@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router"
 import { Fragment, useEffect } from "react"
 import type { ReactNode } from "react"
 
+import { useChatPanel } from "@/chat/ask.ts"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
@@ -15,7 +16,8 @@ import { groups, stateOf } from "@/machines/state.ts"
 const REFRESH_EVERY_MS = 10_000
 
 export const Route = createFileRoute("/")({
-  loader: () => getMachines(),
+  // If the server of the app itself is away for a moment, the page says so and keeps trying.
+  loader: () => getMachines().catch((error: unknown) => ({ list: null, error: String(error) })),
   component: Home,
   pendingComponent: Loading,
 })
@@ -23,6 +25,7 @@ export const Route = createFileRoute("/")({
 function Home() {
   const answer = Route.useLoaderData()
   const router = useRouter()
+  const { ask } = useChatPanel()
   useEffect(() => {
     const timer = setInterval(() => void router.invalidate(), REFRESH_EVERY_MS)
     return () => clearInterval(timer)
@@ -84,7 +87,7 @@ function Home() {
                   {members.map(({ machine, state }, index) => (
                     <Fragment key={machine.machine}>
                       {index > 0 && <ItemSeparator className="my-0" />}
-                      <MachineRow machine={machine} state={state} asOf={asOf} />
+                      <MachineRow machine={machine} state={state} asOf={asOf} onAsk={ask} />
                     </Fragment>
                   ))}
                 </ItemGroup>

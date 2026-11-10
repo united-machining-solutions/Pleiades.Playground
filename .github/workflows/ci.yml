@@ -127,6 +127,8 @@ jobs:
           # The document must link a stylesheet that the server actually has.
           stylesheet=$(curl -fsS http://localhost:5600/ | grep -o '/assets/[^"]*\.css' | head -n 1)
           curl -fsS "http://localhost:5600${stylesheet}" -o /dev/null
+          # The stack starts without a language model, and the chat must say so.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5600/api/harness/sessions)" = 503
       - name: The simulator's values arrive
         run: |
           sleep 30

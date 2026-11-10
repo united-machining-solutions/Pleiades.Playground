@@ -1,19 +1,26 @@
 # playground-app
 
 The example application: a single-page app on [TanStack Start](https://tanstack.com/start). The browser renders
-the app. The server delivers the document, the server routes and the server functions, and will run the agent
+the app. The server delivers the document, the server routes and the server functions, and runs the agent
 harness.
 
-Home asks "what needs you?": it lists the machines of the demo stack, first those in alarm, stopped or without
-data, then those in setup, then the running ones, and reads them again every ten seconds. The values come from
-[`genui-mcp`](../genui-mcp/README.md); the app draws them itself. Cards and chat follow.
+- **Home** asks "what needs you?": it lists the machines of the demo stack, first those in alarm, stopped or
+  without data, then those in setup, then the running ones, and reads them again every ten seconds.
+- **Chat** is the panel on the right, with "New chat" and the chats so far. It opens from the button in the
+  header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
+  language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
+  of a tool call itself, with the same parts as Home. Whether the panel is open, and with which chat, is in the
+  URL (`?chat=`). Everything about the chat is in that panel: the pages on the left stay the same without it.
+
+The values always come from `genui-mcp`. Without a language model the chat says which settings are missing;
+everything else works.
 
 | | |
 |---|---|
 | In the demo stack | <http://localhost:5600/>, port from `APP_PORT` |
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app` |
-| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend |
+| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` for the chat: any OpenAI-compatible endpoint (chat completions). The key stays on the server. |
 
 ## Develop
 
@@ -28,12 +35,16 @@ the backend of the running demo stack answers.
 
 ## What is where
 
-- `src/routes/`: one file per route. `__root.tsx` is the document and the layout, `index.tsx` is Home,
-  `health.ts` is a server route.
+- `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
+  `index.tsx` is Home, `health.ts` and `api/harness/$.ts` are server routes.
 - `src/routeTree.gen.ts`: written by the build. Commit it, never edit it.
 - `src/machines/`: Home. `get-machines.ts` is the server function that calls the backend as a typed MCP client,
   `state.ts` decides which value of the binding is which state on the screen, `state-symbol.tsx` draws the
   signs.
+- `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
+  with the tools of the backend; chats live in memory and are gone after a restart. `chat-sidebar.tsx` is the
+  panel with the chat on `useChat`, `tool-results.ts` says what the app draws for which tool.
 - `src/components/ui/`: [shadcn/ui](https://ui.shadcn.com) components, added with `shadcn add` and kept as
-  generated. `components.json` holds the settings of the preset `b5JNecjwG`.
+  generated. `components.json` holds the settings of the preset `b5JNecjwG`. The layout follows the block
+  `sidebar-15`: the pages on the left, the chat on the right.
 - `src/styles.css`: the theme of the preset, light only. `src/dataviz.css`: chart and state colours.

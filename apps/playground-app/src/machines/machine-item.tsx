@@ -1,7 +1,8 @@
 import type { Machine } from "@pleiades/genui-mcp"
 
 import { Badge } from "@/components/ui/badge"
-import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item"
+import { Button } from "@/components/ui/button"
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item"
 
 import { clock, duration } from "./format.ts"
 import { openError, openWarning, stateLabel } from "./state.ts"
@@ -79,9 +80,29 @@ function Since({ told, asOf }: { told: Told; asOf: string }) {
   )
 }
 
-/** A machine that needs someone, or is in setup: one row of a list. */
-export function MachineRow({ machine, state, asOf }: { machine: Machine; state: State; asOf: string }) {
+const why: Partial<Record<State, (machine: string) => string>> = {
+  alarm: (machine) => `Why is ${machine} in alarm?`,
+  stopped: (machine) => `Why is ${machine} stopped?`,
+  "no-data": (machine) => `Why does ${machine} send no data?`,
+}
+
+/**
+ * A machine that needs someone, or is in setup: one row of a list. With `onAsk`, a machine that
+ * needs someone offers the question why.
+ */
+export function MachineRow({
+  machine,
+  state,
+  asOf,
+  onAsk,
+}: {
+  machine: Machine
+  state: State
+  asOf: string
+  onAsk?: (question: string) => void
+}) {
   const told = tell(machine, state)
+  const question = why[state]?.(machine.machine)
   return (
     <Item role="listitem">
       {/* As tall as the first line, so the sign sits on it. */}
@@ -95,11 +116,19 @@ export function MachineRow({ machine, state, asOf }: { machine: Machine; state: 
         </ItemTitle>
         <ItemDescription>
           <span className="text-foreground">{told.message}</span>
-          {" · "}
-          {[told.detail, machine.program.value].filter(Boolean).join(" · ")}
+          {[told.detail, machine.program.value]
+            .filter((more) => more && more !== told.message)
+            .map((more) => ` · ${more}`)}
         </ItemDescription>
       </ItemContent>
       <Since told={told} asOf={asOf} />
+      {onAsk && question && (
+        <ItemActions>
+          <Button variant="outline" size="sm" onClick={() => onAsk(question)}>
+            Ask why
+          </Button>
+        </ItemActions>
+      )}
     </Item>
   )
 }
@@ -109,7 +138,8 @@ export function MachineTile({ machine, asOf }: { machine: Machine; asOf: string 
   const told = tell(machine, "running")
   const warned = told.detail !== ""
   return (
-    <Item variant="outline" size="sm" role="listitem">
+    // Tiles of one row are equally tall: keep the content at the top, where the sign is.
+    <Item variant="outline" size="sm" role="listitem" className="items-start">
       <ItemMedia variant="icon" className="h-5">
         <StateSymbol state={warned ? "warning" : "running"} label={warned ? "Warning" : stateLabel.running} />
       </ItemMedia>

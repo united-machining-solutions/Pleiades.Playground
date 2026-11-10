@@ -182,6 +182,10 @@ services:
         condition: service_healthy
     environment:
       GENUI_MCP_URL: http://genui-mcp:8080/mcp
+      # The chat needs a language model; everything else works without one.
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
 
   # One simulator per machine. The serial number is the machine id in every topic.
   simulator-p-04:
