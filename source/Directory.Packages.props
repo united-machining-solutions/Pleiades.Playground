@@ -28,7 +28,7 @@
     <PackageVersion Include="Microsoft.OpenApi" Version="2.12.2" />
   </ItemGroup>
   <ItemGroup Label="Storage">
-    <PackageVersion Include="MongoDB.Bson" Version="3.12.0" />
+    <PackageVersion Include="MongoDB.Bson" Version="3.13.0" />
     <PackageVersion Include="MongoDB.Driver" Version="3.12.0" />
   </ItemGroup>
   <ItemGroup Label="Messaging">
