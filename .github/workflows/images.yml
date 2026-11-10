@@ -1,9 +1,10 @@
 name: Images
 
 # Builds multi-architecture images and pushes them to the GitHub Container Registry.
-# Runs on a version tag (v1.2.3) and on manual start, not on every push: nothing is published by accident.
+# Every push to main publishes the tags `main` and `sha-<commit>`; a version tag (v1.2.3) publishes `1.2.3`.
 on:
   push:
+    branches: [main]
     tags: ["v*.*.*"]
   workflow_dispatch:
 
@@ -48,6 +49,7 @@ jobs:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           tags: |
             type=semver,pattern={{version}}
+            type=ref,event=branch
             type=sha,prefix=sha-
       - name: Version for the assemblies
         id: version

@@ -65,7 +65,8 @@ jobs:
     name: Demo stack starts healthy
     needs: changes
     if: needs.changes.outputs.stack == 'true'
-    runs-on: ubuntu-latest
+    # Pinned: MongoDB 8.0 does not start on the kernel of the newest runner image.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - name: Start the stack
