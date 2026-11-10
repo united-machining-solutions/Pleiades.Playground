@@ -1,0 +1,27 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Events.Api.Test</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Events.Api.Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="ModelContextProtocol" />
+    <PackageReference Include="Moq" />
+    <PackageReference Include="SonarAnalyzer.CSharp">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <ProjectReference Include="..\Pleiades.Playground.Common.Json\Pleiades.Playground.Common.Json.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Notification.DataTransferObjects\Pleiades.Playground.Notification.DataTransferObjects.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Mcp.Testing\Pleiades.Playground.Mcp.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Events.Api\Pleiades.Playground.Events.Api.csproj" />
+  </ItemGroup>
+
+</Project>

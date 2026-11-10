@@ -1,0 +1,30 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+    <!-- net10.0 only, like the package. Nearly everything this suite pins is FRAMEWORK behaviour
+         (the minimal-plaintext body, WriteAsJsonAsync's content type, ResultStatusCodes, the
+         empty-report aggregation rule), so it runs on the one framework the package targets. -->
+    <AssemblyName>Pleiades.Playground.HealthChecks.AspNetCore.Test</AssemblyName>
+    <RootNamespace>Pleiades.Playground.HealthChecks.AspNetCore.Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.HealthChecks.AspNetCore\Pleiades.Playground.HealthChecks.AspNetCore.csproj" />
+  </ItemGroup>
+
+
+</Project>

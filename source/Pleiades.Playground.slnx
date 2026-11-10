@@ -1,0 +1,66 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="../global.json" />
+    <File Path="../README.md" />
+    <File Path=".editorconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="NuGet.Config" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="Pleiades.Playground.Common.AspNetCore/Pleiades.Playground.Common.AspNetCore.csproj" />
+    <Project Path="Pleiades.Playground.Common.AspNetCore.Test/Pleiades.Playground.Common.AspNetCore.Test.csproj" />
+    <Project Path="Pleiades.Playground.Common.Authorization/Pleiades.Playground.Common.Authorization.csproj" />
+    <Project Path="Pleiades.Playground.Common.Authorization.Test/Pleiades.Playground.Common.Authorization.Test.csproj" />
+    <Project Path="Pleiades.Playground.Common.DataTransferObjects/Pleiades.Playground.Common.DataTransferObjects.csproj" />
+    <Project Path="Pleiades.Playground.Common.Exceptions/Pleiades.Playground.Common.Exceptions.csproj" />
+    <Project Path="Pleiades.Playground.Common.Json/Pleiades.Playground.Common.Json.csproj" />
+    <Project Path="Pleiades.Playground.Common.Json.Test/Pleiades.Playground.Common.Json.Test.csproj" />
+    <Project Path="Pleiades.Playground.Common.Logging/Pleiades.Playground.Common.Logging.csproj" />
+    <Project Path="Pleiades.Playground.Common.Logging.AspNetCore/Pleiades.Playground.Common.Logging.AspNetCore.csproj" />
+    <Project Path="Pleiades.Playground.Common.Logging.Configuration/Pleiades.Playground.Common.Logging.Configuration.csproj" />
+    <Project Path="Pleiades.Playground.Common.Logging.Loki/Pleiades.Playground.Common.Logging.Loki.csproj" />
+    <Project Path="Pleiades.Playground.Common.Pagination/Pleiades.Playground.Common.Pagination.csproj" />
+    <Project Path="Pleiades.Playground.Common.RestApi/Pleiades.Playground.Common.RestApi.csproj" />
+    <Project Path="Pleiades.Playground.Common.RestApi.Test/Pleiades.Playground.Common.RestApi.Test.csproj" />
+    <Project Path="Pleiades.Playground.HealthChecks.AspNetCore/Pleiades.Playground.HealthChecks.AspNetCore.csproj" />
+    <Project Path="Pleiades.Playground.HealthChecks.AspNetCore.Test/Pleiades.Playground.HealthChecks.AspNetCore.Test.csproj" />
+    <Project Path="Pleiades.Playground.HealthChecks.MongoDb/Pleiades.Playground.HealthChecks.MongoDb.csproj" />
+    <Project Path="Pleiades.Playground.HealthChecks.MongoDb.Test/Pleiades.Playground.HealthChecks.MongoDb.Test.csproj" />
+    <Project Path="Pleiades.Playground.HealthChecks.Mqtt/Pleiades.Playground.HealthChecks.Mqtt.csproj" />
+    <Project Path="Pleiades.Playground.HealthChecks.Mqtt.Test/Pleiades.Playground.HealthChecks.Mqtt.Test.csproj" />
+    <Project Path="Pleiades.Playground.Mqtt.Extensions/Pleiades.Playground.Mqtt.Extensions.csproj" />
+  </Folder>
+  <Folder Name="/Mcp/">
+    <Project Path="Pleiades.Playground.Mcp.Discovery/Pleiades.Playground.Mcp.Discovery.csproj" />
+    <Project Path="Pleiades.Playground.Mcp.Discovery.Test/Pleiades.Playground.Mcp.Discovery.Test.csproj" />
+    <Project Path="Pleiades.Playground.Mcp.Server/Pleiades.Playground.Mcp.Server.csproj" />
+    <Project Path="Pleiades.Playground.Mcp.Server.Test/Pleiades.Playground.Mcp.Server.Test.csproj" />
+    <Project Path="Pleiades.Playground.Mcp.Testing/Pleiades.Playground.Mcp.Testing.csproj" />
+  </Folder>
+  <Folder Name="/Timeseries/">
+    <Project Path="Pleiades.Playground.Timeseries.Api/Pleiades.Playground.Timeseries.Api.csproj" />
+    <Project Path="Pleiades.Playground.Timeseries.Api.Client/Pleiades.Playground.Timeseries.Api.Client.csproj" />
+    <Project Path="Pleiades.Playground.Timeseries.Api.Client.Test/Pleiades.Playground.Timeseries.Api.Client.Test.csproj" />
+    <Project Path="Pleiades.Playground.Timeseries.Api.Test/Pleiades.Playground.Timeseries.Api.Test.csproj" />
+    <Project Path="Pleiades.Playground.Timeseries.Common/Pleiades.Playground.Timeseries.Common.csproj" />
+    <Project Path="Pleiades.Playground.Timeseries.DataTransferObjects/Pleiades.Playground.Timeseries.DataTransferObjects.csproj" />
+    <Project Path="Pleiades.Playground.Timeseries.Generators/Pleiades.Playground.Timeseries.Generators.csproj" />
+    <Project Path="Pleiades.Playground.Timeseries.Persistence/Pleiades.Playground.Timeseries.Persistence.csproj" />
+    <Project Path="Pleiades.Playground.Timeseries.Persistence.Test/Pleiades.Playground.Timeseries.Persistence.Test.csproj" />
+  </Folder>
+  <Folder Name="/Events/">
+    <Project Path="Pleiades.Playground.Events.Api/Pleiades.Playground.Events.Api.csproj" />
+    <Project Path="Pleiades.Playground.Events.Api.Client/Pleiades.Playground.Events.Api.Client.csproj" />
+    <Project Path="Pleiades.Playground.Events.Api.Client.Test/Pleiades.Playground.Events.Api.Client.Test.csproj" />
+    <Project Path="Pleiades.Playground.Events.Api.Test/Pleiades.Playground.Events.Api.Test.csproj" />
+    <Project Path="Pleiades.Playground.Events.DataTransferObjects/Pleiades.Playground.Events.DataTransferObjects.csproj" />
+    <Project Path="Pleiades.Playground.Events.Generators/Pleiades.Playground.Events.Generators.csproj" />
+    <Project Path="Pleiades.Playground.Events.Persistence/Pleiades.Playground.Events.Persistence.csproj" />
+    <Project Path="Pleiades.Playground.Events.Persistence.Test/Pleiades.Playground.Events.Persistence.Test.csproj" />
+    <Project Path="Pleiades.Playground.Notification.DataTransferObjects/Pleiades.Playground.Notification.DataTransferObjects.csproj" />
+  </Folder>
+  <Folder Name="/Simulator/">
+    <Project Path="Pleiades.Playground.Simulator/Pleiades.Playground.Simulator.csproj" />
+  </Folder>
+</Solution>

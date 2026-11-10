@@ -1,0 +1,27 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Pleiades.Playground.Mcp.Server.Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.AspNetCore\Pleiades.Playground.Common.AspNetCore.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\skill.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Mcp.Server\Pleiades.Playground.Mcp.Server.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Mcp.Testing\Pleiades.Playground.Mcp.Testing.csproj" />
+  </ItemGroup>
+
+</Project>

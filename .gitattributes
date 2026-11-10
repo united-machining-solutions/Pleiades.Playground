@@ -1,0 +1,6 @@
+# Containers are Linux: keep LF everywhere so scripts and configs never carry CR into an image.
+* text=auto eol=lf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
+*.pdf binary

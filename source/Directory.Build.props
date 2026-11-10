@@ -1,0 +1,23 @@
+<Project>
+  <!-- One build configuration for every project under source/. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AnalysisMode>All</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <SignAssembly>false</SignAssembly>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <PropertyGroup>
+    <Version Condition=" '$(ProjectVersion)' != '' ">$(ProjectVersion)</Version>
+    <Version Condition=" '$(ProjectVersion)' == '' ">0.0.1</Version>
+    <Authors>Pleiades contributors</Authors>
+    <Company>Pleiades contributors</Company>
+    <Product>Pleiades Playground</Product>
+    <Copyright>Copyright © Pleiades contributors</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+</Project>

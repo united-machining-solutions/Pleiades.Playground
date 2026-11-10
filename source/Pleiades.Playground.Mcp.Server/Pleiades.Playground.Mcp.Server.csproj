@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Mcp.Server</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Mcp.Server</RootNamespace>
+    <Description>Hosting standard for Pleiades MCP servers on ASP.NET Core: one call registers the server with a derived version, an explicit session mode, authorization filters, the spec-native instructions (incl. the link to the service's OpenAPI document) and the Pleiades discovery surface (`{prefix}_describe_server`, `{prefix}_get_skill_guide`, `{prefix}://skill`, `GET /skill`) with a tool list derived from the registered tools.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Mcp.Discovery\Pleiades.Playground.Mcp.Discovery.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pleiades.Playground.Mcp.Server.Test" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,178 @@
+# Pleiades Playground demo stack.
+#
+#   simulator ──MQTT──▶ broker ──▶ timeseries-persistence ──REST──▶ timeseries-api ──▶ mongodb
+#                          └─────▶ events-persistence ─────REST──▶ events-api ──────▶ mongodb
+#
+# Start:  docker compose up -d --build
+# Every numeric value on the broker is in its coherent SI unit (contracts/mqtt).
+name: pleiades-playground
+
+x-service: &service
+  restart: unless-stopped
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+x-build: &build
+  context: ./source
+  args:
+    VERSION: ${PLEIADES_VERSION:-0.0.1}
+
+# The services require a Loki sink in their configuration; the demo disables it.
+x-logging-env: &logging-env
+  Config__Loki__Sinks__0__Name: demo
+  Config__Loki__Sinks__0__Enabled: "false"
+  Config__Loki__Sinks__0__Uri: http://localhost:3100
+
+x-simulator: &simulator
+  <<: *service
+  image: ghcr.io/united-machining-solutions/pleiades.playground.simulator:${PLEIADES_VERSION:-dev}
+  build:
+    <<: *build
+    dockerfile: Pleiades.Playground.Simulator/Dockerfile
+  depends_on:
+    broker:
+      condition: service_healthy
+    timeseries-persistence:
+      condition: service_started
+    events-persistence:
+      condition: service_started
+
+services:
+  broker:
+    image: eclipse-mosquitto:${MOSQUITTO_VERSION:-2}
+    restart: unless-stopped
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+      - "${MQTT_WS_PORT:-9001}:9001"
+    volumes:
+      - ./stacks/broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/version", "-C", "1", "-W", "3"]
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mongodb:
+    image: mongo:${MONGODB_VERSION:-8.0}
+    restart: unless-stopped
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      # Time-series collections need a writable primary: initiate the single-node replica set on the
+      # first pass and report healthy once it is primary.
+      test: >-
+        HOME=/tmp mongosh --quiet --eval "try { if (!db.hello().isWritablePrimary) throw new Error('not primary') }
+        catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb:27017'}]}); throw e }"
+      start_period: 15s
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  timeseries-api:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.timeseries.api:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Timeseries.Api/Dockerfile
+    ports:
+      - "${TIMESERIES_API_PORT:-5500}:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      <<: *logging-env
+      Config__MongoTimeseries__ConnectionString: mongodb://mongodb:27017/?replicaSet=rs0
+      Config__MongoTimeseries__DatabaseName: Timeseries
+      Config__MongoTimeseries__DataRetentionPeriod: ${DATA_RETENTION:-30.00:00:00}
+      # Authorization is implemented and switched off for the demo.
+      Config__Auth__Enabled: "false"
+
+  timeseries-persistence:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.timeseries.persistence:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Timeseries.Persistence/Dockerfile
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-api:
+        condition: service_healthy
+    environment:
+      <<: *logging-env
+      Config__MqttSource__ConnectionString: mqtt://broker:1883
+      Config__MqttSource__User: ""
+      Config__MqttSource__Password: ""
+      Config__MqttSource__ClientId: timeseries-persistence
+      Config__Topics__0: machines/+/umati/#
+      Config__Topics__1: machines/+/vendor/#
+      Config__CachingTime: "00:00:05"
+      Config__TimeseriesApi__Uri: http://timeseries-api:8080
+
+  events-api:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.events.api:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Events.Api/Dockerfile
+    ports:
+      - "${EVENTS_API_PORT:-5510}:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      <<: *logging-env
+      Config__MongoDb__ConnectionString: mongodb://mongodb:27017/?replicaSet=rs0
+      Config__MongoDb__DatabaseName: Events
+      Config__MongoDb__DataRetentionPeriod: ${DATA_RETENTION:-30.00:00:00}
+      Config__Auth__Enabled: "false"
+
+  events-persistence:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.events.persistence:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Events.Persistence/Dockerfile
+    depends_on:
+      broker:
+        condition: service_healthy
+      events-api:
+        condition: service_healthy
+    environment:
+      <<: *logging-env
+      Config__MqttSource__ConnectionString: mqtt://broker:1883
+      Config__MqttSource__User: ""
+      Config__MqttSource__Password: ""
+      Config__MqttSource__ClientId: events-persistence
+      Config__Topics__0: machines/+/events/#
+      Config__EventsApi__Uri: http://events-api:8080
+
+  # One simulator per machine. The serial number is the machine id in every topic.
+  simulator-p-04:
+    <<: *simulator
+    environment:
+      <<: *logging-env
+      Config__SerialNumber: P-04
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: simulator-p-04
+
+  simulator-p-07:
+    <<: *simulator
+    environment:
+      <<: *logging-env
+      Config__SerialNumber: P-07
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: simulator-p-07
+
+  simulator-m-02:
+    <<: *simulator
+    environment:
+      <<: *logging-env
+      Config__SerialNumber: M-02
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: simulator-m-02
+
+volumes:
+  mongodb_data:

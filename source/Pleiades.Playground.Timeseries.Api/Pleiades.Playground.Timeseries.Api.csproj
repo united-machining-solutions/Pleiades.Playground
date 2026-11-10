@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Pleiades.Playground.Timeseries.Api</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Timeseries.Api</RootNamespace>
+    <UserSecretsId>d0025f67-34ff-44af-bec9-8a8c5aa77e4b</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <ProjectReference Include="..\Pleiades.Playground.Common.AspNetCore\Pleiades.Playground.Common.AspNetCore.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Json\Pleiades.Playground.Common.Json.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging\Pleiades.Playground.Common.Logging.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Pagination\Pleiades.Playground.Common.Pagination.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging.AspNetCore\Pleiades.Playground.Common.Logging.AspNetCore.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging.Configuration\Pleiades.Playground.Common.Logging.Configuration.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging.Loki\Pleiades.Playground.Common.Logging.Loki.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Authorization\Pleiades.Playground.Common.Authorization.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.DataTransferObjects\Pleiades.Playground.Common.DataTransferObjects.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.HealthChecks.AspNetCore\Pleiades.Playground.HealthChecks.AspNetCore.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Mcp.Server\Pleiades.Playground.Mcp.Server.csproj" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\skill.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="$(AssemblyName).Test" />
+    <InternalsVisibleTo Include="$(AssemblyName).Client.Test" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Timeseries.Common\Pleiades.Playground.Timeseries.Common.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Timeseries.DataTransferObjects\Pleiades.Playground.Timeseries.DataTransferObjects.csproj" />
+  </ItemGroup>
+</Project>

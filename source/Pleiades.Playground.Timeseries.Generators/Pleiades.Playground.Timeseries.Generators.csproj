@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Timeseries.Generators</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Timeseries.Generators</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Mqtt.Extensions\Pleiades.Playground.Mqtt.Extensions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Timeseries.DataTransferObjects\Pleiades.Playground.Timeseries.DataTransferObjects.csproj" />
+  </ItemGroup>
+</Project>

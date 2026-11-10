@@ -1,0 +1,39 @@
+# Secrets and local configuration: commit .env.example, never .env
+.env
+*.env.local
+secrets/
+*.key
+*.pem
+
+# .NET
+[Bb]in/
+[Oo]bj/
+TestResults/
+*.user
+*.suo
+.vs/
+*.trx
+coverage*.xml
+.build.log
+.test.log
+
+# Node
+node_modules/
+dist/
+.turbo/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Editors and OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+
+# Manuals that must not be published
+demo/manuals/private/
+artifacts/

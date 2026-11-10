@@ -1,0 +1,3 @@
+[*.cs]
+# S4005: Use System.Uri instead of string - relative URIs with IHttpClientFactory make this a false positive
+dotnet_diagnostic.S4005.severity = none

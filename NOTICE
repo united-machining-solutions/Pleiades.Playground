@@ -1,0 +1,14 @@
+Pleiades Playground
+Copyright the Pleiades contributors
+
+This product includes software contributed by United Machining Solutions.
+
+Source code and contracts are licensed under the Apache License, Version 2.0 (see LICENSE).
+Documentation and demo content are licensed under CC BY 4.0 (see LICENSE-docs).
+
+The data model referenced under contracts/datamodel is a separate project of the umati community and is
+not covered by the licences of this repository. Its descriptions originate from OPC UA Companion
+Specifications; copyright remains with their owners.
+
+Third-party container images referenced by compose.yaml (MQTT broker, database) are distributed under
+their own licences and are not part of this repository.

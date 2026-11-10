@@ -1,0 +1,29 @@
+name: Contract change
+description: Propose a change to an agreed interface under contracts/
+labels: [contract]
+body:
+  - type: dropdown
+    id: contract
+    attributes:
+      label: Contract
+      options:
+        - MQTT binding (topics, envelope, units)
+        - REST (OpenAPI)
+        - MCP tools and cards
+        - Data model pin
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: Proposed change
+      description: What changes on the wire, with an example before and after.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Who is affected
+      description: Which adapters, services or applications must change, and is it breaking.
+    validations:
+      required: true

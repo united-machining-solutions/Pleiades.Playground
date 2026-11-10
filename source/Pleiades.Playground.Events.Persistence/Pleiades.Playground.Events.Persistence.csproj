@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Events.Persistence</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Events.Persistence</RootNamespace>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging\Pleiades.Playground.Common.Logging.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging.Configuration\Pleiades.Playground.Common.Logging.Configuration.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging.Loki\Pleiades.Playground.Common.Logging.Loki.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <ProjectReference Include="..\Pleiades.Playground.HealthChecks.AspNetCore\Pleiades.Playground.HealthChecks.AspNetCore.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.HealthChecks.Mqtt\Pleiades.Playground.HealthChecks.Mqtt.csproj" />
+    <PackageReference Include="SonarAnalyzer.CSharp">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <ProjectReference Include="..\Pleiades.Playground.Mqtt.Extensions\Pleiades.Playground.Mqtt.Extensions.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Notification.DataTransferObjects\Pleiades.Playground.Notification.DataTransferObjects.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Events.Api.Client\Pleiades.Playground.Events.Api.Client.csproj" />
+  </ItemGroup>
+</Project>

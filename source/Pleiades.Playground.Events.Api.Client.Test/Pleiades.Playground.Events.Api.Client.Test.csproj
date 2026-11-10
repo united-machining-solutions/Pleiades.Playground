@@ -1,0 +1,23 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Events.Api.Client.Test</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Events.Api.Client.Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Moq" />
+    <PackageReference Include="SonarAnalyzer.CSharp">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <ProjectReference Include="..\Pleiades.Playground.Notification.DataTransferObjects\Pleiades.Playground.Notification.DataTransferObjects.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Events.Api.Client\Pleiades.Playground.Events.Api.Client.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Events.Api\Pleiades.Playground.Events.Api.csproj" />
+  </ItemGroup>
+
+</Project>

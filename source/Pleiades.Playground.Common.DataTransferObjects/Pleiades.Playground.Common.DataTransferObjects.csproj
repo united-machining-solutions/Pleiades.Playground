@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+      <AssemblyName>Pleiades.Playground.Common.DataTransferObjects</AssemblyName>
+      <RootNamespace>Pleiades.Playground.Common.DataTransferObjects</RootNamespace>
+      <Description>Pleiades.Playground.Common.DataTransferObjects Data Transfer Objects</Description>
+      <Product>Pleiades Playground - Common</Product>
+  </PropertyGroup>
+
+
+  <ItemGroup>
+    <SonarQubeSetting Include="sonar.coverage.exclusions">
+      <Value>**/*DtoV*.cs</Value>
+    </SonarQubeSetting>
+  </ItemGroup>
+  
+</Project>

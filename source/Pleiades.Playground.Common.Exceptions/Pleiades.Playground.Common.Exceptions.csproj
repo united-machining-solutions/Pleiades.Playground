@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+      <AssemblyName>Pleiades.Playground.Common.Exceptions</AssemblyName>
+      <RootNamespace>Pleiades.Playground.Common.Exceptions</RootNamespace>
+      <Description>Pleiades.Playground.Common.Exceptions Common exceptions stuff</Description>
+  </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="SonarAnalyzer.CSharp">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+</Project>

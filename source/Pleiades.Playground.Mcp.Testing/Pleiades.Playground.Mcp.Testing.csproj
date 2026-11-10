@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Mcp.Testing</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Mcp.Testing</RootNamespace>
+    <Description>Test kit for Pleiades MCP servers: connect an MCP client through any HttpClient (e.g. from WebApplicationFactory) and check the server against the Pleiades conventions — instructions, discovery tools, describe text vs registered tools, tool naming, descriptions, annotations, schemas and the skill resource. Test-framework agnostic: returns the list of violations.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.Core" />
+  </ItemGroup>
+
+</Project>

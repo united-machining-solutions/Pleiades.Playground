@@ -1,0 +1,21 @@
+# EditorConfig for Test Projects
+# ConfigureAwait(false) is not necessary in test code
+# Test method naming convention uses underscores (MethodName_Scenario_ExpectedResult)
+
+[*.cs]
+# CA2007: Do not directly await a Task - disabled for test code
+dotnet_diagnostic.CA2007.severity = none
+
+# CA1707: Identifiers should not contain underscores - disabled for test method naming convention
+dotnet_diagnostic.CA1707.severity = none
+
+# CA1515: Make class internal - disabled because test classes must be public for test discovery
+dotnet_diagnostic.CA1515.severity = none
+
+# The resilience telemetry tests are lifted unchanged from Pleiades.Playground.IT.Network.Api.Test,
+# which suppresses these two for the same reasons:
+# CA2000: Dispose objects before losing scope - irrelevant in a short-lived test process
+dotnet_diagnostic.CA2000.severity = none
+
+# CA2234: Pass System.Uri objects instead of strings - adds clutter to tests
+dotnet_diagnostic.CA2234.severity = none

@@ -1,0 +1,17 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Pleiades.Playground.Mcp.Discovery.Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\sample-skill.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Mcp.Discovery\Pleiades.Playground.Mcp.Discovery.csproj" />
+  </ItemGroup>
+
+</Project>

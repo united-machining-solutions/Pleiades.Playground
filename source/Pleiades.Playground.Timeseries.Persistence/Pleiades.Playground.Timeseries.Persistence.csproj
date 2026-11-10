@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Timeseries.Persistence</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Timeseries.Persistence</RootNamespace>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <UserSecretsId>736da8cc-afac-4b8e-b2fb-864ea8e1bc21</UserSecretsId>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+  </PropertyGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Pleiades.Playground.Timeseries.Persistence.Test" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <ItemGroup>
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging\Pleiades.Playground.Common.Logging.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging.Configuration\Pleiades.Playground.Common.Logging.Configuration.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging.Loki\Pleiades.Playground.Common.Logging.Loki.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <ProjectReference Include="..\Pleiades.Playground.HealthChecks.AspNetCore\Pleiades.Playground.HealthChecks.AspNetCore.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.HealthChecks.Mqtt\Pleiades.Playground.HealthChecks.Mqtt.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Mqtt.Extensions\Pleiades.Playground.Mqtt.Extensions.csproj" />
+  </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Pleiades.Playground.Timeseries.Api.Client\Pleiades.Playground.Timeseries.Api.Client.csproj" />
+      <ProjectReference Include="..\Pleiades.Playground.Timeseries.Common\Pleiades.Playground.Timeseries.Common.csproj" />
+    </ItemGroup>
+
+</Project>

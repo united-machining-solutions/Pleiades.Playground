@@ -1,0 +1,22 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+      <AssemblyName>Pleiades.Playground.Timeseries.Api.Test</AssemblyName>
+      <RootNamespace>Pleiades.Playground.Timeseries.Api.Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <!-- Mock<IMongoDatabase> in the unit tests still needs the driver types; only Testcontainers
+         left with the superseded MongoTimeseriesServiceTest (now ported into the integration stack). -->
+    <PackageReference Include="MongoDB.Driver" />
+    <PackageReference Include="Moq" />
+    <ProjectReference Include="..\Pleiades.Playground.Mcp.Testing\Pleiades.Playground.Mcp.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Timeseries.Api\Pleiades.Playground.Timeseries.Api.csproj" />
+  </ItemGroup>
+
+</Project>

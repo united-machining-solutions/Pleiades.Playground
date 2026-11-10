@@ -1,0 +1,8 @@
+# Who reviews what. The last matching pattern wins.
+# Replace the placeholders with GitHub teams once the maintainers are named (see MAINTAINERS.md).
+
+# *             <team for the repository>
+# /source/      <team for services and libraries>
+# /apps/        <team for applications>
+# /packages/    <team for applications>
+# /contracts/   <one team per partner>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Events.DataTransferObjects</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Events.DataTransferObjects</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Common.DataTransferObjects\Pleiades.Playground.Common.DataTransferObjects.csproj" />
+  </ItemGroup>
+
+</Project>

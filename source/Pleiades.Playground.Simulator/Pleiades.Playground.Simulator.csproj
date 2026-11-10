@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Simulator</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Simulator</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.AspNetCore\Pleiades.Playground.Common.AspNetCore.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging\Pleiades.Playground.Common.Logging.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.HealthChecks.AspNetCore\Pleiades.Playground.HealthChecks.AspNetCore.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.HealthChecks.Mqtt\Pleiades.Playground.HealthChecks.Mqtt.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging.Configuration\Pleiades.Playground.Common.Logging.Configuration.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging.Loki\Pleiades.Playground.Common.Logging.Loki.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Mqtt.Extensions\Pleiades.Playground.Mqtt.Extensions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Timeseries.Common\Pleiades.Playground.Timeseries.Common.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Timeseries.Generators\Pleiades.Playground.Timeseries.Generators.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Events.Generators\Pleiades.Playground.Events.Generators.csproj" />
+  </ItemGroup>
+</Project>

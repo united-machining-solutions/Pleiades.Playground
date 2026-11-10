@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Mcp.Discovery</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Mcp.Discovery</RootNamespace>
+    <Description>Cross-cutting helpers for the discovery surface of Pleiades MCP servers: standardised `*_describe_server` rendering and embedded skill-guide resource loading. Used by every Pleiades MCP server to avoid re-implementing the same `DiscoveryTools.cs` boilerplate.</Description>
+  </PropertyGroup>
+
+</Project>

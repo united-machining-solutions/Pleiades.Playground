@@ -1,0 +1,28 @@
+<Project Sdk="MSTest.Sdk">
+
+    <PropertyGroup>
+        <AssemblyName>Pleiades.Playground.Timeseries.Api.Client.Test</AssemblyName>
+        <RootNamespace>Pleiades.Playground.Timeseries.Api.Client.Test</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+        <PackageReference Include="Moq" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Pleiades.Playground.Timeseries.Api.Client\Pleiades.Playground.Timeseries.Api.Client.csproj" />
+      <ProjectReference Include="..\Pleiades.Playground.Timeseries.Api\Pleiades.Playground.Timeseries.Api.csproj" />
+    </ItemGroup>
+  
+    <ItemGroup>
+        <None Update="appsettings.Test.json">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+  
+  
+
+
+</Project>

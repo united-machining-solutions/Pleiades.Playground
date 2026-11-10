@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Pleiades.Playground.Common.Pagination</RootNamespace>
+    <AssemblyName>Pleiades.Playground.Common.Pagination</AssemblyName>
+  </PropertyGroup>
+
+</Project>

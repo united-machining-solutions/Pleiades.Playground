@@ -1,0 +1,31 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /source
+    schedule:
+      interval: weekly
+    groups:
+      microsoft:
+        patterns: ["Microsoft.*", "System.*"]
+      serilog:
+        patterns: ["Serilog*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directories:
+      - /source/Pleiades.Playground.Timeseries.Api
+      - /source/Pleiades.Playground.Timeseries.Persistence
+      - /source/Pleiades.Playground.Events.Api
+      - /source/Pleiades.Playground.Events.Persistence
+      - /source/Pleiades.Playground.Simulator
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
