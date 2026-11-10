@@ -71,7 +71,9 @@ jobs:
           build-args: VERSION=${{ steps.version.outputs.value }}
           sbom: true
           provenance: mode=max
+      # GitHub stores attestations for public repositories only (private ones need an enterprise plan).
       - uses: actions/attest-build-provenance@v2
+        if: ${{ !github.event.repository.private }}
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
