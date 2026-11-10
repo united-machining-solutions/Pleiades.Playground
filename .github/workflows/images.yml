@@ -57,7 +57,7 @@ jobs:
           else
             echo "value=0.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           fi
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         id: push
         with:
           context: source
