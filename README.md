@@ -68,7 +68,7 @@ dotnet test --solution Pleiades.Playground.slnx
 ```
 
 The solution needs the .NET 10 SDK and nuget.org, nothing else. TypeScript packages use pnpm workspaces
-(`pnpm-workspace.yaml`).
+(`pnpm-workspace.yaml`). Every tool and how to check it: [development setup](docs/development-setup.md).
 
 ## Units
 
@@ -79,6 +79,7 @@ unit `one` (1.0 = 100 %). Displays convert, the wire does not. See
 ## Contributing, security, licence
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): pull requests, sign-off (DCO), checks.
+- [Working with Claude](docs/working-with-claude.md): how to change this repository with a coding agent.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability.
 - Code and contracts: [Apache-2.0](LICENSE). Documentation and demo content: [CC BY 4.0](LICENSE-docs).
 - The data model referenced in `contracts/datamodel` is a separate project with its own licence.

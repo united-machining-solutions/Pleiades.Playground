@@ -35,6 +35,8 @@ There is no contributor licence agreement.
 
 ## Checks before a pull request
 
+The tools you need are listed in the [development setup](docs/development-setup.md).
+
 ```bash
 cd source
 dotnet build Pleiades.Playground.slnx -c Release
@@ -43,6 +45,12 @@ dotnet test --solution Pleiades.Playground.slnx -c Release
 
 For changes to the stack: `docker compose up -d --build` and check that every container reports healthy.
 The same checks run in CI on every pull request.
+
+## Working with a coding agent
+
+Agents are welcome. You stay responsible for the change: you sign off the commits and you review the diff before
+you ask a person. See [Working with Claude](docs/working-with-claude.md); the rules for agents are in
+[AGENTS.md](AGENTS.md).
 
 ## Adding a service
 
