@@ -46,6 +46,10 @@ jobs:
               - '.github/workflows/ci.yml'
             stack:
               - 'source/**'
+              - 'apps/**'
+              - 'packages/**'
+              - 'pnpm-lock.yaml'
+              - '.dockerignore'
               - 'stacks/**'
               - 'compose.yaml'
               - '.env.example'
@@ -111,6 +115,12 @@ jobs:
           curl -fsS http://localhost:5510/health
           curl -fsS http://localhost:5500/openapi/v1.json -o /dev/null
           curl -fsS http://localhost:5510/openapi/v1.json -o /dev/null
+      - name: The app answers
+        run: |
+          curl -fsS http://localhost:5600/health
+          # The document must link a stylesheet that the server actually has.
+          stylesheet=$(curl -fsS http://localhost:5600/ | grep -o '/assets/[^"]*\.css' | head -n 1)
+          curl -fsS "http://localhost:5600${stylesheet}" -o /dev/null
       - name: The simulator's values arrive
         run: |
           sleep 30

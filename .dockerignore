@@ -1,0 +1,13 @@
+# Build context of the TypeScript images (docker build -f apps/<name>/Dockerfile .): the workspace
+# and nothing else. The .NET images use source/ as their context and are not affected.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!apps
+!packages
+**/node_modules
+**/.output
+**/.tanstack
+**/dist

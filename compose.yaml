@@ -149,6 +149,16 @@ services:
       Config__Topics__0: machines/+/events/#
       Config__EventsApi__Uri: http://events-api:8080
 
+  # The example application. A TypeScript image: its build context is the repository root.
+  playground-app:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.app:${PLEIADES_VERSION:-dev}
+    build:
+      context: .
+      dockerfile: apps/playground-app/Dockerfile
+    ports:
+      - "${APP_PORT:-5600}:8080"
+
   # One simulator per machine. The serial number is the machine id in every topic.
   simulator-p-04:
     <<: *simulator

@@ -27,6 +27,7 @@ updates:
       - /source/Pleiades.Playground.Events.Api
       - /source/Pleiades.Playground.Events.Persistence
       - /source/Pleiades.Playground.Simulator
+      - /apps/playground-app
     schedule:
       interval: weekly
 

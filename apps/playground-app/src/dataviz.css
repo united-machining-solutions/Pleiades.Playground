@@ -1,0 +1,102 @@
+/*
+ * Chart and state colours, one layer on top of the shadcn preset. Light theme only.
+ *
+ * Source: IBM Carbon, "Data visualization: color palettes", light theme
+ * (https://www.carbondesignsystem.com/data-visualization/color-palettes/). Edge, ink and grey tones come
+ * from Carbon's base palette. Contrast against white in brackets, WCAG formula.
+ *
+ * Rules:
+ * - Categories take these colours in this order, never cyclically. More than 14 series: group the rest
+ *   as "Other" or use small multiples, never new colours.
+ * - A single series is Cyan 50.
+ * - States have their own tokens: never a state from --chart-*, never a series from --state-*.
+ * - An alarm band is hatched as well. Red 60 and Green 60 are equally light (1.00:1), so with red-green
+ *   colour blindness "running" and "alarm" would look the same.
+ * - Never colour alone: a badge carries a symbol and a word, a band a colour and a pattern or an edge.
+ * - Close to IEC 60204-1 / IEC 60073: red is danger or fault, yellow abnormal, green normal, blue "action
+ *   required", white and grey neutral; there is no orange. So a stop without an alarm is yellow and setup
+ *   is neutral. A stop and a warning share the colour and differ in shape: a stop is a whole band with an
+ *   edge, a warning only a symbol on the running band. Blue stays free for "operator needed".
+ *
+ * Which value of the binding (MachineryItemState, MachineryOperationMode) is which state is up to the app.
+ *
+ * A chart on a canvas cannot read CSS gradients: read the colours with getComputedStyle and build the
+ * patterns as CanvasPattern from --state-alarm and --state-alarm-stripe.
+ */
+
+:root {
+  /* Categories: Carbon categorical, light theme, in this order */
+  --chart-1: #6929c4;   /* Purple 70  (7.74:1) */
+  --chart-2: #1192e8;   /* Cyan 50    (3.33:1) */
+  --chart-3: #005d5d;   /* Teal 70    (7.71:1) */
+  --chart-4: #9f1853;   /* Magenta 70 (7.69:1) */
+  --chart-5: #fa4d56;   /* Red 50     (3.35:1) */
+  --chart-6: #570408;   /* Red 90     (14.73:1) */
+  --chart-7: #198038;   /* Green 60   (5.02:1) */
+  --chart-8: #002d9c;   /* Blue 80    (11.32:1) */
+  --chart-9: #ee538b;   /* Magenta 50 (3.36:1) */
+  --chart-10: #b28600;  /* Yellow 50  (3.33:1) */
+  --chart-11: #009d9a;  /* Teal 50    (3.34:1) */
+  --chart-12: #012749;  /* Cyan 90    (15.13:1) */
+  --chart-13: #8a3800;  /* Orange 70  (7.94:1) */
+  --chart-14: #a56eff;  /* Purple 50  (3.35:1) */
+
+  /* A single series */
+  --chart-single: #1192e8;  /* Cyan 50 (3.33:1) */
+
+  /* Machine states: fill, edge (where the fill does not reach 3:1), pattern */
+  --state-running: #198038;          /* Green 60, Carbon "normal" (5.02:1) */
+  --state-alarm: #da1e28;            /* Red 60, Carbon "danger" (5.00:1) */
+  --state-alarm-stripe: #f6c7c9;     /* light stripes in the alarm band (white at 75 % over Red 60) */
+  --state-stopped: #f1c21b;          /* Yellow 30, IEC "abnormal" (1.68:1, always with an edge); a whole band */
+  --state-stopped-edge: #8e6a00;     /* Yellow 60 (4.99:1) */
+  --state-warning: #f1c21b;          /* Yellow 30, like a stop; only a symbol on the running band, never a band */
+  --state-warning-edge: #8e6a00;     /* Yellow 60 (4.99:1) */
+  --state-setup: #e0e0e0;            /* Gray 20, neutral (1.32:1, always with an edge); 3.80:1 against "running" */
+  --state-setup-edge: #6f6f6f;       /* Gray 60 (5.02:1) */
+  --state-no-data: #c6c6c6;          /* Gray 30, only as hatching; the pattern tells it from setup */
+  --state-no-data-edge: #8d8d8d;     /* Gray 50 (3.32:1) */
+  --state-ink: #161616;              /* Gray 100: symbol and text on yellow 10.75:1, on Gray 20 13.71:1 */
+
+  --state-alarm-pattern: repeating-linear-gradient(135deg, var(--state-alarm) 0 4px, var(--state-alarm-stripe) 4px 6px);
+  --state-no-data-pattern: repeating-linear-gradient(135deg, var(--state-no-data) 0 3px, #ffffff 3px 6px);
+}
+
+@theme inline {
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
+  --color-chart-9: var(--chart-9);
+  --color-chart-10: var(--chart-10);
+  --color-chart-11: var(--chart-11);
+  --color-chart-12: var(--chart-12);
+  --color-chart-13: var(--chart-13);
+  --color-chart-14: var(--chart-14);
+  --color-chart-single: var(--chart-single);
+
+  --color-state-running: var(--state-running);
+  --color-state-alarm: var(--state-alarm);
+  --color-state-stopped: var(--state-stopped);
+  --color-state-stopped-edge: var(--state-stopped-edge);
+  --color-state-warning: var(--state-warning);
+  --color-state-warning-edge: var(--state-warning-edge);
+  --color-state-setup: var(--state-setup);
+  --color-state-setup-edge: var(--state-setup-edge);
+  --color-state-no-data: var(--state-no-data);
+  --color-state-no-data-edge: var(--state-no-data-edge);
+  --color-state-ink: var(--state-ink);
+}
+
+/* Bands on a time axis (HTML): an alarm is hatched, missing data is hatched with an edge */
+@utility band-alarm {
+  background: var(--state-alarm-pattern);
+}
+@utility band-no-data {
+  background: var(--state-no-data-pattern);
+  box-shadow: inset 0 0 0 1px var(--state-no-data-edge);
+}
