@@ -6,12 +6,17 @@
     "dev": "vite dev --port 3000",
     "build": "vite build",
     "start": "node .output/server/index.mjs",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test": "node --test"
   },
   "dependencies": {
+    "@base-ui/react": "catalog:",
     "@fontsource-variable/roboto": "catalog:",
+    "@tanstack/ai-mcp": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
+    "class-variance-authority": "catalog:",
+    "cn": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "shadcn": "catalog:",
@@ -19,6 +24,7 @@
     "tw-animate-css": "catalog:"
   },
   "devDependencies": {
+    "@pleiades/genui-mcp": "workspace:*",
     "@tailwindcss/vite": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

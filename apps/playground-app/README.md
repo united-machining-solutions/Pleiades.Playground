@@ -1,29 +1,39 @@
 # playground-app
 
 The example application: a single-page app on [TanStack Start](https://tanstack.com/start). The browser renders
-the app. The server delivers the document and the server routes, and will run the agent harness.
+the app. The server delivers the document, the server routes and the server functions, and will run the agent
+harness.
 
-For now it is an empty shell; cards and chat follow.
+Home asks "what needs you?": it lists the machines of the demo stack, first those in alarm, stopped or without
+data, then those in setup, then the running ones, and reads them again every ten seconds. The values come from
+[`genui-mcp`](../genui-mcp/README.md); the app draws them itself. Cards and chat follow.
 
 | | |
 |---|---|
 | In the demo stack | <http://localhost:5600/>, port from `APP_PORT` |
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app` |
+| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend |
 
 ## Develop
 
 ```bash
 pnpm install
 pnpm --filter @pleiades/playground-app dev
+pnpm --filter @pleiades/playground-app test
 ```
 
-The development server listens on <http://localhost:3000/>.
+The development server listens on <http://localhost:3000/> and reads from <http://localhost:5520/mcp>, where
+the backend of the running demo stack answers.
 
 ## What is where
 
-- `src/routes/`: one file per route. `__root.tsx` is the document and the layout, `health.ts` is a server route.
+- `src/routes/`: one file per route. `__root.tsx` is the document and the layout, `index.tsx` is Home,
+  `health.ts` is a server route.
 - `src/routeTree.gen.ts`: written by the build. Commit it, never edit it.
-- `src/styles.css`: the theme of the [shadcn/ui](https://ui.shadcn.com) preset `b5JNecjwG`, light only.
-  `components.json` holds the settings of the preset for `shadcn add`.
-- `src/dataviz.css`: chart and state colours.
+- `src/machines/`: Home. `get-machines.ts` is the server function that calls the backend as a typed MCP client,
+  `state.ts` decides which value of the binding is which state on the screen, `state-symbol.tsx` draws the
+  signs.
+- `src/components/ui/`: [shadcn/ui](https://ui.shadcn.com) components, added with `shadcn add` and kept as
+  generated. `components.json` holds the settings of the preset `b5JNecjwG`.
+- `src/styles.css`: the theme of the preset, light only. `src/dataviz.css`: chart and state colours.

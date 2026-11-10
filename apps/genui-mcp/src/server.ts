@@ -7,6 +7,8 @@ import type { Apis } from "./apis.ts"
 import { description, skillGuide } from "./guide.ts"
 import { listMachines, machineList } from "./machines.ts"
 
+export type { Machine, MachineList, Reading } from "./machines.ts"
+
 // The MCP server and its tools. Nothing here reads the environment: where the two APIs are comes
 // with each request (see main.ts), so an application can import the type of this server.
 

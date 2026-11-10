@@ -177,6 +177,11 @@ services:
       dockerfile: apps/playground-app/Dockerfile
     ports:
       - "${APP_PORT:-5600}:8080"
+    depends_on:
+      genui-mcp:
+        condition: service_healthy
+    environment:
+      GENUI_MCP_URL: http://genui-mcp:8080/mcp
 
   # One simulator per machine. The serial number is the machine id in every topic.
   simulator-p-04:
