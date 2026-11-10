@@ -1,10 +1,9 @@
 name: Images
 
 # Builds multi-architecture images and pushes them to the GitHub Container Registry.
-# On main the tag is the commit, on a version tag (v1.2.3) it is the version.
+# Runs on a version tag (v1.2.3) and on manual start, not on every push: nothing is published by accident.
 on:
   push:
-    branches: [main]
     tags: ["v*.*.*"]
   workflow_dispatch:
 
