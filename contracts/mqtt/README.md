@@ -1,7 +1,7 @@
 # MQTT binding (draft 0.1.0)
 
 How machine data appears on the broker. This is a working draft for the playground. It follows the umati data
-model under [`../datamodel`](../README.md) where that is simple and names every deviation below.
+model referenced in [`../datamodel`](../datamodel/README.md) where that is simple and names every deviation below.
 
 ## Topics
 

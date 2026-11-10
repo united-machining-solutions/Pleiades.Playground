@@ -37,7 +37,7 @@ Four layers, three agreed interfaces. Everything below the solution layer is the
 
 | Agreed interface | Contract | Where |
 |---|---|---|
-| Data | Topics, value envelope and units on the broker | [`contracts/mqtt`](contracts/mqtt/README.md), [`contracts/datamodel`](contracts/README.md) |
+| Data | Topics, value envelope and units on the broker | [`contracts/mqtt`](contracts/mqtt/README.md), [`contracts/datamodel`](contracts/datamodel/README.md) |
 | Interfaces | REST (OpenAPI) and MCP tools | [`contracts/openapi`](contracts/openapi/README.md), [`contracts/mcp`](contracts/mcp/README.md) |
 | Runtime | Every service is a container image | `Dockerfile` next to each service, [`compose.yaml`](compose.yaml) |
 
@@ -81,4 +81,4 @@ unit `one` (1.0 = 100 %). Displays convert, the wire does not. See
 - [CONTRIBUTING.md](CONTRIBUTING.md): pull requests, sign-off (DCO), checks.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability.
 - Code and contracts: [Apache-2.0](LICENSE). Documentation and demo content: [CC BY 4.0](LICENSE-docs).
-- The data model under `contracts/datamodel` is a separate project with its own licence.
+- The data model referenced in `contracts/datamodel` is a separate project with its own licence.
