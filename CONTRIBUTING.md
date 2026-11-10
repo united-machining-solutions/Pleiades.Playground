@@ -41,6 +41,13 @@ dotnet build Pleiades.Playground.slnx -c Release
 dotnet test --solution Pleiades.Playground.slnx -c Release
 ```
 
+For changes under `apps/` or `packages/`:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm typecheck && pnpm test && pnpm build
+```
+
 For changes to the stack: `docker compose up -d --build` and check that every container reports healthy.
 The same checks run in CI on every pull request.
 

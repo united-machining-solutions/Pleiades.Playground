@@ -10,6 +10,11 @@ updates:
       serilog:
         patterns: ["Serilog*"]
 
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

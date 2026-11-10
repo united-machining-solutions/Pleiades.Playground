@@ -1,0 +1,17 @@
+{
+  // Shared by every package under apps/ and packages/. A package adds what only it needs
+  // (jsx, DOM, paths) in its own tsconfig.json that extends this file.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "skipLibCheck": true,
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  }
+}

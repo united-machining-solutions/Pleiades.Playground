@@ -67,8 +67,15 @@ dotnet build Pleiades.Playground.slnx
 dotnet test --solution Pleiades.Playground.slnx
 ```
 
-The solution needs the .NET 10 SDK and nuget.org, nothing else. TypeScript packages use pnpm workspaces
-(`pnpm-workspace.yaml`).
+The solution needs the .NET 10 SDK and nuget.org, nothing else.
+
+```bash
+pnpm install
+pnpm typecheck && pnpm test && pnpm build
+```
+
+The TypeScript workspace (`apps/`, `packages/`) needs Node.js in the version of `.nvmrc`, pnpm in the version of
+`package.json` and npmjs.org, nothing else. Every version is pinned once, in the catalog of `pnpm-workspace.yaml`.
 
 ## Units
 

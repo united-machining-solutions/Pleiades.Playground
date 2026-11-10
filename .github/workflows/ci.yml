@@ -23,6 +23,7 @@ jobs:
       pull-requests: read
     outputs:
       dotnet: ${{ steps.filter.outputs.dotnet }}
+      typescript: ${{ steps.filter.outputs.typescript }}
       stack: ${{ steps.filter.outputs.stack }}
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +34,15 @@ jobs:
             dotnet:
               - 'source/**'
               - 'global.json'
+              - '.github/workflows/ci.yml'
+            typescript:
+              - 'apps/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.base.json'
+              - '.nvmrc'
               - '.github/workflows/ci.yml'
             stack:
               - 'source/**'
@@ -62,6 +72,28 @@ jobs:
       - name: Test
         working-directory: source
         run: dotnet test --solution Pleiades.Playground.slnx -c Release --no-build
+
+  typescript:
+    name: TypeScript build and test
+    needs: changes
+    if: needs.changes.outputs.typescript == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Reads the pnpm version from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Test
+        run: pnpm test
+      - name: Build
+        run: pnpm build
 
   stack:
     name: Demo stack starts healthy
@@ -95,7 +127,7 @@ jobs:
   ci:
     name: CI result
     if: always()
-    needs: [dotnet, stack]
+    needs: [dotnet, typescript, stack]
     runs-on: ubuntu-latest
     steps:
       - name: Fail if a job failed

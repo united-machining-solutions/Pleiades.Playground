@@ -1,3 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Every version is pinned here, once, like Directory.Packages.props under source/.
+# A package.json refers to an entry with "catalog:".
+catalog: {}

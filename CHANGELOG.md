@@ -12,3 +12,5 @@ All notable changes are documented here. The format follows
 - Simulator for values, states and notifications of several machines.
 - Shared libraries for logging, JSON, authorization, health checks, MQTT and the MCP server standard.
 - Demo stack (`compose.yaml`), contracts and CI.
+- TypeScript workspace for `apps/` and `packages/`: pinned Node.js and pnpm, one version catalog, a shared
+  TypeScript configuration and a CI job.
