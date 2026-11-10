@@ -10,6 +10,10 @@ the server is the source of truth for tool names and parameters.
 |---|---|---|
 | Timeseries | `http://localhost:5500/mcp` | `timeseries_topics_query`, `timeseries_baseunit_query`, `timeseries_string_query`, `timeseries_boolean_query`, `timeseries_statistics_query` |
 | Events | `http://localhost:5510/mcp` | `events_notification_query`, `events_notification_pairs`, `events_notification_message_stats`, `events_notification_level_distribution`, `events_notification_time_buckets` |
+| Generative UI | `http://localhost:5520/mcp` | `genui_machine_list` |
+
+The generative UI server is not an API of its own: it reads the two servers above over REST and returns what
+a display needs, each value with the topic or notification it comes from.
 
 Example entry for an MCP client:
 

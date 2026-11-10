@@ -5,6 +5,8 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    // Node.js runs TypeScript files directly and wants the .ts in every import.
+    "allowImportingTsExtensions": true,
     "noEmit": true,
     "skipLibCheck": true,
 

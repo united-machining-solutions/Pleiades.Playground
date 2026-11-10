@@ -149,7 +149,26 @@ services:
       Config__Topics__0: machines/+/events/#
       Config__EventsApi__Uri: http://events-api:8080
 
-  # The example application. A TypeScript image: its build context is the repository root.
+  # The generative UI backend: an MCP server that reads both APIs. The TypeScript images are built
+  # from the repository root.
+  genui-mcp:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.genui.mcp:${PLEIADES_VERSION:-dev}
+    build:
+      context: .
+      dockerfile: apps/genui-mcp/Dockerfile
+    ports:
+      - "${GENUI_MCP_PORT:-5520}:8080"
+    depends_on:
+      timeseries-api:
+        condition: service_healthy
+      events-api:
+        condition: service_healthy
+    environment:
+      TIMESERIES_API_URL: http://timeseries-api:8080
+      EVENTS_API_URL: http://events-api:8080
+
+  # The example application.
   playground-app:
     <<: *service
     image: ghcr.io/united-machining-solutions/pleiades.playground.app:${PLEIADES_VERSION:-dev}

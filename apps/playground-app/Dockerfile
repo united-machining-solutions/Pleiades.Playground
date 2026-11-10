@@ -5,7 +5,7 @@ FROM --platform=$BUILDPLATFORM node:26.13-alpine3.24 AS build
 WORKDIR /repo
 COPY . .
 # pnpm in the version that package.json names as "packageManager".
-RUN npm install --global "$(node --print 'require("./package.json").packageManager')" && \
+RUN npm install --global --ignore-scripts "$(node --print 'require("./package.json").packageManager')" && \
     pnpm install --frozen-lockfile && \
     pnpm --filter @pleiades/playground-app build
 

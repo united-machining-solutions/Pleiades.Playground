@@ -14,5 +14,7 @@ All notable changes are documented here. The format follows
 - Demo stack (`compose.yaml`), contracts and CI.
 - TypeScript workspace for `apps/` and `packages/`: pinned Node.js and pnpm, one version catalog, a shared
   TypeScript configuration and a CI job.
+- Generative UI backend `genui-mcp` in the demo stack on port 5520: an MCP server with the tool
+  `genui_machine_list`, which reads the Timeseries and Events APIs.
 - Example application `playground-app` (TanStack Start, shadcn/ui) in the demo stack on port 5600: an empty shell
   with a liveness endpoint.

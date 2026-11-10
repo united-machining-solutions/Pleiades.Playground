@@ -20,6 +20,7 @@ docker compose up -d --build
 | Timeseries API | <http://localhost:5500/> | Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp` |
 | Events API | <http://localhost:5510/> | Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp` |
 | MQTT broker | `localhost:1883` | Anonymous in the demo network |
+| Generative UI backend | <http://localhost:5520/mcp> | MCP server for displays, see [`apps/genui-mcp`](apps/genui-mcp/README.md) |
 | Example app | <http://localhost:5600/> | An empty shell for now, see [`apps/playground-app`](apps/playground-app/README.md) |
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
