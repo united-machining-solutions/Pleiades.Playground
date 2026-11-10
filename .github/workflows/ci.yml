@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # A manual run checks everything, whatever changed.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -42,7 +44,7 @@ jobs:
   dotnet:
     name: .NET build and test
     needs: changes
-    if: needs.changes.outputs.dotnet == 'true'
+    if: needs.changes.outputs.dotnet == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       DOTNET_NOLOGO: "1"
@@ -64,7 +66,7 @@ jobs:
   stack:
     name: Demo stack starts healthy
     needs: changes
-    if: needs.changes.outputs.stack == 'true'
+    if: needs.changes.outputs.stack == 'true' || github.event_name == 'workflow_dispatch'
     # Pinned: MongoDB 8.0 does not start on the kernel of the newest runner image.
     runs-on: ubuntu-22.04
     steps:
