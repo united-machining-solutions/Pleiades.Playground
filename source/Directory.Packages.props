@@ -32,7 +32,7 @@
     <PackageVersion Include="MongoDB.Driver" Version="3.12.0" />
   </ItemGroup>
   <ItemGroup Label="Messaging">
-    <PackageVersion Include="MQTTnet" Version="4.3.7.1207" />
+    <PackageVersion Include="MQTTnet" Version="5.2.0.1603" />
     <PackageVersion Include="MQTTnet.Extensions.ManagedClient" Version="4.3.7.1207" />
     <PackageVersion Include="System.Reactive" Version="7.0.0" />
   </ItemGroup>
