@@ -19,11 +19,32 @@ durations are computed here, never by a language model.
 | `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and the states it went through over the last hours (`hours`, 8 if omitted) as spans without a gap. Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. |
 
+| Resource | What it is |
+|---|---|
+| `genui://skill` | The skill guide, as markdown. |
+| `ui://genui/machine` | The machine card as a file for other hosts, see below. |
+
 Every instant of a result is ISO 8601 in UTC. The two machine tools also take a `timeZone`, an IANA name such
 as `Europe/Zurich`: then every instant is a local time there with its offset, `2026-11-11T09:00:41.000+01:00`.
 So whoever reads the result, a language model included, has nothing to convert.
 
-Cards as `ui://` resources (MCP Apps) follow.
+## The machine card for other hosts
+
+`genui_machine_show` links a card file: its `_meta.ui.resourceUri` names the resource `ui://genui/machine`, an
+[MCP App](https://modelcontextprotocol.io/extensions/apps/overview). A host that shows MCP Apps loads the
+file, puts it next to the answer and sends it the result of the tool. The file checks the result against the
+contract of the card and draws `MachineCard` of [`@pleiades/cards`](../../packages/cards/README.md): the
+component the example application draws itself, with the same theme. So a card is one component in two
+wrappers: an application that imports it, and one HTML file for every other host.
+
+- The file is a single HTML page with its script and its styles inside, about 520 kB and 150 kB compressed.
+  It loads nothing from anywhere, so a host has no origin to allow for it.
+- It shows what the result says and nothing newer: it calls no tool and does not refresh.
+- It is light and has the frame of the card. The font is the one the host names, so the card reads like the
+  conversation around it. Times are written by the clock of the browser.
+
+To see it, add `http://localhost:5520/mcp` to a host that shows MCP Apps and ask for one machine. A host that
+runs somewhere else needs an address it can reach.
 
 ## When a machine is there
 
@@ -55,20 +76,29 @@ same sentence to its log, once per failed request.
 
 ```bash
 pnpm install
+pnpm --filter @pleiades/genui-mcp build   # the card files, to dist/ui
 pnpm --filter @pleiades/genui-mcp dev     # http://localhost:5520/mcp, reads the APIs of the running demo stack
 pnpm --filter @pleiades/genui-mcp test
 ```
 
-There is no build step. Node.js runs the TypeScript files as they are, so every import names its file with
-`.ts`, and the code uses no syntax that needs compiling (enums, namespaces, parameter properties). Node.js
-does that only outside `node_modules`. So the image keeps the layout of the workspace, where
+The server has no build step. Node.js runs the TypeScript files as they are, so every import names its file
+with `.ts`, and the code uses no syntax that needs compiling (enums, namespaces, parameter properties).
+Node.js does that only outside `node_modules`. So the image keeps the layout of the workspace, where
 `@pleiades/cards` is linked and not copied.
+
+Only the card files are built. Vite writes each as one HTML file to `dist/ui`, and the server reads it there
+when a host asks for the resource. Without a build the tools work, and the resource says how to build it.
+What the card files need (React, the bundler) are development dependencies: the image keeps the built
+files and not those.
 
 ## What is where
 
 - `src/main.ts`: reads the settings and serves `/mcp` and `/health`.
-- `src/server.ts`: the MCP server and its tools. An application imports its type and calls it with
-  `createMCPClient<typeof server>`.
+- `src/server.ts`: the MCP server, its tools and its resources. An application imports its type and calls it
+  with `createMCPClient<typeof server>`.
+- `src/card-file.ts`: reads a built card file.
+- `ui/`: the card files, which run in a host and not in Node.js. `machine.tsx` takes the result from the host
+  and draws the machine card, `vite.config.ts` builds it into one HTML file.
 - `src/machines.ts`: what a machine does now. The shape of a machine is a contract of the card catalogue,
   [`@pleiades/cards`](../../packages/cards/README.md), because cards show it.
 - `src/history.ts`: the states of a machine over a stretch of time, as spans. Which values are which state

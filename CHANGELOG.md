@@ -30,6 +30,10 @@ All notable changes are documented here. The format follows
 - `genui-mcp` takes whether a machine is there from its signs of life, the heartbeat included, and lets a
   value hold until the next one of its topic. A machine that publishes its state only on a change is shown
   with that state, not as "No data".
+- `genui-mcp` serves the machine card as an MCP App: `genui_machine_show` links the resource
+  `ui://genui/machine`, one HTML file that draws the result in a host that shows MCP Apps. The example
+  application keeps drawing the card itself. The shadcn theme moves to the card catalogue
+  (`packages/cards/src/theme.css`), so both draw the card with the same theme.
 
 ### Changed
 

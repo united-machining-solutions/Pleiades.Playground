@@ -23,11 +23,16 @@ Nothing is built here. The package is source: an import names the file, for exam
 | Importer | Files | Needs |
 |---|---|---|
 | The backend, in Node.js | `.ts` files only: contracts and rules | `zod` |
-| An application, through its bundler | everything | React, Base UI and the theme of the page |
+| An application, through its bundler | everything | React, Base UI and a theme: `src/theme.css`, or one of its own |
+| A card file of the backend, through its bundler | everything | the same |
 
 Node.js runs the `.ts` files as they are. So they use no syntax that needs compiling, every import names its
 file with `.ts`, and none of them imports a `.tsx` file. The React libraries are optional peer dependencies:
-the application brings them, and the image of the backend stays without them.
+whoever draws a card brings them, and the image of the backend stays without them.
+
+A card is drawn in two places: by an application that imports the component, and by a
+[card file](../../apps/genui-mcp/README.md) of the backend, one HTML page that a host of MCP Apps shows.
+Both import the theme from here, so the card looks the same in both.
 
 ## What is where
 
@@ -42,7 +47,9 @@ the application brings them, and the image of the backend stays without them.
 - `src/ui/`: the [shadcn/ui](https://ui.shadcn.com) components the cards are built from, kept as generated.
   An application imports them from here instead of keeping a second copy.
 - `src/dataviz.css`: chart and state colours. `src/styles.css` is what a page imports: the colours, and the
-  class names of this package for Tailwind. The theme itself (the shadcn tokens) is the page's own.
+  class names of this package for Tailwind.
+- `src/theme.css`: the theme, which is the shadcn tokens of the preset, light only. A page imports it before
+  `styles.css`, or brings a shadcn theme of its own. The font is not part of it.
 
 ## A new card
 
@@ -51,6 +58,8 @@ the application brings them, and the image of the backend stays without them.
    [`contracts/mcp`](../../contracts/mcp/README.md).
 3. Write the component with the inferred type as its properties.
 4. In the application, draw the component where the result of the tool arrives.
+5. For other hosts, add a card file under `apps/genui-mcp/ui/` and to the build there, and link it from the
+   tool.
 
 ```bash
 pnpm --filter @pleiades/cards test

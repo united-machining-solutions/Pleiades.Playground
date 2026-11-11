@@ -1,0 +1,8 @@
+/*
+ * The stylesheet of the card files. Tailwind looks for class names in this folder and, through the
+ * stylesheet of the cards, in the card catalogue. The theme is the one of the catalogue. A card file
+ * has no background and no font of its own: it stands in the conversation of a host.
+ */
+@import "tailwindcss" source(".");
+@import "@pleiades/cards/theme.css";
+@import "@pleiades/cards/styles.css";

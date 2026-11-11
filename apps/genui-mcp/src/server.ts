@@ -5,6 +5,7 @@ import type { MCPToolContext } from "@tanstack/ai-mcp/server"
 import { z } from "zod"
 
 import type { Apis } from "./apis.ts"
+import { CARD_MIME_TYPE, readCardFile } from "./card-file.ts"
 import { description, skillGuide } from "./guide.ts"
 import { HISTORY_HOURS, listMachines, showMachine } from "./machines.ts"
 import { inTimeZoneOf, isTimeZone } from "./time.ts"
@@ -22,6 +23,9 @@ const readOnly = {
 } as const
 
 const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] })
+
+/** The machine card as a file for other hosts. The example application draws the card itself. */
+export const MACHINE_CARD_URI = "ui://genui/machine"
 
 const describeServer = toolDefinition({
   name: "genui_describe_server",
@@ -76,7 +80,8 @@ const machineShowTool = toolDefinition({
     timeZone,
   }),
   outputSchema: machineShow,
-  metadata: { title: "Show machine", annotations: readOnly },
+  // The link to the card: a host that shows MCP Apps loads that resource and draws the result with it.
+  metadata: { title: "Show machine", annotations: readOnly, _meta: { ui: { resourceUri: MACHINE_CARD_URI } } },
 }).server<Context>(async (input, ctx) =>
   inTimeZoneOf(await showMachine(ctx.context.apis, input.machine, input.hours), input.timeZone),
 )
@@ -88,6 +93,9 @@ export const server = createMCPServer({
   resources: [
     resourceDefinition({ uri: "genui://skill", name: "skill", mimeType: "text/markdown" }).read(() => ({
       text: skillGuide,
+    })),
+    resourceDefinition({ uri: MACHINE_CARD_URI, name: "machine-card", mimeType: CARD_MIME_TYPE }).read(async () => ({
+      text: await readCardFile("machine"),
     })),
   ],
 })

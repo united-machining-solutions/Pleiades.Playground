@@ -170,6 +170,9 @@ catalogs:
     '@fontsource-variable/roboto':
       specifier: 5.3.0
       version: 5.3.0
+    '@modelcontextprotocol/ext-apps':
+      specifier: 2.0.4
+      version: 2.0.4
     '@shadcn/react':
       specifier: 0.3.1
       version: 0.3.1
@@ -254,6 +257,9 @@ catalogs:
     vite:
       specifier: 8.3.7
       version: 8.3.7
+    vite-plugin-singlefile:
+      specifier: 2.3.4
+      version: 2.3.4
     zod:
       specifier: 4.6.7
       version: 4.6.7
@@ -261,31 +267,6 @@ catalogs:
 importers:
 
   .: {}
-
-  apps/genui-mcp:
-    dependencies:
-      '@pleiades/cards':
-        specifier: workspace:*
-        version: link:../../packages/cards
-      '@tanstack/ai':
-        specifier: 'catalog:'
-        version: 1.4.0(@opentelemetry/api@1.10.0)(zod@4.6.7)
-      '@tanstack/ai-mcp':
-        specifier: 'catalog:'
-        version: 1.2.0(@opentelemetry/api@1.10.0)(@tanstack/ai-harness@0.3.0(@opentelemetry/api@1.10.0)(@tanstack/ai-persistence@1.0.1(@tanstack/ai@1.4.0(@opentelemetry/api@1.10.0)(zod@4.6.7)))(@tanstack/ai@1.4.0(@opentelemetry/api@1.10.0)(zod@4.6.7)))(zod@4.6.7)
-      srvx:
-        specifier: 'catalog:'
-        version: 1.0.8
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.7
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 26.6.6
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
 
   apps/app:
     dependencies:
@@ -383,6 +364,70 @@ importers:
       vite:
         specifier: 'catalog:'
         version: 8.3.7(@types/node@26.6.6)(jiti@2.7.0)
+
+  apps/genui-mcp:
+    dependencies:
+      '@pleiades/cards':
+        specifier: workspace:*
+        version: link:../../packages/cards
+      '@tanstack/ai':
+        specifier: 'catalog:'
+        version: 1.4.0(@opentelemetry/api@1.10.0)(zod@4.6.7)
+      '@tanstack/ai-mcp':
+        specifier: 'catalog:'
+        version: 1.2.0(@opentelemetry/api@1.10.0)(@tanstack/ai-harness@0.3.0(@opentelemetry/api@1.10.0)(@tanstack/ai-persistence@1.0.1(@tanstack/ai@1.4.0(@opentelemetry/api@1.10.0)(zod@4.6.7)))(@tanstack/ai@1.4.0(@opentelemetry/api@1.10.0)(zod@4.6.7)))(zod@4.6.7)
+      srvx:
+        specifier: 'catalog:'
+        version: 1.0.8
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
+    devDependencies:
+      '@base-ui/react':
+        specifier: 'catalog:'
+        version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@modelcontextprotocol/ext-apps':
+        specifier: 'catalog:'
+        version: 2.0.4(@modelcontextprotocol/client@2.4.0)(@modelcontextprotocol/core@2.4.0)(@modelcontextprotocol/server@2.4.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(zod@4.6.7)
+      '@tailwindcss/vite':
+        specifier: 'catalog:'
+        version: 4.3.5(vite@8.3.7(@types/node@26.6.6)(jiti@2.7.0))
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-react':
+        specifier: 'catalog:'
+        version: 6.3.0(vite@8.3.7(@types/node@26.6.6)(jiti@2.7.0))
+      class-variance-authority:
+        specifier: 'catalog:'
+        version: 0.7.1
+      cn:
+        specifier: 'catalog:'
+        version: 0.5.2
+      react:
+        specifier: 'catalog:'
+        version: 19.3.1
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.3.1(react@19.3.1)
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.3.5
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.7(@types/node@26.6.6)(jiti@2.7.0)
+      vite-plugin-singlefile:
+        specifier: 'catalog:'
+        version: 2.3.4(vite@8.3.7(@types/node@26.6.6)(jiti@2.7.0))
 
   packages/cards:
     dependencies:
@@ -645,6 +690,24 @@ packages:
   '@modelcontextprotocol/core@2.4.0':
     resolution: {integrity: sha512-z8QBKqdfXLPzkLQuG4xp8hrVEMm1PZ1IgxMN2sMbJiFiAKOWXnAzogXn2W4aqIBlP1ea6U5yiqVquvUNM1Cj6Q==}
     engines: {node: '>=20'}
+
+  '@modelcontextprotocol/ext-apps@2.0.4':
+    resolution: {integrity: sha512-B+PcbuGiaf0e5I3uy4iO5tS3Abo+5w8JvZFzHMzQdq9yVwP836zJkw2+KCGOQ0r4TM1fuQi4JdnbuWjkS4aBvg==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@modelcontextprotocol/client': ^2.0.0
+      '@modelcontextprotocol/core': ^2.0.0
+      '@modelcontextprotocol/server': ^2.0.0
+      react: ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^17.0.0 || ^18.0.0 || ^19.0.0
+      zod: ^4.2.0
+    peerDependenciesMeta:
+      '@modelcontextprotocol/server':
+        optional: true
+      react:
+        optional: true
+      react-dom:
+        optional: true
 
   '@modelcontextprotocol/server@2.4.0':
     resolution: {integrity: sha512-rgR9yxSaAJ+bcsi/XroT/S2AfPiIWloXAnrdfYSCms9ivVju0ishu/wW0J21Ho6+ZOR1r7RyeRbjiRuF87ix5Q==}
@@ -2362,6 +2425,16 @@ packages:
     resolution: {integrity: sha512-hVDIBwsRruT73PbK7uP5ebUt+ezEtCmzZz3F59BSr2F6OVFnJ/6h8liuvdLrQ88Xmnk6/+xGGuq+pG9WwTuy3A==}
     engines: {node: ^20.17.0 || >=22.9.0}
 
+  vite-plugin-singlefile@2.3.4:
+    resolution: {integrity: sha512-1FAhlTCL6KJDpSUudrVU+gspapvS+tmKCg70vwNaAU6tyXn3E/C6+NnwQIze06byhBRv7VggZ78K0h+J/Rsdrg==}
+    engines: {node: '>18.0.0'}
+    peerDependencies:
+      rollup: ^4.59.0
+      vite: ^5.4.21 || ^6.0.0 || ^7.0.0 || ^8.0.0
+    peerDependenciesMeta:
+      rollup:
+        optional: true
+
   vite@8.3.7:
     resolution: {integrity: sha512-oxh0dMxrayBr33ScJvvBJ2HBQ2jc1TBrXKR2NyL/MJ9WPuX19mN2DXWUmywKdyw5RFVQBo8hmtb2FMC0LHrnng==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -2749,6 +2822,17 @@ snapshots:
   '@modelcontextprotocol/core@2.4.0':
     dependencies:
       zod: 4.6.7
+
+  '@modelcontextprotocol/ext-apps@2.0.4(@modelcontextprotocol/client@2.4.0)(@modelcontextprotocol/core@2.4.0)(@modelcontextprotocol/server@2.4.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(zod@4.6.7)':
+    dependencies:
+      '@modelcontextprotocol/client': 2.4.0
+      '@modelcontextprotocol/core': 2.4.0
+      '@standard-schema/spec': 1.1.0
+      zod: 4.6.7
+    optionalDependencies:
+      '@modelcontextprotocol/server': 2.4.0
+      react: 19.3.1
+      react-dom: 19.3.1(react@19.3.1)
 
   '@modelcontextprotocol/server@2.4.0':
     dependencies:
@@ -4222,6 +4306,11 @@ snapshots:
   util-deprecate@1.0.2: {}
 
   validate-npm-package-name@7.0.2: {}
+
+  vite-plugin-singlefile@2.3.4(vite@8.3.7(@types/node@26.6.6)(jiti@2.7.0)):
+    dependencies:
+      picomatch: 4.0.7
+      vite: 8.3.7(@types/node@26.6.6)(jiti@2.7.0)
 
   vite@8.3.7(@types/node@26.6.6)(jiti@2.7.0):
     dependencies:

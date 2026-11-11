@@ -1,14 +1,22 @@
 # Build context: the repository root (docker build -f apps/genui-mcp/Dockerfile .).
-# Nothing is compiled: Node.js runs the TypeScript files as they are. The build stage only installs
-# the production dependencies of this server and of the workspace packages it imports. They are
-# plain JavaScript, so one stage serves every target architecture; --platform=$BUILDPLATFORM keeps
-# it native on the build machine.
-FROM --platform=$BUILDPLATFORM node:26.13-alpine3.24 AS build
+# The server is not compiled: Node.js runs its TypeScript files as they are. Only the card files
+# are built, each to one HTML file. Everything here is plain JavaScript and HTML, so the build
+# stages serve every target architecture; --platform=$BUILDPLATFORM keeps them native on the build
+# machine.
+FROM --platform=$BUILDPLATFORM node:26.13-alpine3.24 AS workspace
 WORKDIR /repo
 COPY . .
 # pnpm in the version that package.json names as "packageManager".
-RUN npm install --global --ignore-scripts "$(node --print 'require("./package.json").packageManager')" && \
-    pnpm install --frozen-lockfile --prod --filter "@pleiades/genui-mcp..."
+RUN npm install --global --ignore-scripts "$(node --print 'require("./package.json").packageManager')"
+
+# The card files, built with the development dependencies. The image does not keep those.
+FROM workspace AS cards
+RUN pnpm install --frozen-lockfile --filter "@pleiades/genui-mcp..." && \
+    pnpm --filter @pleiades/genui-mcp build
+
+# The production dependencies of this server and of the workspace packages it imports.
+FROM workspace AS build
+RUN pnpm install --frozen-lockfile --prod --filter "@pleiades/genui-mcp..."
 
 # The Alpine minor is pinned on purpose, as in the images under source/.
 FROM node:26.13-alpine3.24 AS final
@@ -20,6 +28,7 @@ EXPOSE 8080
 COPY --from=build /repo/node_modules node_modules
 COPY --from=build /repo/packages/cards packages/cards
 COPY --from=build /repo/apps/genui-mcp apps/genui-mcp
+COPY --from=cards /repo/apps/genui-mcp/dist apps/genui-mcp/dist
 WORKDIR /app/apps/genui-mcp
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
     CMD wget -qO /dev/null http://127.0.0.1:8080/health || exit 1
