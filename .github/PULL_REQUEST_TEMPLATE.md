@@ -5,6 +5,7 @@
 ## How it was verified
 
 - [ ] `dotnet build` and `dotnet test --solution source/Pleiades.Playground.slnx`
+- [ ] `pnpm typecheck`, `pnpm test` and `pnpm build` (if `apps/` or `packages/` are affected)
 - [ ] `docker compose up -d --build`, all containers healthy (if the stack is affected)
 - [ ] Not verified: <!-- say what and why -->
 

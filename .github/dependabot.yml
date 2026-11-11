@@ -20,6 +20,11 @@ updates:
       - dependency-name: "System.*"
         update-types: ["version-update:semver-major"]
 
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -35,6 +40,8 @@ updates:
       - /source/Pleiades.Playground.Events.Api
       - /source/Pleiades.Playground.Events.Persistence
       - /source/Pleiades.Playground.Simulator
+      - /apps/genui-mcp
+      - /apps/app
     schedule:
       interval: weekly
     # The services target .NET 10. Images of the next .NET version arrive with the move to it.
