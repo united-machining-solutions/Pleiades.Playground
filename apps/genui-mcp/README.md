@@ -29,14 +29,17 @@ pnpm --filter @pleiades/genui-mcp test
 ```
 
 There is no build step. Node.js runs the TypeScript files as they are, so every import names its file with
-`.ts`, and the code uses no syntax that needs compiling (enums, namespaces, parameter properties).
+`.ts`, and the code uses no syntax that needs compiling (enums, namespaces, parameter properties). Node.js
+does that only outside `node_modules`. So the image keeps the layout of the workspace, where
+`@pleiades/cards` is linked and not copied.
 
 ## What is where
 
 - `src/main.ts`: reads the settings and serves `/mcp` and `/health`.
 - `src/server.ts`: the MCP server and its tools. An application imports its type and calls it with
   `createMCPClient<typeof server>`.
-- `src/machines.ts`: what a machine does now, and the shape of that answer.
+- `src/machines.ts`: what a machine does now. The shape of a machine is a contract of the card catalogue,
+  [`@pleiades/cards`](../../packages/cards/README.md), because cards show it.
 - `src/apis.ts`: the two APIs over REST. Every answer is checked against the shape this server relies on.
 - `src/time.ts`: the Timeseries API counts microseconds, the Events API writes ISO 8601; from here on an
   instant is ISO 8601 in UTC.

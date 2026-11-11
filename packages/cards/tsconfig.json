@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // The backend imports the contracts and the state rules, and Node.js runs those files as they
+  // are: it removes the types and nothing else. Only the .tsx files need an application to build them.
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src"]
+}

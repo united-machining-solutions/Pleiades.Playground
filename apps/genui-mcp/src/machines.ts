@@ -1,3 +1,5 @@
+import { SILENT_AFTER_SECONDS, machine } from "@pleiades/cards/machine/contract.ts"
+import type { Machine, Reading } from "@pleiades/cards/machine/contract.ts"
 import { z } from "zod"
 
 import { listTopics, readOpenNotifications, readStrings } from "./apis.ts"
@@ -5,47 +7,12 @@ import type { Apis, OpenNotification, Sample, Series } from "./apis.ts"
 import { secondsBefore } from "./time.ts"
 
 // What every machine does now. Each value names the topic or the notification it comes from.
+// The shape of one machine is a contract of the card catalogue, because cards show it.
 
 /** How far back the values are read to find since when a state has lasted. */
 export const WINDOW_SECONDS = 30 * 60
 /** How far back a machine and its open notifications are still looked for. */
 export const HORIZON_SECONDS = 24 * 60 * 60
-/**
- * A machine publishes its state every few seconds. After a pause longer than this, what the value
- * was in between is not known, so the pause ends a run.
- */
-export const SILENT_AFTER_SECONDS = 30
-
-const reading = z.object({
-  value: z.string().nullable().describe("The newest value, or null if the topic had none."),
-  at: z.iso.datetime().nullable().describe("When the newest value was measured."),
-  since: z.iso.datetime().nullable().describe("Since when the value has been the same."),
-  sinceIsLowerBound: z
-    .boolean()
-    .describe("True if the value was already the same where the window starts, so `since` is only the earliest time known."),
-  topic: z.string().describe("The MQTT topic the value comes from."),
-})
-export type Reading = z.infer<typeof reading>
-
-const notification = z.object({
-  correlationId: z.string(),
-  notificationId: z.string(),
-  level: z.enum(["Warning", "Error"]),
-  title: z.string(),
-  raisedAt: z.iso.datetime(),
-  topic: z.string().describe("The MQTT topic the notification comes from."),
-})
-
-const machine = z.object({
-  machine: z.string().describe("The serial number, which identifies the machine in every topic."),
-  connection: reading,
-  itemState: reading,
-  operationMode: reading,
-  program: reading,
-  lastValueAt: z.iso.datetime().nullable().describe("The newest value of any of the readings."),
-  notifications: z.array(notification).describe("Warnings and errors that have not gone."),
-})
-export type Machine = z.infer<typeof machine>
 
 export const machineList = z.object({
   asOf: z.iso.datetime(),
@@ -74,7 +41,7 @@ function silentBetween(earlier: string, later: string): boolean {
 /**
  * The newest value and the start of the unbroken run of that value. Samples are oldest first and
  * were read from `windowStart` on. A run goes back as far as the value stayed the same without a
- * pause; only a run that reaches the start of the window began before it.
+ * pause (see SILENT_AFTER_SECONDS); only a run that reaches the start of the window began before it.
  */
 export function currentRun(topic: string, samples: ReadonlyArray<Sample>, windowStart: string): Reading {
   const newest = samples.at(-1)

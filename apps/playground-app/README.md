@@ -39,12 +39,14 @@ the backend of the running demo stack answers.
   `index.tsx` is Home, `health.ts` and `api/harness/$.ts` are server routes.
 - `src/routeTree.gen.ts`: written by the build. Commit it, never edit it.
 - `src/machines/`: Home. `get-machines.ts` is the server function that calls the backend as a typed MCP client,
-  `state.ts` decides which value of the binding is which state on the screen, `state-symbol.tsx` draws the
-  signs.
+  `machine-item.tsx` draws a machine as a row or a tile. Which value of the binding is which state, the signs
+  and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend; chats live in memory and are gone after a restart. `chat-sidebar.tsx` is the
   panel with the chat on `useChat`, `tool-results.ts` says what the app draws for which tool.
 - `src/components/ui/`: [shadcn/ui](https://ui.shadcn.com) components, added with `shadcn add` and kept as
   generated. `components.json` holds the settings of the preset `b5JNecjwG`. The layout follows the block
-  `sidebar-15`: the pages on the left, the chat on the right.
-- `src/styles.css`: the theme of the preset, light only. `src/dataviz.css`: chart and state colours.
+  `sidebar-15`: the pages on the left, the chat on the right. `Badge` and `Card` live in `@pleiades/cards`,
+  because the cards are built from them.
+- `src/styles.css`: the theme of the preset, light only. The chart and state colours come with
+  `@pleiades/cards`.

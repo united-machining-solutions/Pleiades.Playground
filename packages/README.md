@@ -2,8 +2,6 @@
 
 TypeScript packages shared by the applications under [`../apps`](../apps/README.md).
 
-Planned:
-
 | Folder | What it is |
 |---|---|
-| `cards/` | The card catalogue: one React component per card. |
+| [`cards/`](cards/README.md) | The card catalogue: for each card its contract and its React component, and what both applications need to show a machine. |

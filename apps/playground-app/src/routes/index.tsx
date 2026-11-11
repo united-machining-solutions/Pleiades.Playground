@@ -1,19 +1,27 @@
+import { clock } from "@pleiades/cards/machine/format.ts"
+import { stateOf } from "@pleiades/cards/machine/state.ts"
+import type { State } from "@pleiades/cards/machine/state.ts"
+import { Badge } from "@pleiades/cards/ui/badge.tsx"
+import { Card } from "@pleiades/cards/ui/card.tsx"
 import { createFileRoute, useRouter } from "@tanstack/react-router"
 import { Fragment, useEffect } from "react"
 import type { ReactNode } from "react"
 
 import { useChatPanel } from "@/chat/ask.ts"
-import { Badge } from "@/components/ui/badge"
-import { Card } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { ItemGroup, ItemSeparator } from "@/components/ui/item"
 import { Skeleton } from "@/components/ui/skeleton"
-import { clock } from "@/machines/format.ts"
 import { getMachines } from "@/machines/get-machines.ts"
 import { MachineRow, MachineTile } from "@/machines/machine-item.tsx"
-import { groups, stateOf } from "@/machines/state.ts"
 
 const REFRESH_EVERY_MS = 10_000
+
+/** Home asks "what needs you?": first the machines that do, then the rest. */
+const groups: ReadonlyArray<{ title: string; states: ReadonlyArray<State> }> = [
+  { title: "Needs you", states: ["alarm", "stopped", "no-data"] },
+  { title: "Setup", states: ["setup"] },
+  { title: "Running", states: ["running"] },
+]
 
 export const Route = createFileRoute("/")({
   // If the server of the app itself is away for a moment, the page says so and keeps trying.

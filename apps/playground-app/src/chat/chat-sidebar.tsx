@@ -1,3 +1,5 @@
+import { stateOf } from "@pleiades/cards/machine/state.ts"
+import { Card } from "@pleiades/cards/ui/card.tsx"
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react"
 import { Link, getRouteApi, useRouter } from "@tanstack/react-router"
 import { ArrowUpIcon, CheckIcon, LoaderIcon, MessageSquareIcon, PlusIcon, XIcon } from "lucide-react"
@@ -5,7 +7,6 @@ import { useEffect, useState } from "react"
 import type { FormEvent, KeyboardEvent } from "react"
 
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group"
 import { ItemGroup, ItemSeparator } from "@/components/ui/item"
@@ -31,7 +32,6 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { MachineRow } from "@/machines/machine-item.tsx"
-import { stateOf } from "@/machines/state.ts"
 
 import { NEW_CHAT, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
 import { suggestions } from "./suggestions.ts"

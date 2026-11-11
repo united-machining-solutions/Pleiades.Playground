@@ -1,11 +1,9 @@
-import type { Machine } from "@pleiades/genui-mcp"
+import { SILENT_AFTER_SECONDS } from "./contract.ts"
+import type { Machine } from "./contract.ts"
 
 // Which value of the binding is which state on the screen. This file decides it, nothing else does.
 
 export type State = "alarm" | "stopped" | "no-data" | "setup" | "running"
-
-/** The simulator publishes every five seconds. A machine that is silent for longer is not live. */
-export const SILENT_AFTER_SECONDS = 30
 
 export const stateLabel: Record<State, string> = {
   alarm: "Alarm",
@@ -14,13 +12,6 @@ export const stateLabel: Record<State, string> = {
   setup: "Setup",
   running: "Running",
 }
-
-/** Home asks "what needs you?": first the machines that do, then the rest. */
-export const groups: ReadonlyArray<{ title: string; states: ReadonlyArray<State> }> = [
-  { title: "Needs you", states: ["alarm", "stopped", "no-data"] },
-  { title: "Setup", states: ["setup"] },
-  { title: "Running", states: ["running"] },
-]
 
 export function openError(machine: Machine) {
   return machine.notifications.find((one) => one.level === "Error")

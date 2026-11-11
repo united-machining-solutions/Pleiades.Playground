@@ -1,0 +1,44 @@
+{
+  "name": "@pleiades/cards",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "@base-ui/react": "catalog:",
+    "class-variance-authority": "catalog:",
+    "cn": "catalog:",
+    "react": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@base-ui/react": {
+      "optional": true
+    },
+    "class-variance-authority": {
+      "optional": true
+    },
+    "cn": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@base-ui/react": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "class-variance-authority": "catalog:",
+    "cn": "catalog:",
+    "react": "catalog:",
+    "typescript": "catalog:"
+  }
+}
