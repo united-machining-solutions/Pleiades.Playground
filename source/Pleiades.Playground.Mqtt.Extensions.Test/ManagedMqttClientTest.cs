@@ -122,6 +122,66 @@ public sealed class ManagedMqttClientTest
     }
 
     [TestMethod]
+    public async Task AConnectWhileTheLastDisconnectIsPending_IsNoFailedAttempt_AndIsRepeatedAtOnce()
+    {
+        // MQTTnet answers a connect during its own disconnect with an InvalidOperationException. The
+        // watchdog forces such a disconnect; waiting the whole reconnect delay then would be wrong.
+        var broker = new FakeMqttClient();
+        broker.OnConnect = () => broker.ConnectAttempts < 2
+            ? throw new InvalidOperationException("Not allowed to connect while connect/disconnect is pending.")
+            : FakeMqttClient.Accepted();
+        using var client = Managed(broker);
+        var failures = new ConcurrentQueue<ConnectingFailedEventArgs>();
+        client.ConnectingFailedAsync += Record(failures);
+        var options = Options();
+
+        await client.StartAsync(new ManagedMqttClientOptions
+        {
+            ClientOptions = options.ClientOptions,
+            AutoReconnectDelay = TimeSpan.FromMinutes(1),
+            ConnectionCheckInterval = options.ConnectionCheckInterval,
+        });
+        await UntilAsync(() => client.IsConnected, "the second attempt connects without the reconnect delay");
+
+        Assert.IsEmpty(failures);
+    }
+
+    [TestMethod]
+    public async Task AnInvalidTopicFilter_IsRefusedAtTheCall_AndDoesNotHoldBackTheValidOnes()
+    {
+        // MQTTnet validates when it sends. Queued unchecked, one invalid filter would fail the
+        // SUBSCRIBE of every filter sent with it, on every attempt.
+        var broker = new FakeMqttClient();
+        using var client = Managed(broker);
+        await client.SubscribeAsync(Values);
+
+        await Assert.ThrowsAsync<Exception>(() => client.SubscribeAsync("machines/#/timeseries"));
+
+        await client.StartAsync(Options());
+        await UntilAsync(() => !broker.Subscribes.IsEmpty, "the valid filter is sent");
+        Assert.AreEqual(Values, broker.Subscribes.Single().TopicFilters.Single().Topic);
+    }
+
+    [TestMethod]
+    public async Task TheQueue_IsPublishedOnlyAfterTheSubscriptionsWereSent()
+    {
+        // What the queue publishes may be answered at once; the answer is lost without the subscription.
+        var suback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var broker = new FakeMqttClient { WhileSubscribing = _ => suback.Task };
+        using var client = Managed(broker);
+        await client.SubscribeAsync(Values);
+        await client.EnqueueAsync(Message("request"));
+
+        await client.StartAsync(Options());
+        await UntilAsync(() => !broker.Subscribes.IsEmpty, "the SUBSCRIBE is sent");
+        await Task.Delay(100, TestContext.CancellationToken);
+        Assert.IsEmpty(broker.Published, "the broker has not answered the SUBSCRIBE yet");
+
+        suback.SetResult();
+        await UntilAsync(() => broker.Published.Count == 1, "the queue is published after the SUBACK");
+    }
+
+    [TestMethod]
     public async Task AHandlerThatThrows_DoesNotEndTheLoop()
     {
         var broker = new FakeMqttClient();
