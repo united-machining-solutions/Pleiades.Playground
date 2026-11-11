@@ -5,8 +5,10 @@ import { z } from "zod"
 // apart. Every value names the topic or the notification it comes from.
 
 /**
- * A machine publishes its state every few seconds. Silent for longer than this, it is not live,
- * and a run of a value ends: what the value was in between is not known.
+ * A machine gives a sign of life every few seconds: its heartbeat, or any value it publishes.
+ * Its state it may publish only when the state changes, so a value holds until the next one.
+ * Silent for longer than this, the machine is not live, and a run of a value ends: what the
+ * value was in between is not known.
  */
 export const SILENT_AFTER_SECONDS = 30
 
@@ -22,7 +24,7 @@ export const reading = z.object({
   since: instant.nullable().describe("Since when the value has been the same."),
   sinceIsLowerBound: z
     .boolean()
-    .describe("True if the value was already the same where the window starts, so `since` is only the earliest time known."),
+    .describe("True if the value was already the same before the values that were read, so `since` is only the earliest time known."),
   topic: z.string().describe("The MQTT topic the value comes from."),
 })
 export type Reading = z.infer<typeof reading>
@@ -41,10 +43,11 @@ export type Notification = z.infer<typeof notification>
 export const machine = z.object({
   machine: z.string().describe("The serial number, which identifies the machine in every topic."),
   connection: reading,
+  heartbeat: reading.describe("The sign of life of the machine. Its value counts up and says nothing else."),
   itemState: reading,
   operationMode: reading,
   program: reading,
-  lastValueAt: instant.nullable().describe("The newest value of any of the readings."),
+  lastValueAt: instant.nullable().describe("The newest value of any of the readings: the last sign of life."),
   notifications: z.array(notification).describe("Warnings and errors that have not gone."),
 })
 export type Machine = z.infer<typeof machine>

@@ -22,6 +22,7 @@ const shown = {
   machine: {
     machine: "P-04",
     connection: reading,
+    heartbeat: reading,
     itemState: reading,
     operationMode: reading,
     program: reading,

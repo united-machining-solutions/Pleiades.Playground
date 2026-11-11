@@ -2,9 +2,11 @@ import { SILENT_AFTER_SECONDS, instant, machine } from "@pleiades/cards/machine/
 import type { Machine, MachineShow, Reading } from "@pleiades/cards/machine/contract.ts"
 import { z } from "zod"
 
-import { listTopics, readOpenNotifications, readRaised, readStrings } from "./apis.ts"
+import { listTopics, readNumbers, readOpenNotifications, readRaised, readStrings } from "./apis.ts"
 import type { Apis, OpenNotification, Sample, Series } from "./apis.ts"
 import { spansBetween } from "./history.ts"
+import { silences, silentBetween } from "./liveness.ts"
+import type { Stretch } from "./liveness.ts"
 import { secondsBefore } from "./time.ts"
 
 // What every machine does now. Each value names the topic or the notification it comes from.
@@ -26,46 +28,49 @@ export type MachineList = z.infer<typeof machineList>
 
 const paths = {
   connection: "umati/Connection/State",
+  heartbeat: "umati/Connection/Heartbeat",
   itemState: "umati/State/MachineryItemState",
   operationMode: "umati/State/MachineryOperationMode",
   program: "umati/Production/ActiveProgram",
 } as const
 type ReadingName = keyof typeof paths
+const names = Object.keys(paths) as Array<ReadingName>
+
+/** The heartbeat counts, the other readings are text. */
+const readValues = (name: ReadingName) => (name === "heartbeat" ? readNumbers : readStrings)
 
 /** `machines/P-04/umati/State/MachineryItemState` belongs to the machine `P-04`. */
 export function machineOf(topic: string): string | undefined {
   return /^machines\/([^/]+)\//.exec(topic)?.[1]
 }
 
-function silentBetween(earlier: string, later: string): boolean {
-  return Date.parse(later) - Date.parse(earlier) > SILENT_AFTER_SECONDS * 1000
-}
-
 /**
- * The newest value and the start of the unbroken run of that value. Samples are oldest first and
- * were read from `windowStart` on. A run goes back as far as the value stayed the same without a
- * pause (see SILENT_AFTER_SECONDS); only a run that reaches the start of the window began before it.
+ * The newest value and the start of its unbroken run. Samples are oldest first. A value holds
+ * until the next one of its topic, so a run goes back as far as the value stayed the same, but
+ * not across a stretch in which the machine was silent: what the value was then is not known.
+ *
+ * `mayBeOlder` says whether there may be values older than these samples. If so, a run that
+ * reaches the oldest sample began at some time before it, and `since` is only a lower bound.
  */
-export function currentRun(topic: string, samples: ReadonlyArray<Sample>, windowStart: string): Reading {
+export function currentRun(
+  topic: string,
+  samples: ReadonlyArray<Sample>,
+  silent: ReadonlyArray<Stretch>,
+  mayBeOlder: boolean,
+): Reading {
   const newest = samples.at(-1)
   if (!newest) return { value: null, at: null, since: null, sinceIsLowerBound: false, topic }
   let since = newest.at
-  let reachesFirstSample = true
+  let reachesOldest = true
   for (let index = samples.length - 2; index >= 0; index--) {
     const before = samples[index]
-    if (!before || before.value !== newest.value || silentBetween(before.at, since)) {
-      reachesFirstSample = false
+    if (!before || before.value !== newest.value || silentBetween(silent, before.at, since)) {
+      reachesOldest = false
       break
     }
     since = before.at
   }
-  return {
-    value: newest.value,
-    at: newest.at,
-    since,
-    sinceIsLowerBound: reachesFirstSample && !silentBetween(windowStart, since),
-    topic,
-  }
+  return { value: newest.value, at: newest.at, since, sinceIsLowerBound: reachesOldest && mayBeOlder, topic }
 }
 
 function samplesOf(series: ReadonlyArray<Series>, topic: string): ReadonlyArray<Sample> {
@@ -81,14 +86,15 @@ function newest(instants: ReadonlyArray<string | null>): string | null {
 
 export async function listMachines(apis: Apis, now = new Date()): Promise<MachineList> {
   const windowStart = secondsBefore(now, WINDOW_SECONDS)
+  // The values just before the window say what held and whether the machine was there where it begins.
+  const readFrom = secondsBefore(windowStart, SILENT_AFTER_SECONDS)
   const horizon = secondsBefore(now, HORIZON_SECONDS)
-  const names = Object.keys(paths) as Array<ReadingName>
 
   const [topics, errors, warnings, ...series] = await Promise.all([
     listTopics(apis, horizon, now),
     readOpenNotifications(apis, "Error", horizon, now),
     readOpenNotifications(apis, "Warning", horizon, now),
-    ...names.map((name) => readStrings(apis, `machines/*/${paths[name]}`, windowStart, now)),
+    ...names.map((name) => readValues(name)(apis, `machines/*/${paths[name]}`, readFrom, now)),
   ])
   const inWindow = Object.fromEntries(names.map((name, index) => [name, series[index] ?? []])) as Record<
     ReadingName,
@@ -99,20 +105,27 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
 
   const machines = await Promise.all(
     serialNumbers.map(async (serialNumber): Promise<Machine> => {
+      const topicOf = (name: ReadingName) => `machines/${serialNumber}/${paths[name]}`
+      const recent = (name: ReadingName) => samplesOf(inWindow[name], topicOf(name))
+      // Every value is a sign of life, whatever it says.
+      const signs = names.flatMap((name) => recent(name).map((sample) => sample.at))
+      const silent = silences(signs, windowStart.toISOString(), now.toISOString())
+
       const read = async (name: ReadingName): Promise<Reading> => {
-        const topic = `machines/${serialNumber}/${paths[name]}`
-        const samples = samplesOf(inWindow[name], topic)
-        if (samples.length > 0) return currentRun(topic, samples, windowStart.toISOString())
-        // Silent for longer than the window: the last known value, without a "since".
-        const [last] = await readStrings(apis, topic, horizon, now, 1)
-        return {
-          ...currentRun(topic, last?.samples ?? [], horizon.toISOString()),
-          since: null,
-          sinceIsLowerBound: false,
+        const samples = recent(name)
+        // A value from before the window says what held where it begins.
+        if (samples[0] && samples[0].at <= windowStart.toISOString()) {
+          return currentRun(topicOf(name), samples, silent, true)
         }
+        // Without one the topic is quiet, as one is that is published only on a change. The two
+        // values before the window say what held, and whether it began with a change.
+        const [earlier] = await readValues(name)(apis, topicOf(name), horizon, readFrom, 2)
+        const before = earlier?.samples ?? []
+        return currentRun(topicOf(name), [...before, ...samples], silent, before.length === 2)
       }
-      const [connection, itemState, operationMode, program] = await Promise.all([
+      const [connection, heartbeat, itemState, operationMode, program] = await Promise.all([
         read("connection"),
+        read("heartbeat"),
         read("itemState"),
         read("operationMode"),
         read("program"),
@@ -121,10 +134,11 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
       return {
         machine: serialNumber,
         connection,
+        heartbeat,
         itemState,
         operationMode,
         program,
-        lastValueAt: newest([connection.at, itemState.at, operationMode.at, program.at]),
+        lastValueAt: newest([connection.at, heartbeat.at, itemState.at, operationMode.at, program.at]),
         notifications: open
           .filter((one) => one.machine === serialNumber)
           .sort((a, b) => b.raisedAt.localeCompare(a.raisedAt))
@@ -151,16 +165,26 @@ export async function showMachine(
   now = new Date(),
 ): Promise<MachineShow> {
   const from = secondsBefore(now, hours * 60 * 60)
-  // The values just before say what was known where the history begins.
+  // The signs of life just before say whether the machine was there where the history begins.
   const readFrom = secondsBefore(from, SILENT_AFTER_SECONDS)
   const topic = (name: ReadingName) => `machines/${serialNumber}/${paths[name]}`
-  const read = async (name: ReadingName) => samplesOf(await readStrings(apis, topic(name), readFrom, now), topic(name))
+  const read = async (name: ReadingName) =>
+    samplesOf(await readValues(name)(apis, topic(name), readFrom, now), topic(name))
+  /** The values of a reading, and before them the one that held where the history begins. */
+  const readWithHeld = async (name: ReadingName) => {
+    const [held, samples] = await Promise.all([
+      readValues(name)(apis, topic(name), secondsBefore(readFrom, HORIZON_SECONDS), readFrom, 1),
+      read(name),
+    ])
+    return [...samplesOf(held, topic(name)), ...samples]
+  }
 
-  const [list, connection, itemState, operationMode, errors] = await Promise.all([
+  const [list, connection, itemState, operationMode, heartbeat, errors] = await Promise.all([
     listMachines(apis, now),
-    read("connection"),
-    read("itemState"),
-    read("operationMode"),
+    readWithHeld("connection"),
+    readWithHeld("itemState"),
+    readWithHeld("operationMode"),
+    read("heartbeat"),
     // An error that still stands may have been raised long before the history begins.
     readRaised(apis, "Error", serialNumber, secondsBefore(from, HORIZON_SECONDS), now),
   ])
@@ -176,7 +200,7 @@ export async function showMachine(
     history: {
       from: from.toISOString(),
       to: list.asOf,
-      spans: spansBetween(from.toISOString(), list.asOf, { connection, itemState, operationMode, errors }),
+      spans: spansBetween(from.toISOString(), list.asOf, { connection, itemState, operationMode, heartbeat, errors }),
     },
   }
 }

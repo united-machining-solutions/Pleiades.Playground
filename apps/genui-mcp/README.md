@@ -15,7 +15,7 @@ durations are computed here, never by a language model.
 
 | Tool | What it returns |
 |---|---|
-| `genui_machine_list` | Every machine with what it does now: connection, state and operation mode with the time since when, the active program, and the warnings and errors that have not gone. |
+| `genui_machine_list` | Every machine with what it does now: connection, heartbeat, state and operation mode with the time since when, the active program, and the warnings and errors that have not gone. |
 | `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and the states it went through over the last hours (`hours`, 8 if omitted) as spans without a gap. Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. |
 
@@ -24,6 +24,18 @@ as `Europe/Zurich`: then every instant is a local time there with its offset, `2
 So whoever reads the result, a language model included, has nothing to convert.
 
 Cards as `ui://` resources (MCP Apps) follow.
+
+## When a machine is there
+
+The [MQTT binding](../../contracts/mqtt/README.md) has no quality field: whether values are current is told
+by `Connection/State` and `Connection/Heartbeat`. This server reads it so:
+
+- **A value holds until the next one of its topic.** A machine may publish its state only when the state
+  changes; a simulator repeats it every few seconds. Both read the same.
+- **Every value is a sign of life**, and the heartbeat is one that is nothing else. A machine that gave no sign
+  for more than 30 seconds is silent: it has no data, whatever its last values say.
+- **A silence ends a run.** What a value was while the machine was silent is not known, so "since" is the
+  first value after the silence.
 
 ## Develop
 
@@ -47,6 +59,7 @@ does that only outside `node_modules`. So the image keeps the layout of the work
   [`@pleiades/cards`](../../packages/cards/README.md), because cards show it.
 - `src/history.ts`: the states of a machine over a stretch of time, as spans. Which values are which state
   is decided in the card catalogue, for the past as for the present.
+- `src/liveness.ts`: the stretches in which a machine gave no sign of life.
 - `src/apis.ts`: the two APIs over REST. Every answer is checked against the shape this server relies on.
 - `src/time.ts`: the Timeseries API counts microseconds, the Events API writes ISO 8601; from here on an
   instant is ISO 8601 in UTC. A result is written in the time zone of the caller at the very end.

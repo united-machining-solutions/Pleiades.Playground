@@ -16,6 +16,7 @@ function machine(changes: Partial<Machine> = {}): Machine {
   return {
     machine: "P-04",
     connection: reading("Connected"),
+    heartbeat: reading("2825"),
     itemState: reading("Executing"),
     operationMode: reading("Processing"),
     program: reading("SHAFT_4711.MPF"),

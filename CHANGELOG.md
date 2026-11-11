@@ -27,6 +27,9 @@ All notable changes are documented here. The format follows
 - The machine tools of `genui-mcp` take a `timeZone` and then write every instant as a local time with its
   offset to UTC. The chat passes the time zone of the browser, so an answer gives the times of the person's
   clock, and it draws the markdown of an answer.
+- `genui-mcp` takes whether a machine is there from its signs of life, the heartbeat included, and lets a
+  value hold until the next one of its topic. A machine that publishes its state only on a change is shown
+  with that state, not as "No data".
 
 ### Changed
 

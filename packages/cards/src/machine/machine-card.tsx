@@ -18,7 +18,7 @@ export function MachineCard({ machine, asOf, history }: MachineShow) {
   const state = stateOf(machine, asOf)
   const told = tell(machine, state)
   const warning = openWarning(machine)
-  const topics = [machine.itemState, machine.operationMode, machine.connection, machine.program]
+  const topics = [machine.itemState, machine.operationMode, machine.connection, machine.heartbeat, machine.program]
     .map((reading) => reading.topic)
     .concat(machine.notifications.slice(0, 1).map((one) => one.topic))
 

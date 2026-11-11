@@ -24,10 +24,14 @@ export const skillGuide = `# genui: skill guide
   the result. Do not convert them. Say "UTC" with a time that is in UTC, and nothing with a local one.
 - Every reading carries its \`topic\`, every notification the topic it was published on.
 - A reading has \`value\`, \`at\` (when it was measured) and \`since\` (since when it has been the same).
-  If \`sinceIsLowerBound\` is true, the value was already the same where the window starts, and
-  \`since\` is the earliest time known. Say "for at least", not "since".
-- A machine publishes every few seconds. A pause of more than 30 seconds ends a run, because what
-  the value was in between is not known: \`since\` is then the first value after the pause.
+  If \`sinceIsLowerBound\` is true, the value was already the same before the values that were read,
+  and \`since\` is the earliest time known. Say "for at least", not "since".
+- A machine may publish a value only when it changes. A value holds until the next one of its topic,
+  so an \`at\` of hours ago is not stale by itself.
+- A machine is there while it gives signs of life: its heartbeat, or any value it publishes. Silent
+  for more than 30 seconds, it is not, and its values are the last known ones, not the present. Such
+  a silence also ends a run, because what the value was in between is not known: \`since\` is then
+  the first value after the silence.
 - Units are SI on the wire; a display converts them.
 
 ## Machines
@@ -35,8 +39,12 @@ export const skillGuide = `# genui: skill guide
 \`genui_machine_list\` lists every machine that published a value in the last 24 hours. Pass the
 \`timeZone\` of the person you answer, if you know it.
 
-- \`connection\`: \`umati/Connection/State\`. Anything but \`Connected\`, or a \`lastValueAt\` that is not
-  current, means the other readings are the last known ones, not the present.
+- \`connection\`: \`umati/Connection/State\`. Anything but \`Connected\` means the other readings are the
+  last known ones, not the present.
+- \`heartbeat\`: \`umati/Connection/Heartbeat\`, the sign of life. Its value counts up and says nothing
+  else; its \`at\` is what matters.
+- \`lastValueAt\`: the newest \`at\` of all readings, so the last sign of life. More than 30 seconds
+  before \`asOf\`, the machine is silent.
 - \`itemState\`: \`umati/State/MachineryItemState\`, for example \`Executing\` or \`NotExecuting\`.
 - \`operationMode\`: \`umati/State/MachineryOperationMode\`, for example \`Processing\` or \`Setup\`.
 - \`program\`: \`umati/Production/ActiveProgram\`.
@@ -53,7 +61,7 @@ first. \`hours\` says how far back the history goes, 8 if omitted, 24 at most.
 
 A span has one of five states, decided from the values in this order:
 
-- \`no-data\`: no value for more than 30 seconds, or the connection is not \`Connected\`.
+- \`no-data\`: no sign of life for more than 30 seconds, or the connection is not \`Connected\`.
 - \`alarm\`: an error was raised and has not gone.
 - \`setup\`: the operation mode is \`Setup\`.
 - \`stopped\`: the item state is anything but \`Executing\`.
