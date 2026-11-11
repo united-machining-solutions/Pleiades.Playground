@@ -83,3 +83,12 @@ of the two APIs. Stop the stack with `docker compose down`; add `--volumes` to d
 - **The `mongodb` container stays unhealthy.** MongoDB 8.0 does not start on some very recent Linux kernels.
   CI runs the stack on `ubuntu-22.04` for that reason. `MONGODB_VERSION` in `.env` selects another image tag.
 - **A port is in use.** Copy `.env.example` to `.env` and change the port there.
+- **A second checkout replaces the containers of the first.** `compose.yaml` fixes the project name
+  `pleiades-playground`. To run two checkouts side by side, give the second one its own project name and image
+  tag, and other ports in its `.env`:
+
+  ```bash
+  PLEIADES_VERSION=0.0.1-mybranch docker compose -p pleiades-mybranch up -d --build --wait
+  ```
+
+  Use the same `-p` for `ps`, `logs` and `down`.
