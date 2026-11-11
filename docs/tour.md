@@ -4,6 +4,9 @@ Six stops through the running demo, for someone who has never seen it: what you 
 the code. The screenshots were taken from the demo stack on one computer; your machines will be in other
 states, because the simulator keeps changing them.
 
+With a coding agent in the repository you can ask for this tour: "give me a tour". The agent then walks you
+through the stops in your running stack, see [`AGENTS.md`](../AGENTS.md).
+
 1. [Start](#1-start)
 2. [Home](#2-home)
 3. [The page of one machine](#3-the-page-of-one-machine)
