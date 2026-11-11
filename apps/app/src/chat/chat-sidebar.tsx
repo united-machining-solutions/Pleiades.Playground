@@ -3,11 +3,20 @@ import { stateOf } from "@pleiades/cards/machine/state.ts"
 import { Card } from "@pleiades/cards/ui/card.tsx"
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react"
 import { Link, getRouteApi, useRouter } from "@tanstack/react-router"
-import { ArrowUpIcon, CheckIcon, LoaderIcon, MessageSquareIcon, PlusIcon, XIcon } from "lucide-react"
+import { ArrowUpIcon, CheckIcon, ChevronDownIcon, LoaderIcon, MessageSquareIcon, PlusIcon, XIcon } from "lucide-react"
 import { useEffect, useState } from "react"
 import type { FormEvent, KeyboardEvent } from "react"
 
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group"
 import { ItemGroup, ItemSeparator } from "@/components/ui/item"
@@ -34,7 +43,8 @@ import {
 } from "@/components/ui/sidebar"
 import { MachineRow } from "@/machines/machine-item.tsx"
 
-import { NEW_CHAT, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
+import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
+import { chooseChatModel, fetchChatModel } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
 import { machineListOf, machineShowOf, toolLabels } from "./tool-results.ts"
 
@@ -90,8 +100,10 @@ function NoLanguageModel() {
       <EmptyHeader>
         <EmptyTitle>No language model configured</EmptyTitle>
         <EmptyDescription>
-          Set <code>LLM_BASE_URL</code>, <code>LLM_MODEL</code> and <code>LLM_API_KEY</code> in <code>.env</code> and
-          start the stack again. Any OpenAI-compatible endpoint works. Home needs no language model.
+          Name at least one model in <code>.env</code> and start the stack again: <code>OPENAI_API_KEY</code> with{" "}
+          <code>OPENAI_MODELS</code>, <code>ANTHROPIC_API_KEY</code> with <code>ANTHROPIC_MODELS</code>, or{" "}
+          <code>LLM_BASE_URL</code> with <code>LLM_MODELS</code> for any OpenAI-compatible endpoint. Home needs no
+          language model.
         </EmptyDescription>
       </EmptyHeader>
     </Empty>
@@ -100,8 +112,14 @@ function NoLanguageModel() {
 
 /** The panel before a chat: questions to begin with, and the chats so far. */
 function Start() {
-  const { chats } = root.useLoaderData()
+  const { chats, chatStatus } = root.useLoaderData()
   const panel = useChatPanel()
+  // The next chat begins with the model picked here.
+  const [model, setModel] = useState(() => pickedModel(chatStatus.models))
+  const choose = (name: string) => {
+    pickModel(name)
+    setModel(name)
+  }
   return (
     <>
       <SidebarContent>
@@ -133,27 +151,54 @@ function Start() {
           </SidebarGroup>
         )}
       </SidebarContent>
-      <Composer placeholder="Ask about the machines" onSend={panel.ask} />
+      <Composer
+        placeholder="Ask about the machines"
+        onSend={panel.ask}
+        models={chatStatus.models}
+        model={model}
+        onModel={choose}
+      />
     </>
   )
 }
 
 function Conversation({ threadId }: { threadId: string }) {
   const router = useRouter()
-  const { chats } = root.useLoaderData()
+  const { chats, chatStatus } = root.useLoaderData()
   const titled = chats.some((entry) => entry.threadId === threadId && entry.titled)
   const { messages, sendMessage, isLoading, error } = useChat({
     threadId,
     connection: fetchServerSentEvents("/api/harness/run"),
     persistence: true,
   })
+  const [model, setModel] = useState(() => pickedModel(chatStatus.models))
+  const [switchError, setSwitchError] = useState<string>()
+  const switchTo = (name: string) =>
+    chooseChatModel(threadId, name).then(
+      () => setSwitchError(undefined),
+      (problem: unknown) => setSwitchError(problem instanceof Error ? problem.message : String(problem)),
+    )
+  const choose = (name: string) => {
+    pickModel(name)
+    setModel(name)
+    void switchTo(name)
+  }
 
-  // A question asked anywhere in the app opens this chat and is its first message.
   useEffect(() => {
     rememberThread(threadId)
     const first = takeFirstQuestion(threadId)
-    if (first) void sendMessage(first)
-    // Only when the chat opens, whatever sendMessage is on later renders.
+    void (async () => {
+      if (first) {
+        // A question asked anywhere in the app opens this chat and is its first message. The chat
+        // begins with the model picked last; the first model answers without being picked.
+        if (model !== undefined && model !== chatStatus.models[0]) await switchTo(model)
+        void sendMessage(first)
+      } else {
+        // A chat from before keeps the model it picked.
+        setModel((await fetchChatModel(threadId)) ?? chatStatus.models[0])
+      }
+    })()
+    // Only when the chat opens, whatever the other values are on later renders.
   }, [threadId])
 
   // After its first turn the chat exists on the server. Name it after its first question, so the
@@ -178,7 +223,9 @@ function Conversation({ threadId }: { threadId: string }) {
             <MessageScrollerViewport>
               <MessageScrollerContent className="gap-5 p-4">
                 {messages.map((message) => (
-                  <MessageScrollerItem key={message.id}>
+                  // An item paints nothing outside its box, and a card draws its edge as a ring
+                  // around itself: one pixel of room keeps that edge.
+                  <MessageScrollerItem key={message.id} className="p-px">
                     <Message align={message.role === "user" ? "end" : "start"}>
                       <MessageContent>
                         {message.parts.map((part, index) => {
@@ -236,6 +283,11 @@ function Conversation({ threadId }: { threadId: string }) {
                     <MarkerContent>The language model did not answer: {error.message}</MarkerContent>
                   </Marker>
                 )}
+                {switchError && (
+                  <Marker>
+                    <MarkerContent>{switchError}</MarkerContent>
+                  </Marker>
+                )}
               </MessageScrollerContent>
             </MessageScrollerViewport>
             <MessageScrollerButton />
@@ -246,19 +298,32 @@ function Conversation({ threadId }: { threadId: string }) {
         placeholder={messages.length === 0 ? "Ask about the machines" : "Ask a follow-up"}
         busy={isLoading}
         onSend={(question) => void sendMessage(question)}
+        models={chatStatus.models}
+        model={model}
+        onModel={choose}
       />
     </>
   )
 }
 
+/**
+ * Where a question is written. With more than one model in the settings it also says which model
+ * answers and lets the chat pick another one, after the shadcn pattern "Model Selector".
+ */
 function Composer({
   placeholder,
   busy = false,
   onSend,
+  models,
+  model,
+  onModel,
 }: {
   placeholder: string
   busy?: boolean
   onSend: (question: string) => void
+  models: ReadonlyArray<string>
+  model: string | undefined
+  onModel: (name: string) => void
 }) {
   const [text, setText] = useState("")
   const send = () => {
@@ -277,6 +342,7 @@ function Composer({
       send()
     }
   }
+  const choice = models.length > 1 && model !== undefined
   return (
     <SidebarFooter className="border-t">
       <form onSubmit={onSubmit}>
@@ -288,8 +354,36 @@ function Composer({
             onChange={(event) => setText(event.target.value)}
             onKeyDown={onKeyDown}
           />
-          <InputGroupAddon align="inline-end">
-            <InputGroupButton type="submit" variant="default" size="icon-sm" aria-label="Send" disabled={busy}>
+          {/* With a choice of models the field gets a second line: the model on the left, send on the right. */}
+          <InputGroupAddon align={choice ? "block-end" : "inline-end"}>
+            {choice && (
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<InputGroupButton variant="ghost" aria-label={`Model: ${model}`} />}>
+                  {model}
+                  <ChevronDownIcon />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" className="w-auto min-w-48">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel>Model</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={model} onValueChange={(name) => onModel(String(name))}>
+                      {models.map((name) => (
+                        <DropdownMenuRadioItem key={name} value={name} closeOnClick>
+                          {name}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <InputGroupButton
+              type="submit"
+              variant="default"
+              size="icon-sm"
+              className={choice ? "ml-auto" : undefined}
+              aria-label="Send"
+              disabled={busy}
+            >
               <ArrowUpIcon />
             </InputGroupButton>
           </InputGroupAddon>
