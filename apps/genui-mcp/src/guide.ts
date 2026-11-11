@@ -22,6 +22,8 @@ export const skillGuide = `# genui: skill guide
 - A reading has \`value\`, \`at\` (when it was measured) and \`since\` (since when it has been the same).
   If \`sinceIsLowerBound\` is true, the value was already the same where the window starts, and
   \`since\` is the earliest time known. Say "for at least", not "since".
+- A machine publishes every few seconds. A pause of more than 30 seconds ends a run, because what
+  the value was in between is not known: \`since\` is then the first value after the pause.
 - Units are SI on the wire; a display converts them.
 
 ## Machines

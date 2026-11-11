@@ -5,7 +5,12 @@ import { currentRun, machineOf } from "./machines.ts"
 import { fromMicroseconds } from "./time.ts"
 
 const topic = "machines/P-04/umati/State/MachineryItemState"
-const at = (minute: number) => `2026-11-16T09:${String(minute).padStart(2, "0")}:00.000Z`
+const windowStart = "2026-11-16T09:00:00.000Z"
+/** An instant that many seconds after the start of the window. */
+const at = (seconds: number) => new Date(Date.parse(windowStart) + seconds * 1000).toISOString()
+/** A value every five seconds, as a machine publishes it. */
+const every5s = (from: number, to: number, value: string) =>
+  Array.from({ length: (to - from) / 5 + 1 }, (_, index) => ({ at: at(from + index * 5), value }))
 
 test("the machine is the topic level after machines/", () => {
   assert.equal(machineOf(topic), "P-04")
@@ -14,32 +19,41 @@ test("the machine is the topic level after machines/", () => {
 })
 
 test("a run starts where the value last changed", () => {
-  const run = currentRun(topic, [
-    { at: at(0), value: "Executing" },
-    { at: at(1), value: "NotExecuting" },
-    { at: at(2), value: "Executing" },
-    { at: at(3), value: "Executing" },
-  ])
-  assert.deepEqual(run, {
+  const samples = [
+    ...every5s(0, 55, "Executing"),
+    ...every5s(60, 115, "NotExecuting"),
+    ...every5s(120, 180, "Executing"),
+  ]
+  assert.deepEqual(currentRun(topic, samples, windowStart), {
     value: "Executing",
-    at: at(3),
-    since: at(2),
+    at: at(180),
+    since: at(120),
     sinceIsLowerBound: false,
     topic,
   })
 })
 
 test("a value that never changed in the window has only a lower bound", () => {
-  const run = currentRun(topic, [
-    { at: at(0), value: "Executing" },
-    { at: at(1), value: "Executing" },
-  ])
-  assert.equal(run.since, at(0))
+  const run = currentRun(topic, every5s(5, 180, "Executing"), windowStart)
+  assert.equal(run.since, at(5))
   assert.equal(run.sinceIsLowerBound, true)
 })
 
+test("a pause ends a run, also if the value is the same after it", () => {
+  const samples = [...every5s(0, 60, "Executing"), ...every5s(600, 660, "Executing")]
+  const run = currentRun(topic, samples, windowStart)
+  assert.equal(run.since, at(600))
+  assert.equal(run.sinceIsLowerBound, false)
+})
+
+test("a machine that came back in the middle of the window has a since, not a lower bound", () => {
+  const run = currentRun(topic, every5s(1200, 1260, "Executing"), windowStart)
+  assert.equal(run.since, at(1200))
+  assert.equal(run.sinceIsLowerBound, false)
+})
+
 test("a topic without a value yields an empty reading that still names its topic", () => {
-  assert.deepEqual(currentRun(topic, []), {
+  assert.deepEqual(currentRun(topic, [], windowStart), {
     value: null,
     at: null,
     since: null,

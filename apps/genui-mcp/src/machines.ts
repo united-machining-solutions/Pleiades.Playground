@@ -10,6 +10,11 @@ import { secondsBefore } from "./time.ts"
 export const WINDOW_SECONDS = 30 * 60
 /** How far back a machine and its open notifications are still looked for. */
 export const HORIZON_SECONDS = 24 * 60 * 60
+/**
+ * A machine publishes its state every few seconds. After a pause longer than this, what the value
+ * was in between is not known, so the pause ends a run.
+ */
+export const SILENT_AFTER_SECONDS = 30
 
 const reading = z.object({
   value: z.string().nullable().describe("The newest value, or null if the topic had none."),
@@ -17,7 +22,7 @@ const reading = z.object({
   since: z.iso.datetime().nullable().describe("Since when the value has been the same."),
   sinceIsLowerBound: z
     .boolean()
-    .describe("True if the value was already the same where the window starts."),
+    .describe("True if the value was already the same where the window starts, so `since` is only the earliest time known."),
   topic: z.string().describe("The MQTT topic the value comes from."),
 })
 export type Reading = z.infer<typeof reading>
@@ -62,17 +67,33 @@ export function machineOf(topic: string): string | undefined {
   return /^machines\/([^/]+)\//.exec(topic)?.[1]
 }
 
-/** The newest value and the start of the unbroken run of that value. Samples are oldest first. */
-export function currentRun(topic: string, samples: ReadonlyArray<Sample>): Reading {
+function silentBetween(earlier: string, later: string): boolean {
+  return Date.parse(later) - Date.parse(earlier) > SILENT_AFTER_SECONDS * 1000
+}
+
+/**
+ * The newest value and the start of the unbroken run of that value. Samples are oldest first and
+ * were read from `windowStart` on. A run goes back as far as the value stayed the same without a
+ * pause; only a run that reaches the start of the window began before it.
+ */
+export function currentRun(topic: string, samples: ReadonlyArray<Sample>, windowStart: string): Reading {
   const newest = samples.at(-1)
   if (!newest) return { value: null, at: null, since: null, sinceIsLowerBound: false, topic }
-  let start = samples.length - 1
-  while (start > 0 && samples[start - 1]?.value === newest.value) start--
+  let since = newest.at
+  let reachesFirstSample = true
+  for (let index = samples.length - 2; index >= 0; index--) {
+    const before = samples[index]
+    if (!before || before.value !== newest.value || silentBetween(before.at, since)) {
+      reachesFirstSample = false
+      break
+    }
+    since = before.at
+  }
   return {
     value: newest.value,
     at: newest.at,
-    since: samples[start]?.at ?? newest.at,
-    sinceIsLowerBound: start === 0,
+    since,
+    sinceIsLowerBound: reachesFirstSample && !silentBetween(windowStart, since),
     topic,
   }
 }
@@ -111,10 +132,14 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
       const read = async (name: ReadingName): Promise<Reading> => {
         const topic = `machines/${serialNumber}/${paths[name]}`
         const samples = samplesOf(inWindow[name], topic)
-        if (samples.length > 0) return currentRun(topic, samples)
+        if (samples.length > 0) return currentRun(topic, samples, windowStart.toISOString())
         // Silent for longer than the window: the last known value, without a "since".
         const [last] = await readStrings(apis, topic, horizon, now, 1)
-        return { ...currentRun(topic, last?.samples ?? []), since: null, sinceIsLowerBound: false }
+        return {
+          ...currentRun(topic, last?.samples ?? [], horizon.toISOString()),
+          since: null,
+          sinceIsLowerBound: false,
+        }
       }
       const [connection, itemState, operationMode, program] = await Promise.all([
         read("connection"),
