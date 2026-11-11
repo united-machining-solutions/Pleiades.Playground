@@ -21,7 +21,7 @@ docker compose up -d --build
 | Events API | <http://localhost:5510/> | Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp` |
 | MQTT broker | `localhost:1883` | Anonymous in the demo network |
 | Generative UI backend | <http://localhost:5520/mcp> | MCP server for displays, see [`apps/genui-mcp`](apps/genui-mcp/README.md) |
-| Example app | <http://localhost:5600/> | What every machine does now, and a chat about it; see [`apps/playground-app`](apps/playground-app/README.md) |
+| Example app | <http://localhost:5600/> | What every machine does now, and a chat about it; see [`apps/app`](apps/app/README.md) |
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo.
@@ -39,7 +39,7 @@ Four layers, three agreed interfaces. Everything below the solution layer is the
 
 | Agreed interface | Contract | Where |
 |---|---|---|
-| Data | Topics, value envelope and units on the broker | [`contracts/mqtt`](contracts/mqtt/README.md), [`contracts/datamodel`](contracts/README.md) |
+| Data | Topics, value envelope and units on the broker | [`contracts/mqtt`](contracts/mqtt/README.md), [`contracts/datamodel`](contracts/datamodel/README.md) |
 | Interfaces | REST (OpenAPI) and MCP tools | [`contracts/openapi`](contracts/openapi/README.md), [`contracts/mcp`](contracts/mcp/README.md) |
 | Runtime | Every service is a container image | `Dockerfile` next to each service, [`compose.yaml`](compose.yaml) |
 
@@ -90,4 +90,4 @@ unit `one` (1.0 = 100 %). Displays convert, the wire does not. See
 - [CONTRIBUTING.md](CONTRIBUTING.md): pull requests, sign-off (DCO), checks.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability.
 - Code and contracts: [Apache-2.0](LICENSE). Documentation and demo content: [CC BY 4.0](LICENSE-docs).
-- The data model under `contracts/datamodel` is a separate project with its own licence.
+- The data model referenced in `contracts/datamodel` is a separate project with its own licence.

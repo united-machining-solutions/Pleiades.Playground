@@ -1,7 +1,8 @@
 ---
 title: "The data model is a submodule, the binding is ours"
-status: accepted
+status: superseded
 date: 2026-11-10
+superseded-by: 0006
 ---
 
 # ADR-0005: Data model as a submodule

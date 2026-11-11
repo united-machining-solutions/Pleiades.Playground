@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using MQTTnet.Client;
+using MQTTnet;
 
 namespace Pleiades.Playground.HealthChecks.Mqtt;
 

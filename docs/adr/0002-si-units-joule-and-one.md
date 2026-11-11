@@ -26,7 +26,7 @@ Displays convert to what people are used to (millimetre, 1/min, bar, percent, kW
 
 - No value is ambiguous; statistics and comparisons need no conversion table.
 - Adapters convert once at the source and must know the unit of every signal.
-- The data model under `contracts/datamodel` lists energy in watt hours; the binding documents the deviation.
+- The data model referenced in `contracts/datamodel` lists energy in watt hours; the binding documents the deviation.
 
 ## Alternatives considered
 

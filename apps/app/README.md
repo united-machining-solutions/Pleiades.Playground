@@ -1,4 +1,4 @@
-# playground-app
+# app
 
 The example application: a single-page app on [TanStack Start](https://tanstack.com/start). The browser renders
 the app. The server delivers the document, the server routes and the server functions, and runs the agent
@@ -21,17 +21,22 @@ everything else works.
 
 | | |
 |---|---|
-| In the demo stack | <http://localhost:5600/>, port from `APP_PORT` |
+| In the demo stack | <http://localhost:5600/>, port from `APP_PORT`, on this computer only (`APP_BIND`) |
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app` |
 | Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` for the chat: any OpenAI-compatible endpoint (chat completions). The key stays on the server. |
+
+**The chat has no sign-in.** The agent harness runs with open access: whoever reaches the port can chat with
+the configured model, at the cost of whoever owns its key, and can list and read every chat. So the demo
+stack publishes the port on this computer only (`APP_BIND`, `127.0.0.1` if unset). To show the app from another
+device, set `APP_BIND=0.0.0.0`, and only in a network you trust.
 
 ## Develop
 
 ```bash
 pnpm install
-pnpm --filter @pleiades/playground-app dev
-pnpm --filter @pleiades/playground-app test
+pnpm --filter @pleiades/app dev
+pnpm --filter @pleiades/app test
 ```
 
 The development server listens on <http://localhost:3000/> and reads from <http://localhost:5520/mcp>, where
