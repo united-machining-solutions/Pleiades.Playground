@@ -16,6 +16,19 @@ const producing = (itemState: Array<Sample>, to: number) => ({
   connection: every5s(-5, to, "Connected"),
   operationMode: every5s(-5, to, "Processing"),
   itemState,
+  heartbeat: [],
+  errors: [],
+})
+
+/**
+ * A machine that told its state once, an hour before, and has given only its heartbeat since.
+ * The heartbeat counts up, every five seconds.
+ */
+const toldOnce = (heartbeatTo: number) => ({
+  connection: [{ at: at(-3600), value: "Connected" }],
+  operationMode: [{ at: at(-3600), value: "Processing" }],
+  itemState: [{ at: at(-3600), value: "Executing" }],
+  heartbeat: every5s(-5, heartbeatTo, "beat").map((sample, index) => ({ ...sample, value: String(index) })),
   errors: [],
 })
 
@@ -71,6 +84,7 @@ test("a silence is no data from 30 seconds after the last value until the next o
     connection: silentBetween("Connected"),
     operationMode: silentBetween("Processing"),
     itemState: silentBetween("Executing"),
+    heartbeat: [],
     errors: [],
   }
   const spans = spansBetween(at(0), at(300), past)
@@ -83,6 +97,36 @@ test("a silence is no data from 30 seconds after the last value until the next o
 })
 
 test("nothing known is no data", () => {
-  const past = { connection: [], itemState: [], operationMode: [], errors: [] }
+  const past = { connection: [], itemState: [], operationMode: [], heartbeat: [], errors: [] }
   assert.deepEqual(spansBetween(at(0), at(300), past), [{ state: "no-data", from: at(0), to: at(300) }])
+})
+
+test("a machine that told its state once keeps it while its heartbeat arrives", () => {
+  assert.deepEqual(spansBetween(at(0), at(600), toldOnce(600)), [{ state: "running", from: at(0), to: at(600) }])
+})
+
+test("a state that was told once changes with the next value, not before", () => {
+  const past = {
+    ...toldOnce(600),
+    itemState: [
+      { at: at(-3600), value: "Executing" },
+      { at: at(250), value: "NotExecuting" },
+    ],
+  }
+  assert.deepEqual(spansBetween(at(0), at(600), past), [
+    { state: "running", from: at(0), to: at(250) },
+    { state: "stopped", from: at(250), to: at(600) },
+  ])
+})
+
+test("without its heartbeat a machine that told its state once has no data", () => {
+  const spans = spansBetween(at(0), at(600), toldOnce(60))
+  assert.deepEqual(
+    spans.map((span) => span.state),
+    ["running", "no-data"],
+  )
+  assert.equal(spans[1]?.from, new Date(Date.parse(at(90)) + 1).toISOString())
+
+  const never = { ...toldOnce(600), heartbeat: [] }
+  assert.deepEqual(spansBetween(at(0), at(600), never), [{ state: "no-data", from: at(0), to: at(600) }])
 })

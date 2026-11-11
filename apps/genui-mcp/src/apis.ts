@@ -29,15 +29,21 @@ const topicsAnswer = z.object({
   booleanTopics: z.array(z.string()).default([]),
 })
 
-const stringSeriesAnswer = z.object({
-  series: z.array(
-    z.object({
-      topic: z.string(),
-      timestamps: z.array(z.number()),
-      values: z.array(z.string().nullable()),
-    }),
-  ),
-})
+type SeriesAnswer = {
+  series: Array<{ topic: string; timestamps: Array<number>; values: Array<string | number | null> }>
+}
+const seriesAnswer = (value: z.ZodType<string | number>): z.ZodType<SeriesAnswer> =>
+  z.object({
+    series: z.array(
+      z.object({
+        topic: z.string(),
+        timestamps: z.array(z.number()),
+        values: z.array(value.nullable()),
+      }),
+    ),
+  })
+const stringSeriesAnswer = seriesAnswer(z.string())
+const numberSeriesAnswer = seriesAnswer(z.number())
 
 const pairsAnswer = z.object({
   items: z.array(
@@ -73,12 +79,12 @@ export async function listTopics(apis: Apis, from: Date, to: Date): Promise<Arra
   return [...answer.baseUnitTopics, ...answer.stringTopics, ...answer.booleanTopics]
 }
 
-/**
- * The text values of a topic between the two instants, oldest first. The topic may contain `*`
- * as a wildcard and then yields one series per topic. `newest` keeps only that many of the
- * newest values, counted over all series together.
- */
-export async function readStrings(
+/** How the values of a topic are read: the topic, from when to when, and how many of the newest. */
+export type ReadValues = (apis: Apis, topic: string, from: Date, to: Date, newest?: number) => Promise<Array<Series>>
+
+async function readSeries(
+  kind: "stringValues" | "baseUnitValues",
+  answer: z.ZodType<SeriesAnswer>,
   apis: Apis,
   topic: string,
   from: Date,
@@ -86,7 +92,7 @@ export async function readStrings(
   newest?: number,
 ): Promise<Array<Series>> {
   const url = between(
-    new URL(`/timeseries/stringValues/topics/${topic}`, apis.timeseriesUrl),
+    new URL(`/timeseries/${kind}/topics/${topic}`, apis.timeseriesUrl),
     ["startTime", "stopTime"],
     from,
     to,
@@ -95,17 +101,27 @@ export async function readStrings(
     url.searchParams.set("limit", String(newest))
     url.searchParams.set("sorting", "Descending")
   }
-  const answer = await getJson(url, stringSeriesAnswer)
-  return answer.series.map((series) => ({
-    topic: series.topic,
-    samples: series.timestamps
+  const { series } = await getJson(url, answer)
+  return series.map((one) => ({
+    topic: one.topic,
+    samples: one.timestamps
       .flatMap((timestamp, index) => {
-        const value = series.values[index]
-        return value == null ? [] : [{ at: fromMicroseconds(timestamp), value }]
+        const value = one.values[index]
+        return value == null ? [] : [{ at: fromMicroseconds(timestamp), value: String(value) }]
       })
       .sort((a, b) => a.at.localeCompare(b.at)),
   }))
 }
+
+/**
+ * The text values of a topic between the two instants, oldest first. The topic may contain `*`
+ * as a wildcard and then yields one series per topic. `newest` keeps only that many of the
+ * newest values, counted over all series together.
+ */
+export const readStrings: ReadValues = (...read) => readSeries("stringValues", stringSeriesAnswer, ...read)
+
+/** The same for a topic whose values are numbers. A number comes back as its text. */
+export const readNumbers: ReadValues = (...read) => readSeries("baseUnitValues", numberSeriesAnswer, ...read)
 
 /** The notifications of one level that were raised between the two instants, each with when it went. */
 async function readPairs(apis: Apis, level: NotificationLevel, from: Date, to: Date, machine?: string) {

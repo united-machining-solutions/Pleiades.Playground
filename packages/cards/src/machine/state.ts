@@ -19,12 +19,12 @@ export type Known = {
   operationMode: string | null
   /** An error was raised and has not gone. */
   error: boolean
-  /** The newest value is no older than SILENT_AFTER_SECONDS. */
+  /** The newest sign of life, a heartbeat or any value, is no older than SILENT_AFTER_SECONDS. */
   live: boolean
 }
 
 export function stateFrom(known: Known): State {
-  // Without current values the others are the last known ones, not the present.
+  // Without a sign of life the values are the last known ones, not the present.
   if (!known.live || known.connection !== "Connected") return "no-data"
   if (known.error) return "alarm"
   if (known.operationMode === "Setup") return "setup"
