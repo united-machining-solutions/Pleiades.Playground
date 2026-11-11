@@ -48,7 +48,8 @@ export const skillGuide = `# genui: skill guide
 - \`itemState\`: \`umati/State/MachineryItemState\`, for example \`Executing\` or \`NotExecuting\`.
 - \`operationMode\`: \`umati/State/MachineryOperationMode\`, for example \`Processing\` or \`Setup\`.
 - \`program\`: \`umati/Production/ActiveProgram\`.
-- \`notifications\`: warnings and errors that were raised and have not gone, newest first.
+- \`notifications\`: warnings and errors that were raised in the last 24 hours and have not gone,
+  newest first. One that has stood for longer is not among them, so an empty list does not rule it out.
 
 Do not derive a reason for a stop that the data does not give: a machine that stands without an open
 notification stands for a reason nobody recorded.

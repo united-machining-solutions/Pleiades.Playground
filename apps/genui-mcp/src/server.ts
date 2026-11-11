@@ -51,7 +51,7 @@ const timeZone = z
 const machineListTool = toolDefinition({
   name: "genui_machine_list",
   description:
-    "List every machine with what it does now: connection, state and operation mode with the time since when, the active program, and the warnings and errors that have not gone. Every value names the topic it comes from.",
+    "List every machine with what it does now: connection, state and operation mode with the time since when, the active program, and the warnings and errors of the last 24 hours that have not gone. Every value names the topic it comes from.",
   inputSchema: z.object({ timeZone }),
   outputSchema: machineList,
   metadata: { title: "List machines", annotations: readOnly },
