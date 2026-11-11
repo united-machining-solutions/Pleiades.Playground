@@ -157,6 +157,9 @@ jobs:
           # The built file, with the media type a host knows an MCP App by.
           grep -q 'text/html;profile=mcp-app' card.txt
           grep -q '<!doctype html>' card.txt
+          # It draws its own frame and says so, and it carries its notices.
+          grep -q '"prefersBorder":false' card.txt
+          grep -q 'Notices for the software in this file' card.txt
       - name: Logs on failure
         if: failure()
         run: docker compose logs --no-color --tail 200

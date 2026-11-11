@@ -33,7 +33,10 @@ All notable changes are documented here. The format follows
 - `genui-mcp` serves the machine card as an MCP App: `genui_machine_show` links the resource
   `ui://genui/machine`, one HTML file that draws the result in a host that shows MCP Apps. The example
   application keeps drawing the card itself. The shadcn theme moves to the card catalogue
-  (`packages/cards/src/theme.css`), so both draw the card with the same theme.
+  (`packages/cards/src/theme.css`), so both draw the card with the same theme. The file carries the notices
+  of the software in it, and it tells the host that it draws its own frame.
+- `genui-mcp` answers on stdin and stdout when started with `--stdio`, so a desktop host can start it as a
+  process of its own.
 
 ### Changed
 

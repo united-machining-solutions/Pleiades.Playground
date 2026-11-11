@@ -7,6 +7,7 @@ durations are computed here, never by a language model.
 | | |
 |---|---|
 | In the demo stack | <http://localhost:5520/mcp> (streamable HTTP), port from `GENUI_MCP_PORT` |
+| For a desktop host | stdin and stdout, when started with `--stdio` |
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.genui.mcp` |
 | Settings | `TIMESERIES_API_URL`, `EVENTS_API_URL` |
@@ -37,14 +38,41 @@ contract of the card and draws `MachineCard` of [`@pleiades/cards`](../../packag
 component the example application draws itself, with the same theme. So a card is one component in two
 wrappers: an application that imports it, and one HTML file for every other host.
 
-- The file is a single HTML page with its script and its styles inside, about 520 kB and 150 kB compressed.
+- The file is a single HTML page with its script and its styles inside, about 580 kB and 160 kB compressed.
   It loads nothing from anywhere, so a host has no origin to allow for it.
 - It shows what the result says and nothing newer: it calls no tool and does not refresh.
-- It is light and has the frame of the card. The font is the one the host names, so the card reads like the
-  conversation around it. Times are written by the clock of the browser.
+- It is light and draws the frame of the card itself. It says so to the host (`prefersBorder: false`), as the
+  standard recommends, so no host puts a second frame around it. The font is the one the host names, so the
+  card reads like the conversation around it. Times are written by the clock of the browser.
+- It travels alone, so it carries its notices: a comment at its end holds the `NOTICE` of this repository
+  and the licence of every package the build put into the file.
 
 To see it, add `http://localhost:5520/mcp` to a host that shows MCP Apps and ask for one machine. A host that
 runs somewhere else needs an address it can reach.
+
+### In a desktop host
+
+A desktop host starts a server as a process of its own and talks to it on stdin and stdout. Started with
+`--stdio`, this server answers there instead of on a port. With the demo stack running, the image is enough,
+for example as an entry in the configuration file of the Claude desktop app:
+
+```json
+{
+  "mcpServers": {
+    "pleiades-genui": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm", "--no-healthcheck",
+        "--network", "pleiades-playground_default",
+        "-e", "TIMESERIES_API_URL=http://timeseries-api:8080",
+        "-e", "EVENTS_API_URL=http://events-api:8080",
+        "ghcr.io/united-machining-solutions/pleiades.playground.genui.mcp:dev",
+        "--stdio"
+      ]
+    }
+  }
+}
+```
 
 ## When a machine is there
 
@@ -93,7 +121,7 @@ files and not those.
 
 ## What is where
 
-- `src/main.ts`: reads the settings and serves `/mcp` and `/health`.
+- `src/main.ts`: reads the settings and serves `/mcp` and `/health`, or with `--stdio` stdin and stdout.
 - `src/server.ts`: the MCP server, its tools and its resources. An application imports its type and calls it
   with `createMCPClient<typeof server>`.
 - `src/card-file.ts`: reads a built card file.
