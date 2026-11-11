@@ -6,7 +6,10 @@ Its tools read the Timeseries API and the Events API and return what a display n
 where each value comes from, and since when it has lasted. Numbers, order and durations are computed
 here, never by a language model.
 
-Discovery: call genui_get_skill_guide once, then the tool that fits the question.
+A result is an answer, not raw data. Its text says in words what the values are, and a host that
+shows MCP Apps draws them as a card. So a question about a machine takes one call and no preparation:
+call the tool that fits the question. genui_get_skill_guide explains the values, for a reader that
+works with them.
 
 Tools:
 - genui_machine_list: every machine with what it does now.
@@ -16,7 +19,17 @@ Tools:
 
 export const skillGuide = `# genui: skill guide
 
-## What a result contains
+## A result is an answer
+
+- The text of a result says in words what a display shows: what a machine does, since when, with
+  which program, and for one machine how long each state lasted over the last hours. The values
+  next to the text are for a display.
+- A host that shows MCP Apps draws the result of \`genui_machine_show\` as the machine card. The
+  person then sees every value. Say what matters in a sentence or two. Do not list the values again,
+  and do not draw them again.
+- The rest of this guide is for a reader that works with the values.
+
+## What the values contain
 
 - Every instant is ISO 8601. It is in UTC, unless the call names a \`timeZone\`: then it is a local
   time there with its offset, for example \`2026-11-11T09:00:41.000+01:00\`.
@@ -68,5 +81,7 @@ A span has one of five states, decided from the values in this order:
 - \`stopped\`: the item state is anything but \`Executing\`.
 - \`running\`: everything else.
 
-The spans are the result of that rule, so add up their durations and do not count states yourself.
+\`history.totals\` says how long each state lasted in total between \`from\` and \`to\`, in seconds.
+The sums are added up here, from the spans. Take them from there: do not add up spans, and do not
+count states yourself.
 `

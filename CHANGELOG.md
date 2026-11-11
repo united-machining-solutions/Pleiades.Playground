@@ -37,6 +37,10 @@ All notable changes are documented here. The format follows
   of the software in it, and it tells the host that it draws its own frame.
 - `genui-mcp` answers on stdin and stdout when started with `--stdio`, so a desktop host can start it as a
   process of its own.
+- The machine tools of `genui-mcp` answer in words. The text of a result says in a few lines what a display
+  shows, and the values stay in `structuredContent`, so a language model no longer reads the history of a
+  machine as raw data. The sums of that history come from the server (`history.totals`); the card no longer
+  adds them up.
 
 ### Changed
 

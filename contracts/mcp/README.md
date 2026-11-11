@@ -13,8 +13,10 @@ the server is the source of truth for tool names and parameters.
 | Generative UI | `http://localhost:5520/mcp` | `genui_machine_list`, `genui_machine_show` |
 
 The generative UI server is not an API of its own: it reads the two servers above over REST and returns what
-a display needs, each value with the topic or notification it comes from. `genui_machine_show` links the
-machine card, the resource `ui://genui/machine`: a host that shows MCP Apps draws the result with it.
+a display needs, each value with the topic or notification it comes from. Its results are answers, not raw
+data: the text of a result says in words what the values are, so its tools need no call before them.
+`genui_machine_show` links the machine card, the resource `ui://genui/machine`: a host that shows MCP Apps
+draws the result with it.
 
 Example entry for an MCP client:
 

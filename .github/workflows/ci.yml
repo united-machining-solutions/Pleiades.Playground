@@ -148,6 +148,9 @@ jobs:
             -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"genui_machine_show","arguments":{"machine":"P-04"}}}' \
             | tee machine.txt
           grep -q '"spans"' machine.txt
+          # The text says the machine in words, and the sums of the history come from the server.
+          grep -q '"text":"P-04: ' machine.txt
+          grep -q '"totals"' machine.txt
       - name: The backend serves the machine card as an MCP App
         run: |
           curl -fsS -X POST http://localhost:5520/mcp \

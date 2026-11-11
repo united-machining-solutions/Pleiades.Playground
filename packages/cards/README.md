@@ -43,6 +43,8 @@ Both import the theme from here, so the card looks the same in both.
     does: the backend asks it for the past, the lists and the cards for the present.
   - `tell.ts` says in words what is the matter, `format.ts` writes times and durations, `state-symbol.tsx`
     draws the signs, `state-band.tsx` the band of states over time.
+  - `in-words.ts`: the list and the card in words, for a reader that does not see them. The backend sends
+    them as the text of a result, which is what a language model reads.
   - `machine-card.tsx`: the machine card.
 - `src/ui/`: the [shadcn/ui](https://ui.shadcn.com) components the cards are built from, kept as generated.
   An application imports them from here instead of keeping a second copy.

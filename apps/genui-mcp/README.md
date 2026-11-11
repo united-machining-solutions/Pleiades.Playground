@@ -17,8 +17,8 @@ durations are computed here, never by a language model.
 | Tool | What it returns |
 |---|---|
 | `genui_machine_list` | Every machine with what it does now: connection, heartbeat, state and operation mode with the time since when, the active program, and the warnings and errors of the last 24 hours that have not gone. |
-| `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and the states it went through over the last hours (`hours`, 8 if omitted) as spans without a gap. Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
-| `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. |
+| `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and what it did over the last hours (`hours`, 8 if omitted): how long each state lasted in total, and the states as spans without a gap. Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. A question about a machine needs neither: a result answers it. |
 
 | Resource | What it is |
 |---|---|
@@ -28,6 +28,24 @@ durations are computed here, never by a language model.
 Every instant of a result is ISO 8601 in UTC. The two machine tools also take a `timeZone`, an IANA name such
 as `Europe/Zurich`: then every instant is a local time there with its offset, `2026-11-11T09:00:41.000+01:00`.
 So whoever reads the result, a language model included, has nothing to convert.
+
+## A result is an answer
+
+A result has two parts, for two readers:
+
+- **Its text is for a language model**, and for a host that shows nothing else. It says in words what a
+  display shows: what a machine does, since when, with which program, and for one machine how long each
+  state lasted over the last hours. A few lines, in the words of the card.
+- **Its values (`structuredContent`) are for a display.** The example application and the card file draw
+  them.
+
+So a model does not read a history of a few hundred spans to answer a question, and it adds nothing up:
+the sums come from here (`history.totals`). The text of `genui_machine_show` ends with a note for a model:
+where the host shows MCP Apps, the person already sees the card, and a sentence or two is the whole answer.
+
+Hosts differ in what they give a model. The standard for MCP Apps gives it the text. Some hosts give it
+the values instead. The chat of the example application is one of them, through its client library: there
+a model still reads every span.
 
 ## The machine card for other hosts
 
