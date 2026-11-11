@@ -37,6 +37,12 @@ by `Connection/State` and `Connection/Heartbeat`. This server reads it so:
 - **A silence ends a run.** What a value was while the machine was silent is not known, so "since" is the
   first value after the silence.
 
+## When an API fails
+
+A tool call fails with a sentence that names the API, what happened and where, for example
+`The Timeseries API did not answer: ECONNREFUSED (http://timeseries-api:8080/topics).` The server writes the
+same sentence to its log, once per failed request.
+
 ## Develop
 
 ```bash

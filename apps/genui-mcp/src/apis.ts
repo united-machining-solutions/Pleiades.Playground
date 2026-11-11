@@ -58,12 +58,41 @@ const pairsAnswer = z.object({
   ),
 })
 
-async function getJson<TAnswer>(url: URL, answer: z.ZodType<TAnswer>): Promise<TAnswer> {
-  const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
-  if (!response.ok) {
-    throw new Error(`${url.origin}${url.pathname} answered ${response.status}`)
+type Api = "Timeseries API" | "Events API"
+const TIMEOUT_SECONDS = 10
+
+/**
+ * Why a request got no answer. `fetch` only says "fetch failed" and keeps the reason, for example
+ * ECONNREFUSED, in the cause.
+ */
+function reasonOf(error: unknown): string {
+  if (!(error instanceof Error)) return String(error)
+  if (error.name === "TimeoutError") return `no answer within ${TIMEOUT_SECONDS} seconds`
+  const cause = error.cause as { code?: unknown; message?: unknown } | undefined
+  return String(cause?.code ?? cause?.message ?? error.message)
+}
+
+/**
+ * A request that failed, as an error that names the API and says what happened. It is logged
+ * here, once, because a tool call only carries it to whoever asked.
+ */
+function failure(api: Api, url: URL, what: string, cause?: unknown): Error {
+  const message = `The ${api} ${what} (${url.origin}${url.pathname}).`
+  console.error(message)
+  return new Error(message, { cause })
+}
+
+async function getJson<TAnswer>(api: Api, url: URL, answer: z.ZodType<TAnswer>): Promise<TAnswer> {
+  const unanswered = (error: unknown): never => {
+    throw failure(api, url, `did not answer: ${reasonOf(error)}`, error)
   }
-  return answer.parse(await response.json())
+  const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_SECONDS * 1000) }).catch(unanswered)
+  if (!response.ok) throw failure(api, url, `answered ${response.status}`)
+  const checked = answer.safeParse(await response.json().catch(unanswered))
+  if (!checked.success) {
+    throw failure(api, url, `answered in a shape this server does not know: ${z.prettifyError(checked.error)}`)
+  }
+  return checked.data
 }
 
 function between(url: URL, names: [from: string, to: string], from: Date, to: Date): URL {
@@ -75,8 +104,16 @@ function between(url: URL, names: [from: string, to: string], from: Date, to: Da
 /** Every topic that had a value between the two instants. */
 export async function listTopics(apis: Apis, from: Date, to: Date): Promise<Array<string>> {
   const url = between(new URL("/topics", apis.timeseriesUrl), ["startTime", "stopTime"], from, to)
-  const answer = await getJson(url, topicsAnswer)
+  const answer = await getJson("Timeseries API", url, topicsAnswer)
   return [...answer.baseUnitTopics, ...answer.stringTopics, ...answer.booleanTopics]
+}
+
+/**
+ * A topic as part of the path of a URL. Its levels stay levels and `*` stays the wildcard; what
+ * else a serial number may contain, a space or a question mark, must not end the path.
+ */
+export function inPath(topic: string): string {
+  return topic.split("/").map(encodeURIComponent).join("/")
 }
 
 /** How the values of a topic are read: the topic, from when to when, and how many of the newest. */
@@ -92,7 +129,7 @@ async function readSeries(
   newest?: number,
 ): Promise<Array<Series>> {
   const url = between(
-    new URL(`/timeseries/${kind}/topics/${topic}`, apis.timeseriesUrl),
+    new URL(`/timeseries/${kind}/topics/${inPath(topic)}`, apis.timeseriesUrl),
     ["startTime", "stopTime"],
     from,
     to,
@@ -101,7 +138,7 @@ async function readSeries(
     url.searchParams.set("limit", String(newest))
     url.searchParams.set("sorting", "Descending")
   }
-  const { series } = await getJson(url, answer)
+  const { series } = await getJson("Timeseries API", url, answer)
   return series.map((one) => ({
     topic: one.topic,
     samples: one.timestamps
@@ -134,7 +171,7 @@ async function readPairs(apis: Apis, level: NotificationLevel, from: Date, to: D
   url.searchParams.set("level", level)
   url.searchParams.set("Take", "1000")
   if (machine !== undefined) url.searchParams.set("mId", machine)
-  return (await getJson(url, pairsAnswer)).items
+  return (await getJson("Events API", url, pairsAnswer)).items
 }
 
 /** The notifications of one level that were raised between the two instants and have not gone. */

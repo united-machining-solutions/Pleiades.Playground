@@ -15,7 +15,13 @@ function connect() {
   return createMCPClient<typeof server>({ transport: { type: "http", url } })
 }
 
-/** Asks the backend and closes the connection again. */
+/** A tool that answered, but without values. Its message is the sentence the backend gave as the reason. */
+class Refused extends Error {}
+
+/**
+ * Asks the backend and closes the connection again. If there are no values, the error is a
+ * sentence that names who did not answer: the backend names its APIs, this function the backend.
+ */
 async function ask<TValues>(
   read: (backend: Awaited<ReturnType<typeof connect>>) => Promise<TValues>,
 ): Promise<Answer<TValues>> {
@@ -27,8 +33,20 @@ async function ask<TValues>(
       await backend.close()
     }
   } catch (error) {
-    return { values: null, error: error instanceof Error ? error.message : String(error) }
+    if (error instanceof Refused) return { values: null, error: error.message }
+    return { values: null, error: `The generative UI backend did not answer: ${reasonOf(error)}.` }
   }
+}
+
+/**
+ * Why a request got no answer. The client and `fetch` each wrap what the network said, for example
+ * ECONNREFUSED, in an error of their own: the innermost cause is the reason.
+ */
+function reasonOf(error: unknown): string {
+  let innermost = error
+  while (innermost instanceof Error && innermost.cause !== undefined) innermost = innermost.cause
+  const { code, message } = (innermost ?? {}) as { code?: unknown; message?: unknown }
+  return String(code ?? message ?? innermost)
 }
 
 /** What a tool wrote as text, which is where it says why it failed. */
@@ -47,7 +65,7 @@ export const getMachines = createServerFn({ method: "GET" }).handler(
     ask(async (backend) => {
       const result = await backend.callTool("genui_machine_list", {})
       if (result.isError || !result.structuredContent) {
-        throw new Error(textOf(result) ?? "genui_machine_list returned no values")
+        throw new Refused(textOf(result) ?? "genui_machine_list returned no values.")
       }
       return result.structuredContent
     }),
@@ -61,7 +79,7 @@ export const getMachine = createServerFn({ method: "GET" })
       ask(async (backend) => {
         const result = await backend.callTool("genui_machine_show", { machine })
         if (result.isError || !result.structuredContent) {
-          throw new Error(textOf(result) ?? "genui_machine_show returned no values")
+          throw new Refused(textOf(result) ?? "genui_machine_show returned no values.")
         }
         return result.structuredContent
       }),
