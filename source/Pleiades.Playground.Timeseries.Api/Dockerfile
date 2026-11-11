@@ -1,7 +1,7 @@
 # Build context: source/ (docker build -f source/Pleiades.Playground.Timeseries.Api/Dockerfile source).
 # The SDK stage publishes a portable, framework-dependent app, so one stage serves every target
 # architecture; --platform=$BUILDPLATFORM keeps the build native on the build machine.
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 COPY . .
 ARG VERSION=0.0.1
