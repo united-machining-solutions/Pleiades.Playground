@@ -30,6 +30,21 @@ All notable changes are documented here. The format follows
 - `genui-mcp` takes whether a machine is there from its signs of life, the heartbeat included, and lets a
   value hold until the next one of its topic. A machine that publishes its state only on a change is shown
   with that state, not as "No data".
+- `genui-mcp` serves the machine card as an MCP App: `genui_machine_show` links the resource
+  `ui://genui/machine`, one HTML file that draws the result in a host that shows MCP Apps. The example
+  application keeps drawing the card itself. The shadcn theme moves to the card catalogue
+  (`packages/cards/src/theme.css`), so both draw the card with the same theme. The file carries the notices
+  of the software in it, and it tells the host that it draws its own frame.
+- `genui-mcp` answers on stdin and stdout when started with `--stdio`, so a desktop host can start it as a
+  process of its own.
+- The machine tools of `genui-mcp` answer in words. The text of a result says in a few lines what a display
+  shows, and the values stay in `structuredContent`, so a language model no longer reads the history of a
+  machine as raw data. The sums of that history come from the server (`history.totals`); the card no longer
+  adds them up.
+- What a language model reads of a result is short, whichever part a host gives it. The states of a machine
+  over the last hours are no longer in the result of `genui_machine_show`: the machine card asks for the
+  spans of its band itself, with the new tool `genui_span_list`, which only a card calls. A history too long
+  for the band is thinned.
 
 ### Changed
 

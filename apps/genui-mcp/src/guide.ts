@@ -6,17 +6,31 @@ Its tools read the Timeseries API and the Events API and return what a display n
 where each value comes from, and since when it has lasted. Numbers, order and durations are computed
 here, never by a language model.
 
-Discovery: call genui_get_skill_guide once, then the tool that fits the question.
+A result is an answer, not raw data. Its text says in words what the values are, and a host that
+shows MCP Apps draws them as a card. So a question about a machine takes one call and no preparation:
+call the tool that fits the question. genui_get_skill_guide explains the values, for a reader that
+works with them.
 
 Tools:
 - genui_machine_list: every machine with what it does now.
-- genui_machine_show: one machine with what it does now and what it did over the last hours.
+- genui_machine_show: one machine with what it does now and how long each state lasted over the last hours.
+- genui_span_list: the states of one machine as spans, for the band of a card. A card calls it.
 - genui_describe_server: this text.
 - genui_get_skill_guide: the conventions of this server as markdown.`
 
 export const skillGuide = `# genui: skill guide
 
-## What a result contains
+## A result is an answer
+
+- The text of a result says in words what a display shows: what a machine does, since when, with
+  which program, and for one machine how long each state lasted over the last hours. The values
+  next to the text are for a display.
+- A host that shows MCP Apps draws the result of \`genui_machine_show\` as the machine card. The
+  person then sees every value. Say what matters in a sentence or two. Do not list the values again,
+  and do not draw them again.
+- The rest of this guide is for a reader that works with the values.
+
+## What the values contain
 
 - Every instant is ISO 8601. It is in UTC, unless the call names a \`timeZone\`: then it is a local
   time there with its offset, for example \`2026-11-11T09:00:41.000+01:00\`.
@@ -57,8 +71,14 @@ notification stands for a reason nobody recorded.
 ## One machine
 
 \`genui_machine_show\` takes the serial number (\`machine\`) and returns the same readings for that
-machine, and its \`history\`: the states between \`from\` and \`to\` as spans without a gap, oldest
-first. \`hours\` says how far back the history goes, 8 if omitted, 24 at most.
+machine, and its \`history\`: how long each state lasted in total between \`from\` and \`to\`
+(\`totals\`, in seconds). \`hours\` says how far back the history goes, 8 if omitted, 24 at most.
+The sums are added up here. Take them from there, and do not count states yourself.
+
+The states themselves, as spans without a gap and oldest first, are what a card draws as a band.
+They grow with time, so they are not in that result: a card asks \`genui_span_list\` for them, with
+\`history.from\` and \`history.to\`. A question about how long or how often is answered by the sums.
+Ask for the spans only to say when something happened.
 
 A span has one of five states, decided from the values in this order:
 
@@ -68,5 +88,7 @@ A span has one of five states, decided from the values in this order:
 - \`stopped\`: the item state is anything but \`Executing\`.
 - \`running\`: everything else.
 
-The spans are the result of that rule, so add up their durations and do not count states yourself.
+A band has room for a few hundred spans. A history with more is thinned to that many: each slot of
+the band then shows the state that lasted longest in it, and an alarm always keeps a slot, so none
+is thinned away. The sums are not affected: they are added up from every span.
 `

@@ -1,4 +1,3 @@
-import { MachineCard } from "@pleiades/cards/machine/machine-card.tsx"
 import { stateOf } from "@pleiades/cards/machine/state.ts"
 import { Card } from "@pleiades/cards/ui/card.tsx"
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react"
@@ -42,6 +41,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { MachineRow } from "@/machines/machine-item.tsx"
+import { ShownMachine } from "@/machines/shown-machine.tsx"
 
 import { Answer } from "./answer.tsx"
 import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
@@ -259,7 +259,7 @@ function Conversation({ threadId }: { threadId: string }) {
                             // The app draws the values of a tool itself: a card from the catalogue,
                             // or a list with the same rows as Home.
                             const shown = machineShowOf(part.content)
-                            if (shown) return <MachineCard key={index} {...shown} />
+                            if (shown) return <ShownMachine key={index} values={shown} />
                             const list = machineListOf(part.content)
                             if (!list) return null
                             return (

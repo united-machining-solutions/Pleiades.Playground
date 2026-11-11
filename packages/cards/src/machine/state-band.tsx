@@ -1,4 +1,4 @@
-import type { MachineShow, State } from "./contract.ts"
+import type { MachineShow, Span, State } from "./contract.ts"
 import { clock, lasting } from "./format.ts"
 import { stateLabel } from "./state.ts"
 import { StateSymbol } from "./state-symbol.tsx"
@@ -15,20 +15,19 @@ const band: Record<State, string> = {
   "no-data": "band-no-data",
 }
 
-/** The order in which the sums below the band are read. */
-const order: ReadonlyArray<State> = ["running", "setup", "stopped", "alarm", "no-data"]
+/**
+ * The spans of a band. They reach a card after its values: undefined while they are on their
+ * way, null if they are not to be had.
+ */
+export type Spans = ReadonlyArray<Span> | null | undefined
 
 /**
  * What a machine did over the last hours: one band, and below it how long each state lasted in
- * total. The sums say in words what the band shows.
+ * total. The sums say in words what the band shows. They come with the history: the backend
+ * adds them up. Without its spans the band is left out, and the sums stand alone.
  */
-export function StateBand({ history }: { history: MachineShow["history"] }) {
-  const total = Date.parse(history.to) - Date.parse(history.from)
-  const sums = new Map<State, number>()
-  for (const span of history.spans) {
-    sums.set(span.state, (sums.get(span.state) ?? 0) + Date.parse(span.to) - Date.parse(span.from))
-  }
-  const hours = Math.round(total / 3_600_000)
+export function StateBand({ history, spans }: { history: MachineShow["history"]; spans: Spans }) {
+  const hours = Math.round((Date.parse(history.to) - Date.parse(history.from)) / 3_600_000)
   return (
     <figure className="flex flex-col gap-1.5">
       <figcaption className="flex justify-between gap-2 text-xs text-muted-foreground tabular-nums">
@@ -38,24 +37,25 @@ export function StateBand({ history }: { history: MachineShow["history"] }) {
         </span>
       </figcaption>
       {/* The sums below say the same in words, so the band itself is skipped by a screen reader. */}
-      <div aria-hidden className="flex h-3 overflow-hidden rounded-sm">
-        {history.spans.map((span) => (
-          <div
-            key={span.from}
-            className={band[span.state]}
-            style={{ flexGrow: Date.parse(span.to) - Date.parse(span.from), flexBasis: 0 }}
-          />
-        ))}
-      </div>
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground tabular-nums">
-        {order
-          .filter((state) => sums.has(state))
-          .map((state) => (
-            <li key={state} className="flex items-center gap-1.5">
-              <StateSymbol state={state} />
-              {stateLabel[state]} {lasting(sums.get(state) ?? 0)}
-            </li>
+      {spans === undefined && <div aria-hidden className="h-3 animate-pulse rounded-sm bg-muted" />}
+      {spans && (
+        <div aria-hidden className="flex h-3 overflow-hidden rounded-sm">
+          {spans.map((span) => (
+            <div
+              key={span.from}
+              className={band[span.state]}
+              style={{ flexGrow: Date.parse(span.to) - Date.parse(span.from), flexBasis: 0 }}
+            />
           ))}
+        </div>
+      )}
+      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground tabular-nums">
+        {history.totals.map(({ state, seconds }) => (
+          <li key={state} className="flex items-center gap-1.5">
+            <StateSymbol state={state} />
+            {stateLabel[state]} {lasting(seconds * 1000)}
+          </li>
+        ))}
       </ul>
     </figure>
   )

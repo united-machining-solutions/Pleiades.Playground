@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node --watch src/main.ts",
     "start": "node src/main.ts",
-    "typecheck": "tsc",
+    "build": "vite build ui",
+    "typecheck": "tsc && tsc --project ui",
     "test": "node --test"
   },
   "dependencies": {
@@ -17,7 +18,21 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@base-ui/react": "catalog:",
+    "@modelcontextprotocol/ext-apps": "catalog:",
+    "@tailwindcss/vite": "catalog:",
     "@types/node": "catalog:",
-    "typescript": "catalog:"
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "class-variance-authority": "catalog:",
+    "cn": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "rollup-plugin-license": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-singlefile": "catalog:"
   }
 }

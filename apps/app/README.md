@@ -77,5 +77,5 @@ the backend of the running demo stack answers.
   generated. `components.json` holds the settings of the preset `b5JNecjwG`. The layout follows the block
   `sidebar-15`: the pages on the left, the chat on the right. `Badge` and `Card` live in `@pleiades/cards`,
   because the cards are built from them.
-- `src/styles.css`: the theme of the preset, light only. The chart and state colours come with
-  `@pleiades/cards`.
+- `src/styles.css`: Tailwind and the font. The theme of the preset, light only, and the chart and state
+  colours come with `@pleiades/cards`, so a card looks the same wherever it is drawn.

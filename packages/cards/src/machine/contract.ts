@@ -61,6 +61,12 @@ export type State = z.infer<typeof state>
 export const span = z.object({ state, from: instant, to: instant })
 export type Span = z.infer<typeof span>
 
+export const total = z.object({
+  state,
+  seconds: z.number().describe("How long the machine was in that state between `from` and `to`, in seconds."),
+})
+export type Total = z.infer<typeof total>
+
 /** The list of machines: what every machine does now. An application draws it with rows of its own. */
 export const machineList = z.object({
   asOf: instant,
@@ -69,7 +75,11 @@ export const machineList = z.object({
 })
 export type MachineList = z.infer<typeof machineList>
 
-/** The machine card: what one machine does now, and what it did in the hours before. */
+/**
+ * The machine card: what one machine does now, and how long each state lasted in the hours
+ * before. These values are few, so a language model can read them. The states themselves, the
+ * spans of the band, are not among them: a card asks for those itself (`spanList`).
+ */
 export const machineShow = z.object({
   asOf: instant,
   windowSeconds: z.number().describe("How far back the values were read to find `since`."),
@@ -77,7 +87,28 @@ export const machineShow = z.object({
   history: z.object({
     from: instant,
     to: instant,
-    spans: z.array(span).describe("The states between `from` and `to`, oldest first and without a gap."),
+    totals: z
+      .array(total)
+      .describe(
+        "How long each state lasted in total between `from` and `to`, in the order a display reads the states. A state that did not occur is not listed.",
+      ),
   }),
 })
 export type MachineShow = z.infer<typeof machineShow>
+
+/**
+ * The states of one machine between two instants: what the band of the machine card draws. A
+ * card asks for them after its values, with the `from` and `to` of their history, so the band and
+ * the sums are about the same hours. They grow with time, so they are not part of what a language
+ * model reads.
+ */
+export const spanList = z.object({
+  machine: z.string().describe("The serial number of the machine."),
+  from: instant,
+  to: instant,
+  spans: z.array(span).describe("The states between `from` and `to`, oldest first and without a gap."),
+})
+export type SpanList = z.infer<typeof spanList>
+
+/** How many spans a band has room for: about one for each pixel of its width. */
+export const BAND_SLOTS = 720

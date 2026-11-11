@@ -13,7 +13,8 @@ export type Told = {
   atLeast: boolean
 }
 
-export function tell(machine: Machine, state: State): Told {
+/** `time` writes an instant as a time of day: the clock of the browser, unless the caller has another. */
+export function tell(machine: Machine, state: State, time: (instant: string) => string = clock): Told {
   const { itemState, operationMode, program } = machine
   const warning = openWarning(machine)
   switch (state) {
@@ -38,7 +39,7 @@ export function tell(machine: Machine, state: State): Told {
         message: "No data from the adapter",
         detail:
           itemState.value && itemState.at
-            ? `Last known: ${itemState.value} at ${clock(itemState.at)}`
+            ? `Last known: ${itemState.value} at ${time(itemState.at)}`
             : "Nothing known about this machine",
         since: machine.lastValueAt,
         atLeast: false,

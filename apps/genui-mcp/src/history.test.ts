@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { Sample } from "./apis.ts"
-import { spansBetween } from "./history.ts"
+import { spansBetween, thinned, totalsOf } from "./history.ts"
 
 const start = "2026-11-16T09:00:00.000Z"
 /** An instant that many seconds after the start. */
@@ -129,4 +129,57 @@ test("without its heartbeat a machine that told its state once has no data", () 
 
   const never = { ...toldOnce(600), heartbeat: [] }
   assert.deepEqual(spansBetween(at(0), at(600), never), [{ state: "no-data", from: at(0), to: at(600) }])
+})
+
+test("a history too long for a band is thinned to the state that lasted longest in each slot", () => {
+  const spans = [
+    { state: "running" as const, from: at(0), to: at(40) },
+    { state: "stopped" as const, from: at(40), to: at(45) },
+    { state: "running" as const, from: at(45), to: at(60) },
+    { state: "stopped" as const, from: at(60), to: at(100) },
+  ]
+  // The stop of five seconds is too short for a slot of fifty; the long one stays.
+  assert.deepEqual(thinned(spans, 2), [
+    { state: "running", from: at(0), to: at(50) },
+    { state: "stopped", from: at(50), to: at(100) },
+  ])
+  // A history that fits stays as it is.
+  assert.deepEqual(thinned(spans, 4), spans)
+})
+
+test("an alarm is never thinned away: it keeps the slot most of it lies in", () => {
+  const spans = [
+    { state: "running" as const, from: at(0), to: at(48) },
+    { state: "alarm" as const, from: at(48), to: at(51) },
+    { state: "running" as const, from: at(51), to: at(100) },
+  ]
+  assert.deepEqual(thinned(spans, 2), [
+    { state: "alarm", from: at(0), to: at(50) },
+    { state: "running", from: at(50), to: at(100) },
+  ])
+  // An alarm that already shows in one slot does not take a second one.
+  const long = [
+    { state: "running" as const, from: at(0), to: at(10) },
+    { state: "alarm" as const, from: at(10), to: at(55) },
+    { state: "running" as const, from: at(55), to: at(100) },
+  ]
+  assert.deepEqual(thinned(long, 2), [
+    { state: "alarm", from: at(0), to: at(50) },
+    { state: "running", from: at(50), to: at(100) },
+  ])
+})
+
+test("the sums of a history are added up here, in the order a display reads the states", () => {
+  const spans = [
+    { state: "no-data" as const, from: at(0), to: at(60) },
+    { state: "running" as const, from: at(60), to: at(300) },
+    { state: "stopped" as const, from: at(300), to: at(360) },
+    { state: "running" as const, from: at(360), to: at(600.5) },
+  ]
+  assert.deepEqual(totalsOf(spans), [
+    { state: "running", seconds: 480.5 },
+    { state: "stopped", seconds: 60 },
+    { state: "no-data", seconds: 60 },
+  ])
+  assert.deepEqual(totalsOf([]), [])
 })

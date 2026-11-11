@@ -1,9 +1,9 @@
-import { SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
-import type { Machine, MachineList, MachineShow, Reading } from "@pleiades/cards/machine/contract.ts"
+import { BAND_SLOTS, SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
+import type { Machine, MachineList, MachineShow, Reading, Span, SpanList } from "@pleiades/cards/machine/contract.ts"
 
 import { listTopics, readNumbers, readOpenNotifications, readRaised, readStrings } from "./apis.ts"
 import type { Apis, OpenNotification, Sample, Series } from "./apis.ts"
-import { spansBetween } from "./history.ts"
+import { spansBetween, thinned, totalsOf } from "./history.ts"
 import { silences, silentBetween } from "./liveness.ts"
 import type { Stretch } from "./liveness.ts"
 import { secondsBefore } from "./time.ts"
@@ -18,6 +18,8 @@ export const WINDOW_SECONDS = 30 * 60
 export const HORIZON_SECONDS = 24 * 60 * 60
 /** How many hours back the history of one machine goes, if nobody asks for more or less. */
 export const HISTORY_HOURS = 8
+/** How many hours a history covers at most. */
+export const MOST_HOURS = 24
 
 const paths = {
   connection: "umati/Connection/State",
@@ -150,19 +152,13 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
   return { asOf: now.toISOString(), windowSeconds: WINDOW_SECONDS, machines }
 }
 
-/** One machine: what it does now, as in the list, and the states of the hours before. */
-export async function showMachine(
-  apis: Apis,
-  serialNumber: string,
-  hours = HISTORY_HOURS,
-  now = new Date(),
-): Promise<MachineShow> {
-  const from = secondsBefore(now, hours * 60 * 60)
+/** The states of one machine between two instants, as spans without a gap. */
+async function readSpans(apis: Apis, serialNumber: string, from: Date, to: Date): Promise<Array<Span>> {
   // The signs of life just before say whether the machine was there where the history begins.
   const readFrom = secondsBefore(from, SILENT_AFTER_SECONDS)
   const topic = (name: ReadingName) => `machines/${serialNumber}/${paths[name]}`
   const read = async (name: ReadingName) =>
-    samplesOf(await readValues(name)(apis, topic(name), readFrom, now), topic(name))
+    samplesOf(await readValues(name)(apis, topic(name), readFrom, to), topic(name))
   /** The values of a reading, and before them the one that held where the history begins. */
   const readWithHeld = async (name: ReadingName) => {
     const [held, samples] = await Promise.all([
@@ -172,15 +168,29 @@ export async function showMachine(
     return [...samplesOf(held, topic(name)), ...samples]
   }
 
-  const [list, connection, itemState, operationMode, heartbeat, errors] = await Promise.all([
-    listMachines(apis, now),
+  const [connection, itemState, operationMode, heartbeat, errors] = await Promise.all([
     readWithHeld("connection"),
     readWithHeld("itemState"),
     readWithHeld("operationMode"),
     read("heartbeat"),
     // An error that still stands may have been raised long before the history begins.
-    readRaised(apis, "Error", serialNumber, secondsBefore(from, HORIZON_SECONDS), now),
+    readRaised(apis, "Error", serialNumber, secondsBefore(from, HORIZON_SECONDS), to),
   ])
+  return spansBetween(from.toISOString(), to.toISOString(), { connection, itemState, operationMode, heartbeat, errors })
+}
+
+/**
+ * One machine: what it does now, as in the list, and how long each state lasted in the hours
+ * before. The states themselves are not in this result: they grow with time (`listSpans`).
+ */
+export async function showMachine(
+  apis: Apis,
+  serialNumber: string,
+  hours = HISTORY_HOURS,
+  now = new Date(),
+): Promise<MachineShow> {
+  const from = secondsBefore(now, hours * 60 * 60)
+  const [list, spans] = await Promise.all([listMachines(apis, now), readSpans(apis, serialNumber, from, now)])
   const found = list.machines.find((one) => one.machine === serialNumber)
   if (!found) {
     const known = list.machines.map((one) => one.machine).join(", ") || "none"
@@ -190,10 +200,26 @@ export async function showMachine(
     asOf: list.asOf,
     windowSeconds: list.windowSeconds,
     machine: found,
-    history: {
-      from: from.toISOString(),
-      to: list.asOf,
-      spans: spansBetween(from.toISOString(), list.asOf, { connection, itemState, operationMode, heartbeat, errors }),
-    },
+    history: { from: from.toISOString(), to: list.asOf, totals: totalsOf(spans) },
   }
+}
+
+/**
+ * The states of one machine between two instants: what the band of the machine card draws. A
+ * card asks with the `from` and `to` of its values, so the band is about the same hours as the
+ * sums. A band has room for `slots` spans; a longer history is thinned to that many.
+ */
+export async function listSpans(
+  apis: Apis,
+  serialNumber: string,
+  from: string,
+  to: string,
+  slots = BAND_SLOTS,
+): Promise<SpanList> {
+  const [begin, end] = [new Date(from), new Date(to)]
+  const hours = (end.getTime() - begin.getTime()) / 3_600_000
+  if (!(hours > 0)) throw new Error("The spans end before they begin: `to` must be later than `from`.")
+  if (hours > MOST_HOURS) throw new Error(`The spans reach back ${MOST_HOURS} hours at most, as the history of a machine does.`)
+  const spans = thinned(await readSpans(apis, serialNumber, begin, end), slots)
+  return { machine: serialNumber, from: begin.toISOString(), to: end.toISOString(), spans }
 }

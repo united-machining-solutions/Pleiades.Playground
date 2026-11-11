@@ -1,5 +1,5 @@
-import type { Span } from "@pleiades/cards/machine/contract.ts"
-import { stateFrom } from "@pleiades/cards/machine/state.ts"
+import type { Span, State, Total } from "@pleiades/cards/machine/contract.ts"
+import { stateFrom, stateOrder, stateSeverity } from "@pleiades/cards/machine/state.ts"
 
 import type { Raised, Sample } from "./apis.ts"
 import { silences, silentAt } from "./liveness.ts"
@@ -71,4 +71,75 @@ export function spansBetween(from: string, to: string, past: Past): Array<Span> 
     else spans.push({ state, from: new Date(at).toISOString(), to: until })
   })
   return spans
+}
+
+/**
+ * The same history in at most `slots` spans, for a band that has no room for more. The time is
+ * cut into that many equal slots, and each slot shows one state: the one that lasted longest in
+ * it, so the band keeps its proportions. Only an alarm is never thinned away: one that lasted
+ * longest in no slot still keeps the slot most of it lies in. A history that fits stays as it
+ * is. The sums of a history are added up from all of its spans, not from these.
+ */
+export function thinned(spans: ReadonlyArray<Span>, slots: number): Array<Span> {
+  const [first, last] = [spans[0], spans.at(-1)]
+  if (spans.length <= slots || !first || !last) return [...spans]
+  const start = Date.parse(first.from)
+  const end = Date.parse(last.to)
+  const width = (end - start) / slots
+  /** Where a slot begins; the slot after the last one begins where the history ends. */
+  const edge = (slot: number) => (slot >= slots ? end : start + slot * width)
+  /** A span with the slots it touches, and how much of it lies in one of them. */
+  const laid = spans.map((span) => {
+    const [from, to] = [Date.parse(span.from), Date.parse(span.to)]
+    const firstSlot = Math.min(slots - 1, Math.floor((from - start) / width))
+    const lastSlot = Math.min(slots - 1, Math.max(firstSlot, Math.ceil((to - start) / width) - 1))
+    const share = (slot: number) => Math.max(0, Math.min(to, edge(slot + 1)) - Math.max(from, edge(slot)))
+    return { state: span.state, firstSlot, lastSlot, share }
+  })
+
+  const lasted = Array.from({ length: slots }, () => new Map<State, number>())
+  for (const one of laid) {
+    for (let slot = one.firstSlot; slot <= one.lastSlot; slot++) {
+      lasted[slot]?.set(one.state, (lasted[slot]?.get(one.state) ?? 0) + one.share(slot))
+    }
+  }
+  // Of two states that lasted equally long in a slot, it shows the one that needs a person more.
+  const shown = lasted.map((slot) =>
+    stateSeverity.reduce((longest, state) => ((slot.get(state) ?? 0) > (slot.get(longest) ?? 0) ? state : longest)),
+  )
+  for (const one of laid) {
+    if (one.state !== "alarm") continue
+    let most = one.firstSlot
+    let seen = false
+    for (let slot = one.firstSlot; slot <= one.lastSlot; slot++) {
+      if (shown[slot] === "alarm") seen = true
+      if (one.share(slot) > one.share(most)) most = slot
+    }
+    if (!seen) shown[most] = "alarm"
+  }
+
+  const thin: Array<Span> = []
+  shown.forEach((state, slot) => {
+    const until = new Date(edge(slot + 1)).toISOString()
+    const before = thin.at(-1)
+    if (before?.state === state) before.to = until
+    else thin.push({ state, from: new Date(edge(slot)).toISOString(), to: until })
+  })
+  return thin
+}
+
+/**
+ * How long each state lasted in total, in the order a display reads the states. A state that did
+ * not occur is left out. A display and a language model take the sums from here: neither adds
+ * up spans.
+ */
+export function totalsOf(spans: ReadonlyArray<Span>): Array<Total> {
+  const milliseconds = new Map<State, number>()
+  for (const span of spans) {
+    milliseconds.set(span.state, (milliseconds.get(span.state) ?? 0) + Date.parse(span.to) - Date.parse(span.from))
+  }
+  return stateOrder.flatMap((state) => {
+    const sum = milliseconds.get(state)
+    return sum === undefined ? [] : [{ state, seconds: sum / 1000 }]
+  })
 }
