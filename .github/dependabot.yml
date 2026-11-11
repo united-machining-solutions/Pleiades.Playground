@@ -33,6 +33,12 @@ updates:
       - /source/Pleiades.Playground.Simulator
     schedule:
       interval: weekly
+    # The services target .NET 10. Images of the next .NET version arrive with the move to it.
+    ignore:
+      - dependency-name: "dotnet/sdk"
+        versions: [">=11"]
+      - dependency-name: "dotnet/aspnet"
+        versions: [">=11"]
 
   - package-ecosystem: docker-compose
     directory: /
