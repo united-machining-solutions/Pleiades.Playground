@@ -7,6 +7,12 @@ import { readFile } from "node:fs/promises"
 /** The media type that tells a host that a resource is an MCP App. */
 export const CARD_MIME_TYPE = "text/html;profile=mcp-app"
 
+/**
+ * What a card tells a host about itself. A card draws its own frame and its own ground, so it asks
+ * the host for none. The standard recommends to say so, because the hosts' defaults differ.
+ */
+export const CARD_META = { ui: { prefersBorder: false } } as const
+
 const built = new URL("../dist/ui/", import.meta.url)
 
 /** The card file of that name, from the folder the build writes to. */

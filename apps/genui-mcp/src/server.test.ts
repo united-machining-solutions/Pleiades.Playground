@@ -6,7 +6,7 @@ import { MACHINE_CARD_URI, server } from "./server.ts"
 
 type Listed = {
   tools?: Array<{ name: string; _meta?: { ui?: { resourceUri?: string } } }>
-  resources?: Array<{ uri: string; mimeType?: string }>
+  resources?: Array<{ uri: string; mimeType?: string; _meta?: { ui?: { prefersBorder?: boolean } } }>
 }
 
 /** One request as a host sends it, and the result of the answer. */
@@ -33,5 +33,8 @@ test("the tool that shows a machine links the machine card, and the list links n
 
 test("the machine card is a resource that a host reads as an MCP App", async () => {
   const { resources = [] } = await ask("resources/list")
-  assert.equal(resources.find((resource) => resource.uri === MACHINE_CARD_URI)?.mimeType, CARD_MIME_TYPE)
+  const card = resources.find((resource) => resource.uri === MACHINE_CARD_URI)
+  assert.equal(card?.mimeType, CARD_MIME_TYPE)
+  // The card draws its own frame and says so.
+  assert.equal(card?._meta?.ui?.prefersBorder, false)
 })

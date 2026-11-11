@@ -5,7 +5,7 @@ import type { MCPToolContext } from "@tanstack/ai-mcp/server"
 import { z } from "zod"
 
 import type { Apis } from "./apis.ts"
-import { CARD_MIME_TYPE, readCardFile } from "./card-file.ts"
+import { CARD_META, CARD_MIME_TYPE, readCardFile } from "./card-file.ts"
 import { description, skillGuide } from "./guide.ts"
 import { HISTORY_HOURS, listMachines, showMachine } from "./machines.ts"
 import { inTimeZoneOf, isTimeZone } from "./time.ts"
@@ -94,8 +94,19 @@ export const server = createMCPServer({
     resourceDefinition({ uri: "genui://skill", name: "skill", mimeType: "text/markdown" }).read(() => ({
       text: skillGuide,
     })),
-    resourceDefinition({ uri: MACHINE_CARD_URI, name: "machine-card", mimeType: CARD_MIME_TYPE }).read(async () => ({
-      text: await readCardFile("machine"),
-    })),
   ],
+  // The card files are registered here and not under `resources`: a card tells the host how to
+  // show it, and `resourceDefinition` has no place for that (`_meta`).
+  setup(mcp) {
+    mcp.registerResource(
+      "machine-card",
+      MACHINE_CARD_URI,
+      { mimeType: CARD_MIME_TYPE, _meta: CARD_META },
+      async (uri) => ({
+        contents: [
+          { uri: uri.href, mimeType: CARD_MIME_TYPE, text: await readCardFile("machine"), _meta: CARD_META },
+        ],
+      }),
+    )
+  },
 })
