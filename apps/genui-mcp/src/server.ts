@@ -7,6 +7,7 @@ import { z } from "zod"
 import type { Apis } from "./apis.ts"
 import { description, skillGuide } from "./guide.ts"
 import { HISTORY_HOURS, listMachines, machineList, showMachine } from "./machines.ts"
+import { inTimeZoneOf, isTimeZone } from "./time.ts"
 
 export type { MachineList } from "./machines.ts"
 
@@ -40,14 +41,23 @@ const getSkillGuide = toolDefinition({
   metadata: { title: "Get skill guide", annotations: readOnly },
 }).server(() => text(skillGuide))
 
+/** A caller that shows the result to a person names that person's time zone. */
+const timeZone = z
+  .string()
+  .refine(isTimeZone, "This is not a time zone the server knows.")
+  .optional()
+  .describe(
+    "The IANA time zone to write every instant of the result in, for example Europe/Zurich. The instants are then local times with their offset to UTC. UTC if omitted.",
+  )
+
 const machineListTool = toolDefinition({
   name: "genui_machine_list",
   description:
     "List every machine with what it does now: connection, state and operation mode with the time since when, the active program, and the warnings and errors that have not gone. Every value names the topic it comes from.",
-  inputSchema: z.object({}),
+  inputSchema: z.object({ timeZone }),
   outputSchema: machineList,
   metadata: { title: "List machines", annotations: readOnly },
-}).server<Context>((_input, ctx) => listMachines(ctx.context.apis))
+}).server<Context>(async (input, ctx) => inTimeZoneOf(await listMachines(ctx.context.apis), input.timeZone))
 
 const machineShowTool = toolDefinition({
   name: "genui_machine_show",
@@ -65,10 +75,13 @@ const machineShowTool = toolDefinition({
       .max(24)
       .optional()
       .describe(`How many hours back the history goes. ${HISTORY_HOURS} if omitted.`),
+    timeZone,
   }),
   outputSchema: machineShow,
   metadata: { title: "Show machine", annotations: readOnly },
-}).server<Context>((input, ctx) => showMachine(ctx.context.apis, input.machine, input.hours))
+}).server<Context>(async (input, ctx) =>
+  inTimeZoneOf(await showMachine(ctx.context.apis, input.machine, input.hours), input.timeZone),
+)
 
 export const server = createMCPServer({
   name: "genui",

@@ -1,4 +1,4 @@
-import { SILENT_AFTER_SECONDS, machine } from "@pleiades/cards/machine/contract.ts"
+import { SILENT_AFTER_SECONDS, instant, machine } from "@pleiades/cards/machine/contract.ts"
 import type { Machine, MachineShow, Reading } from "@pleiades/cards/machine/contract.ts"
 import { z } from "zod"
 
@@ -18,7 +18,7 @@ export const HORIZON_SECONDS = 24 * 60 * 60
 export const HISTORY_HOURS = 8
 
 export const machineList = z.object({
-  asOf: z.iso.datetime(),
+  asOf: instant,
   windowSeconds: z.number().describe("How far back the values were read to find `since`."),
   machines: z.array(machine),
 })

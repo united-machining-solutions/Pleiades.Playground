@@ -1,3 +1,4 @@
+import { defineChatMiddleware } from "@tanstack/ai"
 import type { AnyTextAdapter } from "@tanstack/ai"
 import { createAnthropicChat } from "@tanstack/ai-anthropic"
 import { createHarnessHost, defineHarness } from "@tanstack/ai-harness"
@@ -7,6 +8,7 @@ import { createOpenaiChat } from "@tanstack/ai-openai"
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
 
+import { withTimeZone } from "./local-times.ts"
 import { modelNames, modelSettings } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
 
@@ -15,7 +17,8 @@ import type { ModelSettings } from "./models.ts"
 
 const instructions = `You help people in a machine shop understand what their machines do.
 Read values with the tools and never invent one. If the tools do not give a reason, say that none is recorded.
-Answer in a few plain sentences. The app shows the values of a tool call next to your answer, so do not repeat them as a list or a table.`
+Answer in a few plain sentences. The app shows the values of a tool call next to your answer, so do not repeat them as a list or a table.
+The tools write every time as the clock of the person you answer shows it. Say a time the way a clock does, for example 09:30: take the hours and minutes as they stand in the result, do not convert them, and name no time zone and no offset.`
 
 // The tools of the generative UI backend, under their own names. Created once, shared by all chats.
 const tools = mcp({
@@ -25,6 +28,16 @@ const tools = mcp({
       url: process.env.GENUI_MCP_URL ?? "http://localhost:5520/mcp",
       toolName: (tool) => tool.name,
     },
+  },
+})
+
+// Every tool that takes a time zone is called with the one of the person who asks. What the
+// browser sent along with the question is the context of the run.
+const localTimes = defineChatMiddleware({
+  name: "local-times",
+  onBeforeToolCall(ctx, call) {
+    const args = withTimeZone(call.args, call.tool?.inputSchema, ctx.context)
+    return args && { type: "transformArgs", args }
   },
 })
 
@@ -72,6 +85,7 @@ export function harnessHandler() {
       models,
       // Of a chat's settings the browser may change the model, and nothing else.
       expose: { settings: ["model"] },
+      middleware: [localTimes],
       systemPrompts: [instructions],
       plugins: () => [tools],
     }),

@@ -24,6 +24,9 @@ All notable changes are documented here. The format follows
   is the machine card: what one machine does now and which states it went through over the last hours. The
   tool `genui_machine_show` returns its values, the app shows it on a page per machine
   (`/machines/<serial number>`) and in the chat.
+- The machine tools of `genui-mcp` take a `timeZone` and then write every instant as a local time with its
+  offset to UTC. The chat passes the time zone of the browser, so an answer gives the times of the person's
+  clock, and it draws the markdown of an answer.
 
 ### Changed
 

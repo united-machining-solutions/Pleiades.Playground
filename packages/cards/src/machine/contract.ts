@@ -10,7 +10,11 @@ import { z } from "zod"
  */
 export const SILENT_AFTER_SECONDS = 30
 
-const instant = z.iso.datetime()
+/**
+ * An instant is ISO 8601: in UTC, or as a clock in the time zone a tool was asked for shows it,
+ * with its offset to UTC. Either way it is one point in time.
+ */
+export const instant = z.iso.datetime({ offset: true })
 
 export const reading = z.object({
   value: z.string().nullable().describe("The newest value, or null if the topic had none."),
