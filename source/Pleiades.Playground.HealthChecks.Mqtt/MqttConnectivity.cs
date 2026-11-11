@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MQTTnet.Exceptions;
-using MQTTnet.Extensions.ManagedClient;
+using Pleiades.Playground.Mqtt.Extensions;
 
 namespace Pleiades.Playground.HealthChecks.Mqtt;
 

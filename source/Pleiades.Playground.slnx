@@ -30,6 +30,7 @@
     <Project Path="Pleiades.Playground.HealthChecks.Mqtt/Pleiades.Playground.HealthChecks.Mqtt.csproj" />
     <Project Path="Pleiades.Playground.HealthChecks.Mqtt.Test/Pleiades.Playground.HealthChecks.Mqtt.Test.csproj" />
     <Project Path="Pleiades.Playground.Mqtt.Extensions/Pleiades.Playground.Mqtt.Extensions.csproj" />
+    <Project Path="Pleiades.Playground.Mqtt.Extensions.Test/Pleiades.Playground.Mqtt.Extensions.Test.csproj" />
   </Folder>
   <Folder Name="/Mcp/">
     <Project Path="Pleiades.Playground.Mcp.Discovery/Pleiades.Playground.Mcp.Discovery.csproj" />

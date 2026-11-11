@@ -19,3 +19,10 @@ All notable changes are documented here. The format follows
 - Example application `playground-app` (TanStack Start, shadcn/ui) in the demo stack on port 5600. Home lists
   what every machine does now, with the values of `genui_machine_list`. A chat next to the page (TanStack AI
   harness, any OpenAI-compatible model) answers questions with the same tools.
+
+### Changed
+
+- MQTT: MQTTnet 5 replaces MQTTnet 4. MQTTnet 5 ships no managed client, so `Pleiades.Playground.Mqtt.Extensions`
+  now carries its own `ManagedMqttClient`: it reconnects every 10 s, subscribes again on every new connection
+  and queues outgoing messages while there is none. Topics, payloads and content types on the broker are
+  unchanged.

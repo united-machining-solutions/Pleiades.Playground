@@ -1,6 +1,4 @@
-using MQTTnet.Client;
-using MQTTnet.Extensions.ManagedClient;
-using MQTTnet.Server;
+using MQTTnet;
 
 namespace Pleiades.Playground.Mqtt.Extensions;
 
@@ -11,7 +9,6 @@ public static class MqttClientOptionsBuilderExtension
 {
     private const int KeepAlivePeriodSeconds = 60;
     private const int OperationTimeoutSeconds = 15;
-    private const int AutoReconnectDelaySeconds = 10;
 
     /// <summary>
     ///     Sets the connection parameters on a MqttClientOptionsBuilder from a mqtt config
@@ -56,30 +53,6 @@ public static class MqttClientOptionsBuilderExtension
         if (uri.Scheme is "ws" or "wss")
         {
             retBuilder = retBuilder.WithWebSocketServer(webSocketOptionsBuilder => ConfigureWebSocket(webSocketOptionsBuilder, uri.ToString()));
-        }
-
-        return retBuilder;
-    }
-
-    /// <summary>
-    ///     Sets the connection parameters on a ManagedMqttClientOptionsBuilder from a mqtt config
-    /// </summary>
-    public static ManagedMqttClientOptionsBuilder WithConfig(this ManagedMqttClientOptionsBuilder builder, MqttConfig config)
-    {
-        _ = builder ?? throw new ArgumentNullException(nameof(builder));
-        _ = config ?? throw new ArgumentNullException(nameof(config));
-
-        var clientOptionsBuilder = new MqttClientOptionsBuilder().WithConfig(config);
-
-        var retBuilder = builder
-            .WithAutoReconnectDelay(TimeSpan.FromSeconds(AutoReconnectDelaySeconds))
-            .WithClientOptions(clientOptionsBuilder.Build());
-
-        if (config.MaxPendingMessages is { } maxPendingMessages)
-        {
-            retBuilder = retBuilder
-                .WithMaxPendingMessages(maxPendingMessages)
-                .WithPendingMessagesOverflowStrategy(MqttPendingMessagesOverflowStrategy.DropOldestQueuedMessage);
         }
 
         return retBuilder;

@@ -13,4 +13,5 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0002](0002-si-units-joule-and-one.md) | SI units on the wire: energy in joule, fractions in `one` | accepted |
 | [0003](0003-naming.md) | Names: `Pleiades.Playground.<Area>.<Part>` | accepted |
 | [0004](0004-licence-and-contributions.md) | Apache-2.0, CC BY 4.0 and DCO | accepted |
-| [0005](0005-data-model-as-submodule.md) | The data model is a submodule, the binding is ours | accepted |
+| [0005](0005-data-model-as-submodule.md) | The data model is a submodule, the binding is ours | superseded by 0006 |
+| [0006](0006-data-model-by-reference.md) | The data model is referenced by a pinned commit, not a submodule | accepted |

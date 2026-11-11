@@ -9,6 +9,12 @@ updates:
         patterns: ["Microsoft.*", "System.*"]
       serilog:
         patterns: ["Serilog*"]
+    # The solution targets .NET 10. Packages of the next major version arrive with the move to the next .NET.
+    ignore:
+      - dependency-name: "Microsoft.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "System.*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /
@@ -19,6 +25,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
 
   - package-ecosystem: docker
     directories:
