@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
-using MQTTnet.Client;
-using MQTTnet.Extensions.ManagedClient;
+using MQTTnet;
+using Pleiades.Playground.Mqtt.Extensions;
 
 namespace Pleiades.Playground.HealthChecks.Mqtt;
 
@@ -147,7 +147,7 @@ public sealed class MqttSubscriptionReadiness
     }
 
     /// <summary>
-    /// The handler for <see cref="IManagedMqttClient.SubscriptionsChangedAsync"/>, which MQTTnet raises
+    /// The handler for <see cref="IManagedMqttClient.SubscriptionsChangedAsync"/>, which the managed client raises
     /// after the SUBACK and the UNSUBACK with one result code per topic filter. Attach it before the
     /// first <c>SubscribeAsync</c>, or an early answer is missed.
     /// </summary>
@@ -158,14 +158,14 @@ public sealed class MqttSubscriptionReadiness
     {
         ArgumentNullException.ThrowIfNull(eventArgs);
 
-        // MQTTnet never puts one filter into both lists of the same event, so the order only matters
+        // The managed client never puts one filter into both lists of the same event, so the order only matters
         // to a reader: what was removed, then what was granted.
-        foreach (var item in (eventArgs.UnsubscribeResult ?? []).SelectMany(result => result.Items))
+        foreach (var item in eventArgs.UnsubscribeResult.SelectMany(result => result.Items))
         {
             _resultCodes.TryRemove(item.TopicFilter, out _);
         }
 
-        foreach (var item in (eventArgs.SubscribeResult ?? []).SelectMany(result => result.Items))
+        foreach (var item in eventArgs.SubscribeResult.SelectMany(result => result.Items))
         {
             _resultCodes[item.TopicFilter.Topic] = item.ResultCode;
         }

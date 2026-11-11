@@ -3,8 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using MQTTnet;
-using MQTTnet.Client;
-using MQTTnet.Extensions.ManagedClient;
+using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Events.Api.Client.NotificationEvents;
 using Pleiades.Playground.HealthChecks.Mqtt;
 

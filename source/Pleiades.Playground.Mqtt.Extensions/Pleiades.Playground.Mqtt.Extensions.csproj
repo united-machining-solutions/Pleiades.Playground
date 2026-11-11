@@ -13,14 +13,13 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="MQTTnet" />
-    <PackageReference Include="MQTTnet.Extensions.ManagedClient" />
     <ProjectReference Include="..\Pleiades.Playground.Common.Json\Pleiades.Playground.Common.Json.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.Common.DataTransferObjects\Pleiades.Playground.Common.DataTransferObjects.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-      <_Parameter1>Pleiades.Playground.Mqtt.Test</_Parameter1>
+      <_Parameter1>Pleiades.Playground.Mqtt.Extensions.Test</_Parameter1>
     </AssemblyAttribute>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>Pleiades.Playground.Mqtt.Client</_Parameter1>
