@@ -15,20 +15,13 @@ const band: Record<State, string> = {
   "no-data": "band-no-data",
 }
 
-/** The order in which the sums below the band are read. */
-const order: ReadonlyArray<State> = ["running", "setup", "stopped", "alarm", "no-data"]
-
 /**
  * What a machine did over the last hours: one band, and below it how long each state lasted in
- * total. The sums say in words what the band shows.
+ * total. The sums say in words what the band shows. They come with the history: the backend
+ * adds them up.
  */
 export function StateBand({ history }: { history: MachineShow["history"] }) {
-  const total = Date.parse(history.to) - Date.parse(history.from)
-  const sums = new Map<State, number>()
-  for (const span of history.spans) {
-    sums.set(span.state, (sums.get(span.state) ?? 0) + Date.parse(span.to) - Date.parse(span.from))
-  }
-  const hours = Math.round(total / 3_600_000)
+  const hours = Math.round((Date.parse(history.to) - Date.parse(history.from)) / 3_600_000)
   return (
     <figure className="flex flex-col gap-1.5">
       <figcaption className="flex justify-between gap-2 text-xs text-muted-foreground tabular-nums">
@@ -48,14 +41,12 @@ export function StateBand({ history }: { history: MachineShow["history"] }) {
         ))}
       </div>
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground tabular-nums">
-        {order
-          .filter((state) => sums.has(state))
-          .map((state) => (
-            <li key={state} className="flex items-center gap-1.5">
-              <StateSymbol state={state} />
-              {stateLabel[state]} {lasting(sums.get(state) ?? 0)}
-            </li>
-          ))}
+        {history.totals.map(({ state, seconds }) => (
+          <li key={state} className="flex items-center gap-1.5">
+            <StateSymbol state={state} />
+            {stateLabel[state]} {lasting(seconds * 1000)}
+          </li>
+        ))}
       </ul>
     </figure>
   )

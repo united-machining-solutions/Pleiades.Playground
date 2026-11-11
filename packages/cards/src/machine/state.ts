@@ -12,6 +12,9 @@ export const stateLabel: Record<State, string> = {
   running: "Running",
 }
 
+/** The order in which a display reads the states, for example the sums of a history. */
+export const stateOrder: ReadonlyArray<State> = ["running", "setup", "stopped", "alarm", "no-data"]
+
 /** What is known about a machine at one instant. */
 export type Known = {
   connection: string | null

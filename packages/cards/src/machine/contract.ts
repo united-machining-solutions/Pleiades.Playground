@@ -61,6 +61,12 @@ export type State = z.infer<typeof state>
 export const span = z.object({ state, from: instant, to: instant })
 export type Span = z.infer<typeof span>
 
+export const total = z.object({
+  state,
+  seconds: z.number().describe("How long the machine was in that state between `from` and `to`, in seconds."),
+})
+export type Total = z.infer<typeof total>
+
 /** The list of machines: what every machine does now. An application draws it with rows of its own. */
 export const machineList = z.object({
   asOf: instant,
@@ -78,6 +84,11 @@ export const machineShow = z.object({
     from: instant,
     to: instant,
     spans: z.array(span).describe("The states between `from` and `to`, oldest first and without a gap."),
+    totals: z
+      .array(total)
+      .describe(
+        "How long each state lasted in total between `from` and `to`: the sums of the spans, in the order a display reads the states. A state that did not occur is not listed.",
+      ),
   }),
 })
 export type MachineShow = z.infer<typeof machineShow>

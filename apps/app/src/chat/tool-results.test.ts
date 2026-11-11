@@ -33,6 +33,7 @@ const shown = {
     from: "2026-11-16T01:30:00.000Z",
     to: "2026-11-16T09:30:00.000Z",
     spans: [{ state: "running", from: "2026-11-16T01:30:00.000Z", to: "2026-11-16T09:30:00.000Z" }],
+    totals: [{ state: "running", seconds: 28_800 }],
   },
 }
 

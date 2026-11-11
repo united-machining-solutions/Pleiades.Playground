@@ -3,7 +3,7 @@ import type { Machine, MachineList, MachineShow, Reading } from "@pleiades/cards
 
 import { listTopics, readNumbers, readOpenNotifications, readRaised, readStrings } from "./apis.ts"
 import type { Apis, OpenNotification, Sample, Series } from "./apis.ts"
-import { spansBetween } from "./history.ts"
+import { spansBetween, totalsOf } from "./history.ts"
 import { silences, silentBetween } from "./liveness.ts"
 import type { Stretch } from "./liveness.ts"
 import { secondsBefore } from "./time.ts"
@@ -186,14 +186,11 @@ export async function showMachine(
     const known = list.machines.map((one) => one.machine).join(", ") || "none"
     throw new Error(`No machine "${serialNumber}" published a value in the last 24 hours. Machines that did: ${known}.`)
   }
+  const spans = spansBetween(from.toISOString(), list.asOf, { connection, itemState, operationMode, heartbeat, errors })
   return {
     asOf: list.asOf,
     windowSeconds: list.windowSeconds,
     machine: found,
-    history: {
-      from: from.toISOString(),
-      to: list.asOf,
-      spans: spansBetween(from.toISOString(), list.asOf, { connection, itemState, operationMode, heartbeat, errors }),
-    },
+    history: { from: from.toISOString(), to: list.asOf, spans, totals: totalsOf(spans) },
   }
 }

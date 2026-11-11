@@ -1,5 +1,5 @@
-import type { Span } from "@pleiades/cards/machine/contract.ts"
-import { stateFrom } from "@pleiades/cards/machine/state.ts"
+import type { Span, State, Total } from "@pleiades/cards/machine/contract.ts"
+import { stateFrom, stateOrder } from "@pleiades/cards/machine/state.ts"
 
 import type { Raised, Sample } from "./apis.ts"
 import { silences, silentAt } from "./liveness.ts"
@@ -71,4 +71,20 @@ export function spansBetween(from: string, to: string, past: Past): Array<Span> 
     else spans.push({ state, from: new Date(at).toISOString(), to: until })
   })
   return spans
+}
+
+/**
+ * How long each state lasted in total, in the order a display reads the states. A state that did
+ * not occur is left out. A display and a language model take the sums from here: neither adds
+ * up spans.
+ */
+export function totalsOf(spans: ReadonlyArray<Span>): Array<Total> {
+  const milliseconds = new Map<State, number>()
+  for (const span of spans) {
+    milliseconds.set(span.state, (milliseconds.get(span.state) ?? 0) + Date.parse(span.to) - Date.parse(span.from))
+  }
+  return stateOrder.flatMap((state) => {
+    const sum = milliseconds.get(state)
+    return sum === undefined ? [] : [{ state, seconds: sum / 1000 }]
+  })
 }

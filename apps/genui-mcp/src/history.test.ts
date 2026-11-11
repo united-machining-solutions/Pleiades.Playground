@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { Sample } from "./apis.ts"
-import { spansBetween } from "./history.ts"
+import { spansBetween, totalsOf } from "./history.ts"
 
 const start = "2026-11-16T09:00:00.000Z"
 /** An instant that many seconds after the start. */
@@ -129,4 +129,19 @@ test("without its heartbeat a machine that told its state once has no data", () 
 
   const never = { ...toldOnce(600), heartbeat: [] }
   assert.deepEqual(spansBetween(at(0), at(600), never), [{ state: "no-data", from: at(0), to: at(600) }])
+})
+
+test("the sums of a history are added up here, in the order a display reads the states", () => {
+  const spans = [
+    { state: "no-data" as const, from: at(0), to: at(60) },
+    { state: "running" as const, from: at(60), to: at(300) },
+    { state: "stopped" as const, from: at(300), to: at(360) },
+    { state: "running" as const, from: at(360), to: at(600.5) },
+  ]
+  assert.deepEqual(totalsOf(spans), [
+    { state: "running", seconds: 480.5 },
+    { state: "stopped", seconds: 60 },
+    { state: "no-data", seconds: 60 },
+  ])
+  assert.deepEqual(totalsOf([]), [])
 })
