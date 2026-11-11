@@ -32,6 +32,7 @@ catalog:
   nitro: 3.0.261103-rc
   react: 19.3.1
   react-dom: 19.3.1
+  rollup-plugin-license: 3.7.2
   shadcn: 4.23.0
   srvx: 1.0.8
   tailwindcss: 4.3.5
@@ -40,6 +41,14 @@ catalog:
   vite: 8.3.7
   vite-plugin-singlefile: 2.3.4
   zod: 4.6.7
+
+# rollup-plugin-license lists the packages a bundler put into a file. It names Rollup as a peer.
+# The card files are built by Vite on Rolldown, which calls the same hooks, so Rollup stays out.
+packageExtensions:
+  rollup-plugin-license:
+    peerDependenciesMeta:
+      rollup:
+        optional: true
 
 # Versions that were pinned before they were a day old, the age pnpm asks for by default. pnpm
 # wrote this list. An entry can go once its version is older than a day.

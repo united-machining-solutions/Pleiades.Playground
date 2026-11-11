@@ -5,6 +5,8 @@
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
 !tsconfig.base.json
+# A card file carries the notices of this repository.
+!NOTICE
 !apps
 !packages
 **/node_modules
