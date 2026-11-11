@@ -21,3 +21,8 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
 - Use the GitHub CLI (`gh`) for pull requests, checks and logs. The person signs in; never ask for a token and
   never type a password.
 - Tools and their checks: [docs/development-setup.md](docs/development-setup.md).
+- A person who is new here, or who asks for a tour: guide them through [docs/tour.md](docs/tour.md), one stop
+  at a time. Check with `docker compose ps` that the stack runs, and ask before you start it. For each stop say
+  what to open, what to look at and where it lives in the code, then wait for the person. The chat needs a
+  language model: without one, show what the panel says and go on. When a session begins without a task, offer
+  the tour once: "Shall I give you a tour of the demo?"

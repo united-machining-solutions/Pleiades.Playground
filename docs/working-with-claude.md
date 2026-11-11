@@ -54,6 +54,7 @@ the last hour, and what did the spindle do at that time?". The tools are listed 
 
 | You want | Ask for |
 |---|---|
+| A tour of the demo | "Give me a tour." The agent walks you through the [tour](tour.md) stop by stop, in your running stack. It offers the tour itself when a session begins without a task. |
 | To see the demo | "Start the stack and show me what the simulator publishes for one machine." |
 | A new value | "Add the topic `…` to the simulator and to the MQTT binding, with its SI unit." |
 | To know why a check is red | "Why is pull request 12 red?" The agent reads `gh pr checks` and `gh run view --log-failed`. |

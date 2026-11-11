@@ -45,6 +45,9 @@ All notable changes are documented here. The format follows
   over the last hours are no longer in the result of `genui_machine_show`: the machine card asks for the
   spans of its band itself, with the new tool `genui_span_list`, which only a card calls. A history too long
   for the band is thinned.
+- A tour of the demo with screenshots (`docs/tour.md`): what the example app shows, stop by stop, and where
+  it lives in the code. A coding agent gives the tour when asked ("give me a tour") and offers it when a
+  session begins without a task (`AGENTS.md`).
 
 ### Changed
 
