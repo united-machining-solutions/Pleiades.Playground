@@ -15,7 +15,7 @@ x-service: &service
 x-build: &build
   context: ./source
   args:
-    VERSION: ${PLEIADES_VERSION:-0.0.1}
+    VERSION: ${PLEIADES_BUILD_VERSION:-0.0.1}
 
 # The services require a Loki sink in their configuration; the demo disables it.
 x-logging-env: &logging-env
