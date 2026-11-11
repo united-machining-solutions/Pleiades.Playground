@@ -19,6 +19,9 @@ internal sealed class FakeMqttClient : IMqttClient
     /// <summary>Awaited before a connect attempt ends, with the token the caller passed.</summary>
     public Func<CancellationToken, Task>? WhileConnecting { get; set; }
 
+    /// <summary>Awaited before a SUBSCRIBE is answered, after it was recorded.</summary>
+    public Func<CancellationToken, Task>? WhileSubscribing { get; set; }
+
     /// <summary>Runs before a publish is recorded; throws to make the publish fail.</summary>
     public Action<MqttApplicationMessage>? OnPublish { get; set; }
 
@@ -104,13 +107,18 @@ internal sealed class FakeMqttClient : IMqttClient
     public Task SendEnhancedAuthenticationExchangeDataAsync(MqttEnhancedAuthenticationExchangeData data, CancellationToken cancellationToken = default) =>
         Task.CompletedTask;
 
-    public Task<MqttClientSubscribeResult> SubscribeAsync(MqttClientSubscribeOptions options, CancellationToken cancellationToken = default)
+    public async Task<MqttClientSubscribeResult> SubscribeAsync(MqttClientSubscribeOptions options, CancellationToken cancellationToken = default)
     {
         Subscribes.Enqueue(options);
+        if (WhileSubscribing is { } whileSubscribing)
+        {
+            await whileSubscribing(cancellationToken);
+        }
+
         var items = options.TopicFilters
             .Select(filter => new MqttClientSubscribeResultItem(filter, MqttClientSubscribeResultCode.GrantedQoS0))
             .ToList();
-        return Task.FromResult(new MqttClientSubscribeResult(1, items, string.Empty, []));
+        return new MqttClientSubscribeResult(1, items, string.Empty, []);
     }
 
     public Task<MqttClientUnsubscribeResult> UnsubscribeAsync(MqttClientUnsubscribeOptions options, CancellationToken cancellationToken = default)
