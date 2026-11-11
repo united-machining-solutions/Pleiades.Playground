@@ -16,3 +16,8 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   TypeScript `pnpm typecheck`, `pnpm test` and `pnpm build`; for the stack
   `docker compose up -d --build` and healthy containers. Say what you could not verify.
 - Do not commit, push or publish unless asked.
+- When asked: work on a branch, never on `main`; one topic per pull request; sign off every commit
+  (`git commit -s`) and add a `Co-Authored-By` trailer that names you; fill in the pull request template.
+- Use the GitHub CLI (`gh`) for pull requests, checks and logs. The person signs in; never ask for a token and
+  never type a password.
+- Tools and their checks: [docs/development-setup.md](docs/development-setup.md).
