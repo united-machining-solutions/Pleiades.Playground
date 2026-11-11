@@ -25,7 +25,7 @@
   </ItemGroup>
   <ItemGroup Label="Storage">
     <PackageVersion Include="MongoDB.Bson" Version="3.13.0" />
-    <PackageVersion Include="MongoDB.Driver" Version="3.12.0" />
+    <PackageVersion Include="MongoDB.Driver" Version="3.13.0" />
   </ItemGroup>
   <ItemGroup Label="Messaging">
     <PackageVersion Include="MQTTnet" Version="5.2.0.1603" />
@@ -49,6 +49,6 @@
   </ItemGroup>
   <ItemGroup Label="Test and analysis">
     <PackageVersion Include="Moq" Version="4.21.0" />
-    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.34.0.3385" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.36.0.15337" />
   </ItemGroup>
 </Project>

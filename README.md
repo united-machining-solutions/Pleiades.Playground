@@ -79,6 +79,8 @@ pnpm typecheck && pnpm test && pnpm build
 The TypeScript workspace (`apps/`, `packages/`) needs Node.js in the version of `.nvmrc`, pnpm in the version of
 `package.json` and npmjs.org, nothing else. Every version is pinned once, in the catalog of `pnpm-workspace.yaml`.
 
+Every tool and how to check it: [development setup](docs/development-setup.md).
+
 ## Units
 
 Every numeric value is in its coherent SI unit. Energy is in joule, ratios and percentages are fractions with the
@@ -88,6 +90,7 @@ unit `one` (1.0 = 100 %). Displays convert, the wire does not. See
 ## Contributing, security, licence
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): pull requests, sign-off (DCO), checks.
+- [Working with Claude](docs/working-with-claude.md): how to change this repository with a coding agent.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability.
 - Code and contracts: [Apache-2.0](LICENSE). Documentation and demo content: [CC BY 4.0](LICENSE-docs).
 - The data model referenced in `contracts/datamodel` is a separate project with its own licence.
