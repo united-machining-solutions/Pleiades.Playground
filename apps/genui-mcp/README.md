@@ -19,6 +19,10 @@ durations are computed here, never by a language model.
 | `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and the states it went through over the last hours (`hours`, 8 if omitted) as spans without a gap. Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. |
 
+Every instant of a result is ISO 8601 in UTC. The two machine tools also take a `timeZone`, an IANA name such
+as `Europe/Zurich`: then every instant is a local time there with its offset, `2026-11-11T09:00:41.000+01:00`.
+So whoever reads the result, a language model included, has nothing to convert.
+
 Cards as `ui://` resources (MCP Apps) follow.
 
 ## Develop
@@ -45,4 +49,4 @@ does that only outside `node_modules`. So the image keeps the layout of the work
   is decided in the card catalogue, for the past as for the present.
 - `src/apis.ts`: the two APIs over REST. Every answer is checked against the shape this server relies on.
 - `src/time.ts`: the Timeseries API counts microseconds, the Events API writes ISO 8601; from here on an
-  instant is ISO 8601 in UTC.
+  instant is ISO 8601 in UTC. A result is written in the time zone of the caller at the very end.

@@ -18,7 +18,10 @@ export const skillGuide = `# genui: skill guide
 
 ## What a result contains
 
-- Every instant is ISO 8601 in UTC.
+- Every instant is ISO 8601. It is in UTC, unless the call names a \`timeZone\`: then it is a local
+  time there with its offset, for example \`2026-11-11T09:00:41.000+01:00\`.
+- To a person, say a time the way a clock does, \`09:00\`: the hours and minutes as they stand in
+  the result. Do not convert them. Say "UTC" with a time that is in UTC, and nothing with a local one.
 - Every reading carries its \`topic\`, every notification the topic it was published on.
 - A reading has \`value\`, \`at\` (when it was measured) and \`since\` (since when it has been the same).
   If \`sinceIsLowerBound\` is true, the value was already the same where the window starts, and
@@ -29,7 +32,8 @@ export const skillGuide = `# genui: skill guide
 
 ## Machines
 
-\`genui_machine_list\` lists every machine that published a value in the last 24 hours.
+\`genui_machine_list\` lists every machine that published a value in the last 24 hours. Pass the
+\`timeZone\` of the person you answer, if you know it.
 
 - \`connection\`: \`umati/Connection/State\`. Anything but \`Connected\`, or a \`lastValueAt\` that is not
   current, means the other readings are the last known ones, not the present.
