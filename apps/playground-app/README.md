@@ -12,9 +12,11 @@ harness.
 - **Chat** is the panel on the right, with "New chat" and the chats so far. It opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
-  of a tool call itself: a card of the catalogue, or a list with the same rows as Home. Whether the panel is
-  open, and with which chat, is in the URL (`?chat=`), and the page stays where it is: you chat about what you
-  see. Everything about the chat is in that panel: the pages on the left stay the same without it.
+  of a tool call itself: a card of the catalogue, or a list with the same rows as Home. An answer is drawn
+  from its markdown, and its times are those of your clock: the browser sends its time zone along with a
+  question, and the server adds it to the tool calls. Whether the panel is open, and with which chat, is in
+  the URL (`?chat=`), and the page stays where it is: you chat about what you see. Everything about the chat
+  is in that panel: the pages on the left stay the same without it.
 
 The values always come from `genui-mcp`. Without a language model the chat says which settings are missing;
 everything else works.
@@ -62,8 +64,10 @@ the backend of the running demo stack answers.
   and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
-  `models.ts` reads which models the settings name. `chat-sidebar.tsx` is the panel with the chat on `useChat`
-  and the choice of the model, `tool-results.ts` says what the app draws for which tool.
+  `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a
+  tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat` and the choice of the model,
+  `tool-results.ts` says what the app draws for which tool, and `answer.tsx` draws what the model writes
+  ([TanStack Markdown](https://tanstack.com/markdown)).
 - `src/components/ui/`: [shadcn/ui](https://ui.shadcn.com) components, added with `shadcn add` and kept as
   generated. `components.json` holds the settings of the preset `b5JNecjwG`. The layout follows the block
   `sidebar-15`: the pages on the left, the chat on the right. `Badge` and `Card` live in `@pleiades/cards`,

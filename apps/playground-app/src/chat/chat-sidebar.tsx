@@ -43,12 +43,14 @@ import {
 } from "@/components/ui/sidebar"
 import { MachineRow } from "@/machines/machine-item.tsx"
 
+import { Answer } from "./answer.tsx"
 import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
 import { chooseChatModel, fetchChatModel } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
 import { machineListOf, machineShowOf, toolLabels } from "./tool-results.ts"
 
 const root = getRouteApi("__root__")
+const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
 
 /**
  * Everything about the chat lives in this panel on the right, after the shadcn block sidebar-15:
@@ -170,6 +172,9 @@ function Conversation({ threadId }: { threadId: string }) {
     threadId,
     connection: fetchServerSentEvents("/api/harness/run"),
     persistence: true,
+    // The time zone of this browser goes along with every question, so the answer gives the
+    // times the person's clock shows.
+    forwardedProps: { timeZone },
   })
   const [model, setModel] = useState(() => pickedModel(chatStatus.models))
   const [switchError, setSwitchError] = useState<string>()
@@ -235,9 +240,7 @@ function Conversation({ threadId }: { threadId: string }) {
                                 {part.content}
                               </div>
                             ) : (
-                              <p key={index} className="whitespace-pre-wrap">
-                                {part.content}
-                              </p>
+                              <Answer key={index} text={part.content} />
                             )
                           }
                           if (part.type === "tool-call") {

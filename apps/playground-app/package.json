@@ -21,6 +21,7 @@
     "@tanstack/ai-openai": "catalog:",
     "@tanstack/ai-persistence": "catalog:",
     "@tanstack/ai-react": "catalog:",
+    "@tanstack/markdown": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
     "class-variance-authority": "catalog:",
