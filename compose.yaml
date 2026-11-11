@@ -169,12 +169,12 @@ services:
       EVENTS_API_URL: http://events-api:8080
 
   # The example application.
-  playground-app:
+  app:
     <<: *service
     image: ghcr.io/united-machining-solutions/pleiades.playground.app:${PLEIADES_VERSION:-dev}
     build:
       context: .
-      dockerfile: apps/playground-app/Dockerfile
+      dockerfile: apps/app/Dockerfile
     ports:
       - "${APP_PORT:-5600}:8080"
     depends_on:

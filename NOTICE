@@ -13,6 +13,6 @@ Specifications; copyright remains with their owners.
 Third-party container images referenced by compose.yaml (MQTT broker, database) are distributed under
 their own licences and are not part of this repository.
 
-The image of the example application (apps/playground-app) contains the Roboto typeface, licensed under
+The image of the example application (apps/app) contains the Roboto typeface, licensed under
 the SIL Open Font License 1.1. Its chart and state colours are taken from the IBM Carbon Design System,
 licensed under the Apache License, Version 2.0.

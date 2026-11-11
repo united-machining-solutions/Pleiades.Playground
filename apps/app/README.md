@@ -1,4 +1,4 @@
-# playground-app
+# app
 
 The example application: a single-page app on [TanStack Start](https://tanstack.com/start). The browser renders
 the app. The server delivers the document, the server routes and the server functions, and runs the agent
@@ -26,8 +26,8 @@ everything else works.
 
 ```bash
 pnpm install
-pnpm --filter @pleiades/playground-app dev
-pnpm --filter @pleiades/playground-app test
+pnpm --filter @pleiades/app dev
+pnpm --filter @pleiades/app test
 ```
 
 The development server listens on <http://localhost:3000/> and reads from <http://localhost:5520/mcp>, where
