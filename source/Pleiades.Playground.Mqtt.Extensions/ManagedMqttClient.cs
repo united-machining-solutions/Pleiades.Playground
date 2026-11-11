@@ -48,6 +48,10 @@ public sealed class ManagedMqttClient : IManagedMqttClient
     private readonly SemaphoreSlim _connected = new(0);
     private readonly SemaphoreSlim _queuedMessages = new(0);
 
+    // Whether the subscriptions were sent on the current connection. Written by the connection loop only:
+    // cleared before every connect attempt and set after the first synchronization that follows it.
+    private volatile bool _subscriptionsSent;
+
     /// <summary>
     /// Creates a managed client around <paramref name="client"/> and takes ownership of it.
     /// </summary>
@@ -127,10 +131,11 @@ public sealed class ManagedMqttClient : IManagedMqttClient
     public Task StartAsync(ManagedMqttClientOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
         lock (_lifecycleLock)
         {
+            // Inside the lock: a start that raced a dispose would leave loops nothing could stop.
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (_stopping is not null)
             {
                 throw new InvalidOperationException("The managed client is already started.");
@@ -225,9 +230,18 @@ public sealed class ManagedMqttClient : IManagedMqttClient
         ArgumentNullException.ThrowIfNull(topicFilters);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        // Checked here, where the caller still hears about it. MQTTnet checks the same when it sends,
+        // and one invalid filter there would fail the SUBSCRIBE of every filter queued with it, again
+        // and again.
+        var filters = topicFilters.ToList();
+        foreach (var topicFilter in filters)
+        {
+            MqttTopicValidator.ThrowIfInvalidSubscribe(topicFilter.Topic);
+        }
+
         lock (_subscriptionsLock)
         {
-            foreach (var topicFilter in topicFilters)
+            foreach (var topicFilter in filters)
             {
                 _subscriptions[topicFilter.Topic] = topicFilter;
                 _pendingSubscriptions[topicFilter.Topic] = topicFilter;
@@ -264,16 +278,15 @@ public sealed class ManagedMqttClient : IManagedMqttClient
     /// <inheritdoc />
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-
         CancellationTokenSource? stopping;
         lock (_lifecycleLock)
         {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
             stopping = _stopping;
             _stopping = null;
         }
@@ -295,35 +308,32 @@ public sealed class ManagedMqttClient : IManagedMqttClient
         {
             try
             {
-                var connectedNow = false;
                 if (!InternalClient.IsConnected)
                 {
-                    if (!await TryConnectAsync(options, cancellationToken).ConfigureAwait(false))
+                    _subscriptionsSent = false;
+                    if (await TryConnectAsync(options, cancellationToken).ConfigureAwait(false) is { } retryAfter)
                     {
-                        await Task.Delay(options.AutoReconnectDelay, cancellationToken).ConfigureAwait(false);
+                        await Task.Delay(retryAfter, cancellationToken).ConfigureAwait(false);
                         continue;
                     }
 
-                    connectedNow = true;
                     QueueEverySubscriptionAgain();
                 }
 
                 var synchronized = await SynchronizeSubscriptionsAsync(options, cancellationToken).ConfigureAwait(false);
 
-                if (connectedNow)
+                if (!_subscriptionsSent)
                 {
                     // Subscriptions first, then the queue: what the queue publishes may be answered at once.
+                    _subscriptionsSent = true;
                     Signal(_connected);
                 }
 
-                if (synchronized)
-                {
-                    await _connectionWork.WaitAsync(options.ConnectionCheckInterval, cancellationToken).ConfigureAwait(false);
-                }
-                else
-                {
-                    await Task.Delay(options.AutoReconnectDelay, cancellationToken).ConfigureAwait(false);
-                }
+                // A lost connection and a new subscription end either wait at once. After a failed
+                // synchronization the longer wait keeps a broker that does not answer from being asked
+                // every second.
+                var wait = synchronized ? options.ConnectionCheckInterval : options.AutoReconnectDelay;
+                await _connectionWork.WaitAsync(wait, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception) when (cancellationToken.IsCancellationRequested)
             {
@@ -338,7 +348,8 @@ public sealed class ManagedMqttClient : IManagedMqttClient
         }
     }
 
-    private async Task<bool> TryConnectAsync(ManagedMqttClientOptions options, CancellationToken cancellationToken)
+    /// <returns><see langword="null"/> when connected, otherwise how long to wait before the next attempt.</returns>
+    private async Task<TimeSpan?> TryConnectAsync(ManagedMqttClientOptions options, CancellationToken cancellationToken)
     {
         MqttClientConnectResult? result = null;
         Exception failure;
@@ -348,11 +359,17 @@ public sealed class ManagedMqttClient : IManagedMqttClient
             result = await InternalClient.ConnectAsync(options.ClientOptions, timeout.Token).ConfigureAwait(false);
             if (result.ResultCode == MqttClientConnectResultCode.Success)
             {
-                return true;
+                return null;
             }
 
             // MQTTnet 5 returns a refused CONNECT instead of throwing it.
             failure = new MqttConnectingFailedException($"Connecting with MQTT server failed ({result.ResultCode}).", null);
+        }
+        catch (InvalidOperationException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // MQTTnet is still taking the previous connection down, for example after the forced
+            // disconnect of the watchdog. That is no failed attempt: nothing was tried yet.
+            return options.ConnectionCheckInterval;
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -361,7 +378,7 @@ public sealed class ManagedMqttClient : IManagedMqttClient
 
         // Not logged here: MQTTnet logs the attempt, and the event tells the host of this client.
         await RaiseAsync(ConnectingFailedAsync, new ConnectingFailedEventArgs(result, failure)).ConfigureAwait(false);
-        return false;
+        return options.AutoReconnectDelay;
     }
 
     /// <summary>
@@ -413,10 +430,16 @@ public sealed class ManagedMqttClient : IManagedMqttClient
                 subscribeResults.Add(await InternalClient.SubscribeAsync(subscribe, timeout.Token).ConfigureAwait(false));
             }
         }
-        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception exception)
         {
-            _logger.Warning(exception, "Synchronizing subscriptions failed.");
+            // Also when the client is stopping: what was taken from the queue is still owed after a restart.
             QueueAgain(subscriptions, unsubscriptions);
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+
+            _logger.Warning(exception, "Synchronizing subscriptions failed.");
             return false;
         }
 
@@ -450,7 +473,7 @@ public sealed class ManagedMqttClient : IManagedMqttClient
         {
             try
             {
-                if (!InternalClient.IsConnected)
+                if (!InternalClient.IsConnected || !_subscriptionsSent)
                 {
                     // Nothing is taken from the queue without a connection, so MaxPendingMessages bounds what waits.
                     await _connected.WaitAsync(options.ConnectionCheckInterval, cancellationToken).ConfigureAwait(false);
@@ -458,9 +481,16 @@ public sealed class ManagedMqttClient : IManagedMqttClient
                 }
 
                 var message = unsent ?? await DequeueAsync(cancellationToken).ConfigureAwait(false);
-                if (message is not null)
+                if (message is null)
                 {
-                    unsent = await PublishAsync(message, options, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                unsent = await PublishAsync(message, options, cancellationToken).ConfigureAwait(false);
+                if (unsent is not null)
+                {
+                    // A send that fails at once on a connection that stays up must not spin.
+                    await Task.Delay(options.ConnectionCheckInterval, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (Exception) when (cancellationToken.IsCancellationRequested)
@@ -504,8 +534,10 @@ public sealed class ManagedMqttClient : IManagedMqttClient
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
-            _logger.Error(exception, "Publishing an application message failed, the message is dropped.");
-            return null;
+            // Whatever ended the connection ended this send as well: the same case as a closed socket.
+            var repeat = !InternalClient.IsConnected && message.QualityOfServiceLevel != MqttQualityOfServiceLevel.AtMostOnce;
+            _logger.Error(exception, "Publishing an application message failed, the message is {0}.", repeat ? "sent again" : "dropped");
+            return repeat ? message : null;
         }
     }
 

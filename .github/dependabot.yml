@@ -9,6 +9,10 @@ updates:
         patterns: ["Microsoft.*", "System.*"]
       serilog:
         patterns: ["Serilog*"]
+      mcp:
+        patterns: ["ModelContextProtocol*"]
+      mongodb:
+        patterns: ["MongoDB.*"]
     # The solution targets .NET 10. Packages of the next major version arrive with the move to the next .NET.
     ignore:
       - dependency-name: "Microsoft.*"
@@ -40,6 +44,12 @@ updates:
       - /apps/app
     schedule:
       interval: weekly
+    # The services target .NET 10. Images of the next .NET version arrive with the move to it.
+    ignore:
+      - dependency-name: "dotnet/sdk"
+        versions: [">=11"]
+      - dependency-name: "dotnet/aspnet"
+        versions: [">=11"]
 
   - package-ecosystem: docker-compose
     directory: /
