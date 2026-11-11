@@ -1,4 +1,0 @@
-[submodule "contracts/datamodel"]
-	path = contracts/datamodel
-	url = https://github.com/umati/MachineTool-DataModel.git
-	branch = spec/draft-v0.2

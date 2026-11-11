@@ -16,7 +16,7 @@ All notable changes are documented here. The format follows
   TypeScript configuration and a CI job.
 - Generative UI backend `genui-mcp` in the demo stack on port 5520: an MCP server with the tool
   `genui_machine_list`, which reads the Timeseries and Events APIs.
-- Example application `playground-app` (TanStack Start, shadcn/ui) in the demo stack on port 5600. Home lists
+- Example application `app` (TanStack Start, shadcn/ui) in the demo stack on port 5600. Home lists
   what every machine does now, with the values of `genui_machine_list`. A chat next to the page (TanStack AI
   harness) answers questions with the same tools. Its language models come from the settings: OpenAI,
   Anthropic, and any endpoint that speaks OpenAI's chat completions. With several models a chat picks one.
@@ -24,3 +24,10 @@ All notable changes are documented here. The format follows
   is the machine card: what one machine does now and which states it went through over the last hours. The
   tool `genui_machine_show` returns its values, the app shows it on a page per machine
   (`/machines/<serial number>`) and in the chat.
+
+### Changed
+
+- MQTT: MQTTnet 5 replaces MQTTnet 4. MQTTnet 5 ships no managed client, so `Pleiades.Playground.Mqtt.Extensions`
+  now carries its own `ManagedMqttClient`: it reconnects every 10 s, subscribes again on every new connection
+  and queues outgoing messages while there is none. Topics, payloads and content types on the broker are
+  unchanged.

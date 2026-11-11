@@ -1,14 +1,13 @@
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
-using MQTTnet.Client;
-using MQTTnet.Extensions.ManagedClient;
+using MQTTnet;
+using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Common.Json;
 using Pleiades.Playground.Events.Api.Client.Exceptions;
 using Pleiades.Playground.Events.Api.Client.NotificationEvents;
 using Pleiades.Playground.Common.DataTransferObjects;
 using Pleiades.Playground.HealthChecks.Mqtt;
-using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Notification.DataTransferObjects;
 
 namespace Pleiades.Playground.Events.Persistence;

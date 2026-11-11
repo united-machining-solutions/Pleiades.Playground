@@ -15,7 +15,7 @@ x-service: &service
 x-build: &build
   context: ./source
   args:
-    VERSION: ${PLEIADES_VERSION:-0.0.1}
+    VERSION: ${PLEIADES_BUILD_VERSION:-0.0.1}
 
 # The services require a Loki sink in their configuration; the demo disables it.
 x-logging-env: &logging-env
@@ -169,14 +169,16 @@ services:
       EVENTS_API_URL: http://events-api:8080
 
   # The example application.
-  playground-app:
+  app:
     <<: *service
     image: ghcr.io/united-machining-solutions/pleiades.playground.app:${PLEIADES_VERSION:-dev}
     build:
       context: .
-      dockerfile: apps/playground-app/Dockerfile
+      dockerfile: apps/app/Dockerfile
     ports:
-      - "${APP_PORT:-5600}:8080"
+      # The chat has no sign-in, and with a key set it spends that key. So the app answers on this
+      # computer only, unless APP_BIND opens it to the network.
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-5600}:8080"
     depends_on:
       genui-mcp:
         condition: service_healthy
