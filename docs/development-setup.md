@@ -9,12 +9,13 @@ What you need on your machine, and how to check that it works.
 | Git | Everything | yes |
 | Docker with Compose v2 (Docker Desktop, or Docker Engine with the Compose plugin) | Starting the demo stack | yes |
 | .NET 10 SDK | Building and testing `source/` | for .NET work |
-| Node.js LTS and pnpm | `apps/` and `packages/` | for TypeScript work |
+| Node.js in the version of `.nvmrc` and pnpm | `apps/` and `packages/` | for TypeScript work |
 | GitHub CLI (`gh`) | Pull requests, checks and logs from the terminal | recommended |
 | A coding agent, for example Claude Code | Working with an agent, see [Working with Claude](working-with-claude.md) | optional |
 | An MQTT client, for example `mosquitto_sub` or MQTT Explorer | Watching what the simulator publishes | optional |
 
-The exact SDK version comes from [`global.json`](../global.json). NuGet packages come from nuget.org; no other
+The exact SDK version comes from [`global.json`](../global.json), the Node.js version from [`.nvmrc`](../.nvmrc)
+and the pnpm version from [`package.json`](../package.json). Packages come from nuget.org and npmjs.org; no other
 feed and no secret is needed.
 
 ## Install
@@ -40,7 +41,7 @@ Linux: use the packages of your distribution or the installers of [Docker](https
 [.NET](https://learn.microsoft.com/dotnet/core/install/linux), [Node.js](https://nodejs.org/) and the
 [GitHub CLI](https://github.com/cli/cli#installation).
 
-pnpm comes with Node.js through Corepack:
+pnpm comes with Node.js through Corepack, in the version `package.json` names:
 
 ```bash
 corepack enable pnpm
@@ -72,11 +73,14 @@ cd source
 dotnet build Pleiades.Playground.slnx
 dotnet test --solution Pleiades.Playground.slnx
 cd ..
+pnpm install
+pnpm typecheck && pnpm test && pnpm build
 docker compose up -d --build --wait
 ```
 
-Every container reports healthy, and <http://localhost:5500/> and <http://localhost:5510/> show the Swagger UI
-of the two APIs. Stop the stack with `docker compose down`; add `--volumes` to drop the stored data.
+Every container reports healthy. <http://localhost:5500/> and <http://localhost:5510/> show the Swagger UI of the
+two APIs, and <http://localhost:5600/> shows the example app (on this computer only, see `APP_BIND` in
+`.env.example`). Stop the stack with `docker compose down`; add `--volumes` to drop the stored data.
 
 ## Known issues
 
@@ -88,7 +92,7 @@ of the two APIs. Stop the stack with `docker compose down`; add `--volumes` to d
   tag, and other ports in its `.env`:
 
   ```bash
-  PLEIADES_VERSION=0.0.1-mybranch docker compose -p pleiades-mybranch up -d --build --wait
+  PLEIADES_VERSION=mybranch docker compose -p pleiades-mybranch up -d --build --wait
   ```
 
   Use the same `-p` for `ps`, `logs` and `down`.

@@ -20,6 +20,8 @@ coverage*.xml
 # Node
 node_modules/
 dist/
+.output/
+.tanstack/
 .turbo/
 
 # Python

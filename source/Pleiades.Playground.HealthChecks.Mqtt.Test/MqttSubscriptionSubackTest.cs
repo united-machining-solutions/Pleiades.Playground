@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MQTTnet;
-using MQTTnet.Client;
-using MQTTnet.Extensions.ManagedClient;
+using Pleiades.Playground.Mqtt.Extensions;
 using MQTTnet.Packets;
 
 namespace Pleiades.Playground.HealthChecks.Mqtt.Test;
@@ -12,7 +11,7 @@ namespace Pleiades.Playground.HealthChecks.Mqtt.Test;
 /// before the broker had even received the SUBSCRIBE. Only the SUBACK says what the broker granted.
 /// </summary>
 /// <remarks>
-/// Every SUBACK here arrives the way MQTTnet delivers it: as <c>SubscriptionsChangedAsync</c> raised
+/// Every SUBACK here arrives the way the managed client delivers it: as <c>SubscriptionsChangedAsync</c> raised
 /// on the client the worker wired the readiness to, not as a direct call into the readiness.
 /// </remarks>
 [TestClass]
@@ -31,7 +30,7 @@ public sealed class MqttSubscriptionSubackTest
     {
         // THE PREMISE, against the real client: it is never started, so there is no broker at all,
         // and SubscribeAsync returns anyway. A mark set on that return reports Healthy too early.
-        using var client = new MqttFactory().CreateManagedMqttClient();
+        using var client = new MqttClientFactory().CreateManagedMqttClient();
         var readiness = new MqttSubscriptionReadiness();
         client.SubscriptionsChangedAsync += readiness.HandleSubscriptionsChangedAsync;
 

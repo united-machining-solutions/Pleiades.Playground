@@ -15,7 +15,7 @@ x-service: &service
 x-build: &build
   context: ./source
   args:
-    VERSION: ${PLEIADES_VERSION:-0.0.1}
+    VERSION: ${PLEIADES_BUILD_VERSION:-0.0.1}
 
 # The services require a Loki sink in their configuration; the demo disables it.
 x-logging-env: &logging-env
@@ -148,6 +148,46 @@ services:
       Config__MqttSource__ClientId: events-persistence
       Config__Topics__0: machines/+/events/#
       Config__EventsApi__Uri: http://events-api:8080
+
+  # The generative UI backend: an MCP server that reads both APIs. The TypeScript images are built
+  # from the repository root.
+  genui-mcp:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.genui.mcp:${PLEIADES_VERSION:-dev}
+    build:
+      context: .
+      dockerfile: apps/genui-mcp/Dockerfile
+    ports:
+      - "${GENUI_MCP_PORT:-5520}:8080"
+    depends_on:
+      timeseries-api:
+        condition: service_healthy
+      events-api:
+        condition: service_healthy
+    environment:
+      TIMESERIES_API_URL: http://timeseries-api:8080
+      EVENTS_API_URL: http://events-api:8080
+
+  # The example application.
+  app:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.app:${PLEIADES_VERSION:-dev}
+    build:
+      context: .
+      dockerfile: apps/app/Dockerfile
+    ports:
+      # The chat has no sign-in, and with a key set it spends that key. So the app answers on this
+      # computer only, unless APP_BIND opens it to the network.
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-5600}:8080"
+    depends_on:
+      genui-mcp:
+        condition: service_healthy
+    environment:
+      GENUI_MCP_URL: http://genui-mcp:8080/mcp
+      # The chat needs a language model; everything else works without one.
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
 
   # One simulator per machine. The serial number is the machine id in every topic.
   simulator-p-04:

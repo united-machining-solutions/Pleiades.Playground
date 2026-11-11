@@ -17,11 +17,13 @@ How to work on this repository with Claude Code. Most of it holds for any coding
 
 ## Give the agent the running stack
 
-Both APIs offer their data as MCP tools. With the stack running, connect them once:
+The two APIs and the generative UI backend offer their data as MCP tools. With the stack running, connect them
+once:
 
 ```bash
 claude mcp add --transport http pleiades-timeseries http://localhost:5500/mcp
 claude mcp add --transport http pleiades-events http://localhost:5510/mcp
+claude mcp add --transport http pleiades-genui http://localhost:5520/mcp
 ```
 
 The agent can then answer questions from the data, for example "which notifications did machine P-04 raise in
@@ -60,7 +62,7 @@ the last hour, and what did the spindle do at that time?". The tools are listed 
 
 ## What stays with you
 
-- Secrets. The demo needs none; where one is needed, its name goes to `.env.example` and its value stays out of
-  prompts, commits and logs.
+- Secrets. The demo needs none. The chat in the example app needs the key of a language model (`LLM_API_KEY` in
+  `.env`): you set it yourself, and its value stays out of prompts, commits and logs.
 - Publishing: merging, releasing, changing repository settings.
 - The judgement whether a change is right. The agent is fast, and it can be wrong with confidence.

@@ -66,6 +66,10 @@ machines/{SerialNumber}/events/notifications
 
 The payload is the notification event of the Events API (see [`../openapi`](../openapi/README.md)).
 
+- The MQTT 5 content type is mandatory and names the payload: `notificationeventdtov1`.
+- The Events persistence logs and drops a message without a content type or with an unknown one. A client that
+  speaks MQTT 3.1.1 cannot set the content type, so notifications need an MQTT 5 client.
+
 ## Deviations from the data model
 
 | Topic | Data model | This binding | Why |

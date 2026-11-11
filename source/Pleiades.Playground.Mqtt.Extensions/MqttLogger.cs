@@ -1,6 +1,6 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging;
-using MQTTnet.Diagnostics;
+using MQTTnet.Diagnostics.Logger;
 
 namespace Pleiades.Playground.Mqtt.Extensions;
 
@@ -83,12 +83,12 @@ public class MqttLogger : IMqttNetLogger
     }
 
     /// <see cref="IMqttNetLogger"/>
-    public void Publish(MqttNetLogLevel logLevel, string source, string message, object[] parameters, Exception exception)
+    public void Publish(MqttNetLogLevel level, string source, string message, object[] parameters, Exception exception)
     {
         var msg = parameters is null ? message : string.Format(CultureInfo.CurrentCulture, message, parameters);
         if (_name is null)
         {
-            switch (logLevel)
+            switch (level)
             {
                 case MqttNetLogLevel.Verbose:
                     _logVerbose(_logger, source, msg, exception);
@@ -109,7 +109,7 @@ public class MqttLogger : IMqttNetLogger
         }
         else
         {
-            switch (logLevel)
+            switch (level)
             {
                 case MqttNetLogLevel.Verbose:
                     _logVerboseNamed(_logger, source, _name, msg, exception);

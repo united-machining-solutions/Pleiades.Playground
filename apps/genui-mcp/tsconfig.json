@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // Node.js runs these files as they are: it removes the types and nothing else.
+  "compilerOptions": {
+    "types": ["node"],
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src"]
+}

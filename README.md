@@ -20,6 +20,8 @@ docker compose up -d --build
 | Timeseries API | <http://localhost:5500/> | Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp` |
 | Events API | <http://localhost:5510/> | Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp` |
 | MQTT broker | `localhost:1883` | Anonymous in the demo network |
+| Generative UI backend | <http://localhost:5520/mcp> | MCP server for displays, see [`apps/genui-mcp`](apps/genui-mcp/README.md) |
+| Example app | <http://localhost:5600/> | What every machine does now, and a chat about it; see [`apps/app`](apps/app/README.md) |
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo.
@@ -67,8 +69,17 @@ dotnet build Pleiades.Playground.slnx
 dotnet test --solution Pleiades.Playground.slnx
 ```
 
-The solution needs the .NET 10 SDK and nuget.org, nothing else. TypeScript packages use pnpm workspaces
-(`pnpm-workspace.yaml`). Every tool and how to check it: [development setup](docs/development-setup.md).
+The solution needs the .NET 10 SDK and nuget.org, nothing else.
+
+```bash
+pnpm install
+pnpm typecheck && pnpm test && pnpm build
+```
+
+The TypeScript workspace (`apps/`, `packages/`) needs Node.js in the version of `.nvmrc`, pnpm in the version of
+`package.json` and npmjs.org, nothing else. Every version is pinned once, in the catalog of `pnpm-workspace.yaml`.
+
+Every tool and how to check it: [development setup](docs/development-setup.md).
 
 ## Units
 
