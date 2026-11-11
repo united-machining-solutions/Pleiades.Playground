@@ -1,6 +1,5 @@
-import { machineShow } from "@pleiades/cards/machine/contract.ts"
-import type { MachineShow } from "@pleiades/cards/machine/contract.ts"
-import type { MachineList } from "@pleiades/genui-mcp"
+import { machineList, machineShow } from "@pleiades/cards/machine/contract.ts"
+import type { MachineList, MachineShow } from "@pleiades/cards/machine/contract.ts"
 
 // What the app shows for the result of a tool call. The result reaches the chat as text; the
 // tools of the generative UI backend write their values as JSON into it.
@@ -22,12 +21,10 @@ function jsonOf(content: unknown): unknown {
   }
 }
 
-/** The machines in the result of `genui_machine_list`, or null if the text is something else. */
+/** The machines in the result of `genui_machine_list`, checked against the contract of the list. */
 export function machineListOf(content: unknown): MachineList | null {
-  const value = jsonOf(content)
-  if (typeof value !== "object" || value === null) return null
-  const list = value as Partial<MachineList>
-  return typeof list.asOf === "string" && Array.isArray(list.machines) ? (list as MachineList) : null
+  const list = machineList.safeParse(jsonOf(content))
+  return list.success ? list.data : null
 }
 
 /** The values of the machine card in the result of `genui_machine_show`, checked against its contract. */

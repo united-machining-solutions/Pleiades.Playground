@@ -36,6 +36,14 @@ const shown = {
   },
 }
 
+test("a list whose machines do not keep the contract is not drawn", () => {
+  const list = { asOf: shown.asOf, windowSeconds: 1800 }
+  assert.equal(machineListOf(JSON.stringify({ ...list, machines: [shown.machine] }))?.machines.length, 1)
+  const withoutReadings = { machine: "P-04", notifications: [] }
+  assert.equal(machineListOf(JSON.stringify({ ...list, machines: [withoutReadings] })), null)
+  assert.equal(machineListOf(JSON.stringify({ ...list, asOf: "this morning", machines: [] })), null)
+})
+
 test("the JSON of genui_machine_show becomes the values of the machine card", () => {
   assert.equal(machineShowOf(JSON.stringify(shown))?.machine.machine, "P-04")
 })

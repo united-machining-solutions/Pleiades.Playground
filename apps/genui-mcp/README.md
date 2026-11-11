@@ -15,7 +15,7 @@ durations are computed here, never by a language model.
 
 | Tool | What it returns |
 |---|---|
-| `genui_machine_list` | Every machine with what it does now: connection, heartbeat, state and operation mode with the time since when, the active program, and the warnings and errors that have not gone. |
+| `genui_machine_list` | Every machine with what it does now: connection, heartbeat, state and operation mode with the time since when, the active program, and the warnings and errors of the last 24 hours that have not gone. |
 | `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and the states it went through over the last hours (`hours`, 8 if omitted) as spans without a gap. Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. |
 
@@ -36,6 +36,20 @@ by `Connection/State` and `Connection/Heartbeat`. This server reads it so:
   for more than 30 seconds is silent: it has no data, whatever its last values say.
 - **A silence ends a run.** What a value was while the machine was silent is not known, so "since" is the
   first value after the silence.
+
+## Known limit
+
+A warning or an error that has stood for more than 24 hours is not in a result, and the history of a machine
+does not show an error that was raised more than 24 hours before the history begins. The Events API returns
+the notifications that were raised between two instants; it cannot be asked for the ones that are open. Reading
+every notification of the retention time on each call would be the only way around it here. A filter for open
+notifications in the Events API would solve it.
+
+## When an API fails
+
+A tool call fails with a sentence that names the API, what happened and where, for example
+`The Timeseries API did not answer: ECONNREFUSED (http://timeseries-api:8080/topics).` The server writes the
+same sentence to its log, once per failed request.
 
 ## Develop
 

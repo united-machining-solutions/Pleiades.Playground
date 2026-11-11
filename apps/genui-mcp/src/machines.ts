@@ -1,6 +1,5 @@
-import { SILENT_AFTER_SECONDS, instant, machine } from "@pleiades/cards/machine/contract.ts"
-import type { Machine, MachineShow, Reading } from "@pleiades/cards/machine/contract.ts"
-import { z } from "zod"
+import { SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
+import type { Machine, MachineList, MachineShow, Reading } from "@pleiades/cards/machine/contract.ts"
 
 import { listTopics, readNumbers, readOpenNotifications, readRaised, readStrings } from "./apis.ts"
 import type { Apis, OpenNotification, Sample, Series } from "./apis.ts"
@@ -10,7 +9,8 @@ import type { Stretch } from "./liveness.ts"
 import { secondsBefore } from "./time.ts"
 
 // What every machine does now. Each value names the topic or the notification it comes from.
-// The shape of one machine is a contract of the card catalogue, because cards show it.
+// The shapes of a machine and of the list are contracts of the card catalogue, because an
+// application draws them and checks what it gets against them.
 
 /** How far back the values are read to find since when a state has lasted. */
 export const WINDOW_SECONDS = 30 * 60
@@ -18,13 +18,6 @@ export const WINDOW_SECONDS = 30 * 60
 export const HORIZON_SECONDS = 24 * 60 * 60
 /** How many hours back the history of one machine goes, if nobody asks for more or less. */
 export const HISTORY_HOURS = 8
-
-export const machineList = z.object({
-  asOf: instant,
-  windowSeconds: z.number().describe("How far back the values were read to find `since`."),
-  machines: z.array(machine),
-})
-export type MachineList = z.infer<typeof machineList>
 
 const paths = {
   connection: "umati/Connection/State",

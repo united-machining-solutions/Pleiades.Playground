@@ -48,7 +48,9 @@ export const machine = z.object({
   operationMode: reading,
   program: reading,
   lastValueAt: instant.nullable().describe("The newest value of any of the readings: the last sign of life."),
-  notifications: z.array(notification).describe("Warnings and errors that have not gone."),
+  notifications: z
+    .array(notification)
+    .describe("Warnings and errors that were raised in the last 24 hours and have not gone."),
 })
 export type Machine = z.infer<typeof machine>
 
@@ -58,6 +60,14 @@ export type State = z.infer<typeof state>
 
 export const span = z.object({ state, from: instant, to: instant })
 export type Span = z.infer<typeof span>
+
+/** The list of machines: what every machine does now. An application draws it with rows of its own. */
+export const machineList = z.object({
+  asOf: instant,
+  windowSeconds: z.number().describe("How far back the values were read to find `since`."),
+  machines: z.array(machine),
+})
+export type MachineList = z.infer<typeof machineList>
 
 /** The machine card: what one machine does now, and what it did in the hours before. */
 export const machineShow = z.object({

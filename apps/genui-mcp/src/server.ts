@@ -1,4 +1,4 @@
-import { machineShow } from "@pleiades/cards/machine/contract.ts"
+import { machineList, machineShow } from "@pleiades/cards/machine/contract.ts"
 import { toolDefinition } from "@tanstack/ai"
 import { createMCPServer, resourceDefinition } from "@tanstack/ai-mcp/server"
 import type { MCPToolContext } from "@tanstack/ai-mcp/server"
@@ -6,10 +6,8 @@ import { z } from "zod"
 
 import type { Apis } from "./apis.ts"
 import { description, skillGuide } from "./guide.ts"
-import { HISTORY_HOURS, listMachines, machineList, showMachine } from "./machines.ts"
+import { HISTORY_HOURS, listMachines, showMachine } from "./machines.ts"
 import { inTimeZoneOf, isTimeZone } from "./time.ts"
-
-export type { MachineList } from "./machines.ts"
 
 // The MCP server and its tools. Nothing here reads the environment: where the two APIs are comes
 // with each request (see main.ts), so an application can import the type of this server.
@@ -53,7 +51,7 @@ const timeZone = z
 const machineListTool = toolDefinition({
   name: "genui_machine_list",
   description:
-    "List every machine with what it does now: connection, state and operation mode with the time since when, the active program, and the warnings and errors that have not gone. Every value names the topic it comes from.",
+    "List every machine with what it does now: connection, state and operation mode with the time since when, the active program, and the warnings and errors of the last 24 hours that have not gone. Every value names the topic it comes from.",
   inputSchema: z.object({ timeZone }),
   outputSchema: machineList,
   metadata: { title: "List machines", annotations: readOnly },
