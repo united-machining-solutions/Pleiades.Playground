@@ -22,7 +22,8 @@ export function takeFirstQuestion(threadId: string): string | undefined {
 
 export function useChatPanel() {
   const navigate = useNavigate()
-  const show = (chat: string | undefined) => void navigate({ to: "/", search: chat ? { chat } : {} })
+  // The page stays where it is: you chat about what you see.
+  const show = (chat: string | undefined) => void navigate({ to: ".", search: chat ? { chat } : {} })
   return {
     /** Open the panel where it was left. */
     open: () => show(lastThread ?? NEW_CHAT),

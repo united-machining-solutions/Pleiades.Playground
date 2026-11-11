@@ -258,6 +258,9 @@ importers:
 
   apps/genui-mcp:
     dependencies:
+      '@pleiades/cards':
+        specifier: workspace:*
+        version: link:../../packages/cards
       '@tanstack/ai':
         specifier: 'catalog:'
         version: 1.4.0(zod@4.6.7)
@@ -286,6 +289,9 @@ importers:
       '@fontsource-variable/roboto':
         specifier: 'catalog:'
         version: 5.3.0
+      '@pleiades/cards':
+        specifier: workspace:*
+        version: link:../../packages/cards
       '@shadcn/react':
         specifier: 'catalog:'
         version: 0.3.1(@types/react@19.3.0)(react@19.3.1)
@@ -362,6 +368,34 @@ importers:
       vite:
         specifier: 'catalog:'
         version: 8.3.7(@types/node@26.6.6)(jiti@2.7.0)
+
+  packages/cards:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
+    devDependencies:
+      '@base-ui/react':
+        specifier: 'catalog:'
+        version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
+      class-variance-authority:
+        specifier: 'catalog:'
+        version: 0.7.1
+      cn:
+        specifier: 'catalog:'
+        version: 0.5.2
+      react:
+        specifier: 'catalog:'
+        version: 19.3.1
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
 
 packages:
 

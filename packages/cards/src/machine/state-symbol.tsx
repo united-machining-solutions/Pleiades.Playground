@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 
-import type { State } from "./state.ts"
+import type { State } from "./contract.ts"
 
 /**
  * The sign of a state. A state is never told by colour alone: every sign has its own shape, and

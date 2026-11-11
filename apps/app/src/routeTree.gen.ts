@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as HealthRouteImport } from './routes/health'
+import { Route as MachinesMachineRouteImport } from './routes/machines.$machine'
 import { Route as ApiHarnessSplatRouteImport } from './routes/api/harness/$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const HealthRoute = HealthRouteImport.update({
   path: '/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MachinesMachineRoute = MachinesMachineRouteImport.update({
+  id: '/machines/$machine',
+  path: '/machines/$machine',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHarnessSplatRoute = ApiHarnessSplatRouteImport.update({
   id: '/api/harness/$',
   path: '/api/harness/$',
@@ -32,30 +38,34 @@ const ApiHarnessSplatRoute = ApiHarnessSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/health': typeof HealthRoute
+  '/machines/$machine': typeof MachinesMachineRoute
   '/api/harness/$': typeof ApiHarnessSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/health': typeof HealthRoute
+  '/machines/$machine': typeof MachinesMachineRoute
   '/api/harness/$': typeof ApiHarnessSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/health': typeof HealthRoute
+  '/machines/$machine': typeof MachinesMachineRoute
   '/api/harness/$': typeof ApiHarnessSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/health' | '/api/harness/$'
+  fullPaths: '/' | '/health' | '/machines/$machine' | '/api/harness/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/health' | '/api/harness/$'
-  id: '__root__' | '/' | '/health' | '/api/harness/$'
+  to: '/' | '/health' | '/machines/$machine' | '/api/harness/$'
+  id: '__root__' | '/' | '/health' | '/machines/$machine' | '/api/harness/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HealthRoute: typeof HealthRoute
+  MachinesMachineRoute: typeof MachinesMachineRoute
   ApiHarnessSplatRoute: typeof ApiHarnessSplatRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/machines/$machine': {
+      id: '/machines/$machine'
+      path: '/machines/$machine'
+      fullPath: '/machines/$machine'
+      preLoaderRoute: typeof MachinesMachineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/harness/$': {
       id: '/api/harness/$'
       path: '/api/harness/$'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HealthRoute: HealthRoute,
+  MachinesMachineRoute: MachinesMachineRoute,
   ApiHarnessSplatRoute: ApiHarnessSplatRoute,
 }
 export const routeTree = rootRouteImport

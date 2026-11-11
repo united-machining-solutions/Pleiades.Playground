@@ -1,8 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import type { Machine, Reading } from "@pleiades/genui-mcp"
-
+import type { Machine, Reading } from "./contract.ts"
 import { duration } from "./format.ts"
 import { stateOf } from "./state.ts"
 

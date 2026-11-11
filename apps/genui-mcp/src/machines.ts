@@ -1,46 +1,21 @@
+import { SILENT_AFTER_SECONDS, machine } from "@pleiades/cards/machine/contract.ts"
+import type { Machine, MachineShow, Reading } from "@pleiades/cards/machine/contract.ts"
 import { z } from "zod"
 
-import { listTopics, readOpenNotifications, readStrings } from "./apis.ts"
+import { listTopics, readOpenNotifications, readRaised, readStrings } from "./apis.ts"
 import type { Apis, OpenNotification, Sample, Series } from "./apis.ts"
+import { spansBetween } from "./history.ts"
 import { secondsBefore } from "./time.ts"
 
 // What every machine does now. Each value names the topic or the notification it comes from.
+// The shape of one machine is a contract of the card catalogue, because cards show it.
 
 /** How far back the values are read to find since when a state has lasted. */
 export const WINDOW_SECONDS = 30 * 60
 /** How far back a machine and its open notifications are still looked for. */
 export const HORIZON_SECONDS = 24 * 60 * 60
-
-const reading = z.object({
-  value: z.string().nullable().describe("The newest value, or null if the topic had none."),
-  at: z.iso.datetime().nullable().describe("When the newest value was measured."),
-  since: z.iso.datetime().nullable().describe("Since when the value has been the same."),
-  sinceIsLowerBound: z
-    .boolean()
-    .describe("True if the value was already the same where the window starts."),
-  topic: z.string().describe("The MQTT topic the value comes from."),
-})
-export type Reading = z.infer<typeof reading>
-
-const notification = z.object({
-  correlationId: z.string(),
-  notificationId: z.string(),
-  level: z.enum(["Warning", "Error"]),
-  title: z.string(),
-  raisedAt: z.iso.datetime(),
-  topic: z.string().describe("The MQTT topic the notification comes from."),
-})
-
-const machine = z.object({
-  machine: z.string().describe("The serial number, which identifies the machine in every topic."),
-  connection: reading,
-  itemState: reading,
-  operationMode: reading,
-  program: reading,
-  lastValueAt: z.iso.datetime().nullable().describe("The newest value of any of the readings."),
-  notifications: z.array(notification).describe("Warnings and errors that have not gone."),
-})
-export type Machine = z.infer<typeof machine>
+/** How many hours back the history of one machine goes, if nobody asks for more or less. */
+export const HISTORY_HOURS = 8
 
 export const machineList = z.object({
   asOf: z.iso.datetime(),
@@ -62,17 +37,33 @@ export function machineOf(topic: string): string | undefined {
   return /^machines\/([^/]+)\//.exec(topic)?.[1]
 }
 
-/** The newest value and the start of the unbroken run of that value. Samples are oldest first. */
-export function currentRun(topic: string, samples: ReadonlyArray<Sample>): Reading {
+function silentBetween(earlier: string, later: string): boolean {
+  return Date.parse(later) - Date.parse(earlier) > SILENT_AFTER_SECONDS * 1000
+}
+
+/**
+ * The newest value and the start of the unbroken run of that value. Samples are oldest first and
+ * were read from `windowStart` on. A run goes back as far as the value stayed the same without a
+ * pause (see SILENT_AFTER_SECONDS); only a run that reaches the start of the window began before it.
+ */
+export function currentRun(topic: string, samples: ReadonlyArray<Sample>, windowStart: string): Reading {
   const newest = samples.at(-1)
   if (!newest) return { value: null, at: null, since: null, sinceIsLowerBound: false, topic }
-  let start = samples.length - 1
-  while (start > 0 && samples[start - 1]?.value === newest.value) start--
+  let since = newest.at
+  let reachesFirstSample = true
+  for (let index = samples.length - 2; index >= 0; index--) {
+    const before = samples[index]
+    if (!before || before.value !== newest.value || silentBetween(before.at, since)) {
+      reachesFirstSample = false
+      break
+    }
+    since = before.at
+  }
   return {
     value: newest.value,
     at: newest.at,
-    since: samples[start]?.at ?? newest.at,
-    sinceIsLowerBound: start === 0,
+    since,
+    sinceIsLowerBound: reachesFirstSample && !silentBetween(windowStart, since),
     topic,
   }
 }
@@ -111,10 +102,14 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
       const read = async (name: ReadingName): Promise<Reading> => {
         const topic = `machines/${serialNumber}/${paths[name]}`
         const samples = samplesOf(inWindow[name], topic)
-        if (samples.length > 0) return currentRun(topic, samples)
+        if (samples.length > 0) return currentRun(topic, samples, windowStart.toISOString())
         // Silent for longer than the window: the last known value, without a "since".
         const [last] = await readStrings(apis, topic, horizon, now, 1)
-        return { ...currentRun(topic, last?.samples ?? []), since: null, sinceIsLowerBound: false }
+        return {
+          ...currentRun(topic, last?.samples ?? [], horizon.toISOString()),
+          since: null,
+          sinceIsLowerBound: false,
+        }
       }
       const [connection, itemState, operationMode, program] = await Promise.all([
         read("connection"),
@@ -146,4 +141,42 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
   )
 
   return { asOf: now.toISOString(), windowSeconds: WINDOW_SECONDS, machines }
+}
+
+/** One machine: what it does now, as in the list, and the states of the hours before. */
+export async function showMachine(
+  apis: Apis,
+  serialNumber: string,
+  hours = HISTORY_HOURS,
+  now = new Date(),
+): Promise<MachineShow> {
+  const from = secondsBefore(now, hours * 60 * 60)
+  // The values just before say what was known where the history begins.
+  const readFrom = secondsBefore(from, SILENT_AFTER_SECONDS)
+  const topic = (name: ReadingName) => `machines/${serialNumber}/${paths[name]}`
+  const read = async (name: ReadingName) => samplesOf(await readStrings(apis, topic(name), readFrom, now), topic(name))
+
+  const [list, connection, itemState, operationMode, errors] = await Promise.all([
+    listMachines(apis, now),
+    read("connection"),
+    read("itemState"),
+    read("operationMode"),
+    // An error that still stands may have been raised long before the history begins.
+    readRaised(apis, "Error", serialNumber, secondsBefore(from, HORIZON_SECONDS), now),
+  ])
+  const found = list.machines.find((one) => one.machine === serialNumber)
+  if (!found) {
+    const known = list.machines.map((one) => one.machine).join(", ") || "none"
+    throw new Error(`No machine "${serialNumber}" published a value in the last 24 hours. Machines that did: ${known}.`)
+  }
+  return {
+    asOf: list.asOf,
+    windowSeconds: list.windowSeconds,
+    machine: found,
+    history: {
+      from: from.toISOString(),
+      to: list.asOf,
+      spans: spansBetween(from.toISOString(), list.asOf, { connection, itemState, operationMode, errors }),
+    },
+  }
 }

@@ -1,0 +1,8 @@
+/*
+ * What a page needs to draw the cards: the chart and state colours, and Tailwind reading the class
+ * names of this package. The theme itself (the shadcn tokens) is the page's own.
+ *
+ *   @import "@pleiades/cards/styles.css";
+ */
+@import "./dataviz.css";
+@source ".";

@@ -6,11 +6,12 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/roboto";
-@import "./dataviz.css";
+/* The cards: their chart and state colours, and their class names for Tailwind. */
+@import "@pleiades/cards/styles.css";
 
 /*
  * The theme as "shadcn init --preset b5JNecjwG" wrote it, with two changes: there is no dark theme,
- * and the chart colours live in dataviz.css.
+ * and the chart colours come with the cards.
  */
 
 @theme inline {
