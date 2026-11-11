@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Options;
-using MQTTnet.Extensions.ManagedClient;
+using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Events.Generators.NotificationEvent;
 using Pleiades.Playground.Timeseries.Generators.BaseUnitValue;
 using Pleiades.Playground.Timeseries.Generators.BooleanValue;
