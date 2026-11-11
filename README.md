@@ -26,6 +26,9 @@ docker compose up -d --build
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo.
 
+New here? Take the [tour of the demo](docs/tour.md): six stops with screenshots, from the start to where to
+change what.
+
 ## Architecture
 
 Four layers, three agreed interfaces. Everything below the solution layer is the shared base.
