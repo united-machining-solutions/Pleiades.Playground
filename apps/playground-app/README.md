@@ -24,7 +24,21 @@ everything else works.
 | In the demo stack | <http://localhost:5600/>, port from `APP_PORT` |
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app` |
-| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `LLM_BASE_URL`, `LLM_MODEL` and `LLM_API_KEY` for the chat: any OpenAI-compatible endpoint (chat completions). The key stays on the server. |
+| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. The language models of the chat, see below. |
+
+## Language models
+
+The chat offers every model the settings name, in up to three blocks. Each block is optional, and a block
+counts once it is complete. Several models are separated by commas.
+
+| Block | Settings | How the app talks to it |
+|---|---|---|
+| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` | OpenAI's Responses API |
+| Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODELS` | Anthropic's Messages API |
+| Any other endpoint | `LLM_BASE_URL`, `LLM_MODELS`, and `LLM_API_KEY` if it wants one | OpenAI's chat completions, which a local model server or a gateway speaks |
+
+The first model answers until a chat picks another one in its input field. The agent harness keeps that
+choice with the chat. With one model the field shows no choice. The keys stay on the server.
 
 ## Develop
 
@@ -47,8 +61,9 @@ the backend of the running demo stack answers.
   `machine-item.tsx` draws a machine as a row or a tile. Which value of the binding is which state, the signs
   and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
-  with the tools of the backend; chats live in memory and are gone after a restart. `chat-sidebar.tsx` is the
-  panel with the chat on `useChat`, `tool-results.ts` says what the app draws for which tool.
+  with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
+  `models.ts` reads which models the settings name. `chat-sidebar.tsx` is the panel with the chat on `useChat`
+  and the choice of the model, `tool-results.ts` says what the app draws for which tool.
 - `src/components/ui/`: [shadcn/ui](https://ui.shadcn.com) components, added with `shadcn add` and kept as
   generated. `components.json` holds the settings of the preset `b5JNecjwG`. The layout follows the block
   `sidebar-15`: the pages on the left, the chat on the right. `Badge` and `Card` live in `@pleiades/cards`,

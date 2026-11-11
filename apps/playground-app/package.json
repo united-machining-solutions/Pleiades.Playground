@@ -14,6 +14,8 @@
     "@fontsource-variable/roboto": "catalog:",
     "@pleiades/cards": "workspace:*",
     "@shadcn/react": "catalog:",
+    "@tanstack/ai": "catalog:",
+    "@tanstack/ai-anthropic": "catalog:",
     "@tanstack/ai-harness": "catalog:",
     "@tanstack/ai-mcp": "catalog:",
     "@tanstack/ai-openai": "catalog:",

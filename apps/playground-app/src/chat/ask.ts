@@ -20,6 +20,18 @@ export function takeFirstQuestion(threadId: string): string | undefined {
   return question
 }
 
+/** The model picked last, so that the next chat begins with it. */
+let lastModel: string | undefined
+
+export function pickModel(model: string) {
+  lastModel = model
+}
+
+/** The model picked last if the settings still name it, else the first one they name. */
+export function pickedModel(models: ReadonlyArray<string>): string | undefined {
+  return lastModel !== undefined && models.includes(lastModel) ? lastModel : models[0]
+}
+
 export function useChatPanel() {
   const navigate = useNavigate()
   // The page stays where it is: you chat about what you see.
