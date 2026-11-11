@@ -23,39 +23,51 @@ public static class MqttClientOptionsBuilderExtension
             .WithCredentials(config.User, config.Password)
             .WithKeepAlivePeriod(TimeSpan.FromSeconds(KeepAlivePeriodSeconds))
             .WithTimeout(TimeSpan.FromSeconds(OperationTimeoutSeconds))
-            .WithCleanSession(config.CleanSession)
-            .WithTlsOptions(tlsOptions =>
-            {
-                tlsOptions
-                    .UseTls(config.UseTls)
-                    .WithCertificateValidationHandler(_ => true);
-            });
+            .WithCleanSession(config.CleanSession);
 
         if (!string.IsNullOrWhiteSpace(config.ClientId))
         {
             retBuilder = retBuilder.WithClientId(config.ClientId);
         }
 
+        bool useTls;
         if (config.UseSecureWebSocket)
         {
-            return retBuilder
-                .WithWebSocketServer(webSocketOptionsBuilder => ConfigureWebSocket(webSocketOptionsBuilder, config.ConnectionString))
-                .WithTlsOptions(tlsOptions =>
-                {
-                    tlsOptions
-                        .UseTls()
-                        .WithCertificateValidationHandler(_ => true); // Trust all certificates
-                });
+            var webSocketUri = WithWebSocketScheme(config.ConnectionString);
+            retBuilder = retBuilder.WithWebSocketServer(webSocketOptionsBuilder => ConfigureWebSocket(webSocketOptionsBuilder, webSocketUri));
+            useTls = true;
         }
-
-        var uri = new Uri(config.ConnectionString);
-        retBuilder = retBuilder.WithConnectionUri(uri);
-        if (uri.Scheme is "ws" or "wss")
+        else
         {
-            retBuilder = retBuilder.WithWebSocketServer(webSocketOptionsBuilder => ConfigureWebSocket(webSocketOptionsBuilder, uri.ToString()));
+            var uri = new Uri(config.ConnectionString);
+            retBuilder = retBuilder.WithConnectionUri(uri);
+            if (uri.Scheme is "ws" or "wss")
+            {
+                retBuilder = retBuilder.WithWebSocketServer(webSocketOptionsBuilder => ConfigureWebSocket(webSocketOptionsBuilder, uri.ToString()));
+            }
+
+            useTls = config.UseTls || uri.Scheme is "mqtts" or "wss";
         }
 
-        return retBuilder;
+        // Last on purpose. WithConnectionUri of MQTTnet 5 replaces the TLS options with its own: none for
+        // mqtt:// and ws://, and for mqtts:// and wss:// options without the validation handler. Set before
+        // it, UseTls would be dropped and a certificate of a private authority refused.
+        return retBuilder.WithTlsOptions(tlsOptions =>
+        {
+            tlsOptions
+                .UseTls(useTls)
+                .WithCertificateValidationHandler(_ => true); // Trust all certificates
+        });
+    }
+
+    // MQTTnet 5 takes a WebSocket address only with its scheme; MQTTnet 4 also took "host:port/path", and that
+    // is what configurations with UseSecureWebSocket carry.
+    private static string WithWebSocketScheme(string connectionString)
+    {
+        return connectionString.StartsWith("ws://", StringComparison.OrdinalIgnoreCase)
+            || connectionString.StartsWith("wss://", StringComparison.OrdinalIgnoreCase)
+            ? connectionString
+            : "wss://" + connectionString;
     }
 
     // WebSocket keep-alive frames are sent without a timeout and block all sends forever when the peer stalls.
