@@ -59,6 +59,14 @@ export type State = z.infer<typeof state>
 export const span = z.object({ state, from: instant, to: instant })
 export type Span = z.infer<typeof span>
 
+/** The list of machines: what every machine does now. An application draws it with rows of its own. */
+export const machineList = z.object({
+  asOf: instant,
+  windowSeconds: z.number().describe("How far back the values were read to find `since`."),
+  machines: z.array(machine),
+})
+export type MachineList = z.infer<typeof machineList>
+
 /** The machine card: what one machine does now, and what it did in the hours before. */
 export const machineShow = z.object({
   asOf: instant,

@@ -1,4 +1,4 @@
-import { machineShow } from "@pleiades/cards/machine/contract.ts"
+import { machineList, machineShow } from "@pleiades/cards/machine/contract.ts"
 import { toolDefinition } from "@tanstack/ai"
 import { createMCPServer, resourceDefinition } from "@tanstack/ai-mcp/server"
 import type { MCPToolContext } from "@tanstack/ai-mcp/server"
@@ -6,10 +6,8 @@ import { z } from "zod"
 
 import type { Apis } from "./apis.ts"
 import { description, skillGuide } from "./guide.ts"
-import { HISTORY_HOURS, listMachines, machineList, showMachine } from "./machines.ts"
+import { HISTORY_HOURS, listMachines, showMachine } from "./machines.ts"
 import { inTimeZoneOf, isTimeZone } from "./time.ts"
-
-export type { MachineList } from "./machines.ts"
 
 // The MCP server and its tools. Nothing here reads the environment: where the two APIs are comes
 // with each request (see main.ts), so an application can import the type of this server.
