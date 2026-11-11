@@ -1,5 +1,5 @@
 # Build context: source/ (docker build -f source/Pleiades.Playground.Simulator/Dockerfile source).
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 COPY . .
 ARG VERSION=0.0.1
