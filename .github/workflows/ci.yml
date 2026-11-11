@@ -141,6 +141,13 @@ jobs:
             -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"genui_machine_list","arguments":{}}}' \
             | tee machines.txt
           grep -q "P-04" machines.txt
+      - name: The backend shows one machine with its history
+        run: |
+          curl -fsS -X POST http://localhost:5520/mcp \
+            -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"genui_machine_show","arguments":{"machine":"P-04"}}}' \
+            | tee machine.txt
+          grep -q '"spans"' machine.txt
       - name: Logs on failure
         if: failure()
         run: docker compose logs --no-color --tail 200

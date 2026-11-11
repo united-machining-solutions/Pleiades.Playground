@@ -1,9 +1,10 @@
 import { SILENT_AFTER_SECONDS, machine } from "@pleiades/cards/machine/contract.ts"
-import type { Machine, Reading } from "@pleiades/cards/machine/contract.ts"
+import type { Machine, MachineShow, Reading } from "@pleiades/cards/machine/contract.ts"
 import { z } from "zod"
 
-import { listTopics, readOpenNotifications, readStrings } from "./apis.ts"
+import { listTopics, readOpenNotifications, readRaised, readStrings } from "./apis.ts"
 import type { Apis, OpenNotification, Sample, Series } from "./apis.ts"
+import { spansBetween } from "./history.ts"
 import { secondsBefore } from "./time.ts"
 
 // What every machine does now. Each value names the topic or the notification it comes from.
@@ -13,6 +14,8 @@ import { secondsBefore } from "./time.ts"
 export const WINDOW_SECONDS = 30 * 60
 /** How far back a machine and its open notifications are still looked for. */
 export const HORIZON_SECONDS = 24 * 60 * 60
+/** How many hours back the history of one machine goes, if nobody asks for more or less. */
+export const HISTORY_HOURS = 8
 
 export const machineList = z.object({
   asOf: z.iso.datetime(),
@@ -138,4 +141,42 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
   )
 
   return { asOf: now.toISOString(), windowSeconds: WINDOW_SECONDS, machines }
+}
+
+/** One machine: what it does now, as in the list, and the states of the hours before. */
+export async function showMachine(
+  apis: Apis,
+  serialNumber: string,
+  hours = HISTORY_HOURS,
+  now = new Date(),
+): Promise<MachineShow> {
+  const from = secondsBefore(now, hours * 60 * 60)
+  // The values just before say what was known where the history begins.
+  const readFrom = secondsBefore(from, SILENT_AFTER_SECONDS)
+  const topic = (name: ReadingName) => `machines/${serialNumber}/${paths[name]}`
+  const read = async (name: ReadingName) => samplesOf(await readStrings(apis, topic(name), readFrom, now), topic(name))
+
+  const [list, connection, itemState, operationMode, errors] = await Promise.all([
+    listMachines(apis, now),
+    read("connection"),
+    read("itemState"),
+    read("operationMode"),
+    // An error that still stands may have been raised long before the history begins.
+    readRaised(apis, "Error", serialNumber, secondsBefore(from, HORIZON_SECONDS), now),
+  ])
+  const found = list.machines.find((one) => one.machine === serialNumber)
+  if (!found) {
+    const known = list.machines.map((one) => one.machine).join(", ") || "none"
+    throw new Error(`No machine "${serialNumber}" published a value in the last 24 hours. Machines that did: ${known}.`)
+  }
+  return {
+    asOf: list.asOf,
+    windowSeconds: list.windowSeconds,
+    machine: found,
+    history: {
+      from: from.toISOString(),
+      to: list.asOf,
+      spans: spansBetween(from.toISOString(), list.asOf, { connection, itemState, operationMode, errors }),
+    },
+  }
 }

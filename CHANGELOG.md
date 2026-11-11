@@ -19,3 +19,7 @@ All notable changes are documented here. The format follows
 - Example application `playground-app` (TanStack Start, shadcn/ui) in the demo stack on port 5600. Home lists
   what every machine does now, with the values of `genui_machine_list`. A chat next to the page (TanStack AI
   harness, any OpenAI-compatible model) answers questions with the same tools.
+- Card catalogue `packages/cards`: for each card its contract (zod) and its React component. The first card
+  is the machine card: what one machine does now and which states it went through over the last hours. The
+  tool `genui_machine_show` returns its values, the app shows it on a page per machine
+  (`/machines/<serial number>`) and in the chat.

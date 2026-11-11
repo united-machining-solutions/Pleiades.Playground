@@ -1,3 +1,4 @@
+import { MachineCard } from "@pleiades/cards/machine/machine-card.tsx"
 import { stateOf } from "@pleiades/cards/machine/state.ts"
 import { Card } from "@pleiades/cards/ui/card.tsx"
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react"
@@ -35,7 +36,7 @@ import { MachineRow } from "@/machines/machine-item.tsx"
 
 import { NEW_CHAT, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
 import { suggestions } from "./suggestions.ts"
-import { machineListOf, toolLabels } from "./tool-results.ts"
+import { machineListOf, machineShowOf, toolLabels } from "./tool-results.ts"
 
 const root = getRouteApi("__root__")
 
@@ -123,7 +124,7 @@ function Start() {
             <SidebarMenu>
               {chats.map((entry) => (
                 <SidebarMenuItem key={entry.threadId}>
-                  <SidebarMenuButton render={<Link to="/" search={{ chat: entry.threadId }} />}>
+                  <SidebarMenuButton render={<Link to="." search={{ chat: entry.threadId }} />}>
                     <span>{entry.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -205,7 +206,10 @@ function Conversation({ threadId }: { threadId: string }) {
                             )
                           }
                           if (part.type === "tool-result") {
-                            // The app draws the values of a tool itself, with the same parts as Home.
+                            // The app draws the values of a tool itself: a card from the catalogue,
+                            // or a list with the same rows as Home.
+                            const shown = machineShowOf(part.content)
+                            if (shown) return <MachineCard key={index} {...shown} />
                             const list = machineListOf(part.content)
                             if (!list) return null
                             return (

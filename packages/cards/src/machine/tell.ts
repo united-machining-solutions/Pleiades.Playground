@@ -1,7 +1,6 @@
-import type { Machine } from "./contract.ts"
+import type { Machine, State } from "./contract.ts"
 import { clock } from "./format.ts"
 import { openError, openWarning } from "./state.ts"
-import type { State } from "./state.ts"
 
 // What is the matter with a machine, in words. A list and a card say the same about a machine.
 

@@ -1,3 +1,4 @@
+import { machineShow } from "@pleiades/cards/machine/contract.ts"
 import { toolDefinition } from "@tanstack/ai"
 import { createMCPServer, resourceDefinition } from "@tanstack/ai-mcp/server"
 import type { MCPToolContext } from "@tanstack/ai-mcp/server"
@@ -5,7 +6,7 @@ import { z } from "zod"
 
 import type { Apis } from "./apis.ts"
 import { description, skillGuide } from "./guide.ts"
-import { listMachines, machineList } from "./machines.ts"
+import { HISTORY_HOURS, listMachines, machineList, showMachine } from "./machines.ts"
 
 export type { MachineList } from "./machines.ts"
 
@@ -48,10 +49,31 @@ const machineListTool = toolDefinition({
   metadata: { title: "List machines", annotations: readOnly },
 }).server<Context>((_input, ctx) => listMachines(ctx.context.apis))
 
+const machineShowTool = toolDefinition({
+  name: "genui_machine_show",
+  description:
+    "Show one machine: what it does now, as in genui_machine_list, and which states it went through over the last hours, as spans without a gap. Use it for a question about a single machine. The result is the contract of the machine card.",
+  inputSchema: z.object({
+    machine: z
+      .string()
+      .regex(/^[\w.-]+$/)
+      .describe("The serial number of the machine, for example P-04."),
+    hours: z
+      .number()
+      .int()
+      .min(1)
+      .max(24)
+      .optional()
+      .describe(`How many hours back the history goes. ${HISTORY_HOURS} if omitted.`),
+  }),
+  outputSchema: machineShow,
+  metadata: { title: "Show machine", annotations: readOnly },
+}).server<Context>((input, ctx) => showMachine(ctx.context.apis, input.machine, input.hours))
+
 export const server = createMCPServer({
   name: "genui",
   version: "0.1.0",
-  tools: [describeServer, getSkillGuide, machineListTool],
+  tools: [describeServer, getSkillGuide, machineListTool, machineShowTool],
   resources: [
     resourceDefinition({ uri: "genui://skill", name: "skill", mimeType: "text/markdown" }).read(() => ({
       text: skillGuide,

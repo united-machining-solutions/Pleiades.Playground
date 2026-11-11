@@ -6,11 +6,15 @@ harness.
 
 - **Home** asks "what needs you?": it lists the machines of the demo stack, first those in alarm, stopped or
   without data, then those in setup, then the running ones, and reads them again every ten seconds.
+- **A page per machine** (`/machines/P-04`) shows the machine card of the
+  [card catalogue](../../packages/cards/README.md): what the machine does now and what it did over the last
+  hours. It needs no language model. Home leads to it.
 - **Chat** is the panel on the right, with "New chat" and the chats so far. It opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
-  of a tool call itself, with the same parts as Home. Whether the panel is open, and with which chat, is in the
-  URL (`?chat=`). Everything about the chat is in that panel: the pages on the left stay the same without it.
+  of a tool call itself: a card of the catalogue, or a list with the same rows as Home. Whether the panel is
+  open, and with which chat, is in the URL (`?chat=`), and the page stays where it is: you chat about what you
+  see. Everything about the chat is in that panel: the pages on the left stay the same without it.
 
 The values always come from `genui-mcp`. Without a language model the chat says which settings are missing;
 everything else works.
@@ -36,9 +40,10 @@ the backend of the running demo stack answers.
 ## What is where
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
-  `index.tsx` is Home, `health.ts` and `api/harness/$.ts` are server routes.
+  `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `health.ts` and `api/harness/$.ts` are
+  server routes.
 - `src/routeTree.gen.ts`: written by the build. Commit it, never edit it.
-- `src/machines/`: Home. `get-machines.ts` is the server function that calls the backend as a typed MCP client,
+- `src/machines/`: `get-machines.ts` holds the server functions that call the backend as a typed MCP client,
   `machine-item.tsx` draws a machine as a row or a tile. Which value of the binding is which state, the signs
   and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)

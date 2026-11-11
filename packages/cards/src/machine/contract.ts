@@ -44,3 +44,23 @@ export const machine = z.object({
   notifications: z.array(notification).describe("Warnings and errors that have not gone."),
 })
 export type Machine = z.infer<typeof machine>
+
+/** What a machine does, as a list and a card name it. `state.ts` decides which values are which state. */
+export const state = z.enum(["alarm", "stopped", "no-data", "setup", "running"])
+export type State = z.infer<typeof state>
+
+export const span = z.object({ state, from: instant, to: instant })
+export type Span = z.infer<typeof span>
+
+/** The machine card: what one machine does now, and what it did in the hours before. */
+export const machineShow = z.object({
+  asOf: instant,
+  windowSeconds: z.number().describe("How far back the values were read to find `since`."),
+  machine,
+  history: z.object({
+    from: instant,
+    to: instant,
+    spans: z.array(span).describe("The states between `from` and `to`, oldest first and without a gap."),
+  }),
+})
+export type MachineShow = z.infer<typeof machineShow>

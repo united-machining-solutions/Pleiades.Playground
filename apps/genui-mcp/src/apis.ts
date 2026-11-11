@@ -107,13 +107,8 @@ export async function readStrings(
   }))
 }
 
-/** The notifications of one level that were raised between the two instants and have not gone. */
-export async function readOpenNotifications(
-  apis: Apis,
-  level: NotificationLevel,
-  from: Date,
-  to: Date,
-): Promise<Array<OpenNotification>> {
+/** The notifications of one level that were raised between the two instants, each with when it went. */
+async function readPairs(apis: Apis, level: NotificationLevel, from: Date, to: Date, machine?: string) {
   const url = between(
     new URL("/notificationEvents/correlationPairs", apis.eventsUrl),
     ["from", "to"],
@@ -122,8 +117,19 @@ export async function readOpenNotifications(
   )
   url.searchParams.set("level", level)
   url.searchParams.set("Take", "1000")
-  const answer = await getJson(url, pairsAnswer)
-  return answer.items
+  if (machine !== undefined) url.searchParams.set("mId", machine)
+  return (await getJson(url, pairsAnswer)).items
+}
+
+/** The notifications of one level that were raised between the two instants and have not gone. */
+export async function readOpenNotifications(
+  apis: Apis,
+  level: NotificationLevel,
+  from: Date,
+  to: Date,
+): Promise<Array<OpenNotification>> {
+  const pairs = await readPairs(apis, level, from, to)
+  return pairs
     .filter((pair) => pair.timestampGone === null)
     .map((pair) => ({
       correlationId: pair.correlationId,
@@ -133,4 +139,22 @@ export async function readOpenNotifications(
       title: pair.title ?? "",
       raisedAt: new Date(pair.timestampRaised).toISOString(),
     }))
+}
+
+/** From when to when a notification stood. `goneAt` is null as long as it has not gone. */
+export type Raised = { raisedAt: string; goneAt: string | null }
+
+/** When the notifications of one level of one machine were raised and when they went. */
+export async function readRaised(
+  apis: Apis,
+  level: NotificationLevel,
+  machine: string,
+  from: Date,
+  to: Date,
+): Promise<Array<Raised>> {
+  const pairs = await readPairs(apis, level, from, to, machine)
+  return pairs.map((pair) => ({
+    raisedAt: new Date(pair.timestampRaised).toISOString(),
+    goneAt: pair.timestampGone === null ? null : new Date(pair.timestampGone).toISOString(),
+  }))
 }

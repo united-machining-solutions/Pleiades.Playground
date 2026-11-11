@@ -1,20 +1,20 @@
+import type { State } from "@pleiades/cards/machine/contract.ts"
 import { clock } from "@pleiades/cards/machine/format.ts"
 import { stateOf } from "@pleiades/cards/machine/state.ts"
-import type { State } from "@pleiades/cards/machine/state.ts"
 import { Badge } from "@pleiades/cards/ui/badge.tsx"
 import { Card } from "@pleiades/cards/ui/card.tsx"
-import { createFileRoute, useRouter } from "@tanstack/react-router"
-import { Fragment, useEffect } from "react"
+import { createFileRoute } from "@tanstack/react-router"
+import { Fragment } from "react"
 import type { ReactNode } from "react"
 
 import { useChatPanel } from "@/chat/ask.ts"
+import { NoAnswer } from "@/components/no-answer.tsx"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { ItemGroup, ItemSeparator } from "@/components/ui/item"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useLive } from "@/hooks/use-live.ts"
 import { getMachines } from "@/machines/get-machines.ts"
 import { MachineRow, MachineTile } from "@/machines/machine-item.tsx"
-
-const REFRESH_EVERY_MS = 10_000
 
 /** Home asks "what needs you?": first the machines that do, then the rest. */
 const groups: ReadonlyArray<{ title: string; states: ReadonlyArray<State> }> = [
@@ -25,36 +25,25 @@ const groups: ReadonlyArray<{ title: string; states: ReadonlyArray<State> }> = [
 
 export const Route = createFileRoute("/")({
   // If the server of the app itself is away for a moment, the page says so and keeps trying.
-  loader: () => getMachines().catch((error: unknown) => ({ list: null, error: String(error) })),
+  loader: () => getMachines().catch((error: unknown) => ({ values: null, error: String(error) })),
   component: Home,
   pendingComponent: Loading,
 })
 
 function Home() {
   const answer = Route.useLoaderData()
-  const router = useRouter()
   const { ask } = useChatPanel()
-  useEffect(() => {
-    const timer = setInterval(() => void router.invalidate(), REFRESH_EVERY_MS)
-    return () => clearInterval(timer)
-  }, [router])
+  useLive()
 
-  if (answer.list === null) {
+  if (answer.values === null) {
     return (
       <Page>
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No answer from the backend</EmptyTitle>
-            <EmptyDescription>
-              The generative UI backend did not answer ({answer.error}). This page keeps trying.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <NoAnswer error={answer.error} />
       </Page>
     )
   }
 
-  const { asOf, machines } = answer.list
+  const { asOf, machines } = answer.values
   if (machines.length === 0) {
     return (
       <Page>
@@ -84,11 +73,11 @@ function Home() {
             {members.length === 0 ? (
               <p className="text-sm text-muted-foreground">No machine needs you right now.</p>
             ) : title === "Running" ? (
-              <div role="list" className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-3">
+              <ul className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-3">
                 {members.map(({ machine }) => (
                   <MachineTile key={machine.machine} machine={machine} asOf={asOf} />
                 ))}
-              </div>
+              </ul>
             ) : (
               <Card className="gap-0 py-0">
                 <ItemGroup className="gap-0">

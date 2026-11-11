@@ -16,6 +16,7 @@ durations are computed here, never by a language model.
 | Tool | What it returns |
 |---|---|
 | `genui_machine_list` | Every machine with what it does now: connection, state and operation mode with the time since when, the active program, and the warnings and errors that have not gone. |
+| `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and the states it went through over the last hours (`hours`, 8 if omitted) as spans without a gap. Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. |
 
 Cards as `ui://` resources (MCP Apps) follow.
@@ -40,6 +41,8 @@ does that only outside `node_modules`. So the image keeps the layout of the work
   `createMCPClient<typeof server>`.
 - `src/machines.ts`: what a machine does now. The shape of a machine is a contract of the card catalogue,
   [`@pleiades/cards`](../../packages/cards/README.md), because cards show it.
+- `src/history.ts`: the states of a machine over a stretch of time, as spans. Which values are which state
+  is decided in the card catalogue, for the past as for the present.
 - `src/apis.ts`: the two APIs over REST. Every answer is checked against the shape this server relies on.
 - `src/time.ts`: the Timeseries API counts microseconds, the Events API writes ISO 8601; from here on an
   instant is ISO 8601 in UTC.
