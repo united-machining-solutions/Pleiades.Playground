@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
-using MQTTnet.Client;
+using MQTTnet;
 using MQTTnet.Exceptions;
-using MQTTnet.Extensions.ManagedClient;
 
 namespace Pleiades.Playground.Mqtt.Extensions;
 

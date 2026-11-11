@@ -2,8 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using MQTTnet;
-using MQTTnet.Client;
-using MQTTnet.Extensions.ManagedClient;
+using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Timeseries.Api.Client.BaseUnitValue;
 using Pleiades.Playground.Timeseries.Api.Client.BooleanValue;
 using Pleiades.Playground.Timeseries.Api.Client.StringValue;
@@ -11,7 +10,6 @@ using Pleiades.Playground.Timeseries.Common.Daos;
 using Pleiades.Playground.Timeseries.DataTransferObjects;
 using Pleiades.Playground.Common.DataTransferObjects;
 using Pleiades.Playground.HealthChecks.Mqtt;
-using Pleiades.Playground.Mqtt.Extensions;
 
 namespace Pleiades.Playground.Timeseries.Persistence;
 

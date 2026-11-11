@@ -2,9 +2,8 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
-using MQTTnet.Extensions.ManagedClient;
-using Pleiades.Playground.Common.DataTransferObjects;
 using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Common.DataTransferObjects;
 
 namespace Pleiades.Playground.Timeseries.Generators.BaseUnitValue;
 

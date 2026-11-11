@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MQTTnet.Extensions.ManagedClient;
 
 namespace Pleiades.Playground.Mqtt.Extensions;
 

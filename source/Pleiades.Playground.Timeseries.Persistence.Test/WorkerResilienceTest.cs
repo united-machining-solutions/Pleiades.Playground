@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
-using MQTTnet.Extensions.ManagedClient;
+using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Common.Json;
 using Pleiades.Playground.Timeseries.Api.Client.BaseUnitValue;
 using Pleiades.Playground.Timeseries.Api.Client.BooleanValue;

@@ -3,9 +3,8 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
-using MQTTnet.Extensions.ManagedClient;
-using Pleiades.Playground.Common.Json;
 using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Common.Json;
 using Pleiades.Playground.Notification.DataTransferObjects;
 
 namespace Pleiades.Playground.Events.Generators.NotificationEvent;

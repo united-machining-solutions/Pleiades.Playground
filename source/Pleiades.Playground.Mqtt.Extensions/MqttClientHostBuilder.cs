@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MQTTnet;
-using MQTTnet.Extensions.ManagedClient;
 
 namespace Pleiades.Playground.Mqtt.Extensions;
 
@@ -22,7 +21,7 @@ internal sealed class MqttClientHostBuilder(IServiceCollection services) : IMqtt
             .AddKeyedSingleton(name, (provider, _) =>
             {
                 var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-                return new MqttFactory().CreateManagedMqttClient(new MqttLogger(loggerFactory, name));
+                return new MqttClientFactory().CreateManagedMqttClient(new MqttLogger(loggerFactory, name));
             });
         ClientNames.Add(name);
         return this;

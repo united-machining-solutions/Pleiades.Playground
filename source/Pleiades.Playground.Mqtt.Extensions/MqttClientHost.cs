@@ -2,8 +2,7 @@ using System.Collections.Immutable;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MQTTnet.Client;
-using MQTTnet.Extensions.ManagedClient;
+using MQTTnet;
 
 namespace Pleiades.Playground.Mqtt.Extensions;
 
@@ -66,7 +65,7 @@ internal class MqttClientHost: IHostedService
                 _logMqttClientStart(_logger, client.Key, null);
                 AttachLifecycleHandlers(client.Key, client.Value);
                 var config = _configOptions.Get(client.Key);
-                var options = new ManagedMqttClientOptionsBuilder().WithConfig(config).Build();
+                var options = ManagedMqttClientOptions.From(config);
                 var watchdog = new ConnectionWatchdog(client.Key, client.Value, _logger);
                 _watchdogs[client.Key] = watchdog;
                 return StartClientAsync(client.Value, options, watchdog);
@@ -123,7 +122,7 @@ internal class MqttClientHost: IHostedService
         };
         Func<ApplicationMessageSkippedEventArgs, Task> onMessageSkipped = args =>
         {
-            LogSkipped(name, skippedMessages.Register(args.ApplicationMessage.ApplicationMessage.Topic));
+            LogSkipped(name, skippedMessages.Register(args.ApplicationMessage.Topic));
             return Task.CompletedTask;
         };
 

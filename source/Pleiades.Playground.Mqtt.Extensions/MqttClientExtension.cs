@@ -1,6 +1,5 @@
 using System.Text.Json;
 using MQTTnet;
-using MQTTnet.Extensions.ManagedClient;
 using MQTTnet.Protocol;
 using Pleiades.Playground.Common.Json;
 using Pleiades.Playground.Common.DataTransferObjects;
