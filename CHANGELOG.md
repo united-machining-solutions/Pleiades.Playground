@@ -48,6 +48,9 @@ All notable changes are documented here. The format follows
 - A tour of the demo with screenshots (`docs/tour.md`): what the example app shows, stop by stop, and where
   it lives in the code. A coding agent gives the tour when asked ("give me a tour") and offers it when a
   session begins without a task (`AGENTS.md`).
+- About the name (`docs/name.md`): where the name Pleiades comes from, what it stands for and what it does
+  not, how Taurus, Pleiades and this playground relate, and how to write it. `README.md` says it in two
+  sentences.
 
 ### Changed
 
