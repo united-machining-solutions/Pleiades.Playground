@@ -9,6 +9,8 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+        <!-- Serilog.Extensions.Logging asks for 10.0.0. The direct reference holds the current patch and lets dependency updates move it. -->
+        <PackageReference Include="Microsoft.Extensions.Logging" />
         <PackageReference Include="Serilog" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
         <PackageReference Include="Serilog.Extensions.Hosting" />
