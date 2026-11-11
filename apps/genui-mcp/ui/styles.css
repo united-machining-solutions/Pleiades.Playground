@@ -6,3 +6,11 @@
 @import "tailwindcss" source(".");
 @import "@pleiades/cards/theme.css";
 @import "@pleiades/cards/styles.css";
+
+@layer base {
+  /* The conversation of the host shows through around the card. */
+  html,
+  body {
+    background: transparent;
+    }
+}

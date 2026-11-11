@@ -59,8 +59,9 @@ function Note({ children }: { children: ReactNode }) {
 }
 
 createRoot(document.getElementById("root")!).render(
-  // The ring of the card lies outside its box: the padding keeps the host from cutting it off.
-  <div className="mx-auto max-w-2xl p-1">
+  // The card fills the width the host gives it. Its ring lies outside its box: the padding keeps
+  // the host from cutting it off.
+  <div className="p-1">
     <Machine />
   </div>,
 )
