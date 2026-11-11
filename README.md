@@ -7,6 +7,10 @@ so applications and AI agents use one set of tools.
 The repository is a monorepo so that the whole demo case starts with one command. What proves itself here moves
 out of the playground later.
 
+Pleiades is named after the star cluster: many stars, one sky, one open foundation. The name stands for an open
+digital foundation for manufacturing, on which independent manufacturers stay visible and keep competing; this
+playground tries the idea in code. More in [About the name](docs/name.md).
+
 > **Status: playground.** Interfaces may change without notice. Do not run this in production.
 
 ## Start
