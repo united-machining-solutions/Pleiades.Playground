@@ -17,7 +17,8 @@ durations are computed here, never by a language model.
 | Tool | What it returns |
 |---|---|
 | `genui_machine_list` | Every machine with what it does now: connection, heartbeat, state and operation mode with the time since when, the active program, and the warnings and errors of the last 24 hours that have not gone. |
-| `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and what it did over the last hours (`hours`, 8 if omitted): how long each state lasted in total, and the states as spans without a gap. Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and how long each state lasted in total over the last hours (`hours`, 8 if omitted). Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_span_list` | The states of one machine between two instants (`from`, `to`) as spans without a gap: the band of the machine card. A card calls it after `genui_machine_show`. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. A question about a machine needs neither: a result answers it. |
 
 | Resource | What it is |
@@ -39,13 +40,25 @@ A result has two parts, for two readers:
 - **Its values (`structuredContent`) are for a display.** The example application and the card file draw
   them.
 
-So a model does not read a history of a few hundred spans to answer a question, and it adds nothing up:
-the sums come from here (`history.totals`). The text of `genui_machine_show` ends with a note for a model:
-where the host shows MCP Apps, the person already sees the card, and a sentence or two is the whole answer.
+A model adds nothing up: the sums come from here (`history.totals`). The text of `genui_machine_show`
+ends with a note for a model: where the host shows MCP Apps, the person already sees the card, and a
+sentence or two is the whole answer.
 
 Hosts differ in what they give a model. The standard for MCP Apps gives it the text. Some hosts give it
-the values instead. The chat of the example application is one of them, through its client library: there
-a model still reads every span.
+the values instead, among them the chat of the example application, through its client library. So the
+values are short too. The rule is: **what a model reads is short, and a series is fetched by the card
+itself.**
+
+- What grows with time or with the number of things is not a value of a result. The spans of the band
+  are a tool of their own, `genui_span_list`, which only a card calls.
+- A card asks for its series with the `from` and `to` of its values, so the band and the sums are about
+  the same hours.
+- A result stands without its series. Where a host lets no card call a tool, or the data is gone, the
+  card shows the state and the sums and leaves the band out.
+- A series is bounded. A band has room for 720 spans; a longer history is thinned to that many. Each slot
+  then shows the state that lasted longest in it, so the band keeps its proportions, and an alarm always
+  keeps a slot, so none is thinned away. A thinned band therefore shows a short alarm wider than it was;
+  how long it lasted is in the sums, which are added up from every span.
 
 ## The machine card for other hosts
 
@@ -58,10 +71,13 @@ wrappers: an application that imports it, and one HTML file for every other host
 
 - The file is a single HTML page with its script and its styles inside, about 580 kB and 160 kB compressed.
   It loads nothing from anywhere, so a host has no origin to allow for it.
-- It shows what the result says and nothing newer: it calls no tool and does not refresh.
+- It shows what the result says and nothing newer. It asks the server for the spans of its band, through
+  the host, and for nothing else: it does not refresh.
 - It is light and draws the frame of the card itself. It says so to the host (`prefersBorder: false`), as the
   standard recommends, so no host puts a second frame around it. The font is the one the host names, so the
-  card reads like the conversation around it. Times are written by the clock of the browser.
+  card reads like the conversation around it. A host that serves its font from an origin of its own has to
+  find that origin in the resource (`csp.resourceDomains`), or its sandbox blocks the font. Times are written
+  by the clock of the browser.
 - It travels alone, so it carries its notices: a comment at its end holds the `NOTICE` of this repository
   and the licence of every package the build put into the file.
 
@@ -142,13 +158,14 @@ files and not those.
 - `src/main.ts`: reads the settings and serves `/mcp` and `/health`, or with `--stdio` stdin and stdout.
 - `src/server.ts`: the MCP server, its tools and its resources. An application imports its type and calls it
   with `createMCPClient<typeof server>`.
-- `src/card-file.ts`: reads a built card file.
+- `src/card-file.ts`: reads a built card file, and says what a card tells a host about itself.
+- `src/names.ts`: the names the server and its card files share.
 - `ui/`: the card files, which run in a host and not in Node.js. `machine.tsx` takes the result from the host
   and draws the machine card, `vite.config.ts` builds it into one HTML file.
 - `src/machines.ts`: what a machine does now. The shape of a machine is a contract of the card catalogue,
   [`@pleiades/cards`](../../packages/cards/README.md), because cards show it.
-- `src/history.ts`: the states of a machine over a stretch of time, as spans. Which values are which state
-  is decided in the card catalogue, for the past as for the present.
+- `src/history.ts`: the states of a machine over a stretch of time, as spans, their sums, and the thinning
+  for a band. Which values are which state is decided in the card catalogue, for the past as for the present.
 - `src/liveness.ts`: the stretches in which a machine gave no sign of life.
 - `src/apis.ts`: the two APIs over REST. Every answer is checked against the shape this server relies on.
 - `src/time.ts`: the Timeseries API counts microseconds, the Events API writes ISO 8601; from here on an

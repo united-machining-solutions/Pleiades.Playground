@@ -32,7 +32,6 @@ const shown = {
   history: {
     from: "2026-11-16T01:30:00.000Z",
     to: "2026-11-16T09:30:00.000Z",
-    spans: [{ state: "running", from: "2026-11-16T01:30:00.000Z", to: "2026-11-16T09:30:00.000Z" }],
     totals: [{ state: "running", seconds: 28_800 }],
   },
 }
@@ -50,7 +49,7 @@ test("the JSON of genui_machine_show becomes the values of the machine card", ()
 })
 
 test("what does not keep the contract of the card is not drawn as one", () => {
-  const unknownState = { ...shown, history: { ...shown.history, spans: [{ ...shown.history.spans[0], state: "idle" }] } }
+  const unknownState = { ...shown, history: { ...shown.history, totals: [{ state: "idle", seconds: 28_800 }] } }
   assert.equal(machineShowOf(JSON.stringify(unknownState)), null)
   assert.equal(machineShowOf('{"asOf":"2026-11-16T09:30:00.000Z","windowSeconds":1800,"machines":[]}'), null)
   assert.equal(machineShowOf("genui is the generative UI backend"), null)

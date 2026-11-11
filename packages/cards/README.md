@@ -15,6 +15,12 @@ generative UI backend. Its contract and its component lie next to each other, so
 The list of machines, the result of `genui_machine_list`, has a contract here too (`machineList`), but no
 card: an application draws it with rows of its own and checks what it gets against the contract.
 
+**What a model reads is short, and a series is fetched by the card itself.** The contract of a card holds
+what a language model may read with it: a few values. What grows with time or with the number of things
+has a contract of its own and a tool of its own, which only a card calls. For the machine card that is
+`spanList`, the states of its band (`genui_span_list`): whoever draws the card asks for them with the
+`from` and `to` of its values and hands them in as they arrive. The card stands without them.
+
 Nothing is built here. The package is source: an import names the file, for example
 `@pleiades/cards/machine/contract.ts`.
 
@@ -37,8 +43,8 @@ Both import the theme from here, so the card looks the same in both.
 ## What is where
 
 - `src/machine/`: what is shown about a machine.
-  - `contract.ts`: the shape of a machine as the tools return it, the contract of the machine card, and after
-    how many seconds of silence a machine is not live.
+  - `contract.ts`: the shape of a machine as the tools return it, the contract of the machine card and of
+    the spans of its band, and after how many seconds of silence a machine is not live.
   - `state.ts`: which value of the binding is which state on the screen. This file decides it, nothing else
     does: the backend asks it for the past, the lists and the cards for the present.
   - `tell.ts` says in words what is the matter, `format.ts` writes times and durations, `state-symbol.tsx`
@@ -62,6 +68,8 @@ Both import the theme from here, so the card looks the same in both.
 4. In the application, draw the component where the result of the tool arrives.
 5. For other hosts, add a card file under `apps/genui-mcp/ui/` and to the build there, and link it from the
    tool.
+6. If the card shows a series, keep it out of the contract of the card: give it a contract and a tool of its
+   own, and let the application and the card file ask for it.
 
 ```bash
 pnpm --filter @pleiades/cards test

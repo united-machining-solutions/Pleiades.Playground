@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { Machine, Reading } from "./contract.ts"
-import { machineInWords, machineListInWords, machineShowInWords } from "./in-words.ts"
+import { machineInWords, machineListInWords, machineShowInWords, spanListInWords } from "./in-words.ts"
 
 // The instants are written as a tool writes them for a person in Zurich: local, with the offset.
 const asOf = "2026-11-16T10:30:00.000+01:00"
@@ -72,7 +72,6 @@ test("the card in words has the sums of the history as the backend added them up
   const history = {
     from: "2026-11-16T02:30:00.000+01:00",
     to: asOf,
-    spans: [],
     totals: [
       { state: "running" as const, seconds: 19_680 },
       { state: "stopped" as const, seconds: 2_760 },
@@ -86,6 +85,14 @@ test("the card in words has the sums of the history as the backend added them up
       "Last 8 hours, 02:30 to 10:30: running 5 h 28 min, stopped 46 min, no data 22 min.",
       "Read at 10:30.",
     ].join("\n"),
+  )
+})
+
+test("the spans of a band are for a display, and their words say only what the list is", () => {
+  const spans = [{ state: "running" as const, from: "2026-11-16T01:30:00.000Z", to: "2026-11-16T09:30:00.000Z" }]
+  assert.equal(
+    spanListInWords({ machine: "P-04", from: "2026-11-16T01:30:00.000Z", to: "2026-11-16T09:30:00.000Z", spans }),
+    "1 span of P-04, 01:30 UTC to 09:30 UTC, for the band of the machine card. How long each state lasted in total is in the result of genui_machine_show.",
   )
 })
 

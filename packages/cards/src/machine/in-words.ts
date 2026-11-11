@@ -1,4 +1,4 @@
-import type { Machine, MachineList, MachineShow } from "./contract.ts"
+import type { Machine, MachineList, MachineShow, SpanList } from "./contract.ts"
 import { duration, lasting, written } from "./format.ts"
 import { openWarning, stateLabel, stateOf } from "./state.ts"
 import { tell } from "./tell.ts"
@@ -37,6 +37,15 @@ function historyInWords({ from, to, totals }: MachineShow["history"]): string {
 /** The machine card in words. */
 export function machineShowInWords({ machine, asOf, history }: MachineShow): string {
   return [machineInWords(machine, asOf), historyInWords(history), `Read at ${written(asOf)}.`].join("\n")
+}
+
+/**
+ * The spans of a band in words. They are for a display: a reader of words has the sums of the
+ * card, so this says only what the list is.
+ */
+export function spanListInWords({ machine, from, to, spans }: SpanList): string {
+  const count = `${spans.length} ${spans.length === 1 ? "span" : "spans"}`
+  return `${count} of ${machine}, ${written(from)} to ${written(to)}, for the band of the machine card. How long each state lasted in total is in the result of genui_machine_show.`
 }
 
 /** The list of machines in words: a line for each machine. */

@@ -1,4 +1,4 @@
-import type { MachineShow, State } from "./contract.ts"
+import type { MachineShow, Span, State } from "./contract.ts"
 import { clock, lasting } from "./format.ts"
 import { stateLabel } from "./state.ts"
 import { StateSymbol } from "./state-symbol.tsx"
@@ -16,11 +16,17 @@ const band: Record<State, string> = {
 }
 
 /**
+ * The spans of a band. They reach a card after its values: undefined while they are on their
+ * way, null if they are not to be had.
+ */
+export type Spans = ReadonlyArray<Span> | null | undefined
+
+/**
  * What a machine did over the last hours: one band, and below it how long each state lasted in
  * total. The sums say in words what the band shows. They come with the history: the backend
- * adds them up.
+ * adds them up. Without its spans the band is left out, and the sums stand alone.
  */
-export function StateBand({ history }: { history: MachineShow["history"] }) {
+export function StateBand({ history, spans }: { history: MachineShow["history"]; spans: Spans }) {
   const hours = Math.round((Date.parse(history.to) - Date.parse(history.from)) / 3_600_000)
   return (
     <figure className="flex flex-col gap-1.5">
@@ -31,15 +37,18 @@ export function StateBand({ history }: { history: MachineShow["history"] }) {
         </span>
       </figcaption>
       {/* The sums below say the same in words, so the band itself is skipped by a screen reader. */}
-      <div aria-hidden className="flex h-3 overflow-hidden rounded-sm">
-        {history.spans.map((span) => (
-          <div
-            key={span.from}
-            className={band[span.state]}
-            style={{ flexGrow: Date.parse(span.to) - Date.parse(span.from), flexBasis: 0 }}
-          />
-        ))}
-      </div>
+      {spans === undefined && <div aria-hidden className="h-3 animate-pulse rounded-sm bg-muted" />}
+      {spans && (
+        <div aria-hidden className="flex h-3 overflow-hidden rounded-sm">
+          {spans.map((span) => (
+            <div
+              key={span.from}
+              className={band[span.state]}
+              style={{ flexGrow: Date.parse(span.to) - Date.parse(span.from), flexBasis: 0 }}
+            />
+          ))}
+        </div>
+      )}
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground tabular-nums">
         {history.totals.map(({ state, seconds }) => (
           <li key={state} className="flex items-center gap-1.5">

@@ -15,6 +15,12 @@ export const stateLabel: Record<State, string> = {
 /** The order in which a display reads the states, for example the sums of a history. */
 export const stateOrder: ReadonlyArray<State> = ["running", "setup", "stopped", "alarm", "no-data"]
 
+/**
+ * Which of two states is shown where there is room for one only and neither outweighs the other,
+ * for example in one slot of a band: the one that needs a person more comes first.
+ */
+export const stateSeverity: ReadonlyArray<State> = ["alarm", "no-data", "stopped", "setup", "running"]
+
 /** What is known about a machine at one instant. */
 export type Known = {
   connection: string | null

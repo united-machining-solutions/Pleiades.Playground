@@ -41,6 +41,10 @@ All notable changes are documented here. The format follows
   shows, and the values stay in `structuredContent`, so a language model no longer reads the history of a
   machine as raw data. The sums of that history come from the server (`history.totals`); the card no longer
   adds them up.
+- What a language model reads of a result is short, whichever part a host gives it. The states of a machine
+  over the last hours are no longer in the result of `genui_machine_show`: the machine card asks for the
+  spans of its band itself, with the new tool `genui_span_list`, which only a card calls. A history too long
+  for the band is thinned.
 
 ### Changed
 

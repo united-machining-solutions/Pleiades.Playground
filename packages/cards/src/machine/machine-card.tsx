@@ -6,6 +6,7 @@ import type { MachineShow } from "./contract.ts"
 import { clock, duration } from "./format.ts"
 import { openWarning, stateLabel, stateOf } from "./state.ts"
 import { StateBand } from "./state-band.tsx"
+import type { Spans } from "./state-band.tsx"
 import { StateSymbol } from "./state-symbol.tsx"
 import { tell } from "./tell.ts"
 
@@ -13,8 +14,11 @@ import { tell } from "./tell.ts"
  * The machine card: what one machine does now, since when, with which program, and what it did
  * over the last hours. It draws the result of `genui_machine_show` and computes nothing but the
  * wording.
+ *
+ * The spans of its band are not part of that result. Whoever draws the card asks for them
+ * (`genui_span_list`) and hands them in as they arrive. The card stands without them.
  */
-export function MachineCard({ machine, asOf, history }: MachineShow) {
+export function MachineCard({ machine, asOf, history, spans }: MachineShow & { spans?: Spans }) {
   const state = stateOf(machine, asOf)
   const told = tell(machine, state)
   const warning = openWarning(machine)
@@ -55,7 +59,7 @@ export function MachineCard({ machine, asOf, history }: MachineShow) {
           {/* Without data the program would be the last known one, not the present. */}
           {state !== "no-data" && machine.program.value && <Row label="Program">{machine.program.value}</Row>}
         </dl>
-        <StateBand history={history} />
+        <StateBand history={history} spans={spans} />
       </CardContent>
       <CardFooter className="block text-xs break-words text-muted-foreground">
         Read at {clock(asOf)} from {topics.join(", ")}

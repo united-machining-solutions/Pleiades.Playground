@@ -147,10 +147,18 @@ jobs:
             -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
             -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"genui_machine_show","arguments":{"machine":"P-04"}}}' \
             | tee machine.txt
-          grep -q '"spans"' machine.txt
           # The text says the machine in words, and the sums of the history come from the server.
           grep -q '"text":"P-04: ' machine.txt
           grep -q '"totals"' machine.txt
+          # What a language model reads stays short: the spans of the band are not in it.
+          if grep -q '"spans"' machine.txt; then echo "The result of genui_machine_show carries spans."; exit 1; fi
+      - name: The backend lists the spans of a card's band
+        run: |
+          curl -fsS -X POST http://localhost:5520/mcp \
+            -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"genui_span_list\",\"arguments\":{\"machine\":\"P-04\",\"from\":\"$(date -u -d '-10 minutes' +%FT%TZ)\",\"to\":\"$(date -u +%FT%TZ)\"}}}" \
+            | tee spans.txt
+          grep -q '"spans":\[{"state"' spans.txt
       - name: The backend serves the machine card as an MCP App
         run: |
           curl -fsS -X POST http://localhost:5520/mcp \

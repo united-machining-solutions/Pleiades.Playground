@@ -2,10 +2,11 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import { CARD_MIME_TYPE } from "./card-file.ts"
-import { MACHINE_CARD_URI, server } from "./server.ts"
+import { MACHINE_CARD_URI, SPAN_LIST_TOOL } from "./names.ts"
+import { server } from "./server.ts"
 
 type Listed = {
-  tools?: Array<{ name: string; _meta?: { ui?: { resourceUri?: string } } }>
+  tools?: Array<{ name: string; _meta?: { ui?: { resourceUri?: string; visibility?: Array<string> } } }>
   resources?: Array<{ uri: string; mimeType?: string; _meta?: { ui?: { prefersBorder?: boolean } } }>
 }
 
@@ -29,6 +30,13 @@ test("the tool that shows a machine links the machine card, and the list links n
   const linkOf = (name: string) => tools.find((tool) => tool.name === name)?._meta?.ui?.resourceUri
   assert.equal(linkOf("genui_machine_show"), MACHINE_CARD_URI)
   assert.equal(linkOf("genui_machine_list"), undefined)
+})
+
+test("the spans of a band are for a card: a host does not offer that tool to its language model", async () => {
+  const { tools = [] } = await ask("tools/list")
+  assert.deepEqual(tools.find((tool) => tool.name === SPAN_LIST_TOOL)?._meta?.ui?.visibility, ["app"])
+  // The tools a model calls say nothing about who sees them, which means everybody.
+  assert.equal(tools.find((tool) => tool.name === "genui_machine_show")?._meta?.ui?.visibility, undefined)
 })
 
 test("the machine card is a resource that a host reads as an MCP App", async () => {

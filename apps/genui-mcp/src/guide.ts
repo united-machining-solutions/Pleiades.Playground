@@ -13,7 +13,8 @@ works with them.
 
 Tools:
 - genui_machine_list: every machine with what it does now.
-- genui_machine_show: one machine with what it does now and what it did over the last hours.
+- genui_machine_show: one machine with what it does now and how long each state lasted over the last hours.
+- genui_span_list: the states of one machine as spans, for the band of a card. A card calls it.
 - genui_describe_server: this text.
 - genui_get_skill_guide: the conventions of this server as markdown.`
 
@@ -70,8 +71,14 @@ notification stands for a reason nobody recorded.
 ## One machine
 
 \`genui_machine_show\` takes the serial number (\`machine\`) and returns the same readings for that
-machine, and its \`history\`: the states between \`from\` and \`to\` as spans without a gap, oldest
-first. \`hours\` says how far back the history goes, 8 if omitted, 24 at most.
+machine, and its \`history\`: how long each state lasted in total between \`from\` and \`to\`
+(\`totals\`, in seconds). \`hours\` says how far back the history goes, 8 if omitted, 24 at most.
+The sums are added up here. Take them from there, and do not count states yourself.
+
+The states themselves, as spans without a gap and oldest first, are what a card draws as a band.
+They grow with time, so they are not in that result: a card asks \`genui_span_list\` for them, with
+\`history.from\` and \`history.to\`. A question about how long or how often is answered by the sums.
+Ask for the spans only to say when something happened.
 
 A span has one of five states, decided from the values in this order:
 
@@ -81,7 +88,7 @@ A span has one of five states, decided from the values in this order:
 - \`stopped\`: the item state is anything but \`Executing\`.
 - \`running\`: everything else.
 
-\`history.totals\` says how long each state lasted in total between \`from\` and \`to\`, in seconds.
-The sums are added up here, from the spans. Take them from there: do not add up spans, and do not
-count states yourself.
+A band has room for a few hundred spans. A history with more is thinned to that many: each slot of
+the band then shows the state that lasted longest in it, and an alarm always keeps a slot, so none
+is thinned away. The sums are not affected: they are added up from every span.
 `

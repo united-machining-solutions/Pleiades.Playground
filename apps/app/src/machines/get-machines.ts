@@ -1,4 +1,4 @@
-import type { MachineList, MachineShow } from "@pleiades/cards/machine/contract.ts"
+import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
@@ -71,7 +71,7 @@ export const getMachines = createServerFn({ method: "GET" }).handler(
     }),
 )
 
-/** One machine with the states of the last hours: the values of the machine card. */
+/** One machine, and how long each state lasted over the last hours: the values of the machine card. */
 export const getMachine = createServerFn({ method: "GET" })
   .validator((machine: string) => machine)
   .handler(
@@ -84,3 +84,21 @@ export const getMachine = createServerFn({ method: "GET" })
         return result.structuredContent
       }),
   )
+
+/**
+ * The spans of a card's band, for the hours its values are about. They are not among the values,
+ * because a language model reads those. Null if they are not to be had: the card stands without
+ * its band.
+ */
+export const getSpans = createServerFn({ method: "GET" })
+  .validator((hours: { machine: string; from: string; to: string }) => hours)
+  .handler(async ({ data }): Promise<Array<Span> | null> => {
+    const answer = await ask(async (backend) => {
+      const result = await backend.callTool("genui_span_list", data)
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? "genui_span_list returned no values.")
+      }
+      return result.structuredContent.spans
+    })
+    return answer.values
+  })

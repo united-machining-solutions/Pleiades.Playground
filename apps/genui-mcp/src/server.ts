@@ -1,5 +1,5 @@
-import { machineList, machineShow } from "@pleiades/cards/machine/contract.ts"
-import { machineListInWords, machineShowInWords } from "@pleiades/cards/machine/in-words.ts"
+import { BAND_SLOTS, instant, machineList, machineShow, spanList } from "@pleiades/cards/machine/contract.ts"
+import { machineListInWords, machineShowInWords, spanListInWords } from "@pleiades/cards/machine/in-words.ts"
 import { toolDefinition } from "@tanstack/ai"
 import { createMCPServer, resourceDefinition } from "@tanstack/ai-mcp/server"
 import type { MCPToolContext } from "@tanstack/ai-mcp/server"
@@ -8,7 +8,8 @@ import { z } from "zod"
 import type { Apis } from "./apis.ts"
 import { CARD_META, CARD_MIME_TYPE, readCardFile } from "./card-file.ts"
 import { description, skillGuide } from "./guide.ts"
-import { HISTORY_HOURS, listMachines, showMachine } from "./machines.ts"
+import { HISTORY_HOURS, MOST_HOURS, listMachines, listSpans, showMachine } from "./machines.ts"
+import { MACHINE_CARD_URI, SPAN_LIST_TOOL } from "./names.ts"
 import { inTimeZoneOf, isTimeZone } from "./time.ts"
 
 // The MCP server and its tools. Nothing here reads the environment: where the two APIs are comes
@@ -34,9 +35,6 @@ const text = (value: string) => ({ content: [{ type: "text" as const, text: valu
 function inWords<TValues>(values: TValues, words: string): TValues {
   return { content: [{ type: "text", text: words }], structuredContent: values } as unknown as TValues
 }
-
-/** The machine card as a file for other hosts. The example application draws the card itself. */
-export const MACHINE_CARD_URI = "ui://genui/machine"
 
 /** What a language model is told with the words of a card: who sees what, and what is left to say. */
 const shownAsCard =
@@ -67,6 +65,11 @@ const timeZone = z
     "The IANA time zone to write every instant of the result in, for example Europe/Zurich. The instants are then local times with their offset to UTC. UTC if omitted.",
   )
 
+const serialNumber = z
+  .string()
+  .regex(/^[\w.-]+$/)
+  .describe("The serial number of the machine, for example P-04.")
+
 const machineListTool = toolDefinition({
   name: "genui_machine_list",
   description:
@@ -82,17 +85,14 @@ const machineListTool = toolDefinition({
 const machineShowTool = toolDefinition({
   name: "genui_machine_show",
   description:
-    "Show one machine: what it does now, as in genui_machine_list, and what it did over the last hours: how long each state lasted in total, and the states as spans without a gap. Use it for a question about a single machine. The result says it in words and carries the values of the machine card, which a host that shows MCP Apps draws for the person.",
+    "Show one machine: what it does now, as in genui_machine_list, and how long each state lasted in total over the last hours. Use it for a question about a single machine. The result says it in words and carries the values of the machine card, which a host that shows MCP Apps draws for the person.",
   inputSchema: z.object({
-    machine: z
-      .string()
-      .regex(/^[\w.-]+$/)
-      .describe("The serial number of the machine, for example P-04."),
+    machine: serialNumber,
     hours: z
       .number()
       .int()
       .min(1)
-      .max(24)
+      .max(MOST_HOURS)
       .optional()
       .describe(`How many hours back the history goes. ${HISTORY_HOURS} if omitted.`),
     timeZone,
@@ -105,10 +105,36 @@ const machineShowTool = toolDefinition({
   return inWords(shown, `${machineShowInWords(shown)}\n\n${shownAsCard}`)
 })
 
+const spanListTool = toolDefinition({
+  name: SPAN_LIST_TOOL,
+  description:
+    "List the states of one machine between two instants as spans without a gap: what the band of the machine card draws. A card calls it after genui_machine_show, with `history.from` and `history.to` of that result. A language model does not need it to say how long or how often: the sums are in the result of genui_machine_show.",
+  inputSchema: z.object({
+    machine: serialNumber,
+    from: instant.describe("Where the spans begin: `history.from` of genui_machine_show."),
+    to: instant.describe(`Where they end: \`history.to\` of genui_machine_show. At most ${MOST_HOURS} hours after \`from\`.`),
+    slots: z
+      .number()
+      .int()
+      .min(1)
+      .max(2000)
+      .optional()
+      .describe(
+        `How many spans the band has room for, ${BAND_SLOTS} if omitted. A longer history is thinned to that many: each slot then shows the state that lasted longest in it, and an alarm always keeps a slot.`,
+      ),
+  }),
+  outputSchema: spanList,
+  // Only a card calls this tool: a host that shows MCP Apps does not offer it to its language model.
+  metadata: { title: "List spans", annotations: readOnly, _meta: { ui: { visibility: ["app"] } } },
+}).server<Context>(async (input, ctx) => {
+  const list = await listSpans(ctx.context.apis, input.machine, input.from, input.to, input.slots)
+  return inWords(list, spanListInWords(list))
+})
+
 export const server = createMCPServer({
   name: "genui",
   version: "0.1.0",
-  tools: [describeServer, getSkillGuide, machineListTool, machineShowTool],
+  tools: [describeServer, getSkillGuide, machineListTool, machineShowTool, spanListTool],
   resources: [
     resourceDefinition({ uri: "genui://skill", name: "skill", mimeType: "text/markdown" }).read(() => ({
       text: skillGuide,
