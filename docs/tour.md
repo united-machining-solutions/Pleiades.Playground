@@ -217,3 +217,5 @@ To use the tools from your own agent, add the three MCP addresses to any MCP cli
 
 The screenshots are 1383 × 868 pixels, taken in Chrome in the light theme of the app. To replace one, keep
 the file name under [`images/tour/`](images/tour) and describe in the text what the new picture shows.
+Whoever changes what a stop shows keeps the stop current, see [CONTRIBUTING.md](../CONTRIBUTING.md#conventions);
+CI checks that every pointer of this page still has its target.
