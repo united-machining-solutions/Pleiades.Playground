@@ -6,5 +6,8 @@
     "typecheck": "pnpm --recursive --if-present run typecheck",
     "test": "pnpm --recursive --if-present run test",
     "build": "pnpm --recursive --if-present run build"
+  },
+  "devDependencies": {
+    "@tanstack/intent": "catalog:"
   }
 }
