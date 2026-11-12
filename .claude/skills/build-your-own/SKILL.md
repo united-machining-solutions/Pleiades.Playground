@@ -73,6 +73,8 @@ Where the rows meet:
 - "As it is" means that nothing is left to add up, compare or put in order. A language model must not do
   that, and a page must not either. If the answer needs it, it is a card.
 - A tool counts for the chat only if the chat has a language model. The command above says whether it has.
+  If it has none and the idea needs the chat, say so in step 4, and offer the steps under "When the chat has
+  no language model".
 - Read the limits of an answer that exists, for example how far back it looks. If the idea needs more than
   that, it is a card.
 
@@ -120,8 +122,8 @@ Then:
    your hand-over, not a change. If the idea needs more than the recipe allows, stop and say what, and why.
 
 `.env` is not needed to build: the demo needs no secret. Only the chat needs the key of a language model.
-Never open the file, never print it, never ask for a key: the person sets it, see
-[Language models](../../../apps/app/README.md#language-models).
+Never open the file, never print it, never ask for a key: the person sets it, the way the section "When the
+chat has no language model" says.
 
 ## 6. Show it and hand over
 
@@ -132,6 +134,23 @@ Never open the file, never print it, never ask for a key: the person sets it, se
   (`git commit -s`), with a `Co-Authored-By` trailer that names you.
 - Nothing leaves this computer unless the person asks for it. To share the work, the way is a pull request:
   [CONTRIBUTING.md](../../../CONTRIBUTING.md).
+
+## When the chat has no language model
+
+The look-up says whether it has one. Pages and cards work without it; only an answer in the chat needs it.
+The key belongs to the person or to their company, and you never see it.
+
+1. See whether `.env` is there, without opening it. If it is not, ask, then copy `.env.example` to `.env`.
+   If it is, leave it as it is.
+2. Ask the person to open `.env` in an editor and to fill in one block themselves: the key, and the name of
+   a model where the line is empty. There is a block for OpenAI, one for Anthropic, and one for any other
+   endpoint, a model on their own computer included. What goes where:
+   [Language models](../../../apps/app/README.md#language-models). Tell them to keep the key out of this
+   conversation.
+3. When they say it is done, start the app again, `docker compose up -d app`, and look again: the look-up
+   says whether the chat answers now.
+
+If the person has no key, say what works without one, and go on with that.
 
 ## What stays as it is
 
