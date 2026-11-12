@@ -66,3 +66,7 @@ All notable changes are documented here. The format follows
 - A serial number follows one rule, the one of the MQTT binding: everything but `/`, `+` and `#`
   (`serialNumber` in `packages/cards`). `genui_machine_show` refused a machine that the list showed, for
   example one with a space in its name.
+- `genui-mcp`: the history of a machine looks back as far for an error that stands as the list does, 24 hours
+  from its end, so the state on a card and the end of its band no longer contradict each other.
+- `genui-mcp`: a time zone the server does not know is refused with a sentence that says what to name. The
+  message used to be the one of the runtime.

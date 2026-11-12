@@ -12,15 +12,17 @@ type Listed = {
     _meta?: { ui?: { resourceUri?: string; visibility?: Array<string> } }
   }>
   resources?: Array<{ uri: string; mimeType?: string; _meta?: { ui?: { prefersBorder?: boolean } } }>
+  isError?: boolean
+  content?: Array<{ type: string; text?: string }>
 }
 
 /** One request as a host sends it, and the result of the answer. */
-async function ask(method: string): Promise<Listed> {
+async function ask(method: string, params?: unknown): Promise<Listed> {
   const response = await server.fetch(
     new Request("http://localhost/mcp", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method }),
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
     }),
   )
   const body = await response.text()
@@ -48,6 +50,17 @@ test("the tools that take a machine take every serial number the MQTT binding al
   for (const name of ["genui_machine_show", SPAN_LIST_TOOL]) {
     // The rule reaches a caller as a pattern, and the server checks what comes in against it.
     assert.equal(tools.find((tool) => tool.name === name)?.inputSchema?.properties?.machine?.pattern, "^[^/+#]+$")
+  }
+})
+
+test("a tool refuses a time zone it does not know, in words, before it reads anything", async () => {
+  for (const [name, more] of [
+    ["genui_machine_list", {}],
+    ["genui_machine_show", { machine: "P-04" }],
+  ] as const) {
+    const result = await ask("tools/call", { name, arguments: { ...more, timeZone: "Mars/Olympus" } })
+    assert.equal(result.isError, true)
+    assert.match(result.content?.[0]?.text ?? "", /"Mars\/Olympus" is not a time zone this server knows/)
   }
 })
 

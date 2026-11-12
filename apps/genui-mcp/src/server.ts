@@ -10,7 +10,7 @@ import { CARD_META, CARD_MIME_TYPE, readCardFile } from "./card-file.ts"
 import { description, skillGuide } from "./guide.ts"
 import { HISTORY_HOURS, MOST_HOURS, listMachines, listSpans, showMachine } from "./machines.ts"
 import { MACHINE_CARD_URI, SPAN_LIST_TOOL } from "./names.ts"
-import { inTimeZoneOf, isTimeZone } from "./time.ts"
+import { inTimeZoneOf, knownTimeZone } from "./time.ts"
 
 // The MCP server and its tools. Nothing here reads the environment: where the two APIs are comes
 // with each request (see main.ts), so an application can import the type of this server.
@@ -56,10 +56,12 @@ const getSkillGuide = toolDefinition({
   metadata: { title: "Get skill guide", annotations: readOnly },
 }).server(() => text(skillGuide))
 
-/** A caller that shows the result to a person names that person's time zone. */
+/**
+ * A caller that shows the result to a person names that person's time zone. Whether the name is
+ * one is checked where the tool runs (`knownTimeZone`), before anything is read.
+ */
 const timeZone = z
   .string()
-  .refine(isTimeZone, "This is not a time zone the server knows.")
   .optional()
   .describe(
     "The IANA time zone to write every instant of the result in, for example Europe/Zurich. The instants are then local times with their offset to UTC. UTC if omitted.",
@@ -75,7 +77,8 @@ const machineListTool = toolDefinition({
   outputSchema: machineList,
   metadata: { title: "List machines", annotations: readOnly },
 }).server<Context>(async (input, ctx) => {
-  const list = inTimeZoneOf(await listMachines(ctx.context.apis), input.timeZone)
+  const zone = knownTimeZone(input.timeZone)
+  const list = inTimeZoneOf(await listMachines(ctx.context.apis), zone)
   return inWords(list, machineListInWords(list))
 })
 
@@ -98,7 +101,8 @@ const machineShowTool = toolDefinition({
   // The link to the card: a host that shows MCP Apps loads that resource and draws the result with it.
   metadata: { title: "Show machine", annotations: readOnly, _meta: { ui: { resourceUri: MACHINE_CARD_URI } } },
 }).server<Context>(async (input, ctx) => {
-  const shown = inTimeZoneOf(await showMachine(ctx.context.apis, input.machine, input.hours), input.timeZone)
+  const zone = knownTimeZone(input.timeZone)
+  const shown = inTimeZoneOf(await showMachine(ctx.context.apis, input.machine, input.hours), zone)
   return inWords(shown, `${machineShowInWords(shown)}\n\n${shownAsCard}`)
 })
 
