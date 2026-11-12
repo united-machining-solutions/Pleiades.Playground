@@ -98,8 +98,10 @@ what you assumed. For example:
 - **Nothing to build.** Give the answer itself if you have read it, and say where to see it: the address to
   open, or the question to ask the chat. Then ask whether that is what they were looking for.
 - **A source.** It is the bigger build, so say more: the stack does not have the data, a new source needs the
-  agreement of the maintainers before it can be merged, and you need to know where the values come from.
-  `add-source` asks for the rest.
+  agreement of the maintainers before it can be merged, and you need to know where the values come from. On
+  the person's own branch it can run and be shown before they answer. Name what it changes for everyone, so
+  that the yes covers it: an entry in `compose.yaml`, and for a value that is not about a machine one
+  setting of the service that stores the values. `add-source` asks for the rest.
 
 Then wait for a yes. If the person changes the idea, go back to step 3.
 

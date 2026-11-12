@@ -33,41 +33,54 @@ What the value is about decides its topic.
 | A machine, and it is specific to its maker | `machines/{SerialNumber}/vendor/<path>` | Yes, by the binding |
 | A place, a line, anything that is not a machine | `sites/{SiteId}/{Source}/<path>`, proposed in [issue 60](https://github.com/united-machining-solutions/Pleiades.Playground/issues/60) | Not yet |
 
+- Ask the person only what you cannot look up: where the values come from, whether that needs a key, and
+  whose they are. Assume the rest, and say what you assumed.
 - One value per topic. One SI unit from the table of the binding: convert once, in the adapter. The time of
   the observation, in UTC.
+- `{SiteId}` and `{Source}` have no list yet. Choose short names in kebab-case, and say in the issue that they
+  are part of the proposal.
 - A topic the binding does not have, and every new service, needs an issue first
   ([Contributing](../../../CONTRIBUTING.md#how-to-contribute)). Draft it for the person: what the value is
   about, the topic you propose, its unit, where the values come from and under which terms, and what in the
   stack has to change for it. Give the draft to the person as text: it is theirs to open. Open it with
-  `gh issue create` only on a yes.
+  `gh issue create` only when they say yes to that: a yes to building is not one.
 - Do not change `contracts/mqtt` on the branch. The issue is where a new topic is agreed. Until then the topic
   is a proposal, and the README of the adapter and your hand-over say so.
 - On the person's own branch the adapter can be built and shown before the answer comes. Say so, and say that
   it can be merged once the maintainers have agreed.
-- Read the terms of the source before you take it. Take one whose terms allow this use, and name them.
+- Read the terms of the source before you take it. Take one whose terms allow this use, and name them. For a
+  device of the person's own, name whose it is.
 
 ## 3. Build the adapter
 
 By [Adding a service](../../../CONTRIBUTING.md#adding-a-service):
 
 - A folder of its own with a `Dockerfile` and a short README. .NET goes under `source/` with a name of the
-  pattern there, like the simulator. Any other language goes into a folder in kebab-case under `apps/`. An
-  adapter in TypeScript is part of the pnpm workspace: its versions go into the catalog of
-  `pnpm-workspace.yaml`, and `pnpm install` writes the lockfile that the images and CI install from.
+  pattern there, like the simulator. TypeScript goes into a folder in kebab-case under `apps/` and is part of
+  the pnpm workspace: its versions go into the catalog of `pnpm-workspace.yaml`, an MQTT client among them if
+  the catalog has none, and `pnpm install` writes the lockfile that the images and CI install from. For any
+  other language the repository has no place yet: propose one in the issue.
 - It fetches, converts once to the SI unit, and publishes the value envelope of the binding, each value with
   the time it was observed.
 - It says that it is there the way a machine does: `Connection/State` and `Connection/Heartbeat` below its own
-  topic, as the binding describes them for a machine.
-- A liveness endpoint, and one entry in `compose.yaml`. It waits for the broker and for the persistence, so
-  that a first value is not lost.
+  topic. The binding names them, the settings of the simulator show them
+  (`source/Pleiades.Playground.Simulator/appsettings.json`): the state is `Connected`, the heartbeat counts
+  up in the unit `one` every ten seconds. Send the heartbeat on a timer of its own, not with each value: a
+  reader takes a source as silent after 30 seconds without a sign of life.
+- A liveness endpoint like the one of `apps/genui-mcp`: `/health` answers while the adapter is connected to
+  the broker, and the `Dockerfile` checks it.
+- One entry in `compose.yaml`, shaped like the one of `genui-mcp`. It waits for the broker and for
+  `timeseries-persistence`, each with `condition: service_healthy`, so that a first value is not lost.
 - Its settings come from the environment. The name of a key goes to `.env.example`, its value into the
   person's `.env`, never into a commit, a log or your answer. The person sets it.
 - The README names the source of the values, its terms, and the topic.
 
 **A value that is not about a machine is not stored yet.** The persistence listens below `machines/` only.
-For such a value it needs one more topic filter in its settings in `compose.yaml`. That is a setting of a
+For such a value it needs one more topic filter in its settings in `compose.yaml`: the next
+`Config__Topics__<n>` of `timeseries-persistence`, as narrow as the topic you proposed. That is a setting of a
 service that is there, so it is the maintainers' to accept: add the one line on the branch, and say so in the
-README of the adapter, in the draft of the issue and in your hand-over.
+README of the adapter, in the draft of the issue and in your hand-over. Tell the person what it means: on
+their branch the value is stored and can be shown, for everyone else once the maintainers accept the line.
 
 You touch the new folder, one entry in `compose.yaml`, names in `.env.example`, and a row in `apps/README.md`
 if the folder is there. For TypeScript, the catalog and the lockfile. For a value that is not about a

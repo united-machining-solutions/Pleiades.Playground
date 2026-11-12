@@ -11,15 +11,20 @@ computer is ready for, and for everything that is missing they hold one sentence
 
 ## How you talk
 
-- Plain words, in the language of the person. Short sentences. No word they would have to look up: say "the
-  program that runs the demo" before you say Docker, once.
+- Plain words, in the language of the person, and address them the way they address you. Short sentences.
+  No word they would have to look up: say "the program that runs the demo" before you say Docker, once.
 - One step at a time. After every check, say in one sentence what you found, also when it is good news.
 - Ask before you start, install or download anything, and say how long it takes. While something runs for
-  minutes, say every minute or two that it is still at it.
-- Never open `.env`, never print it, never ask for a key.
-- Do not look for a way around a step that fails. Stop that level, and give the sentence to pass on.
+  minutes, say every minute or two that it is still at it. If you cannot speak while it runs, say so before
+  you start.
+- Never open `.env`, never print it, never ask for a key. If the person offers one, say no: they put it in
+  themselves, and it stays out of this conversation.
+- Do not look for a way around a step that fails, also when the person asks for one or is in a hurry. Stop
+  that level, and give the sentence to pass on.
 - A sentence to pass on is for the IT of the person or for a helper. Give it in the language of the person,
   on a line of its own, so that they can copy it.
+- Installing a program is for the IT of the person or for a helper. If the person says they can do it
+  themselves, the steps are in the [development setup](../../../docs/development-setup.md).
 
 ## Three levels
 
@@ -44,17 +49,18 @@ not checked yet with the reason. Level 2 does not wait for level 1. Level 3 does
    - It names a client and then says that it cannot reach the engine: Docker is installed and not running.
      Ask the person to start Docker Desktop themselves, from the Start menu on Windows or from the
      Applications folder on a Mac, and to say when its window shows that it runs. Do not start it from here:
-     a Docker that is started from this app ends when this app is closed. When `docker version` names a
-     server too, say that it runs.
+     a Docker that is started from this app ends when this app is closed. When they say that it runs, run
+     `docker version` again: it names a server too now. Say that it runs.
 2. **Does the stack run already?** `docker compose ps -a`. If every service is healthy, say so and go to the
-   check.
+   check. If it lists nothing, or a service is not healthy, go on with the next step.
 3. **Start the stack.** Say first that the first start downloads and builds for ten minutes or more. On a
-   yes: `docker compose up -d --build --wait`.
+   yes: `docker compose up -d --build --wait`. It runs longer than most tools let a command run: start it
+   in the background and wait for it to end, or it is cut off and looks like a failure.
    - It fails with words like "certificate", "x509" or "unable to get local issuer certificate": the network
      of the company looks into the connections, and Docker does not trust it. The sentence to pass on, with
-     the host that the error names put first: "Docker on my computer cannot download from <host>. It needs
-     docker.io, mcr.microsoft.com, registry.npmjs.org and nuget.org. Please allow these hosts for Docker, or
-     give Docker the root certificate of our network."
+     the host of the address in the error in place of `<host>`: "Docker on my computer cannot download from
+     <host>. It needs docker.io, mcr.microsoft.com, registry.npmjs.org and nuget.org. Please allow these
+     hosts for Docker, or give Docker the root certificate of our network."
    - A port is in use, or one container stays unhealthy: "Known issues" in the development setup says what
      to do. Tell the person what it says, in their words.
    - It dies once with "EOF" while building: start it once more.
@@ -64,8 +70,9 @@ not checked yet with the reason. Level 2 does not wait for level 1. Level 3 does
 ## Level 2: build
 
 1. **Node.js.** `node --version` is the version of `.nvmrc`. If it is missing or older, installing it is for
-   the person's IT or a helper. The sentence to pass on: "Please install Node.js in version 26 on my
-   computer." Then pnpm and the packages wait for it: say so, and do not check them.
+   the person's IT or a helper. The sentence to pass on, with the version that `.nvmrc` names: "Please
+   install Node.js in version <version> on my computer." The level ends here as not ready: pnpm and the
+   packages wait for Node.js. Say so, and do not check them.
 2. **pnpm.** Ask first: the first call may download it. Then `pnpm --version` answers with the version that
    `package.json` names. If the command is missing: `npm install --global corepack`, then
    `corepack enable pnpm`. Node.js no longer brings Corepack from version 25. If the person does not want a
@@ -94,8 +101,9 @@ do now:
 
 - Level 1 is ready: take the tour, or look around the example app.
 - Level 2 is ready: say what they would like to see, and `build-your-own` takes it from there.
-- Nothing is ready yet: that is fine. Tell them what to ask for, and that the same check takes a minute once
-  it is done.
+- A level is not ready: the next step is to pass on its sentence. Once that is done, the same check takes a
+  minute.
+- Nothing is ready yet: that is fine. The next step is the same.
 
 ## When something stops working later
 
