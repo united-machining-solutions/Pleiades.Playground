@@ -121,8 +121,8 @@ copy `.env.example` to `.env`, fill one of the three blocks and start the stack 
 
 | Block | Settings |
 |---|---|
-| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` |
 | Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODELS` |
+| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` |
 | Any endpoint that speaks OpenAI's chat completions, for example a local model server | `LLM_BASE_URL`, `LLM_MODELS`, and `LLM_API_KEY` if it wants one |
 
 The chat has no sign-in, and whoever reaches the port chats at the cost of the owner of the key. Read
@@ -149,10 +149,10 @@ The machine card is also an MCP App: one HTML file that the generative UI backen
 `ui://genui/machine`, so a desktop chat that shows MCP Apps draws the same card next to its answer. How to
 connect such a host is in [The machine card for other hosts](../apps/genui-mcp/README.md#the-machine-card-for-other-hosts).
 
-> **Screenshot missing.** The machine card inside a desktop host was out of reach when this tour was
-> written. Add it as `docs/images/tour/machine-card-in-host.png` and replace this note with the image.
-
-<!-- TODO(tour): ![The machine card of P-04 inside a desktop chat that shows MCP Apps.](images/tour/machine-card-in-host.png) -->
+![A desktop chat with the question "Show machine P-04". Under it the machine card of P-04, drawn by the chat
+from the card file of the backend: in alarm since 15:39 with "Spindle overtemperature, machine stopped", the
+program, and the states of the last eight hours as a band with their sums. Below the card the chat says the
+same in two paragraphs.](images/tour/machine-card-in-host.png)
 
 ## 5. When a machine goes silent
 
@@ -217,3 +217,5 @@ To use the tools from your own agent, add the three MCP addresses to any MCP cli
 
 The screenshots are 1383 × 868 pixels, taken in Chrome in the light theme of the app. To replace one, keep
 the file name under [`images/tour/`](images/tour) and describe in the text what the new picture shows.
+Whoever changes what a stop shows keeps the stop current, see [CONTRIBUTING.md](../CONTRIBUTING.md#conventions);
+CI checks that every pointer of this page still has its target.

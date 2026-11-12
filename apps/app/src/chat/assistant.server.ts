@@ -51,19 +51,19 @@ const localTimes = defineChatMiddleware({
 })
 
 /**
- * The adapter of one model. Each provider gets its own: OpenAI and Anthropic theirs, any other
+ * The adapter of one model. Each provider gets its own: Anthropic and OpenAI theirs, any other
  * endpoint the one for chat completions. Where two blocks name the same model, the earlier one
  * has it.
  *
  * The names come from the settings, not from the lists the adapters know. A name a provider does
  * not have fails at the first question, with the provider's own words.
  */
-function adapterOf(name: string, { openai, anthropic, compatible }: ModelSettings): AnyTextAdapter {
-  if (openai?.models.includes(name)) {
-    return createOpenaiChat(name as Parameters<typeof createOpenaiChat>[0], openai.apiKey)
-  }
+function adapterOf(name: string, { anthropic, openai, compatible }: ModelSettings): AnyTextAdapter {
   if (anthropic?.models.includes(name)) {
     return createAnthropicChat(name as Parameters<typeof createAnthropicChat>[0], anthropic.apiKey)
+  }
+  if (openai?.models.includes(name)) {
+    return createOpenaiChat(name as Parameters<typeof createOpenaiChat>[0], openai.apiKey)
   }
   return openaiCompatibleText(name, {
     baseURL: compatible?.baseURL ?? "",

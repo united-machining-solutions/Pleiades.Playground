@@ -16,3 +16,4 @@
 - [ ] A contract under `contracts/` changed: the affected maintainers are asked for review
 - [ ] No secret value, no internal host name, no customer data
 - [ ] `CHANGELOG.md` updated for a notable change
+- [ ] The demo looks, starts or behaves differently: `docs/tour.md` and its screenshots still match
