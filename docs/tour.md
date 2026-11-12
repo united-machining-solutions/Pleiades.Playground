@@ -121,8 +121,8 @@ copy `.env.example` to `.env`, fill one of the three blocks and start the stack 
 
 | Block | Settings |
 |---|---|
-| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` |
 | Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODELS` |
+| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` |
 | Any endpoint that speaks OpenAI's chat completions, for example a local model server | `LLM_BASE_URL`, `LLM_MODELS`, and `LLM_API_KEY` if it wants one |
 
 The chat has no sign-in, and whoever reaches the port chats at the cost of the owner of the key. Read
