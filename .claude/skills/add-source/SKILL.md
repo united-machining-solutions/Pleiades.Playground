@@ -13,7 +13,7 @@ Do not build it that way.
 A source is the one recipe that changes what everyone shares: a contract and the stack. So it has a step the
 other recipes do not have: agree first.
 
-The example of [the map](../../../docs/build-your-own.md#a-source): the outside temperature.
+The example: the outside temperature.
 
 ## 1. Is it missing?
 

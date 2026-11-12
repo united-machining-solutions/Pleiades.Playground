@@ -104,7 +104,7 @@ First see that this computer can build. Do not install anything without a yes.
 | Check | How | If it fails |
 |---|---|---|
 | Node.js | `node --version` is the version of `.nvmrc` | Say which version is there and which is needed, and point to the [development setup](../../../docs/development-setup.md). Stop: the person or a helper installs it. |
-| pnpm | Ask first, then `corepack enable pnpm` and `pnpm --version`. The first call downloads pnpm. | If it does not answer, stop and say so. Do not look for a way around it. |
+| pnpm | Ask first, then `pnpm --version`: it answers with the version `package.json` names. The first call may download pnpm. | If the command is missing: `npm install --global corepack`, then `corepack enable pnpm`. Node.js no longer brings Corepack from version 25. If pnpm still does not answer, stop and say so. |
 | The packages | `node_modules/` is there | Ask, then `pnpm install`. |
 
 When you stop here, say in one sentence what is missing and what to ask a helper for. The idea is not lost:
@@ -116,11 +116,12 @@ Then:
    `main`.
 2. Follow the recipe: the skill `create-page`, `create-card` or `add-source`, each a `SKILL.md` in a folder
    next to this one. After `add-source`, go on with `create-card`: a source is seen once a card shows it.
-3. Touch only what the recipe names. If the idea needs more, stop and say what, and why.
+3. Build what you proposed, and touch only what the recipe names. A good idea on the way is a sentence in
+   your hand-over, not a change. If the idea needs more than the recipe allows, stop and say what, and why.
 
 `.env` is not needed to build: the demo needs no secret. Only the chat needs the key of a language model.
-Never open the file, never print it, never ask for a key: the person sets it, see "Which model answers" in
-the map.
+Never open the file, never print it, never ask for a key: the person sets it, see
+[Language models](../../../apps/app/README.md#language-models).
 
 ## 6. Show it and hand over
 

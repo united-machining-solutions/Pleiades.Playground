@@ -12,8 +12,8 @@ checks.
 
 If the data is not in the stack, this is the wrong recipe: take `add-source` first.
 
-The example of [the map](../../../docs/build-your-own.md#a-card): the alarms of one machine over the last
-eight hours.
+The example: the alarms of one machine over the last eight hours. The Events API has them, and no tool answers
+that question yet.
 
 ## Before you write code
 
@@ -32,7 +32,8 @@ eight hours.
 
    The first is for the tool, the second for how a chat draws the result of a tool.
 4. The skill `shadcn` (`.claude/skills/shadcn/`), and the docs of every component before you use it:
-   `pnpm --filter @pleiades/app exec shadcn docs <name>`.
+   `pnpm --filter @pleiades/app exec shadcn docs <name>`. The command names
+   the page of the docs: read that page.
 
 No library skill covers the agent harness of the chat. What you need of it is in
 [`apps/app`: What is where](../../../apps/app/README.md#what-is-where), under `src/chat/`: which file gives
@@ -84,7 +85,7 @@ next recipe, `create-page`.
 Run the checks. Do not assume them.
 
 - `pnpm typecheck && pnpm test && pnpm build` pass.
-- The stack runs with it: `docker compose up -d --build --wait genui-mcp app`.
+- The stack runs with it: `docker compose up -d --build --wait --no-deps genui-mcp app`.
 - You have called the tool and read its result:
 
   ```bash

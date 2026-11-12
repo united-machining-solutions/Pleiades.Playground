@@ -104,6 +104,10 @@ async function chat() {
 async function call(tool, pairs) {
   const value = (text) => (/^-?\d+(\.\d+)?$/.test(text) ? Number(text) : text === "true" ? true : text === "false" ? false : text)
   const args = Object.fromEntries(pairs.map((pair) => [pair.slice(0, pair.indexOf("=")), value(pair.slice(pair.indexOf("=") + 1))]))
+  // Times in the zone of this computer, where the tool takes one.
+  const { tools } = await mcp("tools/list")
+  const takes = tools.find((one) => one.name === tool)?.inputSchema?.properties ?? {}
+  if ("timeZone" in takes && !("timeZone" in args)) args.timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const result = await mcp("tools/call", { name: tool, arguments: args })
   for (const piece of result.content ?? []) if (piece.type === "text") console.log(piece.text)
   if (result.structuredContent) {
@@ -120,7 +124,7 @@ if (mode === "call" && tool) {
     process.exitCode = 1
   })
 } else {
-  await part("Pages of the example app", "apps/app/src/routes", pages)
+  await part(`Pages of the example app, at ${at.app}`, "apps/app/src/routes", pages)
   await part("Answers: the tools of the generative UI backend", at.genui, answers)
   await part("Stored values", at.timeseries, values)
   await part("Notifications", at.events, notifications)

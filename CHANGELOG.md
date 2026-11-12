@@ -51,8 +51,9 @@ All notable changes are documented here. The format follows
 - About the name (`docs/name.md`): where the name Pleiades comes from, what it stands for and what it does
   not, how Taurus, Pleiades and this playground relate, and how to write it. `README.md` says it in two
   sentences.
-- Build your own (`docs/build-your-own.md`): where an idea starts, as pictures of the way of a value and of
-  who calls whom, and which settings choose the language model, a local one included.
+- Build your own (`docs/build-your-own.md`): where an idea starts, in three pictures: the way of a value, who
+  calls whom, and a card and its server. How to use a language model on your own computer is in
+  `apps/app/README.md`.
 - Skills for building on the stack (`.claude/skills/`): `build-your-own` asks a person for the goal, looks what
   the stack already has and takes the recipe that fits; `create-page`, `create-card` and `add-source` are the
   recipes, each with the files it touches and the checks that say it is done. They load the skills of
