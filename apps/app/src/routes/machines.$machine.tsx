@@ -49,29 +49,29 @@ function Machine() {
   )
 }
 
-function Page({ machine, line, children }: { machine: string; line?: string; children: ReactNode }) {
+/** The page of a machine is titled with the machine; the way back is the breadcrumb in the header. */
+function Page({ machine, line, children }: { machine?: string; line?: string; children: ReactNode }) {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">
-          {/* The chat stays open while the page changes. */}
-          <Link to="/" search className="text-muted-foreground hover:text-foreground">
-            Machines
-          </Link>{" "}
-          <span className="text-muted-foreground">/</span> {machine}
-        </h1>
-        {line && <p className="text-sm text-muted-foreground">{line}</p>}
-      </div>
+      {machine && (
+        <div>
+          <h1 className="text-2xl font-semibold">{machine}</h1>
+          {line && <p className="text-sm text-muted-foreground">{line}</p>}
+        </div>
+      )}
       {children}
     </div>
   )
 }
 
-/** A machine the backend does not know. The page says so once and does not ask again. */
+/**
+ * A machine the backend does not know. The page says so once and does not ask again. It has no
+ * title: a title would name a machine that is not there.
+ */
 function NoMachine() {
   const { machine } = Route.useParams()
   return (
-    <Page machine={machine}>
+    <Page>
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon">

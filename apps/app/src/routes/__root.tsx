@@ -7,7 +7,9 @@ import { ChatSidebar } from "@/chat/chat-sidebar.tsx"
 import { fetchChats, getChatStatus } from "@/chat/status.ts"
 import { AppSidebar } from "@/components/app-sidebar.tsx"
 import { AskAnything } from "@/components/ask-anything.tsx"
+import { PageBreadcrumb } from "@/components/page-breadcrumb.tsx"
 import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 
 import appCss from "../styles.css?url"
@@ -73,6 +75,10 @@ function Layout() {
         <SidebarInset className="min-w-0">
           <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-3">
             <SidebarTrigger />
+            {/* The classes of the block; self-center because the separator stretches by default,
+                and a stretched item of a set height sits at the top of the header. */}
+            <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 data-vertical:self-center" />
+            <PageBreadcrumb />
             <AskAnything />
             <Button
               variant="ghost"
