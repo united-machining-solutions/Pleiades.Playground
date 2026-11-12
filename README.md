@@ -15,6 +15,12 @@ playground tries the idea in code. More in [About the name](docs/name.md).
 
 ## Start
 
+With Claude Code: open this folder in it and type `/setup`. It checks your computer step by step, asks before it
+starts or installs anything, and starts the demo with you. Then ask for a tour, or type `/build-your-own` to add
+something of your own.
+
+By hand, with Docker running (the first start downloads and builds for ten minutes or more):
+
 ```bash
 docker compose up -d --build
 ```
@@ -28,7 +34,9 @@ docker compose up -d --build
 | Example app | <http://localhost:5600/> | What every machine does now, and a chat about it. It answers on this computer only (`APP_BIND`); see [`apps/app`](apps/app/README.md) |
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
-Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo.
+Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo; only
+the chat of the example app needs the key of a language model, see
+[Language models](apps/app/README.md#language-models).
 
 New here? Take the [tour of the demo](docs/tour.md): six stops with screenshots, from the start to where to
 change what. With a coding agent in the repository, ask it: "give me a tour". To add a page, a card or a
