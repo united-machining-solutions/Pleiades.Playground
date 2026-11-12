@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 770" role="img" aria-labelledby="title desc"
+     font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <title id="title">The stack in detail: who calls whom, and where a card comes from</title>
+  <desc id="desc">At the top the hosts: the example app with its pages and its chat, a language model the chat
+    asks, and another host such as a desktop app. Below them the servers that answer over MCP: the generative
+    UI backend with its card file and the card catalogue, and beside it, as an example that is not in this
+    repository, a knowledge server whose tool finds passages and whose card shows the source. The pages call
+    the generative UI backend; the chat and the other host reach every MCP server. The generative UI backend
+    reads the two APIs over REST. An agent can also read the stored values over MCP. A card calls only its own
+    server: between the card of one server and another server stands a sign for a blocked call. At the bottom the
+    persistence listens to the MQTT broker and writes to the APIs, and the simulators or an adapter of your own
+    publish to the broker.</desc>
+  <defs>
+    <!-- They point along their line: "auto" turns them. -->
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#0369a1"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#6b7280"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="999" height="769" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+
+  <g font-size="12" fill="#6b7280">
+    <!-- The hosts: where a person asks. -->
+    <text x="40" y="50">Where a person asks</text>
+
+    <rect x="40" y="64" width="400" height="110" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="56" y="88" font-size="15" font-weight="600" fill="#111827">Example app</text>
+    <text x="424" y="88" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">apps/app :5600</text>
+    <rect x="56" y="102" width="180" height="60" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="68" y="124" font-size="13" font-weight="600" fill="#111827">Pages</text>
+    <text x="68" y="144">draw the cards themselves</text>
+    <rect x="244" y="102" width="180" height="60" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="256" y="124" font-size="13" font-weight="600" fill="#111827">Chat</text>
+    <text x="256" y="144">an agent harness</text>
+
+    <rect x="470" y="64" width="220" height="110" rx="10" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="486" y="88" font-size="15" font-weight="600" fill="#111827">Language model</text>
+    <text x="486" y="112">OpenAI, Anthropic, or any</text>
+    <text x="486" y="130">endpoint, local or remote</text>
+    <text x="486" y="154">picks the tool and answers</text>
+
+    <rect x="720" y="64" width="240" height="110" rx="10" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="736" y="88" font-size="15" font-weight="600" fill="#111827">Another host</text>
+    <text x="736" y="112">Claude Desktop, any MCP client</text>
+    <text x="736" y="136">has a model of its own and</text>
+    <text x="736" y="154">shows a card as an MCP App</text>
+
+    <!-- The servers that answer. -->
+    <text x="40" y="240">Servers that answer</text>
+
+    <rect x="40" y="252" width="400" height="140" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="56" y="276" font-size="15" font-weight="600" fill="#111827">Generative UI backend</text>
+    <text x="424" y="276" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">apps/genui-mcp :5520</text>
+    <text x="56" y="298">its tools compute an answer: text for a model, values for a card</text>
+    <rect x="56" y="314" width="180" height="62" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="68" y="338" font-size="13" font-weight="600" fill="#111827">Card file</text>
+    <text x="68" y="358">the card for other hosts</text>
+    <rect x="244" y="314" width="180" height="62" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="256" y="338" font-size="12.5" font-family="ui-monospace, Consolas, monospace" fill="#111827">packages/cards</text>
+    <text x="256" y="358">contract and component</text>
+
+    <rect x="470" y="252" width="240" height="140" rx="10" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="486" y="276" font-size="15" font-weight="600" fill="#111827">A knowledge server</text>
+    <text x="486" y="296" font-style="italic">example, not in this repository</text>
+    <text x="486" y="320">manuals, how-to</text>
+    <text x="486" y="344">its tool finds the passages,</text>
+    <text x="486" y="362">its card shows the source:</text>
+    <text x="486" y="380">title, section, excerpt, page</text>
+
+    <text x="740" y="286" font-size="13" font-weight="600" fill="#111827">A card comes from the server</text>
+    <text x="740" y="304" font-size="13" font-weight="600" fill="#111827">whose tool answered.</text>
+    <text x="740" y="332">The model brings the answers</text>
+    <text x="740" y="350">together. The cards stay with</text>
+    <text x="740" y="368">their servers.</text>
+
+    <!-- The data. -->
+    <text x="40" y="474">Stored and served</text>
+
+    <rect x="40" y="486" width="400" height="120" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="56" y="510" font-size="15" font-weight="600" fill="#111827">Stored values</text>
+    <text x="424" y="510" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">source/*.Api</text>
+    <rect x="56" y="524" width="180" height="68" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="68" y="546" font-size="13" font-weight="600" fill="#111827">Timeseries API</text>
+    <text x="224" y="546" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">:5500</text>
+    <text x="68" y="574">REST and MCP</text>
+    <rect x="244" y="524" width="180" height="68" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="256" y="546" font-size="13" font-weight="600" fill="#111827">Events API</text>
+    <text x="412" y="546" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">:5510</text>
+    <text x="256" y="574">REST and MCP</text>
+
+
+    <!-- The way in. -->
+    <text x="40" y="634">The way in</text>
+
+    <rect x="40" y="646" width="190" height="96" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="56" y="670" font-size="15" font-weight="600" fill="#111827">Persistence</text>
+    <text x="56" y="692" font-family="ui-monospace, Consolas, monospace" fill="#374151">source/*.Persistence</text>
+    <text x="56" y="716">listens, writes to the APIs</text>
+
+    <rect x="250" y="646" width="190" height="96" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="266" y="670" font-size="15" font-weight="600" fill="#111827">MQTT broker</text>
+    <text x="424" y="670" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">:1883</text>
+    <text x="266" y="692" font-family="ui-monospace, Consolas, monospace" fill="#374151">contracts/mqtt</text>
+    <text x="266" y="716">one value per topic, SI units</text>
+
+    <rect x="470" y="646" width="240" height="42" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="486" y="672" font-size="15" font-weight="600" fill="#111827">Simulators</text>
+    <text x="694" y="672" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">source/*.Simulator</text>
+    <rect x="470" y="700" width="240" height="42" rx="10" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="486" y="726" font-size="15" font-weight="600" fill="#111827">Your adapter</text>
+    <text x="694" y="726" text-anchor="end">any language</text>
+
+    <!-- How to read the lines. -->
+    <line x1="750" y1="660" x2="780" y2="660" stroke="#9ca3af" stroke-width="1.5"/>
+    <text x="790" y="664">in this repository</text>
+    <line x1="750" y1="682" x2="780" y2="682" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="790" y="686">outside it, or an example</text>
+    <line x1="750" y1="704" x2="780" y2="704" stroke="#0369a1" stroke-width="1.5"/>
+    <text x="790" y="708">a call over MCP</text>
+    <circle cx="765" cy="726" r="6.5" fill="#ffffff" stroke="#b91c1c" stroke-width="1.5"/>
+    <line x1="760.4" y1="730.6" x2="769.6" y2="721.4" stroke="#b91c1c" stroke-width="1.5"/>
+    <text x="790" y="730">a call the standard blocks</text>
+
+    <!-- A card calls only its own server. -->
+    <text x="256" y="416" font-size="12.5" font-weight="600" fill="#111827">A card calls only its own server.</text>
+    <text x="462" y="416" font-size="12.5">A tool for a card is blocked across servers.</text>
+  </g>
+  <g>
+    <line x1="440" y1="345" x2="470" y2="345" stroke="#b91c1c" stroke-width="1.5"/>
+    <circle cx="455" cy="345" r="6.5" fill="#ffffff" stroke="#b91c1c" stroke-width="1.5"/>
+    <line x1="450.4" y1="349.6" x2="459.6" y2="340.4" stroke="#b91c1c" stroke-width="1.5"/>
+  </g>
+
+  <!-- Who calls whom. Grey: REST and MQTT. Blue: MCP. -->
+  <g fill="none" stroke-width="1.5">
+    <line x1="424" y1="132" x2="470" y2="132" stroke="#6b7280" marker-end="url(#ag)"/>
+
+    <line x1="146" y1="174" x2="146" y2="252" stroke="#0369a1" marker-end="url(#ab)"/>
+    <path d="M334 174V212H940" stroke="#0369a1"/>
+    <line x1="840" y1="174" x2="840" y2="212" stroke="#0369a1"/>
+    <line x1="380" y1="212" x2="380" y2="252" stroke="#0369a1" marker-end="url(#ab)"/>
+    <line x1="590" y1="212" x2="590" y2="252" stroke="#0369a1" stroke-dasharray="5 4" marker-end="url(#ab)"/>
+    <path d="M940 212V548H440" stroke="#0369a1" stroke-dasharray="5 4" marker-end="url(#ab)"/>
+
+    <line x1="240" y1="392" x2="240" y2="486" stroke="#6b7280" marker-end="url(#ag)"/>
+    <line x1="135" y1="646" x2="135" y2="606" stroke="#6b7280" marker-end="url(#ag)"/>
+    <line x1="250" y1="694" x2="230" y2="694" stroke="#6b7280" marker-end="url(#ag)"/>
+    <line x1="470" y1="667" x2="440" y2="667" stroke="#6b7280" marker-end="url(#ag)"/>
+    <line x1="470" y1="721" x2="440" y2="721" stroke="#6b7280" stroke-dasharray="5 4" marker-end="url(#ag)"/>
+  </g>
+  <g font-size="12">
+    <text x="447" y="124" text-anchor="middle" fill="#6b7280">asks</text>
+    <text x="154" y="218" font-weight="600" fill="#0369a1">MCP</text>
+    <text x="470" y="204" font-weight="600" fill="#0369a1">MCP</text>
+    <text x="502" y="204" font-family="ui-monospace, Consolas, monospace" fill="#6b7280">contracts/mcp</text>
+    <text x="690" y="540" text-anchor="middle" fill="#0369a1">raw values, for an agent</text>
+    <text x="250" y="450" font-weight="600" fill="#374151">REST</text>
+    <text x="250" y="468" font-family="ui-monospace, Consolas, monospace" fill="#6b7280">contracts/openapi</text>
+    <text x="143" y="630" font-weight="600" fill="#374151">REST</text>
+    <text x="455" y="698" text-anchor="middle" font-weight="600" fill="#374151">MQTT</text>
+  </g>
+</svg>

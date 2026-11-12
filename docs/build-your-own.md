@@ -21,7 +21,8 @@ steps stands how they talk, and the contract under `contracts/` that says how. W
 replace the step behind it, so the people who work on one step need not know the inside of the next. Not in
 the picture: `compose.yaml` starts every step as a container, and `stacks/` configures the broker. The whole
 list is in the [repository layout](../README.md#repository-layout), and who looks after which area in
-[MAINTAINERS.md](../MAINTAINERS.md).
+[MAINTAINERS.md](../MAINTAINERS.md). Who calls whom is drawn at the end, in
+[The stack in detail](#the-stack-in-detail).
 
 | Your idea | You build | You touch |
 |---|---|---|
@@ -168,3 +169,34 @@ Then start the app again: `docker compose up -d app`.
 - The model must be able to call tools. One that cannot answers without data.
 - With several models, separated by commas, the chat offers each of them, and the first answers until a chat
   picks another.
+
+## The stack in detail
+
+![The hosts at the top: the example app with its pages and its chat, a language model the chat asks, and another
+host such as a desktop app. Below them the servers that answer over MCP: the generative UI backend with its card
+file and the card catalogue, and beside it, as an example that is not in this repository, a knowledge server
+whose tool finds passages and whose card shows the source. The pages call the generative UI backend; the chat
+and the other host reach every MCP server. A sign for a blocked call stands between the card of one server and
+the other server. The generative UI backend reads the two APIs over REST, and an agent can read the stored
+values over MCP. At the bottom the persistence listens to the MQTT broker and writes to the APIs, and the
+simulators or an adapter of your own publish to the broker.](images/build-your-own/stack.svg)
+
+Who calls whom. What is drawn solid is in this repository; what is dashed is outside it, or an example.
+
+- **The pages** of the example app call the generative UI backend and draw its cards themselves.
+- **The chat** asks a language model, and the model picks a tool. Today the chat connects to the generative UI
+  backend only.
+- **Another host**, a desktop app or any MCP client, reaches the same servers and shows a card as an MCP App.
+- **The generative UI backend** reads the two APIs over REST. An agent can read them itself, over MCP.
+
+**A card comes from the server whose tool answered, and it calls only that server.** For the tools that are
+meant for a card, the standard is strict: "Cross-server tool calls are always blocked for app-only tools"
+([MCP Apps specification](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)).
+So a card does not fetch from the data APIs, or from a second server, by itself. What it needs beyond its
+values it asks its own server for, the way the machine card asks for the spans of its band.
+
+**A further source of answers fits beside the generative UI backend**, as an MCP server of its own. The
+knowledge server in the picture is such an example, for manuals; it is not in this repository. An agent calls
+it directly, because there is nothing to compute: the model needs the passages. Its tool can answer with a
+card of its own that shows the source: title, section, excerpt, page. For a question about a machine and its
+manual the model calls both servers and brings the answers together. The cards stay with their servers.
