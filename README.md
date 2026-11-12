@@ -27,6 +27,16 @@ docker compose up -d --build --wait
 
 The command returns when every container is healthy, and fails visibly if one is not.
 
+Without building: the images of the newest `main` are published, and anyone can pull them. This starts the
+same stack from them and builds nothing:
+
+```bash
+PLEIADES_VERSION=main docker compose up -d --no-build --wait
+```
+
+In PowerShell, set the variable first: `$env:PLEIADES_VERSION = "main"`. Or write `PLEIADES_VERSION=main` into
+`.env`. To change the code and see it run, build as above.
+
 | Service | URL | What it is |
 |---|---|---|
 | Timeseries API | <http://localhost:5500/> | Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp` |
