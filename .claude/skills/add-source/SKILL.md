@@ -11,8 +11,7 @@ be traced to where it came from. A value that a card, a tool or the app fetches 
 Do not build it that way.
 
 A source is the one recipe that changes what everyone shares: a contract and the stack. So it has a step the
-other recipes do not have: agree first. And it has one place where the stack does not carry it yet: a value
-that is not about a machine.
+other recipes do not have: agree first.
 
 The example: the outside temperature.
 
@@ -31,14 +30,14 @@ What the value is about decides its topic.
 |---|---|---|
 | A machine, and the data model names it | `machines/{SerialNumber}/umati/<path>` | Yes, by the binding |
 | A machine, and it is specific to its maker | `machines/{SerialNumber}/vendor/<path>` | Yes, by the binding |
-| A place, a line, anything that is not a machine | `sites/{SiteId}/{Source}/<path>`, proposed in [issue 60](https://github.com/united-machining-solutions/Pleiades.Playground/issues/60) | Not yet |
+| A place, a line, anything that is not a machine | `sites/{SiteId}/{Source}/<path>` | Yes, by the binding |
 
 - Ask the person only what you cannot look up: where the values come from, whether that needs a key, and
   whose they are. Assume the rest, and say what you assumed.
 - One value per topic. One SI unit from the table of the binding: convert once, in the adapter. The time of
   the observation, in UTC.
-- `{SiteId}` and `{Source}` have no list yet. Choose short names in kebab-case, and say in the issue that they
-  are part of the proposal.
+- `{SiteId}` and `{Source}` have no list. Choose short names, the source in lower case as the binding asks,
+  for example `weather`, and say in the issue that they are part of the proposal.
 - A topic the binding does not have, and every new service, needs an issue first
   ([Contributing](../../../CONTRIBUTING.md#how-to-contribute)). Draft it for the person: what the value is
   about, the topic you propose, its unit, where the values come from and under which terms, and what in the
@@ -75,18 +74,14 @@ By [Adding a service](../../../CONTRIBUTING.md#adding-a-service):
   person's `.env`, never into a commit, a log or your answer. The person sets it.
 - The README names the source of the values, its terms, and the topic.
 
-**A value that is not about a machine is not stored yet.** The persistence listens below `machines/` only.
-For such a value it needs one more topic filter in its settings in `compose.yaml`: the next
-`Config__Topics__<n>` of `timeseries-persistence`, as narrow as the topic you proposed. That is a setting of a
-service that is there, so it is the maintainers' to accept: add the one line on the branch, and say so in the
-README of the adapter, in the draft of the issue and in your hand-over. Tell the person what it means: on
-their branch the value is stored and can be shown, for everyone else once the maintainers accept the line.
+**A value about a place is stored like one of a machine.** The persistence listens below `machines/` and
+below `sites/`. A value under any other first level is not stored, and a new first level is a change to the
+binding: it needs the issue, not a topic filter on the branch.
 
 You touch the new folder, one entry in `compose.yaml`, names in `.env.example`, and a row in `apps/README.md`
-if the folder is there. For TypeScript, the catalog and the lockfile. For a value that is not about a
-machine, the one topic filter of the persistence. Never the code of a service that is there, and nothing
-under `.github/`: say in your hand-over that the workflow that builds the images does not know the adapter
-yet.
+if the folder is there. For TypeScript, the catalog and the lockfile. Never the code or the settings of a
+service that is there, and nothing under `.github/`: say in your hand-over that the workflow that builds the
+images does not know the adapter yet.
 
 ## Done when
 

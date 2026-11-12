@@ -66,6 +66,11 @@ All notable changes are documented here. The format follows
   shadcn/ui and of the TanStack packages first; `@tanstack/intent` is a development dependency for that.
   `setup` leads a person who has never done it through getting a computer ready, in three levels: see the
   demo, build, chat.
+- MQTT binding, draft 0.2.0: a second family of topics, `sites/{SiteId}/{Source}/<path>`, for a value that is
+  about a place and not about a machine, such as the outside temperature. Envelope, units and content types
+  are those of a machine, and a source says that it is there with `Connection/State` and
+  `Connection/Heartbeat`. The Timeseries persistence of the stack stores the family (`sites/+/#`). No service
+  changed its code, and nothing changes for a machine.
 - For coding agents: shadcn/ui is named as the design system of the user interface (`AGENTS.md`, and a line
   in the pull request template). The agent skill of shadcn/ui (`.claude/skills/shadcn`) and the MCP server of
   its CLI (`.mcp.json`) come with the repository, so an agent reads the docs of a component before it writes
