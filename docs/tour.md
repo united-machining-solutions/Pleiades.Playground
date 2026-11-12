@@ -184,6 +184,8 @@ The topics that count as a sign of life are in the [MQTT binding](../contracts/m
 
 ## 6. Where to change what
 
+To add something of your own, a page, a card or a source of data, follow [Build your own](build-your-own.md).
+
 Each part has a section "What is where" that maps its files:
 
 | You want to change | Start here |

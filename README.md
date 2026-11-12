@@ -31,7 +31,8 @@ The simulator publishes values, states and notifications for three machines as s
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo.
 
 New here? Take the [tour of the demo](docs/tour.md): six stops with screenshots, from the start to where to
-change what. With a coding agent in the repository, ask it: "give me a tour".
+change what. With a coding agent in the repository, ask it: "give me a tour". To add a page, a card or a
+source of data of your own, see [Build your own](docs/build-your-own.md).
 
 ## Architecture
 

@@ -26,3 +26,6 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   what to open, what to look at and where it lives in the code, then wait for the person. The chat needs a
   language model: without one, show what the panel says and go on. When a session begins without a task, offer
   the tour once: "Shall I give you a tour of the demo?"
+- A person who wants to add a page, a card or a source of data of their own: follow
+  [docs/build-your-own.md](docs/build-your-own.md). Find with them at which step the idea starts, then take
+  the recipe of that step.

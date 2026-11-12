@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 440" role="img" aria-labelledby="title desc"
+     font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <title id="title">The way of a value, and where an idea starts</title>
+  <desc id="desc">Four steps from the bottom up: a source publishes to the broker, the stack stores the values,
+    a tool computes an answer that a card draws, and a page shows it. A page starts at the top step, a card at
+    the step of the card and its tool, a source at the bottom step.</desc>
+  <defs>
+    <!-- Both point along their line: "auto" turns them. -->
+    <marker id="up" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#9ca3af"/>
+    </marker>
+    <marker id="to" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#0369a1"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="879" height="439" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+
+  <!-- A value travels up. -->
+  <line x1="62" y1="396" x2="62" y2="52" stroke="#9ca3af" stroke-width="1.5" marker-end="url(#up)"/>
+  <text x="46" y="224" font-size="13" fill="#6b7280" text-anchor="middle" transform="rotate(-90 46 224)">a value travels up</text>
+
+  <!-- The four steps, top to bottom. -->
+  <g font-size="13" fill="#6b7280">
+    <rect x="96" y="36" width="484" height="80" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="116" y="66" font-size="17" font-weight="600" fill="#111827">Page</text>
+    <text x="560" y="66" text-anchor="end" font-family="ui-monospace, Consolas, monospace">apps/app</text>
+    <text x="116" y="94">what a person opens; the chat beside it shows the same cards</text>
+
+    <rect x="96" y="132" width="484" height="80" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="116" y="162" font-size="17" font-weight="600" fill="#111827">Card and its tool</text>
+    <text x="560" y="162" text-anchor="end" font-family="ui-monospace, Consolas, monospace">packages/cards, apps/genui-mcp</text>
+    <text x="116" y="190">the tool computes an answer, the card draws it</text>
+
+    <rect x="96" y="228" width="484" height="80" rx="10" fill="#f9fafb" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="116" y="258" font-size="17" font-weight="600" fill="#111827">Stored values</text>
+    <text x="560" y="258" text-anchor="end">Timeseries API, Events API</text>
+    <text x="116" y="286">kept for you: REST for applications, MCP for agents</text>
+
+    <rect x="96" y="324" width="484" height="80" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="116" y="354" font-size="17" font-weight="600" fill="#111827">Source</text>
+    <text x="560" y="354" text-anchor="end" font-family="ui-monospace, Consolas, monospace">contracts/mqtt</text>
+    <text x="116" y="382">a machine or a place: an adapter publishes to the broker</text>
+  </g>
+
+  <!-- Where an idea starts. -->
+  <g font-size="14" font-weight="600" fill="#0369a1">
+    <line x1="668" y1="76" x2="594" y2="76" stroke="#0369a1" stroke-width="1.5" marker-end="url(#to)"/>
+    <rect x="668" y="58" width="180" height="36" rx="18" fill="#e0f2fe"/>
+    <text x="758" y="81" text-anchor="middle">A page starts here</text>
+
+    <line x1="668" y1="172" x2="594" y2="172" stroke="#0369a1" stroke-width="1.5" marker-end="url(#to)"/>
+    <rect x="668" y="154" width="180" height="36" rx="18" fill="#e0f2fe"/>
+    <text x="758" y="177" text-anchor="middle">A card starts here</text>
+
+    <line x1="668" y1="364" x2="594" y2="364" stroke="#0369a1" stroke-width="1.5" marker-end="url(#to)"/>
+    <rect x="668" y="346" width="180" height="36" rx="18" fill="#e0f2fe"/>
+    <text x="758" y="369" text-anchor="middle">A source starts here</text>
+    <text x="758" y="402" text-anchor="middle" font-size="12" font-weight="400" fill="#6b7280">and needs a card to be seen</text>
+  </g>
+</svg>

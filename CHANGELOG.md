@@ -51,6 +51,9 @@ All notable changes are documented here. The format follows
 - About the name (`docs/name.md`): where the name Pleiades comes from, what it stands for and what it does
   not, how Taurus, Pleiades and this playground relate, and how to write it. `README.md` says it in two
   sentences.
+- Build your own (`docs/build-your-own.md`): where an idea starts, as one picture and three recipes of the
+  same form, for a page, a card and a source of data, and which settings choose the language model, a local
+  one included.
 
 ### Changed
 
