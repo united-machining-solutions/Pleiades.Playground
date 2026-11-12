@@ -93,7 +93,9 @@ workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your
 
 ## What stays with you
 
-- Secrets. The demo needs none. The chat in the example app needs the key of a language model (`LLM_API_KEY` in
-  `.env`): you set it yourself, and its value stays out of prompts, commits and logs.
+- Secrets. The demo needs none. The chat in the example app needs the key of a language model, in `.env`:
+  `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `LLM_API_KEY` for any other endpoint
+  ([Language models](../apps/app/README.md#language-models)). You set it yourself, and its value stays out of
+  prompts, commits and logs.
 - Publishing: merging, releasing, changing repository settings.
 - The judgement whether a change is right. The agent is fast, and it can be wrong with confidence.
