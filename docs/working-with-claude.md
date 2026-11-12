@@ -44,6 +44,18 @@ one of its own:
   `pnpm install` first, and Claude Code asks once whether to trust it. With it the agent searches the registry
   and reads the examples of a component.
 
+## Build something of your own
+
+You have an idea and no plan yet: type `/build-your-own` and say what you would like to see or know. The agent
+checks that the stack runs, asks at most one question, looks what the stack already has, and proposes the
+smallest thing that shows it. On your yes it builds on a branch of your own and shows you the result.
+
+Four skills under `.claude/skills/` do this, and Claude Code loads them by itself: `build-your-own` finds the
+step where the idea starts, and `create-page`, `create-card` and `add-source` are the recipes of the steps.
+Each names the files it touches and the checks that say it is done. Before it writes code, a recipe loads the
+skills of the libraries: the one of shadcn/ui above, and those the TanStack packages ship, in the versions the
+workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your-own.md).
+
 ## How a change goes
 
 1. **Say what you want and what done looks like.** Name the area (`source/…`, `apps/…`, a contract) and the check
@@ -69,6 +81,7 @@ one of its own:
 | You want | Ask for |
 |---|---|
 | A tour of the demo | "Give me a tour." The agent walks you through the [tour](tour.md) stop by stop, in your running stack. It offers the tour itself when a session begins without a task. |
+| Something of your own in the demo | `/build-your-own`, or "I would like to see which machine stood still the longest." The agent finds out whether that is a page, a card or a source, and builds it. |
 | To see the demo | "Start the stack and show me what the simulator publishes for one machine." |
 | A new value | "Add the topic `…` to the simulator and to the MQTT binding, with its SI unit." |
 | To know why a check is red | "Why is pull request 12 red?" The agent reads `gh pr checks` and `gh run view --log-failed`. |

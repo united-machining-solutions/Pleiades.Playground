@@ -14,6 +14,9 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   (`pnpm --filter @pleiades/app exec shadcn docs <name>`) and use its composition whole. Build no element of your
   own where a component exists; add a missing one with `shadcn add`. A deviation is a decision: name it in the
   pull request. The rules, with wrong and right examples, are in `.claude/skills/shadcn/`.
+- Before substantial work with a TanStack library (Router, Start, AI), load its skill in the version this
+  repository pins: `pnpm exec intent list` names them, `pnpm exec intent load <package>#<skill>` prints one.
+  It needs `pnpm install` first.
 - A service reads and writes data only through a contract under `contracts/`. Change the contract first.
 - SI units only; energy in joule, fractions in `one`. Never invent or convert units on the wire.
 - Never commit a secret value. Names go to `.env.example`.
@@ -31,6 +34,8 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   what to open, what to look at and where it lives in the code, then wait for the person. The chat needs a
   language model: without one, show what the panel says and go on. When a session begins without a task, offer
   the tour once: "Shall I give you a tour of the demo?"
-- A person who wants to add a page, a card or a source of data of their own: follow
-  [docs/build-your-own.md](docs/build-your-own.md). Find with them at which step the idea starts, then take
-  the recipe of that step.
+- A person who wants to add a page, a card or a source of data of their own: follow the skill
+  `build-your-own` (`.claude/skills/build-your-own/SKILL.md`). Ask what they want to see, look yourself what
+  the stack already has, propose the smallest thing that shows it, and on a yes take the recipe of the step
+  where the idea starts: `create-page`, `create-card` or `add-source`, each a `SKILL.md` next to it. The map
+  is [docs/build-your-own.md](docs/build-your-own.md).

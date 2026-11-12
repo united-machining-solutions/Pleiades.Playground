@@ -38,110 +38,75 @@ list is in the [repository layout](../README.md#repository-layout), and who look
 | Data the stack does not have yet | [A source](#a-source) | `contracts/mqtt`, a service of your own, `compose.yaml` |
 | The data in an agent you already use | Nothing: [connect it](#with-an-agent-of-your-own) | the settings of your agent |
 
-Each recipe has the same four parts. The last one is a request for your coding agent, to copy as it stands.
+## Start with one sentence
+
+With Claude Code in this repository, type `/build-your-own` and say what you would like to see or know. The
+agent checks that your stack runs, asks at most one question, looks what the stack already has, and proposes
+the smallest thing that shows it. On your yes it builds on a branch of your own with the recipe that fits,
+checks its work and shows you the result. Nothing leaves your computer unless you ask for it.
+
+The recipes are skills, one file each. Claude Code loads them by itself. Any other agent can read them: tell
+it to follow `.claude/skills/build-your-own/SKILL.md`.
+
+| Skill | What it does |
+|---|---|
+| [`build-your-own`](../.claude/skills/build-your-own/SKILL.md) | Asks for the goal, finds the step where the idea starts, and takes the recipe of that step |
+| [`create-page`](../.claude/skills/create-page/SKILL.md) | A page in the example app, from answers that exist |
+| [`create-card`](../.claude/skills/create-card/SKILL.md) | A tool that computes an answer, and the card that draws it |
+| [`add-source`](../.claude/skills/add-source/SKILL.md) | An adapter that brings new values into the stack |
+
+Each recipe names the files it touches and the checks that say it is done. Before it writes code it loads the
+skills of the libraries, in the versions this repository pins: shadcn/ui for the user interface, TanStack for
+routes, server functions and tools.
 
 ## A page
 
-The example: the open warnings of all machines.
+A screen people open, made of answers that exist. The example: the open warnings of all machines. The
+generative UI backend knows them already, so the page only asks and draws.
 
-**You touch** `apps/app`: one route and one line in the sidebar.
+**It touches** `apps/app`: one route and one line in the sidebar.
 
-**Steps**
+**Done when** the page opens in the running stack and shows the warnings Home shows.
 
-1. Add a file under `src/routes/`, for example `warnings.tsx`. The file is the route. The build writes it into
-   `src/routeTree.gen.ts`: commit that file, never edit it.
-2. Read the values in the loader of the route, with a server function from `src/machines/get-machines.ts`.
-   `getMachines()` returns every machine with its open warnings and errors. The browser never talks to the
-   backend itself.
-3. Draw them with what is there: the rows in `src/machines/machine-item.tsx`, a card of `@pleiades/cards`, the
-   shadcn/ui components under `src/components/ui/`. With `useLive()` the page reads its values again every ten
-   seconds.
-4. Add the page to the sidebar, in `src/components/app-sidebar.tsx`.
-
-**Done when** the page opens at <http://localhost:5600/warnings>, shows the warnings Home shows, and
-`pnpm typecheck` passes.
-
-**Tell your agent**
-
-> Add a page `/warnings` to `apps/app` that lists the open warnings of all machines, newest first, with the rows
-> Home uses. Follow `docs/build-your-own.md`. Done when the page shows them in the running stack and
-> `pnpm typecheck` passes.
-
-More: [`apps/app`: What is where](../apps/app/README.md#what-is-where).
+The steps: [`create-page`](../.claude/skills/create-page/SKILL.md). More about the app:
+[`apps/app`: What is where](../apps/app/README.md#what-is-where).
 
 ## A card
 
-The example: the alarms of one machine over the last eight hours. The Events API has them; no tool answers
-that question yet.
+An answer that does not exist yet, to data that does. The example: the alarms of one machine over the last
+eight hours. The Events API has them; no tool answers that question yet.
 
-**You touch** `packages/cards` for the contract and the component, `apps/genui-mcp` for the tool, `apps/app`
+**It touches** `packages/cards` for the contract and the component, `apps/genui-mcp` for the tool, `apps/app`
 for the place that draws it, and a row in [`contracts/mcp`](../contracts/mcp/README.md).
-
-**Steps**, in full under [A new card](../packages/cards/README.md#a-new-card):
-
-1. Write the contract and the component in a folder of their own under `packages/cards/src/`. Build the
-   component from the shadcn/ui components that are there.
-2. Add the tool in `apps/genui-mcp` with that contract as its output. The tool reads the APIs and computes. Its
-   result has two parts: a few lines of text for a language model, and the values for the card
-   ([A result is an answer](../apps/genui-mcp/README.md#a-result-is-an-answer)).
-3. In the app, draw the component where the result of the tool arrives. The card then appears in the chat as
-   soon as the model calls its tool, and on a page if you add one.
-4. For other hosts, add a card file under `apps/genui-mcp/ui/`.
-5. A series, anything that grows with time, gets a tool of its own that only the card calls. A card calls
-   only the server it came from: [A card and its server](#a-card-and-its-server).
 
 Three rules keep a card honest. Numbers, order and durations are computed in the tool, never by a language
 model. Every value names the topic or the notification it comes from. What a model reads is short.
 
-**Done when** the chat answers "Which alarms did P-04 raise today?" with the card, and `pnpm typecheck` and
-`pnpm test` pass.
+**Done when** the chat answers "Which alarms did P-04 raise today?" with the card.
 
-**Tell your agent**
-
-> Add a card that lists the alarms of one machine over the last eight hours. Follow "A new card" in
-> `packages/cards/README.md` and `docs/build-your-own.md`. Done when the chat shows it for P-04 in the running
-> stack and `pnpm typecheck` and `pnpm test` pass.
+The steps: [`create-card`](../.claude/skills/create-card/SKILL.md), which follows
+[A new card](../packages/cards/README.md#a-new-card).
 
 ## A source
 
-The example: the outside temperature.
+Data the stack does not have yet. The example: the outside temperature.
 
 > The topics for a value that belongs to a place are proposed in
 > [issue 60](https://github.com/united-machining-solutions/Pleiades.Playground/issues/60) and not agreed yet.
-> Until they are, read this recipe as the way it will go, and the topic below as an example.
+> Until they are, a source for such a value is built on a branch of your own, with the topic as proposed.
 
 Bring a source in at the bottom, like a machine: an adapter that publishes to the broker. Then the value is
 stored, every tool, card and agent can read it, and it can be traced to where it came from. A value that a
 card, a tool or the app fetches for itself is none of that.
 
-**You touch** an issue, [`contracts/mqtt`](../contracts/mqtt/README.md), a folder with your adapter, and
-`compose.yaml`.
-
-**Steps**
-
-1. Open an issue first. A source adds a service, and it may change a contract
-   ([Contributing](../CONTRIBUTING.md#how-to-contribute)).
-2. Agree the topic in `contracts/mqtt` before any code: what the value is about, the name of the source, and
-   the path. One value per topic, one SI unit from the table, the time of the observation in UTC. For the
-   example: `sites/demo/weather/AirTemperature` in `degreeCelsius`.
-3. Write the adapter as a service of its own: a folder with a `Dockerfile` and a short README, a liveness
-   endpoint, an entry in `compose.yaml` ([Adding a service](../CONTRIBUTING.md#adding-a-service)). The
-   language is up to you. It fetches, converts once to the SI unit, and publishes. It says that it is there the
-   way a machine does, with `Connection/State` and `Connection/Heartbeat`.
-4. Check that the value is stored: the Swagger UI at <http://localhost:5500/> lists the topic under `/topics`.
-5. Show it with [a card](#a-card).
-
-A key of a source: its name goes to `.env.example`, its value into your `.env`, never into a commit. Name the
-source wherever its values are shown.
+**It touches** an issue, [`contracts/mqtt`](../contracts/mqtt/README.md), a folder with your adapter, and
+`compose.yaml`. A source is the one recipe that changes what everyone shares, so the topic is agreed before
+the adapter is merged.
 
 **Done when** the Timeseries API lists the new topic, every container is healthy, and a card shows the value
 with its source.
 
-**Tell your agent**
-
-> Add an adapter that publishes the outside temperature of one place to the broker, as `contracts/mqtt` and
-> `docs/build-your-own.md` say. Open an issue for the topic first. Done when the Timeseries API lists the
-> topic and every container is healthy.
+The steps: [`add-source`](../.claude/skills/add-source/SKILL.md). It drafts the issue for you.
 
 ## With an agent of your own
 

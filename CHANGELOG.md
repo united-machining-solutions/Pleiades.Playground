@@ -51,9 +51,12 @@ All notable changes are documented here. The format follows
 - About the name (`docs/name.md`): where the name Pleiades comes from, what it stands for and what it does
   not, how Taurus, Pleiades and this playground relate, and how to write it. `README.md` says it in two
   sentences.
-- Build your own (`docs/build-your-own.md`): where an idea starts, as one picture and three recipes of the
-  same form, for a page, a card and a source of data, and which settings choose the language model, a local
-  one included.
+- Build your own (`docs/build-your-own.md`): where an idea starts, as pictures of the way of a value and of
+  who calls whom, and which settings choose the language model, a local one included.
+- Skills for building on the stack (`.claude/skills/`): `build-your-own` asks a person for the goal, looks what
+  the stack already has and takes the recipe that fits; `create-page`, `create-card` and `add-source` are the
+  recipes, each with the files it touches and the checks that say it is done. They load the skills of
+  shadcn/ui and of the TanStack packages first; `@tanstack/intent` is a development dependency for that.
 - For coding agents: shadcn/ui is named as the design system of the user interface (`AGENTS.md`, and a line
   in the pull request template). The agent skill of shadcn/ui (`.claude/skills/shadcn`) and the MCP server of
   its CLI (`.mcp.json`) come with the repository, so an agent reads the docs of a component before it writes
