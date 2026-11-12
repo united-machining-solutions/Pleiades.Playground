@@ -32,6 +32,9 @@ There is no contributor licence agreement.
 - **Secrets:** never commit a value. Add the name to `.env.example` and document it.
 - **Licence headers:** new files may carry `SPDX-License-Identifier: Apache-2.0`; documentation is CC BY 4.0.
 - **Decisions:** a choice that shapes the repository gets a short record under `docs/adr/`.
+- **Tour:** a change to what the demo shows, how it starts or where its code lives updates the
+  [tour](docs/tour.md) in the same pull request: the text, the pointers into the code and the screenshot of
+  the stop. Name a screenshot you could not retake in the pull request.
 
 ## Checks before a pull request
 
@@ -51,7 +54,15 @@ pnpm typecheck && pnpm test && pnpm build
 ```
 
 For changes to the stack: `docker compose up -d --build` and check that every container reports healthy.
-The same checks run in CI on every pull request.
+
+For changes to documentation, and when you move or rename a file or reword a heading:
+
+```bash
+node .github/scripts/check-doc-links.mjs
+```
+
+It checks that every link between files of this repository still has its target, the pointers of the tour
+into the code included. The same checks run in CI on every pull request.
 
 ## Working with a coding agent
 

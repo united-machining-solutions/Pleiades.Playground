@@ -19,7 +19,8 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
 - Never commit a secret value. Names go to `.env.example`.
 - Verify before you claim: `dotnet build` and `dotnet test --solution source/Pleiades.Playground.slnx`; for
   TypeScript `pnpm typecheck`, `pnpm test` and `pnpm build`; for the stack
-  `docker compose up -d --build` and healthy containers. Say what you could not verify.
+  `docker compose up -d --build` and healthy containers; for documentation and for a moved or renamed file
+  `node .github/scripts/check-doc-links.mjs`. Say what you could not verify.
 - Do not commit, push or publish unless asked.
 - When asked: work on a branch, never on `main`; one topic per pull request; sign off every commit
   (`git commit -s`) and add a `Co-Authored-By` trailer that names you; fill in the pull request template.
@@ -31,3 +32,5 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   what to open, what to look at and where it lives in the code, then wait for the person. The chat needs a
   language model: without one, show what the panel says and go on. When a session begins without a task, offer
   the tour once: "Shall I give you a tour of the demo?"
+- A change to what the demo shows, how it starts or where its code lives: update [docs/tour.md](docs/tour.md)
+  in the same pull request, and name a screenshot you could not retake.

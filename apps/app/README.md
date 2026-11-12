@@ -8,7 +8,8 @@ harness.
   without data, then those in setup, then the running ones, and reads them again every ten seconds.
 - **A page per machine** (`/machines/P-04`) shows the machine card of the
   [card catalogue](../../packages/cards/README.md): what the machine does now and what it did over the last
-  hours. It needs no language model. Home leads to it.
+  hours. It needs no language model. Home leads to it. For a machine the backend does not know, the page
+  says so and does not ask again.
 - **Chat** is the panel on the right, with "New chat" and the chats so far. It opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
@@ -35,12 +36,13 @@ counts once it is complete. Several models are separated by commas.
 
 | Block | Settings | How the app talks to it |
 |---|---|---|
-| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` | OpenAI's Responses API |
 | Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODELS` | Anthropic's Messages API |
+| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` | OpenAI's Responses API |
 | Any other endpoint | `LLM_BASE_URL`, `LLM_MODELS`, and `LLM_API_KEY` if it wants one | OpenAI's chat completions, which a local model server or a gateway speaks |
 
-The first model answers until a chat picks another one in its input field. The agent harness keeps that
-choice with the chat. With one model the field shows no choice. The keys stay on the server.
+The models are offered block by block in the order of the table, each block in the order of its setting.
+The first one answers until a chat picks another one in its input field: with a key of Anthropic and the
+names of `.env.example`, that is Claude Haiku. The agent harness keeps that choice with the chat. With one model the field shows no choice. The keys stay on the server.
 
 **The chat has no sign-in.** The agent harness runs with open access: whoever reaches the port can chat with
 the configured model, at the cost of whoever owns its key, and can list and read every chat. So the demo
@@ -65,8 +67,9 @@ the backend of the running demo stack answers.
   server routes.
 - `src/routeTree.gen.ts`: written by the build. Commit it, never edit it.
 - `src/machines/`: `get-machines.ts` holds the server functions that call the backend as a typed MCP client,
-  `machine-item.tsx` draws a machine as a row or a tile. Which value of the binding is which state, the signs
-  and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
+  `machine-item.tsx` draws a machine as a row or a tile. `card-tools.ts` names the tools of the backend that
+  only a card calls: the chat keeps them from its language model. Which value of the binding is which state,
+  the signs and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a

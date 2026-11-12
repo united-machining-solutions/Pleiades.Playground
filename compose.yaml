@@ -167,6 +167,8 @@ services:
     environment:
       TIMESERIES_API_URL: http://timeseries-api:8080
       EVENTS_API_URL: http://events-api:8080
+      # The origins a card file may load the font of its host from; none unless set.
+      CARD_RESOURCE_DOMAINS: ${CARD_RESOURCE_DOMAINS:-}
 
   # The example application.
   app:

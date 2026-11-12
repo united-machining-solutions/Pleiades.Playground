@@ -1,12 +1,15 @@
 import { clock } from "@pleiades/cards/machine/format.ts"
 import { MachineCard } from "@pleiades/cards/machine/machine-card.tsx"
-import { Link, createFileRoute } from "@tanstack/react-router"
+import { Link, createFileRoute, notFound } from "@tanstack/react-router"
+import { SearchXIcon } from "lucide-react"
 import type { ReactNode } from "react"
 
 import { NoAnswer } from "@/components/no-answer.tsx"
+import { Button } from "@/components/ui/button"
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLive } from "@/hooks/use-live.ts"
-import { getMachine, getSpans } from "@/machines/get-machines.ts"
+import { getMachine, getMachines, getSpans } from "@/machines/get-machines.ts"
 
 /**
  * One machine. The page asks the backend for the values of a card and draws the card, without a
@@ -19,13 +22,20 @@ export const Route = createFileRoute("/machines/$machine")({
       values: null,
       error: String(error),
     }))
-    if (!answer.values) return { answer, spans: null }
+    if (!answer.values) {
+      // A backend that is away comes back, and the page keeps trying. A machine the backend does
+      // not know does not: the list tells the two apart.
+      const list = await getMachines().catch(() => null)
+      if (list?.values && !list.values.machines.some((one) => one.machine === params.machine)) throw notFound()
+      return { answer, spans: null }
+    }
     const { from, to } = answer.values.history
     const spans = await getSpans({ data: { machine: params.machine, from, to } }).catch(() => null)
     return { answer, spans }
   },
   component: Machine,
   pendingComponent: Loading,
+  notFoundComponent: NoMachine,
 })
 
 function Machine() {
@@ -54,6 +64,30 @@ function Page({ machine, line, children }: { machine: string; line?: string; chi
       </div>
       {children}
     </div>
+  )
+}
+
+/** A machine the backend does not know. The page says so once and does not ask again. */
+function NoMachine() {
+  const { machine } = Route.useParams()
+  return (
+    <Page machine={machine}>
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <SearchXIcon />
+          </EmptyMedia>
+          <EmptyTitle>No machine "{machine}"</EmptyTitle>
+          <EmptyDescription>No machine of that name has published a value in the last 24 hours.</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          {/* The chat stays open while the page changes. */}
+          <Button nativeButton={false} render={<Link to="/" search />}>
+            All machines
+          </Button>
+        </EmptyContent>
+      </Empty>
+    </Page>
   )
 }
 

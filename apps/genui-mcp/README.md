@@ -10,7 +10,7 @@ durations are computed here, never by a language model.
 | For a desktop host | stdin and stdout, when started with `--stdio` |
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.genui.mcp` |
-| Settings | `TIMESERIES_API_URL`, `EVENTS_API_URL` |
+| Settings | `TIMESERIES_API_URL`, `EVENTS_API_URL`, `CARD_RESOURCE_DOMAINS` (optional, see the card below) |
 
 ## Tools
 
@@ -74,10 +74,13 @@ wrappers: an application that imports it, and one HTML file for every other host
 - It shows what the result says and nothing newer. It asks the server for the spans of its band, through
   the host, and for nothing else: it does not refresh.
 - It is light and draws the frame of the card itself. It says so to the host (`prefersBorder: false`), as the
-  standard recommends, so no host puts a second frame around it. The font is the one the host names, so the
-  card reads like the conversation around it. A host that serves its font from an origin of its own has to
-  find that origin in the resource (`csp.resourceDomains`), or its sandbox blocks the font. Times are written
-  by the clock of the browser.
+  standard recommends, so no host puts a second frame around it. Times are written by the clock of the
+  browser.
+- The font is the one the host names, so the card reads like the conversation around it. A host that serves
+  its font from an origin of its own has to find that origin in the resource (`csp.resourceDomains`), or its
+  sandbox blocks the font and the card falls back to a system font. The setting `CARD_RESOURCE_DOMAINS`
+  names those origins, separated by commas: `https://assets.claude.ai` for the Claude apps, for example.
+  Without it the card names none.
 - It travels alone, so it carries its notices: a comment at its end holds the `NOTICE` of this repository
   and the licence of every package the build put into the file.
 
@@ -100,6 +103,7 @@ for example as an entry in the configuration file of the Claude desktop app:
         "--network", "pleiades-playground_default",
         "-e", "TIMESERIES_API_URL=http://timeseries-api:8080",
         "-e", "EVENTS_API_URL=http://events-api:8080",
+        "-e", "CARD_RESOURCE_DOMAINS=https://assets.claude.ai",
         "ghcr.io/united-machining-solutions/pleiades.playground.genui.mcp:dev",
         "--stdio"
       ]
@@ -113,8 +117,9 @@ for example as an entry in the configuration file of the Claude desktop app:
 The [MQTT binding](../../contracts/mqtt/README.md) has no quality field: whether values are current is told
 by `Connection/State` and `Connection/Heartbeat`. This server reads it so:
 
-- **A value holds until the next one of its topic.** A machine may publish its state only when the state
-  changes; a simulator repeats it every few seconds. Both read the same.
+- **A value holds until the next one of its topic**, however long that takes. A machine may publish its state
+  only when the state changes, and one that runs for days says once that it is connected; a simulator repeats
+  it every few seconds. Both read the same.
 - **Every value is a sign of life**, and the heartbeat is one that is nothing else. A machine that gave no sign
   for more than 30 seconds is silent: it has no data, whatever its last values say.
 - **A silence ends a run.** What a value was while the machine was silent is not known, so "since" is the
@@ -122,8 +127,9 @@ by `Connection/State` and `Connection/Heartbeat`. This server reads it so:
 
 ## Known limit
 
-A warning or an error that has stood for more than 24 hours is not in a result, and the history of a machine
-does not show an error that was raised more than 24 hours before the history begins. The Events API returns
+A warning or an error that has stood for more than 24 hours is not in a result: not in the list, not on a
+card and not in the history of a machine. All three look back 24 hours, from now or from where a history
+ends, so the state of a machine and the end of its history say the same. The Events API returns
 the notifications that were raised between two instants; it cannot be asked for the ones that are open. Reading
 every notification of the retention time on each call would be the only way around it here. A filter for open
 notifications in the Events API would solve it.

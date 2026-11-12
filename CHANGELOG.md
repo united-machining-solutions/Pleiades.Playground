@@ -48,9 +48,15 @@ All notable changes are documented here. The format follows
 - A tour of the demo with screenshots (`docs/tour.md`): what the example app shows, stop by stop, and where
   it lives in the code. A coding agent gives the tour when asked ("give me a tour") and offers it when a
   session begins without a task (`AGENTS.md`).
+- CI checks the links between the files of the repository (`.github/scripts/check-doc-links.mjs`): a moved
+  or renamed file and a reworded heading cannot leave a dead pointer in the documentation. The pull request
+  template, `CONTRIBUTING.md` and `AGENTS.md` ask to keep the tour current with a change to the demo.
 - About the name (`docs/name.md`): where the name Pleiades comes from, what it stands for and what it does
   not, how Taurus, Pleiades and this playground relate, and how to write it. `README.md` says it in two
   sentences.
+- ADR-0007 records the decisions of the TypeScript part: the three parts and their stack, the harness of the
+  example app as the agentic layer, the card as one component in two wrappers, and what a language model
+  reads. The layer table in `README.md` names the harness.
 - For coding agents: shadcn/ui is named as the design system of the user interface (`AGENTS.md`, and a line
   in the pull request template). The agent skill of shadcn/ui (`.claude/skills/shadcn`) and the MCP server of
   its CLI (`.mcp.json`) come with the repository, so an agent reads the docs of a component before it writes
@@ -58,7 +64,31 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Chat: the models of Anthropic are offered before those of OpenAI. With keys for both, the first model of
+  `ANTHROPIC_MODELS` answers until a chat picks another; with the names of `.env.example` that is Claude Haiku.
 - MQTT: MQTTnet 5 replaces MQTTnet 4. MQTTnet 5 ships no managed client, so `Pleiades.Playground.Mqtt.Extensions`
   now carries its own `ManagedMqttClient`: it reconnects every 10 s, subscribes again on every new connection
   and queues outgoing messages while there is none. Topics, payloads and content types on the broker are
   unchanged.
+- `app`: the setting `LLM_MODEL` is now `LLM_MODELS` and takes several names, separated by commas. A `.env`
+  that still names `LLM_MODEL` gives the chat no model: rename the line. The blocks `OPENAI_*` and
+  `ANTHROPIC_*` are new beside it.
+- `genui-mcp`: the origins a card file may load from are a setting, `CARD_RESOURCE_DOMAINS`, and no longer
+  the font origin of one host in the code. Without it a card names none. A host that serves its font from
+  an origin of its own needs it set, or the card falls back to a system font there.
+- The images of `genui-mcp` and `app` carry `LICENSE` and `NOTICE` under `/app`.
+
+### Fixed
+
+- `genui-mcp`: a state holds however long ago the machine reported it. A machine that said more than 24 hours
+  ago that it is connected, and has sent only its heartbeat since, was shown as "No data".
+- A serial number follows one rule, the one of the MQTT binding: everything but `/`, `+` and `#`
+  (`serialNumber` in `packages/cards`). `genui_machine_show` refused a machine that the list showed, for
+  example one with a space in its name.
+- `genui-mcp`: the history of a machine looks back as far for an error that stands as the list does, 24 hours
+  from its end, so the state on a card and the end of its band no longer contradict each other.
+- `genui-mcp`: a time zone the server does not know is refused with a sentence that says what to name. The
+  message used to be the one of the runtime.
+- `app`: the chat no longer offers its language model `genui_span_list`, the tool only a card calls.
+- `app`: the page of a machine the backend does not know says so and stops asking. It used to say "No answer
+  from the backend" and ask again every ten seconds.
