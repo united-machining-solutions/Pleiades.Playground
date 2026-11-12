@@ -20,7 +20,8 @@ System, licensed under the Apache License, Version 2.0.
 
 The user interface components under apps/app/src/components/ui/ and packages/cards/src/ui/, the hook
 apps/app/src/hooks/use-mobile.ts and the theme in packages/cards/src/theme.css are copies from shadcn/ui
-(https://ui.shadcn.com), some of them changed. shadcn/ui is licensed under the MIT License:
+(https://ui.shadcn.com), some of them changed. The files under .claude/skills/shadcn/ are a copy of the
+agent skill of shadcn/ui, unchanged. shadcn/ui is licensed under the MIT License:
 
     MIT License
 

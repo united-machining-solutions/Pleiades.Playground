@@ -30,6 +30,20 @@ The agent can then answer questions from the data, for example "which notificati
 the last hour, and what did the spindle do at that time?". The tools are listed in
 [`contracts/mcp`](../contracts/mcp/README.md).
 
+## Give the agent the design system
+
+The user interface is built with [shadcn/ui](https://ui.shadcn.com), and shadcn/ui is its design system
+(`AGENTS.md`). Two things in the repository let an agent use a component as it comes, and keep it from building
+one of its own:
+
+- **The skill of shadcn/ui** lies in `.claude/skills/shadcn`, and Claude Code loads it by itself. It makes the
+  agent look a component up and read its docs before it writes user interface, and it holds the rules of
+  composition with wrong and right examples. `skills-lock.json` names where it comes from;
+  `pnpm dlx skills update` brings a newer one. Another agent takes it with `pnpm dlx skills add shadcn/ui`.
+- **The MCP server of the shadcn CLI** is in `.mcp.json`, in the version the workspace pins. It needs
+  `pnpm install` first, and Claude Code asks once whether to trust it. With it the agent searches the registry
+  and reads the examples of a component.
+
 ## How a change goes
 
 1. **Say what you want and what done looks like.** Name the area (`source/…`, `apps/…`, a contract) and the check
