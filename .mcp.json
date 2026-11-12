@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "shadcn": {
+      "command": "pnpm",
+      "args": ["--filter", "@pleiades/app", "exec", "shadcn", "mcp"]
+    }
+  }
+}

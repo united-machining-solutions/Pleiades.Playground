@@ -9,6 +9,11 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   `source/Directory.Packages.props`, never a version in a project file. nuget.org is the only feed.
 - TypeScript lives under `apps/` and `packages/` in one pnpm workspace with central versions; add a version to
   the `catalog` in `pnpm-workspace.yaml`, never a version in a `package.json`. npmjs.org is the only registry.
+- The user interface under `apps/` and `packages/cards` is built with shadcn/ui, and shadcn/ui is its design
+  system. Before you write user interface, read the docs of the component
+  (`pnpm --filter @pleiades/app exec shadcn docs <name>`) and use its composition whole. Build no element of your
+  own where a component exists; add a missing one with `shadcn add`. A deviation is a decision: name it in the
+  pull request. The rules, with wrong and right examples, are in `.claude/skills/shadcn/`.
 - A service reads and writes data only through a contract under `contracts/`. Change the contract first.
 - SI units only; energy in joule, fractions in `one`. Never invent or convert units on the wire.
 - Never commit a secret value. Names go to `.env.example`.

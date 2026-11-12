@@ -57,6 +57,10 @@ All notable changes are documented here. The format follows
 - ADR-0007 records the decisions of the TypeScript part: the three parts and their stack, the harness of the
   example app as the agentic layer, the card as one component in two wrappers, and what a language model
   reads. The layer table in `README.md` names the harness.
+- For coding agents: shadcn/ui is named as the design system of the user interface (`AGENTS.md`, and a line
+  in the pull request template). The agent skill of shadcn/ui (`.claude/skills/shadcn`) and the MCP server of
+  its CLI (`.mcp.json`) come with the repository, so an agent reads the docs of a component before it writes
+  user interface.
 
 ### Changed
 

@@ -14,6 +14,8 @@
 - [ ] One topic, English only
 - [ ] Commits are signed off (`git commit -s`)
 - [ ] A contract under `contracts/` changed: the affected maintainers are asked for review
+- [ ] The user interface changed: every element is a shadcn/ui component in its documented composition, or the
+      exception is named above
 - [ ] No secret value, no internal host name, no customer data
 - [ ] `CHANGELOG.md` updated for a notable change
 - [ ] The demo looks, starts or behaves differently: `docs/tour.md` and its screenshots still match
