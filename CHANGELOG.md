@@ -51,6 +51,9 @@ All notable changes are documented here. The format follows
 - About the name (`docs/name.md`): where the name Pleiades comes from, what it stands for and what it does
   not, how Taurus, Pleiades and this playground relate, and how to write it. `README.md` says it in two
   sentences.
+- ADR-0007 records the decisions of the TypeScript part: the three parts and their stack, the harness of the
+  example app as the agentic layer, the card as one component in two wrappers, and what a language model
+  reads. The layer table in `README.md` names the harness.
 
 ### Changed
 
@@ -58,9 +61,13 @@ All notable changes are documented here. The format follows
   now carries its own `ManagedMqttClient`: it reconnects every 10 s, subscribes again on every new connection
   and queues outgoing messages while there is none. Topics, payloads and content types on the broker are
   unchanged.
+- `app`: the setting `LLM_MODEL` is now `LLM_MODELS` and takes several names, separated by commas. A `.env`
+  that still names `LLM_MODEL` gives the chat no model: rename the line. The blocks `OPENAI_*` and
+  `ANTHROPIC_*` are new beside it.
 - `genui-mcp`: the origins a card file may load from are a setting, `CARD_RESOURCE_DOMAINS`, and no longer
   the font origin of one host in the code. Without it a card names none. A host that serves its font from
   an origin of its own needs it set, or the card falls back to a system font there.
+- The images of `genui-mcp` and `app` carry `LICENSE` and `NOTICE` under `/app`.
 
 ### Fixed
 
@@ -73,3 +80,6 @@ All notable changes are documented here. The format follows
   from its end, so the state on a card and the end of its band no longer contradict each other.
 - `genui-mcp`: a time zone the server does not know is refused with a sentence that says what to name. The
   message used to be the one of the runtime.
+- `app`: the chat no longer offers its language model `genui_span_list`, the tool only a card calls.
+- `app`: the page of a machine the backend does not know says so and stops asking. It used to say "No answer
+  from the backend" and ask again every ten seconds.

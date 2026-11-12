@@ -8,7 +8,8 @@ harness.
   without data, then those in setup, then the running ones, and reads them again every ten seconds.
 - **A page per machine** (`/machines/P-04`) shows the machine card of the
   [card catalogue](../../packages/cards/README.md): what the machine does now and what it did over the last
-  hours. It needs no language model. Home leads to it.
+  hours. It needs no language model. Home leads to it. For a machine the backend does not know, the page
+  says so and does not ask again.
 - **Chat** is the panel on the right, with "New chat" and the chats so far. It opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
@@ -65,8 +66,9 @@ the backend of the running demo stack answers.
   server routes.
 - `src/routeTree.gen.ts`: written by the build. Commit it, never edit it.
 - `src/machines/`: `get-machines.ts` holds the server functions that call the backend as a typed MCP client,
-  `machine-item.tsx` draws a machine as a row or a tile. Which value of the binding is which state, the signs
-  and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
+  `machine-item.tsx` draws a machine as a row or a tile. `card-tools.ts` names the tools of the backend that
+  only a card calls: the chat keeps them from its language model. Which value of the binding is which state,
+  the signs and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a

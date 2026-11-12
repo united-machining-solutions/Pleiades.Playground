@@ -15,3 +15,4 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0004](0004-licence-and-contributions.md) | Apache-2.0, CC BY 4.0 and DCO | accepted |
 | [0005](0005-data-model-as-submodule.md) | The data model is a submodule, the binding is ours | superseded by 0006 |
 | [0006](0006-data-model-by-reference.md) | The data model is referenced by a pinned commit, not a submodule | accepted |
+| [0007](0007-generative-ui-in-typescript.md) | Generative UI in TypeScript: a backend for displays, a card catalogue and the harness in the example app | proposed |
