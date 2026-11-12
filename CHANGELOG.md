@@ -54,6 +54,8 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Chat: the models of Anthropic are offered before those of OpenAI. With keys for both, the first model of
+  `ANTHROPIC_MODELS` answers until a chat picks another; with the names of `.env.example` that is Claude Haiku.
 - MQTT: MQTTnet 5 replaces MQTTnet 4. MQTTnet 5 ships no managed client, so `Pleiades.Playground.Mqtt.Extensions`
   now carries its own `ManagedMqttClient`: it reconnects every 10 s, subscribes again on every new connection
   and queues outgoing messages while there is none. Topics, payloads and content types on the broker are

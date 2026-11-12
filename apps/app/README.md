@@ -35,12 +35,13 @@ counts once it is complete. Several models are separated by commas.
 
 | Block | Settings | How the app talks to it |
 |---|---|---|
-| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` | OpenAI's Responses API |
 | Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODELS` | Anthropic's Messages API |
+| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` | OpenAI's Responses API |
 | Any other endpoint | `LLM_BASE_URL`, `LLM_MODELS`, and `LLM_API_KEY` if it wants one | OpenAI's chat completions, which a local model server or a gateway speaks |
 
-The first model answers until a chat picks another one in its input field. The agent harness keeps that
-choice with the chat. With one model the field shows no choice. The keys stay on the server.
+The models are offered block by block in the order of the table, each block in the order of its setting.
+The first one answers until a chat picks another one in its input field: with a key of Anthropic and the
+names of `.env.example`, that is Claude Haiku. The agent harness keeps that choice with the chat. With one model the field shows no choice. The keys stay on the server.
 
 **The chat has no sign-in.** The agent harness runs with open access: whoever reaches the port can chat with
 the configured model, at the cost of whoever owns its key, and can list and read every chat. So the demo
