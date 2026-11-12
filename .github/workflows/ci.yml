@@ -171,6 +171,11 @@ jobs:
           # It draws its own frame and says so, and it carries its notices.
           grep -q '"prefersBorder":false' card.txt
           grep -q 'Notices for the software in this file' card.txt
+      - name: The TypeScript images carry the licence and the notices
+        run: |
+          for service in genui-mcp app; do
+            docker compose exec -T "$service" sh -c 'test -s /app/LICENSE && grep -q "Pleiades Playground" /app/NOTICE'
+          done
       - name: Logs on failure
         if: failure()
         run: docker compose logs --no-color --tail 200

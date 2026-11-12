@@ -21,6 +21,18 @@ export function isTimeZone(name: string): boolean {
 }
 
 /**
+ * The time zone a caller named, or undefined if it named none. A name the runtime does not know
+ * is refused here, with a sentence that says what to name instead. A rule in the schema of a
+ * tool that is a function is not run on what comes in, so the schema cannot refuse it.
+ */
+export function knownTimeZone(name: string | undefined): string | undefined {
+  if (name !== undefined && !isTimeZone(name)) {
+    throw new Error(`"${name}" is not a time zone this server knows. Name an IANA time zone, for example Europe/Zurich.`)
+  }
+  return name
+}
+
+/**
  * The same instant as a clock in that time zone shows it, with its offset to UTC:
  * 2026-11-11T08:00:41.000Z in Europe/Zurich is 2026-11-11T09:00:41.000+01:00.
  */

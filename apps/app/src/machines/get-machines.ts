@@ -3,6 +3,8 @@ import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
+import { SPAN_LIST_TOOL } from "./card-tools.ts"
+
 // The values come from the generative UI backend. These functions run on the server of the app:
 // the browser never talks to the backend itself.
 
@@ -94,9 +96,10 @@ export const getSpans = createServerFn({ method: "GET" })
   .validator((hours: { machine: string; from: string; to: string }) => hours)
   .handler(async ({ data }): Promise<Array<Span> | null> => {
     const answer = await ask(async (backend) => {
-      const result = await backend.callTool("genui_span_list", data)
+      // The name is checked against the tools of the backend: if it changes there, this fails to compile.
+      const result = await backend.callTool(SPAN_LIST_TOOL, data)
       if (result.isError || !result.structuredContent) {
-        throw new Refused(textOf(result) ?? "genui_span_list returned no values.")
+        throw new Refused(textOf(result) ?? `${SPAN_LIST_TOOL} returned no values.`)
       }
       return result.structuredContent.spans
     })

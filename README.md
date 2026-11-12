@@ -40,7 +40,7 @@ Four layers, three agreed interfaces. Everything below the solution layer is the
 | Layer | What lives there | In this repository |
 |---|---|---|
 | Solution | Applications that people use | `apps/` (the example app) |
-| Agentic | A harness that talks to a language model and calls tools | bring your own (any MCP client), `apps/` later |
+| Agentic | A harness that talks to a language model and calls tools | `apps/app` (the chat of the example app), or bring your own (any MCP client) |
 | Tool | Time series, events and cards over REST and MCP | `source/*.Timeseries.Api`, `source/*.Events.Api`, `apps/` (cards) |
 | Data | Adapters, broker, persistence | `source/*.Simulator`, `source/*.Persistence`, broker config in `stacks/` |
 

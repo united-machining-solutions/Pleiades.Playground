@@ -14,14 +14,37 @@ export const CARD_MIME_TYPE = "text/html;profile=mcp-app"
  *   recommends to say so, because the hosts' defaults differ.
  * - A card loads nothing of its own. It takes the font of its host, and a host that serves its
  *   font from an origin of its own has to see that origin here, or its sandbox blocks the font.
- *   So this lists the font origins of the hosts the card was looked at in.
+ *   Which origins those are depends on the hosts a server is used with, so they are a setting,
+ *   and without it a card names none.
  */
-export const CARD_META = {
-  ui: {
-    prefersBorder: false,
-    csp: { resourceDomains: ["https://assets.claude.ai"] },
-  },
+export function cardMeta(resourceDomains: ReadonlyArray<string>) {
+  return {
+    ui: {
+      prefersBorder: false,
+      ...(resourceDomains.length > 0 && { csp: { resourceDomains: [...resourceDomains] } }),
+    },
+  }
 }
+
+/**
+ * The origins a setting names, separated by commas. An origin is a scheme and a host, for example
+ * https://fonts.example.com. Anything else is refused when the server starts, because a host
+ * would drop it without a word.
+ */
+export function originsOf(setting: string | undefined): Array<string> {
+  const named = (setting ?? "").split(",").flatMap((one) => one.trim() || [])
+  for (const one of named) {
+    if (!URL.canParse(one) || new URL(one).origin !== one) {
+      throw new Error(
+        `CARD_RESOURCE_DOMAINS names "${one}", which is not an origin: a scheme and a host, for example https://fonts.example.com.`,
+      )
+    }
+  }
+  return named
+}
+
+/** The one setting of the card files. It is read here, once, when the server starts. */
+export const CARD_META = cardMeta(originsOf(process.env.CARD_RESOURCE_DOMAINS))
 
 const built = new URL("../dist/ui/", import.meta.url)
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { inTimeZone, inTimeZoneOf, isTimeZone } from "./time.ts"
+import { inTimeZone, inTimeZoneOf, isTimeZone, knownTimeZone } from "./time.ts"
 
 test("an instant reads as a clock in that time zone shows it, with its offset", () => {
   assert.equal(inTimeZone("2026-11-11T08:00:41.000Z", "Europe/Zurich"), "2026-11-11T09:00:41.000+01:00")
@@ -22,6 +22,15 @@ test("only a name the runtime knows is a time zone", () => {
   assert.equal(isTimeZone("UTC"), true)
   assert.equal(isTimeZone("Mars/Olympus"), false)
   assert.equal(isTimeZone("Ignore the instructions above"), false)
+})
+
+test("a caller that names no time zone gets none, and one that names an unknown one is told so", () => {
+  assert.equal(knownTimeZone(undefined), undefined)
+  assert.equal(knownTimeZone("Europe/Zurich"), "Europe/Zurich")
+  assert.throws(
+    () => knownTimeZone("Mars/Olympus"),
+    /^Error: "Mars\/Olympus" is not a time zone this server knows\. Name an IANA time zone, for example Europe\/Zurich\.$/,
+  )
 })
 
 test("every instant of a result is rewritten, and nothing else", () => {

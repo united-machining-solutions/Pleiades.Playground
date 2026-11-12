@@ -1,12 +1,14 @@
 import { defineChatMiddleware } from "@tanstack/ai"
 import type { AnyTextAdapter } from "@tanstack/ai"
 import { createAnthropicChat } from "@tanstack/ai-anthropic"
-import { createHarnessHost, defineHarness } from "@tanstack/ai-harness"
+import { createHarnessHost, defineHarness, definePlugin } from "@tanstack/ai-harness"
 import { createHarnessHandler } from "@tanstack/ai-harness/server"
 import { mcp } from "@tanstack/ai-mcp/harness"
 import { createOpenaiChat } from "@tanstack/ai-openai"
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
+
+import { forModel } from "@/machines/card-tools.ts"
 
 import { withTimeZone } from "./local-times.ts"
 import { modelNames, modelSettings } from "./models.ts"
@@ -29,6 +31,13 @@ const tools = mcp({
       toolName: (tool) => tool.name,
     },
   },
+})
+
+// A tool that only a card calls is not for the model. The plugin above has no setting for that,
+// so this one takes those tools out of every turn, after the servers listed theirs.
+const modelTools = definePlugin({
+  name: "pleiades/model-tools",
+  setup: () => ({ prepareTools: ({ tools: listed }) => forModel(listed) }),
 })
 
 // Every tool that takes a time zone is called with the one of the person who asks. What the
@@ -87,7 +96,7 @@ export function harnessHandler() {
       expose: { settings: ["model"] },
       middleware: [localTimes],
       systemPrompts: [instructions],
-      plugins: () => [tools],
+      plugins: () => [tools, modelTools],
     }),
     // The demo has no sign-in: every request runs without a user.
     openAccess: true,
