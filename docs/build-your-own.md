@@ -3,7 +3,7 @@
 Add something of your own to the demo. With Claude Code in this repository, type `/build-your-own` and say
 what you would like to see or know. The agent asks one question, looks what the stack already has, proposes
 the smallest thing that shows it, and builds it on a branch of your own. The recipes are skills, and any
-other agent can follow them too.
+other agent can follow them too. If your computer is not ready yet, type `/setup` first.
 
 ![Five steps from the bottom up, each with its folder and its language, and beside each step what one value
 looks like there. A source, a simulator under source/ or an adapter of your own, publishes one value to the
@@ -19,6 +19,7 @@ missing.
 
 | Your idea | Recipe |
 |---|---|
+| Your computer is not ready yet | [`setup`](../.claude/skills/setup/SKILL.md) |
 | You do not know yet where it starts | [`build-your-own`](../.claude/skills/build-your-own/SKILL.md) |
 | A screen people open, made of answers that exist | [`create-page`](../.claude/skills/create-page/SKILL.md) |
 | An answer that does not exist yet, to data that does | [`create-card`](../.claude/skills/create-card/SKILL.md) |

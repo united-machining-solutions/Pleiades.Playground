@@ -58,6 +58,8 @@ All notable changes are documented here. The format follows
   the stack already has and takes the recipe that fits; `create-page`, `create-card` and `add-source` are the
   recipes, each with the files it touches and the checks that say it is done. They load the skills of
   shadcn/ui and of the TanStack packages first; `@tanstack/intent` is a development dependency for that.
+  `setup` leads a person who has never done it through getting a computer ready, in three levels: see the
+  demo, build, chat.
 - For coding agents: shadcn/ui is named as the design system of the user interface (`AGENTS.md`, and a line
   in the pull request template). The agent skill of shadcn/ui (`.claude/skills/shadcn`) and the MCP server of
   its CLI (`.mcp.json`) come with the repository, so an agent reads the docs of a component before it writes

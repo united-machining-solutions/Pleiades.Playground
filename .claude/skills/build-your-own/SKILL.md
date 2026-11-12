@@ -24,7 +24,8 @@ idea starts at the lowest step that is missing.
 ## 1. See that the stack runs
 
 `docker compose ps -a`: every service is healthy. If not, ask, then `docker compose up -d --build --wait`. If
-Docker is missing or not started, say so and stop: nothing here works without it.
+Docker is missing or not started, the skill `setup` leads the person through it: nothing here works without
+it.
 
 Nothing else is needed to look and to talk. What it takes to build, you check in step 5.
 
@@ -104,7 +105,9 @@ Then wait for a yes. If the person changes the idea, go back to step 3.
 
 ## 5. Build it
 
-First see that this computer can build. Do not install anything without a yes.
+First see that this computer can build. Do not install anything without a yes. These three are for
+TypeScript, which a page and a card are written in; a source in another language needs the tools of that
+language instead.
 
 | Check | How | If it fails |
 |---|---|---|
@@ -112,8 +115,9 @@ First see that this computer can build. Do not install anything without a yes.
 | pnpm | Ask first, then `pnpm --version`: it answers with the version `package.json` names. The first call may download pnpm. | If the command is missing: `npm install --global corepack`, then `corepack enable pnpm`. Node.js no longer brings Corepack from version 25. If pnpm still does not answer, stop and say so. |
 | The packages | `node_modules/` is there | Ask, then `pnpm install`. |
 
-When you stop here, say in one sentence what is missing and what to ask a helper for. The idea is not lost:
-say that you will build it as proposed once the computer is ready.
+When you stop here, say in one sentence what is missing and what to ask a helper for. The skill `setup` has
+the steps and the sentences to pass on. The idea is not lost: say that you will build it as proposed once
+the computer is ready.
 
 Then:
 

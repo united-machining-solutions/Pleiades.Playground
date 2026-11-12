@@ -6,7 +6,9 @@ How to work on this repository with Claude Code. Most of it holds for any coding
 ## Before you start
 
 1. Install the tools from the [development setup](development-setup.md). The agent uses the same commands as
-   you: `git`, `dotnet`, `docker compose` and `gh`.
+   you: `git`, `dotnet`, `docker compose` and `gh`. If you would rather be led through it: start Claude Code
+   in the repository and type `/setup`. It checks each step, does what it may on your yes, and tells you what
+   to ask your IT for.
 2. Sign in to GitHub yourself: `gh auth login`. An agent does not type passwords or tokens, and you do not give
    it any.
 3. Start Claude Code in the root of the repository, so that it reads `CLAUDE.md`:
@@ -52,6 +54,7 @@ smallest thing that shows it. On your yes it builds on a branch of your own and 
 
 Four skills under `.claude/skills/` do this, and Claude Code loads them by itself: `build-your-own` finds the
 step where the idea starts, and `create-page`, `create-card` and `add-source` are the recipes of the steps.
+A fifth, `setup`, gets a computer ready first.
 Each names the files it touches and the checks that say it is done. Before it writes code, a recipe loads the
 skills of the libraries: the one of shadcn/ui above, and those the TanStack packages ship, in the versions the
 workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your-own.md).

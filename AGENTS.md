@@ -34,6 +34,9 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   what to open, what to look at and where it lives in the code, then wait for the person. The chat needs a
   language model: without one, show what the panel says and go on. When a session begins without a task, offer
   the tour once: "Shall I give you a tour of the demo?"
+- A person who has just got the repository, or whose stack, example app or chat does not run: follow the
+  skill `setup` (`.claude/skills/setup/SKILL.md`). Check each step yourself, say what you found, ask before you
+  start or install anything, and where you cannot go on, give the person one sentence to pass on.
 - A person who wants to add a page, a card or a source of data of their own: follow the skill
   `build-your-own` (`.claude/skills/build-your-own/SKILL.md`). Ask what they want to see, look yourself what
   the stack already has, propose the smallest thing that shows it, and on a yes take the recipe of the step
