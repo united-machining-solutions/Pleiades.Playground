@@ -149,10 +149,10 @@ The machine card is also an MCP App: one HTML file that the generative UI backen
 `ui://genui/machine`, so a desktop chat that shows MCP Apps draws the same card next to its answer. How to
 connect such a host is in [The machine card for other hosts](../apps/genui-mcp/README.md#the-machine-card-for-other-hosts).
 
-> **Screenshot missing.** The machine card inside a desktop host was out of reach when this tour was
-> written. Add it as `docs/images/tour/machine-card-in-host.png` and replace this note with the image.
-
-<!-- TODO(tour): ![The machine card of P-04 inside a desktop chat that shows MCP Apps.](images/tour/machine-card-in-host.png) -->
+![A desktop chat with the question "Show machine P-04". Under it the machine card of P-04, drawn by the chat
+from the card file of the backend: in alarm since 15:39 with "Spindle overtemperature, machine stopped", the
+program, and the states of the last eight hours as a band with their sums. Below the card the chat says the
+same in two paragraphs.](images/tour/machine-card-in-host.png)
 
 ## 5. When a machine goes silent
 
