@@ -58,3 +58,8 @@ All notable changes are documented here. The format follows
   now carries its own `ManagedMqttClient`: it reconnects every 10 s, subscribes again on every new connection
   and queues outgoing messages while there is none. Topics, payloads and content types on the broker are
   unchanged.
+
+### Fixed
+
+- `genui-mcp`: a state holds however long ago the machine reported it. A machine that said more than 24 hours
+  ago that it is connected, and has sent only its heartbeat since, was shown as "No data".

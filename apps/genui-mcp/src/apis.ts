@@ -116,6 +116,12 @@ export function inPath(topic: string): string {
   return topic.split("/").map(encodeURIComponent).join("/")
 }
 
+/**
+ * Where a read begins that has no beginning: before every value there is. The Timeseries API
+ * wants a start for every query; the newest value before an instant may be of any age.
+ */
+export const EVER = new Date(0)
+
 /** How the values of a topic are read: the topic, from when to when, and how many of the newest. */
 export type ReadValues = (apis: Apis, topic: string, from: Date, to: Date, newest?: number) => Promise<Array<Series>>
 

@@ -1,7 +1,7 @@
 import { BAND_SLOTS, SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
 import type { Machine, MachineList, MachineShow, Reading, Span, SpanList } from "@pleiades/cards/machine/contract.ts"
 
-import { listTopics, readNumbers, readOpenNotifications, readRaised, readStrings } from "./apis.ts"
+import { EVER, listTopics, readNumbers, readOpenNotifications, readRaised, readStrings } from "./apis.ts"
 import type { Apis, OpenNotification, Sample, Series } from "./apis.ts"
 import { spansBetween, thinned, totalsOf } from "./history.ts"
 import { silences, silentBetween } from "./liveness.ts"
@@ -14,7 +14,10 @@ import { secondsBefore } from "./time.ts"
 
 /** How far back the values are read to find since when a state has lasted. */
 export const WINDOW_SECONDS = 30 * 60
-/** How far back a machine and its open notifications are still looked for. */
+/**
+ * How far back a machine and its open notifications are still looked for. A value has no such
+ * limit: the last one of a topic holds, however long ago the machine reported it.
+ */
 export const HORIZON_SECONDS = 24 * 60 * 60
 /** How many hours back the history of one machine goes, if nobody asks for more or less. */
 export const HISTORY_HOURS = 8
@@ -113,8 +116,9 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
           return currentRun(topicOf(name), samples, silent, true)
         }
         // Without one the topic is quiet, as one is that is published only on a change. The two
-        // values before the window say what held, and whether it began with a change.
-        const [earlier] = await readValues(name)(apis, topicOf(name), horizon, readFrom, 2)
+        // values before the window say what held, and whether it began with a change. They may
+        // be of any age: a machine that runs for days reports its connection once.
+        const [earlier] = await readValues(name)(apis, topicOf(name), EVER, readFrom, 2)
         const before = earlier?.samples ?? []
         return currentRun(topicOf(name), [...before, ...samples], silent, before.length === 2)
       }
@@ -159,12 +163,9 @@ async function readSpans(apis: Apis, serialNumber: string, from: Date, to: Date)
   const topic = (name: ReadingName) => `machines/${serialNumber}/${paths[name]}`
   const read = async (name: ReadingName) =>
     samplesOf(await readValues(name)(apis, topic(name), readFrom, to), topic(name))
-  /** The values of a reading, and before them the one that held where the history begins. */
+  /** The values of a reading, and before them the one that held where the history begins, however old. */
   const readWithHeld = async (name: ReadingName) => {
-    const [held, samples] = await Promise.all([
-      readValues(name)(apis, topic(name), secondsBefore(readFrom, HORIZON_SECONDS), readFrom, 1),
-      read(name),
-    ])
+    const [held, samples] = await Promise.all([readValues(name)(apis, topic(name), EVER, readFrom, 1), read(name)])
     return [...samplesOf(held, topic(name)), ...samples]
   }
 

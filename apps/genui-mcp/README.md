@@ -113,8 +113,9 @@ for example as an entry in the configuration file of the Claude desktop app:
 The [MQTT binding](../../contracts/mqtt/README.md) has no quality field: whether values are current is told
 by `Connection/State` and `Connection/Heartbeat`. This server reads it so:
 
-- **A value holds until the next one of its topic.** A machine may publish its state only when the state
-  changes; a simulator repeats it every few seconds. Both read the same.
+- **A value holds until the next one of its topic**, however long that takes. A machine may publish its state
+  only when the state changes, and one that runs for days says once that it is connected; a simulator repeats
+  it every few seconds. Both read the same.
 - **Every value is a sign of life**, and the heartbeat is one that is nothing else. A machine that gave no sign
   for more than 30 seconds is silent: it has no data, whatever its last values say.
 - **A silence ends a run.** What a value was while the machine was silent is not known, so "since" is the
