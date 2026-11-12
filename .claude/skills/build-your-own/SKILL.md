@@ -18,80 +18,109 @@ idea starts at the lowest step that is missing.
 - One question at a time. Do not ask what you can look up.
 - Ask about the goal, never about the build. No "page or card?", no "which route?". The words MCP, tool,
   route, contract, schema and topic stay out of your questions. Use them only if the person does.
+- Do not ask about details. Put what you assumed into your proposal, so that the person can correct it.
 - Say in one sentence what you are about to do, before you do it.
 
-## 1. Check the ground
+## 1. See that the stack runs
 
-Look, without asking, and fix one thing at a time. Ask before you start or install anything.
+`docker compose ps -a`: every service is healthy. If not, ask, then `docker compose up -d --build --wait`. If
+Docker is missing or not started, say so and stop: nothing here works without it.
 
-| Check | How | If it fails |
-|---|---|---|
-| The stack runs | `docker compose ps`: every service is healthy | Ask, then `docker compose up -d --build --wait`. If Docker is missing or not started, say so and stop. |
-| The tools for TypeScript are there | `node --version` is the version of `.nvmrc`, `pnpm --version` answers | Point to the [development setup](../../../docs/development-setup.md): Node.js, then `corepack enable pnpm`. |
-| The packages are installed | `node_modules/` is there | Ask, then `pnpm install`. |
-| Where the work goes | `git branch --show-current` | Nothing yet. You make a branch in step 5. |
-
-`.env` is optional: the demo needs no secret. Only the chat needs the key of a language model. If the idea is
-about the chat, check that the file is there. Never open it, never print it, never ask for a key: the person
-sets it, see "Which model answers" in the map.
-
-If a check fails and you cannot fix it, stop. Say in one sentence what is missing and what to ask a helper
-for. Do not work around it.
+Nothing else is needed to look and to talk. What it takes to build, you check in step 5.
 
 ## 2. Ask the one question
 
 > What would you like to see or know at the end? Say it the way you would say it to a colleague, for
 > example: "Which machine stood still the longest yesterday?"
 
-Skip the question if the person has said it already. If the answer names a solution ("a dashboard", "a
-chart"), ask once what they want to learn from it. Then stop asking.
+Skip the question if the person has said what they want to know. If they named a solution instead of a goal
+("a dashboard", "a chart"), at the start or as their answer, ask once what it should tell them:
+
+> What should it tell you? What would you look for on it first?
+
+Then stop asking.
 
 ## 3. Look for yourself
 
-Go down the steps of the map and stop at the first one that is missing.
+One command shows what the stack has: the pages, the answers, the stored values, the notifications, and
+whether the chat has a language model. It only reads, and it runs with any Node.js from version 18.
 
-1. **Is it shown already?** The pages are the files under `apps/app/src/routes/`. The chat answers with
-   every tool of the generative UI backend.
-2. **Is there an answer?** The tools are listed in [`apps/genui-mcp`](../../../apps/genui-mcp/README.md#tools),
-   the cards in [`packages/cards`](../../../packages/cards/README.md). The running backend lists its tools
-   itself:
+```bash
+node .claude/skills/build-your-own/look.mjs
+```
 
-   ```bash
-   curl -fsS -X POST http://localhost:5520/mcp \
-     -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
-     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-   ```
+Without Node.js, read the same from the files: the routes under `apps/app/src/routes/`, the tools in
+[`apps/genui-mcp`](../../../apps/genui-mcp/README.md#tools), the topics in
+[`contracts/mqtt`](../../../contracts/mqtt/README.md).
 
-3. **Is the data there?** The values the stack has stored: `GET http://localhost:5500/topics` with
-   `startTime` and `stopTime` in ISO 8601, UTC, for the last ten minutes. The notifications: the Events API,
-   <http://localhost:5510/>. What a machine publishes is listed in
-   [`contracts/mqtt`](../../../contracts/mqtt/README.md).
+To read one answer as it is, call its tool:
 
-| You found | Then | Recipe |
+```bash
+node .claude/skills/build-your-own/look.mjs call genui_machine_show machine=P-04
+```
+
+Then take the first row that is true, from the top:
+
+| What is true | Then | Recipe |
 |---|---|---|
-| A page or the chat shows it | Nothing to build. Name the address to open, or the question to ask the chat. | none |
-| An answer exists, and no place shows it | A page | `create-page` |
-| The data is there, and nothing answers the question | A card, with the tool that answers | `create-card` |
-| The data is not in the stack | A source, then a card that shows it | `add-source` |
+| A page shows it, or a tool returns it as it is | Nothing to build | none |
+| Tools return what is needed, and no place shows it together | A page | `create-page` |
+| The stored values or the notifications hold it, and no tool returns it | A card, with the tool that answers | `create-card` |
+| The stack does not have the data | A source, then a card that shows it | `add-source` |
+
+Where the rows meet:
+
+- "As it is" means that nothing is left to add up, compare or put in order. A language model must not do
+  that, and a page must not either. If the answer needs it, it is a card.
+- A tool counts for the chat only if the chat has a language model. The command above says whether it has.
+- Read the limits of an answer that exists, for example how far back it looks. If the idea needs more than
+  that, it is a card.
 
 ## 4. Say it back and wait
 
-One or two sentences: what you found, what you will build, where it will appear. For example:
+Short, two to four sentences: what you found, what you will build, where it will appear, and what you
+assumed. For example:
 
-> The stack knows every warning, but no page lists them. I would add a page "Warnings" to the example app
-> that lists the open warnings of all machines, newest first. Shall I?
+> The stack knows the open warnings of every machine, but no page lists them: Home shows one per machine. I
+> would add a page "Warnings" to the example app that lists them machine by machine. It shows the warnings
+> of the last 24 hours that have not gone. Shall I?
 
-Propose the smallest version: one question answered, with what the stack has today. Leave out filters,
-settings and a second view, and say that they can come next. Then wait for a yes. If the person changes the
-idea, go back to step 3.
+- **The smallest version.** One question answered, with what the stack has today. Leave out filters,
+  settings and a second view, and say that they can come next.
+- **What it leaves out.** Say the limit that matters: how far back it looks, what is not counted. The
+  machines of the demo are simulated: if their values cannot answer the question for real, say that too.
+- **Nothing to build.** Give the answer itself if you have read it, and say where to see it: the address to
+  open, or the question to ask the chat. Then ask whether that is what they were looking for.
+- **A source.** It is the bigger build, so say more: the stack does not have the data, a new source needs the
+  agreement of the maintainers before it can be merged, and you need to know where the values come from.
+  `add-source` asks for the rest.
+
+Then wait for a yes. If the person changes the idea, go back to step 3.
 
 ## 5. Build it
+
+First see that this computer can build. Do not install anything without a yes.
+
+| Check | How | If it fails |
+|---|---|---|
+| Node.js | `node --version` is the version of `.nvmrc` | Say which version is there and which is needed, and point to the [development setup](../../../docs/development-setup.md). Stop: the person or a helper installs it. |
+| pnpm | Ask first, then `corepack enable pnpm` and `pnpm --version`. The first call downloads pnpm. | If it does not answer, stop and say so. Do not look for a way around it. |
+| The packages | `node_modules/` is there | Ask, then `pnpm install`. |
+
+When you stop here, say in one sentence what is missing and what to ask a helper for. The idea is not lost:
+say that you will build it as proposed once the computer is ready.
+
+Then:
 
 1. Make a branch, unless the person is on one of their own: `git switch -c feat/<short-name>`. Never work on
    `main`.
 2. Follow the recipe: the skill `create-page`, `create-card` or `add-source`, each a `SKILL.md` in a folder
    next to this one. After `add-source`, go on with `create-card`: a source is seen once a card shows it.
 3. Touch only what the recipe names. If the idea needs more, stop and say what, and why.
+
+`.env` is not needed to build: the demo needs no secret. Only the chat needs the key of a language model.
+Never open the file, never print it, never ask for a key: the person sets it, see "Which model answers" in
+the map.
 
 ## 6. Show it and hand over
 

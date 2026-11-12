@@ -88,9 +88,7 @@ Run the checks. Do not assume them.
 - You have called the tool and read its result:
 
   ```bash
-  curl -fsS -X POST http://localhost:5520/mcp \
-    -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
-    -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"<tool>","arguments":{}}}'
+  node .claude/skills/build-your-own/look.mjs call <tool> <key>=<value>
   ```
 
   The text says the answer in words, and one number of it is right against the stored values: check it by

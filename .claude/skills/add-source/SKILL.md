@@ -17,9 +17,9 @@ The example of [the map](../../../docs/build-your-own.md#a-source): the outside 
 
 ## 1. Is it missing?
 
-List what the stack has stored: `GET http://localhost:5500/topics` with `startTime` and `stopTime` in ISO
-8601, UTC. Read the example topics in [`contracts/mqtt`](../../../contracts/mqtt/README.md). If the value is
-there under another name, there is nothing to add: take `create-card`.
+List what the stack has stored in the last ten minutes: `node .claude/skills/build-your-own/look.mjs`. Read
+the example topics in [`contracts/mqtt`](../../../contracts/mqtt/README.md). If the value is there under
+another name, there is nothing to add: take `create-card`.
 
 ## 2. Agree the topic, before any code
 
@@ -62,7 +62,8 @@ is new. Never a service that is there.
 Run the checks. Do not assume them.
 
 - `docker compose up -d --build --wait`: every container is healthy.
-- The Timeseries API lists the new topic, and one value of it is right against the source, with its unit and
-  its time: check it by hand in the Swagger UI, <http://localhost:5500/>.
+- The stack has stored the new topic: `node .claude/skills/build-your-own/look.mjs` lists it. One value of
+  it is right against the source, with its unit and its time: check it by hand in the Swagger UI,
+  <http://localhost:5500/>.
 - The diff holds no value of a key.
 - Then show it: `create-card`.
