@@ -12,8 +12,8 @@ checks.
 
 If the data is not in the stack, this is the wrong recipe: take `add-source` first.
 
-The example: the alarms of one machine over the last eight hours. The Events API has them, and no tool answers
-that question yet.
+The example: the alarms of one machine over the last eight hours, each alarm once: how often it was raised,
+for how long in total, and when last. The Events API has every one of them, and no tool sums them up.
 
 ## Before you write code
 
@@ -32,8 +32,8 @@ that question yet.
 
    The first is for the tool, the second for how a chat draws the result of a tool.
 4. The skill `shadcn` (`.claude/skills/shadcn/`), and the docs of every component before you use it:
-   `pnpm --filter @pleiades/app exec shadcn docs <name>`. The command names
-   the page of the docs: read that page.
+   `pnpm --filter @pleiades/app exec shadcn docs <name>`. The command names the page of the docs: read that
+   page. Use the CLI this workspace pins, as here, also where the skill of shadcn/ui writes `shadcn@latest`.
 
 No library skill covers the agent harness of the chat. What you need of it is in
 [`apps/app`: What is where](../../../apps/app/README.md#what-is-where), under `src/chat/`: which file gives
@@ -55,11 +55,16 @@ the language model its tools, and which file says what the app draws for which t
 
 - `packages/cards/src/<name>/`: a new folder with the contract, the component and their tests, and a row in
   the table of `packages/cards/README.md`.
-- `apps/genui-mcp/src/`: the tool in `server.ts`, what computes it in a file of its own with tests, and a
-  row in the table of `apps/genui-mcp/README.md`.
+- `apps/genui-mcp/src/`: the tool in `server.ts`, and what computes it in a file of its own with tests. One
+  more reader in `apis.ts`, if the tool needs a query of the two APIs that is not there, checked like the
+  ones there. The name of the tool in `guide.ts`, the guide of the server, and a row in the table of
+  `apps/genui-mcp/README.md`.
 - `contracts/mcp/README.md`: the name of the tool. A contract changes with an issue first: on your own branch
   add the row, and say in your hand-over that the pull request needs the issue.
-- `apps/app/src/chat/`: the file that says what the app draws for which tool.
+- `apps/app/src/chat/`: where the app names what it draws for which tool, and where it draws it.
+- `apps/app/src/machines/get-machines.ts`: one server function, only if the card fetches a series with a tool
+  of its own.
+- `packages/cards/src/ui/`: a shadcn/ui component the card needs and the catalogue does not have yet.
 - `apps/genui-mcp/ui/`: the card file for other hosts, and its entry in the build there.
 
 Not the two APIs, not `source/`, not a card that is there. A page that shows the card all the time is the
@@ -73,8 +78,8 @@ next recipe, `create-page`.
    `apps/genui-mcp/src/apis.ts`, computes, and returns two things: a few lines of text for a language model,
    and the values for the card. Test what it computes with fixed values, as the tests next to it do.
 4. Write the component with the inferred type of the contract as its properties. Build it from the shadcn/ui
-   components under `packages/cards/src/ui/`; add a missing one with `shadcn add`. Use the composition of
-   its docs whole.
+   components under `packages/cards/src/ui/`. Add a missing one there, not into the app: `shadcn add` takes
+   the folder with `--path`. Use the composition of its docs whole.
 5. In the app, draw the component where the result of the tool arrives. The chat then shows the card as soon
    as the language model calls the tool.
 6. Add the card file for other hosts. If you leave it out, say so: the card then shows in the example app
@@ -96,4 +101,7 @@ Run the checks. Do not assume them.
   hand in the Swagger UI of the API it comes from.
 - The chat answers the question with the card. That needs a language model. Without one, say so, and show
   the card by the call above or on a page.
+- You have looked at the card: its values are those of the call above, nothing runs over, an empty answer
+  says that it is empty. Every check before this one passes on text alone. Without a browser, say that nobody
+  has seen the card.
 - The diff holds only what is under "You touch".

@@ -80,8 +80,11 @@ Where the rows meet:
 
 ## 4. Say it back and wait
 
-Short, two to four sentences: what you found, what you will build, where it will appear, and what you
-assumed. For example:
+First read the recipe you are about to take, at least its rules and what it touches. A proposal the recipe
+does not allow costs the person a second question.
+
+Then say it, short, in two to four sentences: what you found, what you will build, where it will appear, and
+what you assumed. For example:
 
 > The stack knows the open warnings of every machine, but no page lists them: Home shows one per machine. I
 > would add a page "Warnings" to the example app that lists them machine by machine. It shows the warnings
@@ -146,7 +149,8 @@ The key belongs to the person or to their company, and you never see it.
    a model where the line is empty. There is a block for OpenAI, one for Anthropic, and one for any other
    endpoint, a model on their own computer included. What goes where:
    [Language models](../../../apps/app/README.md#language-models). Tell them to keep the key out of this
-   conversation.
+   conversation. A subscription to a chat product, Claude or ChatGPT, is not such a key: the key comes from
+   the API console of the provider and is billed there.
 3. When they say it is done, start the app again, `docker compose up -d app`, and look again: the look-up
    says whether the chat answers now.
 

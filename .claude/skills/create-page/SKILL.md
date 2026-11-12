@@ -29,8 +29,8 @@ Read, in this order:
    what it shows in the address, `not-found-and-errors` if a thing can be missing. Load no more than the page
    needs.
 3. The skill `shadcn` (`.claude/skills/shadcn/`), and the docs of every component before you use it:
-   `pnpm --filter @pleiades/app exec shadcn docs <name>`. The command names
-   the page of the docs: read that page.
+   `pnpm --filter @pleiades/app exec shadcn docs <name>`. The command names the page of the docs: read that
+   page. Use the CLI this workspace pins, as here, also where the skill of shadcn/ui writes `shadcn@latest`.
 
 ## You touch
 
