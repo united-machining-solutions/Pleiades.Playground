@@ -22,8 +22,10 @@ something of your own.
 By hand, with Docker running (the first start downloads and builds for ten minutes or more):
 
 ```bash
-docker compose up -d --build
+docker compose up -d --build --wait
 ```
+
+The command returns when every container is healthy, and fails visibly if one is not.
 
 | Service | URL | What it is |
 |---|---|---|
@@ -35,8 +37,15 @@ docker compose up -d --build
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo; only
-the chat of the example app needs the key of a language model, see
-[Language models](apps/app/README.md#language-models).
+the chat of the example app needs the key of a language model:
+
+```bash
+cp .env.example .env        # then set ANTHROPIC_API_KEY in it, or another block
+docker compose up -d app    # creates the app again with the new settings
+```
+
+A key alone is enough; the names of the models have defaults. `docker compose restart` does not read `.env`
+again. More in [Language models](apps/app/README.md#language-models).
 
 New here? Take the [tour of the demo](docs/tour.md): six stops with screenshots, from the start to where to
 change what. With a coding agent in the repository, ask it: "give me a tour". To add a page, a card or a

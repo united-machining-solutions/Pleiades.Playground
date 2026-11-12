@@ -26,9 +26,6 @@ x-logging-env: &logging-env
 x-simulator: &simulator
   <<: *service
   image: ghcr.io/united-machining-solutions/pleiades.playground.simulator:${PLEIADES_VERSION:-dev}
-  build:
-    <<: *build
-    dockerfile: Pleiades.Playground.Simulator/Dockerfile
   depends_on:
     broker:
       condition: service_healthy
@@ -186,18 +183,24 @@ services:
         condition: service_healthy
     environment:
       GENUI_MCP_URL: http://genui-mcp:8080/mcp
-      # The chat needs at least one language model; everything else works without one.
+      # The chat needs at least one language model; everything else works without one. A block counts
+      # once its key is set, so a key alone is enough: the model names default to those of .env.example.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODELS: ${OPENAI_MODELS:-}
+      OPENAI_MODELS: ${OPENAI_MODELS:-gpt-6-luna,gpt-6.1-sol,gpt-6-astra}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      ANTHROPIC_MODELS: ${ANTHROPIC_MODELS:-}
+      ANTHROPIC_MODELS: ${ANTHROPIC_MODELS:-claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5,claude-fable-5-2}
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODELS: ${LLM_MODELS:-}
 
   # One simulator per machine. The serial number is the machine id in every topic.
+  # All three run the same image. Only the first one builds it, or pulls it, so that happens once and not
+  # three times; the other two take the image that is then on this computer (pull_policy: never).
   simulator-p-04:
     <<: *simulator
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Simulator/Dockerfile
     environment:
       <<: *logging-env
       Config__SerialNumber: P-04
@@ -206,6 +209,7 @@ services:
 
   simulator-p-07:
     <<: *simulator
+    pull_policy: never
     environment:
       <<: *logging-env
       Config__SerialNumber: P-07
@@ -214,6 +218,7 @@ services:
 
   simulator-m-02:
     <<: *simulator
+    pull_policy: never
     environment:
       <<: *logging-env
       Config__SerialNumber: M-02

@@ -1,17 +1,19 @@
 import { createServerFn } from "@tanstack/react-start"
 
-import { modelNames, modelSettings } from "./models.ts"
+import { modelNames, modelSettings, settingGaps } from "./models.ts"
 
 export type ChatStatus = {
   configured: boolean
   /** The models a chat can pick, by name. The first one answers until a chat picks another. */
   models: Array<string>
+  /** What a block lacks that was begun, by the names of its settings: "X is set, Y is empty". */
+  gaps: Array<string>
 }
 
 /** Which language models are configured. Their keys never leave the server. */
 export const getChatStatus = createServerFn({ method: "GET" }).handler((): ChatStatus => {
   const models = modelNames(modelSettings(process.env))
-  return { configured: models.length > 0, models }
+  return { configured: models.length > 0, models, gaps: settingGaps(process.env) }
 })
 
 export type ChatEntry = { threadId: string; title: string; titled: boolean }

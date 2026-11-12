@@ -111,6 +111,7 @@ export function ChatSidebar({ chat }: { chat: string }) {
 }
 
 function NoLanguageModel() {
+  const { chatStatus } = root.useLoaderData()
   return (
     <Empty>
       <EmptyHeader>
@@ -119,10 +120,12 @@ function NoLanguageModel() {
         </EmptyMedia>
         <EmptyTitle>No language model configured</EmptyTitle>
         <EmptyDescription>
-          Name at least one model in <code>.env</code> and start the stack again: <code>OPENAI_API_KEY</code> with{" "}
-          <code>OPENAI_MODELS</code>, <code>ANTHROPIC_API_KEY</code> with <code>ANTHROPIC_MODELS</code>, or{" "}
-          <code>LLM_BASE_URL</code> with <code>LLM_MODELS</code> for any OpenAI-compatible endpoint. Home needs no
-          language model.
+          {/* What is missing first, by the names of the settings. */}
+          {chatStatus.gaps.map((gap) => `${gap}. `)}
+          Set one block in <code>.env</code> and start the app again with <code>docker compose up -d app</code>:{" "}
+          <code>ANTHROPIC_API_KEY</code> with <code>ANTHROPIC_MODELS</code>, <code>OPENAI_API_KEY</code> with{" "}
+          <code>OPENAI_MODELS</code>, or <code>LLM_BASE_URL</code> with <code>LLM_MODELS</code> for any
+          OpenAI-compatible endpoint. Home needs no language model.
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

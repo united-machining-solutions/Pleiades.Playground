@@ -86,6 +86,13 @@ All notable changes are documented here. The format follows
   the font origin of one host in the code. Without it a card names none. A host that serves its font from
   an origin of its own needs it set, or the card falls back to a system font there.
 - The images of `genui-mcp` and `app` carry `LICENSE` and `NOTICE` under `/app`.
+- Stack: a key alone enables the chat. `compose.yaml` fills in the model names of `.env.example` for
+  `ANTHROPIC_MODELS` and `OPENAI_MODELS` where the line is missing or empty. Where a block was begun and is
+  not complete, the chat panel names the setting that is empty.
+- Stack: the image of the simulator is built once, by `simulator-p-04`, and no longer once per simulator.
+- `README.md` starts the stack with `--wait` and shows the two lines that enable the chat. The development
+  setup has three more known issues: a download that breaks off, `pnpm` through the path, and a key that
+  `docker compose restart` does not pick up.
 - `app`: the screens are composed as the shadcn/ui docs compose them. In the chat a question is a `Bubble`,
   the tool calls of a stretch are a `Trace`, an error is an `Alert`, and the questions to begin with are a row
   of buttons above the field. Every empty state has its icon. The path of a page is a `Breadcrumb` in the

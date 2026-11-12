@@ -89,6 +89,19 @@ two APIs, and <http://localhost:5600/> shows the example app (on this computer o
 - **The `mongodb` container stays unhealthy.** MongoDB 8.0 does not start on some very recent Linux kernels.
   CI runs the stack on `ubuntu-22.04` for that reason. `MONGODB_VERSION` in `.env` selects another image tag.
 - **A port is in use.** Copy `.env.example` to `.env` and change the port there.
+- **The first build fails with a download that breaks off** (`apk`, NuGet or npm, often behind a VPN or a
+  proxy). Build fewer images at a time:
+
+  ```bash
+  COMPOSE_PARALLEL_LIMIT=2 docker compose up -d --build --wait
+  ```
+
+  If that helps, the cause is the network, not the repository.
+- **`pnpm typecheck`, `pnpm test` or `pnpm build` fail although `pnpm install` worked.** The scripts in the
+  root `package.json` call `pnpm` again, through the path. Open a new terminal and check `pnpm --version`
+  there: it must answer the version `package.json` names. If it does not, run `corepack enable pnpm` again.
+- **The chat still says "No language model configured" after you set a key.** `docker compose restart` does
+  not read `.env` again. Create the app again: `docker compose up -d app`.
 - **A second checkout replaces the containers of the first.** `compose.yaml` fixes the project name
   `pleiades-playground`. To run two checkouts side by side, give the second one its own project name and image
   tag, and other ports in its `.env`:
