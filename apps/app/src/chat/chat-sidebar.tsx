@@ -2,10 +2,22 @@ import { stateOf } from "@pleiades/cards/machine/state.ts"
 import { Card } from "@pleiades/cards/ui/card.tsx"
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react"
 import { Link, getRouteApi, useRouter } from "@tanstack/react-router"
-import { ArrowUpIcon, CheckIcon, ChevronDownIcon, LoaderIcon, MessageSquareIcon, PlusIcon, XIcon } from "lucide-react"
-import { useEffect, useState } from "react"
+import {
+  ArrowUpIcon,
+  BotOffIcon,
+  ChevronDownIcon,
+  CircleAlertIcon,
+  CircleCheckIcon,
+  LoaderCircleIcon,
+  MessageCircleDashedIcon,
+  PlusIcon,
+  XIcon,
+} from "lucide-react"
+import { Fragment, useEffect, useState } from "react"
 import type { FormEvent, KeyboardEvent } from "react"
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -16,10 +28,9 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group"
 import { ItemGroup, ItemSeparator } from "@/components/ui/item"
-import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker"
 import { Message, MessageContent } from "@/components/ui/message"
 import {
   MessageScroller,
@@ -40,14 +51,17 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import { MachineRow } from "@/machines/machine-item.tsx"
 import { ShownMachine } from "@/machines/shown-machine.tsx"
 
 import { Answer } from "./answer.tsx"
 import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
+import { blocksOf, questionOf } from "./blocks.ts"
+import type { Block, CallState } from "./blocks.ts"
 import { chooseChatModel, fetchChatModel } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
-import { machineListOf, machineShowOf, toolLabels } from "./tool-results.ts"
+import { toolLabel } from "./tool-results.ts"
 
 const root = getRouteApi("__root__")
 const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
@@ -75,7 +89,7 @@ export function ChatSidebar({ chat }: { chat: string }) {
         <div className="flex items-center gap-1">
           {chatStatus.configured && chat !== NEW_CHAT && (
             <Button variant="ghost" size="sm" onClick={panel.startNew}>
-              <PlusIcon />
+              <PlusIcon data-icon="inline-start" />
               New chat
             </Button>
           )}
@@ -100,6 +114,9 @@ function NoLanguageModel() {
   return (
     <Empty>
       <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <BotOffIcon />
+        </EmptyMedia>
         <EmptyTitle>No language model configured</EmptyTitle>
         <EmptyDescription>
           Name at least one model in <code>.env</code> and start the stack again: <code>OPENAI_API_KEY</code> with{" "}
@@ -112,7 +129,7 @@ function NoLanguageModel() {
   )
 }
 
-/** The panel before a chat: questions to begin with, and the chats so far. */
+/** The panel before a chat: the chats so far, and questions to begin with above the field. */
 function Start() {
   const { chats, chatStatus } = root.useLoaderData()
   const panel = useChatPanel()
@@ -125,20 +142,7 @@ function Start() {
   return (
     <>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Ask</SidebarGroupLabel>
-          <SidebarMenu>
-            {suggestions.map((question) => (
-              <SidebarMenuItem key={question}>
-                <SidebarMenuButton onClick={() => panel.ask(question)}>
-                  <MessageSquareIcon />
-                  <span>{question}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
-        {chats.length > 0 && (
+        {chats.length > 0 ? (
           <SidebarGroup>
             <SidebarGroupLabel>Chats</SidebarGroupLabel>
             <SidebarMenu>
@@ -151,10 +155,21 @@ function Start() {
               ))}
             </SidebarMenu>
           </SidebarGroup>
+        ) : (
+          <Empty className="h-full">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <MessageCircleDashedIcon />
+              </EmptyMedia>
+              <EmptyTitle>No chats yet</EmptyTitle>
+              <EmptyDescription>Ask what the machines do, or begin with one of the questions below.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
       </SidebarContent>
       <Composer
         placeholder="Ask about the machines"
+        suggestions={suggestions}
         onSend={panel.ask}
         models={chatStatus.models}
         model={model}
@@ -223,73 +238,60 @@ function Conversation({ threadId }: { threadId: string }) {
   return (
     <>
       <div className="min-h-0 flex-1">
-        <MessageScrollerProvider>
+        {/* A new question settles near the top and the answer grows under it; a chat from before
+            opens at its last question. */}
+        <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor">
           <MessageScroller>
             <MessageScrollerViewport>
-              <MessageScrollerContent className="gap-5 p-4">
-                {messages.map((message) => (
-                  // An item paints nothing outside its box, and a card draws its edge as a ring
-                  // around itself: one pixel of room keeps that edge.
-                  <MessageScrollerItem key={message.id} className="p-px">
-                    <Message align={message.role === "user" ? "end" : "start"}>
-                      <MessageContent>
-                        {message.parts.map((part, index) => {
-                          if (part.type === "text") {
-                            return message.role === "user" ? (
-                              <div key={index} className="max-w-[85%] self-end rounded-2xl bg-sidebar-accent px-3.5 py-2">
-                                {part.content}
-                              </div>
-                            ) : (
-                              <Answer key={index} text={part.content} />
-                            )
-                          }
-                          if (part.type === "tool-call") {
-                            const done = message.parts.some(
-                              (other) => other.type === "tool-result" && other.toolCallId === part.id,
-                            )
-                            const label = toolLabels[part.name]
-                            return (
-                              <Marker key={index}>
-                                <MarkerIcon>{done ? <CheckIcon /> : <LoaderIcon className="animate-spin" />}</MarkerIcon>
-                                <MarkerContent>{(done ? label?.done : label?.running) ?? part.name}</MarkerContent>
-                              </Marker>
-                            )
-                          }
-                          if (part.type === "tool-result") {
-                            // The app draws the values of a tool itself: a card from the catalogue,
-                            // or a list with the same rows as Home.
-                            const shown = machineShowOf(part.content)
-                            if (shown) return <ShownMachine key={index} values={shown} />
-                            const list = machineListOf(part.content)
-                            if (!list) return null
-                            return (
-                              <Card key={index} className="gap-0 py-0">
-                                <ItemGroup className="gap-0">
-                                  {list.machines.map((machine, position) => (
-                                    <div key={machine.machine} role="presentation">
-                                      {position > 0 && <ItemSeparator className="my-0" />}
-                                      <MachineRow machine={machine} state={stateOf(machine, list.asOf)} asOf={list.asOf} />
-                                    </div>
-                                  ))}
-                                </ItemGroup>
-                              </Card>
-                            )
-                          }
-                          return null
-                        })}
-                      </MessageContent>
-                    </Message>
-                  </MessageScrollerItem>
-                ))}
+              <MessageScrollerContent aria-busy={isLoading} className="gap-6 p-4">
+                {messages.map((message) => {
+                  if (message.role === "user") {
+                    return (
+                      <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor>
+                        <Message align="end">
+                          <MessageContent>
+                            <Bubble align="end" variant="muted">
+                              <BubbleContent>{questionOf(message.parts)}</BubbleContent>
+                            </Bubble>
+                          </MessageContent>
+                        </Message>
+                      </MessageScrollerItem>
+                    )
+                  }
+                  const blocks = blocksOf(message.parts, isLoading && message === messages.at(-1))
+                  // An answer that has nothing to show yet takes no room.
+                  if (blocks.length === 0) return null
+                  return (
+                    // An item paints nothing outside its box, and a card draws its edge as a ring
+                    // around itself: one pixel of room keeps that edge.
+                    <MessageScrollerItem key={message.id} messageId={message.id} className="p-px">
+                      <Message>
+                        <MessageContent className="gap-3">
+                          {blocks.map((block, index) => (
+                            <AnswerBlock key={index} block={block} />
+                          ))}
+                        </MessageContent>
+                      </Message>
+                    </MessageScrollerItem>
+                  )
+                })}
                 {error && (
-                  <Marker>
-                    <MarkerContent>The language model did not answer: {error.message}</MarkerContent>
-                  </Marker>
+                  <MessageScrollerItem messageId="error">
+                    <Alert>
+                      <CircleAlertIcon />
+                      <AlertTitle>The language model did not answer</AlertTitle>
+                      <AlertDescription>{error.message}</AlertDescription>
+                    </Alert>
+                  </MessageScrollerItem>
                 )}
                 {switchError && (
-                  <Marker>
-                    <MarkerContent>{switchError}</MarkerContent>
-                  </Marker>
+                  <MessageScrollerItem messageId="switch-error">
+                    <Alert>
+                      <CircleAlertIcon />
+                      <AlertTitle>The model was not changed</AlertTitle>
+                      <AlertDescription>{switchError}</AlertDescription>
+                    </Alert>
+                  </MessageScrollerItem>
                 )}
               </MessageScrollerContent>
             </MessageScrollerViewport>
@@ -309,12 +311,62 @@ function Conversation({ threadId }: { threadId: string }) {
   )
 }
 
+const callIcon: Record<CallState, typeof CircleCheckIcon> = {
+  running: LoaderCircleIcon,
+  done: CircleCheckIcon,
+  failed: CircleAlertIcon,
+}
+
+/** One block of an answer: the tool calls of a stretch, a text, a card or a list. */
+function AnswerBlock({ block }: { block: Block }) {
+  switch (block.kind) {
+    case "steps":
+      return (
+        <Trace>
+          {block.calls.map((call) => {
+            const Icon = callIcon[call.state]
+            return (
+              <TraceLine
+                key={call.id}
+                status={call.state === "running" ? "running" : call.state === "failed" ? "error" : undefined}
+              >
+                <TraceIcon>
+                  <Icon className={call.state === "running" ? "animate-spin" : undefined} />
+                </TraceIcon>
+                <TraceTitle>{toolLabel(call.name)[call.state]}</TraceTitle>
+              </TraceLine>
+            )
+          })}
+        </Trace>
+      )
+    case "text":
+      return <Answer text={block.text} />
+    case "machine":
+      return <ShownMachine values={block.values} />
+    case "list":
+      return (
+        <Card className="gap-0 py-0">
+          <ItemGroup className="gap-0">
+            {block.values.machines.map((machine, position) => (
+              <Fragment key={machine.machine}>
+                {position > 0 && <ItemSeparator className="my-0" />}
+                <MachineRow machine={machine} state={stateOf(machine, block.values.asOf)} asOf={block.values.asOf} />
+              </Fragment>
+            ))}
+          </ItemGroup>
+        </Card>
+      )
+  }
+}
+
 /**
  * Where a question is written. With more than one model in the settings it also says which model
- * answers and lets the chat pick another one, after the shadcn pattern "Model Selector".
+ * answers and lets the chat pick another one, after the shadcn pattern "Model Selector". At the
+ * start of the panel the questions to begin with stand above it, after the pattern "Suggestion".
  */
 function Composer({
   placeholder,
+  suggestions: questions = [],
   busy = false,
   onSend,
   models,
@@ -322,6 +374,7 @@ function Composer({
   onModel,
 }: {
   placeholder: string
+  suggestions?: ReadonlyArray<string>
   busy?: boolean
   onSend: (question: string) => void
   models: ReadonlyArray<string>
@@ -348,10 +401,20 @@ function Composer({
   const choice = models.length > 1 && model !== undefined
   return (
     <SidebarFooter className="border-t">
+      {questions.length > 0 && (
+        <div className="flex scroll-fade-x scrollbar-none gap-2 overflow-x-auto overscroll-x-contain">
+          {questions.map((question) => (
+            <Button key={question} variant="outline" size="sm" className="shrink-0" onClick={() => onSend(question)}>
+              {question}
+            </Button>
+          ))}
+        </div>
+      )}
       <form onSubmit={onSubmit}>
         <InputGroup className="bg-background">
           <InputGroupTextarea
             rows={1}
+            aria-label="Message"
             placeholder={placeholder}
             value={text}
             onChange={(event) => setText(event.target.value)}
@@ -363,7 +426,7 @@ function Composer({
               <DropdownMenu>
                 <DropdownMenuTrigger render={<InputGroupButton variant="ghost" aria-label={`Model: ${model}`} />}>
                   {model}
-                  <ChevronDownIcon />
+                  <ChevronDownIcon data-icon="inline-end" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" className="w-auto min-w-48">
                   <DropdownMenuGroup>

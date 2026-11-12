@@ -1,3 +1,4 @@
+import { Skeleton } from "../ui/skeleton.tsx"
 import type { MachineShow, Span, State } from "./contract.ts"
 import { clock, lasting } from "./format.ts"
 import { stateLabel } from "./state.ts"
@@ -37,7 +38,7 @@ export function StateBand({ history, spans }: { history: MachineShow["history"];
         </span>
       </figcaption>
       {/* The sums below say the same in words, so the band itself is skipped by a screen reader. */}
-      {spans === undefined && <div aria-hidden className="h-3 animate-pulse rounded-sm bg-muted" />}
+      {spans === undefined && <Skeleton aria-hidden className="h-3 rounded-sm" />}
       {spans && (
         <div aria-hidden className="flex h-3 overflow-hidden rounded-sm">
           {spans.map((span) => (
