@@ -173,13 +173,11 @@ Then start the app again: `docker compose up -d app`.
 ## The stack in detail
 
 ![The hosts at the top: the example app with its pages and its chat, a language model the chat asks, and another
-host such as a desktop app. Below them the servers that answer over MCP: the generative UI backend with its card
-file and the card catalogue, and beside it, as an example that is not in this repository, a knowledge server
-whose tool finds passages and whose card shows the source. The pages call the generative UI backend; the chat
-and the other host reach every MCP server. A sign for a blocked call stands between the card of one server and
-the other server. The generative UI backend reads the two APIs over REST, and an agent can read the stored
-values over MCP. At the bottom the persistence listens to the MQTT broker and writes to the APIs, and the
-simulators or an adapter of your own publish to the broker.](images/build-your-own/stack.svg)
+host such as a desktop app. Below them the server that answers over MCP: the generative UI backend with its card
+file and the card catalogue. The pages call it, and so do the chat and the other host. The generative UI backend
+reads the two APIs over REST, and an agent can read the stored values over MCP. A sign between the card file
+and the stored values says that a card has no way there. At the bottom the persistence listens to the MQTT
+broker and writes to the APIs, and the simulators or an adapter of your own publish to the broker.](images/build-your-own/stack.svg)
 
 Who calls whom. What is drawn solid is in this repository; what is dashed is outside it, or an example.
 
@@ -192,11 +190,5 @@ Who calls whom. What is drawn solid is in this repository; what is dashed is out
 **A card comes from the server whose tool answered, and it calls only that server.** For the tools that are
 meant for a card, the standard is strict: "Cross-server tool calls are always blocked for app-only tools"
 ([MCP Apps specification](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)).
-So a card does not fetch from the data APIs, or from a second server, by itself. What it needs beyond its
+So a card does not fetch from the data APIs, or from any other server, by itself. What it needs beyond its
 values it asks its own server for, the way the machine card asks for the spans of its band.
-
-**A further source of answers fits beside the generative UI backend**, as an MCP server of its own. The
-knowledge server in the picture is such an example, for manuals; it is not in this repository. An agent calls
-it directly, because there is nothing to compute: the model needs the passages. Its tool can answer with a
-card of its own that shows the source: title, section, excerpt, page. For a question about a machine and its
-manual the model calls both servers and brings the answers together. The cards stay with their servers.

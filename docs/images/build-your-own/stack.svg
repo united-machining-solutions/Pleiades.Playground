@@ -2,12 +2,11 @@
      font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
   <title id="title">The stack in detail: who calls whom, and where a card comes from</title>
   <desc id="desc">At the top the hosts: the example app with its pages and its chat, a language model the chat
-    asks, and another host such as a desktop app. Below them the servers that answer over MCP: the generative
-    UI backend with its card file and the card catalogue, and beside it, as an example that is not in this
-    repository, a knowledge server whose tool finds passages and whose card shows the source. The pages call
-    the generative UI backend; the chat and the other host reach every MCP server. The generative UI backend
-    reads the two APIs over REST. An agent can also read the stored values over MCP. A card calls only its own
-    server: between the card of one server and another server stands a sign for a blocked call. At the bottom the
+    asks, and another host such as a desktop app. Below them the server that answers over MCP: the generative
+    UI backend with its card file and the card catalogue. The pages call it, and so do the chat and the other
+    host. The generative UI backend reads the two APIs over REST. An agent can also read the stored values
+    over MCP. A card calls only its own server: between the card file and the stored values stands a sign
+    that says a card has no way there. At the bottom the
     persistence listens to the MQTT broker and writes to the APIs, and the simulators or an adapter of your own
     publish to the broker.</desc>
   <defs>
@@ -48,7 +47,7 @@
     <text x="736" y="154">shows a card as an MCP App</text>
 
     <!-- The servers that answer. -->
-    <text x="40" y="240">Servers that answer</text>
+    <text x="40" y="240">The server that answers</text>
 
     <rect x="40" y="252" width="400" height="140" rx="10" fill="#ffffff" stroke="#d1d5db"/>
     <text x="56" y="276" font-size="15" font-weight="600" fill="#111827">Generative UI backend</text>
@@ -61,19 +60,11 @@
     <text x="256" y="338" font-size="12.5" font-family="ui-monospace, Consolas, monospace" fill="#111827">packages/cards</text>
     <text x="256" y="358">contract and component</text>
 
-    <rect x="470" y="252" width="240" height="140" rx="10" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
-    <text x="486" y="276" font-size="15" font-weight="600" fill="#111827">A knowledge server</text>
-    <text x="486" y="296" font-style="italic">example, not in this repository</text>
-    <text x="486" y="320">manuals, how-to</text>
-    <text x="486" y="344">its tool finds the passages,</text>
-    <text x="486" y="362">its card shows the source:</text>
-    <text x="486" y="380">title, section, excerpt, page</text>
-
-    <text x="740" y="286" font-size="13" font-weight="600" fill="#111827">A card comes from the server</text>
-    <text x="740" y="304" font-size="13" font-weight="600" fill="#111827">whose tool answered.</text>
-    <text x="740" y="332">The model brings the answers</text>
-    <text x="740" y="350">together. The cards stay with</text>
-    <text x="740" y="368">their servers.</text>
+    <text x="480" y="286" font-size="13" font-weight="600" fill="#111827">A card comes from the server whose tool answered,</text>
+    <text x="480" y="304" font-size="13" font-weight="600" fill="#111827">and it calls only that server.</text>
+    <text x="480" y="332">It does not fetch from the data APIs by itself. What it needs</text>
+    <text x="480" y="350">beyond its values it asks its own server for, the way the</text>
+    <text x="480" y="368">machine card asks for the spans of its band.</text>
 
     <!-- The data. -->
     <text x="40" y="474">Stored and served</text>
@@ -121,16 +112,16 @@
     <text x="790" y="708">a call over MCP</text>
     <circle cx="765" cy="726" r="6.5" fill="#ffffff" stroke="#b91c1c" stroke-width="1.5"/>
     <line x1="760.4" y1="730.6" x2="769.6" y2="721.4" stroke="#b91c1c" stroke-width="1.5"/>
-    <text x="790" y="730">a call the standard blocks</text>
-
-    <!-- A card calls only its own server. -->
-    <text x="256" y="416" font-size="12.5" font-weight="600" fill="#111827">A card calls only its own server.</text>
-    <text x="462" y="416" font-size="12.5">A tool for a card is blocked across servers.</text>
+    <text x="790" y="730">no way for a card</text>
   </g>
+
+  <!-- A card calls only its own server: it has no way to the data itself. -->
   <g>
-    <line x1="440" y1="345" x2="470" y2="345" stroke="#b91c1c" stroke-width="1.5"/>
-    <circle cx="455" cy="345" r="6.5" fill="#ffffff" stroke="#b91c1c" stroke-width="1.5"/>
-    <line x1="450.4" y1="349.6" x2="459.6" y2="340.4" stroke="#b91c1c" stroke-width="1.5"/>
+    <line x1="146" y1="392" x2="146" y2="486" stroke="#b91c1c" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <circle cx="146" cy="439" r="6.5" fill="#ffffff" stroke="#b91c1c" stroke-width="1.5"/>
+    <line x1="141.4" y1="443.6" x2="150.6" y2="434.4" stroke="#b91c1c" stroke-width="1.5"/>
+    <text x="160" y="435" font-size="12" font-weight="600" fill="#374151">a card calls only</text>
+    <text x="160" y="451" font-size="12" font-weight="600" fill="#374151">its own server</text>
   </g>
 
   <!-- Who calls whom. Grey: REST and MQTT. Blue: MCP. -->
@@ -141,10 +132,9 @@
     <path d="M334 174V212H940" stroke="#0369a1"/>
     <line x1="840" y1="174" x2="840" y2="212" stroke="#0369a1"/>
     <line x1="380" y1="212" x2="380" y2="252" stroke="#0369a1" marker-end="url(#ab)"/>
-    <line x1="590" y1="212" x2="590" y2="252" stroke="#0369a1" stroke-dasharray="5 4" marker-end="url(#ab)"/>
     <path d="M940 212V548H440" stroke="#0369a1" stroke-dasharray="5 4" marker-end="url(#ab)"/>
 
-    <line x1="240" y1="392" x2="240" y2="486" stroke="#6b7280" marker-end="url(#ag)"/>
+    <line x1="334" y1="392" x2="334" y2="486" stroke="#6b7280" marker-end="url(#ag)"/>
     <line x1="135" y1="646" x2="135" y2="606" stroke="#6b7280" marker-end="url(#ag)"/>
     <line x1="250" y1="694" x2="230" y2="694" stroke="#6b7280" marker-end="url(#ag)"/>
     <line x1="470" y1="667" x2="440" y2="667" stroke="#6b7280" marker-end="url(#ag)"/>
@@ -156,8 +146,8 @@
     <text x="470" y="204" font-weight="600" fill="#0369a1">MCP</text>
     <text x="502" y="204" font-family="ui-monospace, Consolas, monospace" fill="#6b7280">contracts/mcp</text>
     <text x="690" y="540" text-anchor="middle" fill="#0369a1">raw values, for an agent</text>
-    <text x="250" y="450" font-weight="600" fill="#374151">REST</text>
-    <text x="250" y="468" font-family="ui-monospace, Consolas, monospace" fill="#6b7280">contracts/openapi</text>
+    <text x="344" y="435" font-weight="600" fill="#374151">REST</text>
+    <text x="344" y="451" font-family="ui-monospace, Consolas, monospace" fill="#6b7280">contracts/openapi</text>
     <text x="143" y="630" font-weight="600" fill="#374151">REST</text>
     <text x="455" y="698" text-anchor="middle" font-weight="600" fill="#374151">MQTT</text>
   </g>
