@@ -1,7 +1,8 @@
-# MQTT binding (draft 0.1.0)
+# MQTT binding (draft 0.2.0)
 
-How machine data appears on the broker. This is a working draft for the playground. It follows the umati data
-model referenced in [`../datamodel`](../datamodel/README.md) where that is simple and names every deviation below.
+How machine data appears on the broker, and values about a place. This is a working draft for the playground.
+It follows the umati data model referenced in [`../datamodel`](../datamodel/README.md) where that is simple and
+names every deviation below.
 
 ## Topics
 
@@ -9,12 +10,27 @@ model referenced in [`../datamodel`](../datamodel/README.md) where that is simpl
 machines/{SerialNumber}/umati/<path>     values named by the data model
 machines/{SerialNumber}/vendor/<path>    manufacturer-specific values
 machines/{SerialNumber}/events/<kind>    events, see "Notifications"
+sites/{SiteId}/{Source}/<path>           values about a place, in the names of one source
 ```
+
+The first two levels of a topic say what a value is about, the third says whose names follow.
 
 - `{SerialNumber}` identifies the machine. It contains no `/`, `+` or `#`.
 - `<path>` is the path of the element in the catalogue; every dot and every instance key is one topic level:
   `Channel[1].ChannelState` becomes `Channel/1/ChannelState`.
 - One value per topic. Consumers ignore topics they do not know.
+
+A value that belongs to no machine is about a place:
+
+- `{SiteId}` names the place. It contains no `/`, `+` or `#`, like `{SerialNumber}`.
+- `{Source}` names the source of the values in lower case, for example `weather`. One adapter per source.
+- `<path>` below a source is in PascalCase, one value per topic. Envelope, units and content types are those
+  of a machine.
+- A source says that it is there the way a machine does: with `Connection/State` and `Connection/Heartbeat`
+  below `sites/{SiteId}/{Source}/`. So whether a value is current reads the same for a machine and for a
+  place.
+- A new source below `sites/` adds its rows to "Example topics of a source". A new first level beside
+  `machines` and `sites` is a change to this binding.
 
 ## Value envelope
 
@@ -26,14 +42,15 @@ UTF-8 JSON, one value per message:
 { "timestamp": "2026-11-16T09:15:00.120Z", "value": true }
 ```
 
-- `timestamp`: ISO 8601, UTC, the time of measurement at the source.
+- `timestamp`: ISO 8601, UTC, the time of measurement at the source. It never lies in the future: a forecast
+  is not a value of this binding.
 - `value`: number, string or boolean.
 - `unit`: mandatory for numbers, the name of the SI unit (see "Units").
 - The MQTT 5 content type names the kind of value: `baseunitvaluedto`, `stringvaluedto`, `booleanvaluedto`.
   Without a content type the Timeseries persistence takes the kind from the JSON type of `value`.
 - Known gap: a number without `unit` is currently stored with the unit `one` instead of being rejected.
 - There is no quality field. Whether values are current is told by `Connection/State` and
-  `Connection/Heartbeat` of the machine.
+  `Connection/Heartbeat` of the machine, or of the source of a place.
 
 ## Units
 
@@ -98,3 +115,19 @@ The payload is the notification event of the Events API (see [`../openapi`](../o
 | `umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `joule` |
 | `vendor/Spindle/1/BearingTemperature` | number | `degreeCelsius` |
 | `events/notifications` | notification event | – |
+
+## Example topics of a source
+
+The stack ships no source. The rows show the shape with one example, the outside temperature of a place.
+
+| Topic below `sites/{SiteId}/weather/` | Kind | Unit |
+|---|---|---|
+| `Connection/State` | string | – |
+| `Connection/Heartbeat` | number | `one` |
+| `AirTemperature` | number | `degreeCelsius` |
+
+```text
+sites/demo/weather/Connection/State       { "timestamp": "2026-11-16T09:10:00Z", "value": "Connected" }
+sites/demo/weather/Connection/Heartbeat   { "timestamp": "2026-11-16T09:10:05Z", "value": 4711, "unit": "one" }
+sites/demo/weather/AirTemperature         { "timestamp": "2026-11-16T09:10:00Z", "value": 10.7, "unit": "degreeCelsius" }
+```

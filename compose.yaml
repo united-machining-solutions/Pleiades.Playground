@@ -108,6 +108,8 @@ services:
       Config__MqttSource__ClientId: timeseries-persistence
       Config__Topics__0: machines/+/umati/#
       Config__Topics__1: machines/+/vendor/#
+      # Values about a place, see contracts/mqtt. A first level the binding does not name is not stored.
+      Config__Topics__2: sites/+/#
       Config__CachingTime: "00:00:05"
       Config__TimeseriesApi__Uri: http://timeseries-api:8080
 
