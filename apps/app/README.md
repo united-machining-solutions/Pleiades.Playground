@@ -44,6 +44,17 @@ The models are offered block by block in the order of the table, each block in t
 The first one answers until a chat picks another one in its input field: with a key of Anthropic and the
 names of `.env.example`, that is Claude Haiku. The agent harness keeps that choice with the chat. With one model the field shows no choice. The keys stay on the server.
 
+A model on your own computer goes into the third block:
+
+```bash
+LLM_BASE_URL=http://host.docker.internal:<port>/v1
+LLM_MODELS=<a model your server has>
+```
+
+Then start the app again: `docker compose up -d app`. The app runs in a container, and `localhost` there is
+the container; with Docker Desktop your own computer is `host.docker.internal`. The model must be able to
+call tools: one that cannot answers without data.
+
 **The chat has no sign-in.** The agent harness runs with open access: whoever reaches the port can chat with
 the configured model, at the cost of whoever owns its key, and can list and read every chat. So the demo
 stack publishes the port on this computer only (`APP_BIND`, `127.0.0.1` if unset). To show the app from another

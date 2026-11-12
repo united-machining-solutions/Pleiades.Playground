@@ -57,6 +57,15 @@ All notable changes are documented here. The format follows
 - ADR-0007 records the decisions of the TypeScript part: the three parts and their stack, the harness of the
   example app as the agentic layer, the card as one component in two wrappers, and what a language model
   reads. The layer table in `README.md` names the harness.
+- Build your own (`docs/build-your-own.md`): where an idea starts, in three pictures: the way of a value, who
+  calls whom, and a card and its server. How to use a language model on your own computer is in
+  `apps/app/README.md`.
+- Skills for building on the stack (`.claude/skills/`): `build-your-own` asks a person for the goal, looks what
+  the stack already has and takes the recipe that fits; `create-page`, `create-card` and `add-source` are the
+  recipes, each with the files it touches and the checks that say it is done. They load the skills of
+  shadcn/ui and of the TanStack packages first; `@tanstack/intent` is a development dependency for that.
+  `setup` leads a person who has never done it through getting a computer ready, in three levels: see the
+  demo, build, chat.
 - For coding agents: shadcn/ui is named as the design system of the user interface (`AGENTS.md`, and a line
   in the pull request template). The agent skill of shadcn/ui (`.claude/skills/shadcn`) and the MCP server of
   its CLI (`.mcp.json`) come with the repository, so an agent reads the docs of a component before it writes

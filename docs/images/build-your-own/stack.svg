@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 680" role="img" aria-labelledby="title desc"
+     font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <title id="title">The stack in detail: who calls whom</title>
+  <desc id="desc">Three rows, and every arrow points from the caller to the one it calls. At the top, where a
+    person asks: the example app with its pages, its chat and the language model the chat asks, and beside it
+    another host, such as Claude Desktop, ChatGPT or an editor, that brings a model of its own. In the middle
+    three MCP servers side by side: the generative UI backend, the Timeseries API and the Events API. The
+    example app calls the generative UI backend only. Another host can call the generative UI backend for
+    answers and cards, and the two APIs for raw values. The generative UI backend reads the two APIs over REST.
+    At the bottom, the way in: the simulators or an adapter of your own publish to the MQTT broker, the
+    persistence subscribes to it and writes to the APIs over REST.</desc>
+  <defs>
+    <!-- They point along their line: "auto" turns them. -->
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#0369a1"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#6b7280"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="999" height="679" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+
+  <g font-size="12" fill="#6b7280">
+    <!-- Row one: where a person asks. Two hosts, side by side. -->
+    <text x="40" y="50">Where a person asks</text>
+
+    <rect x="40" y="64" width="520" height="126" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="56" y="88" font-size="15" font-weight="600" fill="#111827">Example app</text>
+    <text x="544" y="88" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">apps/app :5600</text>
+    <rect x="56" y="102" width="150" height="76" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="68" y="124" font-size="13" font-weight="600" fill="#111827">Pages</text>
+    <text x="68" y="144">call the tools and</text>
+    <text x="68" y="160">draw the cards</text>
+    <rect x="218" y="102" width="150" height="76" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="230" y="124" font-size="13" font-weight="600" fill="#111827">Chat</text>
+    <text x="230" y="144">calls the tool</text>
+    <text x="230" y="160">its model picks</text>
+    <!-- The model belongs to the chat: a setting, not a host. -->
+    <rect x="412" y="102" width="132" height="76" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="424" y="124" font-size="13" font-weight="600" fill="#111827">Language model</text>
+    <text x="424" y="144">set in .env:</text>
+    <text x="424" y="160">hosted or local</text>
+
+    <rect x="600" y="64" width="360" height="126" rx="10" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="616" y="88" font-size="15" font-weight="600" fill="#111827">Another host</text>
+    <text x="616" y="112" fill="#374151">Claude Desktop, ChatGPT, an editor: any MCP client</text>
+    <text x="616" y="136">takes the place of the example app,</text>
+    <text x="616" y="152">brings a model of its own,</text>
+    <text x="616" y="168">shows a card if it supports MCP Apps</text>
+
+    <!-- Row two: three MCP servers, side by side. -->
+    <text x="40" y="262">Three MCP servers</text>
+
+    <rect x="40" y="278" width="620" height="140" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="56" y="302" font-size="15" font-weight="600" fill="#111827">Generative UI backend</text>
+    <rect x="228" y="288" width="38" height="18" rx="9" fill="#ffffff" stroke="#0369a1"/>
+    <text x="247" y="301" text-anchor="middle" font-size="11" font-weight="600" fill="#0369a1">MCP</text>
+    <text x="644" y="302" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">apps/genui-mcp :5520</text>
+    <rect x="56" y="320" width="188" height="82" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="68" y="342" font-size="13" font-weight="600" fill="#111827">Tools</text>
+    <text x="68" y="362">read the two APIs and</text>
+    <text x="68" y="378">compute an answer</text>
+    <rect x="256" y="320" width="188" height="82" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="268" y="342" font-size="13" font-weight="600" fill="#111827">Card file</text>
+    <text x="268" y="362">the card as one HTML file,</text>
+    <text x="268" y="378">for other hosts</text>
+    <rect x="456" y="320" width="188" height="82" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="468" y="342" font-size="12.5" font-family="ui-monospace, Consolas, monospace" fill="#111827">packages/cards</text>
+    <text x="468" y="362">contract and component</text>
+    <text x="468" y="378">of each card</text>
+
+    <rect x="720" y="278" width="240" height="140" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="736" y="302" font-size="15" font-weight="600" fill="#111827">Stored values</text>
+    <text x="944" y="302" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">source/*.Api</text>
+    <rect x="736" y="320" width="208" height="36" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="748" y="343" font-size="13" font-weight="600" fill="#111827">Timeseries API</text>
+    <rect x="848" y="329" width="38" height="18" rx="9" fill="#ffffff" stroke="#0369a1"/>
+    <text x="867" y="342" text-anchor="middle" font-size="11" font-weight="600" fill="#0369a1">MCP</text>
+    <text x="932" y="343" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">:5500</text>
+    <rect x="736" y="366" width="208" height="36" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="748" y="389" font-size="13" font-weight="600" fill="#111827">Events API</text>
+    <rect x="848" y="375" width="38" height="18" rx="9" fill="#ffffff" stroke="#0369a1"/>
+    <text x="867" y="388" text-anchor="middle" font-size="11" font-weight="600" fill="#0369a1">MCP</text>
+    <text x="932" y="389" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">:5510</text>
+
+    <!-- Row three: the way in. -->
+    <text x="40" y="470">The way in</text>
+
+    <rect x="40" y="486" width="260" height="46" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="56" y="514" font-size="15" font-weight="600" fill="#111827">Simulators</text>
+    <text x="284" y="514" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">source/*.Simulator</text>
+    <rect x="40" y="546" width="260" height="46" rx="10" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="56" y="574" font-size="15" font-weight="600" fill="#111827">Your adapter</text>
+    <text x="284" y="574" text-anchor="end">any language</text>
+
+    <rect x="400" y="486" width="240" height="106" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="416" y="512" font-size="15" font-weight="600" fill="#111827">MQTT broker</text>
+    <text x="624" y="512" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">:1883</text>
+    <text x="416" y="540">one value per topic,</text>
+    <text x="416" y="556">in SI units</text>
+
+    <rect x="720" y="486" width="240" height="106" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="736" y="512" font-size="15" font-weight="600" fill="#111827">Persistence</text>
+    <text x="736" y="534" font-family="ui-monospace, Consolas, monospace" fill="#374151">source/*.Persistence</text>
+    <text x="736" y="562">stores what the broker carries</text>
+
+    <!-- How to read the lines. -->
+    <line x1="40" y1="626" x2="70" y2="626" stroke="#9ca3af" stroke-width="1.5"/>
+    <text x="78" y="630">in this repository</text>
+    <line x1="220" y1="626" x2="250" y2="626" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="258" y="630">outside it, or yours</text>
+    <line x1="410" y1="626" x2="440" y2="626" stroke="#0369a1" stroke-width="1.5" marker-end="url(#ab)"/>
+    <text x="448" y="630">a call over MCP</text>
+    <line x1="580" y1="626" x2="610" y2="626" stroke="#6b7280" stroke-width="1.5" marker-end="url(#ag)"/>
+    <text x="618" y="630">any other call</text>
+    <text x="40" y="654">Every arrow points from the caller to the one it calls.</text>
+  </g>
+
+  <!-- Who calls whom. Blue: MCP. Grey: everything else. All of them straight. -->
+  <g fill="none" stroke-width="1.5">
+    <line x1="368" y1="140" x2="412" y2="140" stroke="#6b7280" marker-end="url(#ag)"/>
+
+    <line x1="212" y1="190" x2="212" y2="278" stroke="#0369a1" marker-end="url(#ab)"/>
+    <line x1="630" y1="190" x2="630" y2="278" stroke="#0369a1" marker-end="url(#ab)"/>
+    <line x1="840" y1="190" x2="840" y2="278" stroke="#0369a1" marker-end="url(#ab)"/>
+
+    <line x1="660" y1="348" x2="720" y2="348" stroke="#6b7280" marker-end="url(#ag)"/>
+    <line x1="840" y1="486" x2="840" y2="418" stroke="#6b7280" marker-end="url(#ag)"/>
+    <line x1="720" y1="539" x2="640" y2="539" stroke="#6b7280" marker-end="url(#ag)"/>
+    <line x1="300" y1="509" x2="400" y2="509" stroke="#6b7280" marker-end="url(#ag)"/>
+    <line x1="300" y1="569" x2="400" y2="569" stroke="#6b7280" stroke-dasharray="5 4" marker-end="url(#ag)"/>
+  </g>
+  <g font-size="12" fill="#6b7280">
+    <text x="390" y="132" text-anchor="middle">asks</text>
+
+    <text x="222" y="230" font-weight="600" fill="#0369a1">MCP</text>
+    <text x="222" y="246">answers and cards</text>
+    <text x="640" y="230" font-weight="600" fill="#0369a1">MCP</text>
+    <text x="640" y="246">answers and cards</text>
+    <text x="850" y="230" font-weight="600" fill="#0369a1">MCP</text>
+    <text x="850" y="246">raw values</text>
+
+    <text x="690" y="338" text-anchor="middle" font-weight="600" fill="#374151">REST</text>
+    <text x="690" y="366" text-anchor="middle">reads</text>
+    <text x="850" y="448" font-weight="600" fill="#374151">REST</text>
+    <text x="850" y="464">writes</text>
+    <text x="680" y="529" text-anchor="middle" font-weight="600" fill="#374151">MQTT</text>
+    <text x="680" y="557" text-anchor="middle">subscribes</text>
+    <text x="350" y="535" text-anchor="middle" font-weight="600" fill="#374151">MQTT</text>
+    <text x="350" y="551" text-anchor="middle">publish</text>
+  </g>
+</svg>

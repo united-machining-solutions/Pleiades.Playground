@@ -6,7 +6,9 @@ How to work on this repository with Claude Code. Most of it holds for any coding
 ## Before you start
 
 1. Install the tools from the [development setup](development-setup.md). The agent uses the same commands as
-   you: `git`, `dotnet`, `docker compose` and `gh`.
+   you: `git`, `dotnet`, `docker compose` and `gh`. If you would rather be led through it: start Claude Code
+   in the repository and type `/setup`. It checks each step, does what it may on your yes, and tells you what
+   to ask your IT for.
 2. Sign in to GitHub yourself: `gh auth login`. An agent does not type passwords or tokens, and you do not give
    it any.
 3. Start Claude Code in the root of the repository, so that it reads `CLAUDE.md`:
@@ -44,6 +46,19 @@ one of its own:
   `pnpm install` first, and Claude Code asks once whether to trust it. With it the agent searches the registry
   and reads the examples of a component.
 
+## Build something of your own
+
+You have an idea and no plan yet: type `/build-your-own` and say what you would like to see or know. The agent
+checks that the stack runs, asks at most one question, looks what the stack already has, and proposes the
+smallest thing that shows it. On your yes it builds on a branch of your own and shows you the result.
+
+Four skills under `.claude/skills/` do this, and Claude Code loads them by itself: `build-your-own` finds the
+step where the idea starts, and `create-page`, `create-card` and `add-source` are the recipes of the steps.
+A fifth, `setup`, gets a computer ready first.
+Each names the files it touches and the checks that say it is done. Before it writes code, a recipe loads the
+skills of the libraries: the one of shadcn/ui above, and those the TanStack packages ship, in the versions the
+workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your-own.md).
+
 ## How a change goes
 
 1. **Say what you want and what done looks like.** Name the area (`source/…`, `apps/…`, a contract) and the check
@@ -69,6 +84,7 @@ one of its own:
 | You want | Ask for |
 |---|---|
 | A tour of the demo | "Give me a tour." The agent walks you through the [tour](tour.md) stop by stop, in your running stack. It offers the tour itself when a session begins without a task. |
+| Something of your own in the demo | `/build-your-own`, or "I would like to see which machine stood still the longest." The agent finds out whether that is a page, a card or a source, and builds it. |
 | To see the demo | "Start the stack and show me what the simulator publishes for one machine." |
 | A new value | "Add the topic `…` to the simulator and to the MQTT binding, with its SI unit." |
 | To know why a check is red | "Why is pull request 12 red?" The agent reads `gh pr checks` and `gh run view --log-failed`. |
@@ -77,7 +93,9 @@ one of its own:
 
 ## What stays with you
 
-- Secrets. The demo needs none. The chat in the example app needs the key of a language model (`LLM_API_KEY` in
-  `.env`): you set it yourself, and its value stays out of prompts, commits and logs.
+- Secrets. The demo needs none. The chat in the example app needs the key of a language model, in `.env`:
+  `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `LLM_API_KEY` for any other endpoint
+  ([Language models](../apps/app/README.md#language-models)). You set it yourself, and its value stays out of
+  prompts, commits and logs.
 - Publishing: merging, releasing, changing repository settings.
 - The judgement whether a change is right. The agent is fast, and it can be wrong with confidence.
