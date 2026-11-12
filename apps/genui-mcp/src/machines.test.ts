@@ -117,12 +117,26 @@ type Published = Record<string, ReadonlyArray<{ at: string; value: string | numb
 /**
  * The two APIs with what a test published, oldest first. They answer as the real ones do: only
  * with what lies between the two instants of a request, and with the newest values if it names
- * a limit. No notification was raised.
+ * a limit. `raised` says when the machine P-04 raised an error that has not gone.
  */
-function publishing(published: Published) {
+function publishing(published: Published, raised: ReadonlyArray<string> = []) {
   mock.method(globalThis, "fetch", async (input: Parameters<typeof fetch>[0]) => {
     const url = new URL(String(input))
-    if (url.pathname === "/notificationEvents/correlationPairs") return Response.json({ items: [] })
+    if (url.pathname === "/notificationEvents/correlationPairs") {
+      const from = Date.parse(url.searchParams.get("from") ?? "")
+      const to = Date.parse(url.searchParams.get("to") ?? "")
+      const items = (url.searchParams.get("level") === "Error" ? raised : [])
+        .filter((at) => from <= Date.parse(at) && Date.parse(at) <= to)
+        .map((at, index) => ({
+          correlationId: `c-${index}`,
+          mId: "P-04",
+          notificationId: "E-1",
+          title: "Coolant pressure low",
+          timestampRaised: at,
+          timestampGone: null,
+        }))
+      return Response.json({ items })
+    }
     const start = Date.parse(url.searchParams.get("startTime") ?? "")
     const stop = Date.parse(url.searchParams.get("stopTime") ?? "")
     const between = (topic: string) =>
@@ -208,6 +222,27 @@ test("a serial number is what the MQTT binding allows, so a machine that is list
   )
   const shown = await showMachine(apis, "Line 2", 1, now)
   assert.equal(shown.machine.connection.value, "Connected")
+})
+
+test("the state of a machine and the end of its history say the same about an error that stands", async () => {
+  const running = {
+    "machines/P-04/umati/Connection/State": [{ at: hoursAgo(30), value: "Connected" }],
+    "machines/P-04/umati/State/MachineryItemState": [{ at: hoursAgo(30), value: "Executing" }],
+    "machines/P-04/umati/Connection/Heartbeat": heartbeats(9),
+  }
+  const stateAndHistory = async () => {
+    const shown = await showMachine(apis, "P-04", 8, now)
+    return [stateOf(shown.machine, shown.asOf), shown.history.totals.map((total) => total.state)]
+  }
+
+  // Raised 20 hours ago: the list and the history both look back 24 hours and find it.
+  publishing(running, [hoursAgo(20)])
+  assert.deepEqual(await stateAndHistory(), ["alarm", ["alarm"]])
+
+  // Raised 26 hours ago: neither finds it. The history used to, and then contradicted the state.
+  mock.restoreAll()
+  publishing(running, [hoursAgo(26)])
+  assert.deepEqual(await stateAndHistory(), ["running", ["running"]])
 })
 
 test("a machine whose heartbeat stopped has no data, whatever it reported before", async () => {

@@ -123,8 +123,9 @@ by `Connection/State` and `Connection/Heartbeat`. This server reads it so:
 
 ## Known limit
 
-A warning or an error that has stood for more than 24 hours is not in a result, and the history of a machine
-does not show an error that was raised more than 24 hours before the history begins. The Events API returns
+A warning or an error that has stood for more than 24 hours is not in a result: not in the list, not on a
+card and not in the history of a machine. All three look back 24 hours, from now or from where a history
+ends, so the state of a machine and the end of its history say the same. The Events API returns
 the notifications that were raised between two instants; it cannot be asked for the ones that are open. Reading
 every notification of the retention time on each call would be the only way around it here. A filter for open
 notifications in the Events API would solve it.

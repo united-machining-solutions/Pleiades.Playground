@@ -178,8 +178,10 @@ async function readSpans(apis: Apis, serialNumber: string, from: Date, to: Date)
     readWithHeld("itemState"),
     readWithHeld("operationMode"),
     read("heartbeat"),
-    // An error that still stands may have been raised long before the history begins.
-    readRaised(apis, "Error", serialNumber, secondsBefore(from, HORIZON_SECONDS), to),
+    // An error that still stands may have been raised before the history begins. It is looked
+    // for as far back from the end as the list looks for one that has not gone, so the state
+    // of a machine and the end of its history say the same.
+    readRaised(apis, "Error", serialNumber, secondsBefore(to, HORIZON_SECONDS), to),
   ])
   return spansBetween(from.toISOString(), to.toISOString(), { connection, itemState, operationMode, heartbeat, errors })
 }
