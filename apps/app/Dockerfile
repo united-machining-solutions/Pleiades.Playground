@@ -16,6 +16,8 @@ ENV NODE_ENV=production HOST=0.0.0.0 PORT=8080
 EXPOSE 8080
 # .output is self-contained: the server bundle and the static files, no node_modules.
 COPY --from=build /repo/apps/app/.output .output
+# The licence and the notices travel with the image.
+COPY --from=build /repo/LICENSE /repo/NOTICE ./
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
     CMD wget -qO /dev/null http://127.0.0.1:8080/health || exit 1
 USER node

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict"
-import { test } from "node:test"
+import { afterEach, mock, test } from "node:test"
+
+import { stateOf } from "@pleiades/cards/machine/state.ts"
 
 import { silences } from "./liveness.ts"
-import { currentRun, machineOf } from "./machines.ts"
+import { currentRun, listMachines, machineOf, showMachine } from "./machines.ts"
 import { fromMicroseconds } from "./time.ts"
 
 const topic = "machines/P-04/umati/State/MachineryItemState"
@@ -108,4 +110,150 @@ test("a topic without a value yields an empty reading that still names its topic
 
 test("microseconds since 1970 become ISO 8601 in UTC", () => {
   assert.equal(fromMicroseconds(1794321213106000), "2026-11-10T14:33:33.106Z")
+})
+
+type Published = Record<string, ReadonlyArray<{ at: string; value: string | number }>>
+
+/**
+ * The two APIs with what a test published, oldest first. They answer as the real ones do: only
+ * with what lies between the two instants of a request, and with the newest values if it names
+ * a limit. `raised` says when the machine P-04 raised an error that has not gone.
+ */
+function publishing(published: Published, raised: ReadonlyArray<string> = []) {
+  mock.method(globalThis, "fetch", async (input: Parameters<typeof fetch>[0]) => {
+    const url = new URL(String(input))
+    if (url.pathname === "/notificationEvents/correlationPairs") {
+      const from = Date.parse(url.searchParams.get("from") ?? "")
+      const to = Date.parse(url.searchParams.get("to") ?? "")
+      const items = (url.searchParams.get("level") === "Error" ? raised : [])
+        .filter((at) => from <= Date.parse(at) && Date.parse(at) <= to)
+        .map((at, index) => ({
+          correlationId: `c-${index}`,
+          mId: "P-04",
+          notificationId: "E-1",
+          title: "Coolant pressure low",
+          timestampRaised: at,
+          timestampGone: null,
+        }))
+      return Response.json({ items })
+    }
+    const start = Date.parse(url.searchParams.get("startTime") ?? "")
+    const stop = Date.parse(url.searchParams.get("stopTime") ?? "")
+    const between = (topic: string) =>
+      (published[topic] ?? []).filter((one) => start <= Date.parse(one.at) && Date.parse(one.at) <= stop)
+    const topics = Object.keys(published)
+    const numbers = (topic: string) => typeof published[topic]?.[0]?.value === "number"
+    if (url.pathname === "/topics") {
+      const live = topics.filter((topic) => between(topic).length > 0)
+      return Response.json({
+        baseUnitTopics: live.filter(numbers),
+        stringTopics: live.filter((topic) => !numbers(topic)),
+      })
+    }
+    // A topic in the path: its levels, with * for any one of them.
+    const [, kind = "", asked = ""] = /^\/timeseries\/(\w+)\/topics\/(.+)$/.exec(decodeURIComponent(url.pathname)) ?? []
+    const levels = asked.split("/")
+    const matches = (topic: string) => {
+      const own = topic.split("/")
+      return own.length === levels.length && own.every((level, index) => levels[index] === "*" || levels[index] === level)
+    }
+    const limit = Number(url.searchParams.get("limit") ?? Infinity)
+    const series = topics
+      .filter((topic) => matches(topic) && numbers(topic) === (kind === "baseUnitValues"))
+      .map((topic) => {
+        const samples = between(topic).slice(-limit)
+        return {
+          topic,
+          timestamps: samples.map((one) => Date.parse(one.at) * 1000),
+          values: samples.map((one) => one.value),
+        }
+      })
+    return Response.json({ series })
+  })
+}
+
+afterEach(() => mock.restoreAll())
+
+const apis = { timeseriesUrl: "http://timeseries:8080", eventsUrl: "http://events:8080" }
+const now = new Date("2026-11-16T09:30:00.000Z")
+const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 3_600_000).toISOString()
+/** A heartbeat every ten seconds over that many hours, and nothing else. */
+const heartbeats = (hours: number) =>
+  Array.from({ length: hours * 360 + 1 }, (_, index) => ({
+    at: new Date(now.getTime() - (hours * 360 - index) * 10_000).toISOString(),
+    value: index,
+  }))
+
+test("a state that was reported more than a day ago holds, as long as the machine gives signs of life", async () => {
+  // A machine that has run for 25 hours: it said once that it is connected and what it does.
+  publishing({
+    "machines/P-04/umati/Connection/State": [{ at: hoursAgo(25), value: "Connected" }],
+    "machines/P-04/umati/State/MachineryItemState": [{ at: hoursAgo(25), value: "Executing" }],
+    "machines/P-04/umati/State/MachineryOperationMode": [{ at: hoursAgo(25), value: "Automatic" }],
+    "machines/P-04/umati/Connection/Heartbeat": heartbeats(9),
+  })
+
+  const list = await listMachines(apis, now)
+  const [machine] = list.machines
+  assert.equal(list.machines.length, 1)
+  assert.equal(machine?.connection.value, "Connected")
+  assert.equal(machine?.itemState.since, hoursAgo(25))
+  assert.equal(machine && stateOf(machine, list.asOf), "running")
+
+  // The history says the same about every hour of it.
+  const shown = await showMachine(apis, "P-04", 8, now)
+  assert.deepEqual(shown.history.totals, [{ state: "running", seconds: 8 * 3600 }])
+})
+
+test("a serial number is what the MQTT binding allows, so a machine that is listed can be shown", async () => {
+  assert.equal(machineOf("machines/Line 2/umati/Connection/State"), "Line 2")
+  // What the binding forbids names no machine.
+  assert.equal(machineOf("machines/a+b/umati/Connection/State"), undefined)
+  assert.equal(machineOf("machines/a#b/umati/Connection/State"), undefined)
+
+  publishing({
+    "machines/Line 2/umati/Connection/State": [{ at: hoursAgo(1), value: "Connected" }],
+    "machines/Line 2/umati/Connection/Heartbeat": heartbeats(1),
+  })
+  const list = await listMachines(apis, now)
+  assert.deepEqual(
+    list.machines.map((one) => one.machine),
+    ["Line 2"],
+  )
+  const shown = await showMachine(apis, "Line 2", 1, now)
+  assert.equal(shown.machine.connection.value, "Connected")
+})
+
+test("the state of a machine and the end of its history say the same about an error that stands", async () => {
+  const running = {
+    "machines/P-04/umati/Connection/State": [{ at: hoursAgo(30), value: "Connected" }],
+    "machines/P-04/umati/State/MachineryItemState": [{ at: hoursAgo(30), value: "Executing" }],
+    "machines/P-04/umati/Connection/Heartbeat": heartbeats(9),
+  }
+  const stateAndHistory = async () => {
+    const shown = await showMachine(apis, "P-04", 8, now)
+    return [stateOf(shown.machine, shown.asOf), shown.history.totals.map((total) => total.state)]
+  }
+
+  // Raised 20 hours ago: the list and the history both look back 24 hours and find it.
+  publishing(running, [hoursAgo(20)])
+  assert.deepEqual(await stateAndHistory(), ["alarm", ["alarm"]])
+
+  // Raised 26 hours ago: neither finds it. The history used to, and then contradicted the state.
+  mock.restoreAll()
+  publishing(running, [hoursAgo(26)])
+  assert.deepEqual(await stateAndHistory(), ["running", ["running"]])
+})
+
+test("a machine whose heartbeat stopped has no data, whatever it reported before", async () => {
+  publishing({
+    "machines/P-04/umati/Connection/State": [{ at: hoursAgo(25), value: "Connected" }],
+    "machines/P-04/umati/State/MachineryItemState": [{ at: hoursAgo(25), value: "Executing" }],
+    // The last sign of life is an hour old.
+    "machines/P-04/umati/Connection/Heartbeat": [{ at: hoursAgo(1), value: 1 }],
+  })
+  const list = await listMachines(apis, now)
+  const [machine] = list.machines
+  assert.equal(machine?.connection.value, "Connected")
+  assert.equal(machine && stateOf(machine, list.asOf), "no-data")
 })

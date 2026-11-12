@@ -5,7 +5,8 @@
 !pnpm-lock.yaml
 !pnpm-workspace.yaml
 !tsconfig.base.json
-# A card file carries the notices of this repository.
+# The images carry the licence and the notices of this repository, and so does a card file.
+!LICENSE
 !NOTICE
 !apps
 !packages

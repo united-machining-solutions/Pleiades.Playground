@@ -7,7 +7,7 @@ test("without settings the chat has no model", () => {
   assert.deepEqual(modelNames(modelSettings({})), [])
 })
 
-test("every complete block adds its models, in the order of the settings", () => {
+test("every complete block adds its models: Anthropic's first, then OpenAI's, then the other endpoint's", () => {
   const settings = modelSettings({
     OPENAI_API_KEY: "key-a",
     OPENAI_MODELS: "small, large",
@@ -16,7 +16,7 @@ test("every complete block adds its models, in the order of the settings", () =>
     LLM_BASE_URL: "http://localhost:4000/v1",
     LLM_MODELS: "local",
   })
-  assert.deepEqual(modelNames(settings), ["small", "large", "quick", "local"])
+  assert.deepEqual(modelNames(settings), ["quick", "small", "large", "local"])
   assert.deepEqual(settings.openai, { apiKey: "key-a", models: ["small", "large"] })
 })
 

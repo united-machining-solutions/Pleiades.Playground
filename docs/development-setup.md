@@ -41,9 +41,11 @@ Linux: use the packages of your distribution or the installers of [Docker](https
 [.NET](https://learn.microsoft.com/dotnet/core/install/linux), [Node.js](https://nodejs.org/) and the
 [GitHub CLI](https://github.com/cli/cli#installation).
 
-pnpm comes with Node.js through Corepack, in the version `package.json` names:
+pnpm comes through Corepack, in the version `package.json` names. Node.js no longer brings Corepack from
+version 25, so install it first:
 
 ```bash
+npm install --global corepack
 corepack enable pnpm
 ```
 

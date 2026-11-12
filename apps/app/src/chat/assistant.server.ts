@@ -1,12 +1,14 @@
 import { defineChatMiddleware } from "@tanstack/ai"
 import type { AnyTextAdapter } from "@tanstack/ai"
 import { createAnthropicChat } from "@tanstack/ai-anthropic"
-import { createHarnessHost, defineHarness } from "@tanstack/ai-harness"
+import { createHarnessHost, defineHarness, definePlugin } from "@tanstack/ai-harness"
 import { createHarnessHandler } from "@tanstack/ai-harness/server"
 import { mcp } from "@tanstack/ai-mcp/harness"
 import { createOpenaiChat } from "@tanstack/ai-openai"
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
+
+import { forModel } from "@/machines/card-tools.ts"
 
 import { withTimeZone } from "./local-times.ts"
 import { modelNames, modelSettings } from "./models.ts"
@@ -31,6 +33,13 @@ const tools = mcp({
   },
 })
 
+// A tool that only a card calls is not for the model. The plugin above has no setting for that,
+// so this one takes those tools out of every turn, after the servers listed theirs.
+const modelTools = definePlugin({
+  name: "pleiades/model-tools",
+  setup: () => ({ prepareTools: ({ tools: listed }) => forModel(listed) }),
+})
+
 // Every tool that takes a time zone is called with the one of the person who asks. What the
 // browser sent along with the question is the context of the run.
 const localTimes = defineChatMiddleware({
@@ -42,19 +51,19 @@ const localTimes = defineChatMiddleware({
 })
 
 /**
- * The adapter of one model. Each provider gets its own: OpenAI and Anthropic theirs, any other
+ * The adapter of one model. Each provider gets its own: Anthropic and OpenAI theirs, any other
  * endpoint the one for chat completions. Where two blocks name the same model, the earlier one
  * has it.
  *
  * The names come from the settings, not from the lists the adapters know. A name a provider does
  * not have fails at the first question, with the provider's own words.
  */
-function adapterOf(name: string, { openai, anthropic, compatible }: ModelSettings): AnyTextAdapter {
-  if (openai?.models.includes(name)) {
-    return createOpenaiChat(name as Parameters<typeof createOpenaiChat>[0], openai.apiKey)
-  }
+function adapterOf(name: string, { anthropic, openai, compatible }: ModelSettings): AnyTextAdapter {
   if (anthropic?.models.includes(name)) {
     return createAnthropicChat(name as Parameters<typeof createAnthropicChat>[0], anthropic.apiKey)
+  }
+  if (openai?.models.includes(name)) {
+    return createOpenaiChat(name as Parameters<typeof createOpenaiChat>[0], openai.apiKey)
   }
   return openaiCompatibleText(name, {
     baseURL: compatible?.baseURL ?? "",
@@ -87,7 +96,7 @@ export function harnessHandler() {
       expose: { settings: ["model"] },
       middleware: [localTimes],
       systemPrompts: [instructions],
-      plugins: () => [tools],
+      plugins: () => [tools, modelTools],
     }),
     // The demo has no sign-in: every request runs without a user.
     openAccess: true,
