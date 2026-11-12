@@ -29,6 +29,8 @@ COPY --from=build /repo/node_modules node_modules
 COPY --from=build /repo/packages/cards packages/cards
 COPY --from=build /repo/apps/genui-mcp apps/genui-mcp
 COPY --from=cards /repo/apps/genui-mcp/dist apps/genui-mcp/dist
+# The licence and the notices travel with the image. Each package under node_modules keeps its own.
+COPY --from=build /repo/LICENSE /repo/NOTICE ./
 WORKDIR /app/apps/genui-mcp
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
     CMD wget -qO /dev/null http://127.0.0.1:8080/health || exit 1
