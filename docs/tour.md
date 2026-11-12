@@ -23,8 +23,10 @@ One command builds and starts everything. It needs Docker and nothing else, see 
 docker compose up -d --build --wait
 ```
 
-The command returns when the stack is ready, that is when every container reports healthy: the broker, the database, the two APIs with their
-persistence workers, the generative UI backend, the app and one simulator per machine.
+The command returns when the stack is ready, that is when every container reports healthy: the broker, the
+database, the two APIs with their persistence workers, the generative UI backend, the app and one simulator
+per machine. To see the demo without building it, start it from the published images, see
+[Start](../README.md#start).
 
 ```bash
 docker compose ps --format "table {{.Service}}	{{.Status}}"

@@ -71,6 +71,8 @@ All notable changes are documented here. The format follows
   are those of a machine, and a source says that it is there with `Connection/State` and
   `Connection/Heartbeat`. The Timeseries persistence of the stack stores the family (`sites/+/#`). No service
   changed its code, and nothing changes for a machine.
+- The images of `main` can be pulled without signing in, and `README.md` shows the start without a build:
+  `PLEIADES_VERSION=main docker compose up -d --no-build --wait`.
 - For coding agents: shadcn/ui is named as the design system of the user interface (`AGENTS.md`, and a line
   in the pull request template). The agent skill of shadcn/ui (`.claude/skills/shadcn`) and the MCP server of
   its CLI (`.mcp.json`) come with the repository, so an agent reads the docs of a component before it writes
