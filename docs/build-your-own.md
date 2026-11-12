@@ -80,7 +80,8 @@ for the place that draws it, and a row in [`contracts/mcp`](../contracts/mcp/REA
 3. In the app, draw the component where the result of the tool arrives. The card then appears in the chat as
    soon as the model calls its tool, and on a page if you add one.
 4. For other hosts, add a card file under `apps/genui-mcp/ui/`.
-5. A series, anything that grows with time, gets a tool of its own that only the card calls.
+5. A series, anything that grows with time, gets a tool of its own that only the card calls. A card calls
+   only the server it came from: [A card and its server](#a-card-and-its-server).
 
 Three rules keep a card honest. Numbers, order and durations are computed in the tool, never by a language
 model. Every value names the topic or the notification it comes from. What a model reads is short.
@@ -172,23 +173,42 @@ Then start the app again: `docker compose up -d app`.
 
 ## The stack in detail
 
-![The hosts at the top: the example app with its pages and its chat, a language model the chat asks, and another
-host such as a desktop app. Below them the server that answers over MCP: the generative UI backend with its card
-file and the card catalogue. The pages call it, and so do the chat and the other host. The generative UI backend
-reads the two APIs over REST, and an agent can read the stored values over MCP. A sign between the card file
-and the stored values says that a card has no way there. At the bottom the persistence listens to the MQTT
-broker and writes to the APIs, and the simulators or an adapter of your own publish to the broker.](images/build-your-own/stack.svg)
+![Three rows, and every arrow points from the caller to the one it calls. At the top, where a person asks: the
+example app with its pages, its chat and the language model the chat asks, and beside it another host, such as
+Claude Desktop, ChatGPT or an editor, that brings a model of its own. In the middle three MCP servers side by
+side: the generative UI backend, the Timeseries API and the Events API. The example app calls the generative UI
+backend only. Another host can call the generative UI backend for answers and cards, and the two APIs for raw
+values. The generative UI backend reads the two APIs over REST. At the bottom, the way in: the simulators or an
+adapter of your own publish to the MQTT broker, the persistence subscribes to it and writes to the APIs over
+REST.](images/build-your-own/stack.svg)
 
-Who calls whom. What is drawn solid is in this repository; what is dashed is outside it, or an example.
+Who calls whom. Every arrow points from the caller to the one it calls. What is drawn solid is in this
+repository; what is dashed is outside it, or yours.
 
-- **The pages** of the example app call the generative UI backend and draw its cards themselves.
-- **The chat** asks a language model, and the model picks a tool. Today the chat connects to the generative UI
-  backend only.
-- **Another host**, a desktop app or any MCP client, reaches the same servers and shows a card as an MCP App.
-- **The generative UI backend** reads the two APIs over REST. An agent can read them itself, over MCP.
+- **The example app** is one host. Its pages call the tools of the generative UI backend and draw the cards.
+  Its chat sends the question to a language model and calls the tool the model picks. The model is a setting
+  of the chat ([Which model answers](#which-model-answers)); it calls nothing itself.
+- **Another host** takes the place of the example app: Claude Desktop, ChatGPT, an editor, any MCP client. It
+  brings a model of its own, and it shows a card if it supports MCP Apps. A host that runs elsewhere, as
+  ChatGPT does, cannot reach `localhost`: it needs an address of the stack that it can reach.
+- **Three MCP servers** answer. The generative UI backend gives answers: computed, in words, with a card. It
+  reads the two APIs over REST. The two APIs give the stored values as they are. The example app connects to
+  the generative UI backend only; another host can connect to all three
+  ([With an agent of your own](#with-an-agent-of-your-own)).
+- **The way in**: a simulator or an adapter of your own publishes to the broker. The persistence subscribes
+  to the broker and writes every value to the APIs.
+
+## A card and its server
+
+![On the left a host, the example app or any other, with a card in it. On the right two MCP servers, one above
+the other: the generative UI backend, whose tool answered, and any other MCP server, such as the Timeseries API
+or the Events API. The host calls a tool of the generative UI backend, and the answer brings the card. The card
+asks for more only at that server. Between the card and the other MCP server stands a sign: no call to another
+server. The generative UI backend reads the other server itself.](images/build-your-own/card.svg)
 
 **A card comes from the server whose tool answered, and it calls only that server.** For the tools that are
 meant for a card, the standard is strict: "Cross-server tool calls are always blocked for app-only tools"
 ([MCP Apps specification](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)).
-So a card does not fetch from the data APIs, or from any other server, by itself. What it needs beyond its
-values it asks its own server for, the way the machine card asks for the spans of its band.
+So a card does not fetch from the data APIs, or from any other MCP server, by itself. What it needs beyond its
+values it asks its own server for, the way the machine card asks for the spans of its band. What it needs from
+another source, its own server reads.
