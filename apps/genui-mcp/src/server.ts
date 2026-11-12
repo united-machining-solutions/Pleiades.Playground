@@ -12,8 +12,9 @@ import { HISTORY_HOURS, MOST_HOURS, listMachines, listSpans, showMachine } from 
 import { MACHINE_CARD_URI, SPAN_LIST_TOOL } from "./names.ts"
 import { inTimeZoneOf, knownTimeZone } from "./time.ts"
 
-// The MCP server and its tools. Nothing here reads the environment: where the two APIs are comes
-// with each request (see main.ts), so an application can import the type of this server.
+// The MCP server and its tools. Where the two APIs are comes with each request (see main.ts), so
+// an application can import the type of this server. The one setting read on the way is the one
+// of the card files (card-file.ts).
 
 type Context = MCPToolContext<{ apis: Apis }>
 

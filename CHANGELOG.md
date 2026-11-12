@@ -58,6 +58,9 @@ All notable changes are documented here. The format follows
   now carries its own `ManagedMqttClient`: it reconnects every 10 s, subscribes again on every new connection
   and queues outgoing messages while there is none. Topics, payloads and content types on the broker are
   unchanged.
+- `genui-mcp`: the origins a card file may load from are a setting, `CARD_RESOURCE_DOMAINS`, and no longer
+  the font origin of one host in the code. Without it a card names none. A host that serves its font from
+  an origin of its own needs it set, or the card falls back to a system font there.
 
 ### Fixed
 
