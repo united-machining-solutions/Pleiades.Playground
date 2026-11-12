@@ -1,13 +1,13 @@
 import { clock } from "@pleiades/cards/machine/format.ts"
 import { MachineCard } from "@pleiades/cards/machine/machine-card.tsx"
+import { Skeleton } from "@pleiades/cards/ui/skeleton.tsx"
 import { Link, createFileRoute, notFound } from "@tanstack/react-router"
 import { SearchXIcon } from "lucide-react"
 import type { ReactNode } from "react"
 
 import { NoAnswer } from "@/components/no-answer.tsx"
-import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Skeleton } from "@/components/ui/skeleton"
 import { useLive } from "@/hooks/use-live.ts"
 import { getMachine, getMachines, getSpans } from "@/machines/get-machines.ts"
 
@@ -49,29 +49,29 @@ function Machine() {
   )
 }
 
-function Page({ machine, line, children }: { machine: string; line?: string; children: ReactNode }) {
+/** The page of a machine is titled with the machine; the way back is the breadcrumb in the header. */
+function Page({ machine, line, children }: { machine?: string; line?: string; children: ReactNode }) {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">
-          {/* The chat stays open while the page changes. */}
-          <Link to="/" search className="text-muted-foreground hover:text-foreground">
-            Machines
-          </Link>{" "}
-          <span className="text-muted-foreground">/</span> {machine}
-        </h1>
-        {line && <p className="text-sm text-muted-foreground">{line}</p>}
-      </div>
+      {machine && (
+        <div>
+          <h1 className="text-2xl font-semibold">{machine}</h1>
+          {line && <p className="text-sm text-muted-foreground">{line}</p>}
+        </div>
+      )}
       {children}
     </div>
   )
 }
 
-/** A machine the backend does not know. The page says so once and does not ask again. */
+/**
+ * A machine the backend does not know. The page says so once and does not ask again. It has no
+ * title: a title would name a machine that is not there.
+ */
 function NoMachine() {
   const { machine } = Route.useParams()
   return (
-    <Page machine={machine}>
+    <Page>
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon">
@@ -81,10 +81,11 @@ function NoMachine() {
           <EmptyDescription>No machine of that name has published a value in the last 24 hours.</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          {/* The chat stays open while the page changes. */}
-          <Button nativeButton={false} render={<Link to="/" search />}>
+          {/* A link that looks like a button, as the docs of Button want it: a Button would take
+              the role of a link away. The chat stays open while the page changes. */}
+          <Link to="/" search className={buttonVariants()}>
             All machines
-          </Button>
+          </Link>
         </EmptyContent>
       </Empty>
     </Page>

@@ -15,7 +15,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from "@pleiades/cards/ui/skeleton.tsx"
 import {
   Tooltip,
   TooltipContent,
