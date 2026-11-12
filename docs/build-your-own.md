@@ -3,13 +3,24 @@
 How to add something of your own to the demo: a page, a card, or a source of data. The [tour](tour.md) shows
 what is there. This page shows where your idea starts.
 
-![Four steps from the bottom up: a source publishes to the broker, the stack stores the values, a tool computes
-an answer that a card draws, and a page shows it. A page starts at the top step, a card at the step of the card
-and its tool, a source at the bottom step.](images/build-your-own/ladder.svg)
+![Four steps from the bottom up, each with its folder and its language. A source, a simulator under source/ or
+an adapter of your own, publishes to the broker over MQTT as contracts/mqtt says. The .NET services under
+source/ store the values and serve them over REST as contracts/openapi says. A tool in apps/genui-mcp computes
+an answer that a card of packages/cards draws; it is called over MCP as contracts/mcp says. A page in apps/app
+shows the card. A page starts at the top step, a card at the step of the card and its tool, a source at the
+bottom step.](images/build-your-own/ladder.svg)
 
 A value travels up. A source publishes it, the stack stores it, a tool computes an answer from it, a card draws
 the answer, and a page shows the card. Your idea starts at one of three steps. What starts lower needs the
 steps above it too: a source is seen once a card shows it.
+
+The picture is also the map of the repository. Each step names its folder and its language: the two upper
+steps are TypeScript under `apps/` and `packages/`, the two lower ones are .NET under `source/`. Between two
+steps stands how they talk, and the contract under `contracts/` that says how. Whoever keeps a contract can
+replace the step behind it, so the people who work on one step need not know the inside of the next. Not in
+the picture: `compose.yaml` starts every step as a container, and `stacks/` configures the broker. The whole
+list is in the [repository layout](../README.md#repository-layout), and who looks after which area in
+[MAINTAINERS.md](../MAINTAINERS.md).
 
 | Your idea | You build | You touch |
 |---|---|---|
