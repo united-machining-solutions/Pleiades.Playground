@@ -5,7 +5,8 @@ what is there. This page shows where your idea starts.
 
 ![Four steps from the bottom up, each with its folder and its language. A source, a simulator under source/ or
 an adapter of your own, publishes to the broker over MQTT as contracts/mqtt says. The .NET services under
-source/ store the values and serve them over REST as contracts/openapi says. A tool in apps/genui-mcp computes
+source/ store the values and serve them over REST as contracts/openapi says, and over MCP for an agent that
+reads them itself. A tool in apps/genui-mcp computes
 an answer that a card of packages/cards draws; it is called over MCP as contracts/mcp says. A page in apps/app
 shows the card. A page starts at the top step, a card at the step of the card and its tool, a source at the
 bottom step.](images/build-your-own/ladder.svg)
@@ -27,6 +28,7 @@ list is in the [repository layout](../README.md#repository-layout), and who look
 | A screen people open, made of answers that exist | [A page](#a-page) | `apps/app` |
 | An answer that does not exist yet, to data that does | [A card](#a-card) | `packages/cards`, `apps/genui-mcp`, `apps/app` |
 | Data the stack does not have yet | [A source](#a-source) | `contracts/mqtt`, a service of your own, `compose.yaml` |
+| The data in an agent you already use | Nothing: [connect it](#with-an-agent-of-your-own) | the settings of your agent |
 
 Each recipe has the same four parts. The last one is a request for your coding agent, to copy as it stands.
 
@@ -131,6 +133,21 @@ with its source.
 > Add an adapter that publishes the outside temperature of one place to the broker, as `contracts/mqtt` and
 > `docs/build-your-own.md` say. Open an issue for the topic first. Done when the Timeseries API lists the
 > topic and every container is healthy.
+
+## With an agent of your own
+
+Nothing to build. Three parts of the stack are MCP servers, and any MCP client can use them. The entry to copy
+is in [`contracts/mcp`](../contracts/mcp/README.md).
+
+| MCP server | Gives an agent | Address |
+|---|---|---|
+| Timeseries API | the stored values of a topic, as they are | `http://localhost:5500/mcp` |
+| Events API | the notifications, with when they came and when they went | `http://localhost:5510/mcp` |
+| Generative UI backend | answers: computed, in words, with a card | `http://localhost:5520/mcp` |
+
+The two APIs offer over MCP the same queries as over REST. Use them to look at data before a tool answers for
+it: a new source can be read there as soon as it is stored. The chat of the example app connects only to the
+generative UI backend, so its language model reads answers and not raw values.
 
 ## Which model answers
 

@@ -3,7 +3,8 @@
   <title id="title">The way of a value through the repository, and where an idea starts</title>
   <desc id="desc">Four steps from the bottom up, each with its folder and its language. A source, a simulator
     under source/ or an adapter of your own, publishes to the broker over MQTT as contracts/mqtt says. The
-    .NET services under source/ store the values and serve them over REST as contracts/openapi says. A tool in
+    .NET services under source/ store the values and serve them over REST as contracts/openapi says, and over
+    MCP for an agent that reads them itself. A tool in
     apps/genui-mcp computes an answer that a card of packages/cards draws; it is called over MCP as
     contracts/mcp says. A page in apps/app shows the card. A page starts at the top step, a card at the step
     of the card and its tool, a source at the bottom step.</desc>
@@ -40,7 +41,7 @@
     <text x="116" y="304" font-size="17" font-weight="600" fill="#111827">Stored values</text>
     <text x="560" y="304" text-anchor="end" font-size="12">.NET</text>
     <text x="116" y="326" font-family="ui-monospace, Consolas, monospace" fill="#374151">source/*.Persistence, source/*.Api</text>
-    <text x="116" y="346">kept for you: the persistence listens to the broker, the APIs serve</text>
+    <text x="116" y="346">kept for you; the APIs serve them over REST, and over MCP for agents</text>
 
     <rect x="96" y="396" width="484" height="84" rx="10" fill="#ffffff" stroke="#d1d5db"/>
     <text x="116" y="424" font-size="17" font-weight="600" fill="#111827">Source</text>
@@ -74,6 +75,12 @@
     <line x1="668" y1="198" x2="594" y2="198" stroke="#0369a1" stroke-width="1.5" marker-end="url(#to)"/>
     <rect x="668" y="180" width="180" height="36" rx="18" fill="#e0f2fe"/>
     <text x="758" y="203" text-anchor="middle">A card starts here</text>
+
+    <!-- Not something to build: an agent reads the stored values itself. -->
+    <line x1="668" y1="318" x2="594" y2="318" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#up)"/>
+    <rect x="668" y="300" width="180" height="36" rx="18" fill="#f3f4f6"/>
+    <text x="758" y="323" text-anchor="middle" fill="#374151">An agent reads here</text>
+    <text x="758" y="356" text-anchor="middle" font-size="12" font-weight="400" fill="#6b7280">over MCP, nothing to build</text>
 
     <line x1="668" y1="438" x2="594" y2="438" stroke="#0369a1" stroke-width="1.5" marker-end="url(#to)"/>
     <rect x="668" y="420" width="180" height="36" rx="18" fill="#e0f2fe"/>
