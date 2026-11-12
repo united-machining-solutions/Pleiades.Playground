@@ -18,6 +18,13 @@ export const SILENT_AFTER_SECONDS = 30
  */
 export const instant = z.iso.datetime({ offset: true })
 
+/**
+ * The serial number of a machine: the level after `machines/` in every topic. The MQTT binding
+ * forbids what would break a topic, `/`, `+` and `#`, and nothing else. Whoever takes or lists a
+ * serial number uses this rule, so a machine that is listed can also be asked for.
+ */
+export const serialNumber = z.string().regex(/^[^/+#]+$/)
+
 export const reading = z.object({
   value: z.string().nullable().describe("The newest value, or null if the topic had none."),
   at: instant.nullable().describe("When the newest value was measured."),
@@ -41,7 +48,7 @@ export type Notification = z.infer<typeof notification>
 
 /** What a machine does now. */
 export const machine = z.object({
-  machine: z.string().describe("The serial number, which identifies the machine in every topic."),
+  machine: serialNumber.describe("The serial number, which identifies the machine in every topic."),
   connection: reading,
   heartbeat: reading.describe("The sign of life of the machine. Its value counts up and says nothing else."),
   itemState: reading,
@@ -103,7 +110,7 @@ export type MachineShow = z.infer<typeof machineShow>
  * model reads.
  */
 export const spanList = z.object({
-  machine: z.string().describe("The serial number of the machine."),
+  machine: serialNumber.describe("The serial number of the machine."),
   from: instant,
   to: instant,
   spans: z.array(span).describe("The states between `from` and `to`, oldest first and without a gap."),

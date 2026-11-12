@@ -191,6 +191,25 @@ test("a state that was reported more than a day ago holds, as long as the machin
   assert.deepEqual(shown.history.totals, [{ state: "running", seconds: 8 * 3600 }])
 })
 
+test("a serial number is what the MQTT binding allows, so a machine that is listed can be shown", async () => {
+  assert.equal(machineOf("machines/Line 2/umati/Connection/State"), "Line 2")
+  // What the binding forbids names no machine.
+  assert.equal(machineOf("machines/a+b/umati/Connection/State"), undefined)
+  assert.equal(machineOf("machines/a#b/umati/Connection/State"), undefined)
+
+  publishing({
+    "machines/Line 2/umati/Connection/State": [{ at: hoursAgo(1), value: "Connected" }],
+    "machines/Line 2/umati/Connection/Heartbeat": heartbeats(1),
+  })
+  const list = await listMachines(apis, now)
+  assert.deepEqual(
+    list.machines.map((one) => one.machine),
+    ["Line 2"],
+  )
+  const shown = await showMachine(apis, "Line 2", 1, now)
+  assert.equal(shown.machine.connection.value, "Connected")
+})
+
 test("a machine whose heartbeat stopped has no data, whatever it reported before", async () => {
   publishing({
     "machines/P-04/umati/Connection/State": [{ at: hoursAgo(25), value: "Connected" }],

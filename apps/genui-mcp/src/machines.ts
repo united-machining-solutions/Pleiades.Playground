@@ -1,4 +1,4 @@
-import { BAND_SLOTS, SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
+import { BAND_SLOTS, SILENT_AFTER_SECONDS, serialNumber } from "@pleiades/cards/machine/contract.ts"
 import type { Machine, MachineList, MachineShow, Reading, Span, SpanList } from "@pleiades/cards/machine/contract.ts"
 
 import { EVER, listTopics, readNumbers, readOpenNotifications, readRaised, readStrings } from "./apis.ts"
@@ -37,9 +37,13 @@ const names = Object.keys(paths) as Array<ReadingName>
 /** The heartbeat counts, the other readings are text. */
 const readValues = (name: ReadingName) => (name === "heartbeat" ? readNumbers : readStrings)
 
-/** `machines/P-04/umati/State/MachineryItemState` belongs to the machine `P-04`. */
+/**
+ * `machines/P-04/umati/State/MachineryItemState` belongs to the machine `P-04`. A level that is
+ * no serial number by the rule of the contract names no machine.
+ */
 export function machineOf(topic: string): string | undefined {
-  return /^machines\/([^/]+)\//.exec(topic)?.[1]
+  const level = /^machines\/([^/]+)\//.exec(topic)?.[1]
+  return serialNumber.safeParse(level).success ? level : undefined
 }
 
 /**

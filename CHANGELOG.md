@@ -63,3 +63,6 @@ All notable changes are documented here. The format follows
 
 - `genui-mcp`: a state holds however long ago the machine reported it. A machine that said more than 24 hours
   ago that it is connected, and has sent only its heartbeat since, was shown as "No data".
+- A serial number follows one rule, the one of the MQTT binding: everything but `/`, `+` and `#`
+  (`serialNumber` in `packages/cards`). `genui_machine_show` refused a machine that the list showed, for
+  example one with a space in its name.

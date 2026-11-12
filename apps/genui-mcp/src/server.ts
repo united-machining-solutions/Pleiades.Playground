@@ -1,4 +1,4 @@
-import { BAND_SLOTS, instant, machineList, machineShow, spanList } from "@pleiades/cards/machine/contract.ts"
+import { BAND_SLOTS, instant, machineList, machineShow, serialNumber, spanList } from "@pleiades/cards/machine/contract.ts"
 import { machineListInWords, machineShowInWords, spanListInWords } from "@pleiades/cards/machine/in-words.ts"
 import { toolDefinition } from "@tanstack/ai"
 import { createMCPServer, resourceDefinition } from "@tanstack/ai-mcp/server"
@@ -65,10 +65,7 @@ const timeZone = z
     "The IANA time zone to write every instant of the result in, for example Europe/Zurich. The instants are then local times with their offset to UTC. UTC if omitted.",
   )
 
-const serialNumber = z
-  .string()
-  .regex(/^[\w.-]+$/)
-  .describe("The serial number of the machine, for example P-04.")
+const machine = serialNumber.describe("The serial number of the machine, for example P-04.")
 
 const machineListTool = toolDefinition({
   name: "genui_machine_list",
@@ -87,7 +84,7 @@ const machineShowTool = toolDefinition({
   description:
     "Show one machine: what it does now, as in genui_machine_list, and how long each state lasted in total over the last hours. Use it for a question about a single machine. The result says it in words and carries the values of the machine card, which a host that shows MCP Apps draws for the person.",
   inputSchema: z.object({
-    machine: serialNumber,
+    machine,
     hours: z
       .number()
       .int()
@@ -110,7 +107,7 @@ const spanListTool = toolDefinition({
   description:
     "List the states of one machine between two instants as spans without a gap: what the band of the machine card draws. A card calls it after genui_machine_show, with `history.from` and `history.to` of that result. A language model does not need it to say how long or how often: the sums are in the result of genui_machine_show.",
   inputSchema: z.object({
-    machine: serialNumber,
+    machine,
     from: instant.describe("Where the spans begin: `history.from` of genui_machine_show."),
     to: instant.describe(`Where they end: \`history.to\` of genui_machine_show. At most ${MOST_HOURS} hours after \`from\`.`),
     slots: z

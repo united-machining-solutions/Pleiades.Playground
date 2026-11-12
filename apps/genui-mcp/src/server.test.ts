@@ -6,7 +6,11 @@ import { MACHINE_CARD_URI, SPAN_LIST_TOOL } from "./names.ts"
 import { server } from "./server.ts"
 
 type Listed = {
-  tools?: Array<{ name: string; _meta?: { ui?: { resourceUri?: string; visibility?: Array<string> } } }>
+  tools?: Array<{
+    name: string
+    inputSchema?: { properties?: Record<string, { pattern?: string }> }
+    _meta?: { ui?: { resourceUri?: string; visibility?: Array<string> } }
+  }>
   resources?: Array<{ uri: string; mimeType?: string; _meta?: { ui?: { prefersBorder?: boolean } } }>
 }
 
@@ -37,6 +41,14 @@ test("the spans of a band are for a card: a host does not offer that tool to its
   assert.deepEqual(tools.find((tool) => tool.name === SPAN_LIST_TOOL)?._meta?.ui?.visibility, ["app"])
   // The tools a model calls say nothing about who sees them, which means everybody.
   assert.equal(tools.find((tool) => tool.name === "genui_machine_show")?._meta?.ui?.visibility, undefined)
+})
+
+test("the tools that take a machine take every serial number the MQTT binding allows", async () => {
+  const { tools = [] } = await ask("tools/list")
+  for (const name of ["genui_machine_show", SPAN_LIST_TOOL]) {
+    // The rule reaches a caller as a pattern, and the server checks what comes in against it.
+    assert.equal(tools.find((tool) => tool.name === name)?.inputSchema?.properties?.machine?.pattern, "^[^/+#]+$")
+  }
 })
 
 test("the machine card is a resource that a host reads as an MCP App", async () => {
