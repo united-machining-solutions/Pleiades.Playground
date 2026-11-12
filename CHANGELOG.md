@@ -68,6 +68,11 @@ All notable changes are documented here. The format follows
   the font origin of one host in the code. Without it a card names none. A host that serves its font from
   an origin of its own needs it set, or the card falls back to a system font there.
 - The images of `genui-mcp` and `app` carry `LICENSE` and `NOTICE` under `/app`.
+- `app`: the screens are composed as the shadcn/ui docs compose them. In the chat a question is a `Bubble`,
+  the tool calls of a stretch are a `Trace`, an error is an `Alert`, and the questions to begin with are a row
+  of buttons above the field. Every empty state has its icon. The path of a page is a `Breadcrumb` in the
+  header; the page of a machine is titled with the machine. The band of the machine card waits as a
+  `Skeleton`, which moved to `packages/cards`.
 
 ### Fixed
 
