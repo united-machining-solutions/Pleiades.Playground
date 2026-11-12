@@ -2,6 +2,7 @@
 // nothing else, so it runs before anything is installed.
 //
 //   node .claude/skills/build-your-own/look.mjs                         the overview
+//   node .claude/skills/build-your-own/look.mjs minutes=120              the same, looking further back
 //   node .claude/skills/build-your-own/look.mjs call <tool> [key=value]  one tool of the generative UI backend
 //
 // The ports are those of .env.example. If yours differ, set the same names in the shell.
@@ -68,7 +69,7 @@ async function answers() {
 
 async function values() {
   const to = new Date()
-  const from = new Date(to.getTime() - 10 * 60 * 1000)
+  const from = new Date(to.getTime() - minutes * 60 * 1000)
   const found = await (await get(`${at.timeseries}/topics?startTime=${from.toISOString()}&stopTime=${to.toISOString()}`)).json()
   const kindOf = { baseUnitTopics: "number", stringTopics: "string", booleanTopics: "boolean" }
   const machines = new Set()
@@ -80,7 +81,7 @@ async function values() {
       paths.set(machine ? machine[2] : topic, kindOf[kind] ?? kind)
     }
   }
-  console.log(`  ${paths.size} different topics in the last ten minutes. Machines: ${[...machines].sort().join(", ") || "none"}`)
+  console.log(`  ${paths.size} different topics in the last ${minutes} minutes. Machines: ${[...machines].sort().join(", ") || "none"}`)
   console.log("  Below machines/{SerialNumber}/, or in full where a topic is not about a machine:")
   for (const [path, kind] of [...paths].sort()) console.log(`    ${path.padEnd(64)} ${kind}`)
 }
@@ -118,6 +119,8 @@ async function call(tool, pairs) {
 }
 
 const [mode, tool, ...pairs] = process.argv.slice(2)
+// How far back the stored values are listed. A source that publishes rarely needs more than ten minutes.
+const minutes = Number(/^minutes=(\d+)$/.exec(mode ?? "")?.[1] ?? 10)
 if (mode === "call" && tool) {
   await call(tool, pairs).catch((error) => {
     console.error(`The call failed at ${at.genui}/mcp: ${error.cause?.code ?? error.message}`)
