@@ -1,10 +1,12 @@
 import { clock } from "@pleiades/cards/machine/format.ts"
 import { MachineCard } from "@pleiades/cards/machine/machine-card.tsx"
 import { Link, createFileRoute, notFound } from "@tanstack/react-router"
+import { SearchXIcon } from "lucide-react"
 import type { ReactNode } from "react"
 
 import { NoAnswer } from "@/components/no-answer.tsx"
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
+import { Button } from "@/components/ui/button"
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLive } from "@/hooks/use-live.ts"
 import { getMachine, getMachines, getSpans } from "@/machines/get-machines.ts"
@@ -72,9 +74,18 @@ function NoMachine() {
     <Page machine={machine}>
       <Empty>
         <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <SearchXIcon />
+          </EmptyMedia>
           <EmptyTitle>No machine "{machine}"</EmptyTitle>
           <EmptyDescription>No machine of that name has published a value in the last 24 hours.</EmptyDescription>
         </EmptyHeader>
+        <EmptyContent>
+          {/* The chat stays open while the page changes. */}
+          <Button nativeButton={false} render={<Link to="/" search />}>
+            All machines
+          </Button>
+        </EmptyContent>
       </Empty>
     </Page>
   )
