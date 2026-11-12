@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { modelNames, modelSettings } from "./models.ts"
+import { modelNames, modelSettings, settingGaps } from "./models.ts"
 
 test("without settings the chat has no model", () => {
   assert.deepEqual(modelNames(modelSettings({})), [])
@@ -25,6 +25,24 @@ test("a block without a key or without a model does not count", () => {
   assert.deepEqual(modelSettings({ ANTHROPIC_MODELS: "quick" }), {})
   assert.deepEqual(modelSettings({ LLM_MODELS: "local" }), {})
   assert.deepEqual(modelSettings({ OPENAI_API_KEY: "key-a", OPENAI_MODELS: " , " }), {})
+})
+
+test("a block that was begun says what it lacks, by the names of the settings", () => {
+  assert.deepEqual(settingGaps({}), [])
+  assert.deepEqual(settingGaps({ ANTHROPIC_API_KEY: "key-b", ANTHROPIC_MODELS: " , " }), [
+    "ANTHROPIC_API_KEY is set, ANTHROPIC_MODELS is empty",
+  ])
+  assert.deepEqual(settingGaps({ OPENAI_API_KEY: "key-a", LLM_BASE_URL: "http://localhost:4000/v1" }), [
+    "OPENAI_API_KEY is set, OPENAI_MODELS is empty",
+    "LLM_BASE_URL is set, LLM_MODELS is empty",
+  ])
+  assert.deepEqual(settingGaps({ LLM_MODELS: "local" }), ["LLM_MODELS is set, LLM_BASE_URL is empty"])
+})
+
+test("model names without a key are no gap, and neither is a complete block", () => {
+  assert.deepEqual(settingGaps({ ANTHROPIC_MODELS: "quick", OPENAI_MODELS: "small" }), [])
+  assert.deepEqual(settingGaps({ ANTHROPIC_API_KEY: "key-b", ANTHROPIC_MODELS: "quick" }), [])
+  assert.equal(JSON.stringify(settingGaps({ OPENAI_API_KEY: "key-a" })).includes("key-a"), false)
 })
 
 test("an endpoint of one's own needs no key", () => {

@@ -27,7 +27,7 @@ export const Route = createRootRoute({
       return { chatStatus, chats: chatStatus.configured ? await fetchChats() : [] }
     } catch {
       // The server is away for a moment, for example while it restarts. The next read sets it right.
-      return { chatStatus: { configured: false, models: [] }, chats: [] }
+      return { chatStatus: { configured: false, models: [], gaps: [] }, chats: [] }
     }
   },
   head: () => ({

@@ -36,6 +36,22 @@ export function modelSettings(env: Readonly<Record<string, string | undefined>>)
 }
 
 /**
+ * What a block lacks that was begun: "ANTHROPIC_API_KEY is set, ANTHROPIC_MODELS is empty". It names
+ * settings and never a value. A line of model names without its key is not a gap: the names have
+ * defaults, and a block without a key is simply not used.
+ */
+export function settingGaps(env: Readonly<Record<string, string | undefined>>): Array<string> {
+  const gaps: Array<string> = []
+  const gap = (set: string, empty: string) => gaps.push(`${set} is set, ${empty} is empty`)
+  if (env.ANTHROPIC_API_KEY && names(env.ANTHROPIC_MODELS).length === 0) gap("ANTHROPIC_API_KEY", "ANTHROPIC_MODELS")
+  if (env.OPENAI_API_KEY && names(env.OPENAI_MODELS).length === 0) gap("OPENAI_API_KEY", "OPENAI_MODELS")
+  const compatible = names(env.LLM_MODELS)
+  if (env.LLM_BASE_URL && compatible.length === 0) gap("LLM_BASE_URL", "LLM_MODELS")
+  if (!env.LLM_BASE_URL && compatible.length > 0) gap("LLM_MODELS", "LLM_BASE_URL")
+  return gaps
+}
+
+/**
  * The names the chat offers: block by block, Anthropic's first, each block in the order of its
  * setting. The first one answers until a chat picks another.
  */

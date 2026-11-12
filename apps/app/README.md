@@ -32,7 +32,10 @@ everything else works.
 ## Language models
 
 The chat offers every model the settings name, in up to three blocks. Each block is optional, and a block
-counts once it is complete. Several models are separated by commas.
+counts once it is complete. Several models are separated by commas. In the stack a key alone completes the
+block of Anthropic or of OpenAI: `compose.yaml` fills in the model names of `.env.example` where a line of
+names is missing or empty. Where a block was begun and is not complete, the chat panel says which setting is
+empty.
 
 | Block | Settings | How the app talks to it |
 |---|---|---|

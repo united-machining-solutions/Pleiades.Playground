@@ -20,10 +20,10 @@ One command builds and starts everything. It needs Docker and nothing else, see 
 [development setup](development-setup.md).
 
 ```bash
-docker compose up -d --build
+docker compose up -d --build --wait
 ```
 
-The stack is ready when every container reports healthy: the broker, the database, the two APIs with their
+The command returns when the stack is ready, that is when every container reports healthy: the broker, the database, the two APIs with their
 persistence workers, the generative UI backend, the app and one simulator per machine.
 
 ```bash
@@ -117,7 +117,9 @@ again, an answer shows what was true when it was given.
 
 The chat needs a language model, and the demo starts without one. Then the panel says "No language model
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
-copy `.env.example` to `.env`, fill one of the three blocks and start the stack again:
+copy `.env.example` to `.env`, fill one of the three blocks and create the app again with
+`docker compose up -d app`. For Anthropic and OpenAI a key is enough: the names of the models have
+defaults.
 
 | Block | Settings |
 |---|---|
