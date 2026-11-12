@@ -8,7 +8,6 @@ import type { MachineList, MachineShow } from "@pleiades/cards/machine/contract.
 export const toolLabels: Record<string, { running: string; done: string }> = {
   genui_machine_list: { running: "Reading the machines", done: "Read the machines" },
   genui_machine_show: { running: "Reading the machine", done: "Read the machine" },
-  genui_span_list: { running: "Reading the states of the machine", done: "Read the states of the machine" },
   genui_describe_server: { running: "Looking at the backend", done: "Looked at the backend" },
   genui_get_skill_guide: { running: "Reading the guide of the backend", done: "Read the guide of the backend" },
 }
