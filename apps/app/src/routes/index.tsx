@@ -4,12 +4,13 @@ import { stateOf } from "@pleiades/cards/machine/state.ts"
 import { Badge } from "@pleiades/cards/ui/badge.tsx"
 import { Card } from "@pleiades/cards/ui/card.tsx"
 import { createFileRoute } from "@tanstack/react-router"
+import { FactoryIcon } from "lucide-react"
 import { Fragment } from "react"
 import type { ReactNode } from "react"
 
 import { useChatPanel } from "@/chat/ask.ts"
 import { NoAnswer } from "@/components/no-answer.tsx"
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { ItemGroup, ItemSeparator } from "@/components/ui/item"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLive } from "@/hooks/use-live.ts"
@@ -49,6 +50,9 @@ function Home() {
       <Page>
         <Empty>
           <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <FactoryIcon />
+            </EmptyMedia>
             <EmptyTitle>No machines</EmptyTitle>
             <EmptyDescription>No machine has published a value in the last 24 hours.</EmptyDescription>
           </EmptyHeader>

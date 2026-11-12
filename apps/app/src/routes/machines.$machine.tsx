@@ -5,7 +5,7 @@ import { SearchXIcon } from "lucide-react"
 import type { ReactNode } from "react"
 
 import { NoAnswer } from "@/components/no-answer.tsx"
-import { Button } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useLive } from "@/hooks/use-live.ts"
@@ -81,10 +81,11 @@ function NoMachine() {
           <EmptyDescription>No machine of that name has published a value in the last 24 hours.</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          {/* The chat stays open while the page changes. */}
-          <Button nativeButton={false} render={<Link to="/" search />}>
+          {/* A link that looks like a button, as the docs of Button want it: a Button would take
+              the role of a link away. The chat stays open while the page changes. */}
+          <Link to="/" search className={buttonVariants()}>
             All machines
-          </Button>
+          </Link>
         </EmptyContent>
       </Empty>
     </Page>
