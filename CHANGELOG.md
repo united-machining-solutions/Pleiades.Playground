@@ -51,6 +51,10 @@ All notable changes are documented here. The format follows
 - About the name (`docs/name.md`): where the name Pleiades comes from, what it stands for and what it does
   not, how Taurus, Pleiades and this playground relate, and how to write it. `README.md` says it in two
   sentences.
+- For coding agents: shadcn/ui is named as the design system of the user interface (`AGENTS.md`, and a line
+  in the pull request template). The agent skill of shadcn/ui (`.claude/skills/shadcn`) and the MCP server of
+  its CLI (`.mcp.json`) come with the repository, so an agent reads the docs of a component before it writes
+  user interface.
 
 ### Changed
 
