@@ -3,22 +3,29 @@
 How to add something of your own to the demo: a page, a card, or a source of data. The [tour](tour.md) shows
 what is there. This page shows where your idea starts.
 
-![Four steps from the bottom up, each with its folder and its language. A source, a simulator under source/ or
-an adapter of your own, publishes to the broker over MQTT as contracts/mqtt says. The .NET services under
-source/ store the values and serve them over REST as contracts/openapi says, and over MCP for an agent that
-reads them itself. A tool in apps/genui-mcp computes
-an answer that a card of packages/cards draws; it is called over MCP as contracts/mcp says. A page in apps/app
-shows the card. A page starts at the top step, a card at the step of the card and its tool, a source at the
-bottom step.](images/build-your-own/ladder.svg)
+![Five steps from the bottom up, each with its folder and its language, and beside each step what one value
+looks like there. A source, a simulator under source/ or an adapter of your own, publishes one value to the
+broker over MQTT as contracts/mqtt says: "Executing". The .NET services under source/ store every value with
+its time and serve them over REST as contracts/openapi says. A tool in apps/genui-mcp refines the stored values
+into an answer: Running since 08:39, for 3 h 12 min. It is called over MCP as contracts/mcp says. A card of
+packages/cards draws the answer. A page in apps/app imports the card and shows it, on a page or in the chat. A
+page starts at the top step, a card at the two steps of the answer and the card, a source at the bottom step.
+An agent can read the stored values over MCP, with nothing to build.](images/build-your-own/ladder.svg)
 
-A value travels up. A source publishes it, the stack stores it, a tool computes an answer from it, a card draws
-the answer, and a page shows the card. Your idea starts at one of three steps. What starts lower needs the
-steps above it too: a source is seen once a card shows it.
+A value travels up, and at each step it has another form. A source publishes it: one value, as it happens. The
+stack stores it: every value with its time. A tool refines the stored values into an answer: what a machine
+does, since when, for how long. A card draws the answer, and a page shows the card. The step in the middle is
+the one that makes the rest simple: numbers, order and durations are computed there, never by a language
+model.
 
-The picture is also the map of the repository. Each step names its folder and its language: the two upper
+Your idea starts at one of three places. A card starts at two steps at once, the answer and the card that
+draws it. What starts lower needs the steps above it too: a source is seen once a card shows it.
+
+The picture is also the map of the repository. Each step names its folder and its language: the three upper
 steps are TypeScript under `apps/` and `packages/`, the two lower ones are .NET under `source/`. Between two
-steps stands how they talk, and the contract under `contracts/` that says how. Whoever keeps a contract can
-replace the step behind it, so the people who work on one step need not know the inside of the next. Not in
+steps stands how they talk, and for three of the four the contract under `contracts/` that says how. Whoever
+keeps a contract can replace the step behind it, so the people who work on one step need not know the inside
+of the next. Not in
 the picture: `compose.yaml` starts every step as a container, and `stacks/` configures the broker. The whole
 list is in the [repository layout](../README.md#repository-layout), and who looks after which area in
 [MAINTAINERS.md](../MAINTAINERS.md). Who calls whom is drawn at the end, in
