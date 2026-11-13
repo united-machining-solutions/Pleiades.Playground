@@ -16,7 +16,9 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   pull request. The rules, with wrong and right examples, are in `.claude/skills/shadcn/`.
 - Before substantial work with a TanStack library (Router, Start, AI), load its skill in the version this
   repository pins: `pnpm exec intent list` names them, `pnpm exec intent load <package>#<skill>` prints one.
-  It needs `pnpm install` first.
+  It needs `pnpm install` first. In one thing this repository differs from the skill of the Router: the
+  route tree, `routeTree.gen.ts`, is not committed here. It is written from the route files, see
+  [`apps/app`: What is where](apps/app/README.md#what-is-where). Never commit it, and never edit it.
 - A service reads and writes data only through a contract under `contracts/`. Change the contract first.
 - SI units only; energy in joule, fractions in `one`. Never invent or convert units on the wire.
 - Never commit a secret value. Names go to `.env.example`.
@@ -37,6 +39,9 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   the tour once: "Shall I give you a tour of the demo?"
 - A change to what the demo shows, how it starts or where its code lives: update [docs/tour.md](docs/tour.md)
   in the same pull request, and name a screenshot you could not retake.
+  `node .github/scripts/tour-screenshots.mjs <name>` retakes one from the running stack. Ask the person before
+  you take `chat-answer`, which asks their language model a question, and `home-no-data`, which stops a
+  simulator for a minute.
 - A person who has just got the repository, or whose stack, example app or chat does not run: follow the
   skill `setup` (`.claude/skills/setup/SKILL.md`). Check each step yourself, say what you found, ask before you
   start or install anything, and where you cannot go on, give the person one sentence to pass on.

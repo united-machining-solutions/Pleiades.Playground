@@ -77,6 +77,10 @@ All notable changes are documented here. The format follows
   in the pull request template). The agent skill of shadcn/ui (`.claude/skills/shadcn`) and the MCP server of
   its CLI (`.mcp.json`) come with the repository, so an agent reads the docs of a component before it writes
   user interface.
+- A script takes the screenshots of the tour from the running stack:
+  `node .github/scripts/tour-screenshots.mjs` writes six of the seven pictures under `docs/images/tour/`,
+  each 1280 × 800 pixels. The two pictures of the chat need a language model and are left out without one;
+  the card in another host stays a picture taken by hand. Playwright is a development dependency for that.
 
 ### Changed
 
@@ -105,6 +109,14 @@ All notable changes are documented here. The format follows
   of buttons above the field. Every empty state has its icon. The path of a page is a `Breadcrumb` in the
   header; the page of a machine is titled with the machine. The band of the machine card waits as a
   `Skeleton`, which moved to `packages/cards`.
+- `app`: the sidebar reads its entries from the routes. A page names its entry in the `staticData` of its
+  route (`nav`: a title, an icon, an order), so a new page is one file and touches no list that every page
+  shares. The mark of the sidebar follows the page a person is on; it stayed on Home before. The recipe
+  `create-page` says so.
+- `app`: `src/routeTree.gen.ts` is no longer in the repository. It is written from the route files, by
+  `pnpm install` and `pnpm typecheck` (`apps/app/route-tree.mjs`), by the development server and by the
+  build, so two branches with a page each have nothing to merge in it. After you pull this change the file
+  is gone from your checkout until one of them has run.
 - `genui-mcp` and `app`: a card is one module on each side and one line in a list, so two cards that are
   added at the same time no longer meet in the server, the guide and the chat. The server takes its tools,
   its card files and what its description and its guide say about a card from `src/cards/index.ts`; the

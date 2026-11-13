@@ -78,8 +78,13 @@ the backend of the running demo stack answers.
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `health.ts` and `api/harness/$.ts` are
-  server routes.
-- `src/routeTree.gen.ts`: written by the build. Commit it, never edit it.
+  server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
+  (`nav`: a title, an icon, an order). `src/components/app-sidebar.tsx` reads the entries from the routes
+  and names no page, and `nav.ts` next to it puts them in order and finds the one a person is under.
+- `src/routeTree.gen.ts`: written from the route files and not in the repository, so that two branches with
+  a page each have nothing to merge in it. `pnpm install` and `pnpm typecheck` write it
+  (`route-tree.mjs`), and so do the development server and the build. Never edit it. TanStack advises to
+  commit this file; here everything that needs it writes it first.
 - `src/machines/`: `get-machines.ts` holds the server functions that call the backend as a typed MCP client,
   `machine-item.tsx` draws a machine as a row or a tile. `chat.tsx` is the machine card in the chat: what a
   call of each of its tools is called, what the chat draws for a result (`results.ts` checks it against the

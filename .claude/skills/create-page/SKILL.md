@@ -34,20 +34,23 @@ Read, in this order:
 
 ## You touch
 
-- `apps/app/src/routes/<name>.tsx`: new, the page.
-- `apps/app/src/components/app-sidebar.tsx`: one entry. The sidebar marks the page a person is on: let the
-  mark follow the route, for the entries that are there too.
-- `apps/app/src/routeTree.gen.ts`: written by the build. Commit it, never edit it.
+- `apps/app/src/routes/<name>.tsx`: new, the page. It names its own entry in the sidebar, see step 6. No
+  list of pages is shared, so two new pages never meet in one file.
 - `apps/app/src/machines/get-machines.ts`, only if no server function calls the tool you need: one more, like
   the ones there.
+
+`apps/app/src/routeTree.gen.ts` is not yours to touch and not in the repository: it is written from the
+route files, by `pnpm install`, the typecheck, the development server and the build. Never edit it, and
+never commit it.
 
 Nothing else: no change to the backend, to a card or to a shared component. If the page needs one, stop and
 say so.
 
 ## Steps
 
-1. Add the route file. The file is the route. The build writes it into `src/routeTree.gen.ts`, and until it
-   has, the types do not know the page: run `pnpm --filter @pleiades/app build` once.
+1. Add the route file. The file is the route. Until it is written into `src/routeTree.gen.ts`, the types do
+   not know the page: `pnpm --filter @pleiades/app typecheck` writes it, and so does the development server
+   while it runs.
 2. Read the values in the loader of the route, with a server function. The browser never talks to the
    backend itself.
 3. Draw with what is there, in this order: a card of `@pleiades/cards`, the rows of
@@ -60,7 +63,12 @@ say so.
    Adding up, comparing machines or putting things in a new order is not: that answer is missing, so stop
    and take `create-card`.
 5. If the values change, read them again the way Home does, with `useLive()`.
-6. Add the page to the sidebar.
+6. Give the page its entry in the sidebar, in the route itself:
+   `staticData: { nav: { title: "Warnings", icon: TriangleAlertIcon } }`, with an icon of `lucide-react`,
+   as `src/routes/index.tsx` does for Home. The sidebar reads its entries from the routes and marks the
+   page a person is on. Entries stand by their title; an `order` below 100 moves one up. A page that names
+   no entry stands in no list: right for a page that is reached from another one, like the page of a
+   machine.
 
 The page looks like the pages that are there: the same header, the same spacing, the light theme.
 

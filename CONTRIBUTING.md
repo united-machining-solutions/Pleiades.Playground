@@ -34,7 +34,9 @@ There is no contributor licence agreement.
 - **Decisions:** a choice that shapes the repository gets a short record under `docs/adr/`.
 - **Tour:** a change to what the demo shows, how it starts or where its code lives updates the
   [tour](docs/tour.md) in the same pull request: the text, the pointers into the code and the screenshot of
-  the stop. Name a screenshot you could not retake in the pull request.
+  the stop. One command retakes the screenshots, see
+  [Retaking the screenshots](docs/tour.md#retaking-the-screenshots). Name a screenshot you could not retake
+  in the pull request.
 
 ## Checks before a pull request
 
