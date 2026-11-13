@@ -102,5 +102,5 @@ the backend of the running demo stack answers.
   imported as `@pleiades/ui/components/<name>`. `components.json` holds the settings of the preset
   `b5JNecjwG` and tells `shadcn add` to write a new component there. The layout follows the block
   `sidebar-15`: the pages on the left, the chat on the right.
-- `src/styles.css`: Tailwind and the font. The theme of the preset, light only, and the chart and state
-  colours come with `@pleiades/cards`, so a card looks the same wherever it is drawn.
+- `src/styles.css`: Tailwind and the font. The theme of the preset, light only, comes from `@pleiades/ui`,
+  the chart and state colours from `@pleiades/cards`, so a card looks the same wherever it is drawn.

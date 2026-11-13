@@ -34,7 +34,8 @@ classes of its neighbours, and says so in its first lines:
 | `number-field.tsx` | `NumberField` | `input.tsx`, `input-group.tsx` | a number with its range, its step and its format: a set point |
 | `otp-field.tsx` | `OTPField` | the `input-otp` of shadcn | a short code, one character a slot |
 
-**Left out on purpose.** `second-ways.test.ts` fails if one of the packages in the first group is added:
+**Left out on purpose.** `second-ways.test.ts` fails if one of these packages, `vaul` or a package of Radix
+is added:
 
 | Component of shadcn | Its package | Instead |
 |---|---|---|
@@ -48,8 +49,8 @@ is a decision for a pull request of its own. `form` is empty in this style: a fo
 form library.
 
 The chart is [Recharts](https://recharts.org), as shadcn has it. A series is thinned out before it is
-drawn: never more points than the picture is wide in pixels. The Timeseries API does that itself
-(`downsample`).
+drawn: never more points than the picture is wide in pixels. The Timeseries API does that when asked
+(`downsample=true`, with the width as `limit`).
 
 ## A new component
 
@@ -69,6 +70,9 @@ the `catalog` of `pnpm-workspace.yaml` with its version.
   the exception, and the day shadcn has one of them, the same command shows the difference.
   One generated file differs by a line: `scroll-area.tsx` came with an import it does not use, which the
   type check of this repository does not let through.
+  A `"use client"` line in such a diff is noise from shadcn: it is meant to drop the line from every file
+  here and drops it from every other one, so which files keep it depends on their order
+  (shadcn-ui/ui#12381).
 - One way for each thing. Before a package comes in for something a component here does already, it is a
   decision, and `second-ways.test.ts` holds the ones that were made.
 - Where Tailwind reads class names is up to the page. The example app reads this whole package. A card file
