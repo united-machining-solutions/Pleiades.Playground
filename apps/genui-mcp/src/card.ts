@@ -22,3 +22,12 @@ export type Card<TTools extends ReadonlyArray<AnyServerTool> = ReadonlyArray<Any
 export function card<const TTools extends ReadonlyArray<AnyServerTool>>(given: Card<TTools>): Card<TTools> {
   return given
 }
+
+/**
+ * The tools of all cards as one list, in the order of the cards. The tools differ from card to card,
+ * and TypeScript infers no type for a flattened list of them from the second card on. So the list
+ * is told what it holds: a tool of any of the cards.
+ */
+export function toolsOf<const TCards extends ReadonlyArray<Card>>(cards: TCards): Array<TCards[number]["tools"][number]> {
+  return cards.flatMap<TCards[number]["tools"][number]>((one) => one.tools)
+}

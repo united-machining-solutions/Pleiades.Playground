@@ -2,6 +2,7 @@ import { toolDefinition } from "@tanstack/ai"
 import { createMCPServer, resourceDefinition } from "@tanstack/ai-mcp/server"
 import { z } from "zod"
 
+import { toolsOf } from "./card.ts"
 import { CARD_META, CARD_MIME_TYPE, readCardFile } from "./card-file.ts"
 import { cards } from "./cards/index.ts"
 import { description, skillGuide } from "./guide.ts"
@@ -30,7 +31,7 @@ const getSkillGuide = toolDefinition({
 export const server = createMCPServer({
   name: "genui",
   version: "0.1.0",
-  tools: [describeServer, getSkillGuide, ...cards.flatMap((card) => card.tools)],
+  tools: [describeServer, getSkillGuide, ...toolsOf(cards)],
   resources: [
     resourceDefinition({ uri: "genui://skill", name: "skill", mimeType: "text/markdown" }).read(() => ({
       text: skillGuide,
