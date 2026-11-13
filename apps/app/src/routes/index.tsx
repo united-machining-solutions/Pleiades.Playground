@@ -5,7 +5,7 @@ import { Badge } from "@pleiades/cards/ui/badge.tsx"
 import { Card } from "@pleiades/cards/ui/card.tsx"
 import { Skeleton } from "@pleiades/cards/ui/skeleton.tsx"
 import { createFileRoute } from "@tanstack/react-router"
-import { FactoryIcon } from "lucide-react"
+import { FactoryIcon, HouseIcon } from "lucide-react"
 import { Fragment } from "react"
 import type { ReactNode } from "react"
 
@@ -25,6 +25,8 @@ const groups: ReadonlyArray<{ title: string; states: ReadonlyArray<State> }> = [
 ]
 
 export const Route = createFileRoute("/")({
+  // The entry of this page in the sidebar. A page that names none stands in no list.
+  staticData: { nav: { title: "Home", icon: HouseIcon, order: 0 } },
   // If the server of the app itself is away for a moment, the page says so and keeps trying.
   loader: () => getMachines().catch((error: unknown) => ({ values: null, error: String(error) })),
   component: Home,

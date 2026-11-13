@@ -109,6 +109,14 @@ All notable changes are documented here. The format follows
   of buttons above the field. Every empty state has its icon. The path of a page is a `Breadcrumb` in the
   header; the page of a machine is titled with the machine. The band of the machine card waits as a
   `Skeleton`, which moved to `packages/cards`.
+- `app`: the sidebar reads its entries from the routes. A page names its entry in the `staticData` of its
+  route (`nav`: a title, an icon, an order), so a new page is one file and touches no list that every page
+  shares. The mark of the sidebar follows the page a person is on; it stayed on Home before. The recipe
+  `create-page` says so.
+- `app`: `src/routeTree.gen.ts` is no longer in the repository. It is written from the route files, by
+  `pnpm install` and `pnpm typecheck` (`apps/app/route-tree.mjs`), by the development server and by the
+  build, so two branches with a page each have nothing to merge in it. After you pull this change the file
+  is gone from your checkout until one of them has run.
 
 ### Fixed
 

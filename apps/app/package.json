@@ -6,7 +6,8 @@
     "dev": "vite dev --port 3000",
     "build": "vite build",
     "start": "node .output/server/index.mjs",
-    "typecheck": "tsc",
+    "postinstall": "node route-tree.mjs",
+    "typecheck": "node route-tree.mjs && tsc",
     "test": "node --test"
   },
   "dependencies": {

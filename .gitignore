@@ -23,6 +23,8 @@ dist/
 .output/
 .tanstack/
 .turbo/
+# Written from the route files, see apps/app/route-tree.mjs
+routeTree.gen.ts
 
 # Python
 __pycache__/
