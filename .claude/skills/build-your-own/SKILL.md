@@ -148,10 +148,16 @@ chat has no language model" says.
 The look-up says whether it has one. Pages and cards work without it; only an answer in the chat needs it.
 The key belongs to the person or to their company, and you never see it.
 
-1. See whether `.env` is there, without opening it. If it is, leave it as it is. If it is not, ask, then copy
-   `.env.example` to `.env`, and in the fresh copy set `PLEIADES_VERSION` to the version the stack runs
-   with: `docker compose ps --format "{{.Image}}" app` ends with it, `main` on a computer the skill `setup`
-   got ready. With another version in `.env`, the start in step 3 builds the whole stack.
+1. See whether `.env` is there, without opening it. The version it names has to be the one the stack runs
+   with: `docker compose ps --format "{{.Image}}" app` ends with that version, `main` on a computer the
+   skill `setup` got ready. With another version in `.env`, the start in item 3 builds the app and what it
+   needs, four images, which takes minutes.
+   - `.env` is not there: ask, then copy `.env.example` to `.env`, and set `PLEIADES_VERSION` to that
+     version in the fresh copy.
+   - `.env` is there: leave it closed and compare. `docker compose config --images` lists the images the
+     settings name. Run it with `--images`, never without: without, it prints every setting, a key
+     included. If they end in another version than the images that run, the person sets the line
+     `PLEIADES_VERSION=` to the version that runs, in item 2.
 2. Ask the person to open `.env` in an editor and to fill in one block themselves: the key, and the name of
    a model where the line is empty. There is a block for OpenAI, one for Anthropic, and one for any other
    endpoint, a model on their own computer included. What goes where:
