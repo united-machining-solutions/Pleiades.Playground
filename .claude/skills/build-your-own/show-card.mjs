@@ -71,8 +71,9 @@ const inPage = (data) => JSON.stringify(data).replace(/</g, "\\u003c")
 const page = `<!doctype html>
 <html lang="en">
 <meta charset="utf-8" />
+<meta name="color-scheme" content="light dark" />
 <title>${tool}: the card as a host shows it</title>
-<body style="font-family: system-ui, sans-serif; background: #f4f4f5; margin: 0; padding: 16px">
+<body style="font-family: system-ui, sans-serif; background: #f4f4f5; color: #18181b; margin: 0; padding: 16px">
 <p style="font-size: 13px; margin: 0 0 16px">
   A stand-in for a host of MCP Apps: the card file <code>${uri}</code> as the backend serves it, with the
   result of <code>${tool}</code>. Wide on the left, narrow on the right.

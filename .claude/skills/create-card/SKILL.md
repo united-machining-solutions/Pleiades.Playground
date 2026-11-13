@@ -104,10 +104,11 @@ that the tour does not show the card yet. A page that shows the card all the tim
 
    Look at what an API really returns before you compute from it: in its Swagger UI (the Timeseries API at
    <http://localhost:5500/>, the Events API at <http://localhost:5510/>) or with a GET of your own. Two
-   things the Events API does: a list ends after `Take` entries, 1000 at most, and says so with `hasMore`;
-   and a pair of "raised" and "gone" can come without a duration, because the notification has not gone
-   yet or because the window you asked for cut it. Decide what your figure does with these, and say it in
-   the contract. Where another card shows the same thing, the two must not contradict each other.
+   things the Events API does: a list ends after `Take` entries, 100 if omitted and 1000 at most, and says
+   so with `hasMore`; and a pair of "raised" and "gone" can come without a duration, because the
+   notification has not gone yet or because the window you asked for cut it. Decide what your figure does
+   with these, and say it in the contract. Where another card shows the same thing, the two must not
+   contradict each other.
 4. Write the component with the inferred type of the contract as its properties. Build it from the shadcn/ui
    components of `packages/ui`, imported as `@pleiades/ui/components/<name>`. Add a missing one with
    `pnpm --filter @pleiades/app exec shadcn add <name>`, which writes it there. A component that no card drew
