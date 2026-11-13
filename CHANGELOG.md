@@ -104,6 +104,11 @@ All notable changes are documented here. The format follows
 - `README.md` starts the stack with `--wait` and shows the two lines that enable the chat. The development
   setup has three more known issues: a download that breaks off, `pnpm` through the path, and a key that
   `docker compose restart` does not pick up.
+- The skill `setup` starts the stack from the published images of `main` and no longer builds it: about
+  half a gigabyte to download instead of a build of ten minutes or more. It first makes sure that `.env`
+  names `PLEIADES_VERSION=main`, because a later start with another version there builds the whole stack.
+  The skill `build-your-own` sends a stack that does not run to `setup`, and keeps that version when it
+  makes `.env` for a key.
 - `app`: the screens are composed as the shadcn/ui docs compose them. In the chat a question is a `Bubble`,
   the tool calls of a stretch are a `Trace`, an error is an `Alert`, and the questions to begin with are a row
   of buttons above the field. Every empty state has its icon. The path of a page is a `Breadcrumb` in the

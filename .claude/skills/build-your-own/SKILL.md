@@ -23,9 +23,9 @@ idea starts at the lowest step that is missing.
 
 ## 1. See that the stack runs
 
-`docker compose ps -a`: every service is healthy. If not, ask, then `docker compose up -d --build --wait`. If
-Docker is missing or not started, the skill `setup` leads the person through it: nothing here works without
-it.
+`docker compose ps -a`: every service is healthy. If not, or if Docker is missing or not started, the skill
+`setup` leads the person through it (`.claude/skills/setup/SKILL.md`, level 1): it knows which images this
+computer takes, and starts the stack without building it. Nothing here works without the stack.
 
 Nothing else is needed to look and to talk. What it takes to build, you check in step 5.
 
@@ -148,8 +148,10 @@ chat has no language model" says.
 The look-up says whether it has one. Pages and cards work without it; only an answer in the chat needs it.
 The key belongs to the person or to their company, and you never see it.
 
-1. See whether `.env` is there, without opening it. If it is not, ask, then copy `.env.example` to `.env`.
-   If it is, leave it as it is.
+1. See whether `.env` is there, without opening it. If it is, leave it as it is. If it is not, ask, then copy
+   `.env.example` to `.env`, and in the fresh copy set `PLEIADES_VERSION` to the version the stack runs
+   with: `docker compose ps --format "{{.Image}}" app` ends with it, `main` on a computer the skill `setup`
+   got ready. With another version in `.env`, the start in step 3 builds the whole stack.
 2. Ask the person to open `.env` in an editor and to fill in one block themselves: the key, and the name of
    a model where the line is empty. There is a block for OpenAI, one for Anthropic, and one for any other
    endpoint, a model on their own computer included. What goes where:
