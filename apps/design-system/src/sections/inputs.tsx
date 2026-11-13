@@ -107,7 +107,7 @@ const fieldStates = ["default", "hover", "focus", "disabled", "invalid"] as cons
 function CodeSlots({
   slot,
 }: {
-  slot?: (index: number) => { "aria-invalid"?: boolean; "data-invalid"?: string; "data-preview"?: string } | undefined
+  slot?: (index: number) => { "aria-invalid"?: boolean; "data-preview"?: string } | undefined
 }) {
   return (
     <>
@@ -840,7 +840,7 @@ export function Inputs() {
                   <CodeSlots
                     slot={(index) =>
                       state === "invalid"
-                        ? { "aria-invalid": true, "data-invalid": "" }
+                        ? { "aria-invalid": true }
                         : state === "focus" && index === 2
                           ? { "data-preview": "focus" }
                           : undefined
