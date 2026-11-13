@@ -7,8 +7,9 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
 - Names: `Pleiades.Playground.<Area>.<Part>` (.NET), `pleiades.playground.<area>.<part>` (images).
 - .NET lives flat under `source/` in one solution with central package versions; add a `<PackageVersion>` to
   `source/Directory.Packages.props`, never a version in a project file. nuget.org is the only feed.
-- TypeScript lives under `apps/` and `packages/` in one pnpm workspace with central versions; add a version to
-  the `catalog` in `pnpm-workspace.yaml`, never a version in a `package.json`. npmjs.org is the only registry.
+- TypeScript lives under `apps/` and `packages/` in one pnpm workspace with central versions; a version stands
+  in the `catalog` in `pnpm-workspace.yaml`, never in a `package.json`. `pnpm add` and `shadcn add` keep to
+  that by themselves; do not write a version into a `package.json` by hand. npmjs.org is the only registry.
 - The user interface under `apps/` and `packages/cards` is built with shadcn/ui, and shadcn/ui is its design
   system. Its components live in one place, `packages/ui`, as shadcn generates them: import one as
   `@pleiades/ui/components/<name>`, keep no second copy, and do not edit a generated file. Before you write

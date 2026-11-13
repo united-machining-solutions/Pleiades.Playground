@@ -60,7 +60,8 @@ pnpm --filter @pleiades/app exec shadcn add <name>      # writes src/components/
 ```
 
 The command runs in the app, whose `components.json` points here. A package the component needs goes into
-the `catalog` of `pnpm-workspace.yaml` with its version.
+the `catalog` of `pnpm-workspace.yaml` with its exact version: pnpm puts it there itself
+(`catalogMode: strict`).
 
 ## The rules
 
