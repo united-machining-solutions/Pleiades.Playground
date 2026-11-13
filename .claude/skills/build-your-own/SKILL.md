@@ -60,6 +60,14 @@ To read one answer as it is, call its tool:
 node .claude/skills/build-your-own/look.mjs call genui_machine_show machine=P-04
 ```
 
+To see the card of an answer, without a language model, as a host of MCP Apps shows it:
+
+```bash
+node .claude/skills/build-your-own/show-card.mjs genui_machine_show machine=P-04
+```
+
+It serves a page until it is stopped, and prints its address.
+
 Then take the first row that is true, from the top:
 
 | What is true | Then | Recipe |

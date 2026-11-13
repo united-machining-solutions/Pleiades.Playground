@@ -87,6 +87,11 @@ wrappers: an application that imports it, and one HTML file for every other host
 To see it, add `http://localhost:5520/mcp` to a host that shows MCP Apps and ask for one machine. A host that
 runs somewhere else needs an address it can reach.
 
+Without a host and without a language model, a script stands in for one:
+`node .claude/skills/build-your-own/show-card.mjs genui_machine_show machine=P-04` calls the tool, reads the
+card file it links and serves a page that hands the file the result, as a host does. A tool the card calls
+itself goes on to this server. It is what the recipe `create-card` looks at a new card with.
+
 ### In a desktop host
 
 A desktop host starts a server as a process of its own and talks to it on stdin and stdout. Started with
