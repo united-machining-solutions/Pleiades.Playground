@@ -1,7 +1,8 @@
 import type { LucideIcon } from "lucide-react"
 
 // The pages of the sidebar. A page names its entry itself, in the `staticData` of its route, so a
-// new page is one file and no entry in a list that every page shares.
+// new page is one file and no entry in a list that every page shares. The router knows the entry
+// as `staticData.nav`: router.tsx says so, next to the other thing it registers.
 
 /** How a page stands in the sidebar: its title, its icon, and where among the others. */
 export type NavEntry = {
@@ -9,12 +10,6 @@ export type NavEntry = {
   icon: LucideIcon
   /** Lower comes first; 100 if omitted. Pages of the same order stand by their title. */
   order?: number
-}
-
-declare module "@tanstack/react-router" {
-  interface StaticDataRouteOption {
-    nav?: NavEntry
-  }
 }
 
 /** An entry with the path of its page. */
