@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // The page runs in a browser and is built by Vite: it needs JSX and the DOM. The second path is
+  // the one a component of packages/ui imports another one by.
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client", "node"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@pleiades/ui/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

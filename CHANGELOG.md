@@ -92,6 +92,11 @@ All notable changes are documented here. The format follows
   that shows the card wide and narrow. The recipes `create-page` and `create-card` say what two agents had
   to guess when they built a page and a card by them: which tool has the warnings, how a list is laid out,
   what a card shares with another card, how the card file is tied to its tool and how it is checked.
+- The design system on one page, `apps/design-system` (`pnpm --filter @pleiades/design-system dev`,
+  <http://localhost:3100/>): a small application of its own, Vite and React, outside the demo stack. It shows
+  the tokens with their measured contrast, every component of `packages/ui` in its variants and states
+  with fixed values in the words of the demo, three rules as Do and Don't, and the machine card of the card
+  catalogue. A test fails when a component of `packages/ui` has no block on the page.
 
 ### Changed
 
