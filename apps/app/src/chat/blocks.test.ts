@@ -54,22 +54,44 @@ test("the calls of one stretch are one trace, a text ends it", () => {
   })
 })
 
-test("a result is drawn by the tool whose contract it keeps, whatever the order of the tools", () => {
-  const drawn = (content: string, known: ReadonlyArray<ChatTool>) =>
-    blocksOf([call("a", "any"), result("a", content)], false, known).flatMap((block) =>
-      block.kind === "drawn" ? [block.node] : [],
-    )
-  assert.deepEqual(drawn(list, tools), ["the list"])
-  assert.deepEqual(drawn(shown, tools), ["the card"])
-  assert.deepEqual(drawn(shown, [...tools].reverse()), ["the card"])
+/** What the chat draws for the result of one call. */
+const drawn = (name: string, content: string, known: ReadonlyArray<ChatTool>) =>
+  blocksOf([call("a", name), result("a", content)], false, known).flatMap((block) =>
+    block.kind === "drawn" ? [block.node] : [],
+  )
+
+test("a result is drawn by the card of the tool that was called", () => {
+  assert.deepEqual(drawn("genui_machine_list", list, tools), ["the list"])
+  assert.deepEqual(drawn("genui_machine_show", shown, tools), ["the card"])
 })
 
-test("a result that keeps no contract is drawn by nothing, and so is every result without tools", () => {
-  const kinds = (content: string, known: ReadonlyArray<ChatTool>) =>
-    blocksOf([call("a", "any"), result("a", content)], false, known).map((block) => block.kind)
-  assert.deepEqual(kinds('{"spans":[]}', tools), ["steps"])
-  assert.deepEqual(kinds("genui is the generative UI backend", tools), ["steps"])
-  assert.deepEqual(kinds(list, []), ["steps"])
+test("where two contracts overlap, the tool that was called decides, not the order of the cards", () => {
+  // A card that extends the machine card: its result keeps the contract of the machine card too.
+  const trend = JSON.stringify({ ...JSON.parse(shown), peakAt: "2026-11-16T08:00:00.000Z" })
+  const withTrend: ReadonlyArray<ChatTool> = [
+    ...tools,
+    { name: "genui_trend_show", draw: (content) => (has("peakAt")(content) ? "the trend" : null) },
+  ]
+  assert.deepEqual(drawn("genui_trend_show", trend, withTrend), ["the trend"])
+  assert.deepEqual(drawn("genui_trend_show", trend, [...withTrend].reverse()), ["the trend"])
+  assert.deepEqual(drawn("genui_machine_show", trend, withTrend), ["the card"])
+})
+
+test("a result is drawn by nothing if its tool draws nothing, is not known, or the contract is not kept", () => {
+  assert.deepEqual(drawn("genui_span_list", '{"spans":[]}', tools), [])
+  assert.deepEqual(drawn("genui_get_skill_guide", "genui is the generative UI backend", tools), [])
+  // The result of another tool, whatever it looks like.
+  assert.deepEqual(drawn("genui_alarm_list", list, tools), [])
+  // The right tool, but not the values of its contract.
+  assert.deepEqual(drawn("genui_machine_show", list, tools), [])
+  assert.deepEqual(drawn("genui_machine_list", list, []), [])
+})
+
+test("a result without its call is drawn by nothing", () => {
+  assert.deepEqual(
+    blocksOf([result("gone", list)], false, tools).map((block) => block.kind),
+    [],
+  )
 })
 
 /** The state of the first call of an answer. */

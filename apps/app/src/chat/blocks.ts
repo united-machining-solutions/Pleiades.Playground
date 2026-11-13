@@ -44,14 +44,13 @@ export function blocksOf(
       else blocks.push({ kind: "steps", calls: [call] })
     } else if (part.type === "tool-result") {
       // The app draws the values of a tool itself, the way the card of that tool says: a card from
-      // the catalogue, or a list. The first tool whose contract the result keeps draws it.
-      for (const tool of tools) {
-        const node = tool.draw?.(part.content)
-        if (node !== null && node !== undefined) {
-          blocks.push({ kind: "drawn", node })
-          break
-        }
-      }
+      // the catalogue, or a list. The tool is the one that was called, found by the call of this
+      // result. The content does not choose the card: two contracts can be alike, one can extend
+      // the other, and a result is still the answer of the tool that gave it.
+      const call = parts.find((other) => other.type === "tool-call" && other.id === part.toolCallId)
+      const tool = call?.type === "tool-call" ? tools.find((one) => one.name === call.name) : undefined
+      const node = tool?.draw?.(part.content)
+      if (node !== null && node !== undefined) blocks.push({ kind: "drawn", node })
     } else if (part.type === "text" && part.content.trim() !== "") {
       blocks.push({ kind: "text", text: part.content })
     }
