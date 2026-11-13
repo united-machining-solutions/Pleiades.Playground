@@ -87,6 +87,11 @@ All notable changes are documented here. The format follows
   `number-field.tsx` (a number with range, step and format) and `otp-field.tsx` (a short code). `sonner`,
   `command` and `input-otp` are left out on purpose, each a second way for something that is there on
   Base UI, and a test fails if one of their packages is added.
+- A card can be looked at without a language model: `node .claude/skills/build-your-own/show-card.mjs <tool>`
+  stands in for a host of MCP Apps. It calls the tool, reads the card file the tool links and serves a page
+  that shows the card wide and narrow. The recipes `create-page` and `create-card` say what two agents had
+  to guess when they built a page and a card by them: which tool has the warnings, how a list is laid out,
+  what a card shares with another card, how the card file is tied to its tool and how it is checked.
 
 ### Changed
 
