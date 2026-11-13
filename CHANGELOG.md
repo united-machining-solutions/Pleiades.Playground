@@ -109,6 +109,10 @@ All notable changes are documented here. The format follows
   route (`nav`: a title, an icon, an order), so a new page is one file and touches no list that every page
   shares. The mark of the sidebar follows the page a person is on; it stayed on Home before. The recipe
   `create-page` says so.
+- `app`: `src/routeTree.gen.ts` is no longer in the repository. It is written from the route files, by
+  `pnpm install` and `pnpm typecheck` (`apps/app/route-tree.mjs`), by the development server and by the
+  build, so two branches with a page each have nothing to merge in it. After you pull this change the file
+  is gone from your checkout until one of them has run.
 
 ### Fixed
 

@@ -36,18 +36,21 @@ Read, in this order:
 
 - `apps/app/src/routes/<name>.tsx`: new, the page. It names its own entry in the sidebar, see step 6. No
   list of pages is shared, so two new pages never meet in one file.
-- `apps/app/src/routeTree.gen.ts`: written by the build. Commit it, never edit it. If a merge leaves it in
-  conflict, take either side and run the build: it writes the file anew.
 - `apps/app/src/machines/get-machines.ts`, only if no server function calls the tool you need: one more, like
   the ones there.
+
+`apps/app/src/routeTree.gen.ts` is not yours to touch and not in the repository: it is written from the
+route files, by `pnpm install`, the typecheck, the development server and the build. Never edit it, and
+never commit it.
 
 Nothing else: no change to the backend, to a card or to a shared component. If the page needs one, stop and
 say so.
 
 ## Steps
 
-1. Add the route file. The file is the route. The build writes it into `src/routeTree.gen.ts`, and until it
-   has, the types do not know the page: run `pnpm --filter @pleiades/app build` once.
+1. Add the route file. The file is the route. Until it is written into `src/routeTree.gen.ts`, the types do
+   not know the page: `pnpm --filter @pleiades/app typecheck` writes it, and so does the development server
+   while it runs.
 2. Read the values in the loader of the route, with a server function. The browser never talks to the
    backend itself.
 3. Draw with what is there, in this order: a card of `@pleiades/cards`, the rows of
