@@ -79,7 +79,8 @@ not checked yet with the reason. Level 2 does not wait for level 1. Level 3 does
    - It fails with words like "certificate", "x509" or "unable to get local issuer certificate": the network
      of the company looks into the connections, and Docker does not trust it. The sentence to pass on, with
      the host of the address in the error in place of `<host>`: "Docker on my computer cannot download from
-     <host>. It needs ghcr.io, pkg-containers.githubusercontent.com and docker.io. Please allow these hosts
+     <host>. It needs ghcr.io and pkg-containers.githubusercontent.com, and for Docker Hub
+     registry-1.docker.io, auth.docker.io and production.cloudfront.docker.com. Please allow these hosts
      for Docker, or give Docker the root certificate of our network."
    - A port is in use, or one container stays unhealthy: "Known issues" in the development setup says what
      to do. Tell the person what it says, in their words.
@@ -93,8 +94,10 @@ not checked yet with the reason. Level 2 does not wait for level 1. Level 3 does
 **A person who wants to build the stack from its code** says so, to change a .NET service for example. Then
 steps 3 and 4 are these instead: change nothing in `.env` and make none, and start with
 `docker compose up -d --build --wait`, as the [development setup](../../../docs/development-setup.md)
-does. Say first that it downloads much more and builds for ten minutes or more, and that it needs
-docker.io, mcr.microsoft.com, registry.npmjs.org and nuget.org.
+does. Say first that it downloads much more and builds for ten minutes or more, and that it needs more
+hosts than the start above: the three of Docker Hub named there, mcr.microsoft.com with the hosts its
+layers come from (`*.data.mcr.microsoft.com`), registry.npmjs.org, api.nuget.org and
+dl-cdn.alpinelinux.org.
 
 ## Level 2: build
 
