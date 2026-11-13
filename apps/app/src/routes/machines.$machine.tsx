@@ -1,13 +1,13 @@
 import { clock } from "@pleiades/cards/machine/format.ts"
 import { MachineCard } from "@pleiades/cards/machine/machine-card.tsx"
-import { Skeleton } from "@pleiades/cards/ui/skeleton.tsx"
+import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { Link, createFileRoute, notFound } from "@tanstack/react-router"
 import { SearchXIcon } from "lucide-react"
 import type { ReactNode } from "react"
 
 import { NoAnswer } from "@/components/no-answer.tsx"
-import { buttonVariants } from "@/components/ui/button"
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { buttonVariants } from "@pleiades/ui/components/button"
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { useLive } from "@/hooks/use-live.ts"
 import { getMachine, getMachines, getSpans } from "@/machines/get-machines.ts"
 

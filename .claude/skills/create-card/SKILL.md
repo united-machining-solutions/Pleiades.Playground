@@ -71,7 +71,8 @@ the language model its tools, and which file says what the app draws for which t
   tool of its own.
 - `apps/app/src/chat/cards.tsx`: one line for the card, in the order of the alphabet. The chat and its
   server take the card from there: touch neither `chat-sidebar.tsx` nor `blocks.ts`.
-- `packages/cards/src/ui/`: a shadcn/ui component the card needs and the catalogue does not have yet.
+- `packages/cards/src/styles.css`: one line for a shadcn/ui component the card draws and no card drew before.
+  The components themselves live in `packages/ui`.
 - `apps/genui-mcp/ui/<name>.html` and `<name>.tsx`: new, the card file for other hosts. The build finds the
   page by itself.
 
@@ -90,8 +91,10 @@ next recipe, `create-page`.
    language model, and the values for the card. Test what it computes with fixed values, as the tests next
    to it do.
 4. Write the component with the inferred type of the contract as its properties. Build it from the shadcn/ui
-   components under `packages/cards/src/ui/`. Add a missing one there, not into the app: `shadcn add` takes
-   the folder with `--path`. Use the composition of its docs whole.
+   components of `packages/ui`, imported as `@pleiades/ui/components/<name>`. Add a missing one with
+   `pnpm --filter @pleiades/app exec shadcn add <name>`, which writes it there. A component that no card drew
+   before gets its line in `packages/cards/src/styles.css`, or a card file shows it without its styles: a
+   test of the catalogue tells you. Use the composition of its docs whole.
 5. In the app, draw the component where the result of the tool arrives: in the `draw` of the tool, in the
    `chat.tsx` of the card. The chat then shows the card as soon as the language model calls the tool.
 6. Add the card file for other hosts. If you leave it out, say so: the card then shows in the example app

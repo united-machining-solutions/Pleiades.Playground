@@ -14,9 +14,9 @@ import {
 import { useEffect, useState } from "react"
 import type { FormEvent, KeyboardEvent } from "react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Bubble, BubbleContent } from "@/components/ui/bubble"
-import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
+import { Bubble, BubbleContent } from "@pleiades/ui/components/bubble"
+import { Button } from "@pleiades/ui/components/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,10 +25,10 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group"
-import { Message, MessageContent } from "@/components/ui/message"
+} from "@pleiades/ui/components/dropdown-menu"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@pleiades/ui/components/input-group"
+import { Message, MessageContent } from "@pleiades/ui/components/message"
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -36,7 +36,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
-} from "@/components/ui/message-scroller"
+} from "@pleiades/ui/components/message-scroller"
 import {
   Sidebar,
   SidebarContent,
@@ -47,8 +47,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
+} from "@pleiades/ui/components/sidebar"
+import { Trace, TraceIcon, TraceLine, TraceTitle } from "@pleiades/ui/components/trace"
 
 import { Answer } from "./answer.tsx"
 import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"

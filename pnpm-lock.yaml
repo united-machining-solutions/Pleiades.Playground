@@ -288,18 +288,15 @@ importers:
 
   apps/app:
     dependencies:
-      '@base-ui/react':
-        specifier: 'catalog:'
-        version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@fontsource-variable/roboto':
         specifier: 'catalog:'
         version: 5.3.0
       '@pleiades/cards':
         specifier: workspace:*
         version: link:../../packages/cards
-      '@shadcn/react':
-        specifier: 'catalog:'
-        version: 0.3.1(@types/react@19.3.0)(react@19.3.1)
+      '@pleiades/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@tanstack/ai':
         specifier: 'catalog:'
         version: 1.4.0(@opentelemetry/api@1.10.0)(zod@4.6.7)
@@ -330,9 +327,6 @@ importers:
       '@tanstack/react-start':
         specifier: 'catalog:'
         version: 1.169.5(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.18)(vite@8.3.7(@types/node@26.6.6)(jiti@2.7.0))
-      class-variance-authority:
-        specifier: 'catalog:'
-        version: 0.7.1
       cn:
         specifier: 'catalog:'
         version: 0.5.2
@@ -401,12 +395,12 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
-      '@base-ui/react':
-        specifier: 'catalog:'
-        version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@modelcontextprotocol/ext-apps':
         specifier: 'catalog:'
         version: 2.0.4(@modelcontextprotocol/client@2.4.0)(@modelcontextprotocol/core@2.4.0)(@modelcontextprotocol/server@2.4.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(zod@4.6.7)
+      '@pleiades/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@tailwindcss/vite':
         specifier: 'catalog:'
         version: 4.3.5(vite@8.3.7(@types/node@26.6.6)(jiti@2.7.0))
@@ -422,12 +416,6 @@ importers:
       '@vitejs/plugin-react':
         specifier: 'catalog:'
         version: 6.3.0(vite@8.3.7(@types/node@26.6.6)(jiti@2.7.0))
-      class-variance-authority:
-        specifier: 'catalog:'
-        version: 0.7.1
-      cn:
-        specifier: 'catalog:'
-        version: 0.5.2
       react:
         specifier: 'catalog:'
         version: 19.3.1
@@ -456,24 +444,52 @@ importers:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
-      '@base-ui/react':
-        specifier: 'catalog:'
-        version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@pleiades/ui':
+        specifier: workspace:*
+        version: link:../ui
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.6
       '@types/react':
         specifier: 'catalog:'
         version: 19.3.0
+      react:
+        specifier: 'catalog:'
+        version: 19.3.1
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
+  packages/ui:
+    dependencies:
+      '@base-ui/react':
+        specifier: 'catalog:'
+        version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@shadcn/react':
+        specifier: 'catalog:'
+        version: 0.3.1(@types/react@19.3.0)(react@19.3.1)
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
       cn:
         specifier: 'catalog:'
         version: 0.5.2
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.70.0(@types/react@19.3.0)(react@19.3.1)
+    devDependencies:
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.3.0(@types/react@19.3.0)
       react:
         specifier: 'catalog:'
         version: 19.3.1
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.3.1(react@19.3.1)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

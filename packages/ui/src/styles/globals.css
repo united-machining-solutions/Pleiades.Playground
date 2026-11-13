@@ -1,17 +1,21 @@
 /*
  * The theme: the shadcn tokens as "shadcn init --preset b5JNecjwG" wrote them, with two changes: there
- * is no dark theme, and the chart colours come from dataviz.css. A page imports it after Tailwind, so
- * a card looks the same wherever it is drawn: in the example application and in the card files of the
- * generative UI backend.
+ * is no dark theme, and the chart colours come from dataviz.css of the card catalogue. A page imports
+ * it after Tailwind, so a component looks the same wherever it is drawn: in the example application
+ * and in the card files of the generative UI backend. "shadcn add" writes the tokens of a new
+ * component into this file (components.json names it).
  *
  *   @import "tailwindcss";
- *   @import "@pleiades/cards/theme.css";
- *   @import "@pleiades/cards/styles.css";
+ *   @import "@pleiades/ui/globals.css";
  *
- * The font is not part of it. A page brings its own.
+ * Two things are not part of it, and a page brings its own. The font. And where Tailwind reads class
+ * names: a page that may draw every component reads this whole package (the example application), a
+ * card file reads only the components the cards draw (the stylesheet of the card catalogue).
  */
 
 @theme inline {
+    /* A heading is set in the font of the page, which the page brings. */
+    --font-heading: var(--font-sans);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);

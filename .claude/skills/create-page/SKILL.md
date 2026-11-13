@@ -54,8 +54,10 @@ say so.
 2. Read the values in the loader of the route, with a server function. The browser never talks to the
    backend itself.
 3. Draw with what is there, in this order: a card of `@pleiades/cards`, the rows of
-   `src/machines/machine-item.tsx`, a shadcn/ui component under `src/components/ui/`. Add a missing component
-   with `shadcn add`. Use the composition of its docs whole, and build no element of your own. An empty
+   `src/machines/machine-item.tsx`, a shadcn/ui component of `packages/ui`, imported as
+   `@pleiades/ui/components/<name>`. Add a missing component with
+   `pnpm --filter @pleiades/app exec shadcn add <name>`, which writes it into `packages/ui`. Use the
+   composition of its docs whole, and build no element of your own. An empty
    result gets the `Empty` component; a failure says what failed. Where a page that is there and the docs of
    a component disagree, the docs win: say so in your hand-over.
 4. Compute nothing in the page but wording. Choosing among the values a tool returned and writing them out

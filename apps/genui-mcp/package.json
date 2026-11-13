@@ -18,15 +18,13 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@base-ui/react": "catalog:",
     "@modelcontextprotocol/ext-apps": "catalog:",
+    "@pleiades/ui": "workspace:*",
     "@tailwindcss/vite": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
-    "class-variance-authority": "catalog:",
-    "cn": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "rollup-plugin-license": "catalog:",

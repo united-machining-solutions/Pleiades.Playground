@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  // The components run in a browser and are built by the application that imports them: they need
+  // JSX and the DOM. The path is the one shadcn writes into a component that imports another one,
+  // and the one its command line reads to find this folder.
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@pleiades/ui/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}

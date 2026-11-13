@@ -7,7 +7,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+} from "@pleiades/ui/components/breadcrumb"
 
 /**
  * Where the page stands, in the header as in the shadcn block sidebar-15: "Machines" on Home,

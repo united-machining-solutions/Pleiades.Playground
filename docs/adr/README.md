@@ -17,3 +17,4 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0006](0006-data-model-by-reference.md) | The data model is referenced by a pinned commit, not a submodule | accepted |
 | [0007](0007-generative-ui-in-typescript.md) | Generative UI in TypeScript: a backend for displays, a card catalogue and the harness in the example app | proposed |
 | [0008](0008-route-tree-is-written-not-committed.md) | The route tree of the example app is written, not committed | proposed |
+| [0009](0009-shadcn-components-in-one-package.md) | The shadcn/ui components live in one package, `packages/ui` | proposed |

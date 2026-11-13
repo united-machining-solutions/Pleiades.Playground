@@ -98,9 +98,9 @@ the backend of the running demo stack answers.
   which tool, and its server which tools a language model does not get. `tool-results.ts` says what a card
   may say about a tool, `blocks.ts` turns an answer into blocks, and `answer.tsx` draws what the model writes
   ([TanStack Markdown](https://tanstack.com/markdown)).
-- `src/components/ui/`: [shadcn/ui](https://ui.shadcn.com) components, added with `shadcn add` and kept as
-  generated. `components.json` holds the settings of the preset `b5JNecjwG`. The layout follows the block
-  `sidebar-15`: the pages on the left, the chat on the right. `Badge` and `Card` live in `@pleiades/cards`,
-  because the cards are built from them.
+- The [shadcn/ui](https://ui.shadcn.com) components come from [`packages/ui`](../../packages/ui/README.md),
+  imported as `@pleiades/ui/components/<name>`. `components.json` holds the settings of the preset
+  `b5JNecjwG` and tells `shadcn add` to write a new component there. The layout follows the block
+  `sidebar-15`: the pages on the left, the chat on the right.
 - `src/styles.css`: Tailwind and the font. The theme of the preset, light only, and the chart and state
   colours come with `@pleiades/cards`, so a card looks the same wherever it is drawn.

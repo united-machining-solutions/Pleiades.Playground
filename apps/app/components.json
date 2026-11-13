@@ -5,7 +5,7 @@
   "tsx": true,
   "tailwind": {
     "config": "",
-    "css": "src/styles.css",
+    "css": "../../packages/ui/src/styles/globals.css",
     "baseColor": "neutral",
     "cssVariables": true,
     "prefix": ""
@@ -14,10 +14,10 @@
   "rtl": false,
   "aliases": {
     "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
-    "lib": "@/lib",
-    "hooks": "@/hooks"
+    "hooks": "@pleiades/ui/hooks",
+    "lib": "@pleiades/ui/lib",
+    "utils": "@pleiades/ui/lib/utils",
+    "ui": "@pleiades/ui/components"
   },
   "menuColor": "default",
   "menuAccent": "subtle",

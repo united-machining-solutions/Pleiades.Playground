@@ -4,12 +4,12 @@ import { stateLabel } from "@pleiades/cards/machine/state.ts"
 import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
 import { tell } from "@pleiades/cards/machine/tell.ts"
 import type { Told } from "@pleiades/cards/machine/tell.ts"
-import { Badge } from "@pleiades/cards/ui/badge.tsx"
+import { Badge } from "@pleiades/ui/components/badge"
 import { Link } from "@tanstack/react-router"
 import { ChevronRightIcon } from "lucide-react"
 
-import { Button, buttonVariants } from "@/components/ui/button"
-import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item"
+import { Button, buttonVariants } from "@pleiades/ui/components/button"
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@pleiades/ui/components/item"
 
 function Since({ told, asOf }: { told: Told; asOf: string }) {
   if (told.since === null) return null

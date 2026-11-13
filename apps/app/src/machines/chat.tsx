@@ -1,10 +1,10 @@
 import type { MachineList } from "@pleiades/cards/machine/contract.ts"
 import { stateOf } from "@pleiades/cards/machine/state.ts"
-import { Card } from "@pleiades/cards/ui/card.tsx"
+import { Card } from "@pleiades/ui/components/card"
 import { Fragment } from "react"
 
 import type { ChatTool } from "@/chat/tool-results.ts"
-import { ItemGroup, ItemSeparator } from "@/components/ui/item"
+import { ItemGroup, ItemSeparator } from "@pleiades/ui/components/item"
 
 import { SPAN_LIST_TOOL } from "./card-tools.ts"
 import { MachineRow } from "./machine-item.tsx"

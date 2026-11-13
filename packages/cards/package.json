@@ -13,19 +13,11 @@
     "zod": "catalog:"
   },
   "peerDependencies": {
-    "@base-ui/react": "catalog:",
-    "class-variance-authority": "catalog:",
-    "cn": "catalog:",
+    "@pleiades/ui": "workspace:*",
     "react": "catalog:"
   },
   "peerDependenciesMeta": {
-    "@base-ui/react": {
-      "optional": true
-    },
-    "class-variance-authority": {
-      "optional": true
-    },
-    "cn": {
+    "@pleiades/ui": {
       "optional": true
     },
     "react": {
@@ -33,11 +25,9 @@
     }
   },
   "devDependencies": {
-    "@base-ui/react": "catalog:",
+    "@pleiades/ui": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
-    "class-variance-authority": "catalog:",
-    "cn": "catalog:",
     "react": "catalog:",
     "typescript": "catalog:"
   }
