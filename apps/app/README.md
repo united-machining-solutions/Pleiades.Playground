@@ -80,7 +80,9 @@ the backend of the running demo stack answers.
   `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `health.ts` and `api/harness/$.ts` are
   server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
   (`nav`: a title, an icon, an order). `src/components/app-sidebar.tsx` reads the entries from the routes
-  and names no page, and `nav.ts` next to it puts them in order and finds the one a person is under.
+  and names no page, and `nav.ts` next to it puts them in order and finds the one a person is under. The
+  breadcrumb of the header, `page-breadcrumb.tsx`, reads the same: a page is called by the title of its
+  entry, or by `crumb` in its `staticData`, and a page without an entry stands behind the one it is under.
 - `src/routeTree.gen.ts`: written from the route files and not in the repository, so that two branches with
   a page each have nothing to merge in it. `pnpm install` and `pnpm typecheck` write it
   (`route-tree.mjs`), and so do the development server and the build. Never edit it. TanStack advises to
