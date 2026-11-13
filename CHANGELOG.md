@@ -82,6 +82,13 @@ All notable changes are documented here. The format follows
   each 1280 × 800 pixels. The two pictures of the chat need a language model and are left out without one;
   the card in another host stays a picture taken by hand. Playwright is a development dependency for that.
 
+- `packages/ui` holds every shadcn/ui component of the style that needs no package of its own, 33 more than
+  before, and `chart` on Recharts 3.8.0. Three components are its own, built on a part of Base UI that
+  shadcn has no file for and styled like their neighbours: `meter.tsx` (a measurement in its range),
+  `number-field.tsx` (a number with range, step and format) and `otp-field.tsx` (a short code). `sonner`,
+  `command` and `input-otp` are left out on purpose, each a second way for something that is there on
+  Base UI, and a test fails if one of their packages is added.
+
 ### Changed
 
 - Chat: the models of Anthropic are offered before those of OpenAI. With keys for both, the first model of

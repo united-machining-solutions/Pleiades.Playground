@@ -20,6 +20,37 @@ command line fit as they are.
 - `components.json`: the settings of shadcn for this package: the style `base-vega`, on
   [Base UI](https://base-ui.com), with the icons of Lucide.
 
+## Which components are here
+
+Every component of the style that needs no package of its own, so that nobody has to add one in the middle
+of other work, and `chart`. Three more are ours.
+
+**Ours, on Base UI.** shadcn has no file for them, and Base UI has the part. Each is that part with the
+classes of its neighbours, and says so in its first lines:
+
+| File | Base UI | Looks like | For |
+|---|---|---|---|
+| `meter.tsx` | `Meter` | `progress.tsx` | a measurement in its range: a load, a temperature. `Progress` is for how far a task has come |
+| `number-field.tsx` | `NumberField` | `input.tsx`, `input-group.tsx` | a number with its range, its step and its format: a set point |
+| `otp-field.tsx` | `OTPField` | the `input-otp` of shadcn | a short code, one character a slot |
+
+**Left out on purpose.** `second-ways.test.ts` fails if one of the packages in the first group is added:
+
+| Component of shadcn | Its package | Instead |
+|---|---|---|
+| `sonner` | `sonner`, `next-themes` | `toast.tsx`, on the Toast of Base UI |
+| `command` | `cmdk`, which brings four packages of Radix | `combobox.tsx` for a list to search in |
+| `input-otp` | `input-otp` | `otp-field.tsx` |
+
+Not here yet, because nothing needs them, and each brings a package: `calendar` (react-day-picker,
+date-fns), `carousel` (embla), `resizable` (react-resizable-panels) and `code-block` (shiki). Adding one
+is a decision for a pull request of its own. `form` is empty in this style: a form is `field.tsx` and a
+form library.
+
+The chart is [Recharts](https://recharts.org), as shadcn has it. A series is thinned out before it is
+drawn: never more points than the picture is wide in pixels. The Timeseries API does that itself
+(`downsample`).
+
 ## A new component
 
 ```bash
@@ -34,7 +65,12 @@ the `catalog` of `pnpm-workspace.yaml` with its version.
 
 - A file under `src/components/` stays as generated. What a screen needs beyond it is a component of its own
   that uses it, in the app or in the card catalogue. So an update is one command,
-  `shadcn add <name> --diff`, and what it shows is what shadcn changed.
+  `shadcn add <name> --diff`, and what it shows is what shadcn changed. The three files that are ours are
+  the exception, and the day shadcn has one of them, the same command shows the difference.
+  One generated file differs by a line: `scroll-area.tsx` came with an import it does not use, which the
+  type check of this repository does not let through.
+- One way for each thing. Before a package comes in for something a component here does already, it is a
+  decision, and `second-ways.test.ts` holds the ones that were made.
 - Where Tailwind reads class names is up to the page. The example app reads this whole package. A card file
   reads only the components the cards draw; `packages/cards/src/styles.css` names them.
 - What is not a shadcn component does not belong here: a card, a row of the machine list, a page.
