@@ -77,6 +77,7 @@ the backend of the running demo stack answers.
 ## What is where
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
+  and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
   `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `health.ts` and `api/harness/$.ts` are
   server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
   (`nav`: a title, an icon, an order). `src/components/app-sidebar.tsx` reads the entries from the routes

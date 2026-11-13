@@ -149,6 +149,9 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- `app`: a toast shows. The example app had no `Toaster` at its root, so `toast.add` on a page showed
+  nothing; it has one now, and the `TooltipProvider` the docs of the tooltip ask for at the same place.
+  The provider gives every tooltip the delay `tooltip.tsx` sets, which is none.
 - `genui-mcp`: a state holds however long ago the machine reported it. A machine that said more than 24 hours
   ago that it is connected, and has sent only its heartbeat since, was shown as "No data".
 - A serial number follows one rule, the one of the MQTT binding: everything but `/`, `+` and `#`

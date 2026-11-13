@@ -11,6 +11,8 @@ import { PageBreadcrumb } from "@/components/page-breadcrumb.tsx"
 import { Button } from "@pleiades/ui/components/button"
 import { Separator } from "@pleiades/ui/components/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@pleiades/ui/components/sidebar"
+import { Toaster } from "@pleiades/ui/components/toast"
+import { TooltipProvider } from "@pleiades/ui/components/tooltip"
 
 import appCss from "../styles.css?url"
 
@@ -63,40 +65,47 @@ function Document({ children }: { children: ReactNode }) {
  * The chat never covers the page: you chat about what you see. Next to the open chat the page
  * narrows; where the two do not fit side by side, the page takes the upper half and the chat the
  * lower.
+ *
+ * Around it stands what the docs of two components ask for at the root of an application: the
+ * provider of the tooltips, and the place where a toast appears. Without the second, `toast.add`
+ * on a page shows nothing.
  */
 function Layout() {
   const { chat } = Route.useSearch()
   const panel = useChatPanel()
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      {/* The page and the chat share what the sidebar leaves. */}
-      <div className="flex min-w-0 flex-1 max-lg:flex-col">
-        <SidebarInset className="min-w-0">
-          <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-3">
-            <SidebarTrigger />
-            {/* The classes of the block; self-center because the separator stretches by default,
-                and a stretched item of a set height sits at the top of the header. */}
-            <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 data-vertical:self-center" />
-            <PageBreadcrumb />
-            <AskAnything />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="ml-auto"
-              aria-label={chat ? "Close the chat" : "Open the chat"}
-              aria-pressed={Boolean(chat)}
-              onClick={chat ? panel.close : panel.open}
-            >
-              <PanelRightIcon />
-            </Button>
-          </header>
-          <div className="p-6">
-            <Outlet />
-          </div>
-        </SidebarInset>
-        {chat && <ChatSidebar chat={chat} />}
-      </div>
-    </SidebarProvider>
+    <TooltipProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        {/* The page and the chat share what the sidebar leaves. */}
+        <div className="flex min-w-0 flex-1 max-lg:flex-col">
+          <SidebarInset className="min-w-0">
+            <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-3">
+              <SidebarTrigger />
+              {/* The classes of the block; self-center because the separator stretches by default,
+                  and a stretched item of a set height sits at the top of the header. */}
+              <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 data-vertical:self-center" />
+              <PageBreadcrumb />
+              <AskAnything />
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="ml-auto"
+                aria-label={chat ? "Close the chat" : "Open the chat"}
+                aria-pressed={Boolean(chat)}
+                onClick={chat ? panel.close : panel.open}
+              >
+                <PanelRightIcon />
+              </Button>
+            </header>
+            <div className="p-6">
+              <Outlet />
+            </div>
+          </SidebarInset>
+          {chat && <ChatSidebar chat={chat} />}
+        </div>
+      </SidebarProvider>
+      <Toaster />
+    </TooltipProvider>
   )
 }
