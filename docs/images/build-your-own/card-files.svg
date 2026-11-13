@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 752" role="img" aria-labelledby="title desc"
+     font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+  <title id="title">A card, file by file</title>
+  <desc id="desc">Two columns side by side, the generative UI backend and the example app, and the card
+    catalogue below both. In each column, from the top: what is there already and names no card, the server
+    with its description and its guide in the backend, the chat and its server in the app. It reads a list
+    of the cards, src/cards/index.ts in the backend and src/chat/cards.tsx in the app. A new card adds one
+    line to each list. Each list reads the module of the card, which is new: in the backend its tools, a
+    line about each for the description, its sections of the guide and its card file, in the app what a
+    call is called, what the chat draws for a result and which tool only a card calls. Below the module in
+    the backend is the card file, which the build finds without a list. Both columns read the contract and
+    the component of the card in the card catalogue, a new folder there. Every arrow points from the one
+    that reads to what it reads.</desc>
+  <defs>
+    <!-- They point along their line: "auto" turns them. -->
+    <marker id="fg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#6b7280"/>
+    </marker>
+  </defs>
+  <rect x="0.5" y="0.5" width="999" height="751" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+
+  <g font-size="12" fill="#6b7280">
+    <text x="40" y="50">A new card: files of its own, and one line in each of two lists</text>
+
+    <!-- Column one: the backend. -->
+    <rect x="40" y="64" width="450" height="492" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="56" y="88" font-size="15" font-weight="600" fill="#111827">Generative UI backend</text>
+    <text x="474" y="88" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">apps/genui-mcp</text>
+
+    <rect x="56" y="102" width="418" height="70" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="68" y="124" font-size="13" font-weight="600" fill="#111827">Server, description, guide</text>
+    <text x="462" y="124" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">src/server.ts, guide.ts</text>
+    <text x="68" y="144">are put together from the list below.</text>
+    <text x="68" y="160">They name no card.</text>
+
+    <rect x="56" y="206" width="418" height="96" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="68" y="228" font-size="13" font-weight="600" fill="#111827">The list of the cards</text>
+    <text x="462" y="228" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">src/cards/index.ts</text>
+    <text x="80" y="253" font-family="ui-monospace, Consolas, monospace" fill="#374151">machineCard,</text>
+    <rect x="68" y="262" width="120" height="24" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="80" y="279" font-family="ui-monospace, Consolas, monospace" fill="#374151">yourCard,</text>
+    <text x="200" y="279">your one line, by the alphabet</text>
+
+    <rect x="56" y="336" width="418" height="132" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="68" y="360" font-size="13" font-weight="600" fill="#111827">Your card</text>
+    <text x="462" y="360" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">src/cards/&lt;name&gt;.ts</text>
+    <text x="68" y="384">its tools, each with the contract of its answer</text>
+    <text x="68" y="402">a line about each tool, for the description</text>
+    <text x="68" y="420">its sections of the skill guide</text>
+    <text x="68" y="438">its card file, if other hosts shall show the card</text>
+
+    <rect x="56" y="484" width="418" height="56" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="68" y="508" font-size="13" font-weight="600" fill="#111827">Its card file</text>
+    <text x="462" y="508" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">ui/&lt;name&gt;.html, &lt;name&gt;.tsx</text>
+    <text x="68" y="528">for other hosts. No list: the build takes every page.</text>
+
+    <!-- Column two: the app. -->
+    <rect x="510" y="64" width="450" height="492" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="526" y="88" font-size="15" font-weight="600" fill="#111827">Example app</text>
+    <text x="944" y="88" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">apps/app</text>
+
+    <rect x="526" y="102" width="418" height="70" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="538" y="124" font-size="13" font-weight="600" fill="#111827">Chat, and its server</text>
+    <text x="932" y="124" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">src/chat/</text>
+    <text x="538" y="144">draw and offer what the list below says.</text>
+    <text x="538" y="160">They name no card.</text>
+
+    <rect x="526" y="206" width="418" height="96" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="538" y="228" font-size="13" font-weight="600" fill="#111827">The list of the cards</text>
+    <text x="932" y="228" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">src/chat/cards.tsx</text>
+    <text x="550" y="253" font-family="ui-monospace, Consolas, monospace" fill="#374151">...machineTools,</text>
+    <rect x="538" y="262" width="136" height="24" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="550" y="279" font-family="ui-monospace, Consolas, monospace" fill="#374151">...yourTools,</text>
+    <text x="686" y="279">your one line, by the alphabet</text>
+
+    <rect x="526" y="336" width="418" height="132" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="538" y="360" font-size="13" font-weight="600" fill="#111827">Your card in the chat</text>
+    <text x="932" y="360" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">src/&lt;name&gt;/chat.tsx</text>
+    <text x="538" y="384">what a call of each tool is called in the chat</text>
+    <text x="538" y="402">what the chat draws for a result: your component</text>
+    <text x="538" y="420">which of its tools only a card calls,</text>
+    <text x="538" y="438">so that a language model does not get it</text>
+
+    <rect x="526" y="484" width="418" height="56" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="538" y="508" font-size="13" font-weight="600" fill="#111827">Next to it, where needed</text>
+    <text x="932" y="508" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">src/&lt;name&gt;/</text>
+    <text x="538" y="528">checks a result against its contract, or fetches a series</text>
+
+    <!-- Below both: the catalogue. -->
+    <rect x="40" y="592" width="920" height="84" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+    <text x="56" y="616" font-size="15" font-weight="600" fill="#111827">Card catalogue</text>
+    <text x="944" y="616" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">packages/cards</text>
+    <rect x="56" y="628" width="888" height="36" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
+    <text x="68" y="651" font-size="13" font-weight="600" fill="#111827">Your card</text>
+    <text x="150" y="651">the contract of its answer and the component that draws it, with their tests</text>
+    <text x="932" y="651" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">src/&lt;name&gt;/</text>
+
+    <!-- How to read the lines. -->
+    <line x1="40" y1="706" x2="70" y2="706" stroke="#9ca3af" stroke-width="1.5"/>
+    <text x="78" y="710">there already: you leave it as it is</text>
+    <line x1="320" y1="706" x2="350" y2="706" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="358" y="710">yours: new with your card</text>
+    <line x1="560" y1="706" x2="590" y2="706" stroke="#6b7280" stroke-width="1.5" marker-end="url(#fg)"/>
+    <text x="598" y="710">reads</text>
+    <text x="40" y="734">Every arrow points from the one that reads to what it reads. The two lists are the only code two new cards share.</text>
+  </g>
+
+  <!-- Who reads whom. All of them straight. -->
+  <g fill="none" stroke-width="1.5" stroke="#6b7280">
+    <line x1="265" y1="172" x2="265" y2="206" marker-end="url(#fg)"/>
+    <line x1="265" y1="302" x2="265" y2="336" marker-end="url(#fg)"/>
+    <line x1="735" y1="172" x2="735" y2="206" marker-end="url(#fg)"/>
+    <line x1="735" y1="302" x2="735" y2="336" marker-end="url(#fg)"/>
+    <line x1="265" y1="556" x2="265" y2="592" marker-end="url(#fg)"/>
+    <line x1="735" y1="556" x2="735" y2="592" marker-end="url(#fg)"/>
+  </g>
+  <g font-size="12" fill="#6b7280">
+    <text x="277" y="193">reads</text>
+    <text x="277" y="323">reads</text>
+    <text x="747" y="193">reads</text>
+    <text x="747" y="323">reads</text>
+    <text x="277" y="578">the contract and the component</text>
+    <text x="747" y="578">the component</text>
+  </g>
+</svg>

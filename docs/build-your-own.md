@@ -70,3 +70,30 @@ meant for a card, the standard is strict: "Cross-server tool calls are always bl
 So a card does not fetch from the data APIs, or from any other MCP server, by itself. What it needs beyond its
 values it asks its own server for, the way the machine card asks for the spans of its band. What it needs from
 another source, its own server reads.
+
+## A card, file by file
+
+![Two columns side by side, the generative UI backend and the example app, and the card catalogue below both.
+In each column, from the top: what is there already and names no card, the server with its description and
+its guide in the backend, the chat and its server in the app. It reads a list of the cards,
+src/cards/index.ts in the backend and src/chat/cards.tsx in the app. A new card adds one line to each list.
+Each list reads the module of the card, which is new: in the backend its tools, a line about each for the
+description, its sections of the guide and its card file, in the app what a call is called, what the chat
+draws for a result and which tool only a card calls. Below the module in the backend is the card file, which
+the build finds without a list. Both columns read the contract and the component of the card in the card
+catalogue, a new folder there. Every arrow points from the one that reads to what it reads.](images/build-your-own/card-files.svg)
+
+A new card brings files of its own, and adds one line to each of two lists. What is drawn solid is there
+already and stays as it is; what is dashed is new with your card. The recipe is
+[`create-card`](../.claude/skills/create-card/SKILL.md).
+
+- **In the backend** the card is one module: its tools, a line about each for the description of the server,
+  its sections of the guide, and its card file. `src/cards/index.ts` lists the cards. The server, its
+  description and its guide are put together from that list.
+- **In the app** the card is one module too: what a call of each of its tools is called, what the chat draws
+  for a result, and which tool only a card calls. `src/chat/cards.tsx` lists the cards. The chat and its
+  server take them from there.
+- **In the card catalogue** the card is a folder: the contract of its answer and the component that draws
+  it. Both sides read them there.
+- **The two lists** are the only code that two new cards share: one line each, in the order of the alphabet.
+  A card also adds a row to the tables of the READMEs and of [`contracts/mcp`](../contracts/mcp/README.md).

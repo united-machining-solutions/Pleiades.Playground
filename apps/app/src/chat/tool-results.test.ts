@@ -1,56 +1,43 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { machineListOf, machineShowOf } from "./tool-results.ts"
+import { backendTools, forModel, jsonOf, toolLabel } from "./tool-results.ts"
+import type { ChatTool } from "./tool-results.ts"
 
-test("the JSON of genui_machine_list becomes the list of machines", () => {
-  const list = machineListOf('{"asOf":"2026-11-16T09:30:00.000Z","windowSeconds":1800,"machines":[]}')
-  assert.equal(list?.asOf, "2026-11-16T09:30:00.000Z")
-  assert.deepEqual(list?.machines, [])
+const tools: ReadonlyArray<ChatTool> = [
+  ...backendTools,
+  { name: "genui_machine_list", label: { running: "Reading", done: "Read", failed: "Failed to read" } },
+  { name: "genui_machine_show" },
+  { name: "genui_span_list", cardOnly: true },
+]
+
+test("a language model gets every tool but the ones only a card calls", () => {
+  const listed = ["genui_describe_server", "genui_machine_list", "genui_machine_show", "genui_span_list"].map(
+    (name) => ({ name }),
+  )
+  assert.deepEqual(
+    forModel(listed, tools).map((tool) => tool.name),
+    ["genui_describe_server", "genui_machine_list", "genui_machine_show"],
+  )
 })
 
-test("any other text is no list", () => {
-  assert.equal(machineListOf("genui is the generative UI backend"), null)
-  assert.equal(machineListOf('{"machines":"three"}'), null)
-  assert.equal(machineListOf(undefined), null)
+test("a tool the chat does not know is for the language model", () => {
+  assert.deepEqual(forModel([{ name: "genui_alarm_list" }], tools), [{ name: "genui_alarm_list" }])
 })
 
-const reading = { value: "Executing", at: "2026-11-16T09:29:55.000Z", since: null, sinceIsLowerBound: false, topic: "t" }
-const shown = {
-  asOf: "2026-11-16T09:30:00.000Z",
-  windowSeconds: 1800,
-  machine: {
-    machine: "P-04",
-    connection: reading,
-    heartbeat: reading,
-    itemState: reading,
-    operationMode: reading,
-    program: reading,
-    lastValueAt: reading.at,
-    notifications: [],
-  },
-  history: {
-    from: "2026-11-16T01:30:00.000Z",
-    to: "2026-11-16T09:30:00.000Z",
-    totals: [{ state: "running", seconds: 28_800 }],
-  },
-}
-
-test("a list whose machines do not keep the contract is not drawn", () => {
-  const list = { asOf: shown.asOf, windowSeconds: 1800 }
-  assert.equal(machineListOf(JSON.stringify({ ...list, machines: [shown.machine] }))?.machines.length, 1)
-  const withoutReadings = { machine: "P-04", notifications: [] }
-  assert.equal(machineListOf(JSON.stringify({ ...list, machines: [withoutReadings] })), null)
-  assert.equal(machineListOf(JSON.stringify({ ...list, asOf: "this morning", machines: [] })), null)
+test("a call is called what its card says, and by its name where no card says anything", () => {
+  assert.equal(toolLabel("genui_machine_list", tools).done, "Read")
+  assert.equal(toolLabel("genui_get_skill_guide", tools).done, "Read the guide of the backend")
+  assert.deepEqual(toolLabel("genui_machine_show", tools), {
+    running: "Running genui_machine_show",
+    done: "Ran genui_machine_show",
+    failed: "Failed to run genui_machine_show",
+  })
+  assert.equal(toolLabel("genui_alarm_list", tools).failed, "Failed to run genui_alarm_list")
 })
 
-test("the JSON of genui_machine_show becomes the values of the machine card", () => {
-  assert.equal(machineShowOf(JSON.stringify(shown))?.machine.machine, "P-04")
-})
-
-test("what does not keep the contract of the card is not drawn as one", () => {
-  const unknownState = { ...shown, history: { ...shown.history, totals: [{ state: "idle", seconds: 28_800 }] } }
-  assert.equal(machineShowOf(JSON.stringify(unknownState)), null)
-  assert.equal(machineShowOf('{"asOf":"2026-11-16T09:30:00.000Z","windowSeconds":1800,"machines":[]}'), null)
-  assert.equal(machineShowOf("genui is the generative UI backend"), null)
+test("the values of a result are its JSON, and anything else is none", () => {
+  assert.deepEqual(jsonOf('{"machines":[]}'), { machines: [] })
+  assert.equal(jsonOf("genui is the generative UI backend"), null)
+  assert.equal(jsonOf(undefined), null)
 })

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch src/main.ts",
     "start": "node src/main.ts",
-    "build": "vite build ui",
+    "build": "node ui/build.mjs",
     "typecheck": "tsc && tsc --project ui",
     "test": "node --test"
   },

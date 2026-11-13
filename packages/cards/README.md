@@ -62,12 +62,14 @@ Both import the theme from here, so the card looks the same in both.
 ## A new card
 
 1. Write the contract next to the component, in a folder of its own under `src/`.
-2. In `genui-mcp`, add the tool with that contract as its `outputSchema`, and a row in
+2. In `genui-mcp`, add a module for the card under `src/cards/`, with the tool that has that contract as
+   its `outputSchema`, and one line in `src/cards/index.ts`. Add a row in
    [`contracts/mcp`](../../contracts/mcp/README.md).
 3. Write the component with the inferred type as its properties.
-4. In the application, draw the component where the result of the tool arrives.
-5. For other hosts, add a card file under `apps/genui-mcp/ui/` and to the build there, and link it from the
-   tool.
+4. In the application, say what the chat draws for a result of the tool: a module for the card, like
+   `src/machines/chat.tsx`, and one line in `src/chat/cards.tsx`.
+5. For other hosts, add a page for the card under `apps/genui-mcp/ui/` and link it from the tool. The build
+   finds the page by itself.
 6. If the card shows a series, keep it out of the contract of the card: give it a contract and a tool of its
    own, and let the application and the card file ask for it.
 

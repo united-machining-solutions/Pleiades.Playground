@@ -162,12 +162,21 @@ files and not those.
 ## What is where
 
 - `src/main.ts`: reads the settings and serves `/mcp` and `/health`, or with `--stdio` stdin and stdout.
-- `src/server.ts`: the MCP server, its tools and its resources. An application imports its type and calls it
-  with `createMCPClient<typeof server>`.
+- `src/server.ts`: the MCP server, the two tools with which a caller finds its way, and its resources. It
+  names no card. An application imports its type and calls it with `createMCPClient<typeof server>`.
+- `src/cards/`: one module for each card, and `index.ts`, which lists them: one line for a card, in the
+  order of the alphabet. A module says what its card brings (`src/card.ts`): its tools, a line about each
+  for the description of the server, its sections of the guide, and its card file. `machine.ts` is the
+  machine card, `machine.guide.ts` its sections of the guide, and `machine.names.ts` the names it shares
+  with its card file. The server, the description and the guide are put together from the list, so a new
+  card adds one line there and changes nothing else.
+- `src/tool.ts`: what the tools share: the context of a call, the annotations, a result in words, and the
+  time zone a caller names.
+- `src/guide.ts`: what the two discovery tools say about the server, around what the cards say.
 - `src/card-file.ts`: reads a built card file, and says what a card tells a host about itself.
-- `src/names.ts`: the names the server and its card files share.
 - `ui/`: the card files, which run in a host and not in Node.js. `machine.tsx` takes the result from the host
-  and draws the machine card, `vite.config.ts` builds it into one HTML file.
+  and draws the machine card. `build.mjs` builds every page of the folder into one HTML file each, with
+  `vite.config.ts`: a card adds its page and is named nowhere.
 - `src/machines.ts`: what a machine does now. The shape of a machine is a contract of the card catalogue,
   [`@pleiades/cards`](../../packages/cards/README.md), because cards show it.
 - `src/history.ts`: the states of a machine over a stretch of time, as spans, their sums, and the thinning

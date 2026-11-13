@@ -1,5 +1,3 @@
-import { stateOf } from "@pleiades/cards/machine/state.ts"
-import { Card } from "@pleiades/cards/ui/card.tsx"
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react"
 import { Link, getRouteApi, useRouter } from "@tanstack/react-router"
 import {
@@ -13,7 +11,7 @@ import {
   PlusIcon,
   XIcon,
 } from "lucide-react"
-import { Fragment, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import type { FormEvent, KeyboardEvent } from "react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -30,7 +28,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group"
-import { ItemGroup, ItemSeparator } from "@/components/ui/item"
 import { Message, MessageContent } from "@/components/ui/message"
 import {
   MessageScroller,
@@ -52,13 +49,12 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
-import { MachineRow } from "@/machines/machine-item.tsx"
-import { ShownMachine } from "@/machines/shown-machine.tsx"
 
 import { Answer } from "./answer.tsx"
 import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
 import { blocksOf, questionOf } from "./blocks.ts"
 import type { Block, CallState } from "./blocks.ts"
+import { chatTools } from "./cards.tsx"
 import { chooseChatModel, fetchChatModel } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
 import { toolLabel } from "./tool-results.ts"
@@ -261,7 +257,7 @@ function Conversation({ threadId }: { threadId: string }) {
                       </MessageScrollerItem>
                     )
                   }
-                  const blocks = blocksOf(message.parts, isLoading && message === messages.at(-1))
+                  const blocks = blocksOf(message.parts, isLoading && message === messages.at(-1), chatTools)
                   // An answer that has nothing to show yet takes no room.
                   if (blocks.length === 0) return null
                   return (
@@ -320,7 +316,7 @@ const callIcon: Record<CallState, typeof CircleCheckIcon> = {
   failed: CircleAlertIcon,
 }
 
-/** One block of an answer: the tool calls of a stretch, a text, a card or a list. */
+/** One block of an answer: the tool calls of a stretch, a text, or what a card draws for a result. */
 function AnswerBlock({ block }: { block: Block }) {
   switch (block.kind) {
     case "steps":
@@ -336,7 +332,7 @@ function AnswerBlock({ block }: { block: Block }) {
                 <TraceIcon>
                   <Icon className={call.state === "running" ? "animate-spin" : undefined} />
                 </TraceIcon>
-                <TraceTitle>{toolLabel(call.name)[call.state]}</TraceTitle>
+                <TraceTitle>{toolLabel(call.name, chatTools)[call.state]}</TraceTitle>
               </TraceLine>
             )
           })}
@@ -344,21 +340,9 @@ function AnswerBlock({ block }: { block: Block }) {
       )
     case "text":
       return <Answer text={block.text} />
-    case "machine":
-      return <ShownMachine values={block.values} />
-    case "list":
-      return (
-        <Card className="gap-0 py-0">
-          <ItemGroup className="gap-0">
-            {block.values.machines.map((machine, position) => (
-              <Fragment key={machine.machine}>
-                {position > 0 && <ItemSeparator className="my-0" />}
-                <MachineRow machine={machine} state={stateOf(machine, block.values.asOf)} asOf={block.values.asOf} />
-              </Fragment>
-            ))}
-          </ItemGroup>
-        </Card>
-      )
+    // What the card of a tool draws for its result: a card, a list. The chat names no card.
+    case "drawn":
+      return block.node
   }
 }
 

@@ -117,6 +117,13 @@ All notable changes are documented here. The format follows
   `pnpm install` and `pnpm typecheck` (`apps/app/route-tree.mjs`), by the development server and by the
   build, so two branches with a page each have nothing to merge in it. After you pull this change the file
   is gone from your checkout until one of them has run.
+- `genui-mcp` and `app`: a card is one module on each side and one line in a list, so two cards that are
+  added at the same time no longer meet in the server, the guide and the chat. The server takes its tools,
+  its card files and what its description and its guide say about a card from `src/cards/index.ts`; the
+  chat takes what it draws for which tool, and which tools a language model does not get, from
+  `src/chat/cards.tsx`. The card files are built from every page under `apps/genui-mcp/ui/`. For a caller
+  nothing changed: the lists of tools and resources, the description, the guide and the card file are the
+  same, byte for byte. The recipe `create-card` names the new places.
 
 ### Fixed
 

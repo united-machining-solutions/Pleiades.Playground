@@ -8,7 +8,7 @@ import { useEffect, useState } from "react"
 import type { ReactNode } from "react"
 import { createRoot } from "react-dom/client"
 
-import { SPAN_LIST_TOOL } from "../src/names.ts"
+import { SPAN_LIST_TOOL } from "../src/cards/machine.names.ts"
 import "./styles.css"
 
 // The machine card as an MCP App: the file a host loads from ui://genui/machine and shows with a
