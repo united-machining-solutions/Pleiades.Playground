@@ -81,6 +81,12 @@ All notable changes are documented here. The format follows
   `node .github/scripts/tour-screenshots.mjs` writes six of the seven pictures under `docs/images/tour/`,
   each 1280 × 800 pixels. The two pictures of the chat need a language model and are left out without one;
   the card in another host stays a picture taken by hand. Playwright is a development dependency for that.
+- `packages/ui` holds every shadcn/ui component of the style that needs no package of its own, 33 more than
+  before, and `chart` on Recharts 3.8.0. Three components are its own, built on a part of Base UI that
+  shadcn has no file for and styled like their neighbours: `meter.tsx` (a measurement in its range),
+  `number-field.tsx` (a number with range, step and format) and `otp-field.tsx` (a short code). `sonner`,
+  `command` and `input-otp` are left out on purpose, each a second way for something that is there on
+  Base UI, and a test fails if one of their packages is added.
 - A card can be looked at without a language model: `node .claude/skills/build-your-own/show-card.mjs <tool>`
   stands in for a host of MCP Apps. It calls the tool, reads the card file the tool links and serves a page
   that shows the card wide and narrow. The recipes `create-page` and `create-card` say what two agents had
@@ -109,6 +115,11 @@ All notable changes are documented here. The format follows
 - `README.md` starts the stack with `--wait` and shows the two lines that enable the chat. The development
   setup has three more known issues: a download that breaks off, `pnpm` through the path, and a key that
   `docker compose restart` does not pick up.
+- The skill `setup` starts the stack from the published images of `main` and no longer builds it: about
+  half a gigabyte to download instead of a build of ten minutes or more. It first makes sure that `.env`
+  names `PLEIADES_VERSION=main`, because a later start with another version there builds the whole stack.
+  The skill `build-your-own` sends a stack that does not run to `setup`, and keeps that version when it
+  makes `.env` for a key.
 - `app`: the screens are composed as the shadcn/ui docs compose them. In the chat a question is a `Bubble`,
   the tool calls of a stretch are a `Trace`, an error is an `Alert`, and the questions to begin with are a row
   of buttons above the field. Every empty state has its icon. The path of a page is a `Breadcrumb` in the

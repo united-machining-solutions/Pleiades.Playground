@@ -9,20 +9,23 @@
     "./hooks/*": "./src/hooks/*.ts"
   },
   "scripts": {
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test": "node --test"
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
     "@shadcn/react": "catalog:",
     "class-variance-authority": "catalog:",
     "cn": "catalog:",
-    "lucide-react": "catalog:"
+    "lucide-react": "catalog:",
+    "recharts": "catalog:"
   },
   "peerDependencies": {
     "react": "catalog:",
     "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "react": "catalog:",
