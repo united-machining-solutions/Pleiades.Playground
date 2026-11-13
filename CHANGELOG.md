@@ -146,6 +146,10 @@ All notable changes are documented here. The format follows
   and three in the catalogue. The theme moved with them, from `@pleiades/cards/theme.css` to
   `@pleiades/ui/globals.css`. A card file still carries the styles of the components the cards draw and of
   no other: `packages/cards/src/styles.css` names them, and a test keeps the list right.
+- pnpm puts a package that is added into the catalog itself, with its exact version, and `catalog:` into
+  the `package.json` (`catalogMode: strict` and an empty `savePrefix` in `pnpm-workspace.yaml`). Before,
+  `pnpm add` and `shadcn add` wrote a version with a `^` into the `package.json`, and moving it into the
+  catalog was a step by hand.
 
 ### Fixed
 
