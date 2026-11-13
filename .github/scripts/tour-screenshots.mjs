@@ -8,12 +8,14 @@
 //   node .github/scripts/tour-screenshots.mjs home swagger-ui    only these
 //
 // It needs the stack running (docker compose up -d --wait), the packages of the workspace (pnpm install)
-// and the browser of Playwright (pnpm exec playwright install chromium).
+// and the browser of Playwright (pnpm exec playwright install --only-shell chromium). A stack that was
+// started with "-p <name>" is found with COMPOSE_PROJECT_NAME=<name>.
 //
 // What a run does to the stack:
 // - "chat-answer" asks the language model of the chat one question, at the cost of the owner of its key.
 //   Without a language model the two pictures of the chat are left out, and the run says so.
-// - "home-no-data" stops the simulator of one machine for about a minute and starts it again.
+// - "home-no-data" stops the simulator of one machine for about a minute and starts it again, also when
+//   the run is interrupted with Ctrl+C.
 //
 // The simulator changes the states on its own, so two runs do not give the same picture: look at what a
 // run wrote, and describe in docs/tour.md what the new picture shows. The picture of the card in another
@@ -55,10 +57,29 @@ function addressOf(service) {
   try {
     published = compose("port", service, "8080").trim().split("\n")[0]
   } catch {
-    fail(`The service "${service}" does not run. Start the stack first: docker compose up -d --wait`)
+    fail(
+      `The service "${service}" does not run. Start the stack first: docker compose up -d --wait. ` +
+        "If it runs under a project name of its own (-p <name>), set COMPOSE_PROJECT_NAME=<name> for this script.",
+    )
   }
   return `http://localhost:${published.slice(published.lastIndexOf(":") + 1)}`
 }
+
+/**
+ * The simulator this run has stopped, started again. A `finally` is not enough for that: it does not run
+ * when the run is ended from outside, with Ctrl+C or by a tool that stops waiting. So the simulator is also
+ * started when the process ends, and an interrupt ends the process the ordinary way.
+ */
+let stopped = false
+function startAgain() {
+  if (!stopped) return
+  stopped = false
+  compose("start", SILENT.service)
+  console.log(`  started ${SILENT.service} again`)
+}
+process.on("exit", startAgain)
+process.once("SIGINT", () => process.exit(130))
+process.once("SIGTERM", () => process.exit(143))
 
 /** Opens a page with the chat panel at its start. Answers why the chat cannot be shown, if it cannot. */
 async function openChat(page, url) {
@@ -134,6 +155,7 @@ const pictures = [
     async show(page, at) {
       console.log(`  stopping ${SILENT.service}, then waiting until Home shows ${SILENT.machine} without data`)
       compose("stop", SILENT.service)
+      stopped = true
       await page.goto(at.app)
       await page
         .getByRole("listitem")
@@ -141,10 +163,7 @@ const pictures = [
         .filter({ hasText: "No data" })
         .waitFor({ timeout: SILENCE_TIMEOUT })
     },
-    after() {
-      compose("start", SILENT.service)
-      console.log(`  started ${SILENT.service} again`)
-    },
+    after: startAgain,
   },
 ]
 
@@ -158,7 +177,7 @@ const { chromium } = await import("playwright").catch(() => fail("Playwright is 
 const at = { app: addressOf("app"), timeseries: addressOf("timeseries-api") }
 const browser = await chromium.launch().catch((error) => {
   if (String(error).includes("Executable doesn't exist")) {
-    fail("The browser of Playwright is not installed. Run: pnpm exec playwright install chromium")
+    fail("The browser of Playwright is not installed. Run: pnpm exec playwright install --only-shell chromium")
   }
   throw error
 })
