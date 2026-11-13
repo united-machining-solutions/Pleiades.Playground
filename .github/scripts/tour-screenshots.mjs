@@ -32,9 +32,9 @@ const viewport = { width: 1280, height: 800 }
 /** A picture of the tour stays below this size, so the repository stays light. */
 const LIMIT_BYTES = 500_000
 
-/** The machine of the stop "The page of one machine", and the one the chat is asked about. */
+/** The machine of the stops "The page of one machine" and "The chat beside the page". */
 const SHOWN = "P-04"
-/** The question of the stop "The chat beside the page". The chat answers it with the card of the machine. */
+/** The question of the stop "The chat beside the page". */
 const QUESTION = `What did ${SHOWN} do over the last 8 hours?`
 /** How long a language model may take for its answer, tool calls included. */
 const ANSWER_TIMEOUT = 120_000
@@ -129,8 +129,7 @@ const pictures = [
   {
     name: "chat-answer",
     async show(page, at) {
-      // Beside Home, not beside the page of the machine: there the chat would draw the card a second time.
-      const reason = await openChat(page, at.app)
+      const reason = await openChat(page, `${at.app}/machines/${SHOWN}`)
       if (reason) return reason
       console.log(`  asking the language model: ${QUESTION}`)
       const field = page.getByRole("textbox", { name: "Message" })
