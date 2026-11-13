@@ -29,16 +29,16 @@ Nothing is built here. The package is source: an import names the file, for exam
 | Importer | Files | Needs |
 |---|---|---|
 | The backend, in Node.js | `.ts` files only: contracts and rules | `zod` |
-| An application, through its bundler | everything | React, Base UI and a theme: `src/theme.css`, or one of its own |
+| An application, through its bundler | everything | React, the components of `@pleiades/ui` and a theme: its `globals.css`, or one of its own |
 | A card file of the backend, through its bundler | everything | the same |
 
 Node.js runs the `.ts` files as they are. So they use no syntax that needs compiling, every import names its
-file with `.ts`, and none of them imports a `.tsx` file. The React libraries are optional peer dependencies:
-whoever draws a card brings them, and the image of the backend stays without them.
+file with `.ts`, and none of them imports a `.tsx` file. React and `@pleiades/ui` are optional peer
+dependencies: whoever draws a card brings them, and the image of the backend stays without them.
 
 A card is drawn in two places: by an application that imports the component, and by a
 [card file](../../apps/genui-mcp/README.md) of the backend, one HTML page that a host of MCP Apps shows.
-Both import the theme from here, so the card looks the same in both.
+Both import the theme from [`packages/ui`](../ui/README.md), so the card looks the same in both.
 
 ## What is where
 
@@ -52,12 +52,14 @@ Both import the theme from here, so the card looks the same in both.
   - `in-words.ts`: the list and the card in words, for a reader that does not see them. The backend sends
     them as the text of a result, which is what a language model reads.
   - `machine-card.tsx`: the machine card.
-- `src/ui/`: the [shadcn/ui](https://ui.shadcn.com) components the cards are built from, kept as generated.
-  An application imports them from here instead of keeping a second copy.
-- `src/dataviz.css`: chart and state colours. `src/styles.css` is what a page imports: the colours, and the
-  class names of this package for Tailwind.
-- `src/theme.css`: the theme, which is the shadcn tokens of the preset, light only. A page imports it before
-  `styles.css`, or brings a shadcn theme of its own. The font is not part of it.
+- The [shadcn/ui](https://ui.shadcn.com) components the cards are built from are in
+  [`packages/ui`](../ui/README.md), with every other component of the user interface.
+- `src/dataviz.css`: chart and state colours. `src/styles.css` is what a page imports: the colours, the class
+  names of this package for Tailwind, and one line for each component of `packages/ui` that a card draws. A
+  card file so carries the styles of those components and of no other; `styles.test.ts` fails if a line is
+  missing or left over.
+- The theme is `@pleiades/ui/globals.css`. A page imports it before `styles.css`, or brings a shadcn theme
+  of its own.
 
 ## A new card
 

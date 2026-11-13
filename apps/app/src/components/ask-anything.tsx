@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from "react"
 import type { FormEvent } from "react"
 
 import { useChatPanel } from "@/chat/ask.ts"
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group"
-import { Kbd } from "@/components/ui/kbd"
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@pleiades/ui/components/input-group"
+import { Kbd } from "@pleiades/ui/components/kbd"
 
 /** The field in the header. A question opens a chat in the panel on the right; the page stays as it is. */
 export function AskAnything() {

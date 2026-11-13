@@ -8,7 +8,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-} from "@/components/ui/sidebar"
+} from "@pleiades/ui/components/sidebar"
 
 /**
  * The pages of the app, on the left. Everything about the chat is in the panel on the right, so

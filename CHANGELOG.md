@@ -124,6 +124,12 @@ All notable changes are documented here. The format follows
   `src/chat/cards.tsx`. The card files are built from every page under `apps/genui-mcp/ui/`. For a caller
   nothing changed: the lists of tools and resources, the description, the guide and the card file are the
   same, byte for byte. The recipe `create-card` names the new places.
+- The shadcn/ui components live in one package, `packages/ui` (`@pleiades/ui`), laid out as the monorepo
+  template of shadcn lays it out. The example app and the card catalogue import a component as
+  `@pleiades/ui/components/<name>`, and `shadcn add` writes a new one there; before, twenty lay in the app
+  and three in the catalogue. The theme moved with them, from `@pleiades/cards/theme.css` to
+  `@pleiades/ui/globals.css`. A card file still carries the styles of the components the cards draw and of
+  no other: `packages/cards/src/styles.css` names them, and a test keeps the list right.
 
 ### Fixed
 

@@ -10,10 +10,13 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
 - TypeScript lives under `apps/` and `packages/` in one pnpm workspace with central versions; add a version to
   the `catalog` in `pnpm-workspace.yaml`, never a version in a `package.json`. npmjs.org is the only registry.
 - The user interface under `apps/` and `packages/cards` is built with shadcn/ui, and shadcn/ui is its design
-  system. Before you write user interface, read the docs of the component
-  (`pnpm --filter @pleiades/app exec shadcn docs <name>`) and use its composition whole. Build no element of your
-  own where a component exists; add a missing one with `shadcn add`. A deviation is a decision: name it in the
-  pull request. The rules, with wrong and right examples, are in `.claude/skills/shadcn/`.
+  system. Its components live in one place, `packages/ui`, as shadcn generates them: import one as
+  `@pleiades/ui/components/<name>`, keep no second copy, and do not edit a generated file. Before you write
+  user interface, read the docs of the component (`pnpm --filter @pleiades/app exec shadcn docs <name>`) and
+  use its composition whole. Build no element of your own where a component exists; add a missing one with
+  `pnpm --filter @pleiades/app exec shadcn add <name>`, which writes it into `packages/ui`. A deviation is a
+  decision: name it in the pull request. The rules, with wrong and right examples, are in
+  `.claude/skills/shadcn/`.
 - Before substantial work with a TanStack library (Router, Start, AI), load its skill in the version this
   repository pins: `pnpm exec intent list` names them, `pnpm exec intent load <package>#<skill>` prints one.
   It needs `pnpm install` first. In one thing this repository differs from the skill of the Router: the

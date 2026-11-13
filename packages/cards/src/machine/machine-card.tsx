@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 
-import { Badge } from "../ui/badge.tsx"
-import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "../ui/card.tsx"
+import { Badge } from "@pleiades/ui/components/badge"
+import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import type { MachineShow } from "./contract.ts"
 import { clock, duration } from "./format.ts"
 import { openWarning, stateLabel, stateOf } from "./state.ts"

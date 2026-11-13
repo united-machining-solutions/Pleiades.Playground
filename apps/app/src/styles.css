@@ -7,15 +7,17 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/roboto";
 /*
- * The theme (the shadcn tokens) lies with the cards, so a card looks the same in every page that
- * draws it. The second file brings the chart and state colours and the class names of the cards.
+ * The theme (the shadcn tokens) lies with the components, in packages/ui, so a component looks the
+ * same in every page that draws it. This application may draw every component, so Tailwind reads the
+ * class names of the whole package. The stylesheet of the cards brings the chart and state colours
+ * and the class names of the card catalogue.
  */
-@import "@pleiades/cards/theme.css";
+@import "@pleiades/ui/globals.css";
+@source "../../../packages/ui/src";
 @import "@pleiades/cards/styles.css";
 
 /* The font is this application's own. */
 @theme inline {
-    --font-heading: var(--font-sans);
     --font-sans: 'Roboto Variable', sans-serif;
 }
 

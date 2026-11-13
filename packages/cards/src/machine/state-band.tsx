@@ -1,4 +1,4 @@
-import { Skeleton } from "../ui/skeleton.tsx"
+import { Skeleton } from "@pleiades/ui/components/skeleton"
 import type { MachineShow, Span, State } from "./contract.ts"
 import { clock, lasting } from "./format.ts"
 import { stateLabel } from "./state.ts"

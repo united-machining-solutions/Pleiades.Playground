@@ -1,6 +1,6 @@
 import { ServerOffIcon } from "lucide-react"
 
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 
 /**
  * A page without its values says why, and that it keeps trying. The reason is a sentence that

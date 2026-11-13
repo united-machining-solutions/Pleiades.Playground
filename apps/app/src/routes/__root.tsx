@@ -8,9 +8,9 @@ import { fetchChats, getChatStatus } from "@/chat/status.ts"
 import { AppSidebar } from "@/components/app-sidebar.tsx"
 import { AskAnything } from "@/components/ask-anything.tsx"
 import { PageBreadcrumb } from "@/components/page-breadcrumb.tsx"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { Button } from "@pleiades/ui/components/button"
+import { Separator } from "@pleiades/ui/components/separator"
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@pleiades/ui/components/sidebar"
 
 import appCss from "../styles.css?url"
 

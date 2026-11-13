@@ -1,10 +1,11 @@
 /*
  * The stylesheet of the card files. Tailwind looks for class names in this folder and, through the
- * stylesheet of the cards, in the card catalogue. The theme is the one of the catalogue. A card file
- * has no background and no font of its own: it stands in the conversation of a host.
+ * stylesheet of the cards, in the card catalogue and in the components the cards draw. The theme is
+ * the one of the components (packages/ui). A card file has no background and no font of its own: it
+ * stands in the conversation of a host.
  */
 @import "tailwindcss" source(".");
-@import "@pleiades/cards/theme.css";
+@import "@pleiades/ui/globals.css";
 @import "@pleiades/cards/styles.css";
 
 @layer base {

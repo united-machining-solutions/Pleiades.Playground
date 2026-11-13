@@ -1,9 +1,17 @@
 /*
  * What a page needs to draw the cards: the chart and state colours, and Tailwind reading the class
- * names of this package. The theme (the shadcn tokens) is a file of its own, theme.css: a page with
- * a shadcn theme of its own imports only this one.
+ * names of this package and of the shadcn/ui components the cards draw. The theme (the shadcn tokens)
+ * is a file of packages/ui, globals.css: a page with a shadcn theme of its own imports only this one.
  *
  *   @import "@pleiades/cards/styles.css";
  */
 @import "./dataviz.css";
 @source ".";
+/*
+ * The components live in packages/ui. Tailwind reads exactly the ones a card draws, so a card file
+ * carries no styles of a component it does not show. A card that draws another component adds its
+ * line here, in the order of the alphabet; styles.test.ts fails if one is missing or left over.
+ */
+@source "../../ui/src/components/badge.tsx";
+@source "../../ui/src/components/card.tsx";
+@source "../../ui/src/components/skeleton.tsx";
