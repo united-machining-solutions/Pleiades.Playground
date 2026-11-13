@@ -8,6 +8,7 @@
     "build": "pnpm --recursive --if-present run build"
   },
   "devDependencies": {
-    "@tanstack/intent": "catalog:"
+    "@tanstack/intent": "catalog:",
+    "playwright": "catalog:"
   }
 }

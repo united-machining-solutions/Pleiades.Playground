@@ -221,7 +221,36 @@ To use the tools from your own agent, add the three MCP addresses to any MCP cli
 
 ---
 
-The screenshots are 1383 × 868 pixels, taken in Chrome in the light theme of the app. To replace one, keep
-the file name under [`images/tour/`](images/tour) and describe in the text what the new picture shows.
-Whoever changes what a stop shows keeps the stop current, see [CONTRIBUTING.md](../CONTRIBUTING.md#conventions);
-CI checks that every pointer of this page still has its target.
+## Retaking the screenshots
+
+One command takes the screenshots from the running stack and writes them under
+[`images/tour/`](images/tour), each 1280 × 800 pixels in the light theme:
+
+```bash
+pnpm install
+pnpm exec playwright install --only-shell chromium    # once: the browser that takes the pictures
+node .github/scripts/tour-screenshots.mjs
+```
+
+Take them from a stack on the default ports that has run for a while. On a stack that has just started, the
+band of the machine page is almost all "No data", and with moved ports the picture of the Swagger UI shows
+another port than the text of stop 6. If you started the stack with `-p <name>`, run the script with
+`COMPOSE_PROJECT_NAME=<name>`: without it the script looks for the stack of the default name.
+
+To take only some, name them: `node .github/scripts/tour-screenshots.mjs home machine-page`. The names are
+the file names without `.png`. Two pictures do something to the stack, see the head of
+[the script](../.github/scripts/tour-screenshots.mjs):
+
+- `chat-answer` asks the language model of the chat one question, at the cost of the owner of its key.
+  Without a language model the two pictures of the chat are left out, and the run says so.
+- `home-no-data` stops the simulator of M-02 for about a minute and starts it again, also when you interrupt
+  the run with Ctrl+C. If a run is ended in a way it cannot catch and M-02 stays without data, start it with
+  `docker compose start simulator-m-02`.
+
+The picture of the card in another host, `machine-card-in-host.png`, is taken by hand: it shows another
+program, not the stack.
+
+The simulator keeps changing the states, so a new picture shows other states than the one before. Look at
+it, and describe in the text of its stop what it shows. Whoever changes what a stop shows keeps the stop
+current, see [CONTRIBUTING.md](../CONTRIBUTING.md#conventions); CI checks that every pointer of this page
+still has its target.

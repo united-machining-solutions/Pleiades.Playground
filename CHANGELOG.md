@@ -77,6 +77,10 @@ All notable changes are documented here. The format follows
   in the pull request template). The agent skill of shadcn/ui (`.claude/skills/shadcn`) and the MCP server of
   its CLI (`.mcp.json`) come with the repository, so an agent reads the docs of a component before it writes
   user interface.
+- A script takes the screenshots of the tour from the running stack:
+  `node .github/scripts/tour-screenshots.mjs` writes six of the seven pictures under `docs/images/tour/`,
+  each 1280 × 800 pixels. The two pictures of the chat need a language model and are left out without one;
+  the card in another host stays a picture taken by hand. Playwright is a development dependency for that.
 
 ### Changed
 

@@ -37,6 +37,9 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   the tour once: "Shall I give you a tour of the demo?"
 - A change to what the demo shows, how it starts or where its code lives: update [docs/tour.md](docs/tour.md)
   in the same pull request, and name a screenshot you could not retake.
+  `node .github/scripts/tour-screenshots.mjs <name>` retakes one from the running stack. Ask the person before
+  you take `chat-answer`, which asks their language model a question, and `home-no-data`, which stops a
+  simulator for a minute.
 - A person who has just got the repository, or whose stack, example app or chat does not run: follow the
   skill `setup` (`.claude/skills/setup/SKILL.md`). Check each step yourself, say what you found, ask before you
   start or install anything, and where you cannot go on, give the person one sentence to pass on.
