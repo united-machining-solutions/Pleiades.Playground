@@ -78,8 +78,11 @@ the backend of the running demo stack answers.
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `health.ts` and `api/harness/$.ts` are
-  server routes.
-- `src/routeTree.gen.ts`: written by the build. Commit it, never edit it.
+  server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
+  (`nav`: a title, an icon, an order). `src/components/app-sidebar.tsx` reads the entries from the routes
+  and names no page, and `nav.ts` next to it puts them in order and finds the one a person is under.
+- `src/routeTree.gen.ts`: written by the build. Commit it, never edit it. If a merge leaves it in conflict,
+  take either side and run the build.
 - `src/machines/`: `get-machines.ts` holds the server functions that call the backend as a typed MCP client,
   `machine-item.tsx` draws a machine as a row or a tile. `card-tools.ts` names the tools of the backend that
   only a card calls: the chat keeps them from its language model. Which value of the binding is which state,

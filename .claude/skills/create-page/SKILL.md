@@ -34,10 +34,10 @@ Read, in this order:
 
 ## You touch
 
-- `apps/app/src/routes/<name>.tsx`: new, the page.
-- `apps/app/src/components/app-sidebar.tsx`: one entry. The sidebar marks the page a person is on: let the
-  mark follow the route, for the entries that are there too.
-- `apps/app/src/routeTree.gen.ts`: written by the build. Commit it, never edit it.
+- `apps/app/src/routes/<name>.tsx`: new, the page. It names its own entry in the sidebar, see step 6. No
+  list of pages is shared, so two new pages never meet in one file.
+- `apps/app/src/routeTree.gen.ts`: written by the build. Commit it, never edit it. If a merge leaves it in
+  conflict, take either side and run the build: it writes the file anew.
 - `apps/app/src/machines/get-machines.ts`, only if no server function calls the tool you need: one more, like
   the ones there.
 
@@ -60,7 +60,12 @@ say so.
    Adding up, comparing machines or putting things in a new order is not: that answer is missing, so stop
    and take `create-card`.
 5. If the values change, read them again the way Home does, with `useLive()`.
-6. Add the page to the sidebar.
+6. Give the page its entry in the sidebar, in the route itself:
+   `staticData: { nav: { title: "Warnings", icon: TriangleAlertIcon } }`, with an icon of `lucide-react`,
+   as `src/routes/index.tsx` does for Home. The sidebar reads its entries from the routes and marks the
+   page a person is on. Entries stand by their title; an `order` below 100 moves one up. A page that names
+   no entry stands in no list: right for a page that is reached from another one, like the page of a
+   machine.
 
 The page looks like the pages that are there: the same header, the same spacing, the light theme.
 
