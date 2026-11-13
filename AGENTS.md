@@ -18,7 +18,10 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   shadcn are left out on purpose, `sonner`, `command` and `input-otp` among them: `packages/ui/README.md`
   says what to take instead, and a test fails on their packages. A deviation is a decision: name it in the
   pull request. The rules, with wrong and right examples, are in
-  `.claude/skills/shadcn/`.
+  `.claude/skills/shadcn/`. To see what is there before you build, open the design system,
+  [`apps/design-system`](apps/design-system/README.md): one page that shows every component in its variants
+  and states (`pnpm --filter @pleiades/design-system dev`, <http://localhost:3100/>). A component you add
+  gets its block there; a test fails until it has one.
 - Before substantial work with a TanStack library (Router, Start, AI), load its skill in the version this
   repository pins: `pnpm exec intent list` names them, `pnpm exec intent load <package>#<skill>` prints one.
   It needs `pnpm install` first. In one thing this repository differs from the skill of the Router: the

@@ -83,7 +83,7 @@ Anyone who keeps the contracts may bring their own implementation.
 ## Repository layout
 
 ```text
-apps/         TypeScript applications, one container each
+apps/         TypeScript applications: the two of the demo stack, one container each, and the design system
 packages/     TypeScript packages shared by the apps
 source/       .NET solution: services, libraries and tests, one project per folder
 contracts/    The agreed interfaces as files: data model, MQTT binding, OpenAPI, MCP tools

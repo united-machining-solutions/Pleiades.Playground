@@ -8,6 +8,9 @@ nobody keeps a second copy. Why one package: [ADR-0009](../../docs/adr/0009-shad
 The layout is the one of the monorepo template of shadcn (`shadcn init --monorepo`), so its docs and its
 command line fit as they are.
 
+Every component here is shown on one page, in its variants and states: the
+[design system](../../apps/design-system/README.md), `pnpm --filter @pleiades/design-system dev`.
+
 ## What is where
 
 - `src/components/`: one file for a component, as shadcn generated it. Import one as
@@ -60,7 +63,9 @@ pnpm --filter @pleiades/app exec shadcn add <name>      # writes src/components/
 ```
 
 The command runs in the app, whose `components.json` points here. A package the component needs goes into
-the `catalog` of `pnpm-workspace.yaml` with its version.
+the `catalog` of `pnpm-workspace.yaml` with its version. Then give the component its block on the
+[design system page](../../apps/design-system/README.md#a-new-component-gets-its-block): a test there fails
+until it has one.
 
 ## The rules
 
