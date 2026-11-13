@@ -146,6 +146,9 @@ All notable changes are documented here. The format follows
   and three in the catalogue. The theme moved with them, from `@pleiades/cards/theme.css` to
   `@pleiades/ui/globals.css`. A card file still carries the styles of the components the cards draw and of
   no other: `packages/cards/src/styles.css` names them, and a test keeps the list right.
+- `app`: the breadcrumb of the header reads its pages from the routes, as the sidebar does. It named Home
+  and the page of a machine by hand, so a new page had none. A page is called by the title of its entry,
+  or by `crumb` in the `staticData` of its route; what Home and the page of a machine show is unchanged.
 
 ### Fixed
 

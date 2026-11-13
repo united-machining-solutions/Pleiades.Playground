@@ -58,11 +58,10 @@ never commit it.
 Nothing else: no change to the backend, to a card or to a shared component. If the page needs one, stop and
 say so.
 
-Two things a new page does not get, and you leave them as they are. The breadcrumb in the header:
-`src/components/page-breadcrumb.tsx` holds it for Home and for the page of a machine only. And a place in
-`docs/tour.md` and in the README of the app: `AGENTS.md` asks for the tour when the demo shows something
-new. For a page of your own, say in your hand-over that the tour does not show it yet; whoever merges the
-page decides whether it joins the tour.
+One thing a new page does not get, and you leave it as it is: a place in `docs/tour.md` and in the README
+of the app. `AGENTS.md` asks for the tour when the demo shows something new. For a page of your own, say in
+your hand-over that the tour does not show it yet; whoever merges the page decides whether it joins the
+tour.
 
 ## Steps
 
@@ -97,6 +96,11 @@ page decides whether it joins the tour.
    page a person is on. Entries stand by their title; an `order` below 100 moves one up. A page that names
    no entry stands in no list: right for a page that is reached from another one, like the page of a
    machine.
+
+   The breadcrumb of the header comes from the same place and needs no file of yours. A page with an entry
+   is called by the title of its entry there. A page without one stands behind the entry it is under, and
+   says what it is called with `staticData: { crumb }`: a text, or a function of the parameters of the
+   route, as `src/routes/machines.$machine.tsx` does it.
 
 The page looks like the pages that are there: the same title, the same spacing, the light theme.
 

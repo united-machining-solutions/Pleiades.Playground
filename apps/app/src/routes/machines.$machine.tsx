@@ -17,6 +17,8 @@ import { getMachine, getMachines, getSpans } from "@/machines/get-machines.ts"
  * read with the values, for the same hours, so the card is whole when it appears.
  */
 export const Route = createFileRoute("/machines/$machine")({
+  // No entry in the sidebar: the page stands under Home. In the breadcrumb it is called by its machine.
+  staticData: { crumb: (params) => params.machine ?? "" },
   loader: async ({ params }) => {
     const answer = await getMachine({ data: params.machine }).catch((error: unknown) => ({
       values: null,

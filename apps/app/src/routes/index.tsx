@@ -26,7 +26,8 @@ const groups: ReadonlyArray<{ title: string; states: ReadonlyArray<State> }> = [
 
 export const Route = createFileRoute("/")({
   // The entry of this page in the sidebar. A page that names none stands in no list.
-  staticData: { nav: { title: "Home", icon: HouseIcon, order: 0 } },
+  // In the breadcrumb Home is called by what it shows.
+  staticData: { nav: { title: "Home", icon: HouseIcon, order: 0 }, crumb: "Machines" },
   // If the server of the app itself is away for a moment, the page says so and keeps trying.
   loader: () => getMachines().catch((error: unknown) => ({ values: null, error: String(error) })),
   component: Home,
