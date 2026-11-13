@@ -144,7 +144,7 @@ The three questions above are suggestions to begin with.
 
 **In the code:** [`apps/app/src/chat/`](../apps/app/src/chat). `chat-sidebar.tsx` is the panel with the model
 picker, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
-reads which models the settings name, `tool-results.ts` says what the app draws for which tool, and
+reads which models the settings name, `cards.tsx` lists what the app draws for which tool, card by card, and
 `suggestions.ts` holds the three questions.
 
 ### The card in another host

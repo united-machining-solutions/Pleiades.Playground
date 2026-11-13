@@ -81,14 +81,17 @@ the backend of the running demo stack answers.
   server routes.
 - `src/routeTree.gen.ts`: written by the build. Commit it, never edit it.
 - `src/machines/`: `get-machines.ts` holds the server functions that call the backend as a typed MCP client,
-  `machine-item.tsx` draws a machine as a row or a tile. `card-tools.ts` names the tools of the backend that
-  only a card calls: the chat keeps them from its language model. Which value of the binding is which state,
+  `machine-item.tsx` draws a machine as a row or a tile. `chat.tsx` is the machine card in the chat: what a
+  call of each of its tools is called, what the chat draws for a result (`results.ts` checks it against the
+  contract), and which tool only a card calls. Which value of the binding is which state,
   the signs and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a
   tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat` and the choice of the model,
-  `tool-results.ts` says what the app draws for which tool, and `answer.tsx` draws what the model writes
+  `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for
+  which tool, and its server which tools a language model does not get. `tool-results.ts` says what a card
+  may say about a tool, `blocks.ts` turns an answer into blocks, and `answer.tsx` draws what the model writes
   ([TanStack Markdown](https://tanstack.com/markdown)).
 - `src/components/ui/`: [shadcn/ui](https://ui.shadcn.com) components, added with `shadcn add` and kept as
   generated. `components.json` holds the settings of the preset `b5JNecjwG`. The layout follows the block

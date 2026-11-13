@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import { CARD_MIME_TYPE } from "./card-file.ts"
-import { MACHINE_CARD_URI, SPAN_LIST_TOOL } from "./names.ts"
+import { MACHINE_CARD_URI, SPAN_LIST_TOOL } from "./cards/machine.names.ts"
 import { server } from "./server.ts"
 
 type Listed = {

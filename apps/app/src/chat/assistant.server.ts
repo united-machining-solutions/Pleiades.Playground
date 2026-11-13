@@ -8,11 +8,11 @@ import { createOpenaiChat } from "@tanstack/ai-openai"
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
 
-import { forModel } from "@/machines/card-tools.ts"
-
+import { chatTools } from "./cards.tsx"
 import { withTimeZone } from "./local-times.ts"
 import { modelNames, modelSettings } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
+import { forModel } from "./tool-results.ts"
 
 // The agent harness of the app. It runs on the server only: the keys of the language models stay
 // here, and the browser talks to /api/harness.
@@ -34,10 +34,11 @@ const tools = mcp({
 })
 
 // A tool that only a card calls is not for the model. The plugin above has no setting for that,
-// so this one takes those tools out of every turn, after the servers listed theirs.
+// so this one takes those tools out of every turn, after the servers listed theirs. Which tools
+// those are, the cards say (cards.tsx).
 const modelTools = definePlugin({
   name: "pleiades/model-tools",
-  setup: () => ({ prepareTools: ({ tools: listed }) => forModel(listed) }),
+  setup: () => ({ prepareTools: ({ tools: listed }) => forModel(listed, chatTools) }),
 })
 
 // Every tool that takes a time zone is called with the one of the person who asks. What the
