@@ -63,5 +63,6 @@
   </Folder>
   <Folder Name="/Simulator/">
     <Project Path="Pleiades.Playground.Simulator/Pleiades.Playground.Simulator.csproj" />
+    <Project Path="Pleiades.Playground.Simulator.Test/Pleiades.Playground.Simulator.Test.csproj" />
   </Folder>
 </Solution>

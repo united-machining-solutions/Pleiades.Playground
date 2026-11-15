@@ -57,6 +57,8 @@ timeseries-persistence   Up 3 minutes (healthy)
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
 port and setting. The three simulated machines, P-04, P-07 and M-02, are the three `simulator-*` services.
+P-04 also publishes a second tree, below `umati/example-com_P-04/`, that follows the umati data model exactly;
+no service reads it yet. It is described in [`contracts/mqtt`](../contracts/mqtt/README.md#spec-binding-draft).
 
 ## 2. Home
 

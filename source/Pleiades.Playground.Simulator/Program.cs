@@ -7,6 +7,7 @@ using Pleiades.Playground.HealthChecks.Mqtt;
 using Pleiades.Playground.Timeseries.Generators.BooleanValue;
 using Pleiades.Playground.Timeseries.Generators.StringValue;
 using Pleiades.Playground.Simulator;
+using Pleiades.Playground.Simulator.Spec;
 using Pleiades.Playground.Mqtt.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
@@ -72,6 +73,13 @@ builder.Services.AddSingleton<INotificationEventGenerator, NotificationEventGene
 builder.Services.AddPleiadesDefaultJsonOptions();
 
 builder.Services.AddHostedService<Worker>();
+
+// The output after the data model runs beside the generators, from a virtual machine of its own.
+if (builder.Configuration.GetValue<bool>("Config:SpecOutput:Enabled"))
+{
+    builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.AddHostedService<SpecOutputService>();
+}
 
 builder.Services.AddHealthChecks()
     .AddMqtt();

@@ -208,6 +208,9 @@ services:
       Config__SerialNumber: P-04
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-p-04
+      # P-04 also publishes after the data model, below umati/example-com_P-04/ (contracts/mqtt, "Spec
+      # binding"). A virtual machine of its own drives it; the topics below machines/P-04/ stay as they are.
+      Config__SpecOutput__Enabled: "true"
 
   simulator-p-07:
     <<: *simulator

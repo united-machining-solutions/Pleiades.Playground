@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Pleiades.Playground.Common.Logging.Loki.Configuration;
 using Pleiades.Playground.Events.Generators.NotificationEvent;
 using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Simulator.Spec;
 using Pleiades.Playground.Timeseries.Generators.BaseUnitValue;
 using Pleiades.Playground.Timeseries.Generators.BooleanValue;
 using Pleiades.Playground.Timeseries.Generators.StringValue;
@@ -53,6 +54,12 @@ internal sealed class Config
     /// </summary>
     [Required]
     public required NotificationEventGeneratorConfig NotificationEventGeneratorConfig { get; init; }
+
+    /// <summary>
+    /// The output after the data model, below <c>umati/{machineId}/</c>, in addition to the output of the
+    /// generators. Off unless enabled.
+    /// </summary>
+    public SpecOutputConfig SpecOutput { get; init; } = new();
 
     /// <summary>
     /// Loki logging configuration.

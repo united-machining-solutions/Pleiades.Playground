@@ -92,6 +92,13 @@ All notable changes are documented here. The format follows
   that shows the card wide and narrow. The recipes `create-page` and `create-card` say what two agents had
   to guess when they built a page and a card by them: which tool has the warnings, how a list is laid out,
   what a card shares with another card, how the card file is tied to its tool and how it is checked.
+- Spec output of the simulator, a draft of the MQTT binding of the data model 0.12.0: below
+  `umati/{machineId}/` a virtual machine, a state machine driven by a scenario, publishes the manifest, values,
+  snapshots and lists retained and the events of program executions, job orders and alerts not retained, with
+  the last will `Connection/State = Disconnected`. P-04 publishes it in the demo stack, in addition to its
+  topics below `machines/P-04/`, which stay as they are. Its tests check the consistency of the machine and,
+  with a clone of the model next to the repository, every message against the schemas of the model
+  (`contracts/mqtt`, ADR-0010).
 
 ### Changed
 
