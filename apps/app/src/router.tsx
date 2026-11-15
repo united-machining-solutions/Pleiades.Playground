@@ -1,6 +1,6 @@
 import { createRouter } from "@tanstack/react-router"
 
-import type { NavEntry } from "@/components/nav.ts"
+import type { Crumb, NavEntry } from "@/components/nav.ts"
 
 // Not in the repository: this file is written from the files under routes/, by `pnpm install`, the
 // typecheck, the development server and the build. See route-tree.mjs, and the README of the app.
@@ -14,8 +14,12 @@ declare module "@tanstack/react-router" {
   interface Register {
     router: ReturnType<typeof getRouter>
   }
-  /** What a route says about itself in its `staticData`: its entry in the sidebar, if it has one. */
+  /**
+   * What a route says about itself in its `staticData`: its entry in the sidebar, if it has one, and
+   * what it is called in the breadcrumb, where the title of the entry does not say it.
+   */
   interface StaticDataRouteOption {
     nav?: NavEntry
+    crumb?: Crumb
   }
 }

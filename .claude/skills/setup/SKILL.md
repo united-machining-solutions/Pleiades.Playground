@@ -70,8 +70,9 @@ not checked yet with the reason. Level 2 does not wait for level 1. Level 3 does
 
    After a change, list the images again: they end in `:main` now. If they do not, stop and say what you
    see. Before a start from the published images this step is never left out, and the version is never put
-   in front of one command instead. A later start that finds another version in `.env` builds the whole
-   stack: the start after the person has filled in a key, for example.
+   in front of one command instead. A later start that finds another version in `.env` builds the app and
+   what it needs, four images, which takes minutes: the start after the person has filled in a key, for
+   example.
 4. **Start the stack.** Say first that the first start downloads about half a gigabyte: a few minutes on a
    good connection, longer on a slow one. On a yes to the start: `docker compose up -d --no-build --wait`.
    It can run longer than most tools let a command run: start it in the background and wait for it to end,

@@ -47,6 +47,13 @@ catalog:
   vite-plugin-singlefile: 2.3.4
   zod: 4.6.7
 
+# pnpm keeps the rule above itself. A package that is added, with `pnpm add` or by `shadcn add`, goes
+# into the catalog with its exact version, and its package.json gets "catalog:". Adding a version
+# other than the one in the catalog is refused. A version that is written into a package.json by
+# hand is not: that stays a thing to see in a review.
+catalogMode: strict
+savePrefix: ""
+
 # rollup-plugin-license lists the packages a bundler put into a file. It names Rollup as a peer.
 # The card files are built by Vite on Rolldown, which calls the same hooks, so Rollup stays out.
 packageExtensions:

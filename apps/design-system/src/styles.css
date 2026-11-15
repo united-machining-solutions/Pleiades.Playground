@@ -1,0 +1,31 @@
+/*
+ * Tailwind looks for class names in src/ only: left to itself it also reads the build output.
+ */
+@import "tailwindcss" source(".");
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/roboto";
+/*
+ * The theme (the shadcn tokens) lies with the components, in packages/ui. This page draws every
+ * component, so Tailwind reads the class names of the whole package. The stylesheet of the cards
+ * brings the chart and state colours and the class names of the card catalogue.
+ */
+@import "@pleiades/ui/globals.css";
+@source "../../../packages/ui/src";
+@import "@pleiades/cards/styles.css";
+/* Pins hover, focus and pressed with data-preview, so the page shows the states side by side. */
+@import "./preview-states.css";
+
+/* The font is the one of the example application. */
+@theme inline {
+    --font-sans: 'Roboto Variable', sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}
