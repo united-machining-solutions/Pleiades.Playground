@@ -92,6 +92,11 @@ All notable changes are documented here. The format follows
   that shows the card wide and narrow. The recipes `create-page` and `create-card` say what two agents had
   to guess when they built a page and a card by them: which tool has the warnings, how a list is laid out,
   what a card shares with another card, how the card file is tied to its tool and how it is checked.
+- The design system on one page, `apps/design-system` (`pnpm --filter @pleiades/design-system dev`,
+  <http://localhost:3100/>): a small application of its own, Vite and React, outside the demo stack. It shows
+  the tokens with their measured contrast, every component of `packages/ui` in its variants and states
+  with fixed values in the words of the demo, three rules as Do and Don't, and the machine card of the card
+  catalogue. A test fails when a component of `packages/ui` has no block on the page.
 
 ### Changed
 
@@ -117,9 +122,9 @@ All notable changes are documented here. The format follows
   `docker compose restart` does not pick up.
 - The skill `setup` starts the stack from the published images of `main` and no longer builds it: about
   half a gigabyte to download instead of a build of ten minutes or more. It first makes sure that `.env`
-  names `PLEIADES_VERSION=main`, because a later start with another version there builds the whole stack.
-  The skill `build-your-own` sends a stack that does not run to `setup`, and keeps that version when it
-  makes `.env` for a key.
+  names `PLEIADES_VERSION=main`, because a later start with another version there builds the app and what
+  it needs, four images. The skill `build-your-own` sends a stack that does not run to `setup`, keeps that
+  version when it makes `.env` for a key, and has the person set it right in a `.env` that is there.
 - `app`: the screens are composed as the shadcn/ui docs compose them. In the chat a question is a `Bubble`,
   the tool calls of a stretch are a `Trace`, an error is an `Alert`, and the questions to begin with are a row
   of buttons above the field. Every empty state has its icon. The path of a page is a `Breadcrumb` in the
@@ -146,6 +151,9 @@ All notable changes are documented here. The format follows
   and three in the catalogue. The theme moved with them, from `@pleiades/cards/theme.css` to
   `@pleiades/ui/globals.css`. A card file still carries the styles of the components the cards draw and of
   no other: `packages/cards/src/styles.css` names them, and a test keeps the list right.
+- `app`: the breadcrumb of the header reads its pages from the routes, as the sidebar does. It named Home
+  and the page of a machine by hand, so a new page had none. A page is called by the title of its entry,
+  or by `crumb` in the `staticData` of its route; what Home and the page of a machine show is unchanged.
 - pnpm puts a package that is added into the catalog itself, with its exact version, and `catalog:` into
   the `package.json` (`catalogMode: strict` and an empty `savePrefix` in `pnpm-workspace.yaml`). Before,
   `pnpm add` and `shadcn add` wrote a version with a `^` into the `package.json`, and moving it into the
@@ -153,6 +161,9 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- `app`: a toast shows. The example app had no `Toaster` at its root, so `toast.add` on a page showed
+  nothing; it has one now, and the `TooltipProvider` the docs of the tooltip ask for at the same place.
+  The provider gives every tooltip the delay `tooltip.tsx` sets, which is none.
 - `genui-mcp`: a state holds however long ago the machine reported it. A machine that said more than 24 hours
   ago that it is connected, and has sent only its heartbeat since, was shown as "No data".
 - A serial number follows one rule, the one of the MQTT binding: everything but `/`, `+` and `#`

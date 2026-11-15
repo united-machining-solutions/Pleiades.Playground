@@ -9,7 +9,11 @@ import { MinusIcon } from "lucide-react"
 // behaviour: one character a slot, moving on, pasting a whole code, and what is valid. If shadcn
 // ships an OTP field on Base UI, "shadcn add otp-field --diff" shows what differs.
 //
-//   <OTPField length={6}>
+// The field takes its name from a label: give it an id and a <label htmlFor>, or put it into a
+// Field. Base UI warns about a slot that is named with aria-label instead. A code that is wrong is
+// marked on its slots with aria-invalid, as an input is, or by a Field that is invalid.
+//
+//   <OTPField id="code" length={6}>
 //     <OTPFieldGroup>
 //       <OTPFieldInput /> <OTPFieldInput /> <OTPFieldInput />
 //     </OTPFieldGroup>
@@ -36,7 +40,10 @@ function OTPFieldGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="otp-field-group"
-      className={cn("flex items-center rounded-md", className)}
+      className={cn(
+        "flex items-center rounded-md has-aria-invalid:ring-3 has-aria-invalid:ring-destructive/20 has-data-invalid:ring-3 has-data-invalid:ring-destructive/20 dark:has-aria-invalid:ring-destructive/40 dark:has-data-invalid:ring-destructive/40",
+        className
+      )}
       {...props}
     />
   )
@@ -50,7 +57,7 @@ function OTPFieldInput({
     <OTPFieldPrimitive.Input
       data-slot="otp-field-input"
       className={cn(
-        "relative size-9 border-y border-r border-input bg-transparent text-center text-sm shadow-xs transition-all outline-none first:rounded-l-md first:border-l last:rounded-r-md focus-visible:z-10 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed data-invalid:border-destructive data-invalid:focus-visible:ring-destructive/20 dark:bg-input/30 dark:data-invalid:focus-visible:ring-destructive/40",
+        "relative size-9 border-y border-r border-input bg-transparent text-center text-base shadow-xs transition-all outline-none first:rounded-l-md first:border-l last:rounded-r-md focus-visible:z-10 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed aria-invalid:border-destructive aria-invalid:focus-visible:ring-destructive/20 data-invalid:border-destructive data-invalid:focus-visible:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:focus-visible:ring-destructive/40 dark:data-invalid:focus-visible:ring-destructive/40",
         className
       )}
       {...props}
