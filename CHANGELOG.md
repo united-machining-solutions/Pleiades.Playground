@@ -97,6 +97,9 @@ All notable changes are documented here. The format follows
   the tokens with their measured contrast, every component of `packages/ui` in its variants and states
   with fixed values in the words of the demo, three rules as Do and Don't, and the machine card of the card
   catalogue. A test fails when a component of `packages/ui` has no block on the page.
+- The example application wears umati: the sign of umati is the icon of the page, and the coloured umati
+  wordmark stands at the top of the sidebar in place of the name. Both are trademarks of VDW e.V. and not
+  covered by the licences of this repository (`NOTICE`).
 
 ### Changed
 

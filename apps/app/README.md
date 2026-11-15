@@ -105,5 +105,8 @@ the backend of the running demo stack answers.
   imported as `@pleiades/ui/components/<name>`. `components.json` holds the settings of the preset
   `b5JNecjwG` and tells `shadcn add` to write a new component there. The layout follows the block
   `sidebar-15`: the pages on the left, the chat on the right.
+- `public/`: the sign of umati as the icon of the page, and the umati wordmark at the top of the sidebar.
+  They are trademarks of VDW e.V. and not covered by the licences of this repository, see
+  [NOTICE](../../NOTICE).
 - `src/styles.css`: Tailwind and the font. The theme of the preset, light only, comes from `@pleiades/ui`,
   the chart and state colours from `@pleiades/cards`, so a card looks the same wherever it is drawn.
