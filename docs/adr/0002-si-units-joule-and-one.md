@@ -27,6 +27,8 @@ Displays convert to what people are used to (millimetre, 1/min, bar, percent, kW
 - No value is ambiguous; statistics and comparisons need no conversion table.
 - Adapters convert once at the source and must know the unit of every signal.
 - The data model referenced in `contracts/datamodel` lists energy in watt hours; the binding documents the deviation.
+- The tree below `umati/`, which follows the data model exactly, is outside this decision; see
+  [ADR-0010](0010-spec-binding-beside-the-playground-binding.md).
 
 ## Alternatives considered
 
