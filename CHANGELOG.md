@@ -111,8 +111,8 @@ All notable changes are documented here. The format follows
   the server route `/api/transcribe` has a speech-to-text model write down what was said, and the text goes
   into the field, to send like a typed question. The model gets the names of the machines as its prompt.
   It is a setting beside the key of its block: `OPENAI_TRANSCRIPTION_MODEL` (`gpt-transcribe` in the
-  stack) or `LLM_TRANSCRIPTION_MODEL` for an endpoint that speaks OpenAI's audio transcriptions. Without
-  one the field has no microphone.
+  stack) or `LLM_TRANSCRIPTION_MODEL` for an endpoint that speaks OpenAI's audio transcriptions; an empty
+  `OPENAI_TRANSCRIPTION_MODEL` lets the second count. Without one the field has no microphone.
 
 ### Changed
 

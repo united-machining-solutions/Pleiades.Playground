@@ -83,3 +83,15 @@ test("dictation needs a key and a transcription model, OpenAI's before the other
     "speech",
   )
 })
+
+test("an empty OpenAI name for dictation lets the other endpoint's count, though the OpenAI key is set", () => {
+  assert.equal(
+    dictationSettings({
+      OPENAI_API_KEY: "key-a",
+      OPENAI_TRANSCRIPTION_MODEL: "",
+      LLM_BASE_URL: "http://localhost:4000/v1",
+      LLM_TRANSCRIPTION_MODEL: "local-speech",
+    })?.model,
+    "local-speech",
+  )
+})

@@ -77,7 +77,8 @@ as the stack spells it.
 | Any other endpoint | `LLM_TRANSCRIPTION_MODEL`, with `LLM_BASE_URL` and `LLM_API_KEY` | none |
 
 The other endpoint must speak OpenAI's audio transcriptions (`POST /audio/transcriptions`), as a gateway or a
-local speech server does. With both blocks set, OpenAI's counts. Anthropic has no speech-to-text model.
+local speech server does. With both blocks set, OpenAI's counts; an empty `OPENAI_TRANSCRIPTION_MODEL=` in
+`.env` turns it off, and the other endpoint's counts. Anthropic has no speech-to-text model.
 Without a model for it the field has no microphone, and the chat works as before.
 
 The browser records (`useAudioRecorder` of TanStack AI) and sends the recording to `/api/transcribe`, which
