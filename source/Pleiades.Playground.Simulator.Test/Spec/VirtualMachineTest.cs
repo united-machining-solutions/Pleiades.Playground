@@ -252,7 +252,7 @@ public sealed class VirtualMachineTest
     public void Values_CarryTheUnitOfTheirElementAndStayInTheManifest()
     {
         var run = MachineRun.For(SixHours, MachineRun.Config(TimeSpan.FromMinutes(10)));
-        var paths = SpecElements.Elements.Select(e => e.Path).ToHashSet();
+        var paths = SpecElements.ElementsFor("example.com").Select(e => e.Path).ToHashSet();
         foreach (var value in run.Messages.OfType<SpecValue>())
         {
             Assert.IsTrue(paths.Contains(value.Path), value.Path);
@@ -504,10 +504,10 @@ public sealed class VirtualMachineTest
     [TestMethod]
     public void Event_GoesBelowTheEventsLevelWithSeqAndEpoch()
     {
-        Assert.AreEqual("umati/example-com_P-04/events/production", SpecWire.EventTopic("example-com_P-04", SpecElements.JobOrderChanged));
-        Assert.AreEqual("umati/example-com_P-04/events/production", SpecWire.EventTopic("example-com_P-04", SpecElements.ProgramExecutionStarted));
-        Assert.AreEqual("umati/example-com_P-04/events/notifications", SpecWire.EventTopic("example-com_P-04", SpecElements.AlertRaised));
-        Assert.ThrowsExactly<ArgumentException>(() => SpecWire.EventTopic("example-com_P-04", "Maintenance.TaskDue"), "a group without a name");
+        Assert.AreEqual("simulators/P-04/events/production", SpecWire.EventTopic("P-04", SpecElements.JobOrderChanged));
+        Assert.AreEqual("simulators/P-04/events/production", SpecWire.EventTopic("P-04", SpecElements.ProgramExecutionStarted));
+        Assert.AreEqual("simulators/P-04/events/notifications", SpecWire.EventTopic("P-04", SpecElements.AlertRaised));
+        Assert.ThrowsExactly<ArgumentException>(() => SpecWire.EventTopic("P-04", "Maintenance.TaskDue"), "a group without a name");
         CollectionAssert.IsSubsetOf(SpecElements.Events.Select(e => e.Split('.')[0]).Distinct().ToList(), SpecWire.EventTopicNames.Keys.ToList(),
             "every event of the manifest has a topic");
         var wire = SpecWire.Event(new SpecEvent(SpecElements.AlertCleared, MachineRun.Start, 7, new JsonObject { ["id"] = "a" }), "2026-11-17T06:00:00.000Z");
@@ -516,12 +516,87 @@ public sealed class VirtualMachineTest
     }
 
     [TestMethod]
-    public void MachineId_JoinsDomainAndSerialNumber()
+    public void BearingTemperature_IsASignalOfTheManufacturerInTheSameTree()
     {
-        Assert.AreEqual("example-com_P-04", SpecWire.MachineId("example.com", "P-04"));
-        Assert.AreEqual("umati/example-com_P-04/Channel/1/ChannelState", SpecWire.Topic("example-com_P-04", "Channel.1.ChannelState"));
-        Assert.AreEqual("umati/example-com_P-04/Manifest", SpecWire.ManifestTopic("example-com_P-04"));
-        Assert.ThrowsExactly<ArgumentException>(() => SpecWire.MachineId("example.com", "P/04"));
+        var path = SpecElements.ExtensionPath("example.com", SpecElements.BearingTemperature);
+        Assert.AreEqual("x-example-com.Spindle.1.BearingTemperature", path);
+        Assert.AreEqual("simulators/P-04/vendor/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", path), "the prefix maps to vendor/");
+        Assert.AreEqual("x-example-com", SpecElements.ExtensionPrefix("Example.COM"), "lower case, like the machine id");
+
+        var run = MachineRun.For(TimeSpan.FromHours(1));
+        var values = run.ValuesOf(path).ToList();
+        Assert.IsTrue(values.Count > 100);
+        Assert.IsTrue(values.All(v => v.Unit == SpecElements.UnitDegreeCelsius));
+        Assert.AreEqual("degreeCelsius", (string?)SpecWire.Envelope(values[0])["unit"]);
+    }
+
+    [TestMethod]
+    public void BearingTemperature_WarmsWhileTheSpindleTurnsAndCoolsWhileItStands()
+    {
+        var path = SpecElements.ExtensionPath("example.com", SpecElements.BearingTemperature);
+        var scenario = MachineRun.Config().Scenario;
+        var previous = (double?)null;
+        var changed = true;
+        var warmed = 0;
+        var cooled = 0;
+        MachineRun.For(SixHours, afterStep: (machine, step) =>
+        {
+            var values = machine.Values.ToDictionary(v => v.Path);
+            var rotating = values[SpecElements.SpindleIsRotating].Value!.GetValue<bool>();
+            changed |= step.OfType<SpecValue>().Any(v => v.Path == SpecElements.SpindleIsRotating);
+            if (step.OfType<SpecValue>().FirstOrDefault(v => v.Path == path) is { } published)
+            {
+                var temperature = published.Value!.GetValue<double>();
+                Assert.IsTrue(temperature >= scenario.BearingTemperatureIdle - 0.1 && temperature <= scenario.BearingTemperatureRunning * 1.1,
+                    $"{temperature} at {machine.Now:O}");
+                // Only where the spindle kept its state since the last measurement, rounding aside.
+                if (previous is { } before && !changed)
+                {
+                    if (rotating)
+                    {
+                        warmed += temperature > before ? 1 : 0;
+                        Assert.IsTrue(temperature >= before - 0.1 || before > scenario.BearingTemperatureIdle + ((scenario.BearingTemperatureRunning - scenario.BearingTemperatureIdle) * 0.9),
+                            $"cools while the spindle turns at {machine.Now:O}");
+                    }
+                    else
+                    {
+                        cooled += temperature < before ? 1 : 0;
+                        Assert.IsTrue(temperature <= before + 0.1, $"warms while the spindle stands at {machine.Now:O}");
+                    }
+                }
+                previous = temperature;
+                changed = false;
+            }
+        });
+        Assert.IsTrue(warmed > 50 && cooled > 50, $"warmed {warmed}, cooled {cooled}");
+    }
+
+    [TestMethod]
+    public void Manifest_NamesTypeUnitAndDescriptionOfTheSignalsOfTheManufacturer()
+    {
+        var identity = new MachineIdentity("Example Machine Tools", "P-04", "https://example.com/P-04");
+        var elements = SpecManifest.Build(identity, MachineRun.Config())["elements"]!.AsArray().Select(e => e!.AsObject()).ToList();
+        var extensions = elements.Where(e => e["path"]!.GetValue<string>().StartsWith("x-", StringComparison.Ordinal)).ToList();
+        Assert.HasCount(SpecElements.Extensions.Count, extensions);
+        foreach (var extension in extensions)
+        {
+            Assert.IsTrue(extension["path"]!.GetValue<string>().StartsWith("x-example-com.", StringComparison.Ordinal));
+            Assert.IsNotNull(extension["type"]);
+            Assert.IsNotNull(extension["unit"]!["code"]);
+            Assert.IsNotNull(extension["description"]);
+        }
+        Assert.IsTrue(elements.Where(e => !e["path"]!.GetValue<string>().StartsWith("x-", StringComparison.Ordinal))
+            .All(e => !e.ContainsKey("type") && !e.ContainsKey("unit")), "the model names type and unit of its own elements");
+    }
+
+    [TestMethod]
+    public void Topics_LieBelowTheSerialNumberOfTheSimulator_SplitLikeThePlaygroundTree()
+    {
+        Assert.AreEqual("simulators/P-04/umati/Channel/1/ChannelState", SpecWire.Topic("P-04", "Channel.1.ChannelState"));
+        Assert.AreEqual("simulators/P-04/umati/State/Status", SpecWire.Topic("P-04", SpecElements.Status));
+        Assert.AreEqual("simulators/P-04/umati/Manifest", SpecWire.ManifestTopic("P-04"));
+        Assert.AreEqual("simulators/P-04/vendor/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", "x-example-com.Spindle.1.BearingTemperature"));
+        Assert.AreEqual("simulators/P-04/umati/Connection/State", SpecPublisher.LastWill("P-04", MachineRun.Start).Topic, "the last will");
     }
 
     [TestMethod]

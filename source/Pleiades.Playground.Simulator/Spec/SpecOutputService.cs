@@ -12,7 +12,7 @@ namespace Pleiades.Playground.Simulator.Spec;
 
 /// <summary>
 /// Publishes the virtual machine after the spec binding of contracts/mqtt: the manifest, every value retained and
-/// the events not retained, below <c>umati/{machineId}/</c>. It has its own MQTT connection, with the last will
+/// the events not retained, below <c>simulators/{SerialNumber}/</c>. It has its own MQTT connection, with the last will
 /// <c>Connection/State = Disconnected</c>, beside the connection of the generators.
 /// </summary>
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Instantiated by DI")]
@@ -26,7 +26,6 @@ internal sealed partial class SpecOutputService : BackgroundService
     private readonly Lock _lock = new();
 
     private VirtualMachine? _machine;
-    private string _machineId = string.Empty;
     private JsonObject _manifest = [];
 
     public SpecOutputService(IOptions<Config> config, ILogger<SpecOutputService> logger, ILoggerFactory loggerFactory, TimeProvider timeProvider)
@@ -48,7 +47,6 @@ internal sealed partial class SpecOutputService : BackgroundService
             string.IsNullOrWhiteSpace(_spec.ProductInstanceUri)
                 ? $"https://{_spec.ManufacturerDomain}/{_config.SerialNumber}"
                 : _spec.ProductInstanceUri);
-        _machineId = SpecWire.MachineId(_spec.ManufacturerDomain, _config.SerialNumber);
         _manifest = SpecManifest.Build(identity, _spec);
         var counters = SpecCounterStore.Load(_spec.PersistenceFilePath, _spec.Scenario);
         _machine = new VirtualMachine(identity, _spec, counters, start);
@@ -57,12 +55,12 @@ internal sealed partial class SpecOutputService : BackgroundService
         {
             LogShortRetention(_spec.Scenario.JobOrderRetention);
         }
-        LogStarting(SpecWire.Root, _machineId);
+        LogStarting(SpecWire.Root, _config.SerialNumber);
 
         // Both are disposed once the loop has ended and the client is stopped, in the finally block below.
 #pragma warning disable CA2025
         using var client = new MqttClientFactory().CreateManagedMqttClientWithLogger(_loggerFactory);
-        using var publisher = new SpecPublisher(client, _machineId, _manifest, _machine.SeqEpoch, _spec.EventBufferSize, _logger);
+        using var publisher = new SpecPublisher(client, _config.SerialNumber, _manifest, _machine.SeqEpoch, _spec.EventBufferSize, _logger);
         client.ConnectedAsync += _ => OnConnectedAsync(publisher);
 #pragma warning restore CA2025
         await client.StartAsync(CreateOptions(start)).ConfigureAwait(false);
@@ -144,7 +142,7 @@ internal sealed partial class SpecOutputService : BackgroundService
 
         // The broker publishes the last will when the connection breaks off. Its timestamp is the time of the
         // connect: the binding has no way to put the time of the break into it.
-        var (willTopic, willPayload) = SpecPublisher.LastWill(_machineId, start);
+        var (willTopic, willPayload) = SpecPublisher.LastWill(_config.SerialNumber, start);
         var options = new MqttClientOptionsBuilder()
             .WithConfig(mqtt)
             .WithWillTopic(willTopic)
@@ -173,8 +171,8 @@ internal sealed partial class SpecOutputService : BackgroundService
         }
     }
 
-    [LoggerMessage(EventId = 100, Level = LogLevel.Information, Message = "Spec output publishes the virtual machine below {Root}/{MachineId}/")]
-    private partial void LogStarting(string root, string machineId);
+    [LoggerMessage(EventId = 100, Level = LogLevel.Information, Message = "Spec output publishes the virtual machine below {Root}/{SerialNumber}/")]
+    private partial void LogStarting(string root, string serialNumber);
 
     [LoggerMessage(EventId = 102, Level = LogLevel.Information, Message = "Spec output is stopping")]
     private partial void LogStopping();

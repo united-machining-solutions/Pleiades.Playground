@@ -12,15 +12,15 @@ namespace Pleiades.Playground.Simulator.Spec;
     Justification = "Bound by the configuration binder, never constructed in code")]
 internal sealed class SpecOutputConfig
 {
-    /// <summary>Whether this simulator also publishes below <c>umati/{machineId}/</c>.</summary>
+    /// <summary>Whether this simulator also publishes below <c>simulators/{SerialNumber}/</c>.</summary>
     public bool Enabled { get; init; }
 
     /// <summary>Name of the manufacturer, the value of <c>Identification.Manufacturer</c>.</summary>
     public string Manufacturer { get; init; } = "Example Machine Tools";
 
     /// <summary>
-    /// Internet domain of the manufacturer, for example <c>example.com</c>. With the serial number it forms the
-    /// machine id of the topics: <c>example-com_P-04</c>.
+    /// Internet domain of the manufacturer, for example <c>example.com</c>. It forms the prefix of the signals of the
+    /// manufacturer in the manifest, <c>x-example-com</c>, and the default <see cref="ProductInstanceUri"/>.
     /// </summary>
     [RegularExpression(@"^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$")]
     public string ManufacturerDomain { get; init; } = "example.com";
@@ -190,6 +190,19 @@ internal sealed class ScenarioConfig
     /// <summary>Alerts that come up at random.</summary>
     [SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "Configuration binding")]
     public List<AlertTemplate> Alerts { get; set; } = [];
+
+    /// <summary>
+    /// Temperature of the spindle bearing, a signal of the manufacturer, while the spindle stands, in degrees
+    /// Celsius. The bearing warms towards <see cref="BearingTemperatureRunning"/> while the spindle turns (scaled by
+    /// the spindle override) and cools back while it stands.
+    /// </summary>
+    public double BearingTemperatureIdle { get; init; } = 25;
+
+    /// <summary>Temperature of the spindle bearing the spindle reaches at an override of 1.0, in degrees Celsius.</summary>
+    public double BearingTemperatureRunning { get; init; } = 55;
+
+    /// <summary>How fast the bearing warms and cools: the time constant of the approach.</summary>
+    public TimeSpan BearingTimeConstant { get; init; } = TimeSpan.FromMinutes(6);
 
     /// <summary>Power-on duration at the first start, in seconds.</summary>
     public double InitialPowerOnDuration { get; init; } = 31_536_000;

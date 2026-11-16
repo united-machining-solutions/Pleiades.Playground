@@ -43,6 +43,13 @@ public sealed partial class SchemaConformanceTest
     {
         var manifest = SpecManifest.Build(Identity(), MachineRun.Config());
         AssertValid(Schema("manifest.schema.json"), manifest.ToJsonString(), "manifest");
+
+        // The schema takes a signal of the manufacturer with type, unit and description.
+        var extension = manifest["elements"]!.AsArray().Single(e => e!["path"]!.GetValue<string>().StartsWith("x-", StringComparison.Ordinal))!;
+        Assert.AreEqual("x-example-com.Spindle.1.BearingTemperature", extension["path"]!.GetValue<string>());
+        Assert.AreEqual("number", extension["type"]!.GetValue<string>());
+        Assert.AreEqual("CEL", extension["unit"]!["code"]!.GetValue<string>());
+        Assert.AreEqual("degreeCelsius", extension["unit"]!["name"]!.GetValue<string>());
     }
 
     [TestMethod]
@@ -62,7 +69,10 @@ public sealed partial class SchemaConformanceTest
         {
             // What goes on the wire, parsed back.
             var envelope = JsonNode.Parse(SpecWire.Envelope(value).ToJsonString())!.AsObject();
-            var catalogUnit = units.GetValueOrDefault(CatalogPath(value.Path));
+            // A signal of the manufacturer has its unit in the manifest, an element of the model in the catalogue.
+            var catalogUnit = value.Path.StartsWith("x-", StringComparison.Ordinal)
+                ? ManifestUnit(value.Path)
+                : units.GetValueOrDefault(CatalogPath(value.Path));
             var isNumber = envelope["value"] is JsonValue v && v.GetValueKind() == JsonValueKind.Number;
             Assert.AreEqual(isNumber ? catalogUnit : null, (string?)envelope["unit"], $"unit of {value.Path}");
 
@@ -132,6 +142,13 @@ public sealed partial class SchemaConformanceTest
         Assert.IsFalse(entry.ContainsKey("ProducedQuantity"), "a cancelled job order has no quantity");
         Assert.IsNotNull(entry["EndTime"], "a cancelled job order has the time it was aborted");
         return 1;
+    }
+
+    private static string? ManifestUnit(string path)
+    {
+        var manifest = SpecManifest.Build(Identity(), MachineRun.Config());
+        var element = manifest["elements"]!.AsArray().Single(e => e!["path"]!.GetValue<string>() == path)!;
+        return element["unit"]?["name"]?.GetValue<string>();
     }
 
     private static MachineIdentity Identity()

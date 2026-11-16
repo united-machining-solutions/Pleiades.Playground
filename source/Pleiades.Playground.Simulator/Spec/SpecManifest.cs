@@ -35,7 +35,7 @@ internal static class SpecManifest
             ["Channel"] = new JsonObject { ["1"] = "CHAN1" },
             ["Spindle"] = new JsonObject { ["1"] = "S1" },
         };
-        manifest["elements"] = new JsonArray([.. SpecElements.Elements.Select(e => (JsonNode)Element(e))]);
+        manifest["elements"] = new JsonArray([.. SpecElements.ElementsFor(config.ManufacturerDomain).Select(e => (JsonNode)Element(e))]);
         manifest["events"] = new JsonArray([.. SpecElements.Events.Select(e => (JsonNode)e)]);
         return manifest;
     }
@@ -50,6 +50,12 @@ internal static class SpecManifest
         if (element.CorrelationId)
         {
             json["correlationId"] = true;
+        }
+        if (element.Extension is { } extension)
+        {
+            json["type"] = extension.Type;
+            json["unit"] = new JsonObject { ["code"] = extension.UnitCode, ["name"] = extension.UnitName };
+            json["description"] = extension.Description;
         }
         return json;
     }

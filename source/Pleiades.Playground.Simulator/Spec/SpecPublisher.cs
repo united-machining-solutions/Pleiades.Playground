@@ -16,7 +16,7 @@ namespace Pleiades.Playground.Simulator.Spec;
 internal sealed partial class SpecPublisher : IDisposable
 {
     private readonly IManagedMqttClient _client;
-    private readonly string _machineId;
+    private readonly string _serialNumber;
     private readonly JsonObject _manifest;
     private readonly string _seqEpoch;
     private readonly int _capacity;
@@ -24,12 +24,12 @@ internal sealed partial class SpecPublisher : IDisposable
     private readonly Queue<SpecEvent> _outbox = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    public SpecPublisher(IManagedMqttClient client, string machineId, JsonObject manifest, string seqEpoch, int capacity, ILogger logger)
+    public SpecPublisher(IManagedMqttClient client, string serialNumber, JsonObject manifest, string seqEpoch, int capacity, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentOutOfRangeException.ThrowIfLessThan(capacity, 1);
         _client = client;
-        _machineId = machineId;
+        _serialNumber = serialNumber;
         _manifest = manifest;
         _seqEpoch = seqEpoch;
         _capacity = capacity;
@@ -95,7 +95,7 @@ internal sealed partial class SpecPublisher : IDisposable
         {
             var waiting = Buffered;
             await _client.EnqueueAsync(ValueMessage(ConnectionState("Disconnected", now))).ConfigureAwait(false);
-            await _client.EnqueueAsync(Message(SpecWire.ManifestTopic(_machineId), _manifest, retain: true)).ConfigureAwait(false);
+            await _client.EnqueueAsync(Message(SpecWire.ManifestTopic(_serialNumber), _manifest, retain: true)).ConfigureAwait(false);
             foreach (var value in values)
             {
                 await _client.EnqueueAsync(ValueMessage(value)).ConfigureAwait(false);
@@ -117,10 +117,10 @@ internal sealed partial class SpecPublisher : IDisposable
     }
 
     /// <summary>The last will: <c>Connection/State</c> Disconnected, as the broker publishes it.</summary>
-    public static (string Topic, byte[] Payload) LastWill(string machineId, DateTimeOffset timestamp)
+    public static (string Topic, byte[] Payload) LastWill(string serialNumber, DateTimeOffset timestamp)
     {
         var will = ConnectionState("Disconnected", timestamp);
-        return (SpecWire.Topic(machineId, SpecElements.ConnectionState), Encoding.UTF8.GetBytes(SpecWire.Envelope(will).ToJsonString()));
+        return (SpecWire.Topic(serialNumber, SpecElements.ConnectionState), Encoding.UTF8.GetBytes(SpecWire.Envelope(will).ToJsonString()));
     }
 
     public void Dispose()
@@ -154,7 +154,7 @@ internal sealed partial class SpecPublisher : IDisposable
                     return;
                 }
             }
-            await _client.EnqueueAsync(Message(SpecWire.EventTopic(_machineId, next.Path), SpecWire.Event(next, _seqEpoch), retain: false))
+            await _client.EnqueueAsync(Message(SpecWire.EventTopic(_serialNumber, next.Path), SpecWire.Event(next, _seqEpoch), retain: false))
                 .ConfigureAwait(false);
         }
     }
@@ -166,7 +166,7 @@ internal sealed partial class SpecPublisher : IDisposable
 
     private MqttApplicationMessage ValueMessage(SpecValue value)
     {
-        return Message(SpecWire.Topic(_machineId, value.Path), SpecWire.Envelope(value), retain: true);
+        return Message(SpecWire.Topic(_serialNumber, value.Path), SpecWire.Envelope(value), retain: true);
     }
 
     private static MqttApplicationMessage Message(string topic, JsonObject payload, bool retain)

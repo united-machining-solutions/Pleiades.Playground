@@ -60,6 +60,8 @@ internal sealed class VirtualMachine
     private double _spindleOverride;
     private long _heartbeat;
     private long _seq;
+    private double _bearingTemperature;
+    private readonly string _bearingPath;
     private DateTimeOffset _nextHeartbeat;
     private DateTimeOffset _nextMeasurement;
 
@@ -77,6 +79,8 @@ internal sealed class VirtualMachine
         _random = _scenario.Seed is { } seed ? new Random(seed) : new Random();
         _now = start;
         SeqEpoch = SpecWire.Timestamp(start);
+        _bearingPath = SpecElements.ExtensionPath(config.ManufacturerDomain, SpecElements.BearingTemperature);
+        _bearingTemperature = _scenario.BearingTemperatureIdle;
         _nextJobNumber = _scenario.FirstJobOrderNumber;
         _powerOnDuration = counters.PowerOnDuration;
         _energy = counters.Energy;
@@ -131,6 +135,7 @@ internal sealed class VirtualMachine
         // The power published since the last step held until now; the energy is its integral.
         _energy += _power * elapsed.TotalHours;
         _powerOnDuration += elapsed.TotalSeconds;
+        WarmBearing(elapsed);
         _now = now;
 
         ChangeOverrides(elapsed);
@@ -585,7 +590,21 @@ internal sealed class VirtualMachine
     {
         Set(SpecElements.ActiveEnergy, Math.Round(_energy, 3));
         Set(SpecElements.PowerOnDuration, Math.Round(_powerOnDuration));
+        Set(_bearingPath, Math.Round(_bearingTemperature, 1));
         _nextMeasurement = _now + _config.MeasurementInterval;
+    }
+
+    /// <summary>
+    /// The bearing approaches the temperature of the state that held over the step: warm while the spindle turned,
+    /// cool while it stood.
+    /// </summary>
+    private void WarmBearing(TimeSpan elapsed)
+    {
+        var target = _phase == Phase.Executing
+            ? _scenario.BearingTemperatureIdle + ((_scenario.BearingTemperatureRunning - _scenario.BearingTemperatureIdle) * _spindleOverride)
+            : _scenario.BearingTemperatureIdle;
+        var approach = 1 - Math.Exp(-elapsed.TotalSeconds / _scenario.BearingTimeConstant.TotalSeconds);
+        _bearingTemperature += (target - _bearingTemperature) * approach;
     }
 
     private void UpdatePower()

@@ -23,35 +23,36 @@ internal sealed record SpecEvent(string Path, DateTimeOffset Timestamp, long Seq
 /// <summary>Writes the messages of the spec binding: topics and payloads.</summary>
 internal static class SpecWire
 {
-    /// <summary>The root of every topic of the spec binding.</summary>
-    public const string Root = "umati";
+    /// <summary>
+    /// The root of every topic of the spec binding. The output stands for the simulator of a machine; it lies below
+    /// <c>simulators/{SerialNumber}/</c>, beside <c>machines/{SerialNumber}/</c> of the binding of the playground, and
+    /// is split the same way: <c>umati/</c>, <c>vendor/</c> and <c>events/</c>.
+    /// </summary>
+    public const string Root = "simulators";
+
+    /// <summary>The level of the elements of the model and of the manifest.</summary>
+    public const string ModelLevel = "umati";
+
+    /// <summary>The level of the signals of the manufacturer.</summary>
+    public const string VendorLevel = "vendor";
 
     /// <summary>The MQTT 5 content type of every payload.</summary>
     public const string ContentType = "application/json";
 
     /// <summary>
-    /// The machine id of the topics: the manufacturer domain with <c>-</c> for every dot, then <c>_</c>, then the
-    /// serial number. Only <c>[A-Za-z0-9_-]</c> is allowed.
+    /// The topic of an element, every dot of its path a topic level. An element of the model goes below
+    /// <c>umati/</c>. A signal of the manufacturer, whose path begins with the one prefix segment <c>x-&lt;domain&gt;</c>
+    /// of the model, goes below <c>vendor/</c> without that segment: the binding maps the prefix to the subtree.
     /// </summary>
-    public static string MachineId(string manufacturerDomain, string serialNumber)
+    public static string Topic(string serialNumber, string path)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(manufacturerDomain);
-        ArgumentException.ThrowIfNullOrWhiteSpace(serialNumber);
-#pragma warning disable CA1308 // A domain is lower case by convention; the id is not compared culture-sensitively.
-        var id = $"{manufacturerDomain.Trim().ToLowerInvariant().Replace('.', '-')}_{serialNumber}";
-#pragma warning restore CA1308
-        if (!id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'))
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        if (path.StartsWith("x-", StringComparison.Ordinal))
         {
-            throw new ArgumentException(
-                $"The machine id '{id}' may contain only letters, digits, '-' and '_'; check the domain and the serial number.");
+            var rest = path[(path.IndexOf('.', StringComparison.Ordinal) + 1)..];
+            return $"{Root}/{serialNumber}/{VendorLevel}/{rest.Replace('.', '/')}";
         }
-        return id;
-    }
-
-    /// <summary>The topic of an element: every dot of the path becomes a topic level.</summary>
-    public static string Topic(string machineId, string path)
-    {
-        return $"{Root}/{machineId}/{path.Replace('.', '/')}";
+        return $"{Root}/{serialNumber}/{ModelLevel}/{path.Replace('.', '/')}";
     }
 
     /// <summary>The level below the machine under which every event lies.</summary>
@@ -75,7 +76,7 @@ internal static class SpecWire
     /// them apart.
     /// </summary>
     /// <exception cref="ArgumentException">The group of the event has no topic name.</exception>
-    public static string EventTopic(string machineId, string path)
+    public static string EventTopic(string serialNumber, string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var group = path.Split('.')[0];
@@ -83,13 +84,13 @@ internal static class SpecWire
         {
             throw new ArgumentException($"The group '{group}' of the event '{path}' has no topic name.", nameof(path));
         }
-        return $"{Root}/{machineId}/{EventsLevel}/{name}";
+        return $"{Root}/{serialNumber}/{EventsLevel}/{name}";
     }
 
-    /// <summary>The topic of the manifest.</summary>
-    public static string ManifestTopic(string machineId)
+    /// <summary>The topic of the manifest, below <c>umati/</c>.</summary>
+    public static string ManifestTopic(string serialNumber)
     {
-        return $"{Root}/{machineId}/Manifest";
+        return $"{Root}/{serialNumber}/{ModelLevel}/Manifest";
     }
 
     /// <summary>Source time in UTC, ISO 8601 with milliseconds and <c>Z</c>.</summary>

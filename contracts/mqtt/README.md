@@ -5,8 +5,8 @@ It follows the umati data model referenced in [`../datamodel`](../datamodel/READ
 names every deviation below.
 
 There are two trees on the broker. The topics below `machines/` and `sites/` are the binding of the playground,
-which every service here reads. The topics below `umati/` are a draft that follows the data model exactly, see
-[Spec binding (draft)](#spec-binding-draft); no service reads them yet.
+which every service here reads. The topics below `simulators/` are a draft that follows the data model exactly,
+see [Spec binding (draft)](#spec-binding-draft); no service reads them yet.
 
 ## Topics
 
@@ -15,6 +15,7 @@ machines/{SerialNumber}/umati/<path>     values named by the data model
 machines/{SerialNumber}/vendor/<path>    manufacturer-specific values
 machines/{SerialNumber}/events/<kind>    events, see "Notifications"
 sites/{SiteId}/{Source}/<path>           values about a place, in the names of one source
+simulators/{SerialNumber}/...            the simulator of a machine after the data model, see "Spec binding"
 ```
 
 The first two levels of a topic say what a value is about, the third says whose names follow.
@@ -34,7 +35,7 @@ A value that belongs to no machine is about a place:
   below `sites/{SiteId}/{Source}/`. So whether a value is current reads the same for a machine and for a
   place.
 - A new source below `sites/` adds its rows to "Example topics of a source". A new first level beside
-  `machines` and `sites` is a change to this binding.
+  `machines`, `sites` and `simulators` is a change to this binding.
 
 ## Value envelope
 
@@ -149,30 +150,40 @@ No service of the playground reads it yet.
 
 ### Topics
 
+The tree is built like the binding of the playground, split into `umati/`, `vendor/` and `events/`, but below a
+root of its own, `simulators/`:
+
 ```text
-umati/{machineId}/Manifest                                retained      the manifest
-umati/{machineId}/<path, every "." a level>               retained      value envelope: a value, a snapshot or a list
-umati/{machineId}/events/<topic of the group>            not retained  event
+simulators/{SerialNumber}/umati/Manifest                   retained      the manifest
+simulators/{SerialNumber}/umati/<path, every "." a level>  retained      an element of the model: value, snapshot or list
+simulators/{SerialNumber}/vendor/<path, every "." a level> retained      a signal of the manufacturer
+simulators/{SerialNumber}/events/<topic of the group>      not retained  event
 ```
 
-- `umati/` is a fixed root for the standard. It does not collide with other data on a shared broker.
-- `{machineId}` is one topic level of `[A-Za-z0-9_-]`: the internet domain of the manufacturer with `-` for every
-  dot, then `_`, then the serial number, for example `example-com_P-04`. `ProductInstanceUri` contains `/` and `:`
-  and cannot be a level; it is a value in the manifest and below `Identification`.
+- `simulators/` is the root: the output stands for the simulator of a machine. It lies beside `machines/`, so
+  nothing mixes with the persistence and the app, which subscribe to `machines/+/umati/#`, `machines/+/vendor/#`
+  and `machines/+/events/#`. The tree below `machines/` stays as it is.
+- `{SerialNumber}` is the same serial number as below `machines/` (`Config:SerialNumber`). It contains no `/`,
+  `+` or `#`. The machine is identified by the serial number in the topic and by its manifest:
+  `machine.ProductInstanceUri`, the globally unique id the model asks for, and the values below
+  `umati/Identification/` (`Manufacturer`, `SerialNumber`, `ProductInstanceUri`). `ProductInstanceUri` contains
+  `/` and `:` and cannot be a topic level.
 - Every segment of the path is one topic level, without encoding: `Channel.1.ChannelState` becomes
-  `Channel/1/ChannelState`. Wildcards work: `umati/+/Consumption/Electricity/+/AcActivePowerTotal`.
-- A snapshot is one topic (`State/Status`), and so is a list (`Production/JobOrders`, always the whole list).
+  `umati/Channel/1/ChannelState`. Wildcards work: `simulators/+/umati/Consumption/Electricity/+/AcActivePowerTotal`.
+- A snapshot is one topic (`umati/State/Status`), and so is a list (`umati/Production/JobOrders`, always the
+  whole list).
 - Every event lies below the level `events/`, on one topic per group (`events/production`,
-  `events/notifications`), so `umati/+/events/#` subscribes to exactly the events.
+  `events/notifications`), so `simulators/+/events/+` subscribes to exactly the events.
 - Every message has QoS 1 and the MQTT 5 content type `application/json`.
 
 ```text
-umati/example-com_P-04/Manifest
-umati/example-com_P-04/State/Status
-umati/example-com_P-04/Channel/1/ChannelState
-umati/example-com_P-04/Production/JobOrders
-umati/example-com_P-04/events/production
-umati/example-com_P-04/events/notifications
+simulators/P-04/umati/Manifest
+simulators/P-04/umati/State/Status
+simulators/P-04/umati/Channel/1/ChannelState
+simulators/P-04/umati/Production/JobOrders
+simulators/P-04/vendor/Spindle/1/BearingTemperature
+simulators/P-04/events/production
+simulators/P-04/events/notifications
 ```
 
 ### Value envelope
@@ -205,13 +216,13 @@ The rules for events, so that a consumer can keep nothing but the events and sti
 
 | Rule | What | Why |
 |---|---|---|
-| Topic per group | An event is published on `umati/{machineId}/events/<topic>`, one topic per group of events, the group being the first segment of its path. The binding names the topic of each group, in lower case (table below): every job order and program execution event on `events/production`, every alert event on `events/notifications`. A group without a name in the table is not published. The field `event`, the full path of the model such as `Production.JobOrderStarted`, tells the events of a topic apart. | MQTT keeps the order of messages only within one topic. On one topic `JobOrderStarted` and the `ProgramExecutionStarted` that follows arrive in the order they came up. One subscription per group is enough; `umati/+/events/+` or `umati/+/events/#` gets them all. The binding of the playground does the same with one topic for all notifications, `machines/{SerialNumber}/events/notifications`, and the spec binding keeps its name. |
-| Envelope | `{event, timestamp, seq, seqEpoch, value}`. `event` is the path of the event, `timestamp` its source time. `seq` is an integer that counts every event of the machine, from 1 and without a gap. `seqEpoch` names the run of the adapter that counts: the time it started, in UTC. A new start begins a new epoch and counts from 1 again. | A consumer finds a gap and a duplicate by `(machineId, seqEpoch, seq)`, in any technology. |
+| Topic per group | An event is published on `simulators/{SerialNumber}/events/<topic>`, one topic per group of events, the group being the first segment of its path. The binding names the topic of each group, in lower case (table below): every job order and program execution event on `events/production`, every alert event on `events/notifications`. A group without a name in the table is not published. The field `event`, the full path of the model such as `Production.JobOrderStarted`, tells the events of a topic apart. | MQTT keeps the order of messages only within one topic. On one topic `JobOrderStarted` and the `ProgramExecutionStarted` that follows arrive in the order they came up. One subscription per group is enough; `simulators/+/events/+` gets them all. The binding of the playground does the same with one topic for all notifications, `machines/{SerialNumber}/events/notifications`, and the spec binding keeps its name. |
+| Envelope | `{event, timestamp, seq, seqEpoch, value}`. `event` is the path of the event, `timestamp` its source time. `seq` is an integer that counts every event of the machine, from 1 and without a gap. `seqEpoch` names the run of the adapter that counts: the time it started, in UTC. A new start begins a new epoch and counts from 1 again. | A consumer finds a gap and a duplicate by `(SerialNumber, seqEpoch, seq)`, in any technology. |
 | Delivery | QoS 1, not retained. | QoS 1 delivers at least once; a duplicate is caught by `seq`. A retained event would be a state, and a state is a value. |
 | Outbox | While the broker is away the adapter keeps the events in the order they came up and sends them after the next connect, with their source time. The outbox is bounded; when it is full the oldest event is dropped and logged, and its `seq` stays a gap: nothing is numbered again. Values need no outbox, every connect publishes them whole. | Without an outbox the events of a broker outage are lost unnoticed. |
-| Consumer | A consumer that keeps events subscribes with a persistent session: Clean Start false, a session expiry of for example 24 hours, QoS 1. Several instances of one consumer share the events with a shared subscription, `$share/<group>/umati/+/events/#`. | The broker holds the events while the consumer restarts. |
+| Consumer | A consumer that keeps events subscribes with a persistent session: Clean Start false, a session expiry of for example 24 hours, QoS 1. Several instances of one consumer share the events with a shared subscription, `$share/<group>/simulators/+/events/+`. | The broker holds the events while the consumer restarts. |
 
-| Group of events (first segment of `event`) | Topic below `umati/{machineId}/events/` |
+| Group of events (first segment of `event`) | Topic below `simulators/{SerialNumber}/events/` |
 |---|---|
 | `Production` | `production` |
 | `Notification` | `notifications` |
@@ -249,24 +260,42 @@ The rules for events, so that a consumer can keep nothing but the events and sti
 Exactly those of the catalogue. Unlike the binding of the playground, energy is in `wattHour`; a temperature is
 in `degreeCelsius` in both.
 
+### Signals of the manufacturer
+
+The signals of the manufacturer lie in the same tree as the elements of the model, below `vendor/`:
+
+- In the model a signal of the manufacturer begins with exactly one prefix segment `x-<domain>`, the internet
+  domain of the manufacturer with `-` for every dot (model 0.13.1, rule for names). The manifest lists it so,
+  for example `x-example-com.Spindle.1.BearingTemperature`, with its `type` and, for a number, its `unit`
+  (`code` and `name`) and a `description`.
+- The binding maps that prefix to the subtree `vendor/`: the prefix segment is left out, the rest of the path
+  becomes topic levels. `x-example-com.Spindle.1.BearingTemperature` lies on
+  `simulators/P-04/vendor/Spindle/1/BearingTemperature`. An element of the model never lies below `vendor/`, a
+  signal of the manufacturer never below `umati/`.
+- It has the same envelope as an element of the model, `{timestamp, value, unit}`, retained, QoS 1. The `unit` is
+  the `name` the manifest gives; the value follows the rules of the model for units, a temperature in
+  `degreeCelsius`, energy in `wattHour`.
+- A consumer ignores what it does not know (must-ignore). One that knows only the model subscribes to
+  `simulators/+/umati/#`.
+
 ### What the simulators publish
 
 Every simulator of the demo stack publishes this tree, as client `<ClientId>-spec` with its own last will on
-`umati/{machineId}/Connection/State`. A virtual machine of its own, a state machine driven by a scenario in the
+`simulators/{SerialNumber}/umati/Connection/State`. A virtual machine of its own, a state machine driven by a scenario in the
 configuration (`Config:SpecOutput`), produces every value and event, so they agree with each other.
 `Config:SpecOutput:ScenarioName` picks the scenario from `Config:SpecOutput:Scenarios`; without a name the
 simulator runs `Config:SpecOutput:Scenario`.
 
-| Simulator | Topics below | Scenario | Jobs | Profiles |
-|---|---|---|---|---|
-| P-04 | `umati/example-com_P-04/` | default | shafts, flanges, bushings; cycles of 45 s to 90 s, up to 15 kW | Core, Production, Spindle, Energy, AlertsEvents |
-| P-07 | `umati/example-com_P-07/` | `housings` | housings, cover plates, gearbox housings; cycles of 2.5 min to 7 min, up to 21 kW | Core, Production, Spindle, Energy, AlertsEvents |
-| M-02 | `umati/example-com_M-02/` | `small-parts` | pins, spacers, nozzles in large quantities; cycles of 20 s to 50 s, up to 7 kW | Core, Production, Spindle, Energy, AlertsEvents |
+| Simulator | Topics below | Scenario | Jobs | Profiles | Signals of the manufacturer |
+|---|---|---|---|---|---|
+| P-04 | `simulators/P-04/` | default | shafts, flanges, bushings; cycles of 45 s to 90 s, up to 15 kW | Core, Production, Spindle, Energy, AlertsEvents | `vendor/Spindle/1/BearingTemperature` |
+| P-07 | `simulators/P-07/` | `housings` | housings, cover plates, gearbox housings; cycles of 2.5 min to 7 min, up to 21 kW | Core, Production, Spindle, Energy, AlertsEvents | `vendor/Spindle/1/BearingTemperature` |
+| M-02 | `simulators/M-02/` | `small-parts` | pins, spacers, nozzles in large quantities; cycles of 20 s to 50 s, up to 7 kW | Core, Production, Spindle, Energy, AlertsEvents | `vendor/Spindle/1/BearingTemperature` |
 
 All three deliver the same kind of values below `machines/` today, a spindle included, so all three are machine
 tools with a spindle and declare the same profiles. Each scenario has its own alerts, job order numbers and
-counters. The signals of the manufacturer stay below `machines/{SerialNumber}/vendor/`; the spec tree carries
-the elements of the model only.
+counters. The signals of the manufacturer are those the simulator delivers below
+`machines/{SerialNumber}/vendor/` today, here derived from the virtual machine.
 
 Each virtual machine works like this:
 
@@ -291,28 +320,32 @@ Each virtual machine works like this:
 - Ended and aborted job orders stay in the list for 24 hours, the least the model allows. A shorter time is a
   demo setting (`Scenario:JobOrderRetention`); the manifest then leaves out `jobOrderRetention`.
 - The counters (power-on duration, energy, parts) only grow; they are kept in `/data` across restarts.
+- Its signal of the manufacturer, the temperature of the spindle bearing, warms towards a running temperature
+  while the spindle turns (scaled by the spindle override) and cools back while it stands
+  (`Scenario:BearingTemperatureIdle`, `BearingTemperatureRunning`, `BearingTimeConstant`).
 - The events wait in an outbox of 10 000 while the broker is away (`Config:SpecOutput:EventBufferSize`).
   `seqEpoch` is the start of the simulator.
 
-| Path below `umati/{machineId}/` | Kind | Unit |
+| Path below `simulators/{SerialNumber}/` | Kind | Unit |
 |---|---|---|
-| `Manifest` | manifest | – |
-| `Identification/Manufacturer`, `Identification/SerialNumber`, `Identification/ProductInstanceUri` | string | – |
-| `Connection/State` | enum | – |
-| `Connection/Heartbeat` | integer | – |
-| `State/Status` | snapshot | – |
-| `State/FeedOverride` | number | `one` |
-| `Channel/1/ChannelState` | enum, `correlationId` | – |
-| `Production/ActiveProgram` | string, `correlationId` | – |
-| `Production/ProgramExecution` | snapshot with `State` and `StartTime`, `correlationId` | – |
-| `Production/JobOrders` | list | – |
-| `OperationCounters/PartsProducedInLifetime` | integer | `piece` |
-| `OperationCounters/PowerOnDuration` | number | `second` |
-| `Notification/ActiveAlerts` | list | – |
-| `Spindle/1/IsRotating` | boolean | – |
-| `Spindle/1/Override` | number | `one` |
-| `Consumption/Electricity/Main/AcActivePowerTotal` | number | `watt` |
-| `Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `wattHour` |
+| `umati/Manifest` | manifest | – |
+| `umati/Identification/Manufacturer`, `umati/Identification/SerialNumber`, `umati/Identification/ProductInstanceUri` | string | – |
+| `umati/Connection/State` | enum | – |
+| `umati/Connection/Heartbeat` | integer | – |
+| `umati/State/Status` | snapshot | – |
+| `umati/State/FeedOverride` | number | `one` |
+| `umati/Channel/1/ChannelState` | enum, `correlationId` | – |
+| `umati/Production/ActiveProgram` | string, `correlationId` | – |
+| `umati/Production/ProgramExecution` | snapshot with `State` and `StartTime`, `correlationId` | – |
+| `umati/Production/JobOrders` | list | – |
+| `umati/OperationCounters/PartsProducedInLifetime` | integer | `piece` |
+| `umati/OperationCounters/PowerOnDuration` | number | `second` |
+| `umati/Notification/ActiveAlerts` | list | – |
+| `umati/Spindle/1/IsRotating` | boolean | – |
+| `umati/Spindle/1/Override` | number | `one` |
+| `umati/Consumption/Electricity/Main/AcActivePowerTotal` | number | `watt` |
+| `umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `wattHour` |
+| `vendor/Spindle/1/BearingTemperature` | number, signal of the manufacturer (`x-example-com.Spindle.1.BearingTemperature` in the manifest) | `degreeCelsius` |
 | `events/production` | events `Production.ProgramExecution<Started, Interrupted, Resumed, Ended, Aborted>` and `Production.JobOrder<Added, Released, Revoked, Started, Interrupted, Resumed, Ended, Aborted, Cancelled, Changed, Removed>` | – |
 | `events/notifications` | events `Notification.AlertRaised`, `Notification.AlertChanged`, `Notification.AlertCleared` | – |
 
@@ -322,7 +355,12 @@ next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; withou
 ### Open for the hackathon
 
 - A version level in the topic: proposed no, the version is in the manifest.
-- The final form of `{machineId}`.
+- A globally unique id of the machine in the topic. Here the topic carries the serial number only, which is
+  unique on the broker of the playground but not across manufacturers; the manufacturer and the globally unique
+  `ProductInstanceUri` are in the manifest and below `umati/Identification/`. Whether a binding needs more in
+  the topic is open.
+- The mapping of the prefix `x-<domain>` to the subtree `vendor/` is a proposal of this binding; with several
+  manufacturers below one machine, `vendor/` would need a level for the domain.
 - The topic per group below `events/`, the fields `seq` and `seqEpoch`, the outbox and the persistent session of a consumer
   are proposals of this binding. Whether `seq` and `seqEpoch` belong to the model (they would serve every
   technology), and whether `seqEpoch` belongs in each event or in the manifest, is open. Here it is in each

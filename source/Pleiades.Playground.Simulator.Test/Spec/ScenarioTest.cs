@@ -38,6 +38,8 @@ public sealed class ScenarioTest
         Assert.IsTrue(messages.OfType<SpecEvent>().Any(e => e.Path == SpecElements.JobOrderEnded));
         var seqs = messages.OfType<SpecEvent>().Select(e => e.Seq).ToList();
         CollectionAssert.AreEqual(Enumerable.Range(1, seqs.Count).Select(i => (long)i).ToList(), seqs);
+        var bearing = SpecElements.ExtensionPath(config.ManufacturerDomain, SpecElements.BearingTemperature);
+        Assert.IsTrue(messages.OfType<SpecValue>().Any(v => v.Path == bearing), "its signal of the manufacturer");
     }
 
     [TestMethod]
@@ -104,6 +106,9 @@ public sealed class ScenarioTest
                 SpindleOverrideSteps = scenario.SpindleOverrideSteps,
                 SpindleOverrideChangesPerHour = scenario.SpindleOverrideChangesPerHour,
                 Alerts = scenario.Alerts,
+                BearingTemperatureIdle = scenario.BearingTemperatureIdle,
+                BearingTemperatureRunning = scenario.BearingTemperatureRunning,
+                BearingTimeConstant = scenario.BearingTimeConstant,
             },
         };
     }

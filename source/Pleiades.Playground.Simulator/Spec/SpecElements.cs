@@ -54,6 +54,20 @@ internal static class SpecElements
     public const string UnitPiece = "piece";
     public const string UnitWatt = "watt";
     public const string UnitWattHour = "wattHour";
+    public const string UnitDegreeCelsius = "degreeCelsius";
+
+    /// <summary>Path of the bearing temperature of spindle 1 below the prefix of the manufacturer.</summary>
+    public const string BearingTemperature = "Spindle.1.BearingTemperature";
+
+    /// <summary>
+    /// The signals of the manufacturer, in the same tree as the elements of the model. Their paths are relative to
+    /// the prefix <c>x-&lt;domain&gt;</c> (<see cref="ExtensionPrefix"/>); type and unit are named in the manifest, as
+    /// the rule of the model for extensions asks, and the unit follows its rules: a temperature in degrees Celsius.
+    /// </summary>
+    public static readonly IReadOnlyList<SpecExtension> Extensions =
+    [
+        new(BearingTemperature, "number", "CEL", UnitDegreeCelsius, "Temperature of the bearing of spindle 1"),
+    ];
 
     /// <summary>The profiles the manifest declares.</summary>
     public static readonly IReadOnlyList<string> Profiles = ["Core", "Production", "Spindle", "Energy", "AlertsEvents"];
@@ -91,16 +105,54 @@ internal static class SpecElements
         AlertRaised, AlertChanged, AlertCleared,
     ];
 
+    /// <summary>
+    /// The prefix of the signals of a manufacturer: exactly one segment <c>x-&lt;domain&gt;</c>, every dot of the domain a
+    /// <c>-</c>, for example <c>x-example-com</c>.
+    /// </summary>
+    public static string ExtensionPrefix(string manufacturerDomain)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(manufacturerDomain);
+#pragma warning disable CA1308 // A domain is lower case by convention, as in the machine id.
+        return $"x-{manufacturerDomain.Trim().ToLowerInvariant().Replace('.', '-')}";
+#pragma warning restore CA1308
+    }
+
+    /// <summary>The full path of a signal of the manufacturer.</summary>
+    public static string ExtensionPath(string manufacturerDomain, string relativePath)
+    {
+        return $"{ExtensionPrefix(manufacturerDomain)}.{relativePath}";
+    }
+
+    /// <summary>Every element of the manifest: those of the model, then the signals of the manufacturer.</summary>
+    public static IReadOnlyList<SpecElement> ElementsFor(string manufacturerDomain)
+    {
+        return
+        [
+            .. Elements,
+            .. Extensions.Select(e => new SpecElement(ExtensionPath(manufacturerDomain, e.Path), e.UnitName, "source", false, e)),
+        ];
+    }
+
     /// <summary>The unit name of a numeric element, or <see langword="null"/> when it has none.</summary>
     public static string? UnitOf(string path)
     {
+        ArgumentNullException.ThrowIfNull(path);
+        if (path.StartsWith("x-", StringComparison.Ordinal))
+        {
+            var relative = path[(path.IndexOf('.', StringComparison.Ordinal) + 1)..];
+            return Extensions.FirstOrDefault(e => e.Path == relative)?.UnitName;
+        }
         return Elements.FirstOrDefault(e => e.Path == path)?.Unit;
     }
 }
+
+/// <summary>A signal of the manufacturer: path below the prefix, type, unit and a description for the manifest.</summary>
+internal sealed record SpecExtension(string Path, string Type, string UnitCode, string UnitName, string Description);
 
 /// <summary>An element of the manifest.</summary>
 /// <param name="Path">Path in the data model.</param>
 /// <param name="Unit">Unit name sent with a numeric value, or <see langword="null"/>.</param>
 /// <param name="TimestampSource">Whether the timestamp is source or adapter time.</param>
 /// <param name="CorrelationId">Whether the envelope carries a correlationId while a program runs.</param>
-internal sealed record SpecElement(string Path, string? Unit, string TimestampSource, bool CorrelationId);
+/// <param name="Extension">For a signal of the manufacturer, what the manifest says about it.</param>
+internal sealed record SpecElement(string Path, string? Unit, string TimestampSource, bool CorrelationId, SpecExtension? Extension = null);

@@ -19,7 +19,7 @@ git -C MachineTool-DataModel checkout 2b45df3f4f3faeb799ddcc904332129f93fdcd9e
 
 - The model is not covered by the licences of this repository.
 - The [MQTT binding](../mqtt/README.md) says how this repository uses the model and names every deviation.
-- The simulator can publish exactly after the model, below `umati/{machineId}/`: see "Spec binding" in the
+- The simulator can publish exactly after the model, below `simulators/{SerialNumber}/`: see "Spec binding" in the
   [MQTT binding](../mqtt/README.md#spec-binding-draft). Its tests check every message against the schemas of the
   model when a clone of it lies next to this repository (or in the folder named by `UMATI_DATAMODEL_DIR`).
 - A new version of the model arrives as a pull request that changes the table above and, where needed, the

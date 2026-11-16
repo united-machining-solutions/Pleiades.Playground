@@ -56,7 +56,7 @@ internal sealed class Config
     public required NotificationEventGeneratorConfig NotificationEventGeneratorConfig { get; init; }
 
     /// <summary>
-    /// The output after the data model, below <c>umati/{machineId}/</c>, in addition to the output of the
+    /// The output after the data model, below <c>simulators/{SerialNumber}/</c>, in addition to the output of the
     /// generators. Off unless enabled.
     /// </summary>
     public SpecOutputConfig SpecOutput { get; init; } = new();
