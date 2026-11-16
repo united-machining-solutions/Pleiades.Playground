@@ -5,7 +5,7 @@
 // - the title is a Conventional Commit, because it becomes the commit on main;
 // - the text says what and why, and what was verified: the template is filled in;
 // - a change to a contract links its issue;
-// - a `feat` or a `fix` has its line in CHANGELOG.md, or says why not.
+// - a `feat`, a `fix` or a breaking change (`!`) has its line in CHANGELOG.md, or says why not.
 //
 // Each thing that is missing comes with what to do about it, so whoever reads the failure can act
 // on it: a person, or the agent that is asked to fix the check.

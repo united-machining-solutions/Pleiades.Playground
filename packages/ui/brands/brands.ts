@@ -54,8 +54,17 @@ export function useBrand(): string {
   )
 }
 
-// The brand of the last visit goes back on before anything is drawn. A brand that is no longer in
-// the list is forgotten.
+/**
+ * The brand of the last visit, as a script for the <head> of a document the server sends. The browser
+ * runs it while it reads the head, before it paints anything, and the brand is on from the first frame.
+ * A brand that is no longer in the list is forgotten.
+ */
+export const brandScript = `try{var id=localStorage.getItem(${JSON.stringify(storageKey)});if(id&&${JSON.stringify(
+  brands.map((brand) => brand.id),
+)}.indexOf(id)>=0)document.documentElement.dataset.brand=id}catch(e){}`
+
+// The same when this module runs, for a page without that script in its head. It runs once the bundle
+// is evaluated: what the page painted before that wears no brand for a moment.
 if (typeof document !== "undefined") {
   try {
     const remembered = localStorage.getItem(storageKey)

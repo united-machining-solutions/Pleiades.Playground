@@ -130,10 +130,8 @@ function NoLanguageModel() {
         <EmptyDescription>
           {/* What is missing first, by the names of the settings. */}
           {chatStatus.gaps.map((gap) => `${gap}. `)}
-          Set one block in <code>.env</code> and start the app again with <code>docker compose up -d app</code>:{" "}
-          <code>ANTHROPIC_API_KEY</code> with <code>ANTHROPIC_MODELS</code>, <code>OPENAI_API_KEY</code> with{" "}
-          <code>OPENAI_MODELS</code>, or <code>LLM_BASE_URL</code> with <code>LLM_MODELS</code> for any
-          OpenAI-compatible endpoint. Home needs no language model.
+          Set <code>LLM_BASE_URL</code> and <code>LLM_API_KEY</code> of a LiteLLM gateway in <code>.env</code>{" "}
+          and start the app again with <code>docker compose up -d app</code>. Home needs no language model.
         </EmptyDescription>
       </EmptyHeader>
     </Empty>
@@ -217,7 +215,9 @@ function Conversation({ threadId }: { threadId: string }) {
   }
   // Stop ends the answer twice: `stop` of the chat stops reading it, and the harness cancels the turn
   // on the server. Without that the model goes on writing, the server keeps the whole answer, and the
-  // next question waits until it is done.
+  // next question waits until it is done. When the server refuses the cancel, the chat says so with its
+  // reason, which is true both when the turn goes on and when it had just ended; the next question
+  // takes the alert away.
   const [stopError, setStopError] = useState<string>()
   const halt = () => {
     stop()
@@ -344,7 +344,7 @@ function Conversation({ threadId }: { threadId: string }) {
                   <MessageScrollerItem messageId="stop-error">
                     <Alert>
                       <CircleAlertIcon />
-                      <AlertTitle>The answer goes on on the server</AlertTitle>
+                      <AlertTitle>Stopping did not reach the server</AlertTitle>
                       <AlertDescription>{stopError}</AlertDescription>
                     </Alert>
                   </MessageScrollerItem>
@@ -358,7 +358,10 @@ function Conversation({ threadId }: { threadId: string }) {
       <Composer
         placeholder={messages.length === 0 ? "Ask about the machines" : "Ask a follow-up"}
         busy={isLoading}
-        onSend={(question) => void sendMessage(question)}
+        onSend={(question) => {
+          setStopError(undefined)
+          void sendMessage(question)
+        }}
         onStop={halt}
         models={chatStatus.models}
         model={model}
@@ -390,6 +393,10 @@ function CallLine({ call }: { call: Call }) {
     </TraceLine>
   )
   if (call.output === undefined) return line
+  // The output is data of the stack, shown whole and unfiltered: the chat has no sign-in, so whoever
+  // reaches it may read what the tools read. `wrap` and `max-h-64` bound the box, not the text; a
+  // closed step costs nothing, because the panel of Base UI mounts its children only while open
+  // (`keepMounted` is off by default).
   return (
     <TraceCollapsible>
       <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>

@@ -4,7 +4,7 @@ status: proposed
 date: 2026-11-16
 ---
 
-# ADR-0010: A brand is a block of theme tokens, switched by one attribute
+# ADR-0011: A brand is a block of theme tokens, switched by one attribute
 
 ## Context
 
