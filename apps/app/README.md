@@ -27,6 +27,7 @@ everything else works.
 | In the demo stack | <http://localhost:5600/>, port from `APP_PORT`, on this computer only (`APP_BIND`) |
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app` |
+| Version | At the bottom of the sidebar: `0.0.142 · 7a83c2f` for an image of the workflow "Images", linked to its commit; `dev` for a build of your own, with the commit of the checkout under `vite dev` |
 | Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. The language models of the chat, see below. |
 
 ## Language models

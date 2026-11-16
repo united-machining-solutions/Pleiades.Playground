@@ -4,6 +4,12 @@
 FROM --platform=$BUILDPLATFORM node:26.13-alpine3.24 AS build
 WORKDIR /repo
 COPY . .
+# The build the sidebar of the app names: the workflow "Images" passes the version, the commit and the
+# repository, as the image labels org.opencontainers.image.version, .revision and .source say them.
+# A build without them is "dev".
+ARG VERSION=dev
+ARG REVISION=
+ARG SOURCE=
 # pnpm in the version that package.json names as "packageManager".
 RUN npm install --global --ignore-scripts "$(node --print 'require("./package.json").packageManager')" && \
     pnpm install --frozen-lockfile && \
