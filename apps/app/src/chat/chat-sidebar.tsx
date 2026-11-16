@@ -217,7 +217,9 @@ function Conversation({ threadId }: { threadId: string }) {
   }
   // Stop ends the answer twice: `stop` of the chat stops reading it, and the harness cancels the turn
   // on the server. Without that the model goes on writing, the server keeps the whole answer, and the
-  // next question waits until it is done.
+  // next question waits until it is done. When the server refuses the cancel, the chat says so with its
+  // reason, which is true both when the turn goes on and when it had just ended; the next question
+  // takes the alert away.
   const [stopError, setStopError] = useState<string>()
   const halt = () => {
     stop()
@@ -322,7 +324,7 @@ function Conversation({ threadId }: { threadId: string }) {
                   <MessageScrollerItem messageId="stop-error">
                     <Alert>
                       <CircleAlertIcon />
-                      <AlertTitle>The answer goes on on the server</AlertTitle>
+                      <AlertTitle>Stopping did not reach the server</AlertTitle>
                       <AlertDescription>{stopError}</AlertDescription>
                     </Alert>
                   </MessageScrollerItem>
@@ -336,7 +338,10 @@ function Conversation({ threadId }: { threadId: string }) {
       <Composer
         placeholder={messages.length === 0 ? "Ask about the machines" : "Ask a follow-up"}
         busy={isLoading}
-        onSend={(question) => void sendMessage(question)}
+        onSend={(question) => {
+          setStopError(undefined)
+          void sendMessage(question)
+        }}
         onStop={halt}
         models={chatStatus.models}
         model={model}
