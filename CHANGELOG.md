@@ -165,6 +165,10 @@ All notable changes are documented here. The format follows
   `src/chat/cards.tsx`. The card files are built from every page under `apps/genui-mcp/ui/`. For a caller
   nothing changed: the lists of tools and resources, the description, the guide and the card file are the
   same, byte for byte. The recipe `create-card` names the new places.
+- `app`: the cards of the chat have a place of their own, `src/cards/<name>/`, named like the card everywhere
+  else. The machine card moved there from `src/machines/`, which keeps what the pages and the chat both take
+  of a machine: the server functions and the row. Nothing a person sees changed. A card on a branch of your
+  own moves from `src/<name>/` to `src/cards/<name>/`. The recipe `create-card` names the new place.
 - The shadcn/ui components live in one package, `packages/ui` (`@pleiades/ui`), laid out as the monorepo
   template of shadcn lays it out. The example app and the card catalogue import a component as
   `@pleiades/ui/components/<name>`, and `shadcn add` writes a new one there; before, twenty lay in the app

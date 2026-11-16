@@ -23,7 +23,7 @@ for how long in total, and when last. The Events API has every one of them, and 
 2. Read the machine card as the example to follow: its contract and component under
    `packages/cards/src/machine/`, its tools in `apps/genui-mcp/src/cards/machine.ts`, what computes them in
    `apps/genui-mcp/src/machines.ts` and `history.ts`, what the chat draws for them in
-   `apps/app/src/machines/chat.tsx`, and the tests.
+   `apps/app/src/cards/machine/chat.tsx`, and the tests.
 3. Load the skills of the libraries, in the versions this repository pins:
 
    ```bash
@@ -56,8 +56,7 @@ the language model its tools, and which file says what the app draws for which t
 
 ## You touch
 
-`<name>` is one word in lower case, the same in every place below. The machine card is `machine` everywhere
-but in the app, where its folder `src/machines/` also holds the pieces of its pages.
+`<name>` is one word in lower case, the same in every place below. The machine card is `machine` everywhere.
 
 - `packages/cards/src/<name>/`: a new folder with the contract, the component and their tests, and a row in
   the table of `packages/cards/README.md`.
@@ -73,10 +72,11 @@ but in the app, where its folder `src/machines/` also holds the pieces of its pa
 - `contracts/mcp/README.md`: the name of the tool, in the row of the generative UI backend. A contract
   changes with an issue first: on your own branch add the name, and say in your hand-over that the pull
   request needs the issue.
-- `apps/app/src/<name>/chat.tsx`: new, the card in the chat: what a call of each of its tools is called, what
-  the chat draws for a result, and which tool only a card calls. Next to it, as in `src/machines/`: what
-  checks a result against the contract, with tests, and a server function if the card fetches a series with a
-  tool of its own.
+- `apps/app/src/cards/<name>/chat.tsx`: new, the card in the chat: what a call of each of its tools is called,
+  what the chat draws for a result, and which tool only a card calls. Next to it, as in `src/cards/machine/`:
+  what checks a result against the contract, with tests, and the name of a tool only the card calls. If the
+  card fetches a series with such a tool, its server function stands with the others, in
+  `apps/app/src/machines/get-machines.ts`.
 - `apps/app/src/chat/cards.tsx`: an import and one line for the card, in the order of the alphabet. The chat
   and its server take the card from there: touch neither `chat-sidebar.tsx` nor `blocks.ts`.
 - `packages/cards/src/styles.css`: one line for a shadcn/ui component the card draws and no card drew before.

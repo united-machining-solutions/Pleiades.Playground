@@ -1,4 +1,4 @@
-import { machineTools } from "@/machines/chat.tsx"
+import { machineTools } from "@/cards/machine/chat.tsx"
 
 import { backendTools } from "./tool-results.ts"
 import type { ChatTool } from "./tool-results.ts"
