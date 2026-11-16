@@ -49,7 +49,9 @@ the language model its tools, and which file says what the app draws for which t
 - What a language model reads is short: a few lines of text, a few values. A row for each of a few things
   is part of the answer: the machines, the kinds of alarm of one machine. A series is not: a value for every
   interval, anything that grows with the time it covers. It gets a contract and a tool of its own, which only
-  the card calls and the language model is not offered. The band of the machine card is the example.
+  the card calls and the language model is not offered. The band of the machine card is the example. The card
+  file calls that tool too, through its host, or nobody does outside the example application: a test of the
+  backend fails until it does.
 - A card calls only the server it came from
   ([A card and its server](../../../docs/build-your-own.md#a-card-and-its-server)). What it needs from
   another source, its tool reads.

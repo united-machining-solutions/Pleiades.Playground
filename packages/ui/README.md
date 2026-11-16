@@ -47,9 +47,10 @@ is added:
 | `input-otp` | `input-otp` | `otp-field.tsx` |
 
 Not here yet, because nothing needs them, and each brings a package: `calendar` (react-day-picker,
-date-fns), `carousel` (embla), `resizable` (react-resizable-panels) and `code-block` (shiki). Adding one
-is a decision for a pull request of its own. `form` is empty in this style: a form is `field.tsx` and a
-form library.
+date-fns), `carousel` (embla) and `resizable` (react-resizable-panels). Adding one is a decision for a
+pull request of its own. `code-block` came with the output of a tool call in the chat, as the pattern Tool
+of shadcn has it. It brings `shiki`, which only its hook `use-highlighted-code` loads; nothing in the example
+application calls that hook. `form` is empty in this style: a form is `field.tsx` and a form library.
 
 The chart is [Recharts](https://recharts.org), as shadcn has it. A series is thinned out before it is
 drawn: never more points than the picture is wide in pixels. The Timeseries API does that when asked

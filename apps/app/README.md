@@ -123,7 +123,8 @@ the backend of the running demo stack answers.
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a
-  tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat` and the choice of the model,
+  tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat`, the choice of the model and stop,
+  which also cancels the turn in the harness (`createHarnessClient(...).cancel()`),
   `dictate.tsx` the microphone in its field and `dictation.server.ts` the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for
   which tool, and its server which tools a language model does not get. `tool-results.ts` says what a card
