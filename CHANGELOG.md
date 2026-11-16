@@ -164,6 +164,9 @@ All notable changes are documented here. The format follows
 - `ui`: the buttons of a disabled number field are dimmed once, with the group, and no longer twice. The
   undo of their own dimming lost to `disabled:opacity-50` in the built stylesheet, so they stood at a
   quarter.
+- `app`: the breadcrumb takes the index route of an entry for the page of that entry. Once a page got a
+  detail page and its list moved to `<name>.index.tsx`, the breadcrumb on the list was the entry alone, as
+  a link to the page it was on.
 - `app`: a toast shows. The example app had no `Toaster` at its root, so `toast.add` on a page showed
   nothing; it has one now, and the `TooltipProvider` the docs of the tooltip ask for at the same place.
   The provider gives every tooltip the delay `tooltip.tsx` sets, which is none.
