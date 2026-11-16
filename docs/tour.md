@@ -106,16 +106,17 @@ The button at the right end of the header opens the chat. It is a panel beside t
 where it is: you chat about what you see. A language model answers and calls the tools of the generative UI
 backend, and the app draws the values of a tool call itself, with the same card as the page.
 
-![The page of P-04 on the left and the chat panel on the right. The chat shows the machine card of P-04 as
-the result of a tool call, the step "Read the guide of the backend", and below it an answer in words about
-the last 8 hours. The input field at the bottom shows the model gpt-6-luna.](images/tour/chat-answer.png)
+![The page of P-04 on the left and the chat panel on the right. The chat shows the question, the steps "Read
+the guide of the backend" and "Read the machine", the machine card of P-04 as the result of a tool call, and
+below it an answer in words about the last 8 hours. The input field at the bottom shows the model
+spark/qwen3.8-27b and a microphone.](images/tour/chat-answer.png)
 
-The picture shows the end of one chat, with a language model configured. The question was "What did P-04 do
-over the last 8 hours?". The chat lists each step of the model, here "Read the guide of the backend" and,
-further up, "Read the machine". It draws the card from the values of the tool, and the model sums it up in a
-few sentences. The numbers are the tool's and the wording is the model's: it writes 10 minutes of alarm
-where the card says 9. The card on the left is one minute newer than the one in the chat: the page reads
-again, an answer shows what was true when it was given.
+The picture shows one chat, with a language model configured. The question was "What did P-04 do over the
+last 8 hours?". The chat lists each step of the model, "Read the guide of the backend" and "Read the machine".
+It draws the card from the values of the tool, and the model sums it up in a few sentences. The numbers are
+the tool's and the wording is the model's: the card says 6 minutes of running, the model "just under 7
+minutes". The stack had just started, so most of the 8 hours have no data. The card on the left is one minute
+newer than the one in the chat: the page reads again, an answer shows what was true when it was given.
 
 The chat needs a language model, and the demo starts without one. Then the panel says "No language model
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
@@ -134,14 +135,15 @@ The chat has no sign-in, and whoever reaches the port chats at the cost of the o
 With more than one model, the input field offers a choice. The first model answers until a chat picks
 another one, and the choice stays with that chat.
 
-![The chat panel before the first question, with three suggested questions. The model picker in the input
-field is open and lists six models: three named gpt and three named claude, the first one
-ticked.](images/tour/chat-model-picker.png)
+![Home on the left and the chat panel on the right, before the first question. The model picker in the input
+field is open and lists seven models: spark/qwen3.8-27b, ticked, then three named openai/gpt and three named
+anthropic/claude.](images/tour/chat-model-picker.png)
 
-The models in the picture are the ones this stack was configured with; yours are the names in your `.env`.
+The models in the picture are the ones the gateway of the hackathon lists; yours are the ones your gateway
+lists for your key, in its order.
 The three questions above are suggestions to begin with.
 
-With a speech-to-text model in the settings, the field also has a microphone: press it, speak, press it
+With a speech-to-text model at the gateway, the field also has a microphone: press it, speak, press it
 again, and what was said stands in the field, to send like a typed question. A key of OpenAI is enough; for
 another endpoint see [Dictation](../apps/app/README.md#dictation). The pictures above were taken without it.
 
