@@ -38,6 +38,8 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
 - Do not commit, push or publish unless asked.
 - When asked: work on a branch, never on `main`; one topic per pull request; sign off every commit
   (`git commit -s`) and add a `Co-Authored-By` trailer that names you; fill in the pull request template.
+  When a pull request is open, or its check "Pull request says what it is" fails, run
+  `node .github/scripts/check-pull-request.mjs <number>` and do what it says, also where a person opened it.
 - Use the GitHub CLI (`gh`) for pull requests, checks and logs. The person signs in; never ask for a token and
   never type a password.
 - Tools and their checks: [docs/development-setup.md](docs/development-setup.md).
