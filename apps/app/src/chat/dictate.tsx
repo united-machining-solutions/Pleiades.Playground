@@ -70,23 +70,21 @@ export function DictateButton({ className, onText }: { className?: string; onTex
     return () => clearTimeout(timer)
   }, [recorder.isRecording])
 
-  if (transcription.isLoading) {
-    return (
-      <InputGroupButton variant="ghost" size="icon-sm" className={className} aria-label="Writing down" disabled>
-        <Spinner />
-      </InputGroupButton>
-    )
-  }
+  // One button with one name; aria-pressed says whether it records. While the model writes, the button
+  // is disabled but keeps the focus (Base UI's focusableWhenDisabled), also when the request fails.
+  const writing = transcription.isLoading
   return (
     <InputGroupButton
       variant={recorder.isRecording ? "secondary" : "ghost"}
       size="icon-sm"
       className={className}
-      aria-label={recorder.isRecording ? "Stop dictation" : "Dictate"}
+      aria-label="Dictate"
       aria-pressed={recorder.isRecording}
+      disabled={writing}
+      focusableWhenDisabled
       onClick={() => void toggle()}
     >
-      {recorder.isRecording ? <SquareIcon /> : <MicIcon />}
+      {writing ? <Spinner /> : recorder.isRecording ? <SquareIcon /> : <MicIcon />}
     </InputGroupButton>
   )
 }
