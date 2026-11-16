@@ -122,6 +122,14 @@ All notable changes are documented here. The format follows
 - The example application wears umati: the sign of umati is the icon of the page, and the coloured umati
   wordmark stands at the top of the sidebar in place of the name. Both are trademarks of VDW e.V. and not
   covered by the licences of this repository (`NOTICE`).
+- Stop in the chat field: while an answer comes, send is stop, after the pattern Prompt Input of shadcn.
+  It stops reading the answer (`stop` of `useChat`) and cancels the turn on the server
+  (`createHarnessClient(...).cancel()`), so that the model stops writing, the chat keeps what was shown,
+  and the next question does not wait for the rest.
+- A step in the chat opens to what its tool gave back, or why it failed, after the pattern Tool of shadcn:
+  the line of a call is a `TraceCollapsible` once its result is there, with the result as text in a
+  `CodeBlock` (JSON indented). `code-block` is new in `packages/ui`; it brings `shiki`, which only its
+  highlighting hook loads, and the app does not use that hook.
 
 ### Changed
 
