@@ -68,7 +68,8 @@ device, set `APP_BIND=0.0.0.0`, and only in a network you trust.
 With a speech-to-text model in the settings, the chat field has a microphone. Press it, speak, press it
 again: a spinner shows while the model writes down what was said, and the text goes into the field, after
 what is already there. It is sent like a typed question, when you send it. The model hears the language
-itself.
+itself. It also gets the names of the machines from the backend as its prompt, so that it writes "P-04"
+as the stack spells it.
 
 | Block | Setting | Default in the stack |
 |---|---|---|
