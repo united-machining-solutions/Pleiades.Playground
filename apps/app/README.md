@@ -114,12 +114,12 @@ the backend of the running demo stack answers.
   commit this file; here everything that needs it writes it first.
 - `src/cards/`: a folder for each card, named like the card. `machine/chat.tsx` is the machine card in the
   chat: what a call of each of its tools is called, what the chat draws for a result (`results.ts` checks it
-  against the contract), and which tool only a card calls (`card-tools.ts` holds its name). Which value of
-  the binding is which state, the signs and the wording come from
-  [`@pleiades/cards`](../../packages/cards/README.md).
+  against the contract), and which tool only a card calls. Which value of the binding is which state, the
+  signs and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
 - `src/machines/`: what the pages and the chat both take of a machine. `get-machines.ts` holds the server
-  functions that call the backend as a typed MCP client, `machine-item.tsx` draws a machine as a row or a
-  tile.
+  functions that call the backend as a typed MCP client, `card-tools.ts` the name of the tool only a card
+  calls, `machine-item.tsx` draws a machine as a row or a tile. A card folder imports from here, never the
+  other way.
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a
