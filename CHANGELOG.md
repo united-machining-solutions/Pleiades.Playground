@@ -100,6 +100,12 @@ All notable changes are documented here. The format follows
   the tokens with their measured contrast, every component of `packages/ui` in its variants and states
   with fixed values in the words of the demo, three rules as Do and Don't, and the machine card of the card
   catalogue. A test fails when a component of `packages/ui` has no block on the page.
+- Dictation in the chat field of the example application: a microphone next to send. The browser records,
+  the server route `/api/transcribe` has a speech-to-text model write down what was said, and the text goes
+  into the field, to send like a typed question. The model gets the names of the machines as its prompt.
+  It is a setting beside the key of its block: `OPENAI_TRANSCRIPTION_MODEL` (`gpt-4o-mini-transcribe` in the
+  stack) or `LLM_TRANSCRIPTION_MODEL` for an endpoint that speaks OpenAI's audio transcriptions. Without
+  one the field has no microphone.
 
 ### Changed
 
