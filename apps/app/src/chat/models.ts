@@ -64,3 +64,23 @@ export function modelNames(settings: ModelSettings): Array<string> {
     ]),
   ]
 }
+
+/**
+ * The model that writes down what is said into the chat field, and where it runs. Two blocks can
+ * name one, next to their key: OpenAI, and the other endpoint if it speaks OpenAI's audio
+ * transcriptions, as a gateway or a local speech server does. Anthropic has no such model. The
+ * first complete block counts, in the order of the blocks of the chat.
+ */
+export type DictationSettings = { model: string; apiKey: string; baseURL?: string }
+
+/** Where dictation runs, or undefined: then the chat field has no microphone. */
+export function dictationSettings(env: Readonly<Record<string, string | undefined>>): DictationSettings | undefined {
+  const openai = env.OPENAI_TRANSCRIPTION_MODEL?.trim()
+  if (env.OPENAI_API_KEY && openai) return { model: openai, apiKey: env.OPENAI_API_KEY }
+  const compatible = env.LLM_TRANSCRIPTION_MODEL?.trim()
+  if (env.LLM_BASE_URL && compatible) {
+    // As for the chat: a local server often wants no key, but the request needs one.
+    return { model: compatible, apiKey: env.LLM_API_KEY || "not-needed", baseURL: env.LLM_BASE_URL }
+  }
+  return undefined
+}

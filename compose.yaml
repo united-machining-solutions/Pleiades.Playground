@@ -194,6 +194,11 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODELS: ${LLM_MODELS:-}
+      # Dictation in the chat field, with the key of its block. Without a model for it the field has
+      # no microphone. The OpenAI name has a default only where it is missing (`-`, not `:-`): an empty
+      # line in .env turns it off, so that LLM_TRANSCRIPTION_MODEL counts.
+      OPENAI_TRANSCRIPTION_MODEL: ${OPENAI_TRANSCRIPTION_MODEL-gpt-transcribe}
+      LLM_TRANSCRIPTION_MODEL: ${LLM_TRANSCRIPTION_MODEL:-}
 
   # One simulator per machine. The serial number is the machine id in every topic.
   # All three run the same image. Only the first one builds it, or pulls it, so that happens once and not

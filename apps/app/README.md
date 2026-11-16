@@ -63,6 +63,30 @@ the configured model, at the cost of whoever owns its key, and can list and read
 stack publishes the port on this computer only (`APP_BIND`, `127.0.0.1` if unset). To show the app from another
 device, set `APP_BIND=0.0.0.0`, and only in a network you trust.
 
+## Dictation
+
+With a speech-to-text model in the settings, the chat field has a microphone. Press it, speak, press it
+again: a spinner shows while the model writes down what was said, and the text goes into the field, after
+what is already there. It is sent like a typed question, when you send it. After two minutes the recording
+stops by itself and is written down the same way. The model hears the language itself. It also gets the
+names of the machines from the backend as its prompt, so that it writes "P-04" as the stack spells it.
+
+| Block | Setting | Default in the stack |
+|---|---|---|
+| OpenAI | `OPENAI_TRANSCRIPTION_MODEL`, with `OPENAI_API_KEY` | `gpt-transcribe`, so the key alone is enough |
+| Any other endpoint | `LLM_TRANSCRIPTION_MODEL`, with `LLM_BASE_URL` and `LLM_API_KEY` | none |
+
+The other endpoint must speak OpenAI's audio transcriptions (`POST /audio/transcriptions`), as a gateway or a
+local speech server does. With both blocks set, OpenAI's counts; an empty `OPENAI_TRANSCRIPTION_MODEL=` in
+`.env` turns it off, and the other endpoint's counts. Anthropic has no speech-to-text model.
+Without a model for it the field has no microphone, and the chat works as before.
+
+The browser records (`useAudioRecorder` of TanStack AI) and sends the recording to `/api/transcribe`, which
+calls the model with the key of its block (`generateTranscription`). The route reads at most 32 MiB, as the
+agent harness does, and answers a larger request with 413. A browser lets a page use the
+microphone only over https or on `localhost`; elsewhere the microphone says so when pressed. The recording
+is not kept.
+
 ## Develop
 
 ```bash
@@ -78,8 +102,8 @@ the backend of the running demo stack answers.
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
-  `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `health.ts` and `api/harness/$.ts` are
-  server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
+  `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `health.ts`, `api/harness/$.ts` and
+  `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
   (`nav`: a title, an icon, an order). `src/components/app-sidebar.tsx` reads the entries from the routes
   and names no page, and `nav.ts` next to it puts them in order and finds the one a person is under. The
   breadcrumb of the header, `page-breadcrumb.tsx`, reads the same: a page is called by the title of its
@@ -97,6 +121,7 @@ the backend of the running demo stack answers.
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a
   tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat` and the choice of the model,
+  `dictate.tsx` the microphone in its field and `dictation.server.ts` the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for
   which tool, and its server which tools a language model does not get. `tool-results.ts` says what a card
   may say about a tool, `blocks.ts` turns an answer into blocks, and `answer.tsx` draws what the model writes

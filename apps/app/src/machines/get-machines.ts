@@ -61,17 +61,19 @@ function textOf(result: unknown): string | undefined {
   return texts[0]
 }
 
+/** What every machine does now, for code on the server. The browser asks with `getMachines`. */
+export function listMachines(): Promise<Answer<MachineList>> {
+  return ask(async (backend) => {
+    const result = await backend.callTool("genui_machine_list", {})
+    if (result.isError || !result.structuredContent) {
+      throw new Refused(textOf(result) ?? "genui_machine_list returned no values.")
+    }
+    return result.structuredContent
+  })
+}
+
 /** What every machine does now. */
-export const getMachines = createServerFn({ method: "GET" }).handler(
-  (): Promise<Answer<MachineList>> =>
-    ask(async (backend) => {
-      const result = await backend.callTool("genui_machine_list", {})
-      if (result.isError || !result.structuredContent) {
-        throw new Refused(textOf(result) ?? "genui_machine_list returned no values.")
-      }
-      return result.structuredContent
-    }),
-)
+export const getMachines = createServerFn({ method: "GET" }).handler(() => listMachines())
 
 /** One machine, and how long each state lasted over the last hours: the values of the machine card. */
 export const getMachine = createServerFn({ method: "GET" })

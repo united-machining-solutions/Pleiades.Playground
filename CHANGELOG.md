@@ -107,6 +107,13 @@ All notable changes are documented here. The format follows
   OpenAI. It points the block for any other endpoint at the router with `${OPENAI_BASE_URL}` and
   `${UMS_AI_KEY}` of the profile, and asks the router from inside the app which models it has, so that a chat
   can switch between all of them.
+- Dictation in the chat field of the example application: a microphone next to send. The browser records,
+  the server route `/api/transcribe` has a speech-to-text model write down what was said, and the text goes
+  into the field, to send like a typed question. The model gets the names of the machines as its prompt.
+  It is a setting beside the key of its block: `OPENAI_TRANSCRIPTION_MODEL` (`gpt-transcribe` in the
+  stack) or `LLM_TRANSCRIPTION_MODEL` for an endpoint that speaks OpenAI's audio transcriptions; an empty
+  `OPENAI_TRANSCRIPTION_MODEL` lets the second count. Without one the field has no microphone. A recording
+  stops after two minutes, and the route answers a body over 32 MiB with 413, as the agent harness does.
 - The example application wears umati: the sign of umati is the icon of the page, and the coloured umati
   wordmark stands at the top of the sidebar in place of the name. Both are trademarks of VDW e.V. and not
   covered by the licences of this repository (`NOTICE`).

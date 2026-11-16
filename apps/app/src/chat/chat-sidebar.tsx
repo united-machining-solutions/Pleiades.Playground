@@ -11,7 +11,7 @@ import {
   PlusIcon,
   XIcon,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { FormEvent, KeyboardEvent } from "react"
 
 import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
@@ -55,6 +55,7 @@ import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, us
 import { blocksOf, questionOf } from "./blocks.ts"
 import type { Block, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
+import { DictateButton } from "./dictate.tsx"
 import { chooseChatModel, fetchChatModel } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
 import { toolLabel } from "./tool-results.ts"
@@ -173,6 +174,7 @@ function Start() {
         models={chatStatus.models}
         model={model}
         onModel={choose}
+        dictation={chatStatus.dictation}
       />
     </>
   )
@@ -305,6 +307,7 @@ function Conversation({ threadId }: { threadId: string }) {
         models={chatStatus.models}
         model={model}
         onModel={choose}
+        dictation={chatStatus.dictation}
       />
     </>
   )
@@ -350,6 +353,7 @@ function AnswerBlock({ block }: { block: Block }) {
  * Where a question is written. With more than one model in the settings it also says which model
  * answers and lets the chat pick another one, after the shadcn pattern "Model Selector". At the
  * start of the panel the questions to begin with stand above it, after the pattern "Suggestion".
+ * With a model for speech in the settings, a question can also be spoken into it (dictate.tsx).
  */
 function Composer({
   placeholder,
@@ -359,6 +363,7 @@ function Composer({
   models,
   model,
   onModel,
+  dictation,
 }: {
   placeholder: string
   suggestions?: ReadonlyArray<string>
@@ -367,8 +372,15 @@ function Composer({
   models: ReadonlyArray<string>
   model: string | undefined
   onModel: (name: string) => void
+  dictation: boolean
 }) {
   const [text, setText] = useState("")
+  const field = useRef<HTMLTextAreaElement>(null)
+  // What was said comes after what is written, and the cursor waits behind it.
+  const dictated = (words: string) => {
+    setText((written) => (written.trim() === "" ? words : `${written.trimEnd()} ${words}`))
+    field.current?.focus()
+  }
   const send = () => {
     const question = text.trim()
     if (question === "" || busy) return
@@ -400,6 +412,7 @@ function Composer({
       <form onSubmit={onSubmit}>
         <InputGroup className="bg-background">
           <InputGroupTextarea
+            ref={field}
             rows={1}
             aria-label="Message"
             placeholder={placeholder}
@@ -407,7 +420,8 @@ function Composer({
             onChange={(event) => setText(event.target.value)}
             onKeyDown={onKeyDown}
           />
-          {/* With a choice of models the field gets a second line: the model on the left, send on the right. */}
+          {/* With a choice of models the field gets a second line: the model on the left, dictation
+              and send on the right. */}
           <InputGroupAddon align={choice ? "block-end" : "inline-end"}>
             {choice && (
               <DropdownMenu>
@@ -429,11 +443,12 @@ function Composer({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            {dictation && <DictateButton className={choice ? "ml-auto" : undefined} onText={dictated} />}
             <InputGroupButton
               type="submit"
               variant="default"
               size="icon-sm"
-              className={choice ? "ml-auto" : undefined}
+              className={choice && !dictation ? "ml-auto" : undefined}
               aria-label="Send"
               disabled={busy}
             >

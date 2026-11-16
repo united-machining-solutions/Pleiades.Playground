@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { modelNames, modelSettings, settingGaps } from "./models.ts"
+import { dictationSettings, modelNames, modelSettings, settingGaps } from "./models.ts"
 
 test("without settings the chat has no model", () => {
   assert.deepEqual(modelNames(modelSettings({})), [])
@@ -58,4 +58,40 @@ test("a name listed twice is offered once", () => {
     LLM_MODELS: "same, other",
   })
   assert.deepEqual(modelNames(settings), ["same", "other"])
+})
+
+test("dictation needs a key and a transcription model, OpenAI's before the other endpoint's", () => {
+  assert.equal(dictationSettings({}), undefined)
+  assert.equal(dictationSettings({ OPENAI_API_KEY: "key-a" }), undefined)
+  assert.equal(dictationSettings({ OPENAI_TRANSCRIPTION_MODEL: "speech" }), undefined)
+  assert.equal(dictationSettings({ LLM_TRANSCRIPTION_MODEL: "local-speech" }), undefined)
+  assert.deepEqual(dictationSettings({ OPENAI_API_KEY: "key-a", OPENAI_TRANSCRIPTION_MODEL: " speech " }), {
+    model: "speech",
+    apiKey: "key-a",
+  })
+  assert.deepEqual(
+    dictationSettings({ LLM_BASE_URL: "http://localhost:4000/v1", LLM_TRANSCRIPTION_MODEL: "local-speech" }),
+    { model: "local-speech", apiKey: "not-needed", baseURL: "http://localhost:4000/v1" },
+  )
+  assert.equal(
+    dictationSettings({
+      OPENAI_API_KEY: "key-a",
+      OPENAI_TRANSCRIPTION_MODEL: "speech",
+      LLM_BASE_URL: "http://localhost:4000/v1",
+      LLM_TRANSCRIPTION_MODEL: "local-speech",
+    })?.model,
+    "speech",
+  )
+})
+
+test("an empty OpenAI name for dictation lets the other endpoint's count, though the OpenAI key is set", () => {
+  assert.equal(
+    dictationSettings({
+      OPENAI_API_KEY: "key-a",
+      OPENAI_TRANSCRIPTION_MODEL: "",
+      LLM_BASE_URL: "http://localhost:4000/v1",
+      LLM_TRANSCRIPTION_MODEL: "local-speech",
+    })?.model,
+    "local-speech",
+  )
 })
