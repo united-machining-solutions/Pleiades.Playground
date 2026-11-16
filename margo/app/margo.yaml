@@ -39,6 +39,21 @@ deploymentProfiles:
 
 # Each parameter sets the ${VAR} of the same name in compose/compose.yaml.
 parameters:
+  appHost:
+    value: "pleiades-margo.hub000.ums.internal"
+    targets:
+      - pointer: APP_HOST
+        components: ["default"]
+  serverHost:
+    value: "srv03.hub000.ums.internal"
+    targets:
+      - pointer: SERVER_HOST
+        components: ["default"]
+  httpPort:
+    value: 80
+    targets:
+      - pointer: HTTP_PORT
+        components: ["default"]
   appBind:
     value: "127.0.0.1"
     targets:
@@ -124,6 +139,19 @@ configuration:
   sections:
     - name: Network
       settings:
+        - parameter: appHost
+          name: Host name of the app
+          description: >-
+            The name (a CNAME of the device) under which Traefik serves the example app on the HTTP port, to
+            everyone in the network.
+          schema: hostName
+        - parameter: serverHost
+          name: Host name of the device
+          description: The name of the device itself (its A record); Traefik serves the example app under it as well.
+          schema: hostName
+        - parameter: httpPort
+          name: HTTP port of Traefik
+          schema: port
         - parameter: appBind
           name: Address of the example app
           description: >-
@@ -189,6 +217,10 @@ configuration:
       dataType: integer
       minValue: 1
       maxValue: 65535
+      allowEmpty: false
+    - name: hostName
+      dataType: string
+      regexMatch: "^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$"
       allowEmpty: false
     - name: bindAddress
       dataType: string

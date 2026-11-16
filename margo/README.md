@@ -13,14 +13,15 @@ margo/
 │   ├── license.txt           Copy of LICENSE
 │   └── icon.svg
 └── compose/                  The component: everything here goes into the package
-    ├── compose.yaml          The demo stack
-    └── broker/mosquitto.conf Copy of stacks/broker/mosquitto.conf
+    ├── compose.yaml          The demo stack, with Traefik in front of the example app
+    ├── broker/mosquitto.conf Copy of stacks/broker/mosquitto.conf
+    └── traefik/dynamic.yaml  The route of Traefik to the example app
 ```
 
 ## How it differs from `compose.yaml`
 
-`compose/compose.yaml` runs the same twelve containers as [`compose.yaml`](../compose.yaml) at the root, written so
-that bart accepts it:
+`compose/compose.yaml` runs the same eleven containers as [`compose.yaml`](../compose.yaml) at the root, written so
+that bart accepts it, and one more, Traefik:
 
 - **No `build:`.** The services take the images that the workflow "Images" publishes to
   `ghcr.io/united-machining-solutions`, for `linux/amd64` and `linux/arm64`. `bart build` does not fit here: it
@@ -38,6 +39,12 @@ that bart accepts it:
   diff <(tail -n +3 margo/compose/broker/mosquitto.conf) stacks/broker/mosquitto.conf
   ```
 
+- **Traefik in front of the example app.** It serves the app on the HTTP port (setting *HTTP port of Traefik*,
+  80) under two host names: *Host name of the app*, `pleiades-margo.hub000.ums.internal`, a CNAME of the device,
+  and *Host name of the device*, `srv03.hub000.ums.internal`, its A record. Traefik reads its route from
+  `compose/traefik/dynamic.yaml`, a `configs:` entry, and not from Docker labels: those need the Docker socket,
+  a bind mount out of `compose/`. The file is a Go template that takes the host names from the environment.
+  Plain HTTP only; there is no certificate.
 - **Settings, not `.env`.** Every `${VAR}` of the compose file is a parameter in `app/margo.yaml`, and each one
   is a setting the person who installs the app can change: the ports, the address of the example app, the
   retention and the language models. The default after `:-` in the compose file is the same as the value of the
@@ -82,5 +89,6 @@ and changes nothing.
 ## Security
 
 The app keeps the demo's settings: the MQTT broker accepts anonymous clients, the APIs have authorization
-switched off, and the chat has no sign-in. The example app therefore answers on `127.0.0.1` of the device unless
-the setting *Address of the example app* opens it. Install it only on a device in a network you control.
+switched off, and the chat has no sign-in. Its own port answers on `127.0.0.1` of the device unless the setting
+*Address of the example app* opens it, but Traefik serves the app to the whole network on the HTTP port, without
+sign-in, and with a key set the chat spends that key. Install it only on a device in a network you control.

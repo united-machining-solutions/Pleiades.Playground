@@ -2,13 +2,15 @@
 #
 #   simulator ──MQTT──▶ broker ──▶ timeseries-persistence ──REST──▶ timeseries-api ──▶ mongodb
 #                          └─────▶ events-persistence ─────REST──▶ events-api ──────▶ mongodb
+#   browser ──HTTP──▶ traefik ──▶ app ──MCP──▶ genui-mcp ──▶ both APIs
 #
 # The same stack as compose.yaml at the root of the repository, in the form bart accepts:
 # - no `build:`: the images are the ones the workflow "Images" publishes to ghcr.io;
 # - every image is a literal reference: bart mirrors each one as it stands and does not interpolate it;
 # - no YAML anchors or merge keys: bart's compose parser does not resolve them, so each service says
 #   everything itself;
-# - no bind mount out of this folder: the broker configuration is a config file next to this one.
+# - no bind mount out of this folder: the configurations of the broker and of Traefik are config files
+#   next to this one, and Traefik reads its routes from a file rather than from the Docker socket.
 # Every ${VAR} is a parameter in app/margo.yaml; the default after `:-` is the same as the value there.
 # Every numeric value on the broker is in its coherent SI unit (contracts/mqtt).
 
@@ -176,6 +178,39 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODELS: ${LLM_MODELS:-}
 
+  # The reverse proxy in front of the example app, found by its host name. Not in compose.yaml at the root.
+  traefik:
+    image: traefik:v3
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command:
+      - --global.checkNewVersion=false
+      - --global.sendAnonymousUsage=false
+      # Inside the container on an unprivileged port, so it needs no capability.
+      - --entryPoints.web.address=:8000
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
+      # /ping on the internal entry point "traefik" (:8080), which is not published.
+      - --ping=true
+    ports:
+      - "${HTTP_PORT:-80}:8000"
+    configs:
+      - source: traefik
+        target: /etc/traefik/dynamic.yaml
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      # The name of the app (a CNAME) and the name of the device (its A record); both lead to the app.
+      APP_HOST: ${APP_HOST:-pleiades-margo.hub000.ums.internal}
+      SERVER_HOST: ${SERVER_HOST:-srv03.hub000.ums.internal}
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   # One simulator per machine. The serial number is the machine id in every topic.
   simulator-p-04:
     image: ghcr.io/united-machining-solutions/pleiades.playground.simulator:main
@@ -240,6 +275,8 @@ services:
 configs:
   mosquitto:
     file: ./broker/mosquitto.conf
+  traefik:
+    file: ./traefik/dynamic.yaml
 
 volumes:
   mongodb_data:
