@@ -58,6 +58,22 @@ export function blocksOf(
   return blocks
 }
 
+/**
+ * Whether the chat waits for the first thing of an answer: a question is out, and the answer has
+ * nothing to show yet. The chat shows a running line "Thinking" then, after the shadcn chatbot
+ * template, so that one sees something happen before the first step comes. `live` says whether an
+ * answer is coming.
+ */
+export function waiting(
+  messages: ReadonlyArray<UIMessage>,
+  live: boolean,
+  tools: ReadonlyArray<ChatTool>,
+): boolean {
+  const last = messages.at(-1)
+  if (!live || last === undefined) return false
+  return last.role === "user" || blocksOf(last.parts, true, tools).length === 0
+}
+
 /** The text of a person's message. */
 export function questionOf(parts: UIMessage["parts"]): string {
   return parts

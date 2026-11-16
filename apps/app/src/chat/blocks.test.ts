@@ -3,7 +3,7 @@ import { test } from "node:test"
 
 import type { UIMessage } from "@tanstack/ai-react"
 
-import { blocksOf, questionOf } from "./blocks.ts"
+import { blocksOf, questionOf, waiting } from "./blocks.ts"
 import { jsonOf } from "./tool-results.ts"
 import type { ChatTool } from "./tool-results.ts"
 
@@ -108,6 +108,27 @@ test("a call without a result runs while the answer is live, and has failed afte
 
 test("a result with an error is a failed call", () => {
   assert.equal(firstState([call("a", "genui_machine_list"), result("a", "boom", "error")], true), "failed")
+})
+
+const message = (role: "user" | "assistant", parts: Parts) => ({ id: role, role, parts }) as UIMessage
+
+test("the chat waits while a question is out and its answer shows nothing yet", () => {
+  const question = message("user", [text("What needs me?")])
+  assert.equal(waiting([question], true, tools), true)
+  // An answer that has begun, but with nothing to show: an empty text, or a thought.
+  assert.equal(waiting([question, message("assistant", [text("")])], true, tools), true)
+  assert.equal(
+    waiting([question, message("assistant", [{ type: "thinking", content: "…" } as Parts[number]])], true, tools),
+    true,
+  )
+})
+
+test("the chat does not wait once the answer shows a step or a text, or when no answer comes", () => {
+  const question = message("user", [text("What needs me?")])
+  assert.equal(waiting([question, message("assistant", [call("a", "genui_machine_list")])], true, tools), false)
+  assert.equal(waiting([question, message("assistant", [text("Here is …")])], true, tools), false)
+  assert.equal(waiting([question], false, tools), false)
+  assert.equal(waiting([], true, tools), false)
 })
 
 test("an empty text is no block, a question is its text", () => {

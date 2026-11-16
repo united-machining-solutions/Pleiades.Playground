@@ -52,7 +52,7 @@ import { Trace, TraceIcon, TraceLine, TraceTitle } from "@pleiades/ui/components
 
 import { Answer } from "./answer.tsx"
 import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
-import { blocksOf, questionOf } from "./blocks.ts"
+import { blocksOf, questionOf, waiting } from "./blocks.ts"
 import type { Block, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { DictateButton } from "./dictate.tsx"
@@ -276,6 +276,24 @@ function Conversation({ threadId }: { threadId: string }) {
                     </MessageScrollerItem>
                   )
                 })}
+                {/* Until the answer shows its first step, a running line says that it comes; its
+                    title shimmers, as every running line of a Trace does. */}
+                {waiting(messages, isLoading, chatTools) && (
+                  <MessageScrollerItem messageId="thinking">
+                    <Message>
+                      <MessageContent>
+                        <Trace>
+                          <TraceLine status="running">
+                            <TraceIcon>
+                              <LoaderCircleIcon className="animate-spin" />
+                            </TraceIcon>
+                            <TraceTitle>Thinking</TraceTitle>
+                          </TraceLine>
+                        </Trace>
+                      </MessageContent>
+                    </Message>
+                  </MessageScrollerItem>
+                )}
                 {error && (
                   <MessageScrollerItem messageId="error">
                     <Alert>
