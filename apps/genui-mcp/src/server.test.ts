@@ -3,6 +3,7 @@ import { test } from "node:test"
 
 import { CARD_MIME_TYPE } from "./card-file.ts"
 import { MACHINE_CARD_URI, SPAN_LIST_TOOL } from "./cards/machine.names.ts"
+import { MEASUREMENT_CARD_URI, MEASUREMENT_SERIES_TOOL } from "./cards/measurement.ts"
 import { server } from "./server.ts"
 
 type Listed = {
@@ -57,11 +58,21 @@ test("a tool refuses a time zone it does not know, in words, before it reads any
   for (const [name, more] of [
     ["genui_machine_list", {}],
     ["genui_machine_show", { machine: "P-04" }],
+    ["genui_measurement_list", {}],
   ] as const) {
     const result = await ask("tools/call", { name, arguments: { ...more, timeZone: "Mars/Olympus" } })
     assert.equal(result.isError, true)
     assert.match(result.content?.[0]?.text ?? "", /"Mars\/Olympus" is not a time zone this server knows/)
   }
+})
+
+test("the list of measurements links the measurement card, a resource a host reads as an MCP App", async () => {
+  const { tools = [] } = await ask("tools/list")
+  assert.equal(tools.find((tool) => tool.name === "genui_measurement_list")?._meta?.ui?.resourceUri, MEASUREMENT_CARD_URI)
+  const { resources = [] } = await ask("resources/list")
+  assert.equal(resources.find((resource) => resource.uri === MEASUREMENT_CARD_URI)?.mimeType, CARD_MIME_TYPE)
+  // The series are for a graph: a host does not offer that tool to its language model.
+  assert.deepEqual(tools.find((tool) => tool.name === MEASUREMENT_SERIES_TOOL)?._meta?.ui?.visibility, ["app"])
 })
 
 test("the machine card is a resource that a host reads as an MCP App", async () => {

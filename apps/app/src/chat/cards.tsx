@@ -1,4 +1,5 @@
 import { machineTools } from "@/machines/chat.tsx"
+import { measurementTools } from "@/measurements/chat.tsx"
 
 import { backendTools } from "./tool-results.ts"
 import type { ChatTool } from "./tool-results.ts"
@@ -12,4 +13,5 @@ import type { ChatTool } from "./tool-results.ts"
 export const chatTools: ReadonlyArray<ChatTool> = [
   ...backendTools,
   ...machineTools,
+  ...measurementTools,
 ]
