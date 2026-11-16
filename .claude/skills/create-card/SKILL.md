@@ -76,9 +76,9 @@ the language model its tools, and which file says what the app draws for which t
   request needs the issue.
 - `apps/app/src/cards/<name>/chat.tsx`: new, the card in the chat: what a call of each of its tools is called,
   what the chat draws for a result, and which tool only a card calls. Next to it, as in `src/cards/machine/`:
-  what checks a result against the contract, with tests, and the name of a tool only the card calls. If the
-  card fetches a series with such a tool, its server function stands with the others, in
-  `apps/app/src/machines/get-machines.ts`.
+  what checks a result against the contract, with tests. If the card fetches a series with a tool only the
+  card calls, the name of that tool goes into `apps/app/src/machines/card-tools.ts` and its server function
+  next to the others in `get-machines.ts`: the card folder imports from `src/machines/`, never the other way.
 - `apps/app/src/chat/cards.tsx`: an import and one line for the card, in the order of the alphabet. The chat
   and its server take the card from there: touch neither `chat-sidebar.tsx` nor `blocks.ts`.
 - `packages/cards/src/styles.css`: one line for a shadcn/ui component the card draws and no card drew before.

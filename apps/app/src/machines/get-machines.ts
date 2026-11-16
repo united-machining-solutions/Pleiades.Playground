@@ -3,7 +3,7 @@ import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
-import { SPAN_LIST_TOOL } from "@/cards/machine/card-tools.ts"
+import { SPAN_LIST_TOOL } from "./card-tools.ts"
 
 // The values come from the generative UI backend. These functions run on the server of the app:
 // the browser never talks to the backend itself.

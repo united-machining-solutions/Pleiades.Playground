@@ -18,3 +18,4 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0007](0007-generative-ui-in-typescript.md) | Generative UI in TypeScript: a backend for displays, a card catalogue and the harness in the example app | proposed |
 | [0008](0008-route-tree-is-written-not-committed.md) | The route tree of the example app is written, not committed | proposed |
 | [0009](0009-shadcn-components-in-one-package.md) | The shadcn/ui components live in one package, `packages/ui` | proposed |
+| [0010](0010-language-models-through-one-gateway.md) | The chat takes its language models from a LiteLLM gateway | proposed |
