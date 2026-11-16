@@ -83,21 +83,23 @@ function sources(folder: string, ending: string): Array<{ file: string; text: st
 
 test("a tool that is kept from the language model is called by a card file", async () => {
   const { tools = [] } = await ask("tools/list")
-  // A card file asks the server through its host, with callServerTool.
-  const cardFiles = sources("../ui/", ".tsx").filter(({ text }) => text.includes("callServerTool"))
+  const cardFiles = sources("../ui/", ".tsx")
   const modules = sources("./cards/", ".ts")
   const checked: Array<string> = []
   for (const { name, _meta } of tools) {
     const visibility = _meta?.ui?.visibility
     if (visibility === undefined || visibility.includes("model")) continue
     checked.push(name)
-    // A card file names the tool itself, or by a constant of cards/ that holds its name.
+    // A card file asks the server through its host, `callServerTool({ name: ... })`, and names the tool
+    // there itself (as a string) or by a constant of cards/ that holds its name. A comment or a string
+    // that only mentions the tool is not a call.
     const constants = modules.flatMap(({ text }) =>
       [...text.matchAll(/export const (\w+) = "([^"]+)"/g)].flatMap((found) => (found[2] === name && found[1] ? [found[1]] : [])),
     )
-    const named = new RegExp(`(?<!\\w)(${[name, ...constants].join("|")})(?!\\w)`)
+    const literal = `(["'\`])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\1`
+    const called = new RegExp(`callServerTool\\(\\s*\\{[^}]*?\\bname:\\s*(?:${[literal, ...constants].join("|")})(?![\\w$])`)
     assert.ok(
-      cardFiles.some(({ text }) => named.test(text)),
+      cardFiles.some(({ text }) => called.test(text)),
       `${name} is kept from the language model of a host (visibility: ${JSON.stringify(visibility)}), so only a card can call it, and no card file under ui/ does: in a host other than the example application nobody calls it. Call it from the card file with app.callServerTool, as ui/machine.tsx calls ${SPAN_LIST_TOOL}. The name the two share goes into cards/<name>.names.ts, which imports nothing.`,
     )
   }
