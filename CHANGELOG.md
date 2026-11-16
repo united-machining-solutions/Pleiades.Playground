@@ -124,8 +124,8 @@ All notable changes are documented here. The format follows
   covered by the licences of this repository (`NOTICE`).
 - The example application names its build at the bottom of the sidebar: the version and the short commit,
   `0.0.142 · 7a83c2f`, as a link to the commit. The workflow "Images" passes both, and the repository, to the
-  image build as `VERSION`, `REVISION` and `SOURCE`. A build without them is `dev`; `vite dev` adds the commit
-  of the checkout.
+  image build as `VERSION`, `REVISION` and `SOURCE`; the build reads them as `APP_VERSION`, `APP_REVISION`
+  and `APP_SOURCE`. A build without them is `dev`; `vite dev` adds the commit of the checkout.
 - Stop in the chat field: while an answer comes, send is stop, after the pattern Prompt Input of shadcn.
   It stops reading the answer (`stop` of `useChat`) and cancels the turn on the server
   (`createHarnessClient(...).cancel()`), so that the model stops writing, the chat keeps what was shown,
