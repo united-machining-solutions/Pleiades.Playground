@@ -18,7 +18,8 @@
     "class-variance-authority": "catalog:",
     "cn": "catalog:",
     "lucide-react": "catalog:",
-    "recharts": "catalog:"
+    "recharts": "catalog:",
+    "shiki": "catalog:"
   },
   "peerDependencies": {
     "react": "catalog:",

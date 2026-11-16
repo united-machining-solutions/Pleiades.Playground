@@ -12,6 +12,14 @@ import {
 import { Avatar, AvatarFallback } from "@pleiades/ui/components/avatar"
 import { Bubble, BubbleContent, BubbleGroup, BubbleReactions } from "@pleiades/ui/components/bubble"
 import { Button } from "@pleiades/ui/components/button"
+import {
+  CodeBlock,
+  CodeBlockActions,
+  CodeBlockContent,
+  CodeBlockCopyButton,
+  CodeBlockHeader,
+  CodeBlockTitle,
+} from "@pleiades/ui/components/code-block"
 import { Marker, MarkerContent, MarkerIcon } from "@pleiades/ui/components/marker"
 import {
   Message,
@@ -101,6 +109,37 @@ const attachmentStates = [
   { state: "error", icon: <FileWarningIcon />, line: "Could not be read" },
   { state: "done", icon: <FileSpreadsheetIcon />, line: "CSV · 4 kB" },
 ] as const
+
+// What a tool of the backend gives back, as the chat shows it when the line of the call opens.
+const machineOutput = JSON.stringify(
+  {
+    machine: "P-07",
+    state: "Running",
+    since: "2026-11-16T07:15:00Z",
+    program: "HOUSING_0815.MPF",
+    text: "P-07 runs HOUSING_0815.MPF, since 07:15.",
+  },
+  null,
+  2,
+)
+
+const listOutput = JSON.stringify(
+  {
+    machines: ["P-04", "P-07", "M-02"].map((machine, index) => ({
+      machine,
+      state: ["Alarm", "Running", "Setup"][index],
+      since: ["2026-11-16T09:02:00Z", "2026-11-16T07:15:00Z", "2026-11-16T08:48:00Z"][index],
+      program: ["SHAFT_4711.MPF", "HOUSING_0815.MPF", "FLANGE_2210_WITH_A_VERY_LONG_NAME_FROM_THE_CONTROLLER.MPF"][index],
+    })),
+    text: "Three machines: P-04 in alarm since 09:02, P-07 running since 07:15, M-02 in setup since 08:48.",
+  },
+  null,
+  2,
+)
+
+const log = `09:02:14  P-04  Alarm      700105 Spindle overtemperature
+09:02:15  P-04  Stopped    machine stopped itself
+09:12:40  P-07  Running    HOUSING_0815.MPF`
 
 const questions = [
   {
@@ -476,6 +515,80 @@ export function Conversation() {
                 </TraceLine>
               </a>
             </Trace>
+          </Example>
+        </Examples>
+      </Block>
+
+      <Block
+        name="Code Block"
+        file="code-block"
+        line="Text to read as it is: what a tool gave back, a log, code. In a Trace the line of a call opens to it."
+      >
+        <Examples>
+          <Example title="The output of a tool, as the chat shows it: the line of the call opens to it" className="items-start">
+            <Trace>
+              <TraceCollapsible defaultOpen>
+                <TraceCollapsibleTrigger>
+                  <TraceLine>
+                    <TraceIcon>
+                      <CircleCheckIcon />
+                    </TraceIcon>
+                    <TraceTitle>Read the machine card of P-07</TraceTitle>
+                  </TraceLine>
+                </TraceCollapsibleTrigger>
+                <TraceCollapsibleContent>
+                  <CodeBlock size="sm">
+                    <CodeBlockContent wrap className="max-h-64">
+                      {machineOutput}
+                    </CodeBlockContent>
+                  </CodeBlock>
+                </TraceCollapsibleContent>
+              </TraceCollapsible>
+            </Trace>
+          </Example>
+          <Example title="A call that failed opens to why" className="items-start">
+            <Trace>
+              <TraceCollapsible defaultOpen>
+                <TraceCollapsibleTrigger>
+                  <TraceLine status="error">
+                    <TraceIcon>
+                      <CircleAlertIcon />
+                    </TraceIcon>
+                    <TraceTitle>Failed to read the machine card of P-09</TraceTitle>
+                  </TraceLine>
+                </TraceCollapsibleTrigger>
+                <TraceCollapsibleContent>
+                  <CodeBlock size="sm">
+                    <CodeBlockContent wrap className="max-h-64">
+                      No machine P-09 is known. Known are P-04, P-07 and M-02.
+                    </CodeBlockContent>
+                  </CodeBlock>
+                </TraceCollapsibleContent>
+              </TraceCollapsible>
+            </Trace>
+          </Example>
+        </Examples>
+        <Examples>
+          <Example title="Sizes: default with a title and copy, sm for a Trace" className="flex-col items-stretch">
+            <CodeBlock>
+              <CodeBlockHeader>
+                <CodeBlockTitle>Notifications of the morning</CodeBlockTitle>
+                <CodeBlockActions>
+                  <CodeBlockCopyButton value={log} />
+                </CodeBlockActions>
+              </CodeBlockHeader>
+              <CodeBlockContent>{log}</CodeBlockContent>
+            </CodeBlock>
+            <CodeBlock size="sm">
+              <CodeBlockContent>{log}</CodeBlockContent>
+            </CodeBlock>
+          </Example>
+          <Example title="A long output: long lines wrap, and from 16 rem on it scrolls" className="items-start">
+            <CodeBlock size="sm">
+              <CodeBlockContent wrap className="max-h-64">
+                {listOutput}
+              </CodeBlockContent>
+            </CodeBlock>
           </Example>
         </Examples>
       </Block>

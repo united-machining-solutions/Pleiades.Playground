@@ -48,10 +48,30 @@ test("the calls of one stretch are one trace, a text ends it", () => {
   assert.deepEqual(blocks[0], {
     kind: "steps",
     calls: [
-      { id: "a", name: "genui_get_skill_guide", state: "done" },
-      { id: "b", name: "genui_machine_list", state: "done" },
+      { id: "a", name: "genui_get_skill_guide", state: "done", output: "# The guide" },
+      { id: "b", name: "genui_machine_list", state: "done", output: JSON.stringify(JSON.parse(list), null, 2) },
     ],
   })
+})
+
+/** The output the line of the first call opens to. */
+const firstOutput = (parts: Parts, live: boolean) => {
+  const [first] = blocksOf(parts, live, tools)
+  return first?.kind === "steps" ? first.calls[0]?.output : "no steps"
+}
+
+test("a call opens to what its tool gave back: JSON indented, any other text as it is", () => {
+  assert.equal(firstOutput([call("a", "genui_machine_list"), result("a", '{"machines":[]}')], false), '{\n  "machines": []\n}')
+  assert.equal(firstOutput([call("a", "genui_get_skill_guide"), result("a", "# The guide")], false), "# The guide")
+})
+
+test("a failed call opens to why, and a call without a result does not open", () => {
+  const failed = { ...result("a", "{}", "error"), error: "No machine P-09 is known." } as Parts[number]
+  assert.equal(firstOutput([call("a", "genui_machine_show"), failed], false), "No machine P-09 is known.")
+  // An error without its own words keeps what the tool gave back.
+  assert.equal(firstOutput([call("a", "genui_machine_show"), result("a", "boom", "error")], false), "boom")
+  assert.equal(firstOutput([call("a", "genui_machine_list")], true), undefined)
+  assert.equal(firstOutput([call("a", "genui_machine_list")], false), undefined)
 })
 
 /** What the chat draws for the result of one call. */

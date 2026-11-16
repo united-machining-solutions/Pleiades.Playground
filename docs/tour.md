@@ -112,10 +112,10 @@ the last 8 hours. The input field at the bottom shows the model gpt-6-luna.](ima
 
 The picture shows the end of one chat, with a language model configured. The question was "What did P-04 do
 over the last 8 hours?". The chat lists each step of the model, here "Read the guide of the backend" and,
-further up, "Read the machine". It draws the card from the values of the tool, and the model sums it up in a
-few sentences. The numbers are the tool's and the wording is the model's: it writes 10 minutes of alarm
-where the card says 9. The card on the left is one minute newer than the one in the chat: the page reads
-again, an answer shows what was true when it was given.
+further up, "Read the machine"; a step opens to what its tool gave back. It draws the card from the values
+of the tool, and the model sums it up in a few sentences. The numbers are the tool's and the wording is the
+model's: it writes 10 minutes of alarm where the card says 9. The card on the left is one minute newer than
+the one in the chat: the page reads again, an answer shows what was true when it was given.
 
 The chat needs a language model, and the demo starts without one. Then the panel says "No language model
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
@@ -141,6 +141,9 @@ ticked.](images/tour/chat-model-picker.png)
 
 The models in the picture are the ones this stack was configured with; yours are the names in your `.env`.
 The three questions above are suggestions to begin with.
+
+While an answer comes, send turns into stop: it ends the answer, what came so far stays, and the next
+question can go.
 
 With a speech-to-text model in the settings, the field also has a microphone: press it, speak, press it
 again, and what was said stands in the field, to send like a typed question. A key of OpenAI is enough; for
