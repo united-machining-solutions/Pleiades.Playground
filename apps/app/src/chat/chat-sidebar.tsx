@@ -121,8 +121,8 @@ function NoLanguageModel() {
           {chatStatus.gaps.map((gap) => `${gap}. `)}
           Set one block in <code>.env</code> and start the app again with <code>docker compose up -d app</code>:{" "}
           <code>ANTHROPIC_API_KEY</code> with <code>ANTHROPIC_MODELS</code>, <code>OPENAI_API_KEY</code> with{" "}
-          <code>OPENAI_MODELS</code>, or <code>LLM_BASE_URL</code> with <code>LLM_MODELS</code> for any
-          OpenAI-compatible endpoint. Home needs no language model.
+          <code>OPENAI_MODELS</code>, or <code>LLM_BASE_URL</code> for any OpenAI-compatible endpoint, with{" "}
+          <code>LLM_MODELS</code> or the chat models it lists. Home needs no language model.
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

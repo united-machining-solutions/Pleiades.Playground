@@ -9,6 +9,7 @@ import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
 
 import { chatTools } from "./cards.tsx"
+import { listedModels } from "./listed-models.ts"
 import { withTimeZone } from "./local-times.ts"
 import { modelNames, modelSettings } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
@@ -76,9 +77,9 @@ function adapterOf(name: string, { anthropic, openai, compatible }: ModelSetting
 let handler: ((request: Request) => Promise<Response>) | undefined
 
 /** The fetch handler of the harness, or null as long as no language model is configured. */
-export function harnessHandler() {
+export async function harnessHandler() {
   if (handler) return handler
-  const settings = modelSettings(process.env)
+  const settings = modelSettings(process.env, await listedModels())
   const names = modelNames(settings)
   const [first] = names
   if (first === undefined) return null

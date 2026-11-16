@@ -121,13 +121,13 @@ The chat needs a language model, and the demo starts without one. Then the panel
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
 copy `.env.example` to `.env`, fill one of the three blocks and create the app again with
 `docker compose up -d app`. For Anthropic and OpenAI a key is enough: the names of the models have
-defaults.
+defaults. For a gateway the address and its key are enough: the chat offers the chat models it lists.
 
 | Block | Settings |
 |---|---|
 | Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODELS` |
 | OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` |
-| Any endpoint that speaks OpenAI's chat completions, for example a local model server | `LLM_BASE_URL`, `LLM_MODELS`, and `LLM_API_KEY` if it wants one |
+| Any endpoint that speaks OpenAI's chat completions, for example a gateway or a local model server | `LLM_BASE_URL`, `LLM_API_KEY` if it wants one, and `LLM_MODELS` |
 
 The chat has no sign-in, and whoever reaches the port chats at the cost of the owner of the key. Read
 [Language models](../apps/app/README.md#language-models) before you open the port to a network.

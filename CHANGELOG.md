@@ -23,6 +23,9 @@ All notable changes are documented here. The format follows
   what every machine does now, with the values of `genui_machine_list`. A chat next to the page (TanStack AI
   harness) answers questions with the same tools. Its language models come from the settings: OpenAI,
   Anthropic, and any endpoint that speaks OpenAI's chat completions. With several models a chat picks one.
+  With `LLM_MODELS` empty, the chat offers the chat models the endpoint lists under `/models`, and leaves out
+  those a gateway marks as embedding or speech-to-text models. `.env.example` says what each line of that
+  block takes, and `host.docker.internal` reaches the computer from the app on Linux too.
 - Card catalogue `packages/cards`: for each card its contract (zod) and its React component. The first card
   is the machine card: what one machine does now and which states it went through over the last hours. The
   tool `genui_machine_show` returns its values, the app shows it on a page per machine

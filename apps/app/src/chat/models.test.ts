@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { dictationSettings, modelNames, modelSettings, settingGaps } from "./models.ts"
+import { chatModelsOf, dictationSettings, modelNames, modelSettings, settingGaps } from "./models.ts"
 
 test("without settings the chat has no model", () => {
   assert.deepEqual(modelNames(modelSettings({})), [])
@@ -34,7 +34,7 @@ test("a block that was begun says what it lacks, by the names of the settings", 
   ])
   assert.deepEqual(settingGaps({ OPENAI_API_KEY: "key-a", LLM_BASE_URL: "http://localhost:4000/v1" }), [
     "OPENAI_API_KEY is set, OPENAI_MODELS is empty",
-    "LLM_BASE_URL is set, LLM_MODELS is empty",
+    "LLM_BASE_URL is set, LLM_MODELS is empty, and the endpoint lists no chat model under /models",
   ])
   assert.deepEqual(settingGaps({ LLM_MODELS: "local" }), ["LLM_MODELS is set, LLM_BASE_URL is empty"])
 })
@@ -94,4 +94,39 @@ test("an empty OpenAI name for dictation lets the other endpoint's count, though
     })?.model,
     "local-speech",
   )
+})
+
+// The answer of GET /models of a LiteLLM gateway, shortened from what the hub of the hackathon gave on
+// 2026-11-16: its self-hosted model has no mode, the others say what they are for.
+const gateway = {
+  object: "list",
+  data: [
+    { id: "spark/qwen3.8-27b", object: "model" },
+    { id: "openai/gpt-6-luna", object: "model", mode: "chat" },
+    { id: "anthropic/claude-haiku-5-5", object: "model", mode: "chat" },
+    { id: "spark/qwen3-embedding-8b", object: "model", mode: "embedding" },
+    { id: "openai/gpt-transcribe", object: "model", mode: "audio_transcription" },
+  ],
+}
+
+test("of the models an endpoint lists, the chat takes those that are for chat or do not say", () => {
+  assert.deepEqual(chatModelsOf(gateway), ["spark/qwen3.8-27b", "openai/gpt-6-luna", "anthropic/claude-haiku-5-5"])
+})
+
+test("the speech-to-text model of dictation is never a chat model, even where the endpoint does not say", () => {
+  assert.deepEqual(chatModelsOf({ data: [{ id: "llama3.2" }, { id: "whisper" }] }, " whisper "), ["llama3.2"])
+})
+
+test("an answer that is not a list of models gives none", () => {
+  assert.deepEqual(chatModelsOf(undefined), [])
+  assert.deepEqual(chatModelsOf({ error: "no" }), [])
+  assert.deepEqual(chatModelsOf({ data: [{ id: "" }, { mode: "chat" }, null, { id: "a" }, { id: "a" }] }), ["a"])
+})
+
+test("an empty LLM_MODELS takes the models the endpoint listed, and a named one wins", () => {
+  const env = { LLM_BASE_URL: "http://localhost:4000/v1" }
+  assert.deepEqual(modelSettings(env, ["listed"]).compatible?.models, ["listed"])
+  assert.deepEqual(modelSettings({ ...env, LLM_MODELS: "named" }, ["listed"]).compatible?.models, ["named"])
+  assert.deepEqual(modelSettings({}, ["listed"]), {})
+  assert.deepEqual(settingGaps(env, ["listed"]), [])
 })

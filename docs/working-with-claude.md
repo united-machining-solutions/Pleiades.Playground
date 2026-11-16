@@ -94,7 +94,7 @@ workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your
 ## What stays with you
 
 - Secrets. The demo needs none. The chat in the example app needs the key of a language model, in `.env`:
-  `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `LLM_API_KEY` for any other endpoint
+  `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `LLM_API_KEY` for any other endpoint that wants one
   ([Language models](../apps/app/README.md#language-models)). You set it yourself, and its value stays out of
   prompts, commits and logs.
 - Publishing: merging, releasing, changing repository settings.

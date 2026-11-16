@@ -54,8 +54,9 @@ cp .env.example .env        # then set ANTHROPIC_API_KEY in it, or another block
 docker compose up -d app    # creates the app again with the new settings
 ```
 
-A key alone is enough; the names of the models have defaults. `docker compose restart` does not read `.env`
-again. More in [Language models](apps/app/README.md#language-models).
+For Anthropic or OpenAI a key alone is enough; the names of their models have defaults. `docker compose
+restart` does not read `.env` again. More, also for a gateway or a model on your own computer, in
+[Language models](apps/app/README.md#language-models).
 
 New here? Take the [tour of the demo](docs/tour.md): six stops with screenshots, from the start to where to
 change what. With a coding agent in the repository, ask it: "give me a tour". To add a page, a card or a

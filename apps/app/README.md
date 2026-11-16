@@ -34,20 +34,30 @@ everything else works.
 The chat offers every model the settings name, in up to three blocks. Each block is optional, and a block
 counts once it is complete. Several models are separated by commas. In the stack a key alone completes the
 block of Anthropic or of OpenAI: `compose.yaml` fills in the model names of `.env.example` where a line of
-names is missing or empty. Where a block was begun and is not complete, the chat panel says which setting is
-empty.
+names is missing or empty. The block of any other endpoint counts once `LLM_BASE_URL` is set: where
+`LLM_MODELS` is empty, the app takes the chat models the endpoint lists (see below). Where no block is
+complete, the chat panel says which setting of a begun block is empty; while another block works, it says
+nothing.
 
 | Block | Settings | How the app talks to it |
 |---|---|---|
 | Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODELS` | Anthropic's Messages API |
 | OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` | OpenAI's Responses API |
-| Any other endpoint | `LLM_BASE_URL`, `LLM_MODELS`, and `LLM_API_KEY` if it wants one | OpenAI's chat completions, which a local model server or a gateway speaks |
+| Any other endpoint | `LLM_BASE_URL`, `LLM_API_KEY` if it wants one, and `LLM_MODELS` | OpenAI's chat completions, which a local model server or a gateway speaks |
 
 The models are offered block by block in the order of the table, each block in the order of its setting.
 The first one answers until a chat picks another one in its input field: with a key of Anthropic and the
 names of `.env.example`, that is Claude Haiku. The agent harness keeps that choice with the chat. With one model the field shows no choice. The keys stay on the server.
 
-A model on your own computer goes into the third block:
+A gateway, such as LiteLLM, goes into the third block with its address and its key. `LLM_MODELS` names the
+models of the chat, as `GET <LLM_BASE_URL>/models` lists them. Left empty, the chat offers the models of
+that list when it first asks the server, in the order of the list. It leaves out a model the list marks as
+not for chat (`mode`, as LiteLLM gives it: `embedding`, `audio_transcription`), and the model of
+`LLM_TRANSCRIPTION_MODEL`. A model without a mark stays. The list is read again after a restart of the app,
+not before; where it cannot be read, the server log says why, and the chat panel says that no model is
+there.
+
+A model on your own computer goes into the third block too:
 
 ```bash
 LLM_BASE_URL=http://host.docker.internal:<port>/v1
@@ -55,8 +65,11 @@ LLM_MODELS=<a model your server has>
 ```
 
 Then start the app again: `docker compose up -d app`. The app runs in a container, and `localhost` there is
-the container; with Docker Desktop your own computer is `host.docker.internal`. The model must be able to
-call tools: one that cannot answers without data.
+the container; your own computer is `host.docker.internal`, with Docker Desktop and, through `extra_hosts`
+in `compose.yaml`, with Docker Engine on Linux. The server must then listen on more than `127.0.0.1`. A local
+server such as Ollama marks no model, so its list holds embedding models too: name the chat model in
+`LLM_MODELS`, for Ollama as `ollama list` shows it. The model must be able to call tools: one that cannot
+answers without data.
 
 **The chat has no sign-in.** The agent harness runs with open access: whoever reaches the port can chat with
 the configured model, at the cost of whoever owns its key, and can list and read every chat. So the demo

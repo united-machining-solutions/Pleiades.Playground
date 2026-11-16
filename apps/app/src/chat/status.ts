@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start"
 
+import { listedModels } from "./listed-models.ts"
 import { dictationSettings, modelNames, modelSettings, settingGaps } from "./models.ts"
 
 export type ChatStatus = {
@@ -13,12 +14,13 @@ export type ChatStatus = {
 }
 
 /** Which language models are configured. Their keys never leave the server. */
-export const getChatStatus = createServerFn({ method: "GET" }).handler((): ChatStatus => {
-  const models = modelNames(modelSettings(process.env))
+export const getChatStatus = createServerFn({ method: "GET" }).handler(async (): Promise<ChatStatus> => {
+  const listed = await listedModels()
+  const models = modelNames(modelSettings(process.env, listed))
   return {
     configured: models.length > 0,
     models,
-    gaps: settingGaps(process.env),
+    gaps: settingGaps(process.env, listed),
     dictation: dictationSettings(process.env) !== undefined,
   }
 })
