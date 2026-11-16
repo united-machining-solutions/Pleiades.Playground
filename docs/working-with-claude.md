@@ -54,7 +54,8 @@ smallest thing that shows it. On your yes it builds on a branch of your own and 
 
 Four skills under `.claude/skills/` do this, and Claude Code loads them by itself: `build-your-own` finds the
 step where the idea starts, and `create-page`, `create-card` and `add-source` are the recipes of the steps.
-A fifth, `setup`, gets a computer ready first.
+A fifth, `setup`, gets a computer ready first. A sixth, `add-brand`, puts the look of a brand of your own on
+the user interface: its colours, its corners, its font and its logo.
 Each names the files it touches and the checks that say it is done. Before it writes code, a recipe loads the
 skills of the libraries: the one of shadcn/ui above, and those the TanStack packages ship, in the versions the
 workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your-own.md).

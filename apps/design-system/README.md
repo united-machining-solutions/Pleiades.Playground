@@ -48,6 +48,10 @@ in the root folder take the page along; the build writes `dist/`, which is not i
   or `"active"` pin a state, so the page shows the states of a component side by side.
 - `src/styles.css`: Tailwind, the font, the theme of `packages/ui` and the colours of the card catalogue,
   as in the example app.
+- `src/brand-choice.tsx`: the choice of the brand at the top of the page. It sets `data-brand` on `<html>`,
+  as the switch of the example app does, so this page is where a brand is checked: every component in every
+  state, and under "Color roles" the contrast each pair measures under the brand. A brand is a folder of
+  [`packages/ui/brands`](../../packages/ui/brands/README.md).
 - `src/coverage.test.ts`: the test that every component of `packages/ui` has its block, see below.
 
 ## A new component gets its block

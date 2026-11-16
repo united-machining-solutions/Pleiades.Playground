@@ -1,0 +1,8 @@
+/*
+ * The brands: one line for a brand, in the order of the alphabet. A page that offers the switch imports
+ * this file after the theme. A card file does not: a card in another host stays as the theme draws it.
+ *
+ *   @import "@pleiades/ui/globals.css";
+ *   @import "@pleiades/ui/brands.css";
+ */
+@import "./example/theme.css";

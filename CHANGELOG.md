@@ -54,6 +54,11 @@ All notable changes are documented here. The format follows
 - CI checks the links between the files of the repository (`.github/scripts/check-doc-links.mjs`): a moved
   or renamed file and a reworded heading cannot leave a dead pointer in the documentation. The pull request
   template, `CONTRIBUTING.md` and `AGENTS.md` ask to keep the tour current with a change to the demo.
+- CI checks what a pull request says (`.github/scripts/check-pull-request.mjs`, the workflow "Pull request"):
+  the title is a Conventional Commit, the template is filled in, a change to a contract links its issue, and
+  a `feat` or a `fix` has its line here or says why not. The failure says what to do about each, with the
+  commands, so a person or a coding agent can act on it. It runs again when the title or the text is edited,
+  and leaves drafts and Dependabot alone.
 - About the name (`docs/name.md`): where the name Pleiades comes from, what it stands for and what it does
   not, how Taurus, Pleiades and this playground relate, and how to write it. `README.md` says it in two
   sentences.
@@ -120,6 +125,25 @@ All notable changes are documented here. The format follows
 - The example application wears umati: the sign of umati is the icon of the page, and the coloured umati
   wordmark stands at the top of the sidebar in place of the name. Both are trademarks of VDW e.V. and not
   covered by the licences of this repository (`NOTICE`).
+- Brands (`packages/ui/brands`): a brand is a `DESIGN.md` and, written from it, one block of theme tokens
+  that holds while `<html>` carries `data-brand`. It sets the colour roles, the radius, the font and a
+  logo; the colours of an error, a chart and a state of a machine stay the same in every brand, and no
+  component changes. The example application has the switch at the top of its sidebar, the design system
+  the same choice at the top of its page, where the contrast of every colour role is measured under the
+  brand. One brand comes along, `example`, which is not a company. A card served to another host wears no
+  brand. The skill `add-brand` (`.claude/skills/`) leads a coding agent through a new one. Why: ADR-0010.
+- The example application names its build at the bottom of the sidebar: the version and the short commit,
+  `0.0.142 · 7a83c2f`, as a link to the commit. The workflow "Images" passes both, and the repository, to the
+  image build as `VERSION`, `REVISION` and `SOURCE`. A build without them is `dev`; `vite dev` adds the commit
+  of the checkout.
+- Stop in the chat field: while an answer comes, send is stop, after the pattern Prompt Input of shadcn.
+  It stops reading the answer (`stop` of `useChat`) and cancels the turn on the server
+  (`createHarnessClient(...).cancel()`), so that the model stops writing, the chat keeps what was shown,
+  and the next question does not wait for the rest.
+- A step in the chat opens to what its tool gave back, or why it failed, after the pattern Tool of shadcn:
+  the line of a call is a `TraceCollapsible` once its result is there, with the result as text in a
+  `CodeBlock` (JSON indented). `code-block` is new in `packages/ui`; it brings `shiki`, which only its
+  highlighting hook loads, and the app does not use that hook.
 
 ### Changed
 
@@ -168,6 +192,10 @@ All notable changes are documented here. The format follows
   `src/chat/cards.tsx`. The card files are built from every page under `apps/genui-mcp/ui/`. For a caller
   nothing changed: the lists of tools and resources, the description, the guide and the card file are the
   same, byte for byte. The recipe `create-card` names the new places.
+- `app`: the cards of the chat have a place of their own, `src/cards/<name>/`, named like the card everywhere
+  else. The machine card moved there from `src/machines/`, which keeps what the pages and the chat both take
+  of a machine: the server functions and the row. Nothing a person sees changed. A card on a branch of your
+  own moves from `src/<name>/` to `src/cards/<name>/`. The recipe `create-card` names the new place.
 - The shadcn/ui components live in one package, `packages/ui` (`@pleiades/ui`), laid out as the monorepo
   template of shadcn lays it out. The example app and the card catalogue import a component as
   `@pleiades/ui/components/<name>`, and `shadcn add` writes a new one there; before, twenty lay in the app

@@ -79,8 +79,12 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # The .NET images compile this version in; the TypeScript images do not use it.
-          build-args: VERSION=${{ steps.version.outputs.value }}
+          # The .NET images compile the version in; the app shows the version and the commit in its sidebar,
+          # as a link into the repository. genui-mcp uses none of them.
+          build-args: |
+            VERSION=${{ steps.version.outputs.value }}
+            REVISION=${{ github.sha }}
+            SOURCE=${{ github.server_url }}/${{ github.repository }}
           sbom: true
           provenance: mode=max
       # GitHub stores attestations for public repositories only (private ones need an enterprise plan).

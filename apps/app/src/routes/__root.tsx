@@ -53,7 +53,9 @@ export const Route = createRootRoute({
 
 function Document({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // The browser puts the brand of the last visit on this element before React takes the document
+    // over (packages/ui/brands), so the attribute is not in what the server sent.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

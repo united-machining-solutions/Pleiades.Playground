@@ -1,0 +1,34 @@
+name: Pull request
+
+on:
+  pull_request:
+    # Also when the title or the text is edited: they are what this workflow checks.
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pull-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  says:
+    name: Pull request says what it is
+    # A draft is not finished yet, and an update by Dependabot has a text of its own.
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: The check keeps its own tests
+        run: node --test .github/scripts/check-pull-request.test.mjs
+      # The title, the text and the changed files, as GitHub has them now. The failure says what to do.
+      - name: Check the title, the text and the changed files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: node .github/scripts/check-pull-request.mjs "$NUMBER"

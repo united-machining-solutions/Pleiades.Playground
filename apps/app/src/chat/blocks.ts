@@ -7,14 +7,36 @@ import type { ChatTool } from "./tool-results.ts"
 export type CallState = "running" | "done" | "failed"
 
 /**
+ * A tool call of an answer. `output` is what the tool gave back, or why it failed, once its result
+ * is there: the line of the call opens to show it, after the shadcn pattern Tool.
+ */
+export type Call = { id: string; name: string; state: CallState; output?: string }
+
+/**
  * An answer as the chat draws it, block by block. The tool calls of one stretch are one `Trace`,
  * after the shadcn pattern Chat: a text or something drawn between them starts a new one. A result
  * the app does not draw, such as the guide of the backend, does not break a stretch.
  */
 export type Block =
-  | { kind: "steps"; calls: Array<{ id: string; name: string; state: CallState }> }
+  | { kind: "steps"; calls: Array<Call> }
   | { kind: "text"; text: string }
   | { kind: "drawn"; node: ReactNode }
+
+type ResultPart = Extract<UIMessage["parts"][number], { type: "tool-result" }>
+
+/** The result of a tool as text to read: JSON indented, the error where it failed. */
+export function outputOf(result: ResultPart): string {
+  const text =
+    typeof result.content === "string"
+      ? result.content
+      : result.content.map((part) => (part.type === "text" ? part.content : `[${part.type}]`)).join("\n")
+  if (result.state === "error") return result.error ?? text
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2)
+  } catch {
+    return text
+  }
+}
 
 /**
  * The blocks of an assistant's message. `live` says whether the message is still being answered:
@@ -39,7 +61,8 @@ export function blocksOf(
             ? "running"
             : "failed"
       const last = blocks.at(-1)
-      const call = { id: part.id, name: part.name, state }
+      const call: Call = { id: part.id, name: part.name, state }
+      if (result?.type === "tool-result") call.output = outputOf(result)
       if (last?.kind === "steps") last.calls.push(call)
       else blocks.push({ kind: "steps", calls: [call] })
     } else if (part.type === "tool-result") {
