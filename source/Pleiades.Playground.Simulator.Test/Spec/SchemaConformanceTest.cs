@@ -72,7 +72,7 @@ public sealed partial class SchemaConformanceTest
             {
                 foreach (var entry in entries)
                 {
-                    cancelled += PatchCancelled(entry!.AsObject());
+                    cancelled += Cancelled(entry!.AsObject());
                 }
             }
             AssertValid(runtime, new JsonObject { [value.Path] = envelope }.ToJsonString(), value.Path);
@@ -100,9 +100,9 @@ public sealed partial class SchemaConformanceTest
             // seq and seqEpoch belong to the binding, the schema of the model describes the event without them.
             wire.Remove("seq");
             wire.Remove("seqEpoch");
-            if (specEvent.Path.StartsWith("Production.JobOrder", StringComparison.Ordinal))
+            if (specEvent.Path == SpecElements.JobOrderCancelled)
             {
-                PatchCancelled(wire["value"]!.AsObject());
+                Assert.AreEqual(1, Cancelled(wire["value"]!.AsObject()), "JobOrderCancelled carries a job order that never ran");
             }
             AssertValid(schema, wire.ToJsonString(), specEvent.Path);
         }
@@ -119,20 +119,18 @@ public sealed partial class SchemaConformanceTest
     }
 
     /// <summary>
-    /// A cancelled job order is aborted without having run, so it has no StartTime and no ProducedQuantity, as the
-    /// model says in its table of job order events. Its schemas, though, ask both of every aborted job order (an open
-    /// point of contracts/mqtt). The test adds them to such an entry and so checks every other field of it.
+    /// A cancelled job order is aborted without having run: it carries the time it was aborted as EndTime, and
+    /// neither StartTime nor ProducedQuantity. The entry goes to the schema as it is.
     /// </summary>
-    /// <returns>1 when the entry was a cancelled one, else 0.</returns>
-    private static int PatchCancelled(JsonObject entry)
+    /// <returns>1 when the entry is a cancelled one, else 0.</returns>
+    private static int Cancelled(JsonObject entry)
     {
         if (entry["State"]!.GetValue<string>() != "Aborted" || entry.ContainsKey("StartTime"))
         {
             return 0;
         }
         Assert.IsFalse(entry.ContainsKey("ProducedQuantity"), "a cancelled job order has no quantity");
-        entry["StartTime"] = entry["EndTime"]!.GetValue<string>();
-        entry["ProducedQuantity"] = 0;
+        Assert.IsNotNull(entry["EndTime"], "a cancelled job order has the time it was aborted");
         return 1;
     }
 

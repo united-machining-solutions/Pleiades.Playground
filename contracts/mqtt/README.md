@@ -137,7 +137,7 @@ sites/demo/weather/AirTemperature         { "timestamp": "2026-11-16T09:10:00Z",
 
 ## Spec binding (draft)
 
-A proposal for the MQTT binding of the data model, version 0.13.0 (see [`../datamodel`](../datamodel/README.md)),
+A proposal for the MQTT binding of the data model, version 0.13.1 (see [`../datamodel`](../datamodel/README.md)),
 to be settled at the umati hackathon. Here everything is as the model says: paths, types, units, snapshots,
 lists, events, manifest and connection. The binding of the playground above stays as it is; the two trees live
 side by side on the same broker. Why this tree may use other units than the playground: see
@@ -254,7 +254,8 @@ every value and event of this tree, so they agree with each other:
 - Now and then a running program stops on its own, a programmed halt (`Scenario:ProgramStopsPerHour`): the
   program execution is interrupted and resumed, the job order keeps running.
 - Now and then the planner changes a waiting job order (`Scenario:QueueChangesPerHour`): it revokes its release,
-  cancels it (`JobOrderCancelled`, aborted without having run) or takes it back (`JobOrderRemoved`).
+  cancels it (`JobOrderCancelled`: aborted without having run, so with `EndTime` but without `StartTime` and
+  `ProducedQuantity`) or takes it back (`JobOrderRemoved`).
 - `Executing` in `State/Status`, `Active` in `Channel/1/ChannelState`, a turning spindle and a program execution
   always come together. Channel, active program and program execution carry the `ExecutionId` as
   `correlationId`.
@@ -314,7 +315,3 @@ next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; withou
 - The schema of the runtime values rejects every field besides `value`, `timestamp` and `correlationId`, so an
   envelope with `unit` passes it only once `unit` is taken off again.
 - The timestamp of the last will is the time of the connect: the broker publishes it as it was set then.
-- A cancelled job order: the table of job order events of the model says its entry has no `StartTime`, but the
-  schemas ask `StartTime` and `ProducedQuantity` of every entry in `Aborted`, so no cancelled entry can pass
-  them. The simulator follows the table and sends neither; its schema tests add both to such an entry before
-  they check it.

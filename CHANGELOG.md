@@ -97,7 +97,7 @@ All notable changes are documented here. The format follows
   the tokens with their measured contrast, every component of `packages/ui` in its variants and states
   with fixed values in the words of the demo, three rules as Do and Don't, and the machine card of the card
   catalogue. A test fails when a component of `packages/ui` has no block on the page.
-- Spec output of the simulator, a draft of the MQTT binding of the data model 0.13.0: below
+- Spec output of the simulator, a draft of the MQTT binding of the data model 0.13.1: below
   `umati/{machineId}/` a virtual machine, a state machine driven by a scenario, publishes the manifest, values,
   snapshots and lists retained and the events of program executions, job orders and alerts not retained, with
   the last will `Connection/State = Disconnected`. P-04 publishes it in the demo stack, in addition to its
@@ -110,6 +110,8 @@ All notable changes are documented here. The format follows
   job order or a program execution brings its transition event (`JobOrderStarted`, `ProgramExecutionResumed`
   and so on) instead of `JobOrderChanged`, the program execution snapshot carries `State` and `StartTime` and
   stays after its end, and the scenario now also stops programs, revokes, cancels and takes back job orders.
+  With 0.13.1 a cancelled job order, aborted without having run, carries `EndTime` but neither `StartTime` nor
+  `ProducedQuantity`, and passes the schemas of the model as it is.
 
 ### Changed
 
