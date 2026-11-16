@@ -3,7 +3,7 @@
 A brand is a look for the whole user interface: its colours, its corners, its font, its logo. The
 [theme](../src/styles/globals.css) stays one theme. A brand is a block of its tokens that holds while
 `<html>` carries `data-brand="<id>"`, and the switch sets that one attribute and nothing else. Why it is
-built this way: [ADR-0010](../../../docs/adr/0010-a-brand-is-a-block-of-theme-tokens.md).
+built this way: [ADR-0011](../../../docs/adr/0011-a-brand-is-a-block-of-theme-tokens.md).
 
 The example application has the switch at the top of its sidebar, and the
 [design system](../../../apps/design-system/README.md) has the same choice at the top of its page. The choice is
@@ -19,7 +19,8 @@ remembered in the browser. With no brand in this folder there is nothing to choo
 - `brands.css`: imports the `theme.css` of every brand. A page that offers the switch imports it after the
   theme: `@import "@pleiades/ui/brands.css"`.
 - `brands.ts`: the list of the brands, and the three functions of the switch, `useBrand`, `setBrand` and
-  `currentBrand`. Import it as `@pleiades/ui/brands`.
+  `currentBrand`. A page the server sends puts `brandScript` into its head, so that the brand of the last
+  visit is on from the first frame (the app does, in `routes/__root.tsx`). Import it as `@pleiades/ui/brands`.
 - `example/`: a brand that is not a company. It shows what a brand is, and it is the folder to copy.
 
 ## What a brand may set

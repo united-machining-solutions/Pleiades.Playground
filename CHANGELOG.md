@@ -128,7 +128,7 @@ All notable changes are documented here. The format follows
   component changes. The example application has the switch at the top of its sidebar, the design system
   the same choice at the top of its page, where the contrast of every colour role is measured under the
   brand. One brand comes along, `example`, which is not a company. A card served to another host wears no
-  brand. The skill `add-brand` (`.claude/skills/`) leads a coding agent through a new one. Why: ADR-0010.
+  brand. The skill `add-brand` (`.claude/skills/`) leads a coding agent through a new one. Why: ADR-0011.
 - The example application names its build at the bottom of the sidebar: the version and the short commit,
   `0.0.142 · 7a83c2f`, as a link to the commit. The workflow "Images" passes both, and the repository, to the
   image build as `VERSION`, `REVISION` and `SOURCE`. A build without them is `dev`; `vite dev` adds the commit
