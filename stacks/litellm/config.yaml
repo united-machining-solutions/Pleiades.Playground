@@ -1,0 +1,41 @@
+# A LiteLLM gateway of one's own, for a key of Anthropic or of OpenAI without the gateway of the hackathon.
+# It starts only with the profile "gateway": docker compose --profile gateway up -d. The keys come from .env.
+# The chat offers the models below in this order, and the first one answers until a chat picks another.
+# A model of a provider whose key is empty is offered too, and answers with an error: delete its lines, or
+# add a model of your own. Names change: see the model pages of the providers.
+# `mode` says what a model is for; the app offers the models for chat and takes the first one for speech to
+# text for dictation.
+model_list:
+  - model_name: anthropic/claude-haiku-5-5
+    litellm_params:
+      model: anthropic/claude-haiku-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      mode: chat
+  - model_name: anthropic/claude-sonnet-5-5
+    litellm_params:
+      model: anthropic/claude-sonnet-5-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      mode: chat
+  - model_name: openai/gpt-6-luna
+    litellm_params:
+      model: openai/gpt-6-luna
+      api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      mode: chat
+  - model_name: openai/gpt-6.1-sol
+    litellm_params:
+      model: openai/gpt-6.1-sol
+      api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      mode: chat
+  - model_name: openai/gpt-transcribe
+    litellm_params:
+      model: openai/gpt-transcribe
+      api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      mode: audio_transcription
+
+litellm_settings:
+  drop_params: true
