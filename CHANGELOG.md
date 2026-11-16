@@ -112,7 +112,8 @@ All notable changes are documented here. The format follows
   into the field, to send like a typed question. The model gets the names of the machines as its prompt.
   It is a setting beside the key of its block: `OPENAI_TRANSCRIPTION_MODEL` (`gpt-transcribe` in the
   stack) or `LLM_TRANSCRIPTION_MODEL` for an endpoint that speaks OpenAI's audio transcriptions; an empty
-  `OPENAI_TRANSCRIPTION_MODEL` lets the second count. Without one the field has no microphone.
+  `OPENAI_TRANSCRIPTION_MODEL` lets the second count. Without one the field has no microphone. A recording
+  stops after two minutes, and the route answers a body over 32 MiB with 413, as the agent harness does.
 
 ### Changed
 

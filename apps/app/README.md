@@ -67,9 +67,9 @@ device, set `APP_BIND=0.0.0.0`, and only in a network you trust.
 
 With a speech-to-text model in the settings, the chat field has a microphone. Press it, speak, press it
 again: a spinner shows while the model writes down what was said, and the text goes into the field, after
-what is already there. It is sent like a typed question, when you send it. The model hears the language
-itself. It also gets the names of the machines from the backend as its prompt, so that it writes "P-04"
-as the stack spells it.
+what is already there. It is sent like a typed question, when you send it. After two minutes the recording
+stops by itself and is written down the same way. The model hears the language itself. It also gets the
+names of the machines from the backend as its prompt, so that it writes "P-04" as the stack spells it.
 
 | Block | Setting | Default in the stack |
 |---|---|---|
@@ -82,7 +82,8 @@ local speech server does. With both blocks set, OpenAI's counts; an empty `OPENA
 Without a model for it the field has no microphone, and the chat works as before.
 
 The browser records (`useAudioRecorder` of TanStack AI) and sends the recording to `/api/transcribe`, which
-calls the model with the key of its block (`generateTranscription`). A browser lets a page use the
+calls the model with the key of its block (`generateTranscription`). The route reads at most 32 MiB, as the
+agent harness does, and answers a larger request with 413. A browser lets a page use the
 microphone only over https or on `localhost`; elsewhere the microphone says so when pressed. The recording
 is not kept.
 

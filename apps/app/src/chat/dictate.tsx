@@ -1,5 +1,6 @@
 import { fetchServerSentEvents, useAudioRecorder, useTranscription } from "@tanstack/ai-react"
 import { MicIcon, SquareIcon } from "lucide-react"
+import { useEffect, useEffectEvent } from "react"
 
 import { InputGroupButton } from "@pleiades/ui/components/input-group"
 import { Spinner } from "@pleiades/ui/components/spinner"
@@ -13,9 +14,13 @@ function fail(problem: unknown) {
   })
 }
 
+/** Two minutes: enough for a question, and a few megabytes, far below what the route reads. */
+const MAX_SECONDS = 120
+
 /**
  * Dictation in the chat field. Press it, speak, press it again: what was said goes into the field,
- * to read, change and send like a typed question. Nothing is sent by itself.
+ * to read, change and send like a typed question. Nothing is sent by itself. After two minutes the
+ * recording stops by itself.
  *
  * shadcn has no component for it and names the parts: a Button, and a Spinner while the words are
  * written down. The browser records (TanStack AI's recorder); the model of the settings writes
@@ -53,6 +58,17 @@ export function DictateButton({ className, onText }: { className?: string; onTex
       fail(problem)
     }
   }
+
+  // After two minutes the recording stops by itself and is written down, as if the button was pressed.
+  const stopAtLimit = useEffectEvent(() => {
+    toast.add({ title: "Dictation stopped after two minutes", description: "Press the microphone again to go on." })
+    void toggle()
+  })
+  useEffect(() => {
+    if (!recorder.isRecording) return
+    const timer = setTimeout(() => stopAtLimit(), MAX_SECONDS * 1000)
+    return () => clearTimeout(timer)
+  }, [recorder.isRecording])
 
   if (transcription.isLoading) {
     return (
