@@ -27,7 +27,7 @@ export function AppSidebar() {
       <SidebarHeader>
         {/* The wordmark of umati, from public/. The name of the app stays the title of the page. */}
         <div className="px-2 py-1.5">
-          <img src="/umati-wordmark.svg" alt="umati" className="h-6 w-auto" />
+          <img src="/umati-wordmark.svg" alt="umati" className="h-8 w-auto" />
         </div>
         <SidebarMenu>
           {pages.map((page) => (
