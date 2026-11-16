@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start"
 
-import { modelNames, modelSettings, settingGaps } from "./models.ts"
+import { dictationSettings, modelNames, modelSettings, settingGaps } from "./models.ts"
 
 export type ChatStatus = {
   configured: boolean
@@ -8,12 +8,19 @@ export type ChatStatus = {
   models: Array<string>
   /** What a block lacks that was begun, by the names of its settings: "X is set, Y is empty". */
   gaps: Array<string>
+  /** Whether a model writes down what is said into the chat field. */
+  dictation: boolean
 }
 
 /** Which language models are configured. Their keys never leave the server. */
 export const getChatStatus = createServerFn({ method: "GET" }).handler((): ChatStatus => {
   const models = modelNames(modelSettings(process.env))
-  return { configured: models.length > 0, models, gaps: settingGaps(process.env) }
+  return {
+    configured: models.length > 0,
+    models,
+    gaps: settingGaps(process.env),
+    dictation: dictationSettings(process.env) !== undefined,
+  }
 })
 
 export type ChatEntry = { threadId: string; title: string; titled: boolean }
