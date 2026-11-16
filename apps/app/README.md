@@ -73,7 +73,7 @@ as the stack spells it.
 
 | Block | Setting | Default in the stack |
 |---|---|---|
-| OpenAI | `OPENAI_TRANSCRIPTION_MODEL`, with `OPENAI_API_KEY` | `gpt-4o-mini-transcribe`, so the key alone is enough |
+| OpenAI | `OPENAI_TRANSCRIPTION_MODEL`, with `OPENAI_API_KEY` | `gpt-transcribe`, so the key alone is enough |
 | Any other endpoint | `LLM_TRANSCRIPTION_MODEL`, with `LLM_BASE_URL` and `LLM_API_KEY` | none |
 
 The other endpoint must speak OpenAI's audio transcriptions (`POST /audio/transcriptions`), as a gateway or a
