@@ -144,8 +144,9 @@ lists for your key, in its order.
 The three questions above are suggestions to begin with.
 
 With a speech-to-text model at the gateway, the field also has a microphone: press it, speak, press it
-again, and what was said stands in the field, to send like a typed question. A key of OpenAI is enough; for
-another endpoint see [Dictation](../apps/app/README.md#dictation). The pictures above were taken without it.
+again, and what was said stands in the field, to send like a typed question. The gateway decides which model
+writes it down, see [Dictation](../apps/app/README.md#dictation). The picture of the answer shows the microphone
+at the right of the field.
 
 **In the code:** [`apps/app/src/chat/`](../apps/app/src/chat). `chat-sidebar.tsx` is the panel with the model
 picker, `dictate.tsx` the microphone, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
