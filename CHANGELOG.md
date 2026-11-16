@@ -10,6 +10,9 @@ All notable changes are documented here. The format follows
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
 - Simulator for values, states and notifications of several machines.
+- Deployment (`docs/deployment.md`): the workflow "Deploy" starts the stack with `docker compose` on a runner of
+  your own, from the images of the commit that was merged into `main`. It is off until the variable
+  `DEPLOY_ENABLED` is `true`.
 - Shared libraries for logging, JSON, authorization, health checks, MQTT and the MCP server standard.
 - Demo stack (`compose.yaml`), contracts and CI.
 - TypeScript workspace for `apps/` and `packages/`: pinned Node.js and pnpm, one version catalog, a shared
