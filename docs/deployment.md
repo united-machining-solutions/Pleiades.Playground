@@ -29,6 +29,13 @@ The stack keeps its data: the project name is fixed, so its volumes stay from on
   | `.env` | The settings of [`.env.example`](../.env.example): ports, `APP_BIND`, the keys of the language models. It is never part of a commit. |
   | `compose.override.yaml` | Optional. What only this computer needs, for example the network of a reverse proxy. |
 
+  Behind a gateway that speaks OpenAI's API, such as LiteLLM, the models go through the block of the other
+  endpoint: `LLM_BASE_URL` and `LLM_API_KEY` point at the gateway, `LLM_MODELS` names its chat models, and
+  `LLM_TRANSCRIPTION_MODEL` its speech-to-text model for dictation. Each name must be one the gateway lists
+  under `/models` for that key. A speech-to-text model belongs in `LLM_TRANSCRIPTION_MODEL` only, never in
+  `LLM_MODELS`: the chat cannot answer with it. When the gateway gets new models, update the two lines and
+  recreate the `app` container.
+
 ## What the repository needs
 
 | Setting | Value |

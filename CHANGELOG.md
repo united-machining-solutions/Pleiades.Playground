@@ -12,7 +12,8 @@ All notable changes are documented here. The format follows
 - Simulator for values, states and notifications of several machines.
 - Deployment (`docs/deployment.md`): the workflow "Deploy" starts the stack with `docker compose` on a runner of
   your own, from the images of the commit that was merged into `main`. It is off until the variable
-  `DEPLOY_ENABLED` is `true`.
+  `DEPLOY_ENABLED` is `true`. Behind a gateway such as LiteLLM, its chat models go into `LLM_MODELS` and
+  its speech-to-text model into `LLM_TRANSCRIPTION_MODEL`.
 - Shared libraries for logging, JSON, authorization, health checks, MQTT and the MCP server standard.
 - Demo stack (`compose.yaml`), contracts and CI.
 - TypeScript workspace for `apps/` and `packages/`: pinned Node.js and pnpm, one version catalog, a shared
