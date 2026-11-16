@@ -6,8 +6,9 @@ import { MinusIcon, MoveHorizontalIcon, PlusIcon } from "lucide-react"
 // NumberField of Base UI with the classes of its neighbours input.tsx and input-group.tsx, so a
 // number field stands in a form like an input. Base UI brings the behaviour: the range, the step,
 // the format, the keys, and holding a button down. A button that cannot step is dimmed; in a field
-// that is disabled the whole group is, once. If shadcn ships a number field,
-// "shadcn add number-field --diff" shows what differs.
+// that is disabled the whole group is, once. The undo on the buttons names `:disabled` too: without
+// it, `disabled:opacity-50` wins in the built stylesheet, where Tailwind puts the group part into
+// `:where()`. If shadcn ships a number field, "shadcn add number-field --diff" shows what differs.
 
 function NumberField({
   className,
@@ -55,7 +56,7 @@ function NumberFieldInput({
 }
 
 const stepButton =
-  "flex aspect-square h-full shrink-0 items-center justify-center border-input text-muted-foreground transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-data-disabled/number-field-group:opacity-100 [&_svg:not([class*='size-'])]:size-4"
+  "flex aspect-square h-full shrink-0 items-center justify-center border-input text-muted-foreground transition-colors outline-none select-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-data-disabled/number-field-group:disabled:opacity-100 [&_svg:not([class*='size-'])]:size-4"
 
 function NumberFieldDecrement({
   className,
