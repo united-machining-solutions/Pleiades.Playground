@@ -16,6 +16,14 @@ through the stops in your running stack, see [`AGENTS.md`](../AGENTS.md).
 
 ## 1. Start
 
+The physical-printer integration is optional and is not part of the six demo stops. Start only its
+service with `docker compose --profile ultimaker up -d --build --wait ultimaker-api`.
+It exposes MCP at <http://localhost:5530/mcp> and an OpenAPI document at
+<http://localhost:5530/openapi/v1.json>. Printing is disabled by default. The configuration, Cura
+preview workflow and validation limits are in the
+[Ultimaker service guide](../source/Pleiades.Playground.Ultimaker.Api/README.md).
+No tour screenshot changes: this service adds no application screen.
+
 One command builds and starts everything. It needs Docker and nothing else, see the
 [development setup](development-setup.md).
 

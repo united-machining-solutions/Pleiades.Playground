@@ -35,6 +35,27 @@ x-simulator: &simulator
       condition: service_started
 
 services:
+  # Optional physical-printer service. Starting it never pairs or starts a print.
+  ultimaker-api:
+    <<: *service
+    profiles: [ultimaker]
+    image: pleiades.playground.ultimaker.api:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Ultimaker.Api/Dockerfile
+    ports:
+      - "${ULTIMAKER_BIND:-127.0.0.1}:${ULTIMAKER_API_PORT:-5530}:8080"
+    volumes:
+      - ultimaker_data:/data
+    environment:
+      Config__Auth__Enabled: ${ULTIMAKER_AUTH_ENABLED:-false}
+      Config__Auth__MetadataAddress: ${ULTIMAKER_AUTH_METADATA_ADDRESS:-}
+      Config__Auth__ValidIssuer: ${ULTIMAKER_AUTH_VALID_ISSUER:-}
+      Config__Auth__Audience: ${ULTIMAKER_AUTH_AUDIENCE:-}
+      Ultimaker__PrinterBaseUrl: ${ULTIMAKER_PRINTER_URL:-http://ultimaker.hub0000.ums.internal/}
+      Ultimaker__EnablePrinting: ${ULTIMAKER_ENABLE_PRINTING:-false}
+      Ultimaker__SliceTimeoutSecond: ${ULTIMAKER_SLICE_TIMEOUT_SECOND:-180}
+
   broker:
     image: eclipse-mosquitto:${MOSQUITTO_VERSION:-2}
     restart: unless-stopped
@@ -233,4 +254,5 @@ services:
       Config__MqttDestination__ClientId: simulator-m-02
 
 volumes:
+  ultimaker_data:
   mongodb_data:
