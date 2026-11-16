@@ -205,8 +205,15 @@ function Conversation({ threadId }: { threadId: string }) {
 
   useEffect(() => {
     rememberThread(threadId)
-    const first = takeFirstQuestion(threadId)
+    let current = true
     void (async () => {
+      // In development React runs this effect twice and cleans up the first run at once
+      // (StrictMode). `useChat` detaches then and cuts off a stream the first run had started, so
+      // the question stood in the chat and no answer came. Waiting one tick lets only the run that
+      // stays take the question.
+      await Promise.resolve()
+      if (!current) return
+      const first = takeFirstQuestion(threadId)
       if (first) {
         // A question asked anywhere in the app opens this chat and is its first message. The chat
         // begins with the model picked last; the first model answers without being picked.
@@ -217,6 +224,9 @@ function Conversation({ threadId }: { threadId: string }) {
         setModel((await fetchChatModel(threadId)) ?? chatStatus.models[0])
       }
     })()
+    return () => {
+      current = false
+    }
     // Only when the chat opens, whatever the other values are on later renders.
   }, [threadId])
 

@@ -181,6 +181,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- `app`: a question asked outside the chat ("Ask why", the field in the header) is answered under
+  `vite dev` too. React ran the effect that sends it twice there (StrictMode); `useChat` detached after the
+  first run and cut off its stream, and the second run found the question taken: it stood in the chat and
+  no answer came. The effect now waits one tick, so only the run that stays sends it. The build was not
+  affected.
 - `app`: dictation works in Firefox. Firefox recorded Ogg and reported no type once the recording had
   stopped, so the file went out named WebM, and the speech-to-text model refused it ("Audio file might be
   corrupted or unsupported"). The recorder now asks for WebM with Opus.
