@@ -6,7 +6,7 @@ import { dictationAdapter, dictationPrompt } from "@/chat/dictation.server.ts"
 
 // The browser sends a recording from the chat field, and gets back what was said in it, as text.
 async function transcribe({ request }: { request: Request }) {
-  const adapter = dictationAdapter()
+  const adapter = await dictationAdapter()
   if (!adapter) return Response.json({ error: "No transcription model configured" }, { status: 503 })
   // The button stops after two minutes, a few megabytes; a body over the limit did not come from it.
   const text = await readBodyText(request)
