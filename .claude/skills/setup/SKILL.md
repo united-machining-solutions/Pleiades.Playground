@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Gets a computer ready for the demo stack with a person who may never have done this - Docker and the stack, Node.js, pnpm and the packages, and a language model for the chat. Use when a person has just got the repository, says "set me up", "get me started", "is my computer ready", or when the stack, the example app or the chat does not run.
+description: Gets a computer ready for the demo stack with a person who may never have done this - Docker and the stack, Node.js, pnpm and the packages, and a language model for the chat, the one of the hackathon hub included. Use when a person has just got the repository, says "set me up", "get me started", "is my computer ready", or when the stack, the example app or the chat does not run.
 ---
 
 # Set up
@@ -88,7 +88,74 @@ registry.npmjs.org, api.nuget.org and dl-cdn.alpinelinux.org.
 
 Only the chat needs a language model. `node .claude/skills/build-your-own/look.mjs` says under "Chat" whether
 one is set; without Node.js, the chat panel of the example app says it. Never look for a key in a file. None
-set: follow "When the chat has no language model" in `build-your-own`.
+set: follow "When the chat has no language model" in `build-your-own`, or, at the hackathon with a key of its
+hub, the section below.
+
+### At the hackathon: the hub
+
+The hub of the hackathon routes, behind one address and one key, to a model on the DGX Spark in the room and
+to cloud models. Its handbook gives the person the key, the address and a certificate. Its rules hold: the key
+stays out of this conversation and the repository, a key takes at most two requests at once, and the hub is
+for trying out finished agents, not for help with code. So this session never runs through it.
+
+1. **The certificate.** The handbook saves it in the home folder, as `.hub0000-ca.crt`, on Windows as
+   `hub0000-ca.crt`. This prints the name and the fingerprint of what it finds:
+   `node -e "const fs=require('fs'),os=require('os'),{X509Certificate}=require('crypto');for(const n of ['.hub0000-ca.crt','hub0000-ca.crt']){const p=os.homedir()+'/'+n;if(fs.existsSync(p))console.log(n,new X509Certificate(fs.readFileSync(p)).fingerprint256)}"`.
+   The fingerprint must be
+   `49:6A:BB:24:4D:17:39:3D:FD:4C:F0:64:7A:79:A0:FB:59:6C:13:37:1A:C2:E8:D8:DB:A1:76:69:FF:70:9C:10`; with
+   another one, stop, and the person asks the organizers. Nothing found: the person runs the setup command of
+   the handbook.
+
+   The app trusts it only through a `compose.override.yaml` next to `compose.yaml`, which Docker Compose
+   reads by itself. Ask, write it with the name found, and add the line `compose.override.yaml` to
+   `.git/info/exclude`. If one is there already, the person adds the lines:
+
+   ```yaml
+   services:
+     app:
+       volumes:
+         - ~/.hub0000-ca.crt:/etc/ssl/certs/hub-ca.crt:ro
+       environment:
+         NODE_EXTRA_CA_CERTS: /etc/ssl/certs/hub-ca.crt
+   ```
+
+2. **The profile.** The handbook has the person set the key as `UMS_AI_KEY` and the address as
+   `OPENAI_BASE_URL`. This tells without showing them:
+   `node -e "const e=process.env;console.log(e.UMS_AI_KEY?'key set':'key not set',e.OPENAI_BASE_URL?'- address set':'- address not set',e.OPENAI_API_KEY&&e.OPENAI_API_KEY===e.UMS_AI_KEY?'- OPENAI_API_KEY holds the key too':'')"`.
+   - `not set`, though the person set it: a variable reaches only programs started after it. They restart
+     this program and the terminal, then this skill.
+   - `OPENAI_API_KEY holds the key too`: the handbook sets it for other tools. Docker Compose prefers it to
+     `.env`, and the app would send the key to OpenAI. Start the app without it, every time:
+     `env -u OPENAI_API_KEY docker compose up -d app`; in PowerShell `Remove-Item Env:OPENAI_API_KEY` first.
+3. **The settings**, in the block for any other endpoint in `.env`. The first two lines name the variables
+   of the profile and hold no value; without `OPENAI_BASE_URL`, the person writes the address of the handbook
+   into the first line instead. No `.env`: a fresh copy as in level 1. Otherwise the person puts the lines in.
+
+   ```
+   LLM_BASE_URL=${OPENAI_BASE_URL}
+   LLM_API_KEY=${UMS_AI_KEY}
+   LLM_MODELS=spark/qwen3.8-27b
+   ```
+
+4. **Start and check.** `docker compose up -d app`. A warning that a variable is not set means the app
+   started without it: back to item 2. Then ask the hub from inside the app. This prints no key:
+
+   ```
+   docker compose exec -T app node -e "fetch(process.env.LLM_BASE_URL+'/models',{headers:{Authorization:'Bearer '+process.env.LLM_API_KEY}}).then(async r=>{const ids=r.ok?(await r.json()).data.map(m=>m.id):[];console.log(r.status,(process.env.LLM_MODELS||'').split(',').map(n=>n.trim()+(ids.includes(n.trim())?' listed':' missing')).join(', '));console.log('the hub has:',ids.join(','))}).catch(e=>console.log(e.cause?.code||e.message))"
+   ```
+
+   - `200` and `listed`: the chat answers, in some seconds, since the Spark serves the whole room. The
+     second line names every model of the hub, in the form `LLM_MODELS` takes. Offer it: the person puts it
+     into that line, and after `docker compose up -d app` a chat switches between them. The first one
+     answers until a chat picks another; models of a key of Anthropic or OpenAI in `.env` come before them.
+   - `missing`: the hub has no model of that name.
+   - `401`: the key is wrong or has ended, or did not reach the app: item 2.
+   - `ERR_INVALID_URL`: the app has no address: items 2 and 3.
+   - `ENOTFOUND` or `EAI_AGAIN`: the computer is not in the WLAN of the hub, or a VPN of the company hides
+     the hub's names. Whether it may be off is for the person or their IT.
+   - `UNABLE_TO_VERIFY_LEAF_SIGNATURE`: item 1.
+
+   Questions about the access or a key go to the organizers.
 
 ## Say where it stands
 
