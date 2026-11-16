@@ -143,7 +143,8 @@ lists, events, manifest and connection. The binding of the playground above stay
 side by side on the same broker. Why this tree may use other units than the playground: see
 [ADR-0010](../../docs/adr/0010-spec-binding-beside-the-playground-binding.md).
 
-In the demo stack the simulator of P-04 publishes this tree in addition to its topics below `machines/P-04/`.
+In the demo stack every simulator (P-04, P-07, M-02) publishes this tree in addition to its topics below
+`machines/{SerialNumber}/`.
 No service of the playground reads it yet.
 
 ### Topics
@@ -248,10 +249,26 @@ The rules for events, so that a consumer can keep nothing but the events and sti
 Exactly those of the catalogue. Unlike the binding of the playground, energy is in `wattHour`; a temperature is
 in `degreeCelsius` in both.
 
-### What the simulator publishes
+### What the simulators publish
 
-A virtual machine, a state machine driven by a scenario in the configuration (`Config:SpecOutput`), produces
-every value and event of this tree, so they agree with each other:
+Every simulator of the demo stack publishes this tree, as client `<ClientId>-spec` with its own last will on
+`umati/{machineId}/Connection/State`. A virtual machine of its own, a state machine driven by a scenario in the
+configuration (`Config:SpecOutput`), produces every value and event, so they agree with each other.
+`Config:SpecOutput:ScenarioName` picks the scenario from `Config:SpecOutput:Scenarios`; without a name the
+simulator runs `Config:SpecOutput:Scenario`.
+
+| Simulator | Topics below | Scenario | Jobs | Profiles |
+|---|---|---|---|---|
+| P-04 | `umati/example-com_P-04/` | default | shafts, flanges, bushings; cycles of 45 s to 90 s, up to 15 kW | Core, Production, Spindle, Energy, AlertsEvents |
+| P-07 | `umati/example-com_P-07/` | `housings` | housings, cover plates, gearbox housings; cycles of 2.5 min to 7 min, up to 21 kW | Core, Production, Spindle, Energy, AlertsEvents |
+| M-02 | `umati/example-com_M-02/` | `small-parts` | pins, spacers, nozzles in large quantities; cycles of 20 s to 50 s, up to 7 kW | Core, Production, Spindle, Energy, AlertsEvents |
+
+All three deliver the same kind of values below `machines/` today, a spindle included, so all three are machine
+tools with a spindle and declare the same profiles. Each scenario has its own alerts, job order numbers and
+counters. The signals of the manufacturer stay below `machines/{SerialNumber}/vendor/`; the spec tree carries
+the elements of the model only.
+
+Each virtual machine works like this:
 
 - The machine works through job orders: set up, then one program execution per part, until the quantity is
   made. Each program execution has a new `ExecutionId`. Its snapshot carries `State` and `StartTime` and stays

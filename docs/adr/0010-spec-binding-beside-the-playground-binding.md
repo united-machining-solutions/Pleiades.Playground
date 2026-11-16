@@ -31,6 +31,9 @@ exactly after the model, to find a compromise for the differences.
   container stays one machine; the image, the health check and the logging are those of the simulator.
 - A virtual machine, a state machine driven by a scenario, produces the second tree. The topics below
   `machines/` keep coming from the generators, unchanged.
+- Every simulator of the demo stack publishes the second tree, each from a virtual machine with a scenario of its
+  own kind of machine, with its own MQTT client and last will. The signals of the manufacturer stay below
+  `machines/{SerialNumber}/vendor/`.
 
 ## Consequences
 

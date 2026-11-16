@@ -33,7 +33,7 @@ internal sealed partial class SpecOutputService : BackgroundService
     {
         ArgumentNullException.ThrowIfNull(config);
         _config = config.Value;
-        _spec = _config.SpecOutput;
+        _spec = _config.SpecOutput.Resolve();
         _logger = logger;
         _loggerFactory = loggerFactory;
         _timeProvider = timeProvider;

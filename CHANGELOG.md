@@ -100,8 +100,9 @@ All notable changes are documented here. The format follows
 - Spec output of the simulator, a draft of the MQTT binding of the data model 0.13.1: below
   `umati/{machineId}/` a virtual machine, a state machine driven by a scenario, publishes the manifest, values,
   snapshots and lists retained and the events of program executions, job orders and alerts not retained, with
-  the last will `Connection/State = Disconnected`. P-04 publishes it in the demo stack, in addition to its
-  topics below `machines/P-04/`, which stay as they are. Its tests check the consistency of the machine and,
+  the last will `Connection/State = Disconnected`. Every simulator of the demo stack publishes it, each with a
+  scenario of its own (`Config:SpecOutput:ScenarioName`: P-04 the default, P-07 `housings`, M-02
+  `small-parts`), in addition to its topics below `machines/{SerialNumber}/`, which stay as they are. Its tests check the consistency of the machine and,
   with a clone of the model next to the repository, every message against the schemas of the model
   (`contracts/mqtt`, ADR-0010). Its events lie below `umati/{machineId}/events/`, one topic per group
   (`events/production`, `events/notifications`) so that a group arrives in order, carry `seq` and `seqEpoch`,

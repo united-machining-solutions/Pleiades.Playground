@@ -52,9 +52,49 @@ internal sealed class SpecOutputConfig
     [Range(1, 1_000_000)]
     public int EventBufferSize { get; init; } = 10_000;
 
-    /// <summary>What the virtual machine does.</summary>
+    /// <summary>What the virtual machine does, unless <see cref="ScenarioName"/> picks one of <see cref="Scenarios"/>.</summary>
     [Required]
     public ScenarioConfig Scenario { get; init; } = new();
+
+    /// <summary>
+    /// The name of the scenario in <see cref="Scenarios"/> this simulator runs; empty for <see cref="Scenario"/>. So
+    /// every simulator of the same image works through jobs of its own kind of machine.
+    /// </summary>
+    public string? ScenarioName { get; init; }
+
+    /// <summary>Scenarios by name, for <see cref="ScenarioName"/>.</summary>
+    [SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "Configuration binding")]
+    public Dictionary<string, ScenarioConfig> Scenarios { get; set; } = [];
+
+    /// <summary>This configuration with the scenario <see cref="ScenarioName"/> names as <see cref="Scenario"/>.</summary>
+    /// <exception cref="InvalidOperationException">No scenario has that name.</exception>
+    public SpecOutputConfig Resolve()
+    {
+        if (string.IsNullOrWhiteSpace(ScenarioName))
+        {
+            return this;
+        }
+        if (!Scenarios.TryGetValue(ScenarioName, out var scenario))
+        {
+            throw new InvalidOperationException(
+                $"Config:SpecOutput:ScenarioName '{ScenarioName}' names no scenario in Config:SpecOutput:Scenarios.");
+        }
+        return new SpecOutputConfig
+        {
+            Enabled = Enabled,
+            Manufacturer = Manufacturer,
+            ManufacturerDomain = ManufacturerDomain,
+            ProductInstanceUri = ProductInstanceUri,
+            HeartbeatInterval = HeartbeatInterval,
+            MeasurementInterval = MeasurementInterval,
+            TickInterval = TickInterval,
+            PersistenceFilePath = PersistenceFilePath,
+            EventBufferSize = EventBufferSize,
+            Scenario = scenario,
+            ScenarioName = ScenarioName,
+            Scenarios = Scenarios,
+        };
+    }
 }
 
 /// <summary>
