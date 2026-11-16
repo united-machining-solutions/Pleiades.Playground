@@ -181,6 +181,9 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- `app`: dictation works in Firefox. Firefox recorded Ogg and reported no type once the recording had
+  stopped, so the file went out named WebM, and the speech-to-text model refused it ("Audio file might be
+  corrupted or unsupported"). The recorder now asks for WebM with Opus.
 - `ui`: the buttons of a disabled number field are dimmed once, with the group, and no longer twice. The
   undo of their own dimming lost to `disabled:opacity-50` in the built stylesheet, so they stood at a
   quarter.

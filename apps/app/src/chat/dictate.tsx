@@ -18,6 +18,14 @@ function fail(problem: unknown) {
 const MAX_SECONDS = 120
 
 /**
+ * The format the recorder is asked for. Without it Firefox records Ogg but reports an empty type
+ * once the recording has stopped; the recorder then calls the file WebM, and the model refuses a
+ * file whose name and content disagree. Asked for WebM, Firefox keeps the type. A browser that
+ * cannot record WebM records in its own format, as before.
+ */
+const RECORDING_TYPE = "audio/webm;codecs=opus"
+
+/**
  * Dictation in the chat field. Press it, speak, press it again: what was said goes into the field,
  * to read, change and send like a typed question. Nothing is sent by itself. After two minutes the
  * recording stops by itself.
@@ -27,7 +35,7 @@ const MAX_SECONDS = 120
  * down what was said, on the server (routes/api/transcribe.ts). It hears the language itself.
  */
 export function DictateButton({ className, onText }: { className?: string; onText: (text: string) => void }) {
-  const recorder = useAudioRecorder()
+  const recorder = useAudioRecorder({ mimeType: RECORDING_TYPE })
   const transcription = useTranscription({
     connection: fetchServerSentEvents("/api/transcribe"),
     // One slot for every dictation; nothing of it is kept.
