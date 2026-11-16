@@ -26,7 +26,7 @@ The stack keeps its data: the project name is fixed, so its volumes stay from on
 
   | File | What it holds |
   |---|---|
-  | `.env` | The settings of [`.env.example`](../.env.example): ports, `APP_BIND`, the keys of the language models. It is never part of a commit. |
+  | `.env` | The settings of [`.env.example`](../.env.example): ports, `APP_BIND`, the address and the key of the LiteLLM gateway. It is never part of a commit. |
   | `compose.override.yaml` | Optional. What only this computer needs, for example the network of a reverse proxy. |
 
 ## What the repository needs

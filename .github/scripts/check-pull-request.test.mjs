@@ -72,7 +72,7 @@ test("a change to a contract links its issue", () => {
   assert.equal(check({ files, body: filled([why[0], "A tool more. <!-- #60 -->"], ran) }).length, 1)
 })
 
-test("a feat or a fix has its line in the changelog, or says why not", () => {
+test("a feat, a fix or a breaking change has its line in the changelog, or says why not", () => {
   const files = ["apps/app/src/routes/programs.tsx"]
   assert.deepEqual(check({ title: "feat(app): a page", files }), ['The title says "feat", and CHANGELOG.md has no line for it.'])
   assert.deepEqual(check({ title: "refactor!: a break", files }), ['The title says "refactor!", and CHANGELOG.md has no line for it.'])
