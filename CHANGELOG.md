@@ -121,6 +121,10 @@ All notable changes are documented here. The format follows
   It stops reading the answer (`stop` of `useChat`) and cancels the turn on the server
   (`createHarnessClient(...).cancel()`), so that the model stops writing, the chat keeps what was shown,
   and the next question does not wait for the rest.
+- A step in the chat opens to what its tool gave back, or why it failed, after the pattern Tool of shadcn:
+  the line of a call is a `TraceCollapsible` once its result is there, with the result as text in a
+  `CodeBlock` (JSON indented). `code-block` is new in `packages/ui`; it brings `shiki`, which only its
+  highlighting hook loads, and the app does not use that hook.
 
 ### Changed
 
@@ -185,6 +189,9 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- `app`: dictation works in Firefox. Firefox recorded Ogg and reported no type once the recording had
+  stopped, so the file went out named WebM, and the speech-to-text model refused it ("Audio file might be
+  corrupted or unsupported"). The recorder now asks for WebM with Opus.
 - `ui`: the buttons of a disabled number field are dimmed once, with the group, and no longer twice. The
   undo of their own dimming lost to `disabled:opacity-50` in the built stylesheet, so they stood at a
   quarter.

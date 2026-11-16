@@ -19,6 +19,7 @@ import type { FormEvent, KeyboardEvent } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
 import { Bubble, BubbleContent } from "@pleiades/ui/components/bubble"
 import { Button } from "@pleiades/ui/components/button"
+import { CodeBlock, CodeBlockContent } from "@pleiades/ui/components/code-block"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,12 +51,20 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@pleiades/ui/components/sidebar"
-import { Trace, TraceIcon, TraceLine, TraceTitle } from "@pleiades/ui/components/trace"
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from "@pleiades/ui/components/trace"
 
 import { Answer } from "./answer.tsx"
 import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
 import { blocksOf, questionOf } from "./blocks.ts"
-import type { Block, CallState } from "./blocks.ts"
+import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { DictateButton } from "./dictate.tsx"
 import { chooseChatModel, fetchChatModel } from "./status.ts"
@@ -344,26 +353,44 @@ const callIcon: Record<CallState, typeof CircleCheckIcon> = {
   failed: CircleAlertIcon,
 }
 
+/**
+ * One tool call, after the shadcn pattern Tool: a line while it runs, and a line that opens to what
+ * the tool gave back, or why it failed, once its result is there.
+ */
+function CallLine({ call }: { call: Call }) {
+  const Icon = callIcon[call.state]
+  const line = (
+    <TraceLine status={call.state === "running" ? "running" : call.state === "failed" ? "error" : undefined}>
+      <TraceIcon>
+        <Icon className={call.state === "running" ? "animate-spin" : undefined} />
+      </TraceIcon>
+      <TraceTitle>{toolLabel(call.name, chatTools)[call.state]}</TraceTitle>
+    </TraceLine>
+  )
+  if (call.output === undefined) return line
+  return (
+    <TraceCollapsible>
+      <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
+      <TraceCollapsibleContent>
+        <CodeBlock size="sm">
+          <CodeBlockContent wrap className="max-h-64">
+            {call.output}
+          </CodeBlockContent>
+        </CodeBlock>
+      </TraceCollapsibleContent>
+    </TraceCollapsible>
+  )
+}
+
 /** One block of an answer: the tool calls of a stretch, a text, or what a card draws for a result. */
 function AnswerBlock({ block }: { block: Block }) {
   switch (block.kind) {
     case "steps":
       return (
         <Trace>
-          {block.calls.map((call) => {
-            const Icon = callIcon[call.state]
-            return (
-              <TraceLine
-                key={call.id}
-                status={call.state === "running" ? "running" : call.state === "failed" ? "error" : undefined}
-              >
-                <TraceIcon>
-                  <Icon className={call.state === "running" ? "animate-spin" : undefined} />
-                </TraceIcon>
-                <TraceTitle>{toolLabel(call.name, chatTools)[call.state]}</TraceTitle>
-              </TraceLine>
-            )
-          })}
+          {block.calls.map((call) => (
+            <CallLine key={call.id} call={call} />
+          ))}
         </Trace>
       )
     case "text":
