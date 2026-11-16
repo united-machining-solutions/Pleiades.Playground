@@ -113,15 +113,19 @@ the backend of the running demo stack answers.
   a page each have nothing to merge in it. `pnpm install` and `pnpm typecheck` write it
   (`route-tree.mjs`), and so do the development server and the build. Never edit it. TanStack advises to
   commit this file; here everything that needs it writes it first.
-- `src/machines/`: `get-machines.ts` holds the server functions that call the backend as a typed MCP client,
-  `machine-item.tsx` draws a machine as a row or a tile. `chat.tsx` is the machine card in the chat: what a
-  call of each of its tools is called, what the chat draws for a result (`results.ts` checks it against the
-  contract), and which tool only a card calls. Which value of the binding is which state,
-  the signs and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
+- `src/cards/`: a folder for each card, named like the card. `machine/chat.tsx` is the machine card in the
+  chat: what a call of each of its tools is called, what the chat draws for a result (`results.ts` checks it
+  against the contract), and which tool only a card calls (`card-tools.ts` holds its name). Which value of
+  the binding is which state, the signs and the wording come from
+  [`@pleiades/cards`](../../packages/cards/README.md).
+- `src/machines/`: what the pages and the chat both take of a machine. `get-machines.ts` holds the server
+  functions that call the backend as a typed MCP client, `machine-item.tsx` draws a machine as a row or a
+  tile.
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a
-  tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat` and the choice of the model,
+  tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat`, the choice of the model and stop,
+  which also cancels the turn in the harness (`createHarnessClient(...).cancel()`),
   `dictate.tsx` the microphone in its field and `dictation.server.ts` the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for
   which tool, and its server which tools a language model does not get. `tool-results.ts` says what a card
