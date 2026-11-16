@@ -3,97 +3,53 @@ import { test } from "node:test"
 
 import { chatModelsOf, dictationSettings, modelNames, modelSettings, settingGaps } from "./models.ts"
 
+const endpoint = { LLM_BASE_URL: "http://localhost:4000/v1" }
+
 test("without settings the chat has no model", () => {
+  assert.equal(modelSettings({}), undefined)
   assert.deepEqual(modelNames(modelSettings({})), [])
 })
 
-test("every complete block adds its models: Anthropic's first, then OpenAI's, then the other endpoint's", () => {
-  const settings = modelSettings({
-    OPENAI_API_KEY: "key-a",
-    OPENAI_MODELS: "small, large",
-    ANTHROPIC_API_KEY: "key-b",
-    ANTHROPIC_MODELS: "quick",
-    LLM_BASE_URL: "http://localhost:4000/v1",
-    LLM_MODELS: "local",
-  })
-  assert.deepEqual(modelNames(settings), ["quick", "small", "large", "local"])
-  assert.deepEqual(settings.openai, { apiKey: "key-a", models: ["small", "large"] })
+test("the endpoint's models are those LLM_MODELS names, in its order, each once", () => {
+  const settings = modelSettings({ ...endpoint, LLM_API_KEY: "key-c", LLM_MODELS: "large, small ,large" })
+  assert.deepEqual(settings, { baseURL: "http://localhost:4000/v1", apiKey: "key-c", models: ["large", "small"] })
+  assert.deepEqual(modelNames(settings), ["large", "small"])
 })
 
-test("a block without a key or without a model does not count", () => {
-  assert.deepEqual(modelSettings({ OPENAI_API_KEY: "key-a" }), {})
-  assert.deepEqual(modelSettings({ ANTHROPIC_MODELS: "quick" }), {})
-  assert.deepEqual(modelSettings({ LLM_MODELS: "local" }), {})
-  assert.deepEqual(modelSettings({ OPENAI_API_KEY: "key-a", OPENAI_MODELS: " , " }), {})
-})
-
-test("a block that was begun says what it lacks, by the names of the settings", () => {
-  assert.deepEqual(settingGaps({}), [])
-  assert.deepEqual(settingGaps({ ANTHROPIC_API_KEY: "key-b", ANTHROPIC_MODELS: " , " }), [
-    "ANTHROPIC_API_KEY is set, ANTHROPIC_MODELS is empty",
-  ])
-  assert.deepEqual(settingGaps({ OPENAI_API_KEY: "key-a", LLM_BASE_URL: "http://localhost:4000/v1" }), [
-    "OPENAI_API_KEY is set, OPENAI_MODELS is empty",
-    "LLM_BASE_URL is set, LLM_MODELS is empty, and the endpoint lists no chat model under /models",
-  ])
-  assert.deepEqual(settingGaps({ LLM_MODELS: "local" }), ["LLM_MODELS is set, LLM_BASE_URL is empty"])
-})
-
-test("model names without a key are no gap, and neither is a complete block", () => {
-  assert.deepEqual(settingGaps({ ANTHROPIC_MODELS: "quick", OPENAI_MODELS: "small" }), [])
-  assert.deepEqual(settingGaps({ ANTHROPIC_API_KEY: "key-b", ANTHROPIC_MODELS: "quick" }), [])
-  assert.equal(JSON.stringify(settingGaps({ OPENAI_API_KEY: "key-a" })).includes("key-a"), false)
+test("an empty LLM_MODELS takes the models the endpoint listed, and a named one wins", () => {
+  assert.deepEqual(modelSettings(endpoint, ["listed"])?.models, ["listed"])
+  assert.deepEqual(modelSettings({ ...endpoint, LLM_MODELS: "named" }, ["listed"])?.models, ["named"])
+  assert.equal(modelSettings(endpoint), undefined)
+  assert.equal(modelSettings({ LLM_MODELS: "named" }, ["listed"]), undefined)
 })
 
 test("an endpoint of one's own needs no key", () => {
-  const { compatible } = modelSettings({ LLM_BASE_URL: "http://localhost:1234/v1", LLM_MODELS: "local" })
-  assert.deepEqual(compatible, { baseURL: "http://localhost:1234/v1", apiKey: "not-needed", models: ["local"] })
+  assert.equal(modelSettings({ ...endpoint, LLM_MODELS: "local" })?.apiKey, "not-needed")
 })
 
-test("a name listed twice is offered once", () => {
-  const settings = modelSettings({
-    OPENAI_API_KEY: "key-a",
-    OPENAI_MODELS: "same",
-    LLM_BASE_URL: "http://localhost:4000/v1",
-    LLM_MODELS: "same, other",
-  })
-  assert.deepEqual(modelNames(settings), ["same", "other"])
+test("settings that were begun say what they lack, by their names and never a value", () => {
+  assert.deepEqual(settingGaps({}), [])
+  assert.deepEqual(settingGaps(endpoint), [
+    "LLM_BASE_URL is set, LLM_MODELS is empty, and the endpoint lists no chat model under /models",
+  ])
+  assert.deepEqual(settingGaps(endpoint, ["listed"]), [])
+  assert.deepEqual(settingGaps({ ...endpoint, LLM_MODELS: "named" }), [])
+  assert.deepEqual(settingGaps({ LLM_API_KEY: "key-c", LLM_MODELS: "named", LLM_TRANSCRIPTION_MODEL: " " }), [
+    "LLM_API_KEY is set, LLM_BASE_URL is empty",
+    "LLM_MODELS is set, LLM_BASE_URL is empty",
+  ])
+  assert.equal(JSON.stringify(settingGaps({ LLM_API_KEY: "key-c" })).includes("key-c"), false)
 })
 
-test("dictation needs a key and a transcription model, OpenAI's before the other endpoint's", () => {
+test("dictation needs the endpoint and a transcription model", () => {
   assert.equal(dictationSettings({}), undefined)
-  assert.equal(dictationSettings({ OPENAI_API_KEY: "key-a" }), undefined)
-  assert.equal(dictationSettings({ OPENAI_TRANSCRIPTION_MODEL: "speech" }), undefined)
-  assert.equal(dictationSettings({ LLM_TRANSCRIPTION_MODEL: "local-speech" }), undefined)
-  assert.deepEqual(dictationSettings({ OPENAI_API_KEY: "key-a", OPENAI_TRANSCRIPTION_MODEL: " speech " }), {
+  assert.equal(dictationSettings(endpoint), undefined)
+  assert.equal(dictationSettings({ LLM_TRANSCRIPTION_MODEL: "speech" }), undefined)
+  assert.deepEqual(dictationSettings({ ...endpoint, LLM_TRANSCRIPTION_MODEL: " speech " }), {
     model: "speech",
-    apiKey: "key-a",
+    apiKey: "not-needed",
+    baseURL: "http://localhost:4000/v1",
   })
-  assert.deepEqual(
-    dictationSettings({ LLM_BASE_URL: "http://localhost:4000/v1", LLM_TRANSCRIPTION_MODEL: "local-speech" }),
-    { model: "local-speech", apiKey: "not-needed", baseURL: "http://localhost:4000/v1" },
-  )
-  assert.equal(
-    dictationSettings({
-      OPENAI_API_KEY: "key-a",
-      OPENAI_TRANSCRIPTION_MODEL: "speech",
-      LLM_BASE_URL: "http://localhost:4000/v1",
-      LLM_TRANSCRIPTION_MODEL: "local-speech",
-    })?.model,
-    "speech",
-  )
-})
-
-test("an empty OpenAI name for dictation lets the other endpoint's count, though the OpenAI key is set", () => {
-  assert.equal(
-    dictationSettings({
-      OPENAI_API_KEY: "key-a",
-      OPENAI_TRANSCRIPTION_MODEL: "",
-      LLM_BASE_URL: "http://localhost:4000/v1",
-      LLM_TRANSCRIPTION_MODEL: "local-speech",
-    })?.model,
-    "local-speech",
-  )
 })
 
 // The answer of GET /models of a LiteLLM gateway whose self-hosted model has no model_info: that model
@@ -121,12 +77,4 @@ test("an answer that is not a list of models gives none", () => {
   assert.deepEqual(chatModelsOf(undefined), [])
   assert.deepEqual(chatModelsOf({ error: "no" }), [])
   assert.deepEqual(chatModelsOf({ data: [{ id: "" }, { mode: "chat" }, null, { id: "a" }, { id: "a" }] }), ["a"])
-})
-
-test("an empty LLM_MODELS takes the models the endpoint listed, and a named one wins", () => {
-  const env = { LLM_BASE_URL: "http://localhost:4000/v1" }
-  assert.deepEqual(modelSettings(env, ["listed"]).compatible?.models, ["listed"])
-  assert.deepEqual(modelSettings({ ...env, LLM_MODELS: "named" }, ["listed"]).compatible?.models, ["named"])
-  assert.deepEqual(modelSettings({}, ["listed"]), {})
-  assert.deepEqual(settingGaps(env, ["listed"]), [])
 })

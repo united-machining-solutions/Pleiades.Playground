@@ -87,9 +87,9 @@ registry.npmjs.org, api.nuget.org and dl-cdn.alpinelinux.org.
 ## Level 3: chat
 
 Only the chat needs a language model. `node .claude/skills/build-your-own/look.mjs` says under "Chat" whether
-one is set; without Node.js, the chat panel of the example app says it. Never look for a key in a file. None
-set: follow "When the chat has no language model" in `build-your-own`, or, at the hackathon with a key of its
-hub, the section below.
+one is set; without Node.js, the chat panel of the example app says it. Never look for a key in a file. The
+chat takes its models from a gateway such as LiteLLM. None set: at the hackathon, with a key of its hub, the
+section below; elsewhere "When the chat has no language model" in `build-your-own`.
 
 ### At the hackathon: the hub
 
@@ -122,25 +122,17 @@ for trying out finished agents, not for help with code. So this session never ru
 
 2. **The profile.** The handbook has the person set the key as `UMS_AI_KEY` and the address as
    `OPENAI_BASE_URL`. This tells without showing them:
-   `node -e "const e=process.env;console.log(e.UMS_AI_KEY?'key set':'key not set',e.OPENAI_BASE_URL?'- address set':'- address not set',e.OPENAI_API_KEY&&e.OPENAI_API_KEY===e.UMS_AI_KEY?'- OPENAI_API_KEY holds the key too':'')"`.
+   `node -e "const e=process.env;console.log(e.UMS_AI_KEY?'key set':'key not set',e.OPENAI_BASE_URL?'- address set':'- address not set')"`.
    - `not set`, though the person set it: a variable reaches only programs started after it. They restart
      this program and the terminal, then this skill.
-   - `OPENAI_API_KEY holds the key too`: the handbook sets it for other tools. Docker Compose prefers it to
-     `.env`, and the app would send the key to OpenAI with the first question. Ask, and add one line under
-     `environment` in the `compose.override.yaml` of item 1. It keeps the key out of the app at every start:
-
-     ```yaml
-         environment:
-           NODE_EXTRA_CA_CERTS: /etc/ssl/certs/hub-ca.crt
-           OPENAI_API_KEY: ""
-     ```
-
-     Say that a key of OpenAI of the person's own in `.env` then does not reach the app either.
-3. **The settings**, in the block for any other endpoint in `.env`. The first two lines name the variables
+3. **The settings**, the lines `LLM_` in `.env`. The first two lines name the variables
    of the profile and hold no value; without `OPENAI_BASE_URL`, the person writes the address of the handbook
    into the first line instead. No `.env`: a fresh copy as in level 1. Otherwise the person puts the lines in.
    `LLM_MODELS` stays empty: the chat then offers every chat model the hub lists, in its order, and leaves
-   out the embedding and speech-to-text models, which the hub marks as such.
+   out the embedding and speech-to-text models, which the hub marks as such. The hub lists
+   `spark/qwen3.8-27b` first, the model in the room, which costs nothing and calls tools, so it answers until
+   a chat picks another. If the check in item 4 shows another one first, the person names the Spark model
+   first in `LLM_MODELS`.
 
    ```
    LLM_BASE_URL=${OPENAI_BASE_URL}

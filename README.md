@@ -47,15 +47,15 @@ In PowerShell, set the variable first: `$env:PLEIADES_VERSION = "main"`. Or writ
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo; only
-the chat of the example app needs the key of a language model:
+the chat of the example app needs a language model, through a gateway such as LiteLLM:
 
 ```bash
-cp .env.example .env        # then set ANTHROPIC_API_KEY in it, or another block
+cp .env.example .env        # then set LLM_BASE_URL and LLM_API_KEY in it
 docker compose up -d app    # creates the app again with the new settings
 ```
 
-For Anthropic or OpenAI a key alone is enough; the names of their models have defaults. `docker compose
-restart` does not read `.env` again. More, also for a gateway or a model on your own computer, in
+Address and key are enough; the chat offers the models the gateway lists. `docker compose restart` does not
+read `.env` again. More, also for OpenAI itself or a model on your own computer, in
 [Language models](apps/app/README.md#language-models).
 
 New here? Take the [tour of the demo](docs/tour.md): six stops with screenshots, from the start to where to

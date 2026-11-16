@@ -1,26 +1,26 @@
 import { createServerFn } from "@tanstack/react-start"
 
-import { listedModels } from "./listed-models.ts"
-import { dictationSettings, modelNames, modelSettings, settingGaps } from "./models.ts"
+import { chatSettings } from "./listed-models.ts"
+import { dictationSettings, modelNames } from "./models.ts"
 
 export type ChatStatus = {
   configured: boolean
   /** The models a chat can pick, by name. The first one answers until a chat picks another. */
   models: Array<string>
-  /** What a block lacks that was begun, by the names of its settings: "X is set, Y is empty". */
+  /** What the settings lack, or why the endpoint gave no models, by the names of the settings. */
   gaps: Array<string>
   /** Whether a model writes down what is said into the chat field. */
   dictation: boolean
 }
 
-/** Which language models are configured. Their keys never leave the server. */
+/** Which language models are configured: the same snapshot the harness is built from. Keys never leave the server. */
 export const getChatStatus = createServerFn({ method: "GET" }).handler(async (): Promise<ChatStatus> => {
-  const listed = await listedModels()
-  const models = modelNames(modelSettings(process.env, listed))
+  const chat = await chatSettings()
+  const models = modelNames(chat.settings)
   return {
     configured: models.length > 0,
     models,
-    gaps: settingGaps(process.env, listed),
+    gaps: chat.gaps,
     dictation: dictationSettings(process.env) !== undefined,
   }
 })
