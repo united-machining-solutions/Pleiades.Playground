@@ -56,9 +56,9 @@ All notable changes are documented here. The format follows
   template, `CONTRIBUTING.md` and `AGENTS.md` ask to keep the tour current with a change to the demo.
 - CI checks what a pull request says (`.github/scripts/check-pull-request.mjs`, the workflow "Pull request"):
   the title is a Conventional Commit, the template is filled in, a change to a contract links its issue, and
-  a `feat` or a `fix` has its line here or says why not. The failure says what to do about each, with the
-  commands, so a person or a coding agent can act on it. It runs again when the title or the text is edited,
-  and leaves drafts and Dependabot alone.
+  a `feat`, a `fix` or a breaking change (`!`) has its line here or says why not. The failure says what to
+  do about each, with the commands, so a person or a coding agent can act on it. It runs again when the title
+  or the text is edited, and leaves drafts and Dependabot alone.
 - About the name (`docs/name.md`): where the name Pleiades comes from, what it stands for and what it does
   not, how Taurus, Pleiades and this playground relate, and how to write it. `README.md` says it in two
   sentences.
