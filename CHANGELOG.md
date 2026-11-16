@@ -117,6 +117,10 @@ All notable changes are documented here. The format follows
 - The example application wears umati: the sign of umati is the icon of the page, and the coloured umati
   wordmark stands at the top of the sidebar in place of the name. Both are trademarks of VDW e.V. and not
   covered by the licences of this repository (`NOTICE`).
+- Stop in the chat field: while an answer comes, send is stop, after the pattern Prompt Input of shadcn.
+  It stops reading the answer (`stop` of `useChat`) and cancels the turn on the server
+  (`createHarnessClient(...).cancel()`), so that the model stops writing, the chat keeps what was shown,
+  and the next question does not wait for the rest.
 
 ### Changed
 

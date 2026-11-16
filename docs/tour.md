@@ -142,6 +142,9 @@ ticked.](images/tour/chat-model-picker.png)
 The models in the picture are the ones this stack was configured with; yours are the names in your `.env`.
 The three questions above are suggestions to begin with.
 
+While an answer comes, send turns into stop: it ends the answer, what came so far stays, and the next
+question can go.
+
 With a speech-to-text model in the settings, the field also has a microphone: press it, speak, press it
 again, and what was said stands in the field, to send like a typed question. A key of OpenAI is enough; for
 another endpoint see [Dictation](../apps/app/README.md#dictation). The pictures above were taken without it.

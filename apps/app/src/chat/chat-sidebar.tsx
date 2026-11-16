@@ -1,3 +1,4 @@
+import { createHarnessClient } from "@tanstack/ai-harness/client"
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react"
 import { Link, getRouteApi, useRouter } from "@tanstack/react-router"
 import {
@@ -9,6 +10,7 @@ import {
   LoaderCircleIcon,
   MessageCircleDashedIcon,
   PlusIcon,
+  SquareIcon,
   XIcon,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
@@ -184,7 +186,7 @@ function Conversation({ threadId }: { threadId: string }) {
   const router = useRouter()
   const { chats, chatStatus } = root.useLoaderData()
   const titled = chats.some((entry) => entry.threadId === threadId && entry.titled)
-  const { messages, sendMessage, isLoading, error } = useChat({
+  const { messages, sendMessage, isLoading, error, stop } = useChat({
     threadId,
     connection: fetchServerSentEvents("/api/harness/run"),
     persistence: true,
@@ -203,6 +205,19 @@ function Conversation({ threadId }: { threadId: string }) {
     pickModel(name)
     setModel(name)
     void switchTo(name)
+  }
+  // Stop ends the answer twice: `stop` of the chat stops reading it, and the harness cancels the turn
+  // on the server. Without that the model goes on writing, the server keeps the whole answer, and the
+  // next question waits until it is done.
+  const [stopError, setStopError] = useState<string>()
+  const halt = () => {
+    stop()
+    createHarnessClient({ url: "/api/harness", threadId })
+      .cancel()
+      .then(
+        (receipt) => setStopError(receipt.status === "rejected" ? receipt.reason : undefined),
+        (problem: unknown) => setStopError(problem instanceof Error ? problem.message : String(problem)),
+      )
   }
 
   useEffect(() => {
@@ -294,6 +309,15 @@ function Conversation({ threadId }: { threadId: string }) {
                     </Alert>
                   </MessageScrollerItem>
                 )}
+                {stopError && (
+                  <MessageScrollerItem messageId="stop-error">
+                    <Alert>
+                      <CircleAlertIcon />
+                      <AlertTitle>The answer goes on on the server</AlertTitle>
+                      <AlertDescription>{stopError}</AlertDescription>
+                    </Alert>
+                  </MessageScrollerItem>
+                )}
               </MessageScrollerContent>
             </MessageScrollerViewport>
             <MessageScrollerButton />
@@ -304,6 +328,7 @@ function Conversation({ threadId }: { threadId: string }) {
         placeholder={messages.length === 0 ? "Ask about the machines" : "Ask a follow-up"}
         busy={isLoading}
         onSend={(question) => void sendMessage(question)}
+        onStop={halt}
         models={chatStatus.models}
         model={model}
         onModel={choose}
@@ -354,12 +379,14 @@ function AnswerBlock({ block }: { block: Block }) {
  * answers and lets the chat pick another one, after the shadcn pattern "Model Selector". At the
  * start of the panel the questions to begin with stand above it, after the pattern "Suggestion".
  * With a model for speech in the settings, a question can also be spoken into it (dictate.tsx).
+ * While an answer comes, send is stop, after the pattern "Prompt Input": what came so far stays.
  */
 function Composer({
   placeholder,
   suggestions: questions = [],
   busy = false,
   onSend,
+  onStop,
   models,
   model,
   onModel,
@@ -369,6 +396,7 @@ function Composer({
   suggestions?: ReadonlyArray<string>
   busy?: boolean
   onSend: (question: string) => void
+  onStop?: () => void
   models: ReadonlyArray<string>
   model: string | undefined
   onModel: (name: string) => void
@@ -398,6 +426,9 @@ function Composer({
     }
   }
   const choice = models.length > 1 && model !== undefined
+  // One button that sends, and stops the answer while it comes: the same element, so that it keeps
+  // the focus when it turns from one into the other.
+  const stoppable = busy && onStop !== undefined
   return (
     <SidebarFooter className="border-t">
       {questions.length > 0 && (
@@ -445,14 +476,15 @@ function Composer({
             )}
             {dictation && <DictateButton className={choice ? "ml-auto" : undefined} onText={dictated} />}
             <InputGroupButton
-              type="submit"
+              type={stoppable ? "button" : "submit"}
               variant="default"
               size="icon-sm"
               className={choice && !dictation ? "ml-auto" : undefined}
-              aria-label="Send"
-              disabled={busy}
+              aria-label={stoppable ? "Stop" : "Send"}
+              disabled={busy && !stoppable}
+              onClick={stoppable ? onStop : undefined}
             >
-              <ArrowUpIcon />
+              {stoppable ? <SquareIcon /> : <ArrowUpIcon />}
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
