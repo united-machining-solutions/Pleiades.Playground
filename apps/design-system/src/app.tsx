@@ -1,8 +1,10 @@
+import { brands } from "@pleiades/ui/brands"
 import { buttonVariants } from "@pleiades/ui/components/button"
 import { Toaster } from "@pleiades/ui/components/toast"
 import { TooltipProvider } from "@pleiades/ui/components/tooltip"
 
 import { sections } from "@/block.tsx"
+import { BrandChoice } from "@/brand-choice.tsx"
 import { Actions } from "@/sections/actions.tsx"
 import { BuiltFromThese } from "@/sections/built-from-these.tsx"
 import { Conversation } from "@/sections/conversation.tsx"
@@ -27,7 +29,11 @@ export function App() {
     <TooltipProvider>
       <div className="mx-auto flex w-full max-w-5xl flex-col px-4 pb-24 sm:px-6">
         <header className="flex flex-col gap-1 pt-10 pb-4">
-          <h1 className="text-2xl font-semibold">Design system</h1>
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+            <h1 className="text-2xl font-semibold">Design system</h1>
+            {/* Without a brand in packages/ui/brands there is nothing to choose. */}
+            {brands.length > 0 && <BrandChoice />}
+          </div>
           <p className="max-w-prose text-sm text-muted-foreground">
             What the user interface of Pleiades Playground is built from: the tokens, every component of
             packages/ui, and what the repository builds from them. Take from here before you build an element of

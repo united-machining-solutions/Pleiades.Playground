@@ -133,5 +133,10 @@ the backend of the running demo stack answers.
 - `public/`: the sign of umati as the icon of the page, and the umati wordmark at the top of the sidebar.
   They are trademarks of VDW e.V. and not covered by the licences of this repository, see
   [NOTICE](../../NOTICE).
-- `src/styles.css`: Tailwind and the font. The theme of the preset, light only, comes from `@pleiades/ui`,
-  the chart and state colours from `@pleiades/cards`, so a card looks the same wherever it is drawn.
+- `src/components/brand-switcher.tsx`: the top of the sidebar, the wordmark and the choice of a brand. A
+  brand is a look for the whole app: a block of theme tokens in
+  [`packages/ui/brands`](../../packages/ui/brands/README.md), put on by one attribute, `data-brand` on
+  `<html>`. "Default" is the app without one. With no brand in that folder the wordmark stands alone.
+- `src/styles.css`: Tailwind and the font. The theme of the preset, light only, comes from `@pleiades/ui`
+  and the brands with it, the chart and state colours from `@pleiades/cards`, so a card looks the same
+  wherever it is drawn.

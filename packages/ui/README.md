@@ -20,6 +20,8 @@ Every component here is shown on one page, in its variants and states: the
 - `src/styles/globals.css`: the theme, which is the shadcn tokens of the preset `b5JNecjwG`, light only. A
   page imports it after Tailwind, `@import "@pleiades/ui/globals.css"`, or brings a shadcn theme of its own.
   The font is not part of it.
+- `brands/`: the brands, each a `DESIGN.md` and a block of tokens over the theme that one attribute puts
+  on, `data-brand` on `<html>`. What a brand may set and how to add one: [brands/README.md](brands/README.md).
 - `components.json`: the settings of shadcn for this package: the style `base-vega`, on
   [Base UI](https://base-ui.com), with the icons of Lucide.
 

@@ -4,6 +4,8 @@
   "type": "module",
   "exports": {
     "./globals.css": "./src/styles/globals.css",
+    "./brands.css": "./brands/brands.css",
+    "./brands": "./brands/brands.ts",
     "./lib/*": "./src/lib/*.ts",
     "./components/*": "./src/components/*.tsx",
     "./hooks/*": "./src/hooks/*.ts"
