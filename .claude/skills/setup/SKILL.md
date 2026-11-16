@@ -99,16 +99,17 @@ stays out of this conversation and the repository, a key takes at most two reque
 for trying out finished agents, not for help with code. So this session never runs through it.
 
 1. **The certificate.** The handbook saves it in the home folder, as `.hub0000-ca.crt`, on Windows as
-   `hub0000-ca.crt`. This prints the name and the fingerprint of what it finds:
-   `node -e "const fs=require('fs'),os=require('os'),{X509Certificate}=require('crypto');for(const n of ['.hub0000-ca.crt','hub0000-ca.crt']){const p=os.homedir()+'/'+n;if(fs.existsSync(p))console.log(n,new X509Certificate(fs.readFileSync(p)).fingerprint256)}"`.
-   The fingerprint must be
-   `49:6A:BB:24:4D:17:39:3D:FD:4C:F0:64:7A:79:A0:FB:59:6C:13:37:1A:C2:E8:D8:DB:A1:76:69:FF:70:9C:10`; with
-   another one, stop, and the person asks the organizers. Nothing found: the person runs the setup command of
-   the handbook.
+   `hub0000-ca.crt`. This says of each file it finds whether it is the certificate of the hub:
+   `node -e "const fs=require('fs'),os=require('os'),{X509Certificate}=require('crypto');for(const n of ['.hub0000-ca.crt','hub0000-ca.crt']){const p=os.homedir()+'/'+n;if(!fs.existsSync(p)||!fs.statSync(p).isFile())continue;const pem=fs.readFileSync(p,'utf8');let ok=false;try{ok=pem.split('-----BEGIN ').length===2&&new X509Certificate(pem).fingerprint256==='49:6A:BB:24:4D:17:39:3D:FD:4C:F0:64:7A:79:A0:FB:59:6C:13:37:1A:C2:E8:D8:DB:A1:76:69:FF:70:9C:10'}catch{}console.log(n,ok?'is the certificate of the hub':'is NOT the certificate of the hub')}"`.
+   `is NOT`: stop, and the person asks the organizers. A file with a second block in it is NOT too, whatever
+   the first one is: the app trusts every certificate in the file, so a check of the first one would let an
+   added root through. Nothing found: the person runs the setup command of the handbook.
 
    The app trusts it only through a `compose.override.yaml` next to `compose.yaml`, which Docker Compose
-   reads by itself. Ask, write it with the name found, and add the line `compose.override.yaml` to
-   `.git/info/exclude`. If one is there already, the person adds the lines:
+   reads by itself. Ask, write it with the name found, on Windows `~/hub0000-ca.crt`, and add the line
+   `compose.override.yaml` to `.git/info/exclude`. A name that is not there makes Docker Desktop create an
+   empty folder of that name in the home folder: the person deletes it and the check above runs again. If an
+   override is there already, the person adds the lines:
 
    ```yaml
    services:
@@ -125,8 +126,16 @@ for trying out finished agents, not for help with code. So this session never ru
    - `not set`, though the person set it: a variable reaches only programs started after it. They restart
      this program and the terminal, then this skill.
    - `OPENAI_API_KEY holds the key too`: the handbook sets it for other tools. Docker Compose prefers it to
-     `.env`, and the app would send the key to OpenAI. Start the app without it, every time:
-     `env -u OPENAI_API_KEY docker compose up -d app`; in PowerShell `Remove-Item Env:OPENAI_API_KEY` first.
+     `.env`, and the app would send the key to OpenAI with the first question. Ask, and add one line under
+     `environment` in the `compose.override.yaml` of item 1. It keeps the key out of the app at every start:
+
+     ```yaml
+         environment:
+           NODE_EXTRA_CA_CERTS: /etc/ssl/certs/hub-ca.crt
+           OPENAI_API_KEY: ""
+     ```
+
+     Say that a key of OpenAI of the person's own in `.env` then does not reach the app either.
 3. **The settings**, in the block for any other endpoint in `.env`. The first two lines name the variables
    of the profile and hold no value; without `OPENAI_BASE_URL`, the person writes the address of the handbook
    into the first line instead. No `.env`: a fresh copy as in level 1. Otherwise the person puts the lines in.
@@ -149,11 +158,13 @@ for trying out finished agents, not for help with code. So this session never ru
      into that line, and after `docker compose up -d app` a chat switches between them. The first one
      answers until a chat picks another; models of a key of Anthropic or OpenAI in `.env` come before them.
    - `missing`: the hub has no model of that name.
-   - `401`: the key is wrong or has ended, or did not reach the app: item 2.
+   - `401`: the key is wrong or has ended, or did not reach the app: item 2. Every model shows `missing`
+     then too; the status counts first.
    - `ERR_INVALID_URL`: the app has no address: items 2 and 3.
    - `ENOTFOUND` or `EAI_AGAIN`: the computer is not in the WLAN of the hub, or a VPN of the company hides
      the hub's names. Whether it may be off is for the person or their IT.
-   - `UNABLE_TO_VERIFY_LEAF_SIGNATURE`: item 1.
+   - `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, or `SELF_SIGNED_CERT_IN_CHAIN` when the hub sends its root along:
+     item 1.
 
    Questions about the access or a key go to the organizers.
 

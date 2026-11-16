@@ -98,9 +98,10 @@ All notable changes are documented here. The format follows
   with fixed values in the words of the demo, three rules as Do and Don't, and the machine card of the card
   catalogue. A test fails when a component of `packages/ui` has no block on the page.
 - The skill `setup` gives the chat the language models of the hackathon hub: a router that speaks OpenAI's chat
-  completions behind one address and one key, with a root certificate of its own. The skill checks the
-  certificate by its fingerprint and hands it to the app with a `compose.override.yaml` that stays on the
-  computer, points the block for any other endpoint at the router with `${OPENAI_BASE_URL}` and
+  completions behind one address and one key, with a root certificate of its own. The skill checks that the
+  file holds that certificate alone, by its fingerprint, and hands it to the app with a `compose.override.yaml`
+  that stays on the computer and, where the handbook also sets the key as `OPENAI_API_KEY`, keeps it from
+  OpenAI. It points the block for any other endpoint at the router with `${OPENAI_BASE_URL}` and
   `${UMS_AI_KEY}` of the profile, and asks the router from inside the app which models it has, so that a chat
   can switch between all of them.
 
