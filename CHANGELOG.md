@@ -98,7 +98,7 @@ All notable changes are documented here. The format follows
   with fixed values in the words of the demo, three rules as Do and Don't, and the machine card of the card
   catalogue. A test fails when a component of `packages/ui` has no block on the page.
 - Spec output of the simulator, a draft of the MQTT binding of the data model 0.13.1: below
-  `simulators/{SerialNumber}/`, split like the playground into `umati/`, `vendor/` and `events/`, a virtual machine, a state machine driven by a scenario, publishes the manifest, values,
+  `simulators/{SerialNumber}/`, with a namespace level as in OPC UA (`umati`, the domain of a manufacturer, `events`), a virtual machine, a state machine driven by a scenario, publishes the manifest, values,
   snapshots and lists retained and the events of program executions, job orders and alerts not retained, with
   the last will `Connection/State = Disconnected`. Every simulator of the demo stack publishes it, each with a
   scenario of its own (`Config:SpecOutput:ScenarioName`: P-04 the default, P-07 `housings`, M-02
@@ -113,8 +113,9 @@ All notable changes are documented here. The format follows
   and so on) instead of `JobOrderChanged`, the program execution snapshot carries `State` and `StartTime` and
   stays after its end, and the scenario now also stops programs, revokes, cancels and takes back job orders.
   The signal of the manufacturer, the temperature of the spindle bearing, comes in the same tree below
-  `vendor/Spindle/1/BearingTemperature`, in `degreeCelsius`, follows the spindle and is named in the manifest
-  as `x-example-com.Spindle.1.BearingTemperature` with type and unit; the binding maps the prefix to `vendor/`.
+  `example-com/Spindle/1/BearingTemperature`, in the namespace of the manufacturer, in `degreeCelsius`; it
+  follows the spindle and is named in the manifest as `x-example-com.Spindle.1.BearingTemperature` with type and
+  unit, and the binding maps `x-<domain>.<path>` to `<domain>/<path>`. `umati` and `events` are reserved.
   `machines/{SerialNumber}/` stays as it is.
   With 0.13.1 a cancelled job order, aborted without having run, carries `EndTime` but neither `StartTime` nor
   `ProducedQuantity`, and passes the schemas of the model as it is.

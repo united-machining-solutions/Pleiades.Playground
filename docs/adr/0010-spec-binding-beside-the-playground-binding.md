@@ -27,14 +27,15 @@ exactly after the model, to find a compromise for the differences.
   of a group, carry the binding fields `seq`
   and `seqEpoch`, go out with QoS 1 and wait in a bounded outbox while the broker is away. The model is not
   changed; its schemas check an event once the binding fields are taken off, as with `unit`.
-- The second tree is built like the binding of the playground, split into `umati/`, `vendor/` and `events/`, but
-  below a root of its own, `simulators/{SerialNumber}/`, with the same serial number as below `machines/`, so that
+- The second tree lies below a root of its own, `simulators/{SerialNumber}/`, with the same serial number as below `machines/`, so that
   nothing mixes with the persistence and the app. The machine is identified by that serial number and by the
   manifest, which carries the globally unique `ProductInstanceUri` of the model.
-- Every signal of a machine lies in the second tree: the elements of the model below `umati/`, the signals of the
-  manufacturer below `vendor/`. In the manifest a signal of the manufacturer has the prefix segment `x-<domain>`
-  the model asks for, with type and unit; the binding maps that prefix to `vendor/`. Consumers ignore what they
-  do not know.
+- Below the serial number comes a namespace level, as the namespaces of OPC UA: `umati` for the elements of the
+  model, the domain of a manufacturer (`example-com`) for its signals, `events` for the events. Below every
+  namespace the tree is built the same way, so a signal of a manufacturer lies at the same place as the elements
+  of the model, only in another namespace. In the manifest it has the prefix segment `x-<domain>` the model asks
+  for, with type and unit; the binding maps `x-<domain>.<path>` to `<domain>/<path>`. `umati` and `events` are
+  reserved. Consumers ignore what they do not know.
 - The second tree is an option of the simulator (`Config:SpecOutput:Enabled`), not a service of its own. One
   container stays one machine; the image, the health check and the logging are those of the simulator.
 - A virtual machine, a state machine driven by a scenario, produces the second tree. The topics below

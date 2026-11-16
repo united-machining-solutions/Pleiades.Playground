@@ -55,6 +55,8 @@ internal sealed partial class SpecOutputService : BackgroundService
         {
             LogShortRetention(_spec.Scenario.JobOrderRetention);
         }
+        // Fails at the start when the domain of the manufacturer gives a reserved namespace.
+        SpecWire.Namespace(SpecElements.ExtensionPrefix(_spec.ManufacturerDomain));
         LogStarting(SpecWire.Root, _config.SerialNumber);
 
         // Both are disposed once the loop has ended and the client is stopped, in the finally block below.
