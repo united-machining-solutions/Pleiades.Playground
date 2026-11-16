@@ -12,6 +12,7 @@ Specifications; copyright remains with their owners.
 
 The umati sign and wordmark under apps/app/public/ (favicon.svg, favicon.ico, apple-touch-icon.png,
 umati-wordmark.svg) are trademarks of VDW e.V. and are not covered by the licences of this repository.
+They are used in the example application with the agreement of United Machining Solutions (Christoph Plüss).
 
 Third-party container images referenced by compose.yaml (MQTT broker, database) are distributed under
 their own licences and are not part of this repository.
