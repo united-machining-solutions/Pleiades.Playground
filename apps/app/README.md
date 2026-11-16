@@ -31,43 +31,31 @@ everything else works.
 
 ## Language models
 
-The chat takes its models from one endpoint that speaks OpenAI's chat completions:
+The chat takes its models from a LiteLLM gateway, which reaches Anthropic, OpenAI and models of one's own behind
+one address and one key. At the hackathon that is the gateway of the hub, with the address and the key of its
+handbook.
 
 | Setting | What it holds |
 |---|---|
-| `LLM_BASE_URL` | The address up to `/v1`, as the app reaches it from its container |
-| `LLM_API_KEY` | The key, if the endpoint wants one |
-| `LLM_MODELS` | Empty behind a gateway; otherwise the models of the chat, separated by commas |
+| `LLM_BASE_URL` | The address of the gateway up to `/v1`, as the app reaches it from its container |
+| `LLM_API_KEY` | The key the gateway gave you |
 
-**A gateway first.** A gateway such as LiteLLM reaches Anthropic, OpenAI and models of one's own behind one
-address and one key; at the hackathon, the gateway of the hub does, with the address and the key of its
-handbook. Leave `LLM_MODELS` empty there: the chat offers the models `GET <LLM_BASE_URL>/models` lists, in the
-order of the list, when it first asks the server. It leaves out a model the list marks as not for chat
-(`mode`, as LiteLLM gives it: `embedding`, `audio_transcription`), and the model of `LLM_TRANSCRIPTION_MODEL`. A
-model without a mark stays. A list that came is kept until the app restarts; a new model of the gateway needs
-`docker compose up -d app`. Where the list does not come, the chat panel says why ("GET /models of LLM_BASE_URL
-answered 401"), and the app asks again after half a minute. The chat panel and the harness read the same list.
+The chat offers the models `GET <LLM_BASE_URL>/models` lists, in the order of the list. LiteLLM says of each
+what it is for (`mode`): the chat takes those for `chat`, and those without a mode, which a model of one's own has
+until the admin of the gateway sets one. Every other mode, `embedding` or `audio_transcription`, is left out.
+Which models there are, and in which order, is set at the gateway, also per key. The first one answers until a
+chat picks another one in its input field. The agent harness keeps that choice with the chat. With one model
+the field shows no choice. The key stays on the server.
 
-**`LLM_MODELS`** names models to offer fewer of them, or in another order, and is needed where the endpoint
-marks nothing: OpenAI itself (`https://api.openai.com/v1`) and a local model server list every model they
-have, also those that cannot chat. A named model wins over the list.
+The app asks the gateway when it is first needed. A list with a model for chat is kept until the app restarts;
+a new model of the gateway needs `docker compose up -d app`. Where the list does not come, the chat panel says
+why ("GET /models of the gateway at LLM_BASE_URL answered 401"), and the app asks again after half a minute.
+The chat panel, the harness and dictation read the same list.
 
-The first model answers until a chat picks another one in its input field. The agent harness keeps that choice
-with the chat. With one model the field shows no choice. The key stays on the server. Where settings were begun
-and give no model, the chat panel says which one is empty.
-
-A model on your own computer:
-
-```bash
-LLM_BASE_URL=http://host.docker.internal:<port>/v1
-LLM_MODELS=<a model your server has>
-```
-
-Then start the app again: `docker compose up -d app`. The app runs in a container, and `localhost` there is
-the container; your own computer is `host.docker.internal`, with Docker Desktop and, through `extra_hosts`
-in `compose.yaml`, with Docker Engine on Linux. The server must then listen on more than `127.0.0.1`. For
-Ollama, the name of the model is the one `ollama list` shows. The model must be able to call tools: one that
-cannot answers without data.
+A gateway on your own computer is `http://host.docker.internal:<port>/v1`: the app runs in a container, and
+`localhost` there is the container. The name works with Docker Desktop and, through `extra_hosts` in
+`compose.yaml`, with Docker Engine on Linux; the gateway must then listen on more than `127.0.0.1`. A model must
+be able to call tools: one that cannot answers without data.
 
 **The chat has no sign-in.** The agent harness runs with open access: whoever reaches the port can chat with
 the configured model, at the cost of whoever owns its key, and can list and read every chat. So the demo
@@ -76,19 +64,19 @@ device, set `APP_BIND=0.0.0.0`, and only in a network you trust.
 
 ## Dictation
 
-With a speech-to-text model in the settings, the chat field has a microphone. Press it, speak, press it
+With a speech-to-text model at the gateway, the chat field has a microphone. Press it, speak, press it
 again: a spinner shows while the model writes down what was said, and the text goes into the field, after
 what is already there. It is sent like a typed question, when you send it. After two minutes the recording
 stops by itself and is written down the same way. The model hears the language itself. It also gets the
 names of the machines from the backend as its prompt, so that it writes "P-04" as the stack spells it.
 
-`LLM_TRANSCRIPTION_MODEL` names the speech-to-text model at the endpoint of the chat, as the endpoint gives
-it: at the hub of the hackathon `openai/gpt-transcribe`, at OpenAI `gpt-transcribe`. The endpoint must speak OpenAI's audio
-transcriptions (`POST /audio/transcriptions`), as a gateway, OpenAI and a local speech server do. There is no
-default. Without a model for it the field has no microphone, and the chat works as before.
+Dictation takes the first model the gateway marks for speech to text (`mode: audio_transcription`), at the hub
+of the hackathon `openai/gpt-transcribe`. The gateway passes it on as OpenAI's audio transcriptions
+(`POST /audio/transcriptions`). Where the gateway lists none, the field has no microphone, and the chat works
+as before.
 
 The browser records (`useAudioRecorder` of TanStack AI) and sends the recording to `/api/transcribe`, which
-calls the model with the key of the endpoint (`generateTranscription`). The route reads at most 32 MiB, as the
+calls the model with the key of the gateway (`generateTranscription`). The route reads at most 32 MiB, as the
 agent harness does, and answers a larger request with 413. A browser lets a page use the
 microphone only over https or on `localhost`; elsewhere the microphone says so when pressed. The recording
 is not kept.

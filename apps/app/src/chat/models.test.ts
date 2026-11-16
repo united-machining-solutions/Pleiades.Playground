@@ -1,60 +1,13 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { chatModelsOf, dictationSettings, modelNames, modelSettings, settingGaps } from "./models.ts"
+import { dictationSettings, modelNames, modelSettings, modelsOf, settingGaps } from "./models.ts"
 
-const endpoint = { LLM_BASE_URL: "http://localhost:4000/v1" }
+const gatewayEnv = { LLM_BASE_URL: "http://localhost:4000/v1", LLM_API_KEY: "key-c" }
 
-test("without settings the chat has no model", () => {
-  assert.equal(modelSettings({}), undefined)
-  assert.deepEqual(modelNames(modelSettings({})), [])
-})
-
-test("the endpoint's models are those LLM_MODELS names, in its order, each once", () => {
-  const settings = modelSettings({ ...endpoint, LLM_API_KEY: "key-c", LLM_MODELS: "large, small ,large" })
-  assert.deepEqual(settings, { baseURL: "http://localhost:4000/v1", apiKey: "key-c", models: ["large", "small"] })
-  assert.deepEqual(modelNames(settings), ["large", "small"])
-})
-
-test("an empty LLM_MODELS takes the models the endpoint listed, and a named one wins", () => {
-  assert.deepEqual(modelSettings(endpoint, ["listed"])?.models, ["listed"])
-  assert.deepEqual(modelSettings({ ...endpoint, LLM_MODELS: "named" }, ["listed"])?.models, ["named"])
-  assert.equal(modelSettings(endpoint), undefined)
-  assert.equal(modelSettings({ LLM_MODELS: "named" }, ["listed"]), undefined)
-})
-
-test("an endpoint of one's own needs no key", () => {
-  assert.equal(modelSettings({ ...endpoint, LLM_MODELS: "local" })?.apiKey, "not-needed")
-})
-
-test("settings that were begun say what they lack, by their names and never a value", () => {
-  assert.deepEqual(settingGaps({}), [])
-  assert.deepEqual(settingGaps(endpoint), [
-    "LLM_BASE_URL is set, LLM_MODELS is empty, and the endpoint lists no chat model under /models",
-  ])
-  assert.deepEqual(settingGaps(endpoint, ["listed"]), [])
-  assert.deepEqual(settingGaps({ ...endpoint, LLM_MODELS: "named" }), [])
-  assert.deepEqual(settingGaps({ LLM_API_KEY: "key-c", LLM_MODELS: "named", LLM_TRANSCRIPTION_MODEL: " " }), [
-    "LLM_API_KEY is set, LLM_BASE_URL is empty",
-    "LLM_MODELS is set, LLM_BASE_URL is empty",
-  ])
-  assert.equal(JSON.stringify(settingGaps({ LLM_API_KEY: "key-c" })).includes("key-c"), false)
-})
-
-test("dictation needs the endpoint and a transcription model", () => {
-  assert.equal(dictationSettings({}), undefined)
-  assert.equal(dictationSettings(endpoint), undefined)
-  assert.equal(dictationSettings({ LLM_TRANSCRIPTION_MODEL: "speech" }), undefined)
-  assert.deepEqual(dictationSettings({ ...endpoint, LLM_TRANSCRIPTION_MODEL: " speech " }), {
-    model: "speech",
-    apiKey: "not-needed",
-    baseURL: "http://localhost:4000/v1",
-  })
-})
-
-// The answer of GET /models of a LiteLLM gateway whose self-hosted model has no model_info: that model
+// The answer of GET /models of a LiteLLM gateway whose model of its own has no model_info: that model
 // has no mode, the others say what they are for. A gateway answers so until its admin sets the mode.
-const gateway = {
+const answer = {
   object: "list",
   data: [
     { id: "spark/qwen3.8-27b", object: "model" },
@@ -62,19 +15,62 @@ const gateway = {
     { id: "anthropic/claude-haiku-5-5", object: "model", mode: "chat" },
     { id: "spark/qwen3-embedding-8b", object: "model", mode: "embedding" },
     { id: "openai/gpt-transcribe", object: "model", mode: "audio_transcription" },
+    { id: "local/whisper", object: "model", mode: "audio_transcription" },
   ],
 }
 
-test("of the models an endpoint lists, the chat takes those that are for chat or do not say", () => {
-  assert.deepEqual(chatModelsOf(gateway), ["spark/qwen3.8-27b", "openai/gpt-6-luna", "anthropic/claude-haiku-5-5"])
-})
-
-test("the speech-to-text model of dictation is never a chat model, even where the endpoint does not say", () => {
-  assert.deepEqual(chatModelsOf({ data: [{ id: "llama3.2" }, { id: "whisper" }] }, " whisper "), ["llama3.2"])
+test("of the models the gateway lists, chat takes those for chat or without a mode, dictation those for it", () => {
+  assert.deepEqual(modelsOf(answer), {
+    chat: ["spark/qwen3.8-27b", "openai/gpt-6-luna", "anthropic/claude-haiku-5-5"],
+    transcription: ["openai/gpt-transcribe", "local/whisper"],
+  })
 })
 
 test("an answer that is not a list of models gives none", () => {
-  assert.deepEqual(chatModelsOf(undefined), [])
-  assert.deepEqual(chatModelsOf({ error: "no" }), [])
-  assert.deepEqual(chatModelsOf({ data: [{ id: "" }, { mode: "chat" }, null, { id: "a" }, { id: "a" }] }), ["a"])
+  const none = { chat: [], transcription: [] }
+  assert.deepEqual(modelsOf(undefined), none)
+  assert.deepEqual(modelsOf({ error: "no" }), none)
+  assert.deepEqual(modelsOf({ data: [{ id: "" }, { mode: "chat" }, null, { id: "a" }, { id: " a " }] }), {
+    chat: ["a"],
+    transcription: [],
+  })
+})
+
+test("the chat offers the gateway's chat models in its order, and the first answers", () => {
+  const settings = modelSettings(gatewayEnv, modelsOf(answer))
+  assert.deepEqual(settings, {
+    baseURL: "http://localhost:4000/v1",
+    apiKey: "key-c",
+    models: ["spark/qwen3.8-27b", "openai/gpt-6-luna", "anthropic/claude-haiku-5-5"],
+  })
+  assert.equal(modelNames(settings)[0], "spark/qwen3.8-27b")
+})
+
+test("without a gateway, or without a model for chat, the chat has none", () => {
+  assert.equal(modelSettings({}, modelsOf(answer)), undefined)
+  assert.equal(modelSettings(gatewayEnv, { chat: [], transcription: ["speech"] }), undefined)
+  assert.deepEqual(modelNames(undefined), [])
+})
+
+test("a gateway that wants no key still gets one", () => {
+  assert.equal(modelSettings({ LLM_BASE_URL: "http://localhost:4000/v1" }, modelsOf(answer))?.apiKey, "not-needed")
+})
+
+test("dictation takes the gateway's first model for it, and without one the field has no microphone", () => {
+  assert.deepEqual(dictationSettings(gatewayEnv, modelsOf(answer)), {
+    baseURL: "http://localhost:4000/v1",
+    apiKey: "key-c",
+    model: "openai/gpt-transcribe",
+  })
+  assert.equal(dictationSettings(gatewayEnv, { chat: ["a"], transcription: [] }), undefined)
+  assert.equal(dictationSettings({}, modelsOf(answer)), undefined)
+})
+
+test("what the settings lack is said by their names, never by a value", () => {
+  const none = { chat: [], transcription: [] }
+  assert.deepEqual(settingGaps({}, none), [])
+  assert.deepEqual(settingGaps({ LLM_API_KEY: "key-c" }, none), ["LLM_API_KEY is set, LLM_BASE_URL is empty"])
+  assert.deepEqual(settingGaps(gatewayEnv, none), ["The gateway at LLM_BASE_URL lists no model for chat under /models"])
+  assert.deepEqual(settingGaps(gatewayEnv, modelsOf(answer)), [])
+  assert.equal(JSON.stringify(settingGaps({ LLM_API_KEY: "key-c" }, none)).includes("key-c"), false)
 })

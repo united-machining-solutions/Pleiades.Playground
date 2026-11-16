@@ -7,8 +7,8 @@ import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
 
 import { chatTools } from "./cards.tsx"
-import { chatSettings } from "./listed-models.ts"
-import type { ChatSettings } from "./listed-models.ts"
+import { chatSettings } from "./gateway.ts"
+import type { ChatSettings } from "./gateway.ts"
 import { withTimeZone } from "./local-times.ts"
 import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
@@ -63,7 +63,7 @@ function adapterOf(name: string, { baseURL, apiKey }: ModelSettings): AnyTextAda
 type Handler = (request: Request) => Promise<Response>
 
 // The handler and the snapshot of the settings it was built from. A new snapshot comes only where the
-// last one had no models (see listed-models.ts), so a handler that serves chats is never replaced.
+// last one had no models (see gateway.ts), so a handler that serves chats is never replaced.
 let built: { chat: ChatSettings; handler: Handler | null } | undefined
 
 /** The fetch handler of the harness, or null as long as no language model is configured. */

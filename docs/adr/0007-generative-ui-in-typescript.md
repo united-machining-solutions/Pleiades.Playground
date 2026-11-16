@@ -26,7 +26,7 @@ stood in its READMEs; this record gathers them.
 - **The agentic layer is the harness in the example app** (`apps/app/src/chat`). It runs on the server of
   the app, so the keys of the language models never reach a browser. Any other MCP client can take its
   place: the tools do not know who calls them.
-- **The language models come from one endpoint** that speaks OpenAI's chat completions, a gateway first
+- **The language models come from a LiteLLM gateway**
   ([ADR-0010](0010-language-models-through-one-gateway.md); until then three blocks: OpenAI, Anthropic and such
   an endpoint). A chat picks among its models. Without a model the chat says so and everything else works.
 - **A card is one component in two wrappers.** The example app imports it. Every other host gets it as one

@@ -128,33 +128,27 @@ for trying out finished agents, not for help with code. So this session never ru
 3. **The settings**, the lines `LLM_` in `.env`. The first two lines name the variables
    of the profile and hold no value; without `OPENAI_BASE_URL`, the person writes the address of the handbook
    into the first line instead. No `.env`: a fresh copy as in level 1. Otherwise the person puts the lines in.
-   `LLM_MODELS` stays empty: the chat then offers every chat model the hub lists, in its order, and leaves
-   out the embedding and speech-to-text models, which the hub marks as such. The hub lists
-   `spark/qwen3.8-27b` first, the model in the room, which costs nothing and calls tools, so it answers until
-   a chat picks another. If the check in item 4 shows another one first, the person names the Spark model
-   first in `LLM_MODELS`.
+   The chat then offers every chat model the hub lists, in its order, and dictation takes its speech-to-text
+   model. The hub lists `spark/qwen3.8-27b` first, the model in the room, which costs nothing and calls
+   tools, so it answers until a chat picks another. Which models and in which order is for the organizers.
 
    ```
    LLM_BASE_URL=${OPENAI_BASE_URL}
    LLM_API_KEY=${UMS_AI_KEY}
-   LLM_MODELS=
    ```
 
 4. **Start and check.** `docker compose up -d app`. A warning that a variable is not set means the app
    started without it: back to item 2. Then ask the hub from inside the app. This prints no key:
 
    ```
-   docker compose exec -T app node -e "fetch(process.env.LLM_BASE_URL+'/models',{headers:{Authorization:'Bearer '+process.env.LLM_API_KEY}}).then(async r=>{const chat=r.ok?(await r.json()).data.filter(m=>!m.mode||m.mode==='chat').map(m=>m.id):[];const named=(process.env.LLM_MODELS||'').split(',').map(n=>n.trim()).filter(Boolean);console.log(r.status,named.length?named.map(n=>n+(chat.includes(n)?' listed':' missing')).join(', '):'LLM_MODELS empty: the chat offers the models below');console.log('chat models of the hub:',chat.join(','))}).catch(e=>console.log(e.cause?.code||e.message))"
+   docker compose exec -T app node -e "fetch(process.env.LLM_BASE_URL+'/models',{headers:{Authorization:'Bearer '+process.env.LLM_API_KEY}}).then(async r=>{const ms=r.ok?(await r.json()).data:[];console.log(r.status,'chat:',ms.filter(m=>!m.mode||m.mode==='chat').map(m=>m.id).join(','));console.log('dictation:',ms.filter(m=>m.mode==='audio_transcription').map(m=>m.id)[0]||'none')}).catch(e=>console.log(e.cause?.code||e.message))"
    ```
 
    - `200` and a list of chat models: the chat answers, in some seconds for the Spark, which serves the whole
-     room. The chat offers the models of the second line; the first one answers until a chat picks another,
-     and models of a key of Anthropic or OpenAI in `.env` come before them. To offer only some, the person
-     names them in `LLM_MODELS`, in the form of that line, and starts the app again.
-   - `listed`: a model named in `LLM_MODELS` is one the hub has. `missing`: the hub has no chat model of that
-     name.
-   - `401`: the key is wrong or has ended, or did not reach the app: item 2. The list of chat models is empty
-     then too; the status counts first.
+     room. The chat offers these models; the first one answers until a chat picks another. The second line
+     names the model of dictation; with `none` the field has no microphone.
+   - `401`: the key is wrong or has ended, or did not reach the app: item 2. The list is empty then too; the
+     status counts first.
    - `ERR_INVALID_URL`: the app has no address: items 2 and 3.
    - `ENOTFOUND` or `EAI_AGAIN`: the computer is not in the WLAN of the hub, or a VPN of the company hides
      the hub's names. Whether it may be off is for the person or their IT.

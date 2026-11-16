@@ -119,7 +119,7 @@ function NoLanguageModel() {
         <EmptyDescription>
           {/* What is missing first, by the names of the settings. */}
           {chatStatus.gaps.map((gap) => `${gap}. `)}
-          Set <code>LLM_BASE_URL</code> and <code>LLM_API_KEY</code> of a gateway such as LiteLLM in <code>.env</code>{" "}
+          Set <code>LLM_BASE_URL</code> and <code>LLM_API_KEY</code> of a LiteLLM gateway in <code>.env</code>{" "}
           and start the app again with <code>docker compose up -d app</code>. Home needs no language model.
         </EmptyDescription>
       </EmptyHeader>

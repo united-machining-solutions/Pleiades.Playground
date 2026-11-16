@@ -1,13 +1,13 @@
 import { createServerFn } from "@tanstack/react-start"
 
-import { chatSettings } from "./listed-models.ts"
-import { dictationSettings, modelNames } from "./models.ts"
+import { chatSettings } from "./gateway.ts"
+import { modelNames } from "./models.ts"
 
 export type ChatStatus = {
   configured: boolean
   /** The models a chat can pick, by name. The first one answers until a chat picks another. */
   models: Array<string>
-  /** What the settings lack, or why the endpoint gave no models, by the names of the settings. */
+  /** What the settings lack, or why the gateway gave no models, by the names of the settings. */
   gaps: Array<string>
   /** Whether a model writes down what is said into the chat field. */
   dictation: boolean
@@ -21,7 +21,7 @@ export const getChatStatus = createServerFn({ method: "GET" }).handler(async ():
     configured: models.length > 0,
     models,
     gaps: chat.gaps,
-    dictation: dictationSettings(process.env) !== undefined,
+    dictation: chat.dictation !== undefined,
   }
 })
 

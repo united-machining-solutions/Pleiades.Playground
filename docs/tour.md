@@ -119,15 +119,14 @@ again, an answer shows what was true when it was given.
 
 The chat needs a language model, and the demo starts without one. Then the panel says "No language model
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
-copy `.env.example` to `.env`, set the address and the key of a gateway such as LiteLLM, at the hackathon
-the one of the hub, and create the app again with `docker compose up -d app`. That is enough: the chat
-offers the chat models the gateway lists.
+copy `.env.example` to `.env`, set the address and the key of a LiteLLM gateway, at the hackathon the one of the
+hub, and create the app again with `docker compose up -d app`. The chat offers the chat models the gateway
+lists, and dictation takes its speech-to-text model.
 
 | Setting | What it holds |
 |---|---|
-| `LLM_BASE_URL` | The address of an endpoint that speaks OpenAI's chat completions: a gateway, OpenAI, or a local model server |
-| `LLM_API_KEY` | Its key, if it wants one |
-| `LLM_MODELS` | Empty behind a gateway; the names of the models where the endpoint does not say which ones chat |
+| `LLM_BASE_URL` | The address of the LiteLLM gateway |
+| `LLM_API_KEY` | The key the gateway gave you |
 
 The chat has no sign-in, and whoever reaches the port chats at the cost of the owner of the key. Read
 [Language models](../apps/app/README.md#language-models) before you open the port to a network.

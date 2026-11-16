@@ -166,12 +166,11 @@ The key belongs to the person or to their company, and you never see it.
      settings name. Run it with `--images`, never without: without, it prints every setting, a key
      included. If they end in another version than the images that run, the person sets the line
      `PLEIADES_VERSION=` to the version that runs, in item 2.
-2. Ask the person to open `.env` in an editor and to fill in the lines `LLM_` themselves: for a gateway such
-   as LiteLLM its address and key, for OpenAI itself or a model on their own computer the address, the key
-   if it wants one, and the names of the models. What goes where:
+2. Ask the person to open `.env` in an editor and to fill in the two lines `LLM_` themselves: the address and
+   the key of a LiteLLM gateway, at the hackathon the one of the hub. What goes where:
    [Language models](../../../apps/app/README.md#language-models). Tell them to keep the key out of this
    conversation. A subscription to a chat product, Claude or ChatGPT, is not such a key: the key comes from
-   the API console of the provider and is billed there.
+   whoever runs the gateway.
 3. When they say it is done, start the app again, `docker compose up -d app`, and look again: the look-up
    says whether the chat answers now.
 

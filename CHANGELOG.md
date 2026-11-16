@@ -23,10 +23,7 @@ All notable changes are documented here. The format follows
   what every machine does now, with the values of `genui_machine_list`. A chat next to the page (TanStack AI
   harness) answers questions with the same tools. Its language models come from the settings: OpenAI,
   Anthropic, and any endpoint that speaks OpenAI's chat completions. With several models a chat picks one.
-  With `LLM_MODELS` empty, the chat offers the chat models the endpoint lists under `/models`, and leaves out
-  those a gateway marks as embedding or speech-to-text models. `.env.example` says what each line of that
-  block takes, and `host.docker.internal` reaches the computer from the app on Linux too. The skill `setup`
-  leaves `LLM_MODELS` empty for the hub of the hackathon and checks the chat models it lists.
+  `host.docker.internal` reaches the computer from the app on Linux too.
 - Card catalogue `packages/cards`: for each card its contract (zod) and its React component. The first card
   is the machine card: what one machine does now and which states it went through over the last hours. The
   tool `genui_machine_show` returns its values, the app shows it on a page per machine
@@ -124,11 +121,11 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
-- `app`: the chat takes its models from one endpoint that speaks OpenAI's chat completions, a gateway such as
-  LiteLLM above all: `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODELS`, and `LLM_TRANSCRIPTION_MODEL` for dictation.
-  The blocks `ANTHROPIC_*` and `OPENAI_*`, `OPENAI_TRANSCRIPTION_MODEL` and the package `@tanstack/ai-anthropic`
-  are gone. A `.env` that sets only them gives the chat no model: set the address and the key of the gateway
-  instead, or for OpenAI itself `LLM_BASE_URL=https://api.openai.com/v1` with its key and `LLM_MODELS`.
+- `app`: the chat takes its models from a LiteLLM gateway, with two settings, `LLM_BASE_URL` and `LLM_API_KEY`.
+  It offers the models the gateway marks for chat under `/models`, in its order, and dictation takes the first
+  one it marks for speech to text. The settings `ANTHROPIC_*`, `OPENAI_*`, `OPENAI_TRANSCRIPTION_MODEL`,
+  `LLM_MODELS` and `LLM_TRANSCRIPTION_MODEL` and the package `@tanstack/ai-anthropic` are gone. A `.env` that
+  sets only the keys of Anthropic or OpenAI gives the chat no model: set the address and the key of the gateway.
 - Chat: the models of Anthropic are offered before those of OpenAI. With keys for both, the first model of
   `ANTHROPIC_MODELS` answers until a chat picks another; with the names of `.env.example` that is Claude Haiku.
 - MQTT: MQTTnet 5 replaces MQTTnet 4. MQTTnet 5 ships no managed client, so `Pleiades.Playground.Mqtt.Extensions`
