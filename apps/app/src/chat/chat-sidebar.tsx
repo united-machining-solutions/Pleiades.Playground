@@ -343,6 +343,10 @@ function CallLine({ call }: { call: Call }) {
     </TraceLine>
   )
   if (call.output === undefined) return line
+  // The output is data of the stack, shown whole and unfiltered: the chat has no sign-in, so whoever
+  // reaches it may read what the tools read. `wrap` and `max-h-64` bound the box, not the text; a
+  // closed step costs nothing, because the panel of Base UI mounts its children only while open
+  // (`keepMounted` is off by default).
   return (
     <TraceCollapsible>
       <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
