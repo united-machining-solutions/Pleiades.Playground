@@ -82,19 +82,26 @@ export function blocksOf(
 }
 
 /**
- * Whether the chat waits for the first thing of an answer: a question is out, and the answer has
- * nothing to show yet. The chat shows a running line "Thinking" then, after the shadcn chatbot
- * template, so that one sees something happen before the first step comes. `live` says whether an
- * answer is coming.
+ * Where the chat shows a running line "Thinking", so that one sees something happen, or `undefined`
+ * where it shows none. The line stands while an answer is coming and nothing in it moves: before the
+ * answer shows anything ("apart": on its own under the question, after the shadcn chatbot template),
+ * and once its last step has ended or its last card is drawn, while the model reads that and the
+ * next step or text has not come ("in-answer": under that step or card). A running step and a text
+ * that grows show by themselves that something happens. `live` says whether an answer is coming.
  */
-export function waiting(
+export function thinkingLine(
   messages: ReadonlyArray<UIMessage>,
   live: boolean,
   tools: ReadonlyArray<ChatTool>,
-): boolean {
+): "apart" | "in-answer" | undefined {
   const last = messages.at(-1)
-  if (!live || last === undefined) return false
-  return last.role === "user" || blocksOf(last.parts, true, tools).length === 0
+  if (!live || last === undefined) return undefined
+  if (last.role === "user") return "apart"
+  const shown = blocksOf(last.parts, true, tools).at(-1)
+  if (shown === undefined) return "apart"
+  if (shown.kind === "text") return undefined
+  if (shown.kind === "steps" && shown.calls.some((call) => call.state === "running")) return undefined
+  return "in-answer"
 }
 
 /** The text of a person's message. */

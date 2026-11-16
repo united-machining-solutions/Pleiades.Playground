@@ -119,9 +119,10 @@ All notable changes are documented here. The format follows
   stack) or `LLM_TRANSCRIPTION_MODEL` for an endpoint that speaks OpenAI's audio transcriptions; an empty
   `OPENAI_TRANSCRIPTION_MODEL` lets the second count. Without one the field has no microphone. A recording
   stops after two minutes, and the route answers a body over 32 MiB with 413, as the agent harness does.
-- "Thinking" in the chat: from the question until the answer shows its first step, a running line of a
-  `Trace` stands where the answer will be, and its title shimmers, after the shadcn chatbot template. Before,
-  the chat showed nothing in that time.
+- "Thinking" in the chat: while an answer is coming and nothing in it moves, a running line of a `Trace`
+  says so, and its title shimmers. It stands where the answer will be until the answer shows anything, after
+  the shadcn chatbot template, and under the last step or card while the model reads its result, until the
+  next step or text comes. Before, the chat showed nothing in those times.
 - The example application wears umati: the sign of umati is the icon of the page, and the coloured umati
   wordmark stands at the top of the sidebar in place of the name. Both are trademarks of VDW e.V. and not
   covered by the licences of this repository (`NOTICE`).

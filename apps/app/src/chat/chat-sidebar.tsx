@@ -63,7 +63,7 @@ import {
 
 import { Answer } from "./answer.tsx"
 import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
-import { blocksOf, questionOf, waiting } from "./blocks.ts"
+import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
 import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { DictateButton } from "./dictate.tsx"
@@ -270,6 +270,9 @@ function Conversation({ threadId }: { threadId: string }) {
     }).then(() => router.invalidate())
   }, [isLoading, firstQuestion, titled, threadId, router])
 
+  // Where the running line "Thinking" stands while nothing in the answer moves, if anywhere.
+  const thinking = thinkingLine(messages, isLoading, chatTools)
+
   return (
     <>
       <div className="min-h-0 flex-1">
@@ -303,26 +306,27 @@ function Conversation({ threadId }: { threadId: string }) {
                       <Message>
                         <MessageContent className="gap-3">
                           {blocks.map((block, index) => (
-                            <AnswerBlock key={index} block={block} />
+                            <AnswerBlock
+                              key={index}
+                              block={block}
+                              thinking={
+                                thinking === "in-answer" && message === messages.at(-1) && index === blocks.length - 1
+                              }
+                            />
                           ))}
                         </MessageContent>
                       </Message>
                     </MessageScrollerItem>
                   )
                 })}
-                {/* Until the answer shows its first step, a running line says that it comes; its
-                    title shimmers, as every running line of a Trace does. */}
-                {waiting(messages, isLoading, chatTools) && (
+                {/* Until the answer shows anything, the running line stands on its own where the
+                    answer will be. */}
+                {thinking === "apart" && (
                   <MessageScrollerItem messageId="thinking">
                     <Message>
                       <MessageContent>
                         <Trace>
-                          <TraceLine status="running">
-                            <TraceIcon>
-                              <LoaderCircleIcon className="animate-spin" />
-                            </TraceIcon>
-                            <TraceTitle>Thinking</TraceTitle>
-                          </TraceLine>
+                          <ThinkingLine />
                         </Trace>
                       </MessageContent>
                     </Message>
@@ -410,8 +414,27 @@ function CallLine({ call }: { call: Call }) {
   )
 }
 
-/** One block of an answer: the tool calls of a stretch, a text, or what a card draws for a result. */
-function AnswerBlock({ block }: { block: Block }) {
+/**
+ * The running line "Thinking": an answer is coming and nothing in it moves (`thinkingLine` in
+ * blocks.ts). Its title shimmers, as every running line of a Trace does.
+ */
+function ThinkingLine() {
+  return (
+    <TraceLine status="running">
+      <TraceIcon>
+        <LoaderCircleIcon className="animate-spin" />
+      </TraceIcon>
+      <TraceTitle>Thinking</TraceTitle>
+    </TraceLine>
+  )
+}
+
+/**
+ * One block of an answer: the tool calls of a stretch, a text, or what a card draws for a result.
+ * `thinking` puts the running line "Thinking" under it: under the last step, in the same Trace, or
+ * in a Trace of its own under a card.
+ */
+function AnswerBlock({ block, thinking = false }: { block: Block; thinking?: boolean }) {
   switch (block.kind) {
     case "steps":
       return (
@@ -419,13 +442,23 @@ function AnswerBlock({ block }: { block: Block }) {
           {block.calls.map((call) => (
             <CallLine key={call.id} call={call} />
           ))}
+          {thinking && <ThinkingLine />}
         </Trace>
       )
     case "text":
       return <Answer text={block.text} />
     // What the card of a tool draws for its result: a card, a list. The chat names no card.
     case "drawn":
-      return block.node
+      return thinking ? (
+        <>
+          {block.node}
+          <Trace>
+            <ThinkingLine />
+          </Trace>
+        </>
+      ) : (
+        block.node
+      )
   }
 }
 
