@@ -96,8 +96,8 @@ test("an empty OpenAI name for dictation lets the other endpoint's count, though
   )
 })
 
-// The answer of GET /models of a LiteLLM gateway, shortened from what the hub of the hackathon gave on
-// 2026-11-16: its self-hosted model has no mode, the others say what they are for.
+// The answer of GET /models of a LiteLLM gateway whose self-hosted model has no model_info: that model
+// has no mode, the others say what they are for. A gateway answers so until its admin sets the mode.
 const gateway = {
   object: "list",
   data: [
