@@ -117,6 +117,10 @@ All notable changes are documented here. The format follows
 - The example application wears umati: the sign of umati is the icon of the page, and the coloured umati
   wordmark stands at the top of the sidebar in place of the name. Both are trademarks of VDW e.V. and not
   covered by the licences of this repository (`NOTICE`).
+- A step in the chat opens to what its tool gave back, or why it failed, after the pattern Tool of shadcn:
+  the line of a call is a `TraceCollapsible` once its result is there, with the result as text in a
+  `CodeBlock` (JSON indented). `code-block` is new in `packages/ui`; it brings `shiki`, which only its
+  highlighting hook loads, and the app does not use that hook.
 
 ### Changed
 
