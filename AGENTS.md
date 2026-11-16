@@ -56,8 +56,8 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   start or install anything, and where you cannot go on, give the person one sentence to pass on.
 - A person who wants the user interface in the look of a brand: a brand is a folder of
   [`packages/ui/brands`](packages/ui/brands/README.md), a `DESIGN.md` and a block of theme tokens written
-  from it. Follow its README. A brand never edits a component and never sets a colour that carries a
-  meaning; a test fails if it does.
+  from it. Follow the skill `add-brand` (`.claude/skills/add-brand/SKILL.md`). A brand never edits a
+  component and never sets a colour that carries a meaning; a test fails if it does.
 - A person who wants to add a page, a card or a source of data of their own: follow the skill
   `build-your-own` (`.claude/skills/build-your-own/SKILL.md`). Ask what they want to see, look yourself what
   the stack already has, propose the smallest thing that shows it, and on a yes take the recipe of the step

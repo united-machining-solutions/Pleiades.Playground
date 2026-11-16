@@ -123,7 +123,7 @@ All notable changes are documented here. The format follows
   component changes. The example application has the switch at the top of its sidebar, the design system
   the same choice at the top of its page, where the contrast of every colour role is measured under the
   brand. One brand comes along, `example`, which is not a company. A card served to another host wears no
-  brand. Why: ADR-0010.
+  brand. The skill `add-brand` (`.claude/skills/`) leads a coding agent through a new one. Why: ADR-0010.
 
 ### Changed
 

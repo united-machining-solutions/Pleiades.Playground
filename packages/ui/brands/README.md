@@ -52,6 +52,8 @@ switch. In the example application the same card is drawn by the page and wears 
 
 ## A new brand
 
+A coding agent takes the skill `add-brand` (`.claude/skills/add-brand/SKILL.md`), which leads here.
+
 1. Copy `example/` to a folder with the id of the brand: lower case, digits and hyphens.
 2. Write its `DESIGN.md`: the colours with their values, the font, the radius, and the rules that are easy to
    break. If the brand has one already, put it there as it is.
