@@ -57,10 +57,17 @@ internal static class SpecWire
     /// <summary>The level below the machine under which every event lies.</summary>
     public const string EventsLevel = "events";
 
-    /// <summary>The topic of an event: below <c>events/</c>, every dot of its path a topic level.</summary>
+    /// <summary>
+    /// The topic of an event: one topic per group, below <c>events/</c>. The group is the first segment of the path
+    /// of the event, so every event of <c>Production</c> goes to <c>events/Production</c>. MQTT keeps the order only
+    /// within a topic; on one topic the events of a group arrive in the order they came up. The field
+    /// <c>event</c> tells them apart.
+    /// </summary>
     public static string EventTopic(string machineId, string path)
     {
-        return $"{Root}/{machineId}/{EventsLevel}/{path.Replace('.', '/')}";
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var group = path.Split('.')[0];
+        return $"{Root}/{machineId}/{EventsLevel}/{group}";
     }
 
     /// <summary>The topic of the manifest.</summary>

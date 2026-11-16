@@ -26,13 +26,42 @@ public sealed class SpecPublisherTest
 
         var events = client.Published.Where(m => m.Topic.Contains("/events/", StringComparison.Ordinal)).ToList();
         Assert.HasCount(2, events);
-        Assert.IsTrue(events.All(m => m.Topic == $"umati/{MachineId}/events/Production/JobOrderChanged"));
+        Assert.IsTrue(events.All(m => m.Topic == $"umati/{MachineId}/events/Production"));
         Assert.IsTrue(events.All(m => !m.Retain && m.QualityOfServiceLevel == MqttQualityOfServiceLevel.AtLeastOnce));
         Assert.IsTrue(events.All(m => m.ContentType == SpecWire.ContentType));
         CollectionAssert.AreEqual(new long[] { 1, 2 }, events.Select(Seq).ToList());
 
         var value = client.Published.Single(m => m.Topic.EndsWith("/State/FeedOverride", StringComparison.Ordinal));
         Assert.IsTrue(value.Retain);
+    }
+
+    [TestMethod]
+    public async Task EveryEventOfAGroup_GoesToOneTopic_InTheOrderItCameUp()
+    {
+        using var client = new FakeClient { IsConnected = true };
+        using var publisher = Publisher(client, 10);
+        var run = MachineRun.For(TimeSpan.FromHours(2));
+        var events = run.Messages.OfType<SpecEvent>().ToList();
+
+        await publisher.PublishAsync(events);
+
+        var topics = client.Published.Select(m => m.Topic).Distinct().ToList();
+        CollectionAssert.AreEquivalent(new[] { $"umati/{MachineId}/events/Production", $"umati/{MachineId}/events/Notification" }, topics,
+            "one topic per group, none per event");
+        foreach (var group in new[] { "Production", "Notification" })
+        {
+            var onTopic = client.Published.Where(m => m.Topic == $"umati/{MachineId}/events/{group}").Select(Payload).ToList();
+            var expected = events.Where(e => e.Path.StartsWith(group + ".", StringComparison.Ordinal)).ToList();
+            CollectionAssert.AreEqual(expected.Select(e => e.Path).ToList(), onTopic.Select(p => p["event"]!.GetValue<string>()).ToList(),
+                $"the events of {group} in the order they came up");
+            var seqs = onTopic.Select(p => p["seq"]!.GetValue<long>()).ToList();
+            Assert.IsTrue(seqs.Zip(seqs.Skip(1)).All(p => p.Second > p.First), $"seq grows on {group}");
+        }
+
+        // Job order and program execution share the topic: a job order starts before its first program execution.
+        var production = client.Published.Where(m => m.Topic.EndsWith("/events/Production", StringComparison.Ordinal))
+            .Select(m => Payload(m)["event"]!.GetValue<string>()).ToList();
+        Assert.IsTrue(production.IndexOf(SpecElements.JobOrderStarted) < production.IndexOf(SpecElements.ProgramExecutionStarted));
     }
 
     [TestMethod]
