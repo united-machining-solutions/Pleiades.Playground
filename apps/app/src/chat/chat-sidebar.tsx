@@ -130,10 +130,8 @@ function NoLanguageModel() {
         <EmptyDescription>
           {/* What is missing first, by the names of the settings. */}
           {chatStatus.gaps.map((gap) => `${gap}. `)}
-          Set one block in <code>.env</code> and start the app again with <code>docker compose up -d app</code>:{" "}
-          <code>ANTHROPIC_API_KEY</code> with <code>ANTHROPIC_MODELS</code>, <code>OPENAI_API_KEY</code> with{" "}
-          <code>OPENAI_MODELS</code>, or <code>LLM_BASE_URL</code> with <code>LLM_MODELS</code> for any
-          OpenAI-compatible endpoint. Home needs no language model.
+          Set <code>LLM_BASE_URL</code> and <code>LLM_API_KEY</code> of a LiteLLM gateway in <code>.env</code>{" "}
+          and start the app again with <code>docker compose up -d app</code>. Home needs no language model.
         </EmptyDescription>
       </EmptyHeader>
     </Empty>
@@ -373,6 +371,10 @@ function CallLine({ call }: { call: Call }) {
     </TraceLine>
   )
   if (call.output === undefined) return line
+  // The output is data of the stack, shown whole and unfiltered: the chat has no sign-in, so whoever
+  // reaches it may read what the tools read. `wrap` and `max-h-64` bound the box, not the text; a
+  // closed step costs nothing, because the panel of Base UI mounts its children only while open
+  // (`keepMounted` is off by default).
   return (
     <TraceCollapsible>
       <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>

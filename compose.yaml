@@ -169,6 +169,29 @@ services:
       # The origins a card file may load the font of its host from; none unless set.
       CARD_RESOURCE_DOMAINS: ${CARD_RESOURCE_DOMAINS:-}
 
+  # A LiteLLM gateway of one's own, for a key of Anthropic or OpenAI without the gateway of the hackathon.
+  # It starts only with the profile: docker compose --profile gateway up -d. The app then reaches it as
+  # LLM_BASE_URL=http://litellm:4000/v1, and LLM_API_KEY is its master key, which LiteLLM wants: a key of
+  # one's own choosing that begins with sk-. It publishes no port: only the containers of this stack reach
+  # it. Its models are in stacks/litellm/config.yaml.
+  litellm:
+    <<: *service
+    image: ghcr.io/berriai/litellm:${LITELLM_VERSION:-v1.109.1}
+    profiles: [gateway]
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    volumes:
+      - ./stacks/litellm/config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: ${LLM_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   # The example application.
   app:
     <<: *service
@@ -183,22 +206,17 @@ services:
     depends_on:
       genui-mcp:
         condition: service_healthy
+    # A model server on this computer is host.docker.internal. Docker Desktop knows the name; this line
+    # gives it to Docker Engine on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       GENUI_MCP_URL: http://genui-mcp:8080/mcp
-      # The chat needs at least one language model; everything else works without one. A block counts
-      # once its key is set, so a key alone is enough: the model names default to those of .env.example.
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODELS: ${OPENAI_MODELS:-gpt-6-luna,gpt-6.1-sol,gpt-6-astra}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      ANTHROPIC_MODELS: ${ANTHROPIC_MODELS:-claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5,claude-fable-5-2}
+      # The chat needs a language model; everything else works without one. The models come from a LiteLLM
+      # gateway: the app offers those it marks for chat, and dictation takes the first it marks for speech
+      # to text.
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODELS: ${LLM_MODELS:-}
-      # Dictation in the chat field, with the key of its block. Without a model for it the field has
-      # no microphone. The OpenAI name has a default only where it is missing (`-`, not `:-`): an empty
-      # line in .env turns it off, so that LLM_TRANSCRIPTION_MODEL counts.
-      OPENAI_TRANSCRIPTION_MODEL: ${OPENAI_TRANSCRIPTION_MODEL-gpt-transcribe}
-      LLM_TRANSCRIPTION_MODEL: ${LLM_TRANSCRIPTION_MODEL:-}
 
   # One simulator per machine. The serial number is the machine id in every topic.
   # All three run the same image. Only the first one builds it, or pulls it, so that happens once and not

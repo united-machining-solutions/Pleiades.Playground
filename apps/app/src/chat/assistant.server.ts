@@ -1,16 +1,16 @@
 import { defineChatMiddleware } from "@tanstack/ai"
 import type { AnyTextAdapter } from "@tanstack/ai"
-import { createAnthropicChat } from "@tanstack/ai-anthropic"
 import { createHarnessHost, defineHarness, definePlugin } from "@tanstack/ai-harness"
 import { createHarnessHandler } from "@tanstack/ai-harness/server"
 import { mcp } from "@tanstack/ai-mcp/harness"
-import { createOpenaiChat } from "@tanstack/ai-openai"
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
 
 import { chatTools } from "./cards.tsx"
+import { chatSettings } from "./gateway.ts"
+import type { ChatSettings } from "./gateway.ts"
 import { withTimeZone } from "./local-times.ts"
-import { modelNames, modelSettings } from "./models.ts"
+import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
 import { forModel } from "./tool-results.ts"
 
@@ -52,39 +52,35 @@ const localTimes = defineChatMiddleware({
 })
 
 /**
- * The adapter of one model. Each provider gets its own: Anthropic and OpenAI theirs, any other
- * endpoint the one for chat completions. Where two blocks name the same model, the earlier one
- * has it.
- *
- * The names come from the settings, not from the lists the adapters know. A name a provider does
- * not have fails at the first question, with the provider's own words.
+ * The adapter of one model: OpenAI's chat completions at the endpoint of the settings. The names come
+ * from the settings or from the endpoint's own list. A name the endpoint does not have fails at the
+ * first question, with the endpoint's own words.
  */
-function adapterOf(name: string, { anthropic, openai, compatible }: ModelSettings): AnyTextAdapter {
-  if (anthropic?.models.includes(name)) {
-    return createAnthropicChat(name as Parameters<typeof createAnthropicChat>[0], anthropic.apiKey)
-  }
-  if (openai?.models.includes(name)) {
-    return createOpenaiChat(name as Parameters<typeof createOpenaiChat>[0], openai.apiKey)
-  }
-  return openaiCompatibleText(name, {
-    baseURL: compatible?.baseURL ?? "",
-    apiKey: compatible?.apiKey ?? "",
-    api: "chat-completions",
-  })
+function adapterOf(name: string, { baseURL, apiKey }: ModelSettings): AnyTextAdapter {
+  return openaiCompatibleText(name, { baseURL, apiKey, api: "chat-completions" })
 }
 
-let handler: ((request: Request) => Promise<Response>) | undefined
+type Handler = (request: Request) => Promise<Response>
+
+// The handler and the snapshot of the settings it was built from. A new snapshot comes only where the
+// last one had no models (see gateway.ts), so a handler that serves chats is never replaced.
+let built: { chat: ChatSettings; handler: Handler | null } | undefined
 
 /** The fetch handler of the harness, or null as long as no language model is configured. */
-export function harnessHandler() {
-  if (handler) return handler
-  const settings = modelSettings(process.env)
+export async function harnessHandler(): Promise<Handler | null> {
+  const chat = await chatSettings()
+  // No await between the check and the assignment: requests that wait for the same snapshot share one handler.
+  if (built?.chat !== chat) built = { chat, handler: build(chat.settings) }
+  return built.handler
+}
+
+function build(settings: ModelSettings | undefined): Handler | null {
   const names = modelNames(settings)
   const [first] = names
-  if (first === undefined) return null
+  if (settings === undefined || first === undefined) return null
   // In the order of the settings, which is the order the chat offers them in.
   const models = Object.fromEntries(names.map((name) => [name, adapterOf(name, settings)]))
-  handler = createHarnessHandler({
+  return createHarnessHandler({
     // Chats live in memory: they are gone when the server restarts.
     host: createHarnessHost({ persistence: memoryPersistence() }),
     harness: defineHarness({
@@ -102,5 +98,4 @@ export function harnessHandler() {
     // The demo has no sign-in: every request runs without a user.
     openAccess: true,
   })
-  return handler
 }

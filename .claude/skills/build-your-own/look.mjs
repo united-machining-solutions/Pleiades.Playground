@@ -96,10 +96,14 @@ async function notifications() {
 }
 
 async function chat() {
-  const { status } = await get(`${at.app}/api/harness/sessions`)
-  if (status === 200) console.log("  a language model is set: the chat answers")
-  else if (status === 503) console.log("  no language model is set: the chat cannot answer. Pages and cards work without one.")
-  else console.log(`  the app answered ${status}`)
+  const response = await get(`${at.app}/api/harness/sessions`)
+  if (response.status === 200) console.log("  a language model is set: the chat answers")
+  else if (response.status === 503) {
+    // The app says why: a setting that is empty, or a gateway that refused or was away.
+    const { gaps = [] } = await response.json().catch(() => ({}))
+    const why = gaps.length > 0 ? gaps.join("; ") : "no language model is set"
+    console.log(`  ${why}: the chat cannot answer. Pages and cards work without one.`)
+  } else console.log(`  the app answered ${response.status}`)
 }
 
 async function call(tool, pairs) {
