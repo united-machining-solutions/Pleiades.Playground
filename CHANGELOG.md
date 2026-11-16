@@ -25,7 +25,8 @@ All notable changes are documented here. The format follows
   Anthropic, and any endpoint that speaks OpenAI's chat completions. With several models a chat picks one.
   With `LLM_MODELS` empty, the chat offers the chat models the endpoint lists under `/models`, and leaves out
   those a gateway marks as embedding or speech-to-text models. `.env.example` says what each line of that
-  block takes, and `host.docker.internal` reaches the computer from the app on Linux too.
+  block takes, and `host.docker.internal` reaches the computer from the app on Linux too. The skill `setup`
+  leaves `LLM_MODELS` empty for the hub of the hackathon and checks the chat models it lists.
 - Card catalogue `packages/cards`: for each card its contract (zod) and its React component. The first card
   is the machine card: what one machine does now and which states it went through over the last hours. The
   tool `genui_machine_show` returns its values, the app shows it on a page per machine

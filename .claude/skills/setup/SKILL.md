@@ -139,26 +139,29 @@ for trying out finished agents, not for help with code. So this session never ru
 3. **The settings**, in the block for any other endpoint in `.env`. The first two lines name the variables
    of the profile and hold no value; without `OPENAI_BASE_URL`, the person writes the address of the handbook
    into the first line instead. No `.env`: a fresh copy as in level 1. Otherwise the person puts the lines in.
+   `LLM_MODELS` stays empty: the chat then offers every chat model the hub lists, in its order, and leaves
+   out the embedding and speech-to-text models, which the hub marks as such.
 
    ```
    LLM_BASE_URL=${OPENAI_BASE_URL}
    LLM_API_KEY=${UMS_AI_KEY}
-   LLM_MODELS=spark/qwen3.8-27b
+   LLM_MODELS=
    ```
 
 4. **Start and check.** `docker compose up -d app`. A warning that a variable is not set means the app
    started without it: back to item 2. Then ask the hub from inside the app. This prints no key:
 
    ```
-   docker compose exec -T app node -e "fetch(process.env.LLM_BASE_URL+'/models',{headers:{Authorization:'Bearer '+process.env.LLM_API_KEY}}).then(async r=>{const ids=r.ok?(await r.json()).data.map(m=>m.id):[];console.log(r.status,(process.env.LLM_MODELS||'').split(',').map(n=>n.trim()+(ids.includes(n.trim())?' listed':' missing')).join(', '));console.log('the hub has:',ids.join(','))}).catch(e=>console.log(e.cause?.code||e.message))"
+   docker compose exec -T app node -e "fetch(process.env.LLM_BASE_URL+'/models',{headers:{Authorization:'Bearer '+process.env.LLM_API_KEY}}).then(async r=>{const chat=r.ok?(await r.json()).data.filter(m=>!m.mode||m.mode==='chat').map(m=>m.id):[];const named=(process.env.LLM_MODELS||'').split(',').map(n=>n.trim()).filter(Boolean);console.log(r.status,named.length?named.map(n=>n+(chat.includes(n)?' listed':' missing')).join(', '):'LLM_MODELS empty: the chat offers the models below');console.log('chat models of the hub:',chat.join(','))}).catch(e=>console.log(e.cause?.code||e.message))"
    ```
 
-   - `200` and `listed`: the chat answers, in some seconds, since the Spark serves the whole room. The
-     second line names every model of the hub, in the form `LLM_MODELS` takes. Offer it: the person puts it
-     into that line, and after `docker compose up -d app` a chat switches between them. The first one
-     answers until a chat picks another; models of a key of Anthropic or OpenAI in `.env` come before them.
-   - `missing`: the hub has no model of that name.
-   - `401`: the key is wrong or has ended, or did not reach the app: item 2. Every model shows `missing`
+   - `200` and a list of chat models: the chat answers, in some seconds for the Spark, which serves the whole
+     room. The chat offers the models of the second line; the first one answers until a chat picks another,
+     and models of a key of Anthropic or OpenAI in `.env` come before them. To offer only some, the person
+     names them in `LLM_MODELS`, in the form of that line, and starts the app again.
+   - `listed`: a model named in `LLM_MODELS` is one the hub has. `missing`: the hub has no chat model of that
+     name.
+   - `401`: the key is wrong or has ended, or did not reach the app: item 2. The list of chat models is empty
      then too; the status counts first.
    - `ERR_INVALID_URL`: the app has no address: items 2 and 3.
    - `ENOTFOUND` or `EAI_AGAIN`: the computer is not in the WLAN of the hub, or a VPN of the company hides
