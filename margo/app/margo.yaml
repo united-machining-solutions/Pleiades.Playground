@@ -1,0 +1,203 @@
+apiVersion: margo/v1alpha1
+kind: ApplicationDescription
+id: com-github-united-machining-solutions-pleiades-playground
+metadata:
+  name: Pleiades Playground
+  version: "0.0.0" # overwritten by `bart` from the git tag or --version
+  description: >-
+    An open playground for machine data: simulated machines publish to an MQTT broker, services store time
+    series and events, and an example app with a chat shows them.
+  catalog:
+    organization:
+      - name: United Machining Solutions
+        site: https://github.com/united-machining-solutions
+    application:
+      tagline: Machine data over MQTT, REST and MCP, with an example app and a chat.
+      icon: icon.svg
+      descriptionFile: description.md
+      releaseNotes: release-notes.md
+      licenseFile: license.txt
+      site: https://github.com/united-machining-solutions/Pleiades.Playground
+      tags: ["playground", "mqtt", "mcp", "machine-data"]
+deploymentProfiles:
+  - type: compose
+    id: default
+    components:
+      - name: default
+        properties:
+          repository: oci://example.com/pleiades-playground # overwritten by `bart`, this is just a placeholder
+          revision: "0.0.0" # overwritten by `bart`, this is just a placeholder
+    requiredResources:
+      cpu:
+        cores: 2
+        architectures:
+          - amd64
+          - arm64
+      # Estimates for twelve containers and 30 days of retained data, not measured.
+      memory: 4Gi
+      storage: 20Gi
+
+# Each parameter sets the ${VAR} of the same name in compose/compose.yaml.
+parameters:
+  appBind:
+    value: "127.0.0.1"
+    targets:
+      - pointer: APP_BIND
+        components: ["default"]
+  appPort:
+    value: 5600
+    targets:
+      - pointer: APP_PORT
+        components: ["default"]
+  mqttPort:
+    value: 1883
+    targets:
+      - pointer: MQTT_PORT
+        components: ["default"]
+  mqttWsPort:
+    value: 9001
+    targets:
+      - pointer: MQTT_WS_PORT
+        components: ["default"]
+  timeseriesApiPort:
+    value: 5500
+    targets:
+      - pointer: TIMESERIES_API_PORT
+        components: ["default"]
+  eventsApiPort:
+    value: 5510
+    targets:
+      - pointer: EVENTS_API_PORT
+        components: ["default"]
+  genuiMcpPort:
+    value: 5520
+    targets:
+      - pointer: GENUI_MCP_PORT
+        components: ["default"]
+  dataRetention:
+    value: "30.00:00:00"
+    targets:
+      - pointer: DATA_RETENTION
+        components: ["default"]
+  cardResourceDomains:
+    value: ""
+    targets:
+      - pointer: CARD_RESOURCE_DOMAINS
+        components: ["default"]
+  openaiApiKey:
+    value: ""
+    targets:
+      - pointer: OPENAI_API_KEY
+        components: ["default"]
+  openaiModels:
+    value: "gpt-6-luna,gpt-6.1-sol,gpt-6-astra"
+    targets:
+      - pointer: OPENAI_MODELS
+        components: ["default"]
+  anthropicApiKey:
+    value: ""
+    targets:
+      - pointer: ANTHROPIC_API_KEY
+        components: ["default"]
+  anthropicModels:
+    value: "claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5,claude-fable-5-2"
+    targets:
+      - pointer: ANTHROPIC_MODELS
+        components: ["default"]
+  llmBaseUrl:
+    value: ""
+    targets:
+      - pointer: LLM_BASE_URL
+        components: ["default"]
+  llmApiKey:
+    value: ""
+    targets:
+      - pointer: LLM_API_KEY
+        components: ["default"]
+  llmModels:
+    value: ""
+    targets:
+      - pointer: LLM_MODELS
+        components: ["default"]
+
+configuration:
+  sections:
+    - name: Network
+      settings:
+        - parameter: appBind
+          name: Address of the example app
+          description: >-
+            The address the example app answers on. 127.0.0.1 keeps it on the device; 0.0.0.0 opens it to the
+            network. The chat has no sign-in and spends the key of its language model, so open it only to a
+            network you control.
+          schema: bindAddress
+        - parameter: appPort
+          name: Port of the example app
+          schema: port
+        - parameter: mqttPort
+          name: Port of the MQTT broker
+          description: The broker accepts anonymous clients. Do not expose it to a network you do not control.
+          schema: port
+        - parameter: mqttWsPort
+          name: Port of the MQTT broker over WebSockets
+          schema: port
+        - parameter: timeseriesApiPort
+          name: Port of the time series API
+          schema: port
+        - parameter: eventsApiPort
+          name: Port of the events API
+          schema: port
+        - parameter: genuiMcpPort
+          name: Port of the generative UI MCP server
+          schema: port
+    - name: Data
+      settings:
+        - parameter: dataRetention
+          name: Retention
+          description: How long time series and events are kept, as days.hours:minutes:seconds.
+          schema: timeSpan
+        - parameter: cardResourceDomains
+          name: Card resource domains
+          description: The origins a card may load the font of its host from, comma separated; none if empty.
+          schema: optionalText
+    - name: Language model
+      settings:
+        - parameter: openaiApiKey
+          name: OpenAI API key
+          description: The chat needs at least one language model; a key alone is enough.
+          schema: optionalText
+        - parameter: openaiModels
+          name: OpenAI models
+          schema: optionalText
+        - parameter: anthropicApiKey
+          name: Anthropic API key
+          schema: optionalText
+        - parameter: anthropicModels
+          name: Anthropic models
+          schema: optionalText
+        - parameter: llmBaseUrl
+          name: Base URL of an OpenAI-compatible endpoint
+          schema: optionalText
+        - parameter: llmApiKey
+          name: API key of the OpenAI-compatible endpoint
+          schema: optionalText
+        - parameter: llmModels
+          name: Models of the OpenAI-compatible endpoint
+          schema: optionalText
+  schema:
+    - name: port
+      dataType: integer
+      minValue: 1
+      maxValue: 65535
+      allowEmpty: false
+    - name: bindAddress
+      dataType: string
+      regexMatch: "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$"
+      allowEmpty: false
+    - name: timeSpan
+      dataType: string
+      regexMatch: "^[0-9]+\\.[0-9]{2}:[0-9]{2}:[0-9]{2}$"
+      allowEmpty: false
+    - name: optionalText
+      dataType: string
+      allowEmpty: true

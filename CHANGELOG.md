@@ -15,6 +15,8 @@ All notable changes are documented here. The format follows
   `DEPLOY_ENABLED` is `true`.
 - Shared libraries for logging, JSON, authorization, health checks, MQTT and the MCP server standard.
 - Demo stack (`compose.yaml`), contracts and CI.
+- Margo app (`margo/`): the demo stack as a Margo application, from the published images, validated,
+  packaged and pushed with `bart`.
 - TypeScript workspace for `apps/` and `packages/`: pinned Node.js and pnpm, one version catalog, a shared
   TypeScript configuration and a CI job.
 - Generative UI backend `genui-mcp` in the demo stack on port 5520: an MCP server with the tool

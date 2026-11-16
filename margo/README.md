@@ -1,0 +1,86 @@
+# Margo app
+
+The demo stack as a [Margo](https://margo.sh) application, so that an orchestrator installs it on an edge device
+the way it installs any other app. The folder is a project of `bart`, the FLECS tool that validates a
+Margo app, packages it and pushes it to a registry; `bart init` scaffolded it.
+
+```text
+margo/
+├── app/                      The catalog entry
+│   ├── margo.yaml            ApplicationDescription: id, metadata, deployment profile, parameters, settings
+│   ├── description.md        Shown in the catalog
+│   ├── release-notes.md
+│   ├── license.txt           Copy of LICENSE
+│   └── icon.svg
+└── compose/                  The component: everything here goes into the package
+    ├── compose.yaml          The demo stack
+    └── broker/mosquitto.conf Copy of stacks/broker/mosquitto.conf
+```
+
+## How it differs from `compose.yaml`
+
+`compose/compose.yaml` runs the same twelve containers as [`compose.yaml`](../compose.yaml) at the root, written so
+that bart accepts it:
+
+- **No `build:`.** The services take the images that the workflow "Images" publishes to
+  `ghcr.io/united-machining-solutions`, for `linux/amd64` and `linux/arm64`. `bart build` does not fit here: it
+  builds `src/<service>/Dockerfile` with that folder as the context, and every image of this repository needs
+  `source/` or the root as its context.
+- **Literal image references.** bart mirrors each `image:` as it stands and does not interpolate it, so there is
+  no `${PLEIADES_VERSION}` and no `${MONGODB_VERSION}`. The images of this repository are on `main`; see
+  [Release](#release).
+- **No YAML anchors.** bart's compose parser does not resolve merge keys (`<<: *service`), so every service
+  says everything itself.
+- **The broker configuration is a `configs:` entry** from `compose/broker/`, because a bind mount may not leave
+  `compose/`. The file is a copy; keep it the same as `stacks/broker/mosquitto.conf`:
+
+  ```bash
+  diff <(tail -n +3 margo/compose/broker/mosquitto.conf) stacks/broker/mosquitto.conf
+  ```
+
+- **Settings, not `.env`.** Every `${VAR}` of the compose file is a parameter in `app/margo.yaml`, and each one
+  is a setting the person who installs the app can change: the ports, the address of the example app, the
+  retention and the language models. The default after `:-` in the compose file is the same as the value of the
+  parameter.
+
+A change to the stack in `compose.yaml` belongs here as well, in the same pull request.
+
+## Check
+
+```bash
+bart validate --dir margo
+bart package --dir margo --version 0.1.0 --out /tmp/margo-dist
+```
+
+`package` writes the catalog, the components tarball (the compose file with every image rewritten to the staging
+registry, and the broker configuration) and `images/manifest.yaml`. It reads no registry and needs no
+credentials. `dist/` is ignored by git.
+
+## Release
+
+bart takes the version from a SemVer tag on `HEAD` (`v1.2.3`) or from `--version`, and needs a clean working tree
+for the tag.
+
+1. Tag the commit `v1.2.3` and push the tag. The workflow "Images" publishes the images as `1.2.3`.
+2. Optionally pin the images of this repository in `compose/compose.yaml` from `:main` to `:1.2.3`, so that the
+   app is that exact build. Otherwise `bart push` takes whatever `main` is when it runs.
+3. Add the release to `app/release-notes.md`.
+4. Push to the staging registry (default `apps.flecs.tech`) with its credentials in the environment:
+
+   ```bash
+   BART_REGISTRY_USER=... BART_REGISTRY_TOKEN=... bart push --dir margo --version 1.2.3
+   ```
+
+   `push` copies every image to `<registry>/staging-<app id>/<service>:1.2.3`, so the staged app no longer depends
+   on `main`. The images on ghcr.io are public and need no `--pull-auth`.
+5. `bart release` promotes the staged version to production and `bart sign` signs it; both are for whoever runs
+   the registry.
+
+The three simulators share one image. bart rewrites them all to the copy of one of them; that is the same image
+and changes nothing.
+
+## Security
+
+The app keeps the demo's settings: the MQTT broker accepts anonymous clients, the APIs have authorization
+switched off, and the chat has no sign-in. The example app therefore answers on `127.0.0.1` of the device unless
+the setting *Address of the example app* opens it. Install it only on a device in a network you control.
