@@ -8,7 +8,7 @@ date: 2026-11-15
 
 ## Context
 
-The data model referenced in [`contracts/datamodel`](../../contracts/datamodel/README.md) (0.12.0) asks for things
+The data model referenced in [`contracts/datamodel`](../../contracts/datamodel/README.md) (0.13.0) asks for things
 the binding of the playground does not do: energy in watt hours, snapshots and lists as one value, events,
 a manifest and retained values. [ADR-0002](0002-si-units-joule-and-one.md) puts energy in joule, and
 [ADR-0003](0003-naming.md) puts every topic below `machines/{SerialNumber}/`. The services, the example app and

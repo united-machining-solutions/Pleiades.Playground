@@ -7,14 +7,14 @@ repository. This repository does not contain it. It refers to one exact version:
 |---|---|
 | Repository | <https://github.com/umati/MachineTool-DataModel> |
 | Branch | `spec/draft-v0.2` |
-| Commit | `e8b151cb436fb6939ca94c1ea0db362292c446e1` |
-| Version | 0.12.0 |
+| Commit | `6f267822be950c94ea61ab5dd58d9902bb89b5c6` |
+| Version | 0.13.0 |
 
 The model is a draft. Its repository may require access; the umati data model working group grants it.
 
 ```bash
 git clone --branch spec/draft-v0.2 https://github.com/umati/MachineTool-DataModel.git
-git -C MachineTool-DataModel checkout e8b151cb436fb6939ca94c1ea0db362292c446e1
+git -C MachineTool-DataModel checkout 6f267822be950c94ea61ab5dd58d9902bb89b5c6
 ```
 
 - The model is not covered by the licences of this repository.

@@ -115,6 +115,24 @@ internal sealed class ScenarioConfig
     [Range(0.0, 1.0)]
     public double AbortOnFailureProbability { get; init; } = 0.3;
 
+    /// <summary>
+    /// How often per hour a running program stops on its own (a programmed halt, an operator who measures) and
+    /// continues after <see cref="ProgramStopDuration"/>. The program execution is interrupted, the job order not.
+    /// </summary>
+    public double ProgramStopsPerHour { get; init; } = 2;
+
+    /// <summary>How long a program stop lasts.</summary>
+    public TimeSpan ProgramStopDuration { get; init; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// How often per hour the planner changes a waiting job order: it revokes its release, cancels it (it ends as
+    /// aborted without having run) or takes it back (it leaves the list).
+    /// </summary>
+    public double QueueChangesPerHour { get; init; } = 1;
+
+    /// <summary>How long a revoked job order waits before it may be released again.</summary>
+    public TimeSpan QueueHoldTime { get; init; } = TimeSpan.FromMinutes(5);
+
     /// <summary>Values the feed override takes in turn, as fractions.</summary>
     [SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "Configuration binding")]
     public List<double> FeedOverrideSteps { get; set; } = [];

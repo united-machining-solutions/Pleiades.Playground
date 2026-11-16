@@ -137,7 +137,7 @@ sites/demo/weather/AirTemperature         { "timestamp": "2026-11-16T09:10:00Z",
 
 ## Spec binding (draft)
 
-A proposal for the MQTT binding of the data model, version 0.12.0 (see [`../datamodel`](../datamodel/README.md)),
+A proposal for the MQTT binding of the data model, version 0.13.0 (see [`../datamodel`](../datamodel/README.md)),
 to be settled at the umati hackathon. Here everything is as the model says: paths, types, units, snapshots,
 lists, events, manifest and connection. The binding of the playground above stays as it is; the two trees live
 side by side on the same broker. Why this tree may use other units than the playground: see
@@ -195,7 +195,8 @@ umati/example-com_P-04/events/Production/JobOrderChanged
 ```json
 { "event": "Production.ProgramExecutionEnded", "timestamp": "2026-11-17T09:21:40.000Z",
   "seq": 1842, "seqEpoch": "2026-11-17T06:58:12.000Z",
-  "value": { "ExecutionId": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001", "JobOrderID": "4711/01", "EndState": "Completed",
+  "value": { "ExecutionId": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001", "JobOrderID": "4711/01", "ActiveProgram": "WELLE_4711.MPF",
+             "State": "Ended", "StartTime": "2026-11-17T08:31:00.000Z",
              "Duration": 3040.0, "PartsProduced": 1, "EnergyElectricity": 1850.5 } }
 ```
 
@@ -211,10 +212,17 @@ The rules for events, so that a consumer can keep nothing but the events and sti
 
 - An adapter that names the events of a list in its manifest publishes one for every change of the list, the
   first entries included. So the events alone give the same list as the value. Every `ProgramExecutionStarted`
-  is followed by exactly one `ProgramExecutionEnded`.
-- `JobOrderChanged` comes when a discrete field of the entry changes: the state, a quantity, a time of a state.
-  A field that keeps running, such as `ActualProductionTime`, does not bring one on its own; the event carries
-  its value at the moment of the change.
+  is followed by exactly one `ProgramExecutionEnded` or `ProgramExecutionAborted`.
+- A change of the state of a job order or a program execution brings an event named after the state reached,
+  as the model lists them: `JobOrderReleased`, `JobOrderRevoked`, `JobOrderStarted`, `JobOrderInterrupted`,
+  `JobOrderResumed`, `JobOrderEnded`, `JobOrderAborted`, `JobOrderCancelled`, and `ProgramExecutionStarted`,
+  `ProgramExecutionInterrupted`, `ProgramExecutionResumed`, `ProgramExecutionEnded`, `ProgramExecutionAborted`.
+  Each carries the whole entry or snapshot after the change; the last two also the sums over the program
+  execution, its interruptions included.
+- `JobOrderChanged` comes only without a change of state, when another discrete field changes, such as a
+  quantity. A field that keeps running, such as `ActualProductionTime`, does not bring one on its own; an event
+  carries its value at the moment of the change. A job order taken back before it started leaves with
+  `JobOrderRemoved`, without a change of state.
 - Whoever needs the current state reads the value, not the events.
 - `seq` and `seqEpoch` are fields of this binding, not of the model. The event schema of the model rejects
   them; an event passes it once they are taken off, as `unit` with the values.
@@ -241,7 +249,12 @@ A virtual machine, a state machine driven by a scenario in the configuration (`C
 every value and event of this tree, so they agree with each other:
 
 - The machine works through job orders: set up, then one program execution per part, until the quantity is
-  made. Each program execution has a new `ExecutionId`.
+  made. Each program execution has a new `ExecutionId`. Its snapshot carries `State` and `StartTime` and stays
+  with `Ended` or `Aborted` until the next one begins; it is `null` only before the first.
+- Now and then a running program stops on its own, a programmed halt (`Scenario:ProgramStopsPerHour`): the
+  program execution is interrupted and resumed, the job order keeps running.
+- Now and then the planner changes a waiting job order (`Scenario:QueueChangesPerHour`): it revokes its release,
+  cancels it (`JobOrderCancelled`, aborted without having run) or takes it back (`JobOrderRemoved`).
 - `Executing` in `State/Status`, `Active` in `Channel/1/ChannelState`, a turning spindle and a program execution
   always come together. Channel, active program and program execution carry the `ExecutionId` as
   `correlationId`.
@@ -249,7 +262,8 @@ every value and event of this tree, so they agree with each other:
   the integral of the published power, and `EnergyElectricity` of `ProgramExecutionEnded` is the same integral
   over the program execution.
 - An alert of the category `Failure` comes up only while a program runs. It interrupts the program execution and
-  the job order until it is cleared, or, with a set probability, aborts both (`EndState` and `State` `Aborted`).
+  the job order until it is cleared, or, with a set probability, aborts both (`ProgramExecutionAborted`,
+  `JobOrderAborted`).
   Other alerts change nothing. Every alert carries the `ExecutionId` it came up in as `correlationId`.
 - Ended and aborted job orders stay in the list for 24 hours, the least the model allows. A shorter time is a
   demo setting (`Scenario:JobOrderRetention`); the manifest then leaves out `jobOrderRetention`.
@@ -267,7 +281,7 @@ every value and event of this tree, so they agree with each other:
 | `State/FeedOverride` | number | `one` |
 | `Channel/1/ChannelState` | enum, `correlationId` | – |
 | `Production/ActiveProgram` | string, `correlationId` | – |
-| `Production/ProgramExecution` | snapshot, `correlationId`; `null` between program executions | – |
+| `Production/ProgramExecution` | snapshot with `State` and `StartTime`, `correlationId` | – |
 | `Production/JobOrders` | list | – |
 | `OperationCounters/PartsProducedInLifetime` | integer | `piece` |
 | `OperationCounters/PowerOnDuration` | number | `second` |
@@ -276,8 +290,8 @@ every value and event of this tree, so they agree with each other:
 | `Spindle/1/Override` | number | `one` |
 | `Consumption/Electricity/Main/AcActivePowerTotal` | number | `watt` |
 | `Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `wattHour` |
-| `events/Production/ProgramExecutionStarted`, `events/Production/ProgramExecutionEnded` | event | – |
-| `events/Production/JobOrderAdded`, `events/Production/JobOrderChanged`, `events/Production/JobOrderRemoved` | event | – |
+| `events/Production/ProgramExecution<Started, Interrupted, Resumed, Ended, Aborted>` | event | – |
+| `events/Production/JobOrder<Added, Released, Revoked, Started, Interrupted, Resumed, Ended, Aborted, Cancelled, Changed, Removed>` | event | – |
 | `events/Notification/AlertRaised`, `events/Notification/AlertChanged`, `events/Notification/AlertCleared` | event | – |
 
 The tests of the simulator check every message against the JSON schemas of the model when a clone of it lies
@@ -300,4 +314,7 @@ next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; withou
 - The schema of the runtime values rejects every field besides `value`, `timestamp` and `correlationId`, so an
   envelope with `unit` passes it only once `unit` is taken off again.
 - The timestamp of the last will is the time of the connect: the broker publishes it as it was set then.
-- What `Production.ProgramExecution` holds between two program executions. The simulator sends `null`.
+- A cancelled job order: the table of job order events of the model says its entry has no `StartTime`, but the
+  schemas ask `StartTime` and `ProducedQuantity` of every entry in `Aborted`, so no cancelled entry can pass
+  them. The simulator follows the table and sends neither; its schema tests add both to such an entry before
+  they check it.

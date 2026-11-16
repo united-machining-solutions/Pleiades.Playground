@@ -7,7 +7,7 @@ namespace Pleiades.Playground.Simulator.Spec;
 /// </summary>
 internal static class SpecElements
 {
-    public const string ModelVersion = "0.12.0";
+    public const string ModelVersion = "0.13.0";
     public const string BindingVersion = "0.1.0-draft";
 
     public const string Manufacturer = "Identification.Manufacturer";
@@ -30,8 +30,19 @@ internal static class SpecElements
     public const string ActiveEnergy = "Consumption.Electricity.Main.AcActiveEnergyTotalImportHp";
 
     public const string ProgramExecutionStarted = "Production.ProgramExecutionStarted";
+    public const string ProgramExecutionInterrupted = "Production.ProgramExecutionInterrupted";
+    public const string ProgramExecutionResumed = "Production.ProgramExecutionResumed";
     public const string ProgramExecutionEnded = "Production.ProgramExecutionEnded";
+    public const string ProgramExecutionAborted = "Production.ProgramExecutionAborted";
     public const string JobOrderAdded = "Production.JobOrderAdded";
+    public const string JobOrderReleased = "Production.JobOrderReleased";
+    public const string JobOrderRevoked = "Production.JobOrderRevoked";
+    public const string JobOrderStarted = "Production.JobOrderStarted";
+    public const string JobOrderInterrupted = "Production.JobOrderInterrupted";
+    public const string JobOrderResumed = "Production.JobOrderResumed";
+    public const string JobOrderEnded = "Production.JobOrderEnded";
+    public const string JobOrderAborted = "Production.JobOrderAborted";
+    public const string JobOrderCancelled = "Production.JobOrderCancelled";
     public const string JobOrderChanged = "Production.JobOrderChanged";
     public const string JobOrderRemoved = "Production.JobOrderRemoved";
     public const string AlertRaised = "Notification.AlertRaised";
@@ -73,8 +84,10 @@ internal static class SpecElements
     /// <summary>The events the virtual machine publishes.</summary>
     public static readonly IReadOnlyList<string> Events =
     [
-        ProgramExecutionStarted, ProgramExecutionEnded,
-        JobOrderAdded, JobOrderChanged, JobOrderRemoved,
+        ProgramExecutionStarted, ProgramExecutionInterrupted, ProgramExecutionResumed,
+        ProgramExecutionEnded, ProgramExecutionAborted,
+        JobOrderAdded, JobOrderReleased, JobOrderRevoked, JobOrderStarted, JobOrderInterrupted,
+        JobOrderResumed, JobOrderEnded, JobOrderAborted, JobOrderCancelled, JobOrderChanged, JobOrderRemoved,
         AlertRaised, AlertChanged, AlertCleared,
     ];
 

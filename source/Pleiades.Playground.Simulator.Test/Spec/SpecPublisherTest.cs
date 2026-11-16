@@ -81,7 +81,7 @@ public sealed class SpecPublisherTest
 
     private static SpecPublisher Publisher(FakeClient client, int capacity)
     {
-        return new SpecPublisher(client, MachineId, new JsonObject { ["modelVersion"] = "0.12.0" }, Epoch, capacity, NullLogger.Instance);
+        return new SpecPublisher(client, MachineId, new JsonObject { ["modelVersion"] = "0.13.0" }, Epoch, capacity, NullLogger.Instance);
     }
 
     private static SpecValue Value(int second)

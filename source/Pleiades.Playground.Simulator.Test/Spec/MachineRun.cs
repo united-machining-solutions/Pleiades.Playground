@@ -64,6 +64,10 @@ internal sealed class MachineRun
                 SpindleOverrideChangesPerHour = 10,
                 ScrapRate = 0.1,
                 AbortOnFailureProbability = 0.4,
+                ProgramStopsPerHour = 4,
+                ProgramStopDuration = TimeSpan.FromSeconds(20),
+                QueueChangesPerHour = 3,
+                QueueHoldTime = TimeSpan.FromMinutes(3),
                 Jobs =
                 [
                     new JobTemplate { JobName = "Shaft", Program = "SHAFT.MPF", Quantity = 5, CycleTime = TimeSpan.FromSeconds(40), ExecutingPower = 12000 },

@@ -137,6 +137,9 @@ internal sealed class VirtualMachine
         UpdateAlerts();
         RunPhase(elapsed);
         RaiseAlerts(elapsed);
+        StopProgram(elapsed);
+        ChangeQueue(elapsed);
+        PromoteNextJobOrder();
         RemoveExpiredJobOrders();
         PublishPeriodic();
         return Flush();
@@ -185,7 +188,7 @@ internal sealed class VirtualMachine
             case Phase.Executing:
                 Execute(elapsed);
                 break;
-            case Phase.Interrupted when !HasFailure():
+            case Phase.Interrupted when _now >= _phaseEnd && !HasFailure():
                 ResumeExecution();
                 break;
             case Phase.Faulted when !HasFailure():
@@ -201,7 +204,6 @@ internal sealed class VirtualMachine
         var job = _jobOrders.FirstOrDefault(j => j.State == "AllowedToStart");
         if (job is null)
         {
-            PromoteNextJobOrder();
             return;
         }
 
@@ -225,15 +227,8 @@ internal sealed class VirtualMachine
         var executionId = NewId();
         _execution = new Execution(executionId, _now, _energy, job);
 
-        var snapshot = new JsonObject
-        {
-            ["ExecutionId"] = executionId,
-            ["JobOrderID"] = job.Id,
-            ["ActiveProgram"] = job.Template.Program,
-        };
-        Set(SpecElements.ProgramExecution, snapshot, executionId);
         Set(SpecElements.ActiveProgram, job.Template.Program, executionId);
-        Emit(SpecElements.ProgramExecutionStarted, (JsonObject)snapshot.DeepClone());
+        ChangeExecutionState(_execution, "Running", SpecElements.ProgramExecutionStarted);
         EnterPhase(Phase.Executing, TimeSpan.Zero);
     }
 
@@ -248,7 +243,7 @@ internal sealed class VirtualMachine
         }
 
         var job = execution.Job;
-        EndExecution("Completed");
+        EndExecution("Ended");
         if (job.ProducedQuantity >= job.Template.Quantity)
         {
             job.EndTime = _now;
@@ -264,20 +259,15 @@ internal sealed class VirtualMachine
         }
     }
 
-    private void EndExecution(string endState)
+    /// <summary>
+    /// Ends the program execution as Ended or Aborted. Its snapshot stays with that state until the next one
+    /// begins, and the event carries the sums over the program execution, its interruptions included.
+    /// </summary>
+    private void EndExecution(string state)
     {
         var execution = _execution!;
         var job = execution.Job;
-        var completed = endState == "Completed";
-        var ended = new JsonObject
-        {
-            ["ExecutionId"] = execution.Id,
-            ["JobOrderID"] = job.Id,
-            ["EndState"] = endState,
-            ["Duration"] = Math.Round((_now - execution.Start).TotalSeconds, 3),
-            ["PartsProduced"] = completed ? 1 : 0,
-            ["EnergyElectricity"] = Math.Round(_energy - execution.EnergyAtStart, 3),
-        };
+        var completed = state == "Ended";
         _execution = null;
 
         if (completed)
@@ -292,20 +282,54 @@ internal sealed class VirtualMachine
             ChangeJob(job);
         }
 
-        Set(SpecElements.ProgramExecution, (JsonNode?)null);
         Set(SpecElements.ActiveProgram, job.Template.Program);
-        Emit(SpecElements.ProgramExecutionEnded, ended);
+        var eventPath = completed ? SpecElements.ProgramExecutionEnded : SpecElements.ProgramExecutionAborted;
+        ChangeExecutionState(execution, state, eventPath, sums =>
+        {
+            sums["Duration"] = Math.Round((_now - execution.Start).TotalSeconds, 3);
+            sums["PartsProduced"] = completed ? 1 : 0;
+            sums["EnergyElectricity"] = Math.Round(_energy - execution.EnergyAtStart, 3);
+        });
     }
 
-    private void InterruptExecution()
+    /// <summary>Sets the state of a program execution: its snapshot, and the event named after the new state.</summary>
+    private void ChangeExecutionState(Execution execution, string state, string eventPath, Action<JsonObject>? addSums = null)
     {
-        ChangeJobState(_execution!.Job, "Interrupted");
-        EnterPhase(Phase.Interrupted, TimeSpan.Zero);
+        execution.State = state;
+        var snapshot = new JsonObject
+        {
+            ["ExecutionId"] = execution.Id,
+            ["JobOrderID"] = execution.Job.Id,
+            ["ActiveProgram"] = execution.Job.Template.Program,
+            ["State"] = state,
+            ["StartTime"] = SpecWire.Timestamp(execution.Start),
+        };
+        Set(SpecElements.ProgramExecution, snapshot, execution.Id);
+        var value = (JsonObject)snapshot.DeepClone();
+        addSums?.Invoke(value);
+        Emit(eventPath, value);
+    }
+
+    /// <summary>Interrupts the program execution; a failure interrupts the job order too, a program stop does not.</summary>
+    private void InterruptExecution(bool interruptJob, TimeSpan duration)
+    {
+        var execution = _execution!;
+        ChangeExecutionState(execution, "Interrupted", SpecElements.ProgramExecutionInterrupted);
+        if (interruptJob)
+        {
+            ChangeJobState(execution.Job, "Interrupted");
+        }
+        EnterPhase(Phase.Interrupted, duration);
     }
 
     private void ResumeExecution()
     {
-        ChangeJobState(_execution!.Job, "Running");
+        var execution = _execution!;
+        if (execution.Job.State == "Interrupted")
+        {
+            ChangeJobState(execution.Job, "Running");
+        }
+        ChangeExecutionState(execution, "Running", SpecElements.ProgramExecutionResumed);
         EnterPhase(Phase.Executing, TimeSpan.Zero);
     }
 
@@ -318,6 +342,52 @@ internal sealed class VirtualMachine
         ChangeJobState(job, "Aborted");
         _activeJob = null;
         EnterPhase(Phase.Faulted, TimeSpan.Zero);
+    }
+
+    private void StopProgram(TimeSpan elapsed)
+    {
+        if (_phase == Phase.Executing && _random.NextDouble() < _scenario.ProgramStopsPerHour * elapsed.TotalHours)
+        {
+            InterruptExecution(interruptJob: false, _scenario.ProgramStopDuration);
+        }
+    }
+
+    /// <summary>The planner changes a waiting job order: revokes its release, cancels it, or takes it back.</summary>
+    private void ChangeQueue(TimeSpan elapsed)
+    {
+        if (_random.NextDouble() >= _scenario.QueueChangesPerHour * elapsed.TotalHours)
+        {
+            return;
+        }
+        var waiting = _jobOrders.Where(j => j.State is "NotAllowedToStart" or "AllowedToStart").ToList();
+        if (waiting.Count == 0)
+        {
+            return;
+        }
+        var job = waiting[_random.Next(waiting.Count)];
+        switch (_random.Next(3))
+        {
+            case 0:
+                if (job.State == "AllowedToStart")
+                {
+                    job.HeldUntil = _now + _scenario.QueueHoldTime;
+                    ChangeJobState(job, "NotAllowedToStart");
+                }
+                break;
+            case 1:
+                // Cancelled: it ends as aborted without having run, and stays for the retention.
+                job.EndTime = _now;
+                ChangeJobState(job, "Aborted");
+                AddJobOrder();
+                break;
+            default:
+                // Taken back before it started: it leaves the list without a change of state.
+                _jobOrders.Remove(job);
+                _jobOrdersChanged = true;
+                Emit(SpecElements.JobOrderRemoved, job.ToJson());
+                AddJobOrder();
+                break;
+        }
     }
 
     /// <summary>Sets the phase and everything that follows from it: status, channel, spindle and power.</summary>
@@ -396,7 +466,7 @@ internal sealed class VirtualMachine
                 }
                 else
                 {
-                    InterruptExecution();
+                    InterruptExecution(interruptJob: true, TimeSpan.Zero);
                 }
             }
         }
@@ -447,7 +517,7 @@ internal sealed class VirtualMachine
         {
             return;
         }
-        var next = _jobOrders.FirstOrDefault(j => j.State == "NotAllowedToStart");
+        var next = _jobOrders.FirstOrDefault(j => j.State == "NotAllowedToStart" && (j.HeldUntil is null || _now >= j.HeldUntil));
         if (next is null)
         {
             return;
@@ -455,11 +525,25 @@ internal sealed class VirtualMachine
         ChangeJobState(next, "AllowedToStart");
     }
 
+    /// <summary>Changes the state of a job order; the event is named after the transition.</summary>
     private void ChangeJobState(JobOrder job, string state)
     {
+        var transition = (job.State, state) switch
+        {
+            ("NotAllowedToStart", "AllowedToStart") => SpecElements.JobOrderReleased,
+            ("AllowedToStart", "NotAllowedToStart") => SpecElements.JobOrderRevoked,
+            ("AllowedToStart", "Running") => SpecElements.JobOrderStarted,
+            ("Running", "Interrupted") => SpecElements.JobOrderInterrupted,
+            ("Interrupted", "Running") => SpecElements.JobOrderResumed,
+            ("Running" or "Interrupted", "Ended") => SpecElements.JobOrderEnded,
+            ("Running" or "Interrupted", "Aborted") => SpecElements.JobOrderAborted,
+            ("NotAllowedToStart" or "AllowedToStart", "Aborted") => SpecElements.JobOrderCancelled,
+            _ => throw new InvalidOperationException($"No transition of a job order from {job.State} to {state}."),
+        };
         job.State = state;
         job.StateSince = _now;
-        ChangeJob(job);
+        _jobOrdersChanged = true;
+        Emit(transition, job.ToJson());
     }
 
     private void ChangeJob(JobOrder job)
@@ -595,6 +679,7 @@ internal sealed class VirtualMachine
         public double EnergyAtStart { get; } = energyAtStart;
         public JobOrder Job { get; } = job;
         public double Progress { get; set; }
+        public string State { get; set; } = "Running";
     }
 
     private sealed class JobOrder(string id, JobTemplate template)
@@ -609,6 +694,7 @@ internal sealed class VirtualMachine
         public double GoodQuantity { get; set; }
         public double ActualProductionTime { get; set; }
         public string? JobResult { get; set; }
+        public DateTimeOffset? HeldUntil { get; set; }
 
         public JsonObject ToJson()
         {

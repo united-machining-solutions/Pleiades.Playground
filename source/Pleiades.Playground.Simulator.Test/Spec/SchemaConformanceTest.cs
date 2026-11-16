@@ -57,6 +57,7 @@ public sealed partial class SchemaConformanceTest
             .ToList();
 
         Assert.IsTrue(values.Count > 1000);
+        var cancelled = 0;
         foreach (var value in values)
         {
             // What goes on the wire, parsed back.
@@ -67,8 +68,16 @@ public sealed partial class SchemaConformanceTest
 
             // The unit belongs to the binding, the schema of the model describes the envelope without it.
             envelope.Remove("unit");
+            if (value.Path == SpecElements.JobOrders && envelope["value"] is JsonArray entries)
+            {
+                foreach (var entry in entries)
+                {
+                    cancelled += PatchCancelled(entry!.AsObject());
+                }
+            }
             AssertValid(runtime, new JsonObject { [value.Path] = envelope }.ToJsonString(), value.Path);
         }
+        Assert.IsTrue(cancelled > 0, "the run cancels job orders");
     }
 
     [TestMethod]
@@ -91,6 +100,10 @@ public sealed partial class SchemaConformanceTest
             // seq and seqEpoch belong to the binding, the schema of the model describes the event without them.
             wire.Remove("seq");
             wire.Remove("seqEpoch");
+            if (specEvent.Path.StartsWith("Production.JobOrder", StringComparison.Ordinal))
+            {
+                PatchCancelled(wire["value"]!.AsObject());
+            }
             AssertValid(schema, wire.ToJsonString(), specEvent.Path);
         }
     }
@@ -103,6 +116,24 @@ public sealed partial class SchemaConformanceTest
         var run = MachineRun.For(TimeSpan.FromMinutes(10));
         var published = run.Messages.OfType<SpecValue>().Select(v => v.Path).Append(SpecElements.ConnectionState).ToHashSet();
         CollectionAssert.AreEquivalent(elements.ToList(), published.ToList());
+    }
+
+    /// <summary>
+    /// A cancelled job order is aborted without having run, so it has no StartTime and no ProducedQuantity, as the
+    /// model says in its table of job order events. Its schemas, though, ask both of every aborted job order (an open
+    /// point of contracts/mqtt). The test adds them to such an entry and so checks every other field of it.
+    /// </summary>
+    /// <returns>1 when the entry was a cancelled one, else 0.</returns>
+    private static int PatchCancelled(JsonObject entry)
+    {
+        if (entry["State"]!.GetValue<string>() != "Aborted" || entry.ContainsKey("StartTime"))
+        {
+            return 0;
+        }
+        Assert.IsFalse(entry.ContainsKey("ProducedQuantity"), "a cancelled job order has no quantity");
+        entry["StartTime"] = entry["EndTime"]!.GetValue<string>();
+        entry["ProducedQuantity"] = 0;
+        return 1;
     }
 
     private static MachineIdentity Identity()
