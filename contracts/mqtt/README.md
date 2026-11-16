@@ -151,7 +151,7 @@ No service of the playground reads it yet.
 ```text
 umati/{machineId}/Manifest                                retained      the manifest
 umati/{machineId}/<path, every "." a level>               retained      value envelope: a value, a snapshot or a list
-umati/{machineId}/events/<group of the event>            not retained  event
+umati/{machineId}/events/<topic of the group>            not retained  event
 ```
 
 - `umati/` is a fixed root for the standard. It does not collide with other data on a shared broker.
@@ -161,8 +161,8 @@ umati/{machineId}/events/<group of the event>            not retained  event
 - Every segment of the path is one topic level, without encoding: `Channel.1.ChannelState` becomes
   `Channel/1/ChannelState`. Wildcards work: `umati/+/Consumption/Electricity/+/AcActivePowerTotal`.
 - A snapshot is one topic (`State/Status`), and so is a list (`Production/JobOrders`, always the whole list).
-- Every event lies below the level `events/`, on one topic per group (`events/Production`,
-  `events/Notification`), so `umati/+/events/#` subscribes to exactly the events.
+- Every event lies below the level `events/`, on one topic per group (`events/production`,
+  `events/notifications`), so `umati/+/events/#` subscribes to exactly the events.
 - Every message has QoS 1 and the MQTT 5 content type `application/json`.
 
 ```text
@@ -170,8 +170,8 @@ umati/example-com_P-04/Manifest
 umati/example-com_P-04/State/Status
 umati/example-com_P-04/Channel/1/ChannelState
 umati/example-com_P-04/Production/JobOrders
-umati/example-com_P-04/events/Production
-umati/example-com_P-04/events/Notification
+umati/example-com_P-04/events/production
+umati/example-com_P-04/events/notifications
 ```
 
 ### Value envelope
@@ -204,11 +204,16 @@ The rules for events, so that a consumer can keep nothing but the events and sti
 
 | Rule | What | Why |
 |---|---|---|
-| Topic per group | An event is published on `umati/{machineId}/events/<group>`, the group being the first segment of its path: every job order and program execution event on `events/Production`, every alert event on `events/Notification`. The field `event`, the full path such as `Production.JobOrderStarted`, tells the events of a group apart. | MQTT keeps the order of messages only within one topic. On one topic `JobOrderStarted` and the `ProgramExecutionStarted` that follows arrive in the order they came up. One subscription per group is enough; `umati/+/events/+` or `umati/+/events/#` gets them all. The binding of the playground does the same with one topic for all notifications, `machines/{SerialNumber}/events/notifications`. |
+| Topic per group | An event is published on `umati/{machineId}/events/<topic>`, one topic per group of events, the group being the first segment of its path. The binding names the topic of each group, in lower case (table below): every job order and program execution event on `events/production`, every alert event on `events/notifications`. A group without a name in the table is not published. The field `event`, the full path of the model such as `Production.JobOrderStarted`, tells the events of a topic apart. | MQTT keeps the order of messages only within one topic. On one topic `JobOrderStarted` and the `ProgramExecutionStarted` that follows arrive in the order they came up. One subscription per group is enough; `umati/+/events/+` or `umati/+/events/#` gets them all. The binding of the playground does the same with one topic for all notifications, `machines/{SerialNumber}/events/notifications`, and the spec binding keeps its name. |
 | Envelope | `{event, timestamp, seq, seqEpoch, value}`. `event` is the path of the event, `timestamp` its source time. `seq` is an integer that counts every event of the machine, from 1 and without a gap. `seqEpoch` names the run of the adapter that counts: the time it started, in UTC. A new start begins a new epoch and counts from 1 again. | A consumer finds a gap and a duplicate by `(machineId, seqEpoch, seq)`, in any technology. |
 | Delivery | QoS 1, not retained. | QoS 1 delivers at least once; a duplicate is caught by `seq`. A retained event would be a state, and a state is a value. |
 | Outbox | While the broker is away the adapter keeps the events in the order they came up and sends them after the next connect, with their source time. The outbox is bounded; when it is full the oldest event is dropped and logged, and its `seq` stays a gap: nothing is numbered again. Values need no outbox, every connect publishes them whole. | Without an outbox the events of a broker outage are lost unnoticed. |
 | Consumer | A consumer that keeps events subscribes with a persistent session: Clean Start false, a session expiry of for example 24 hours, QoS 1. Several instances of one consumer share the events with a shared subscription, `$share/<group>/umati/+/events/#`. | The broker holds the events while the consumer restarts. |
+
+| Group of events (first segment of `event`) | Topic below `umati/{machineId}/events/` |
+|---|---|
+| `Production` | `production` |
+| `Notification` | `notifications` |
 
 - An adapter that names the events of a list in its manifest publishes one for every change of the list, the
   first entries included. So the events alone give the same list as the value. Every `ProgramExecutionStarted`
@@ -291,8 +296,8 @@ every value and event of this tree, so they agree with each other:
 | `Spindle/1/Override` | number | `one` |
 | `Consumption/Electricity/Main/AcActivePowerTotal` | number | `watt` |
 | `Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `wattHour` |
-| `events/Production` | events `Production.ProgramExecution<Started, Interrupted, Resumed, Ended, Aborted>` and `Production.JobOrder<Added, Released, Revoked, Started, Interrupted, Resumed, Ended, Aborted, Cancelled, Changed, Removed>` | – |
-| `events/Notification` | events `Notification.AlertRaised`, `Notification.AlertChanged`, `Notification.AlertCleared` | – |
+| `events/production` | events `Production.ProgramExecution<Started, Interrupted, Resumed, Ended, Aborted>` and `Production.JobOrder<Added, Released, Revoked, Started, Interrupted, Resumed, Ended, Aborted, Cancelled, Changed, Removed>` | – |
+| `events/notifications` | events `Notification.AlertRaised`, `Notification.AlertChanged`, `Notification.AlertCleared` | – |
 
 The tests of the simulator check every message against the JSON schemas of the model when a clone of it lies
 next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; without one they are skipped.

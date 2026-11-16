@@ -26,7 +26,7 @@ public sealed class SpecPublisherTest
 
         var events = client.Published.Where(m => m.Topic.Contains("/events/", StringComparison.Ordinal)).ToList();
         Assert.HasCount(2, events);
-        Assert.IsTrue(events.All(m => m.Topic == $"umati/{MachineId}/events/Production"));
+        Assert.IsTrue(events.All(m => m.Topic == $"umati/{MachineId}/events/production"));
         Assert.IsTrue(events.All(m => !m.Retain && m.QualityOfServiceLevel == MqttQualityOfServiceLevel.AtLeastOnce));
         Assert.IsTrue(events.All(m => m.ContentType == SpecWire.ContentType));
         CollectionAssert.AreEqual(new long[] { 1, 2 }, events.Select(Seq).ToList());
@@ -46,11 +46,11 @@ public sealed class SpecPublisherTest
         await publisher.PublishAsync(events);
 
         var topics = client.Published.Select(m => m.Topic).Distinct().ToList();
-        CollectionAssert.AreEquivalent(new[] { $"umati/{MachineId}/events/Production", $"umati/{MachineId}/events/Notification" }, topics,
+        CollectionAssert.AreEquivalent(new[] { $"umati/{MachineId}/events/production", $"umati/{MachineId}/events/notifications" }, topics,
             "one topic per group, none per event");
-        foreach (var group in new[] { "Production", "Notification" })
+        foreach (var (group, name) in new[] { ("Production", "production"), ("Notification", "notifications") })
         {
-            var onTopic = client.Published.Where(m => m.Topic == $"umati/{MachineId}/events/{group}").Select(Payload).ToList();
+            var onTopic = client.Published.Where(m => m.Topic == $"umati/{MachineId}/events/{name}").Select(Payload).ToList();
             var expected = events.Where(e => e.Path.StartsWith(group + ".", StringComparison.Ordinal)).ToList();
             CollectionAssert.AreEqual(expected.Select(e => e.Path).ToList(), onTopic.Select(p => p["event"]!.GetValue<string>()).ToList(),
                 $"the events of {group} in the order they came up");
@@ -59,7 +59,7 @@ public sealed class SpecPublisherTest
         }
 
         // Job order and program execution share the topic: a job order starts before its first program execution.
-        var production = client.Published.Where(m => m.Topic.EndsWith("/events/Production", StringComparison.Ordinal))
+        var production = client.Published.Where(m => m.Topic.EndsWith("/events/production", StringComparison.Ordinal))
             .Select(m => Payload(m)["event"]!.GetValue<string>()).ToList();
         Assert.IsTrue(production.IndexOf(SpecElements.JobOrderStarted) < production.IndexOf(SpecElements.ProgramExecutionStarted));
     }

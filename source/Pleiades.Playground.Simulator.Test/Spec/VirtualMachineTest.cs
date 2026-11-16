@@ -504,9 +504,12 @@ public sealed class VirtualMachineTest
     [TestMethod]
     public void Event_GoesBelowTheEventsLevelWithSeqAndEpoch()
     {
-        Assert.AreEqual("umati/example-com_P-04/events/Production", SpecWire.EventTopic("example-com_P-04", SpecElements.JobOrderChanged));
-        Assert.AreEqual("umati/example-com_P-04/events/Production", SpecWire.EventTopic("example-com_P-04", SpecElements.ProgramExecutionStarted));
-        Assert.AreEqual("umati/example-com_P-04/events/Notification", SpecWire.EventTopic("example-com_P-04", SpecElements.AlertRaised));
+        Assert.AreEqual("umati/example-com_P-04/events/production", SpecWire.EventTopic("example-com_P-04", SpecElements.JobOrderChanged));
+        Assert.AreEqual("umati/example-com_P-04/events/production", SpecWire.EventTopic("example-com_P-04", SpecElements.ProgramExecutionStarted));
+        Assert.AreEqual("umati/example-com_P-04/events/notifications", SpecWire.EventTopic("example-com_P-04", SpecElements.AlertRaised));
+        Assert.ThrowsExactly<ArgumentException>(() => SpecWire.EventTopic("example-com_P-04", "Maintenance.TaskDue"), "a group without a name");
+        CollectionAssert.IsSubsetOf(SpecElements.Events.Select(e => e.Split('.')[0]).Distinct().ToList(), SpecWire.EventTopicNames.Keys.ToList(),
+            "every event of the manifest has a topic");
         var wire = SpecWire.Event(new SpecEvent(SpecElements.AlertCleared, MachineRun.Start, 7, new JsonObject { ["id"] = "a" }), "2026-11-17T06:00:00.000Z");
         CollectionAssert.AreEqual(new[] { "event", "timestamp", "seq", "seqEpoch", "value" }, wire.Select(p => p.Key).ToList());
         Assert.AreEqual(7, wire["seq"]!.GetValue<long>());

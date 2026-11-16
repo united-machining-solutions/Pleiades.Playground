@@ -22,8 +22,9 @@ exactly after the model, to find a compromise for the differences.
   [`contracts/mqtt`, "Spec binding"](../../contracts/mqtt/README.md#spec-binding-draft).
 - ADR-0002 and ADR-0003 keep applying to `machines/` and `sites/`. They do not apply to `umati/`.
 - Events are meant to be stored, and a store of events must miss none. So the binding adds to the model what
-  that needs: events lie in a subtree of their own, one topic per group (`umati/{machineId}/events/Production`,
-  `…/events/Notification`), so that MQTT keeps the order of a group, carry the binding fields `seq`
+  that needs: events lie in a subtree of their own, one topic per group (`umati/{machineId}/events/production`,
+  `…/events/notifications`, the latter named as in the binding of the playground), so that MQTT keeps the order
+  of a group, carry the binding fields `seq`
   and `seqEpoch`, go out with QoS 1 and wait in a bounded outbox while the broker is away. The model is not
   changed; its schemas check an event once the binding fields are taken off, as with `unit`.
 - The second tree is an option of the simulator (`Config:SpecOutput:Enabled`), not a service of its own. One

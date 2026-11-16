@@ -58,16 +58,32 @@ internal static class SpecWire
     public const string EventsLevel = "events";
 
     /// <summary>
-    /// The topic of an event: one topic per group, below <c>events/</c>. The group is the first segment of the path
-    /// of the event, so every event of <c>Production</c> goes to <c>events/Production</c>. MQTT keeps the order only
-    /// within a topic; on one topic the events of a group arrive in the order they came up. The field
-    /// <c>event</c> tells them apart.
+    /// The topic name of each group of events, the group being the first segment of the path of an event. The
+    /// names are those of the binding, in lower case; <c>notifications</c> is the name the binding of the
+    /// playground uses for the same events (<c>machines/{SerialNumber}/events/notifications</c>).
     /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> EventTopicNames = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["Production"] = "production",
+        ["Notification"] = "notifications",
+    };
+
+    /// <summary>
+    /// The topic of an event: one topic per group, below <c>events/</c>, named after <see cref="EventTopicNames"/>.
+    /// So every event of <c>Production</c> goes to <c>events/production</c>. MQTT keeps the order only within a
+    /// topic; on one topic the events of a group arrive in the order they came up. The field <c>event</c> tells
+    /// them apart.
+    /// </summary>
+    /// <exception cref="ArgumentException">The group of the event has no topic name.</exception>
     public static string EventTopic(string machineId, string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var group = path.Split('.')[0];
-        return $"{Root}/{machineId}/{EventsLevel}/{group}";
+        if (!EventTopicNames.TryGetValue(group, out var name))
+        {
+            throw new ArgumentException($"The group '{group}' of the event '{path}' has no topic name.", nameof(path));
+        }
+        return $"{Root}/{machineId}/{EventsLevel}/{name}";
     }
 
     /// <summary>The topic of the manifest.</summary>
