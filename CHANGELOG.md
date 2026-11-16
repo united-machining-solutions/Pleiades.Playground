@@ -10,6 +10,9 @@ All notable changes are documented here. The format follows
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
 - Simulator for values, states and notifications of several machines.
+- Deployment (`docs/deployment.md`): the workflow "Deploy" starts the stack with `docker compose` on a runner of
+  your own, from the images of the commit that was merged into `main`. It is off until the variable
+  `DEPLOY_ENABLED` is `true`.
 - Shared libraries for logging, JSON, authorization, health checks, MQTT and the MCP server standard.
 - Demo stack (`compose.yaml`), contracts and CI.
 - TypeScript workspace for `apps/` and `packages/`: pinned Node.js and pnpm, one version catalog, a shared
@@ -97,6 +100,13 @@ All notable changes are documented here. The format follows
   the tokens with their measured contrast, every component of `packages/ui` in its variants and states
   with fixed values in the words of the demo, three rules as Do and Don't, and the machine card of the card
   catalogue. A test fails when a component of `packages/ui` has no block on the page.
+- The skill `setup` gives the chat the language models of the hackathon hub: a router that speaks OpenAI's chat
+  completions behind one address and one key, with a root certificate of its own. The skill checks that the
+  file holds that certificate alone, by its fingerprint, and hands it to the app with a `compose.override.yaml`
+  that stays on the computer and, where the handbook also sets the key as `OPENAI_API_KEY`, keeps it from
+  OpenAI. It points the block for any other endpoint at the router with `${OPENAI_BASE_URL}` and
+  `${UMS_AI_KEY}` of the profile, and asks the router from inside the app which models it has, so that a chat
+  can switch between all of them.
 - The example application wears umati: the sign of umati is the icon of the page, and the coloured umati
   wordmark stands at the top of the sidebar in place of the name. Both are trademarks of VDW e.V. and not
   covered by the licences of this repository (`NOTICE`).
@@ -164,6 +174,12 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- `ui`: the buttons of a disabled number field are dimmed once, with the group, and no longer twice. The
+  undo of their own dimming lost to `disabled:opacity-50` in the built stylesheet, so they stood at a
+  quarter.
+- `app`: the breadcrumb takes the index route of an entry for the page of that entry. Once a page got a
+  detail page and its list moved to `<name>.index.tsx`, the breadcrumb on the list was the entry alone, as
+  a link to the page it was on.
 - `app`: a toast shows. The example app had no `Toaster` at its root, so `toast.add` on a page showed
   nothing; it has one now, and the `TooltipProvider` the docs of the tooltip ask for at the same place.
   The provider gives every tooltip the delay `tooltip.tsx` sets, which is none.

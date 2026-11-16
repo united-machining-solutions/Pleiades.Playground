@@ -8,5 +8,6 @@
 | [Architecture decisions](adr/README.md) | Why: decisions that shape the repository |
 | [Contracts](../contracts/README.md) | The agreed interfaces |
 | [Changelog](../CHANGELOG.md) | What changed per release |
+| [Deployment](deployment.md) | How the stack runs on one computer and follows `main`, with `docker compose` |
 | [Development setup](development-setup.md) | The tools you need and how to check them |
 | [Working with Claude](working-with-claude.md) | How to change this repository with a coding agent |
