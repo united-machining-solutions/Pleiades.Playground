@@ -149,9 +149,9 @@ No service of the playground reads it yet.
 ### Topics
 
 ```text
-umati/{machineId}/Manifest                         retained      the manifest
-umati/{machineId}/<path, every "." a level>        retained      value envelope: a value, a snapshot or a list
-umati/{machineId}/<event path, every "." a level>  not retained  event
+umati/{machineId}/Manifest                                retained      the manifest
+umati/{machineId}/<path, every "." a level>               retained      value envelope: a value, a snapshot or a list
+umati/{machineId}/events/<event path, every "." a level>  not retained  event
 ```
 
 - `umati/` is a fixed root for the standard. It does not collide with other data on a shared broker.
@@ -161,6 +161,8 @@ umati/{machineId}/<event path, every "." a level>  not retained  event
 - Every segment of the path is one topic level, without encoding: `Channel.1.ChannelState` becomes
   `Channel/1/ChannelState`. Wildcards work: `umati/+/Consumption/Electricity/+/AcActivePowerTotal`.
 - A snapshot is one topic (`State/Status`), and so is a list (`Production/JobOrders`, always the whole list).
+- Every event lies below the level `events/`, so `umati/+/events/#` subscribes to exactly the events, and
+  `umati/{machineId}/#` without that level to the values.
 - Every message has QoS 1 and the MQTT 5 content type `application/json`.
 
 ```text
@@ -168,7 +170,8 @@ umati/example-com_P-04/Manifest
 umati/example-com_P-04/State/Status
 umati/example-com_P-04/Channel/1/ChannelState
 umati/example-com_P-04/Production/JobOrders
-umati/example-com_P-04/Notification/AlertRaised
+umati/example-com_P-04/events/Notification/AlertRaised
+umati/example-com_P-04/events/Production/JobOrderChanged
 ```
 
 ### Value envelope
@@ -191,13 +194,30 @@ umati/example-com_P-04/Notification/AlertRaised
 
 ```json
 { "event": "Production.ProgramExecutionEnded", "timestamp": "2026-11-17T09:21:40.000Z",
+  "seq": 1842, "seqEpoch": "2026-11-17T06:58:12.000Z",
   "value": { "ExecutionId": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001", "JobOrderID": "4711/01", "EndState": "Completed",
              "Duration": 3040.0, "PartsProduced": 1, "EnergyElectricity": 1850.5 } }
 ```
 
-An event is published on the topic of its path (`Production/ProgramExecutionEnded`), not retained. It names
-itself in `event`, so a consumer of `umati/{machineId}/#` tells it from a value. Whoever needs the current state
-reads the value, not the events.
+The rules for events, so that a consumer can keep nothing but the events and still miss none:
+
+| Rule | What | Why |
+|---|---|---|
+| Subtree | An event is published on `umati/{machineId}/events/<path>`, its path with every dot a level, for example `events/Production/JobOrderChanged`. | `umati/+/events/#` subscribes to exactly the events. |
+| Envelope | `{event, timestamp, seq, seqEpoch, value}`. `event` is the path of the event, `timestamp` its source time. `seq` is an integer that counts every event of the machine, from 1 and without a gap. `seqEpoch` names the run of the adapter that counts: the time it started, in UTC. A new start begins a new epoch and counts from 1 again. | A consumer finds a gap and a duplicate by `(machineId, seqEpoch, seq)`, in any technology. |
+| Delivery | QoS 1, not retained. | QoS 1 delivers at least once; a duplicate is caught by `seq`. A retained event would be a state, and a state is a value. |
+| Outbox | While the broker is away the adapter keeps the events in the order they came up and sends them after the next connect, with their source time. The outbox is bounded; when it is full the oldest event is dropped and logged, and its `seq` stays a gap: nothing is numbered again. Values need no outbox, every connect publishes them whole. | Without an outbox the events of a broker outage are lost unnoticed. |
+| Consumer | A consumer that keeps events subscribes with a persistent session: Clean Start false, a session expiry of for example 24 hours, QoS 1. Several instances of one consumer share the events with a shared subscription, `$share/<group>/umati/+/events/#`. | The broker holds the events while the consumer restarts. |
+
+- An adapter that names the events of a list in its manifest publishes one for every change of the list, the
+  first entries included. So the events alone give the same list as the value. Every `ProgramExecutionStarted`
+  is followed by exactly one `ProgramExecutionEnded`.
+- `JobOrderChanged` comes when a discrete field of the entry changes: the state, a quantity, a time of a state.
+  A field that keeps running, such as `ActualProductionTime`, does not bring one on its own; the event carries
+  its value at the moment of the change.
+- Whoever needs the current state reads the value, not the events.
+- `seq` and `seqEpoch` are fields of this binding, not of the model. The event schema of the model rejects
+  them; an event passes it once they are taken off, as `unit` with the values.
 
 ### Manifest and connection
 
@@ -234,6 +254,8 @@ every value and event of this tree, so they agree with each other:
 - Ended and aborted job orders stay in the list for 24 hours, the least the model allows. A shorter time is a
   demo setting (`Scenario:JobOrderRetention`); the manifest then leaves out `jobOrderRetention`.
 - The counters (power-on duration, energy, parts) only grow; they are kept in `/data` across restarts.
+- The events wait in an outbox of 10 000 while the broker is away (`Config:SpecOutput:EventBufferSize`).
+  `seqEpoch` is the start of the simulator.
 
 | Path below `umati/{machineId}/` | Kind | Unit |
 |---|---|---|
@@ -254,9 +276,9 @@ every value and event of this tree, so they agree with each other:
 | `Spindle/1/Override` | number | `one` |
 | `Consumption/Electricity/Main/AcActivePowerTotal` | number | `watt` |
 | `Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `wattHour` |
-| `Production/ProgramExecutionStarted`, `Production/ProgramExecutionEnded` | event | – |
-| `Production/JobOrderAdded`, `Production/JobOrderChanged`, `Production/JobOrderRemoved` | event | – |
-| `Notification/AlertRaised`, `Notification/AlertChanged`, `Notification/AlertCleared` | event | – |
+| `events/Production/ProgramExecutionStarted`, `events/Production/ProgramExecutionEnded` | event | – |
+| `events/Production/JobOrderAdded`, `events/Production/JobOrderChanged`, `events/Production/JobOrderRemoved` | event | – |
+| `events/Notification/AlertRaised`, `events/Notification/AlertChanged`, `events/Notification/AlertCleared` | event | – |
 
 The tests of the simulator check every message against the JSON schemas of the model when a clone of it lies
 next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; without one they are skipped.
@@ -265,7 +287,11 @@ next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; withou
 
 - A version level in the topic: proposed no, the version is in the manifest.
 - The final form of `{machineId}`.
-- Whether events get a subtree of their own (`umati/{machineId}/events/…`), so that one wildcard finds them all.
+- The subtree `events/`, the fields `seq` and `seqEpoch`, the outbox and the persistent session of a consumer
+  are proposals of this binding. Whether `seq` and `seqEpoch` belong to the model (they would serve every
+  technology), and whether `seqEpoch` belongs in each event or in the manifest, is open. Here it is in each
+  event, so that a stored event names its epoch without the manifest it came with.
+- When a job order turns `Running`: at the start of the setup, as here, or at the first program execution.
 - Whether an MQTT 5 user property names the kind of a message (value, event, manifest).
 - `Connection.Heartbeat` is an integer without a unit in the catalogue, while the binding asks for a unit with
   every number. The simulator sends none.

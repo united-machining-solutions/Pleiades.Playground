@@ -263,6 +263,84 @@ public sealed class VirtualMachineTest
     }
 
     [TestMethod]
+    public void Events_AreNumberedWithoutAGapFromOne()
+    {
+        var run = MachineRun.For(SixHours);
+        var seqs = run.Messages.OfType<SpecEvent>().Select(e => e.Seq).ToList();
+        Assert.IsTrue(seqs.Count > 100);
+        CollectionAssert.AreEqual(Enumerable.Range(1, seqs.Count).Select(i => (long)i).ToList(), seqs);
+        Assert.AreEqual(SpecWire.Timestamp(MachineRun.Start), run.Machine.SeqEpoch);
+    }
+
+    [TestMethod]
+    public void JobOrderChanged_NeverComesForARunningTimeAlone()
+    {
+        var run = MachineRun.For(SixHours);
+        var last = new Dictionary<string, JsonObject>();
+        var changed = 0;
+        foreach (var specEvent in run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("Production.JobOrder", StringComparison.Ordinal)))
+        {
+            var id = specEvent.Value["JobOrderID"]!.GetValue<string>();
+            var discrete = (JsonObject)specEvent.Value.DeepClone();
+            discrete.Remove("ActualProductionTime");
+            if (specEvent.Path == SpecElements.JobOrderChanged)
+            {
+                changed++;
+                Assert.IsFalse(JsonNode.DeepEquals(last[id], discrete), $"JobOrderChanged without a discrete change: {specEvent.Value}");
+            }
+            last[id] = discrete;
+        }
+        Assert.IsTrue(changed > 50);
+    }
+
+    [TestMethod]
+    public void JobOrderEvents_Alone_GiveTheSameListAsTheValue()
+    {
+        var run = MachineRun.For(SixHours, MachineRun.Config(TimeSpan.FromMinutes(20)));
+        var replayed = new Dictionary<string, JsonObject>();
+        foreach (var message in run.Messages)
+        {
+            switch (message)
+            {
+                case SpecEvent { Path: SpecElements.JobOrderAdded } added:
+                    replayed.Add(added.Value["JobOrderID"]!.GetValue<string>(), added.Value);
+                    break;
+                case SpecEvent { Path: SpecElements.JobOrderChanged } changed:
+                    replayed[changed.Value["JobOrderID"]!.GetValue<string>()] = changed.Value;
+                    break;
+                case SpecEvent { Path: SpecElements.JobOrderRemoved } removed:
+                    Assert.IsTrue(replayed.Remove(removed.Value["JobOrderID"]!.GetValue<string>()));
+                    break;
+                case SpecValue { Path: SpecElements.JobOrders } list:
+                    var entries = list.Value!.AsArray().Select(e => e!.AsObject()).ToList();
+                    Assert.HasCount(entries.Count, replayed);
+                    foreach (var entry in entries)
+                    {
+                        var id = entry["JobOrderID"]!.GetValue<string>();
+                        var expected = (JsonObject)entry.DeepClone();
+                        var actual = (JsonObject)replayed[id].DeepClone();
+                        expected.Remove("ActualProductionTime");
+                        actual.Remove("ActualProductionTime");
+                        Assert.IsTrue(JsonNode.DeepEquals(expected, actual), $"{id} at {list.Timestamp:O}");
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    [TestMethod]
+    public void Event_GoesBelowTheEventsLevelWithSeqAndEpoch()
+    {
+        Assert.AreEqual("umati/example-com_P-04/events/Production/JobOrderChanged",
+            SpecWire.EventTopic("example-com_P-04", SpecElements.JobOrderChanged));
+        var wire = SpecWire.Event(new SpecEvent(SpecElements.AlertCleared, MachineRun.Start, 7, new JsonObject { ["id"] = "a" }), "2026-11-17T06:00:00.000Z");
+        CollectionAssert.AreEqual(new[] { "event", "timestamp", "seq", "seqEpoch", "value" }, wire.Select(p => p.Key).ToList());
+        Assert.AreEqual(7, wire["seq"]!.GetValue<long>());
+    }
+
+    [TestMethod]
     public void MachineId_JoinsDomainAndSerialNumber()
     {
         Assert.AreEqual("example-com_P-04", SpecWire.MachineId("example.com", "P-04"));
@@ -289,7 +367,7 @@ public sealed class VirtualMachineTest
         return string.Join('\n', run.Messages.Select(m => m switch
         {
             SpecValue v => SpecWire.Envelope(v).ToJsonString(),
-            SpecEvent e => SpecWire.Event(e).ToJsonString(),
+            SpecEvent e => SpecWire.Event(e, run.Machine.SeqEpoch).ToJsonString(),
             _ => string.Empty,
         }));
     }

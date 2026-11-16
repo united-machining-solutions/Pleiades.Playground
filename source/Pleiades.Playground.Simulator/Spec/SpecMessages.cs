@@ -14,8 +14,11 @@ internal abstract record SpecMessage(string Path, DateTimeOffset Timestamp);
 internal sealed record SpecValue(string Path, JsonNode? Value, string? Unit, DateTimeOffset Timestamp, string? CorrelationId)
     : SpecMessage(Path, Timestamp);
 
-/// <summary>An event: something that happened once. <see cref="Value"/> is a flat struct.</summary>
-internal sealed record SpecEvent(string Path, DateTimeOffset Timestamp, JsonObject Value) : SpecMessage(Path, Timestamp);
+/// <summary>
+/// An event: something that happened once. <see cref="Seq"/> numbers the events of a machine without a gap, from 1
+/// in each epoch. <see cref="Value"/> is a flat struct.
+/// </summary>
+internal sealed record SpecEvent(string Path, DateTimeOffset Timestamp, long Seq, JsonObject Value) : SpecMessage(Path, Timestamp);
 
 /// <summary>Writes the messages of the spec binding: topics and payloads.</summary>
 internal static class SpecWire
@@ -45,10 +48,19 @@ internal static class SpecWire
         return id;
     }
 
-    /// <summary>The topic of an element or event: every dot of the path becomes a topic level.</summary>
+    /// <summary>The topic of an element: every dot of the path becomes a topic level.</summary>
     public static string Topic(string machineId, string path)
     {
         return $"{Root}/{machineId}/{path.Replace('.', '/')}";
+    }
+
+    /// <summary>The level below the machine under which every event lies.</summary>
+    public const string EventsLevel = "events";
+
+    /// <summary>The topic of an event: below <c>events/</c>, every dot of its path a topic level.</summary>
+    public static string EventTopic(string machineId, string path)
+    {
+        return $"{Root}/{machineId}/{EventsLevel}/{path.Replace('.', '/')}";
     }
 
     /// <summary>The topic of the manifest.</summary>
@@ -83,14 +95,19 @@ internal static class SpecWire
         return envelope;
     }
 
-    /// <summary>The event <c>{event, timestamp, value}</c>.</summary>
-    public static JsonObject Event(SpecEvent specEvent)
+    /// <summary>
+    /// The event <c>{event, timestamp, seq, seqEpoch, value}</c>. <c>seq</c> and <c>seqEpoch</c> belong to the
+    /// binding: with them a consumer finds a gap or a duplicate.
+    /// </summary>
+    public static JsonObject Event(SpecEvent specEvent, string seqEpoch)
     {
         ArgumentNullException.ThrowIfNull(specEvent);
         return new JsonObject
         {
             ["event"] = specEvent.Path,
             ["timestamp"] = Timestamp(specEvent.Timestamp),
+            ["seq"] = specEvent.Seq,
+            ["seqEpoch"] = seqEpoch,
             ["value"] = specEvent.Value.DeepClone(),
         };
     }

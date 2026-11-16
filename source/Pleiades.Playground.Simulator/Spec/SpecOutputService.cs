@@ -59,11 +59,12 @@ internal sealed partial class SpecOutputService : BackgroundService
         }
         LogStarting(SpecWire.Root, _machineId);
 
-        // Disposed once the loop has ended and the client is stopped, in the finally block below.
+        // Both are disposed once the loop has ended and the client is stopped, in the finally block below.
 #pragma warning disable CA2025
         using var client = new MqttClientFactory().CreateManagedMqttClientWithLogger(_loggerFactory);
+        using var publisher = new SpecPublisher(client, _machineId, _manifest, _machine.SeqEpoch, _spec.EventBufferSize, _logger);
+        client.ConnectedAsync += _ => OnConnectedAsync(publisher);
 #pragma warning restore CA2025
-        client.ConnectedAsync += _ => OnConnectedAsync(client);
         await client.StartAsync(CreateOptions(start)).ConfigureAwait(false);
 
         var lastSaved = start;
@@ -81,14 +82,7 @@ internal sealed partial class SpecOutputService : BackgroundService
                     current = _machine.Counters;
                 }
 
-                // Without a connection nothing is queued: a new connection publishes the whole state again.
-                if (client.IsConnected)
-                {
-                    foreach (var message in messages)
-                    {
-                        await client.EnqueueAsync(ToMqtt(message)).ConfigureAwait(false);
-                    }
-                }
+                await publisher.PublishAsync(messages).ConfigureAwait(false);
 
                 if (now - lastSaved >= TimeSpan.FromSeconds(30))
                 {
@@ -104,15 +98,11 @@ internal sealed partial class SpecOutputService : BackgroundService
         finally
         {
             SaveCounters(_machine.Counters);
-            await DisconnectAsync(client).ConfigureAwait(false);
+            await DisconnectAsync(client, publisher).ConfigureAwait(false);
         }
     }
 
-    /// <summary>
-    /// After every connect: the state is Disconnected, then the manifest and every value come again, and only then
-    /// Connected. So a consumer never sees Connected over values of an earlier connection.
-    /// </summary>
-    private async Task OnConnectedAsync(IManagedMqttClient client)
+    private async Task OnConnectedAsync(SpecPublisher publisher)
     {
         List<SpecValue> values;
         DateTimeOffset now;
@@ -121,22 +111,14 @@ internal sealed partial class SpecOutputService : BackgroundService
             values = [.. _machine!.Values];
             now = _machine.Now;
         }
-
-        await client.EnqueueAsync(ToMqtt(ConnectionState("Disconnected", now))).ConfigureAwait(false);
-        await client.EnqueueAsync(Message(SpecWire.ManifestTopic(_machineId), _manifest, retain: true)).ConfigureAwait(false);
-        foreach (var value in values)
-        {
-            await client.EnqueueAsync(ToMqtt(value)).ConfigureAwait(false);
-        }
-        await client.EnqueueAsync(ToMqtt(ConnectionState("Connected", now))).ConfigureAwait(false);
-        LogConnected(values.Count);
+        await publisher.PublishStateAsync(values, now).ConfigureAwait(false);
     }
 
-    private async Task DisconnectAsync(IManagedMqttClient client)
+    private async Task DisconnectAsync(IManagedMqttClient client, SpecPublisher publisher)
     {
         if (client.IsConnected)
         {
-            await client.EnqueueAsync(ToMqtt(ConnectionState("Disconnected", _timeProvider.GetUtcNow()))).ConfigureAwait(false);
+            await publisher.PublishConnectionStateAsync("Disconnected", _timeProvider.GetUtcNow()).ConfigureAwait(false);
             var deadline = _timeProvider.GetUtcNow() + TimeSpan.FromSeconds(5);
             while (client.PendingApplicationMessagesCount > 0 && _timeProvider.GetUtcNow() < deadline)
             {
@@ -162,11 +144,11 @@ internal sealed partial class SpecOutputService : BackgroundService
 
         // The broker publishes the last will when the connection breaks off. Its timestamp is the time of the
         // connect: the binding has no way to put the time of the break into it.
-        var will = ConnectionState("Disconnected", start);
+        var (willTopic, willPayload) = SpecPublisher.LastWill(_machineId, start);
         var options = new MqttClientOptionsBuilder()
             .WithConfig(mqtt)
-            .WithWillTopic(SpecWire.Topic(_machineId, SpecElements.ConnectionState))
-            .WithWillPayload(Encoding.UTF8.GetBytes(SpecWire.Envelope(will).ToJsonString()))
+            .WithWillTopic(willTopic)
+            .WithWillPayload(willPayload)
             .WithWillRetain(true)
             .WithWillQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
             .WithWillContentType(SpecWire.ContentType)
@@ -177,32 +159,6 @@ internal sealed partial class SpecOutputService : BackgroundService
             ClientOptions = options,
             AutoReconnectDelay = TimeSpan.FromSeconds(10),
         };
-    }
-
-    private static SpecValue ConnectionState(string state, DateTimeOffset timestamp)
-    {
-        return new SpecValue(SpecElements.ConnectionState, JsonValue.Create(state), null, timestamp, null);
-    }
-
-    private MqttApplicationMessage ToMqtt(SpecMessage message)
-    {
-        return message switch
-        {
-            SpecValue value => Message(SpecWire.Topic(_machineId, value.Path), SpecWire.Envelope(value), retain: true),
-            SpecEvent specEvent => Message(SpecWire.Topic(_machineId, specEvent.Path), SpecWire.Event(specEvent), retain: false),
-            _ => throw new ArgumentOutOfRangeException(nameof(message)),
-        };
-    }
-
-    private static MqttApplicationMessage Message(string topic, JsonObject payload, bool retain)
-    {
-        return new MqttApplicationMessageBuilder()
-            .WithTopic(topic)
-            .WithPayload(Encoding.UTF8.GetBytes(payload.ToJsonString()))
-            .WithContentType(SpecWire.ContentType)
-            .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
-            .WithRetainFlag(retain)
-            .Build();
     }
 
     private void SaveCounters(MachineCounters counters)
@@ -219,9 +175,6 @@ internal sealed partial class SpecOutputService : BackgroundService
 
     [LoggerMessage(EventId = 100, Level = LogLevel.Information, Message = "Spec output publishes the virtual machine below {Root}/{MachineId}/")]
     private partial void LogStarting(string root, string machineId);
-
-    [LoggerMessage(EventId = 101, Level = LogLevel.Information, Message = "Spec output connected; published the manifest and {Count} values")]
-    private partial void LogConnected(int count);
 
     [LoggerMessage(EventId = 102, Level = LogLevel.Information, Message = "Spec output is stopping")]
     private partial void LogStopping();

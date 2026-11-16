@@ -83,7 +83,15 @@ public sealed partial class SchemaConformanceTest
         CollectionAssert.AreEquivalent(named.ToList(), events.Select(e => e.Path).Distinct().ToList(), "every event of the manifest comes");
         foreach (var specEvent in events)
         {
-            AssertValid(schema, SpecWire.Event(specEvent).ToJsonString(), specEvent.Path);
+            // What goes on the wire, parsed back.
+            var wire = JsonNode.Parse(SpecWire.Event(specEvent, run.Machine.SeqEpoch).ToJsonString())!.AsObject();
+            Assert.AreEqual(specEvent.Seq, wire["seq"]!.GetValue<long>());
+            Assert.AreEqual(run.Machine.SeqEpoch, wire["seqEpoch"]!.GetValue<string>());
+
+            // seq and seqEpoch belong to the binding, the schema of the model describes the event without them.
+            wire.Remove("seq");
+            wire.Remove("seqEpoch");
+            AssertValid(schema, wire.ToJsonString(), specEvent.Path);
         }
     }
 

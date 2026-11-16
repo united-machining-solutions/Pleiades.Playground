@@ -103,7 +103,10 @@ All notable changes are documented here. The format follows
   the last will `Connection/State = Disconnected`. P-04 publishes it in the demo stack, in addition to its
   topics below `machines/P-04/`, which stay as they are. Its tests check the consistency of the machine and,
   with a clone of the model next to the repository, every message against the schemas of the model
-  (`contracts/mqtt`, ADR-0010).
+  (`contracts/mqtt`, ADR-0010). Its events lie below `umati/{machineId}/events/`, carry `seq` and `seqEpoch`,
+  so that a gap or a duplicate shows, and wait in a bounded outbox (`EventBufferSize`, 10 000) while the broker
+  is away; the oldest is dropped when it is full. The first job orders come with their `JobOrderAdded`, and
+  `JobOrderChanged` never comes for a running time alone.
 
 ### Changed
 

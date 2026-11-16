@@ -59,6 +59,7 @@ internal sealed class VirtualMachine
     private double _feedOverride;
     private double _spindleOverride;
     private long _heartbeat;
+    private long _seq;
     private DateTimeOffset _nextHeartbeat;
     private DateTimeOffset _nextMeasurement;
 
@@ -75,6 +76,7 @@ internal sealed class VirtualMachine
         _spindleOverrideSteps = _scenario.SpindleOverrideSteps.Count > 0 ? _scenario.SpindleOverrideSteps : [1.0];
         _random = _scenario.Seed is { } seed ? new Random(seed) : new Random();
         _now = start;
+        SeqEpoch = SpecWire.Timestamp(start);
         _nextJobNumber = _scenario.FirstJobOrderNumber;
         _powerOnDuration = counters.PowerOnDuration;
         _energy = counters.Energy;
@@ -93,6 +95,12 @@ internal sealed class VirtualMachine
         Interrupted,
         Faulted,
     }
+
+    /// <summary>
+    /// The epoch of the event numbers: the start of this machine in UTC. <see cref="SpecEvent.Seq"/> counts from 1
+    /// within it; a new start begins a new epoch.
+    /// </summary>
+    public string SeqEpoch { get; }
 
     /// <summary>The time the machine has reached.</summary>
     public DateTimeOffset Now => _now;
@@ -150,11 +158,12 @@ internal sealed class VirtualMachine
         Set(SpecElements.SpindleIsRotating, false);
         Set(SpecElements.SpindleOverride, _spindleOverride);
         Set(SpecElements.PartsProducedInLifetime, _partsProduced);
+        // The first list comes with its events too, so that the events alone give the same list.
         for (var i = 0; i < _scenario.QueuedJobOrders; i++)
         {
-            AddJobOrder(raiseEvent: false);
+            AddJobOrder();
         }
-        PromoteNextJobOrder(raiseEvent: false);
+        PromoteNextJobOrder();
         _jobOrdersChanged = true;
         _alertsChanged = true;
         UpdatePower();
@@ -192,7 +201,7 @@ internal sealed class VirtualMachine
         var job = _jobOrders.FirstOrDefault(j => j.State == "AllowedToStart");
         if (job is null)
         {
-            PromoteNextJobOrder(raiseEvent: true);
+            PromoteNextJobOrder();
             return;
         }
 
@@ -203,8 +212,8 @@ internal sealed class VirtualMachine
         _activeJob = job;
 
         // Keep the queue full: the next one may start, a new one waits.
-        AddJobOrder(raiseEvent: true);
-        PromoteNextJobOrder(raiseEvent: true);
+        AddJobOrder();
+        PromoteNextJobOrder();
 
         Set(SpecElements.ActiveProgram, job.Template.Program);
         EnterPhase(Phase.Setup, _scenario.SetupTime);
@@ -418,7 +427,7 @@ internal sealed class VirtualMachine
         return others.Count == 0 ? current : others[_random.Next(others.Count)];
     }
 
-    private void AddJobOrder(bool raiseEvent)
+    private void AddJobOrder()
     {
         var template = _jobTemplates[_nextTemplate];
         _nextTemplate = (_nextTemplate + 1) % _jobTemplates.Count;
@@ -429,13 +438,10 @@ internal sealed class VirtualMachine
         };
         _jobOrders.Add(job);
         _jobOrdersChanged = true;
-        if (raiseEvent)
-        {
-            Emit(SpecElements.JobOrderAdded, job.ToJson());
-        }
+        Emit(SpecElements.JobOrderAdded, job.ToJson());
     }
 
-    private void PromoteNextJobOrder(bool raiseEvent)
+    private void PromoteNextJobOrder()
     {
         if (_jobOrders.Any(j => j.State == "AllowedToStart"))
         {
@@ -446,14 +452,7 @@ internal sealed class VirtualMachine
         {
             return;
         }
-        if (raiseEvent)
-        {
-            ChangeJobState(next, "AllowedToStart");
-        }
-        else
-        {
-            next.State = "AllowedToStart";
-        }
+        ChangeJobState(next, "AllowedToStart");
     }
 
     private void ChangeJobState(JobOrder job, string state)
@@ -562,7 +561,7 @@ internal sealed class VirtualMachine
 
     private void Emit(string path, JsonObject value)
     {
-        _pending.Add(new SpecEvent(path, _now, value));
+        _pending.Add(new SpecEvent(path, _now, ++_seq, value));
     }
 
     private List<SpecMessage> Flush()

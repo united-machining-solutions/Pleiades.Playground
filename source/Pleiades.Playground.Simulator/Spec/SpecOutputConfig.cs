@@ -45,6 +45,13 @@ internal sealed class SpecOutputConfig
     /// </summary>
     public string? PersistenceFilePath { get; init; }
 
+    /// <summary>
+    /// How many events wait at most while the broker is away. When the outbox is full the oldest event is dropped
+    /// and logged; the gap stays visible in <c>seq</c>.
+    /// </summary>
+    [Range(1, 1_000_000)]
+    public int EventBufferSize { get; init; } = 10_000;
+
     /// <summary>What the virtual machine does.</summary>
     [Required]
     public ScenarioConfig Scenario { get; init; } = new();
