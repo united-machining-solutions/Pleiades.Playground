@@ -54,8 +54,9 @@ cp .env.example .env        # then set LLM_BASE_URL and LLM_API_KEY in it
 docker compose up -d app    # creates the app again with the new settings
 ```
 
-Address and key are enough: the chat offers the models the gateway lists. `docker compose restart` does not
-read `.env` again. More in [Language models](apps/app/README.md#language-models).
+Address and key are enough: the chat offers the models the gateway lists. Without a gateway, a key of Anthropic
+or OpenAI and `docker compose --profile gateway up -d` start one of the stack's own. `docker compose restart`
+does not read `.env` again. More in [Language models](apps/app/README.md#language-models).
 
 New here? Take the [tour of the demo](docs/tour.md): six stops with screenshots, from the start to where to
 change what. With a coding agent in the repository, ask it: "give me a tour". To add a page, a card or a

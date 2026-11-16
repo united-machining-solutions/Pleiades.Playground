@@ -52,6 +52,21 @@ a new model of the gateway needs `docker compose up -d app`. Where the list does
 why ("GET /models of the gateway at LLM_BASE_URL answered 401"), and the app asks again after half a minute.
 The chat panel, the harness and dictation read the same list.
 
+**Without the gateway of the hackathon**, with a key of Anthropic or of OpenAI, the stack starts a LiteLLM
+gateway of its own, with the profile `gateway`:
+
+```bash
+# in .env: LLM_BASE_URL=http://litellm:4000/v1, LLM_API_KEY=sk-<a key of your own choosing>,
+# and ANTHROPIC_API_KEY or OPENAI_API_KEY
+docker compose --profile gateway up -d
+```
+
+Its models, their order and what each is for are in [`stacks/litellm/config.yaml`](../../stacks/litellm/config.yaml):
+delete the lines of a provider whose key you do not have, or the chat offers its models and they answer with an
+error. `LLM_API_KEY` becomes the master key of the gateway, which LiteLLM wants before it starts; a long random
+value after `sk-` will do. The gateway publishes no port; only the containers of the stack reach it.
+Without the profile it does not start, and its image is not downloaded.
+
 A gateway on your own computer is `http://host.docker.internal:<port>/v1`: the app runs in a container, and
 `localhost` there is the container. The name works with Docker Desktop and, through `extra_hosts` in
 `compose.yaml`, with Docker Engine on Linux; the gateway must then listen on more than `127.0.0.1`. A model must

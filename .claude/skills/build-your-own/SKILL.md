@@ -167,7 +167,10 @@ The key belongs to the person or to their company, and you never see it.
      included. If they end in another version than the images that run, the person sets the line
      `PLEIADES_VERSION=` to the version that runs, in item 2.
 2. Ask the person to open `.env` in an editor and to fill in the two lines `LLM_` themselves: the address and
-   the key of a LiteLLM gateway, at the hackathon the one of the hub. What goes where:
+   the key of a LiteLLM gateway, at the hackathon the one of the hub. Without one, with a key of Anthropic or
+   OpenAI: `LLM_BASE_URL=http://litellm:4000/v1`, in `LLM_API_KEY` a key of their own choosing that begins
+   with `sk-`, the key of the provider in its line, and in item 3
+   `docker compose --profile gateway up -d` instead. What goes where:
    [Language models](../../../apps/app/README.md#language-models). Tell them to keep the key out of this
    conversation. A subscription to a chat product, Claude or ChatGPT, is not such a key: the key comes from
    whoever runs the gateway.

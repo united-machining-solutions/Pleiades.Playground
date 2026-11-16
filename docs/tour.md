@@ -122,7 +122,9 @@ The chat needs a language model, and the demo starts without one. Then the panel
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
 copy `.env.example` to `.env`, set the address and the key of a LiteLLM gateway, at the hackathon the one of the
 hub, and create the app again with `docker compose up -d app`. The chat offers the chat models the gateway
-lists, and dictation takes its speech-to-text model.
+lists, and dictation takes its speech-to-text model. Without the hub, a key of Anthropic or OpenAI and
+`docker compose --profile gateway up -d` start a gateway of the stack's own, see
+[Language models](../apps/app/README.md#language-models).
 
 | Setting | What it holds |
 |---|---|

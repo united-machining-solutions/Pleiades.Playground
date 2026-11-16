@@ -32,8 +32,9 @@ hub, a LiteLLM gateway that serves a model in the room, the cloud models, and a 
 ## Consequences
 
 - Two settings instead of nine. A participant at the hackathon sets the address and the key of the hub.
-- Who wants Anthropic or OpenAI without the hub runs a LiteLLM gateway of their own. A `.env` that set only
-  the old settings gives the chat no model until it is changed.
+- Who wants Anthropic or OpenAI without the hub starts the stack's own LiteLLM gateway, with the profile
+  `gateway` and the key of the provider in `.env`. A `.env` that set only the old settings gives the chat no
+  model until it is changed.
 - The app speaks chat completions and audio transcriptions only. What Anthropic's Messages API or OpenAI's
   Responses API offer beyond that reaches the chat only as far as LiteLLM translates it.
 - A model of one's own without a mode counts as a chat model. A model of one's own that is not for chat needs
@@ -47,7 +48,8 @@ hub, a LiteLLM gateway that serves a model in the room, the cloud models, and a 
 - **One endpoint of any kind, with `LLM_MODELS` and `LLM_TRANSCRIPTION_MODEL` to name models**: needed for
   endpoints that do not say what a model is for, such as OpenAI itself or Ollama, but at the hackathon it is
   one more line to get wrong, and the gateway already decides what a key may use.
-- **A LiteLLM container in the stack**: every computer would download and run a gateway, and at the hackathon
-  there would be one gateway behind another.
+- **A LiteLLM container in the stack, always on**: every computer would download and run a gateway, and at the
+  hackathon there would be one gateway behind another. Behind the profile `gateway` it starts only where
+  there is no other.
 - **Filter on `mode: chat` only**: drops a model of one's own that the gateway knows nothing about, the very
   model a gateway in the room is there for.

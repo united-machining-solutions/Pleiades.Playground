@@ -107,6 +107,11 @@ All notable changes are documented here. The format follows
   that stays on the computer. It points `LLM_BASE_URL` and `LLM_API_KEY` at the router with
   `${OPENAI_BASE_URL}` and `${UMS_AI_KEY}` of the profile, and asks the router from inside the app which chat
   models and which speech-to-text model it offers.
+- Stack: a LiteLLM gateway of its own, with the profile `gateway` (`docker compose --profile gateway up -d`),
+  for a key of Anthropic or OpenAI without the gateway of the hackathon. It reads `ANTHROPIC_API_KEY` and
+  `OPENAI_API_KEY` from `.env`, takes `LLM_API_KEY` as its master key and its models from
+  `stacks/litellm/config.yaml`, publishes no port, and
+  without the profile neither starts nor downloads (`LITELLM_VERSION`, `v1.109.1`).
 - Dictation in the chat field of the example application: a microphone next to send. The browser records,
   the server route `/api/transcribe` has a speech-to-text model write down what was said, and the text goes
   into the field, to send like a typed question. The model gets the names of the machines as its prompt.

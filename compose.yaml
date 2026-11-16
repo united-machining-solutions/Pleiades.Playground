@@ -169,6 +169,29 @@ services:
       # The origins a card file may load the font of its host from; none unless set.
       CARD_RESOURCE_DOMAINS: ${CARD_RESOURCE_DOMAINS:-}
 
+  # A LiteLLM gateway of one's own, for a key of Anthropic or OpenAI without the gateway of the hackathon.
+  # It starts only with the profile: docker compose --profile gateway up -d. The app then reaches it as
+  # LLM_BASE_URL=http://litellm:4000/v1, and LLM_API_KEY is its master key, which LiteLLM wants: a key of
+  # one's own choosing that begins with sk-. It publishes no port: only the containers of this stack reach
+  # it. Its models are in stacks/litellm/config.yaml.
+  litellm:
+    <<: *service
+    image: ghcr.io/berriai/litellm:${LITELLM_VERSION:-v1.109.1}
+    profiles: [gateway]
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    volumes:
+      - ./stacks/litellm/config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: ${LLM_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   # The example application.
   app:
     <<: *service
