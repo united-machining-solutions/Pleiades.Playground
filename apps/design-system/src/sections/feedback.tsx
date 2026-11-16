@@ -81,7 +81,7 @@ export function Feedback() {
               <InfoIcon />
               <AlertTitle>The chat has no language model</AlertTitle>
               <AlertDescription>
-                Set ANTHROPIC_API_KEY, OPENAI_API_KEY or LLM_BASE_URL and start the app again. Everything else works
+                Set LLM_BASE_URL and LLM_API_KEY and start the app again. Everything else works
                 without one.
               </AlertDescription>
             </Alert>
