@@ -9,7 +9,8 @@ using MQTTnet;
 using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Common.Json;
 using Pleiades.Playground.Events.Api.Client.NotificationEvents;
-using Pleiades.Playground.Events.Api.Client.ProductionEvents;
+using Pleiades.Playground.Events.Api.Client.JobEvents;
+using Pleiades.Playground.Events.Api.Client.WorkMasterEvents;
 using Pleiades.Playground.Events.DataTransferObjects;
 using Pleiades.Playground.HealthChecks.Mqtt;
 using Pleiades.Playground.Notification.DataTransferObjects;
@@ -21,7 +22,8 @@ public class WorkerTest : IDisposable
 {
     private readonly Mock<IManagedMqttClient> _mqttClient;
     private readonly Mock<INotificationEventService> _notificationEventService;
-    private readonly Mock<IProductionEventService> _productionEventService;
+    private readonly Mock<IJobEventService> _jobEventService;
+    private readonly Mock<IWorkMasterEventService> _workMasterEventService;
 
     private Object _data;
 
@@ -35,7 +37,8 @@ public class WorkerTest : IDisposable
     {
         _mqttClient = new Mock<IManagedMqttClient>();
         _notificationEventService = new Mock<INotificationEventService>();
-        _productionEventService = new Mock<IProductionEventService>();
+        _jobEventService = new Mock<IJobEventService>();
+        _workMasterEventService = new Mock<IWorkMasterEventService>();
 
         _data = new();
 
@@ -51,7 +54,8 @@ public class WorkerTest : IDisposable
                              NullLogger<Worker>.Instance,
                              _mqttClient.Object,
                              _notificationEventService.Object,
-                             _productionEventService.Object,
+                             _jobEventService.Object,
+                             _workMasterEventService.Object,
                              new MqttSubscriptionReadiness());
     }
 
@@ -95,23 +99,57 @@ public class WorkerTest : IDisposable
     }
 
     [TestMethod]
-    public async Task ProductionEvent_GoesToTheProductionEventService()
+    public async Task JobEvent_GoesToTheJobEventService()
     {
-        var posted = new List<ProductionEventDtoV1>();
-        _productionEventService.Setup(s => s.PostEvent(It.IsAny<ProductionEventDtoV1>()))
-            .ReturnsAsync((ProductionEventDtoV1 model) =>
+        var posted = new List<JobEventDtoV1>();
+        _jobEventService.Setup(s => s.PostEvent(It.IsAny<JobEventDtoV1>()))
+            .ReturnsAsync((JobEventDtoV1 model) =>
             {
                 posted.Add(model);
                 return model;
             });
 
-        var productionEvent = new ProductionEventDtoV1
+        var jobEvent = new JobEventDtoV1
         {
-            Id = "P-04:2026-11-17T06:00:00.000Z:7",
+            Id = "0f4c4a51-8e2b-5d6a-9c1f-4b7e2d913a60",
             MId = "P-04",
             Timestamp = DateTime.UtcNow,
-            Subject = ProductionSubject.ProgramExecution,
-            Action = ProductionAction.Ended,
+            Action = JobAction.ResultChanged,
+            CorrelationId = "4711/01",
+            JobOrderId = "4711/01",
+            State = "Running",
+            ProducedQuantity = 3,
+            Seq = 7,
+        };
+
+        await _worker.StartAsync(CancellationToken.None).ConfigureAwait(false);
+        await Task.Delay(500).ConfigureAwait(false);
+        await Deliver("jobeventdtov1", JsonSerializer.Serialize(jobEvent, _jsonSerializerOptions), "jobs").ConfigureAwait(false);
+        await Task.Delay(1000).ConfigureAwait(false);
+
+        Assert.HasCount(1, posted);
+        Assert.AreEqual(jobEvent, posted[0]);
+        _workMasterEventService.Verify(s => s.PostEvent(It.IsAny<WorkMasterEventDtoV1>()), Times.Never);
+        _notificationEventService.Verify(s => s.PostEvent(It.IsAny<NotificationEventDtoV1>()), Times.Never);
+    }
+
+    [TestMethod]
+    public async Task WorkMasterEvent_GoesToTheWorkMasterEventService()
+    {
+        var posted = new List<WorkMasterEventDtoV1>();
+        _workMasterEventService.Setup(s => s.PostEvent(It.IsAny<WorkMasterEventDtoV1>()))
+            .ReturnsAsync((WorkMasterEventDtoV1 model) =>
+            {
+                posted.Add(model);
+                return model;
+            });
+
+        var workMasterEvent = new WorkMasterEventDtoV1
+        {
+            Id = "7a1c",
+            MId = "P-04",
+            Timestamp = DateTime.UtcNow,
+            Action = WorkMasterAction.Ended,
             CorrelationId = "exec-1",
             ExecutionId = "exec-1",
             State = "Ended",
@@ -121,12 +159,12 @@ public class WorkerTest : IDisposable
 
         await _worker.StartAsync(CancellationToken.None).ConfigureAwait(false);
         await Task.Delay(500).ConfigureAwait(false);
-        await Deliver("productioneventdtov1", JsonSerializer.Serialize(productionEvent, _jsonSerializerOptions)).ConfigureAwait(false);
+        await Deliver("workmastereventdtov1", JsonSerializer.Serialize(workMasterEvent, _jsonSerializerOptions), "workmasters").ConfigureAwait(false);
         await Task.Delay(1000).ConfigureAwait(false);
 
         Assert.HasCount(1, posted);
-        Assert.AreEqual(productionEvent, posted[0]);
-        _notificationEventService.Verify(s => s.PostEvent(It.IsAny<NotificationEventDtoV1>()), Times.Never);
+        Assert.AreEqual(workMasterEvent, posted[0]);
+        _jobEventService.Verify(s => s.PostEvent(It.IsAny<JobEventDtoV1>()), Times.Never);
     }
 
     [TestMethod]
@@ -134,17 +172,20 @@ public class WorkerTest : IDisposable
     {
         await _worker.StartAsync(CancellationToken.None).ConfigureAwait(false);
         await Task.Delay(500).ConfigureAwait(false);
-        await Deliver("productioneventdtov2", "{}").ConfigureAwait(false);
+        // The production event of an earlier draft is gone; its content type is now an unknown one.
+        await Deliver("productioneventdtov1", "{}").ConfigureAwait(false);
+        await Deliver("jobeventdtov2", "{}").ConfigureAwait(false);
         await Task.Delay(500).ConfigureAwait(false);
 
-        _productionEventService.Verify(s => s.PostEvent(It.IsAny<ProductionEventDtoV1>()), Times.Never);
+        _jobEventService.Verify(s => s.PostEvent(It.IsAny<JobEventDtoV1>()), Times.Never);
+        _workMasterEventService.Verify(s => s.PostEvent(It.IsAny<WorkMasterEventDtoV1>()), Times.Never);
         _notificationEventService.Verify(s => s.PostEvent(It.IsAny<NotificationEventDtoV1>()), Times.Never);
     }
 
-    private async Task Deliver(string contentType, string payload)
+    private async Task Deliver(string contentType, string payload, string kind = "jobs")
     {
         var message = new MqttApplicationMessageBuilder()
-            .WithTopic("machines/P-04/events/production")
+            .WithTopic($"machines/P-04/events/{kind}")
             .WithContentType(contentType)
             .WithPayload(payload).Build();
 

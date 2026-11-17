@@ -73,7 +73,8 @@ internal sealed class MongoDbInitializer(
             var database = client.GetDatabase(_settings.DatabaseName);
 
             await InitializeNotificationEventCollectionAsync(database, linkedCts.Token).ConfigureAwait(false);
-            await InitializeProductionEventCollectionAsync(database, linkedCts.Token).ConfigureAwait(false);
+            await InitializeJobEventCollectionAsync(database, linkedCts.Token).ConfigureAwait(false);
+            await InitializeWorkMasterEventCollectionAsync(database, linkedCts.Token).ConfigureAwait(false);
 
             // The TTL index is reconciled against retention (applied to an existing collection too),
             // so a changed/removed DataRetentionPeriod is honored every boot — without a rebuild.
@@ -127,30 +128,48 @@ internal sealed class MongoDbInitializer(
         LogIndexesEnsured(logger, indexes.Count, collectionName, null);
     }
 
-    private async Task InitializeProductionEventCollectionAsync(
+    private async Task InitializeJobEventCollectionAsync(
         IMongoDatabase database, CancellationToken cancellationToken)
     {
-        var collectionName = _settings.ProductionEventCollection;
-        var collection = database.GetCollection<ProductionEventDao>(collectionName);
+        var collectionName = _settings.JobEventCollection;
+        var collection = database.GetCollection<JobEventDao>(collectionName);
 
-        var indexes = new List<CreateIndexModel<ProductionEventDao>>
+        var indexes = new List<CreateIndexModel<JobEventDao>>
         {
-            new(Builders<ProductionEventDao>.IndexKeys
+            new(Builders<JobEventDao>.IndexKeys
                     .Ascending(e => e.MId)
                     .Descending(e => e.Timestamp),
                 new CreateIndexOptions { Name = "idx_mid_timestamp" }),
 
-            new(Builders<ProductionEventDao>.IndexKeys
-                    .Ascending(e => e.CorrelationId),
-                new CreateIndexOptions { Name = "idx_correlationid" }),
-
-            new(Builders<ProductionEventDao>.IndexKeys
+            new(Builders<JobEventDao>.IndexKeys
                     .Ascending(e => e.JobOrderId),
                 new CreateIndexOptions { Name = "idx_joborderid" }),
+        };
 
-            new(Builders<ProductionEventDao>.IndexKeys
+        await EnsureIndexesAsync(collection, indexes, cancellationToken).ConfigureAwait(false);
+        LogIndexesEnsured(logger, indexes.Count, collectionName, null);
+    }
+
+    private async Task InitializeWorkMasterEventCollectionAsync(
+        IMongoDatabase database, CancellationToken cancellationToken)
+    {
+        var collectionName = _settings.WorkMasterEventCollection;
+        var collection = database.GetCollection<WorkMasterEventDao>(collectionName);
+
+        var indexes = new List<CreateIndexModel<WorkMasterEventDao>>
+        {
+            new(Builders<WorkMasterEventDao>.IndexKeys
+                    .Ascending(e => e.MId)
+                    .Descending(e => e.Timestamp),
+                new CreateIndexOptions { Name = "idx_mid_timestamp" }),
+
+            new(Builders<WorkMasterEventDao>.IndexKeys
                     .Ascending(e => e.ExecutionId),
                 new CreateIndexOptions { Name = "idx_executionid" }),
+
+            new(Builders<WorkMasterEventDao>.IndexKeys
+                    .Ascending(e => e.JobOrderId),
+                new CreateIndexOptions { Name = "idx_joborderid" }),
         };
 
         await EnsureIndexesAsync(collection, indexes, cancellationToken).ConfigureAwait(false);
@@ -204,9 +223,14 @@ internal sealed class MongoDbInitializer(
             _settings.NotificationEventCollection, retention, cancellationToken).ConfigureAwait(false);
 
         await ApplyTtlAsync(
-            database.GetCollection<ProductionEventDao>(_settings.ProductionEventCollection),
-            Builders<ProductionEventDao>.IndexKeys.Ascending(e => e.Timestamp),
-            _settings.ProductionEventCollection, retention, cancellationToken).ConfigureAwait(false);
+            database.GetCollection<JobEventDao>(_settings.JobEventCollection),
+            Builders<JobEventDao>.IndexKeys.Ascending(e => e.Timestamp),
+            _settings.JobEventCollection, retention, cancellationToken).ConfigureAwait(false);
+
+        await ApplyTtlAsync(
+            database.GetCollection<WorkMasterEventDao>(_settings.WorkMasterEventCollection),
+            Builders<WorkMasterEventDao>.IndexKeys.Ascending(e => e.Timestamp),
+            _settings.WorkMasterEventCollection, retention, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -2,8 +2,8 @@
 namespace Pleiades.Playground.Events.DataTransferObjects;
 
 /// <summary>
-/// The last known state of one job order, put together from its production events when it is read: the state,
-/// times and quantities of its last event, and what its program executions add up to.
+/// The last known state of one job order, put together from its job events when it is read: what is ordered and
+/// what came of it after its last event, and what its program executions add up to.
 /// </summary>
 public sealed record JobOrderDtoV1
 {
@@ -17,7 +17,7 @@ public sealed record JobOrderDtoV1
     public required string State { get; init; }
 
     /// <summary>Its last event.</summary>
-    public ProductionAction LastAction { get; init; }
+    public JobAction LastAction { get; init; }
 
     /// <summary>When its last event happened.</summary>
     public DateTime LastChange { get; init; }
@@ -28,10 +28,28 @@ public sealed record JobOrderDtoV1
     /// <summary>Whether it left the job order list of the machine (its last event is Removed).</summary>
     public bool Removed { get; init; }
 
-    /// <summary>The work master (the program) of its program executions, if known.</summary>
-    public string? WorkMaster { get; init; }
+    /// <summary>Name of the job order.</summary>
+    public string? JobName { get; init; }
 
-    /// <summary>When it started.</summary>
+    /// <summary>The work master it carries out.</summary>
+    public string? WorkMasterId { get; init; }
+
+    /// <summary>Order numbers of the ERP.</summary>
+    public IReadOnlyList<string>? OrderNumbers { get; init; }
+
+    /// <summary>Runs planned.</summary>
+    public long? RunsPlanned { get; init; }
+
+    /// <summary>SimulationMode, TestMode or ProductionMode.</summary>
+    public string? JobExecutionMode { get; init; }
+
+    /// <summary>Planned start, if the machine knows it.</summary>
+    public DateTime? PlannedStartTime { get; init; }
+
+    /// <summary>Planned end, if the machine knows it.</summary>
+    public DateTime? PlannedEndTime { get; init; }
+
+    /// <summary>When it started; null before its start, as every field of its result.</summary>
     public DateTime? StartTime { get; init; }
 
     /// <summary>When it ended or was aborted.</summary>
@@ -43,6 +61,15 @@ public sealed record JobOrderDtoV1
     /// <summary>Of those, the good ones.</summary>
     public double? GoodQuantity { get; init; }
 
+    /// <summary>Runs completed.</summary>
+    public long? RunsCompleted { get; init; }
+
+    /// <summary>Time it was in production, in seconds, at its last event.</summary>
+    public double? ActualProductionTime { get; init; }
+
+    /// <summary>Unknown until it ends, then Successful or Unsuccessful.</summary>
+    public string? JobResult { get; init; }
+
     /// <summary>How many program executions it had.</summary>
     public int ProgramExecutions { get; init; }
 
@@ -53,12 +80,15 @@ public sealed record JobOrderDtoV1
     public double EnergyCompressedAir { get; init; }
 }
 
-/// <summary>A job order with the events it went through, oldest first.</summary>
+/// <summary>A job order with the events it went through and its program executions, oldest first.</summary>
 public sealed record JobOrderHistoryDtoV1
 {
-    /// <summary>The last known state of the job order.</summary>
+    /// <summary>The last known state of the job order, its result included.</summary>
     public required JobOrderDtoV1 JobOrder { get; init; }
 
-    /// <summary>Its events and those of its program executions, oldest first.</summary>
-    public required IReadOnlyList<ProductionEventDtoV1> History { get; init; }
+    /// <summary>Its job events, oldest first.</summary>
+    public required IReadOnlyList<JobEventDtoV1> History { get; init; }
+
+    /// <summary>Its program executions, from start to end, oldest first.</summary>
+    public required IReadOnlyList<ProgramExecutionPairDtoV1> ProgramExecutions { get; init; }
 }

@@ -1,7 +1,8 @@
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using Pleiades.Playground.Events.Api.Repositories.NotificationEvent;
-using Pleiades.Playground.Events.Api.Repositories.ProductionEvent;
+using Pleiades.Playground.Events.Api.Repositories.JobEvent;
+using Pleiades.Playground.Events.Api.Repositories.WorkMasterEvent;
 using Pleiades.Playground.Events.Api.Services;
 
 namespace Pleiades.Playground.Events.Api.Extensions;
@@ -33,7 +34,8 @@ internal static class ServiceCollectionExtension
         // 3. REPOSITORIES - transient for stateless CRUD operations
         // ═══════════════════════════════════════════════════════════════
         services.AddTransient<INotificationEventRepository, NotificationEventRepository>();
-        services.AddTransient<IProductionEventRepository, ProductionEventRepository>();
+        services.AddTransient<IJobEventRepository, JobEventRepository>();
+        services.AddTransient<IWorkMasterEventRepository, WorkMasterEventRepository>();
 
         // ═══════════════════════════════════════════════════════════════
         // 4. INDEX SERVICE

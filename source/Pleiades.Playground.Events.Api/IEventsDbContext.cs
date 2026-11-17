@@ -14,7 +14,12 @@ internal interface IEventsDbContext
     IMongoCollection<NotificationEventDao> NotificationEvents { get; }
 
     /// <summary>
-    /// Production events collection: job orders and program executions.
+    /// Job events collection: job orders and their results.
     /// </summary>
-    IMongoCollection<ProductionEventDao> ProductionEvents { get; }
+    IMongoCollection<JobEventDao> JobEvents { get; }
+
+    /// <summary>
+    /// Work master events collection: program executions.
+    /// </summary>
+    IMongoCollection<WorkMasterEventDao> WorkMasterEvents { get; }
 }

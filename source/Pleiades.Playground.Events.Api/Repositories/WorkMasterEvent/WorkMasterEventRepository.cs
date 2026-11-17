@@ -5,18 +5,18 @@ using Pleiades.Playground.Common.Exceptions;
 using Pleiades.Playground.Common.Pagination;
 using Pleiades.Playground.Events.Api.DataAccessObjects;
 
-namespace Pleiades.Playground.Events.Api.Repositories.ProductionEvent;
+namespace Pleiades.Playground.Events.Api.Repositories.WorkMasterEvent;
 
-/// <summary>Repository of production events in MongoDB.</summary>
+/// <summary>Repository of work master events in MongoDB.</summary>
 [SuppressMessage("Performance", "CA1812", Justification = "Instantiated via DI")]
-internal sealed class ProductionEventRepository(IEventsDbContext dbContext) : IProductionEventRepository
+internal sealed class WorkMasterEventRepository(IEventsDbContext dbContext) : IWorkMasterEventRepository
 {
     /// <inheritdoc />
-    public async Task CreateAsync(ProductionEventDao dao, CancellationToken cancellationToken)
+    public async Task CreateAsync(WorkMasterEventDao dao, CancellationToken cancellationToken)
     {
         try
         {
-            await dbContext.ProductionEvents
+            await dbContext.WorkMasterEvents
                 .InsertOneAsync(dao, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -27,11 +27,11 @@ internal sealed class ProductionEventRepository(IEventsDbContext dbContext) : IP
     }
 
     /// <inheritdoc />
-    public async Task CreateManyAsync(IEnumerable<ProductionEventDao> events, CancellationToken cancellationToken)
+    public async Task CreateManyAsync(IEnumerable<WorkMasterEventDao> events, CancellationToken cancellationToken)
     {
         try
         {
-            await dbContext.ProductionEvents
+            await dbContext.WorkMasterEvents
                 .InsertManyAsync(events, new InsertManyOptions { IsOrdered = false }, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -39,7 +39,7 @@ internal sealed class ProductionEventRepository(IEventsDbContext dbContext) : IP
         {
             if (ex.WriteErrors.Any(e => e.Category == ServerErrorCategory.DuplicateKey))
             {
-                throw new PleiadesDuplicateDataException("Some production events already exist.", ex);
+                throw new PleiadesDuplicateDataException("Some work master events already exist.", ex);
             }
 
             throw;
@@ -47,8 +47,8 @@ internal sealed class ProductionEventRepository(IEventsDbContext dbContext) : IP
     }
 
     /// <inheritdoc />
-    public async Task<(List<ProductionEventDao> Items, long TotalCount)> QueryEventsWithPaginationAsync(
-        ProductionEventFilter filter,
+    public async Task<(List<WorkMasterEventDao> Items, long TotalCount)> QueryEventsWithPaginationAsync(
+        WorkMasterEventFilter filter,
         int skip,
         int take,
         Sorting sorting,
@@ -56,9 +56,9 @@ internal sealed class ProductionEventRepository(IEventsDbContext dbContext) : IP
     {
         ArgumentNullException.ThrowIfNull(filter);
         var definition = Build(filter);
-        var countTask = dbContext.ProductionEvents.CountDocumentsAsync(definition, cancellationToken: cancellationToken);
+        var countTask = dbContext.WorkMasterEvents.CountDocumentsAsync(definition, cancellationToken: cancellationToken);
 
-        var find = dbContext.ProductionEvents.Find(definition);
+        var find = dbContext.WorkMasterEvents.Find(definition);
         find = sorting == Sorting.Ascending ? find.SortBy(e => e.Timestamp) : find.SortByDescending(e => e.Timestamp);
         var itemsTask = find.Skip(skip).Limit(take).ToListAsync(cancellationToken);
 
@@ -67,31 +67,27 @@ internal sealed class ProductionEventRepository(IEventsDbContext dbContext) : IP
     }
 
     /// <inheritdoc />
-    public async Task<List<ProductionEventDao>> FindForViewAsync(ProductionEventFilter filter, CancellationToken cancellationToken)
+    public async Task<List<WorkMasterEventDao>> FindForViewAsync(WorkMasterEventFilter filter, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(filter);
-        var newestFirst = await dbContext.ProductionEvents
+        var newestFirst = await dbContext.WorkMasterEvents
             .Find(Build(filter))
             .SortByDescending(e => e.Timestamp)
-            .Limit(IProductionEventRepository.MaxEventsForViews)
+            .Limit(IWorkMasterEventRepository.MaxEventsForViews)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         newestFirst.Reverse();
         return newestFirst;
     }
 
-    private static FilterDefinition<ProductionEventDao> Build(ProductionEventFilter filter)
+    private static FilterDefinition<WorkMasterEventDao> Build(WorkMasterEventFilter filter)
     {
-        var builder = Builders<ProductionEventDao>.Filter;
-        var parts = new List<FilterDefinition<ProductionEventDao>>();
+        var builder = Builders<WorkMasterEventDao>.Filter;
+        var parts = new List<FilterDefinition<WorkMasterEventDao>>();
 
         if (!string.IsNullOrEmpty(filter.MId))
         {
             parts.Add(builder.Eq(e => e.MId, filter.MId));
-        }
-        if (filter.Subject.HasValue)
-        {
-            parts.Add(builder.Eq(e => e.Subject, filter.Subject.Value));
         }
         if (filter.Action.HasValue)
         {
@@ -100,6 +96,10 @@ internal sealed class ProductionEventRepository(IEventsDbContext dbContext) : IP
         if (!string.IsNullOrEmpty(filter.JobOrderId))
         {
             parts.Add(builder.Eq(e => e.JobOrderId, filter.JobOrderId));
+        }
+        if (!string.IsNullOrEmpty(filter.WorkMasterId))
+        {
+            parts.Add(builder.Eq(e => e.WorkMasterId, filter.WorkMasterId));
         }
         if (filter.From.HasValue)
         {

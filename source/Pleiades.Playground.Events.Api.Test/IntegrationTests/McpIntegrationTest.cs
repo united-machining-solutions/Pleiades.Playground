@@ -1,4 +1,5 @@
-using Pleiades.Playground.Events.Api.Repositories.ProductionEvent;
+using Pleiades.Playground.Events.Api.Repositories.JobEvent;
+using Pleiades.Playground.Events.Api.Repositories.WorkMasterEvent;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
@@ -44,8 +45,9 @@ public class McpIntegrationTest : IntegrationTestBase
         "events_notification_level_distribution",
         "events_notification_time_buckets",
         "events_notification_message_stats",
-        "events_production_query",
+        "events_job_events_query",
         "events_job_orders_query",
+        "events_work_master_events_query",
         "events_program_executions_query"
     ];
 
@@ -184,10 +186,11 @@ public class McpIntegrationTest : IntegrationTestBase
     }
 
     [TestMethod]
-    [DataRow("events_production_query")]
+    [DataRow("events_job_events_query")]
     [DataRow("events_job_orders_query")]
+    [DataRow("events_work_master_events_query")]
     [DataRow("events_program_executions_query")]
-    public async Task CallTool_Production_ReturnsPagedResult(string tool)
+    public async Task CallTool_JobsAndWorkMasters_ReturnsPagedResult(string tool)
     {
         await using var scope = await CreateMcpClientAsync(TestContext.CancellationToken);
 
@@ -207,17 +210,17 @@ public class McpIntegrationTest : IntegrationTestBase
     }
 
     [TestMethod]
-    public async Task CallTool_ProductionQuery_WithAnUnknownSubject_IsRefused()
+    public async Task CallTool_JobEventsQuery_WithAnUnknownAction_IsRefused()
     {
         await using var scope = await CreateMcpClientAsync(TestContext.CancellationToken);
 
         var result = await scope.Client.CallToolAsync(
-            "events_production_query",
-            new Dictionary<string, object?> { ["subject"] = "Machine" },
+            "events_job_events_query",
+            new Dictionary<string, object?> { ["action"] = "Exploded" },
             cancellationToken: TestContext.CancellationToken);
 
         Assert.IsTrue(result.IsError);
-        Assert.Contains("JobOrder", GetTextContent(result) ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("ResultChanged", GetTextContent(result) ?? string.Empty, StringComparison.Ordinal);
     }
 
     [TestMethod]
@@ -410,15 +413,24 @@ public class McpIntegrationTest : IntegrationTestBase
             .ReturnsAsync([]);
         ReplaceService(services, notificationMock.Object);
 
-        // Mock ProductionEventRepository: one job order with one ended program execution
-        var events = Pleiades.Playground.Events.Api.Test.ProductionEventSamples.OneJobOrderWithOneExecution("9000-0000");
-        var productionMock = new Mock<IProductionEventRepository>();
-        productionMock.Setup(r => r.QueryEventsWithPaginationAsync(
-                It.IsAny<ProductionEventFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((events, events.Count));
-        productionMock.Setup(r => r.FindForViewAsync(It.IsAny<ProductionEventFilter>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(events);
-        ReplaceService(services, productionMock.Object);
+        // Mock the repositories of job and work master events: one job order with one ended program execution
+        var jobs = Pleiades.Playground.Events.Api.Test.JobEventSamples.OneJobOrder("9000-0000");
+        var jobMock = new Mock<IJobEventRepository>();
+        jobMock.Setup(r => r.QueryEventsWithPaginationAsync(
+                It.IsAny<JobEventFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((jobs, jobs.Count));
+        jobMock.Setup(r => r.FindForViewAsync(It.IsAny<JobEventFilter>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(jobs);
+        ReplaceService(services, jobMock.Object);
+
+        var executions = Pleiades.Playground.Events.Api.Test.JobEventSamples.OneExecution("9000-0000");
+        var workMasterMock = new Mock<IWorkMasterEventRepository>();
+        workMasterMock.Setup(r => r.QueryEventsWithPaginationAsync(
+                It.IsAny<WorkMasterEventFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((executions, executions.Count));
+        workMasterMock.Setup(r => r.FindForViewAsync(It.IsAny<WorkMasterEventFilter>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(executions);
+        ReplaceService(services, workMasterMock.Object);
     }
 
     private static void ReplaceService<T>(IServiceCollection services, T implementation) where T : class

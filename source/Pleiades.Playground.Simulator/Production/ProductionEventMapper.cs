@@ -7,9 +7,10 @@ using Pleiades.Playground.Simulator.Spec;
 namespace Pleiades.Playground.Simulator.Production;
 
 /// <summary>
-/// Turns an event of the virtual machine into a production event of the playground binding: the same event, the
-/// whole state after it, energy in joule instead of watt hours. The data model keeps a job order and its result in
-/// two lists; a production event carries both, and a change of the result is a <c>Changed</c> of the job order.
+/// Turns an event of the virtual machine into an event of the playground binding: a job event for an event of the
+/// profile JobMonitoring, a work master event for one of WorkMasterMonitoring. The same event, the whole state after
+/// it, energy in joule instead of watt hours. The data model keeps a job order and its result in two lists; a job
+/// event carries both.
 /// </summary>
 internal static class ProductionEventMapper
 {
@@ -19,62 +20,83 @@ internal static class ProductionEventMapper
     /// <summary>Joule in one watt hour.</summary>
     public const double JoulePerWattHour = 3600;
 
-    /// <summary>
-    /// The production event of a job order or program execution event; <see langword="null"/> for any other event.
-    /// </summary>
+    /// <summary>The job event of an event of a job order or its result; <see langword="null"/> for any other event.</summary>
     /// <param name="specEvent">The event of the virtual machine.</param>
     /// <param name="serialNumber">The serial number of the machine, the <c>MId</c>.</param>
-    /// <param name="seq">The number of the production event of the machine, counted by the output.</param>
-    public static ProductionEventDtoV1? From(SpecEvent specEvent, string serialNumber, long? seq = null)
+    /// <param name="seq">The number of the job event of the machine, counted by the output.</param>
+    public static JobEventDtoV1? ToJobEvent(SpecEvent specEvent, string serialNumber, long? seq = null)
     {
         ArgumentNullException.ThrowIfNull(specEvent);
-        var (subject, action) = specEvent.Path switch
-        {
-            var p when p.StartsWith(ProgramExecutionPrefix, StringComparison.Ordinal) =>
-                (ProductionSubject.ProgramExecution, p[ProgramExecutionPrefix.Length..]),
-            var p when p.StartsWith(JobOrderPrefix, StringComparison.Ordinal) =>
-                (ProductionSubject.JobOrder, p[JobOrderPrefix.Length..]),
-            _ => (default(ProductionSubject?), string.Empty),
-        };
-        if (subject is null)
+        if (!specEvent.Path.StartsWith(JobOrderPrefix, StringComparison.Ordinal))
         {
             return null;
-        }
-
-        if (action == "ResultChanged")
-        {
-            action = nameof(ProductionAction.Changed);
         }
 
         // The job order and its result in one: the fields of the two lists do not overlap but for JobOrderID.
         var value = (JsonObject)specEvent.Value.DeepClone();
         foreach (var (name, node) in specEvent.Related ?? [])
         {
-            if (!value.ContainsKey(name) && node is not null)
+            if (!value.ContainsKey(name))
             {
-                value[name] = node.DeepClone();
+                value[name] = node?.DeepClone();
             }
         }
-        var jobOrderId = Text(value, "JobOrderID");
-        var executionId = Text(value, "ExecutionId");
-        return new ProductionEventDtoV1
+        var jobOrderId = Text(value, "JobOrderID") ?? string.Empty;
+        return new JobEventDtoV1
         {
             Timestamp = specEvent.Timestamp.UtcDateTime,
             // The id of the CloudEvent of the spec output: the same event has the same id in both bindings, and a
             // repeated delivery repeats it.
             Id = specEvent.Id,
             MId = serialNumber,
-            Subject = subject.Value,
-            Action = Enum.Parse<ProductionAction>(action),
-            CorrelationId = (subject == ProductionSubject.JobOrder ? jobOrderId : executionId) ?? string.Empty,
+            Action = Enum.Parse<JobAction>(specEvent.Path[JobOrderPrefix.Length..]),
+            CorrelationId = jobOrderId,
             JobOrderId = jobOrderId,
-            ExecutionId = executionId,
-            WorkMaster = Text(value, "ActiveWorkMaster"),
             State = Text(value, "State") ?? string.Empty,
+            JobName = Text(value, "JobName"),
+            WorkMasterId = Text(value, "WorkMasterID"),
+            OrderNumbers = value["OrderNumbers"] is JsonArray numbers ? [.. numbers.Select(n => n!.GetValue<string>())] : null,
+            RunsPlanned = Integer(value, "RunsPlanned"),
+            JobExecutionMode = Text(value, "JobExecutionMode"),
+            PlannedStartTime = Time(value, "PlannedStartTime"),
+            PlannedEndTime = Time(value, "PlannedEndTime"),
             StartTime = Time(value, "StartTime"),
             EndTime = Time(value, "EndTime"),
             ProducedQuantity = Number(value, "ProducedQuantity"),
             GoodQuantity = Number(value, "GoodQuantity"),
+            RunsCompleted = Integer(value, "RunsCompleted"),
+            ActualProductionTime = Number(value, "ActualProductionTime"),
+            JobResult = Text(value, "JobResult"),
+            Seq = seq ?? specEvent.Seq,
+        };
+    }
+
+    /// <summary>The work master event of an event of a program execution; <see langword="null"/> for any other event.</summary>
+    /// <param name="specEvent">The event of the virtual machine.</param>
+    /// <param name="serialNumber">The serial number of the machine, the <c>MId</c>.</param>
+    /// <param name="seq">The number of the work master event of the machine, counted by the output.</param>
+    public static WorkMasterEventDtoV1? ToWorkMasterEvent(SpecEvent specEvent, string serialNumber, long? seq = null)
+    {
+        ArgumentNullException.ThrowIfNull(specEvent);
+        if (!specEvent.Path.StartsWith(ProgramExecutionPrefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var value = specEvent.Value;
+        var executionId = Text(value, "ExecutionId") ?? string.Empty;
+        return new WorkMasterEventDtoV1
+        {
+            Timestamp = specEvent.Timestamp.UtcDateTime,
+            Id = specEvent.Id,
+            MId = serialNumber,
+            Action = Enum.Parse<WorkMasterAction>(specEvent.Path[ProgramExecutionPrefix.Length..]),
+            CorrelationId = executionId,
+            ExecutionId = executionId,
+            WorkMasterId = Text(value, "ActiveWorkMaster"),
+            JobOrderId = Text(value, "JobOrderID"),
+            State = Text(value, "State") ?? string.Empty,
+            StartTime = Time(value, "StartTime") ?? specEvent.Timestamp.UtcDateTime,
             Duration = Number(value, "Duration"),
             PartsProduced = Number(value, "PartsProduced"),
             EnergyElectricity = Number(value, "EnergyElectricity") * JoulePerWattHour,
@@ -91,6 +113,11 @@ internal static class ProductionEventMapper
     private static double? Number(JsonObject value, string name)
     {
         return value[name] is { } node ? double.Parse(node.ToJsonString(), CultureInfo.InvariantCulture) : null;
+    }
+
+    private static long? Integer(JsonObject value, string name)
+    {
+        return value[name] is { } node ? long.Parse(node.ToJsonString(), CultureInfo.InvariantCulture) : null;
     }
 
     private static DateTime? Time(JsonObject value, string name)

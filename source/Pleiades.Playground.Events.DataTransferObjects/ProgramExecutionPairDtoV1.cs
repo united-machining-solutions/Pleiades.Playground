@@ -2,7 +2,7 @@
 namespace Pleiades.Playground.Events.DataTransferObjects;
 
 /// <summary>
-/// One program execution from its start to its end: its Started event paired with its Ended or Aborted event by
+/// One program execution from its start to its end: its Started work master event paired with its Ended or Aborted event by
 /// the <see cref="ExecutionId"/>, with the sums its end carries. A program execution without an end is still
 /// running or interrupted.
 /// </summary>
@@ -17,8 +17,8 @@ public sealed record ProgramExecutionPairDtoV1
     /// <summary>The job order it belongs to, if any.</summary>
     public string? JobOrderId { get; init; }
 
-    /// <summary>The work master (the program) it ran.</summary>
-    public string? WorkMaster { get; init; }
+    /// <summary>The work master it carried out.</summary>
+    public string? WorkMasterId { get; init; }
 
     /// <summary>Its state after its last event: Running, Interrupted, Ended or Aborted.</summary>
     public required string State { get; init; }
@@ -30,7 +30,7 @@ public sealed record ProgramExecutionPairDtoV1
     public DateTime? EndTime { get; init; }
 
     /// <summary>How it ended: Ended or Aborted; null while it runs.</summary>
-    public ProductionAction? EndAction { get; init; }
+    public WorkMasterAction? EndAction { get; init; }
 
     /// <summary>How often it was interrupted.</summary>
     public int Interruptions { get; init; }

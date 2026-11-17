@@ -75,7 +75,7 @@ builder.Services.AddPleiadesDefaultJsonOptions();
 builder.Services.AddHostedService<Worker>();
 
 // A virtual machine runs beside the generators when one of its outputs is on: the output after the data model
-// (simulators/) or the production events of the playground binding (machines/{SerialNumber}/events/production).
+// (simulators/) or the production events of the playground binding (machines/{SerialNumber}/events/jobs and …/events/workmasters).
 if (builder.Configuration.GetValue<bool>("Config:SpecOutput:Enabled")
     || builder.Configuration.GetValue("Config:ProductionEvents:Enabled", defaultValue: true))
 {

@@ -49,7 +49,8 @@ builder.Services
         mcp.Name = "Pleiades-Events";
         mcp.Title = "Events API MCP server for industrial machine event analysis.";
         mcp.Domains.Add("Notification events");
-        mcp.Domains.Add("Production events: job orders and program executions");
+        mcp.Domains.Add("Job events: job orders and their results");
+        mcp.Domains.Add("Work master events: program executions");
         mcp.DiscoveryFlow.Add("Use the events_* query tools for filtered event retrieval and analysis.");
         mcp.WritePolicy = FeaturePolicy.Write(EventsFeature.Name);
     })
@@ -106,15 +107,15 @@ builder.Services.AddOpenApi(options =>
                 JsonValue.Create("Reset")
             ];
         }
-        else if (context.JsonTypeInfo.Type == typeof(ProductionSubject))
+        else if (context.JsonTypeInfo.Type == typeof(JobAction))
         {
             schema.Type = JsonSchemaType.String;
-            schema.Enum = [.. Enum.GetNames<ProductionSubject>().Select(n => (JsonNode)JsonValue.Create(n))];
+            schema.Enum = [.. Enum.GetNames<JobAction>().Select(n => (JsonNode)JsonValue.Create(n))];
         }
-        else if (context.JsonTypeInfo.Type == typeof(ProductionAction))
+        else if (context.JsonTypeInfo.Type == typeof(WorkMasterAction))
         {
             schema.Type = JsonSchemaType.String;
-            schema.Enum = [.. Enum.GetNames<ProductionAction>().Select(n => (JsonNode)JsonValue.Create(n))];
+            schema.Enum = [.. Enum.GetNames<WorkMasterAction>().Select(n => (JsonNode)JsonValue.Create(n))];
         }
         return Task.CompletedTask;
     });
@@ -171,8 +172,9 @@ var notificationEvents = app.MapGroup("notificationEvents").WithTags("Notificati
 notificationEvents.MapNotificationEvents();
 notificationEvents.MapNotificationEventStatistics();
 
-app.MapGroup("productionEvents").WithTags("Production Events").MapProductionEvents();
+app.MapGroup("jobEvents").WithTags("Job Events").MapJobEvents();
 app.MapGroup("jobOrders").WithTags("Job Orders").MapJobOrders();
+app.MapGroup("workMasterEvents").WithTags("Work Master Events").MapWorkMasterEvents();
 
 // MCP tool discovery/queries are reads; the internal API key satisfies the read policy.
 // Non-prod (auth disabled) stays anonymous. The group covers /mcp and GET /skill.

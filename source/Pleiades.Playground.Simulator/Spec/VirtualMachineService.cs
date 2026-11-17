@@ -19,7 +19,7 @@ namespace Pleiades.Playground.Simulator.Spec;
 /// <c>Connection/State = CommunicationFault</c>. A scenario may let the adapter lose the machine now and then
 /// (<see cref="ScenarioConfig.CommunicationFaultInterval"/>): meanwhile only the heartbeat goes out;</item>
 /// <item>the production events (<c>Config:ProductionEvents:Enabled</c>): the job order and program execution events
-/// in the binding of the playground, on <c>machines/{SerialNumber}/events/production</c>, over the connection of the
+/// in the binding of the playground, on <c>machines/{SerialNumber}/events/jobs</c> and <c>…/events/workmasters</c>, over the connection of the
 /// generators.</item>
 /// </list>
 /// The scenario of the virtual machine is the one of <c>Config:SpecOutput</c> in both cases.
@@ -266,7 +266,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
     [LoggerMessage(EventId = 100, Level = LogLevel.Information, Message = "Spec output publishes the virtual machine below {Root}/{SerialNumber}/")]
     private partial void LogStarting(string root, string serialNumber);
 
-    [LoggerMessage(EventId = 101, Level = LogLevel.Information, Message = "Production events of the virtual machine go to machines/{SerialNumber}/events/production")]
+    [LoggerMessage(EventId = 101, Level = LogLevel.Information, Message = "Job and work master events of the virtual machine go to machines/{SerialNumber}/events/jobs and /workmasters")]
     private partial void LogProductionEvents(string serialNumber);
 
     [LoggerMessage(EventId = 102, Level = LogLevel.Information, Message = "Virtual machine is stopping")]

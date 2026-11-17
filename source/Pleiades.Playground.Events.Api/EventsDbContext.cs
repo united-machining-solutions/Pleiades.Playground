@@ -20,6 +20,10 @@ internal sealed class EventsDbContext(IMongoClient client, IOptions<MongoDbSetti
         => _database.GetCollection<NotificationEventDao>(_settings.NotificationEventCollection);
 
     /// <inheritdoc />
-    public IMongoCollection<ProductionEventDao> ProductionEvents
-        => _database.GetCollection<ProductionEventDao>(_settings.ProductionEventCollection);
+    public IMongoCollection<JobEventDao> JobEvents
+        => _database.GetCollection<JobEventDao>(_settings.JobEventCollection);
+
+    /// <inheritdoc />
+    public IMongoCollection<WorkMasterEventDao> WorkMasterEvents
+        => _database.GetCollection<WorkMasterEventDao>(_settings.WorkMasterEventCollection);
 }

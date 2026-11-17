@@ -20,11 +20,17 @@ internal static partial class EventsMapper
     public static partial List<NotificationEventDtoV1> Map(List<NotificationEventDao> source);
     public static partial List<NotificationEventDao> Map(List<NotificationEventDtoV1> source);
 
-    // ProductionEvent
-    public static partial ProductionEventDtoV1 Map(ProductionEventDao source);
-    public static partial ProductionEventDao Map(ProductionEventDtoV1 source);
-    public static partial List<ProductionEventDtoV1> Map(List<ProductionEventDao> source);
-    public static partial List<ProductionEventDao> Map(List<ProductionEventDtoV1> source);
+    // JobEvent
+    public static partial JobEventDtoV1 Map(JobEventDao source);
+    public static partial JobEventDao Map(JobEventDtoV1 source);
+    public static partial List<JobEventDtoV1> Map(List<JobEventDao> source);
+    public static partial List<JobEventDao> Map(List<JobEventDtoV1> source);
+
+    // WorkMasterEvent
+    public static partial WorkMasterEventDtoV1 Map(WorkMasterEventDao source);
+    public static partial WorkMasterEventDao Map(WorkMasterEventDtoV1 source);
+    public static partial List<WorkMasterEventDtoV1> Map(List<WorkMasterEventDao> source);
+    public static partial List<WorkMasterEventDao> Map(List<WorkMasterEventDtoV1> source);
 
     // PairedNotificationEvent, LevelDistribution, TimeBucket (DAO -> DTO only)
     public static partial PairedNotificationEventDtoV1 Map(PairedNotificationEventDao source);

@@ -64,7 +64,7 @@ internal sealed class Config
 
     /// <summary>
     /// The production events of the virtual machine, job orders and program executions, on
-    /// <c>machines/{SerialNumber}/events/production</c>. On by default; the virtual machine runs with the scenario
+    /// <c>machines/{SerialNumber}/events/jobs</c> and <c>…/events/workmasters</c>. On by default; the virtual machine runs with the scenario
     /// of <see cref="SpecOutput"/> whether the spec output is on or not.
     /// </summary>
     public ProductionEventsConfig ProductionEvents { get; init; } = new();

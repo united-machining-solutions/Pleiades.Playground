@@ -6,7 +6,8 @@ using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Common.Json;
 using Pleiades.Playground.Events.Api.Client.Exceptions;
 using Pleiades.Playground.Events.Api.Client.NotificationEvents;
-using Pleiades.Playground.Events.Api.Client.ProductionEvents;
+using Pleiades.Playground.Events.Api.Client.JobEvents;
+using Pleiades.Playground.Events.Api.Client.WorkMasterEvents;
 using Pleiades.Playground.Events.DataTransferObjects;
 using Pleiades.Playground.Common.DataTransferObjects;
 using Pleiades.Playground.HealthChecks.Mqtt;
@@ -17,7 +18,8 @@ namespace Pleiades.Playground.Events.Persistence;
 public class Worker : BackgroundService
 {
     private readonly INotificationEventService _notificationEventService;
-    private readonly IProductionEventService _productionEventService;
+    private readonly IJobEventService _jobEventService;
+    private readonly IWorkMasterEventService _workMasterEventService;
     private readonly IManagedMqttClient _mqttClient;
     private readonly Config _config;
     private readonly ILogger<Worker> _logger;
@@ -39,7 +41,8 @@ public class Worker : BackgroundService
         ILogger<Worker> logger,
         IManagedMqttClient mqttClient,
         INotificationEventService notificationEventService,
-        IProductionEventService productionEventService,
+        IJobEventService jobEventService,
+        IWorkMasterEventService workMasterEventService,
         MqttSubscriptionReadiness readiness)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -49,7 +52,8 @@ public class Worker : BackgroundService
 
         _mqttClient = mqttClient ?? throw new ArgumentNullException(nameof(mqttClient));
         _notificationEventService = notificationEventService ?? throw new ArgumentNullException(nameof(notificationEventService));
-        _productionEventService = productionEventService ?? throw new ArgumentNullException(nameof(productionEventService));
+        _jobEventService = jobEventService ?? throw new ArgumentNullException(nameof(jobEventService));
+        _workMasterEventService = workMasterEventService ?? throw new ArgumentNullException(nameof(workMasterEventService));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -118,8 +122,12 @@ public class Worker : BackgroundService
                 await ProcessEventDto<NotificationEventDtoV1>(payload, _notificationEventService.PostEvent).ConfigureAwait(false);
                 break;
 
-            case var s when s.Equals(nameof(ProductionEventDtoV1).ToLowerInvariant(), StringComparison.Ordinal):
-                await ProcessEventDto<ProductionEventDtoV1>(payload, _productionEventService.PostEvent).ConfigureAwait(false);
+            case var s when s.Equals(nameof(JobEventDtoV1).ToLowerInvariant(), StringComparison.Ordinal):
+                await ProcessEventDto<JobEventDtoV1>(payload, _jobEventService.PostEvent).ConfigureAwait(false);
+                break;
+
+            case var s when s.Equals(nameof(WorkMasterEventDtoV1).ToLowerInvariant(), StringComparison.Ordinal):
+                await ProcessEventDto<WorkMasterEventDtoV1>(payload, _workMasterEventService.PostEvent).ConfigureAwait(false);
                 break;
 
             default:

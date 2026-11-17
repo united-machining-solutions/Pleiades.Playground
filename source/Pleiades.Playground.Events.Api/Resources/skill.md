@@ -4,7 +4,7 @@ This guide helps AI agents effectively use the Events API tools to analyze indus
 
 ## Domain Overview
 
-The Events API tracks notification events and production events from **Pleiades industrial machines**. Each machine is identified by a **machine ID (mId)**, e.g. `9000-0001`. Events have severity levels: Silent, Information, Warning, Error.
+The Events API tracks notification events, job events and work master events from **Pleiades industrial machines**. Each machine is identified by a **machine ID (mId)**, e.g. `9000-0001`. Events have severity levels: Silent, Information, Warning, Error.
 
 ## Event Types
 
@@ -15,14 +15,20 @@ System alerts with a **Raised/Reset lifecycle**:
 - Linked via `correlationId` — use `events_notification_pairs` to see durations
 - Severity levels indicate urgency: Silent < Information < Warning < Error
 
-### Production Events (`events_production_query`)
-What happened to **job orders** and **program executions** (subject `JobOrder` or `ProgramExecution`):
-- The action is named after the state reached: a job order is `Added`, `Released`, `Started`, `Interrupted`,
-  `Resumed`, `Ended`, `Aborted`, `Cancelled` (aborted before it started), `Changed` or `Removed`; a program
-  execution is `Started`, `Interrupted`, `Resumed`, `Ended` or `Aborted`
-- Every event carries the whole state after it; `correlationId` is the jobOrderId or the executionId
-- Duration in seconds, energy in **joule** (1 kWh = 3 600 000 J)
-- `events_job_orders_query` gives the last known state of each job order (state, quantities, energy)
+### Job Events (`events_job_events_query`)
+What happened to **job orders**:
+- The action is named after the state reached: `Added`, `Released`, `Revoked`, `Started`, `Interrupted`,
+  `Resumed`, `Ended`, `Aborted`, `Cancelled` (aborted before it started), `Removed`; or `Changed` (the order
+  changed) and `ResultChanged` (a quantity or the end changed)
+- Every event carries the whole job order after it: what is ordered (`jobName`, `workMasterId`, `runsPlanned`)
+  and, from its start, its result (`producedQuantity`, `goodQuantity`, `runsCompleted`, `jobResult`); before the
+  start the result fields are null. `correlationId` is the jobOrderId
+- `events_job_orders_query` gives the last known state of each job order (state, result, energy)
+
+### Work Master Events (`events_work_master_events_query`)
+What happened to **program executions**, the machine carrying out a work master:
+- `Started`, `Interrupted`, `Resumed`, `Ended`, `Aborted`; `correlationId` is the executionId
+- `Ended` and `Aborted` carry the duration in seconds, the parts and the energy in **joule** (1 kWh = 3 600 000 J)
 - `events_program_executions_query` pairs each program execution from start to end, with duration, parts and energy
 
 ## Recommended Workflows
@@ -30,7 +36,7 @@ What happened to **job orders** and **program executions** (subject `JobOrder` o
 ### Production of a Day
 1. `events_job_orders_query` with `mId`, `state=Ended` and `fromDate`/`toDate` — which job orders ended, with how many parts and how much energy
 2. `events_program_executions_query` with `jobOrderId` — the program executions of one job order, cycle times and aborts
-3. `events_production_query` with `jobOrderId` — every event of one job order, in order
+3. `events_job_events_query` with `jobOrderId` — every event of one job order, in order
 
 
 ### Assess Machine Health

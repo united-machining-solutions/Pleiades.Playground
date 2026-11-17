@@ -11,7 +11,8 @@ using Pleiades.Playground.HealthChecks.Mqtt;
 using Pleiades.Playground.Common.RestApi;
 using Pleiades.Playground.Events.Api.Client;
 using Pleiades.Playground.Events.Api.Client.NotificationEvents;
-using Pleiades.Playground.Events.Api.Client.ProductionEvents;
+using Pleiades.Playground.Events.Api.Client.JobEvents;
+using Pleiades.Playground.Events.Api.Client.WorkMasterEvents;
 using Pleiades.Playground.Events.Persistence;
 using Pleiades.Playground.Mqtt.Extensions;
 
@@ -52,7 +53,10 @@ builder.Services.AddMqttClientHost().AddClient(builder.Configuration.GetSection(
 builder.Services.AddEventsApiService<INotificationEventService, NotificationEventApiService>(apiConfig)
     .AddStandardResilienceHandler(ConfigureEventClientResilience);
 
-builder.Services.AddEventsApiService<IProductionEventService, ProductionEventApiService>(apiConfig)
+builder.Services.AddEventsApiService<IJobEventService, JobEventApiService>(apiConfig)
+    .AddStandardResilienceHandler(ConfigureEventClientResilience);
+
+builder.Services.AddEventsApiService<IWorkMasterEventService, WorkMasterEventApiService>(apiConfig)
     .AddStandardResilienceHandler(ConfigureEventClientResilience);
 
 builder.Services.AddPleiadesDefaultJsonOptions();
