@@ -59,6 +59,21 @@ export const IDENTITY_PATHS = {
 /** Where the alerts and notifications of a machine are published, as CloudEvents, below `machines/{machineId}/`. */
 export const NOTIFICATIONS_PATH = "events/notifications"
 
+/**
+ * The job orders of a machine and what came of them, below `machines/{machineId}/`: two lists of the
+ * data model, retained, each message the whole list. The backend reads the job order that runs from
+ * the events of the Events API; a page that is live hears these lists, which say the same.
+ */
+export const JOB_ORDERS_PATH = "umati/JobMonitoring/JobOrders"
+export const JOB_ORDER_RESULTS_PATH = "umati/JobMonitoring/JobOrderResults"
+
+/**
+ * How far back a machine and its alerts are still looked for, in seconds. A machine that published
+ * nothing for longer is not listed, by the backend and by a page that is live alike: at the broker
+ * its retained values still stand.
+ */
+export const HORIZON_SECONDS = 24 * 60 * 60
+
 export const reading = z.object({
   value: z.string().nullable().describe("The newest value, or null if the topic had none."),
   at: instant.nullable().describe("When the newest value was measured."),

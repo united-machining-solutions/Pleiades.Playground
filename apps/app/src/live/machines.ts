@@ -1,19 +1,50 @@
-import { NOTIFICATIONS_PATH, READING_PATHS, SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
-import type { Machine, MachineList, MachineShow, Notification, Reading, ReadingName, Span, State } from "@pleiades/cards/machine/contract.ts"
+import {
+  HORIZON_SECONDS,
+  IDENTITY_PATHS,
+  JOB_ORDERS_PATH,
+  JOB_ORDER_RESULTS_PATH,
+  NOTIFICATIONS_PATH,
+  READING_PATHS,
+  SILENT_AFTER_SECONDS,
+} from "@pleiades/cards/machine/contract.ts"
+import type {
+  Identity,
+  JobOrder,
+  Machine,
+  MachineList,
+  MachineShow,
+  Notification,
+  Reading,
+  ReadingName,
+  Span,
+  State,
+} from "@pleiades/cards/machine/contract.ts"
 import { stateOf, stateOrder } from "@pleiades/cards/machine/state.ts"
 
-import { filterOf, machineOf, notificationOf, valueOf } from "./messages.ts"
-import type { NotificationEvent, Value } from "./messages.ts"
+import { alertOf, brokerPathsOf, filterOf, listOf, machineOf, valueOf, valuesOf } from "./messages.ts"
+import type { AlertEvent, Value } from "./messages.ts"
 
 // What a machine does now, kept up to date from the broker. The backend gives what held when a
 // page was read; every value the broker sends after that is laid onto it here, by the rules the
 // backend reads the stored values with (apps/genui-mcp/src/machines.ts).
 
 const names = Object.keys(READING_PATHS) as Array<ReadingName>
+const identityNames = Object.keys(IDENTITY_PATHS) as Array<keyof Identity>
 
-/** The topics a page subscribes to for what a machine does now: of one machine, or of every one. */
+/**
+ * The topics a page subscribes to for what a machine does now: of one machine, or of every one.
+ * Its readings, where the broker carries them (a snapshot is one topic; an adapter without snapshots
+ * sends its fields one by one), its alerts, who it is, and the job orders it works on.
+ */
 export function machineFilters(machine = "+"): Array<string> {
-  return [...names.map((name) => filterOf(READING_PATHS[name], machine)), filterOf(NOTIFICATIONS_PATH, machine)]
+  const paths = [
+    ...names.flatMap((name) => brokerPathsOf(READING_PATHS[name])),
+    NOTIFICATIONS_PATH,
+    ...identityNames.map((name) => IDENTITY_PATHS[name]),
+    JOB_ORDERS_PATH,
+    JOB_ORDER_RESULTS_PATH,
+  ]
+  return [...new Set(paths)].map((path) => filterOf(path, machine))
 }
 
 /** A machine the page has not heard of yet: nothing is known about it but its topics. */
@@ -27,11 +58,13 @@ export function unknownMachine(machine: string): Machine {
   })
   return {
     machine,
+    identity: { manufacturer: null, model: null, serialNumber: null },
     connection: reading("connection"),
     heartbeat: reading("heartbeat"),
     itemState: reading("itemState"),
     operationMode: reading("operationMode"),
     program: reading("program"),
+    jobOrder: null,
     lastValueAt: null,
     notifications: [],
   }
@@ -65,27 +98,69 @@ export function withValue(machine: Machine, name: ReadingName, value: Value): Ma
   }
 }
 
-/** A warning or an error that is raised, or one that goes. Other levels are not shown. */
-export function withNotification(machine: Machine, event: NotificationEvent): Machine {
-  const known = machine.notifications.some((one) => one.correlationId === event.correlationId)
-  if (event.action === "Reset") {
-    return known
-      ? { ...machine, notifications: machine.notifications.filter((one) => one.correlationId !== event.correlationId) }
-      : machine
+/**
+ * An alert that is raised or changes stands with the fields of its newest event, and one that is
+ * cleared goes: as the Events API pairs them. A display that knows errors and warnings shows a
+ * `Failure` as an error and every other category as a warning.
+ */
+export function withAlert(machine: Machine, event: AlertEvent): Machine {
+  const known = machine.notifications.find((one) => one.correlationId === event.alertId)
+  if (event.action === "Cleared") {
+    return known ? { ...machine, notifications: machine.notifications.filter((one) => one !== known) } : machine
   }
-  const level = event.level === "Error" ? "Error" : event.level === "Warning" ? "Warning" : null
-  if (known || level === null) return machine
-  const raised: Notification = {
-    correlationId: event.correlationId,
-    notificationId: event.notificationId,
-    level,
-    title: event.title,
-    raisedAt: event.at,
+  const alert: Notification = {
+    correlationId: event.alertId,
+    notificationId: event.errorCode,
+    severity: event.severity,
+    level: event.severity === "Failure" ? "Error" : "Warning",
+    title: event.message,
+    // Since when it stands says the event; one that does not say it keeps what is known, or began now.
+    raisedAt: event.since ?? known?.raisedAt ?? event.at,
     topic: filterOf(NOTIFICATIONS_PATH, machine.machine),
   }
+  if (known && (Object.keys(alert) as Array<keyof Notification>).every((key) => known[key] === alert[key])) return machine
   // The newest first, as the backend lists them.
-  const notifications = [...machine.notifications, raised].sort((a, b) => b.raisedAt.localeCompare(a.raisedAt))
+  const notifications = [...machine.notifications.filter((one) => one !== known), alert].sort((a, b) =>
+    b.raisedAt.localeCompare(a.raisedAt),
+  )
   return { ...machine, notifications }
+}
+
+function sameJobOrder(a: JobOrder | null, b: JobOrder | null): boolean {
+  if (a === null || b === null) return a === b
+  return a.jobOrderId === b.jobOrderId && a.state === b.state && a.producedQuantity === b.producedQuantity && a.runsPlanned === b.runsPlanned
+}
+
+/**
+ * The list of job orders: the one that runs or is interrupted is the job order of the machine, the one
+ * whose state changed last if there are several. A job order that runs has a result from its start,
+ * with nothing produced yet; what it produced says the list of results.
+ */
+export function withJobOrders(machine: Machine, entries: ReadonlyArray<Record<string, unknown>>): Machine {
+  const running = entries
+    .filter((entry) => typeof entry.JobOrderID === "string" && (entry.State === "Running" || entry.State === "Interrupted"))
+    .sort((a, b) => String(b.StateSince ?? "").localeCompare(String(a.StateSince ?? "")))[0]
+  const jobOrderId = running?.JobOrderID
+  const jobOrder: JobOrder | null =
+    running && typeof jobOrderId === "string"
+      ? {
+          jobOrderId,
+          state: String(running.State),
+          producedQuantity: machine.jobOrder?.jobOrderId === jobOrderId ? machine.jobOrder.producedQuantity : 0,
+          runsPlanned: typeof running.RunsPlanned === "number" ? running.RunsPlanned : null,
+        }
+      : null
+  return sameJobOrder(machine.jobOrder, jobOrder) ? machine : { ...machine, jobOrder }
+}
+
+/** The list of results: what came of the job order of the machine so far. */
+export function withJobOrderResults(machine: Machine, entries: ReadonlyArray<Record<string, unknown>>): Machine {
+  const { jobOrder } = machine
+  const result = jobOrder && entries.find((entry) => entry.JobOrderID === jobOrder.jobOrderId)
+  if (!jobOrder || !result || typeof result.ProducedQuantity !== "number") return machine
+  return result.ProducedQuantity === jobOrder.producedQuantity
+    ? machine
+    : { ...machine, jobOrder: { ...jobOrder, producedQuantity: result.ProducedQuantity } }
 }
 
 /**
@@ -93,28 +168,50 @@ export function withNotification(machine: Machine, event: NotificationEvent): Ma
  * `now`, in milliseconds since 1970, is the clock of the server: a value stamped far ahead of it is left out.
  */
 export function machineWith(machine: Machine, topic: string, payload: string, now = Date.now()): Machine {
-  if (topic === filterOf(NOTIFICATIONS_PATH, machine.machine)) {
-    const event = notificationOf(payload, now)
-    return event ? withNotification(machine, event) : machine
+  const below = (path: string) => topic === filterOf(path, machine.machine)
+  if (below(NOTIFICATIONS_PATH)) {
+    const event = alertOf(payload, now)
+    return event ? withAlert(machine, event) : machine
   }
-  const name = names.find((one) => machine[one].topic === topic)
-  const value = name && valueOf(payload, now)
-  return name && value ? withValue(machine, name, value) : machine
+  if (below(JOB_ORDERS_PATH)) {
+    const list = listOf(payload, now)
+    return list ? withJobOrders(machine, list.entries) : machine
+  }
+  if (below(JOB_ORDER_RESULTS_PATH)) {
+    const list = listOf(payload, now)
+    return list ? withJobOrderResults(machine, list.entries) : machine
+  }
+  const identityName = identityNames.find((name) => below(IDENTITY_PATHS[name]))
+  if (identityName) {
+    const value = valueOf(payload, now)
+    return value && typeof value.value === "string" && value.value !== machine.identity[identityName]
+      ? { ...machine, identity: { ...machine.identity, [identityName]: value.value } }
+      : machine
+  }
+  // A value is one reading; a snapshot is one for each of its fields the card reads.
+  return valuesOf(topic, payload, now).reduce((before, one) => {
+    const name = names.find((reading) => before[reading].topic === one.topic)
+    return name ? withValue(before, name, one.value) : before
+  }, machine)
 }
 
-/** What a message does to the list of machines. A machine the list does not know yet joins it with its first value. */
+/**
+ * What a message does to the list of machines. A machine the list does not know yet joins it with its
+ * first sign of life, if that is no older than the backend looks for a machine: at the broker the
+ * retained values of a machine that is long gone still stand.
+ */
 export function listWith(list: MachineList, topic: string, payload: string, now = Date.now()): MachineList {
-  const serial = machineOf(topic)
-  if (serial === undefined) return list
-  const known = list.machines.find((one) => one.machine === serial)
-  const machine = known ?? unknownMachine(serial)
+  const id = machineOf(topic)
+  if (id === undefined) return list
+  const known = list.machines.find((one) => one.machine === id)
+  const machine = known ?? unknownMachine(id)
   const updated = machineWith(machine, topic, payload, now)
   // A message that is not a value of the binding changes nothing, and names no machine either.
   if (updated === machine) return list
-  const machines = known
-    ? list.machines.map((one) => (one === known ? updated : one))
-    : [...list.machines, updated].sort((a, b) => a.machine.localeCompare(b.machine))
-  return { ...list, machines }
+  if (known) return { ...list, machines: list.machines.map((one) => (one === known ? updated : one)) }
+  const sign = updated.lastValueAt
+  if (sign === null || now - Date.parse(sign) > HORIZON_SECONDS * 1000) return list
+  return { ...list, machines: [...list.machines, updated].sort((a, b) => a.machine.localeCompare(b.machine)) }
 }
 
 /** The list at a later instant: whether a machine is silent is read against the clock. */
@@ -139,10 +236,10 @@ export type ChartsPage = {
  * is not known, and the page shows it after the next read.
  */
 export function chartsWith(page: ChartsPage, topic: string, payload: string, now = Date.now()): ChartsPage {
-  const serial = machineOf(topic)
+  const id = machineOf(topic)
   let changed = false
   const machines = page.machines.map((entry) => {
-    if (entry.show.machine.machine !== serial) return entry
+    if (entry.show.machine.machine !== id) return entry
     const next = pageWith({ show: entry.show, spans: entry.spans }, topic, payload, now)
     if (next.show === entry.show) return entry
     changed = true

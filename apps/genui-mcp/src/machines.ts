@@ -1,5 +1,6 @@
 import {
   BAND_SLOTS,
+  HORIZON_SECONDS,
   IDENTITY_PATHS,
   NOTIFICATIONS_PATH,
   READING_PATHS,
@@ -22,10 +23,10 @@ import { secondsBefore } from "./time.ts"
 /** How far back the values are read to find since when a state has lasted. */
 export const WINDOW_SECONDS = 30 * 60
 /**
- * How far back a machine and its open notifications are still looked for. A value has no such
- * limit: the last one of a topic holds, however long ago the machine reported it.
+ * How far back a machine and its open notifications are still looked for: the horizon of the contract. A
+ * value has no such limit: the last one of a topic holds, however long ago the machine reported it.
  */
-export const HORIZON_SECONDS = 24 * 60 * 60
+export { HORIZON_SECONDS }
 /** How many hours back the history of one machine goes, if nobody asks for more or less. */
 export const HISTORY_HOURS = 8
 /** How many hours a history covers at most. */
