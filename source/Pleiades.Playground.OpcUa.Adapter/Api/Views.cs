@@ -12,7 +12,8 @@ namespace Pleiades.Playground.OpcUa.Adapter.Api;
 /// <param name="SecurityMode">The message security mode.</param>
 /// <param name="SecurityPolicy">The short name of the security policy.</param>
 /// <param name="CertificateThumbprint">SHA-1 thumbprint of the certificate the server is known by.</param>
-internal sealed record EndpointView(string Url, SecurityMode SecurityMode, string SecurityPolicy, string? CertificateThumbprint);
+/// <param name="User">The user the session logs in with, or null for a session without a user. Never a password.</param>
+internal sealed record EndpointView(string Url, SecurityMode SecurityMode, string SecurityPolicy, string? CertificateThumbprint, string? User = null);
 
 /// <summary>An OPC UA server that is added to the platform.</summary>
 /// <param name="SerialNumber">The machine id in every topic.</param>
@@ -58,8 +59,26 @@ internal sealed record RankedEndpointView(SecurityMode SecurityMode, string Secu
 /// <summary>The endpoints of a server, strongest first.</summary>
 /// <param name="Url">The address that was asked.</param>
 /// <param name="CertificateThumbprint">SHA-1 thumbprint of the certificate the server presents.</param>
-/// <param name="Endpoints">The endpoints a session without a user can use.</param>
-internal sealed record EndpointRankView(string Url, string? CertificateThumbprint, IReadOnlyList<RankedEndpointView> Endpoints);
+/// <param name="Endpoints">The endpoints a session can use: with the stored user if there is one, else without a user.</param>
+/// <param name="NeedsUser">True if the server accepts no session without a user.</param>
+/// <param name="AcceptsUser">True if the server accepts a user name and a password on an encrypted endpoint.</param>
+/// <param name="User">The user a person stored for this server, or null. Never a password.</param>
+internal sealed record EndpointRankView(
+    string Url,
+    string? CertificateThumbprint,
+    IReadOnlyList<RankedEndpointView> Endpoints,
+    bool NeedsUser,
+    bool AcceptsUser,
+    string? User);
+
+/// <summary>A user a person stored for a server. The password is never shown.</summary>
+/// <param name="Url">The address of the server.</param>
+/// <param name="User">The user name.</param>
+internal sealed record StoredUserView(string Url, string User);
+
+/// <summary>The servers with a stored user.</summary>
+/// <param name="Users">One entry per server.</param>
+internal sealed record StoredUserListView(IReadOnlyList<StoredUserView> Users);
 
 /// <summary>A machine an OPC UA server serves.</summary>
 /// <param name="Node">The object of the machine: the <c>machineNode</c> of its registration.</param>
@@ -120,7 +139,7 @@ internal sealed record ProposalView(
 internal static class Views
 {
     public static EndpointView Endpoint(EndpointRegistration endpoint) =>
-        new(endpoint.Url, endpoint.SecurityMode, endpoint.SecurityPolicy, endpoint.ServerCertificateThumbprint);
+        new(endpoint.Url, endpoint.SecurityMode, endpoint.SecurityPolicy, endpoint.ServerCertificateThumbprint, endpoint.User);
 
     public static ServerView Server(MachineConnection connection, IReadOnlyList<string> sharing) => Mapping(connection, sharing).Server;
 
@@ -153,11 +172,18 @@ internal static class Views
         return new MappingView(server, rows);
     }
 
-    public static EndpointRankView Ranking(string url, IReadOnlyList<RankedEndpoint> ranked) =>
-        new(
-            url,
-            ranked.Count > 0 ? ranked[0].Endpoint.ServerCertificateThumbprint : null,
-            [.. ranked.Select(one => new RankedEndpointView(one.Endpoint.SecurityMode, one.Endpoint.SecurityPolicy, one.Recommended, one.Weak))]);
+    public static EndpointRankView Ranking(EndpointOffer offer)
+    {
+        ArgumentNullException.ThrowIfNull(offer);
+        var ranked = offer.Ranked;
+        return new(
+            offer.Url,
+            offer.Offered.Select(one => one.ServerCertificateThumbprint).FirstOrDefault(thumbprint => thumbprint is not null),
+            [.. ranked.Select(one => new RankedEndpointView(one.Endpoint.SecurityMode, one.Endpoint.SecurityPolicy, one.Recommended, one.Weak))],
+            offer.NeedsUser,
+            offer.AcceptsUser,
+            offer.User);
+    }
 
     public static MachineListView Machines(ServedMachines served, IReadOnlyList<MachineConnection> added)
     {

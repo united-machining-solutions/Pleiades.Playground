@@ -65,6 +65,7 @@ builder.Services.AddOpcUa()
 
 builder.Services.AddSingleton(new RegistrationStore(dataDirectory));
 builder.Services.AddSingleton(new AlertStore(dataDirectory));
+builder.Services.AddSingleton(new CredentialStore(dataDirectory));
 builder.Services.AddSingleton<DraftStore>();
 builder.Services.AddSingleton<OpcUaClient>();
 builder.Services.AddSingleton<RegistrationProbe>();
@@ -101,7 +102,7 @@ builder.Services
         mcp.DiscoveryFlow.Add("A gateway serves several machines under one address: opcua_machine_list lists them, and each gets a proposal of its own with its machineNode.");
     })
     .WithOpcUaMcpFilters()
-    .WithRequestFilters(filters => filters.AddCallToolFilter(AnonymousConnect.Filter))
+    .WithRequestFilters(filters => filters.AddCallToolFilter(ScanConnect.Filter))
     .WithOpcUaCoreTools(McpToolProfile.Services)
     .WithPleiadesToolsFromAssembly();
 builder.Services.PostConfigure<McpServerOptions>(UaToolCatalogue.Apply);

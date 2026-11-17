@@ -256,6 +256,9 @@ prefix of a gateway; both are open.
 |---|---|
 | `GET /endpoints?url=opc.tcp://host:4840` | The endpoints the server offers, strongest first. The first one is the one to register. |
 | `GET /endpoints/machines?url=opc.tcp://host:4840` | The machines the server serves, with node, path and serial number: one, or several behind a gateway. |
+| `PUT /users` | Stores the user of a server, `{ "url", "user", "password" }`, after the server accepted it. The card in the chat sends it; `409` if the server refuses the user. |
+| `GET /users` | The servers with a stored user, without the passwords. |
+| `DELETE /users?url=opc.tcp://host:4840` | Forgets the user of a server. |
 | `PUT /machines/{SerialNumber}?dryRun=true` | Tries a registration: connects, reads every node once, and answers with each raw and converted value. Nothing is stored or published. |
 | `PUT /machines/{SerialNumber}` | Registers the machine, or replaces its registration, and starts it. |
 | `POST /drafts/{draftId}/commit` | Registers what a proposal of the chat holds. The button on the proposal sends it; a draft works once and is kept for 30 minutes. |
@@ -279,7 +282,7 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
   there: the three of the identification, `State.MachineryItemState`, `State.MachineryOperationMode` and
   `OperationCounters.PowerOnDuration`.
 - `endpoint`: the URL, `securityMode` and `securityPolicy`. `serverCertificateThumbprint` is filled in by
-  the adapter at the first connect.
+  the adapter at the first connect, and `user` from the user a person stored for the server; never a password.
 - `machineNode`: the object of the machine, as `opcua_machine_list` names it. Required on a server of several
   machines; left out on a server of one.
 - `elements`: one per value.
@@ -320,10 +323,24 @@ After a reconnect, and after a restart of the adapter, the server is asked for t
   another one later, the adapter does not connect and says so in `lastError`.
 - The adapter is one OPC UA client, with one certificate in `/data/pki`. A server that does not accept unknown
   clients has to trust it once.
-- Not in the proof of concept: a session with a user name or a user certificate. Every session is anonymous.
-  The connect tool of the chat, `opcua_ua_connect`, takes no user name and no password, although the library
-  behind it would: a password typed into the chat would go through the language model. A call that passes one
-  all the same is refused before it reaches a server.
+- **A server that wants a user.** A session is anonymous, or logs in with a user name and a password that a
+  person stored for the server. One user per server; a user certificate is not supported.
+  - The person enters user name and password in the card of `opcua_endpoint_rank`, which shows a form when
+    the server says it wants a user (`needsUser`), and offers one when it only accepts one. The app sends them
+    from its server to `PUT /users`; they are never part of the chat, so the language model does not see them.
+  - The adapter tries the user on the server first, on its strongest encrypted endpoint, and keeps it only if
+    the server accepts it: `secrets/credentials.json` in the data directory, readable by the adapter only.
+    No answer of the adapter contains a password; `GET /users` names the servers and users.
+  - A password goes over an encrypted endpoint only (`SignAndEncrypt`). The ranking offers a session with a
+    user no endpoint that only signs or has no security, and a registration with a user and another mode is
+    refused.
+  - A registration names the user in `endpoint.user`, filled in by the adapter from the stored user; the
+    password stays in the store. Machines share a session only with the same user.
+  - The scan logs in with the stored user too: the connect tool of the chat, `opcua_ua_connect`, takes no user
+    name and no password, although the library behind it would. A filter of the MCP server puts the stored
+    user into the call on the side of the adapter, and refuses a call that brings a user of its own.
+  - Removing the user of a server, `DELETE /users?url=`, stops the machines registered with it from
+    connecting; removing a machine keeps the user.
 
 ## Restart, removal, a server that changed
 
@@ -384,9 +401,19 @@ What the scan of the TRUMPF simulator found, and what it did not. Another server
 - Checks: the solution builds and its tests pass, the 85 of the adapter among them; `pnpm typecheck`,
   `pnpm test` and `pnpm build` pass with the chat commands and cards.
 
+- A user, against the UaGateway, against the K09 simulator and against a simulator that wants a user: the
+  endpoints say `needsUser` and `acceptsUser` as the server offers them; a wrong password is refused with `409`
+  within a second (`BadUserAccessDenied`) and nothing is stored; a server without users, or without an
+  encrypted endpoint for them, is refused with a reason; without a stored user the machine list says that the
+  server wants one; a stored user is filled into a scan connect on the side of the adapter, and a user from the
+  model is refused. The secrets folder is `0700`, the file `0600`.
+
 Not verified: a discovery through the chat from the first question to the click, with a language model; for a
 gateway too. The gateway registrations were tried from the example registration with the prefixed namespaces,
-not from a scan of the model.
+not from a scan of the model. A session that logs in with a user: the gateway had no OPC UA user to test with,
+and the simulator, OPC UA stack 2.0.0, rejects the user token of this client, 2.0.2, with
+`BadIdentityTokenRejected` before it checks the password. The card of the chat was built and type-checked, not
+clicked.
 
 ## Known limits
 
@@ -396,7 +423,11 @@ not from a scan of the model.
 - The tools of the OPC UA library serialize with their own JSON settings; the convention check of the
   repository warns about it at start.
 - The MCP endpoint has no sign-in, like the other services of the demo; every request is the one demo caller.
-- Sessions to a server are anonymous only; a user name or a user certificate is not supported yet.
+- One user per server, with a user name and a password; a user certificate is not supported. The password is
+  kept as written in the data volume, readable by the adapter only, not encrypted with a key of its own.
+- A scan session of the OPC UA MCP library tries a refused user again and again, as the managed session of the
+  stack does; the adapter's own sessions stop on a refused user. A stored user is tried before it is kept, so
+  that happens only when the password changed on the server since: remove the user and enter it again.
 - Behind a gateway, each machine is scanned on its own; a mapping is not yet carried over to the next machine
   of the same kind. Alarms are kept apart by namespace, so a gateway that gives its machines common namespaces
   reports the alarms of each to all.
@@ -431,4 +462,4 @@ stays across deployments.
 - A server that is not TRUMPF's, before the proof of concept counts as done.
 - The issue for the new service ([#105](https://github.com/united-machining-solutions/Pleiades.Playground/issues/105)),
   and a contract under `contracts/` for the management API and the MCP tools.
-- Sessions with a user name or a user certificate.
+- Sessions with a user certificate, and a password encrypted at rest.

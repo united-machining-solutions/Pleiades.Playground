@@ -11,6 +11,8 @@ export type Endpoint = {
   securityMode: SecurityMode
   securityPolicy: string
   certificateThumbprint?: string
+  /** The user the session logs in with; absent for a session without a user. Never a password. */
+  user?: string
 }
 
 export type MappingSummary = {
@@ -83,6 +85,12 @@ export type RankedEndpoints = {
   url: string
   certificateThumbprint?: string
   endpoints: Array<{ securityMode: SecurityMode; securityPolicy: string; recommended: boolean; weak: boolean }>
+  /** The server accepts no session without a user. */
+  needsUser?: boolean
+  /** The server accepts a user name and a password on an encrypted endpoint. */
+  acceptsUser?: boolean
+  /** The user a person stored for this server. */
+  user?: string
 }
 
 /** A machine an OPC UA server serves, as `opcua_machine_list` gives it. */
@@ -209,8 +217,16 @@ export function shownValue(row: MappingRow): string {
   return String(row.value)
 }
 
-/** The security of an endpoint in words: "Encrypted, Aes256_Sha256_RsaPss". */
-export function securityOf(endpoint: Pick<Endpoint, "securityMode" | "securityPolicy">): string {
+/** The security of an endpoint in words: "Encrypted, Aes256_Sha256_RsaPss", with the user if there is one. */
+export function securityOf(endpoint: Pick<Endpoint, "securityMode" | "securityPolicy" | "user">): string {
   const mode = { SignAndEncrypt: "Encrypted", Sign: "Signed only", None: "No security" }[endpoint.securityMode]
-  return endpoint.securityMode === "None" ? mode : `${mode}, ${endpoint.securityPolicy}`
+  const security = endpoint.securityMode === "None" ? mode : `${mode}, ${endpoint.securityPolicy}`
+  return endpoint.user ? `${security}, user ${endpoint.user}` : security
+}
+
+/** What the endpoints card asks of the person about a user: nothing, to enter one, or that one may be entered. */
+export function userStep(values: Pick<RankedEndpoints, "needsUser" | "acceptsUser" | "user">): "none" | "required" | "optional" {
+  if (!values.acceptsUser) return "none"
+  if (values.needsUser && !values.user) return "required"
+  return "optional"
 }

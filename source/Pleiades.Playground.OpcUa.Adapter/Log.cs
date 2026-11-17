@@ -50,4 +50,10 @@ internal static partial class Log
 
     [LoggerMessage(17, LogLevel.Warning, "Machine {SerialNumber} could not be run on the session to {Url}: {Reason} It is tried again while the session stands.")]
     public static partial void MachineAttachFailed(this ILogger logger, string serialNumber, string url, string reason);
+
+    [LoggerMessage(18, LogLevel.Information, "A user {User} is stored for {Url}.")]
+    public static partial void UserStored(this ILogger logger, string url, string user);
+
+    [LoggerMessage(19, LogLevel.Information, "The user of {Url} is removed.")]
+    public static partial void UserRemoved(this ILogger logger, string url);
 }

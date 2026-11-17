@@ -10,6 +10,16 @@ namespace Pleiades.Playground.OpcUa.Adapter.Api;
 /// <summary>One machine: its registration and what it does now.</summary>
 internal sealed record MachineDetail(MachineRegistration Registration, MachineStatus Status);
 
+/// <summary>A user name and a password a person entered for a server.</summary>
+/// <param name="Url">The address of the server, <c>opc.tcp://host:port</c>.</param>
+/// <param name="User">The user name.</param>
+/// <param name="Password">The password. It is stored and never sent back.</param>
+internal sealed record UserRequest(string Url, string User, string Password)
+{
+    /// <summary>Never shows the password, also not in a log.</summary>
+    public override string ToString() => $"UserRequest {{ Url = {Url}, User = {User} }}";
+}
+
 /// <summary>
 /// The management API of the adapter: which machines are added, checking a registration, adding and
 /// removing a machine. Adding and removing are here and not among the MCP tools on purpose: a
@@ -21,6 +31,9 @@ internal static class MachineEndpoints
     {
         app.MapGet("/endpoints", RankEndpoints);
         app.MapGet("/endpoints/machines", FindMachines);
+        app.MapGet("/users", ListUsers);
+        app.MapPut("/users", SaveUser);
+        app.MapDelete("/users", RemoveUser);
         app.MapGet("/machines", List);
         app.MapGet("/machines/{serialNumber}", Show);
         app.MapGet("/machines/{serialNumber}/mapping", Mapping);
@@ -32,7 +45,7 @@ internal static class MachineEndpoints
     /// <summary>Whether an exception says that the OPC UA server, not the request, is the problem.</summary>
     public static bool IsServerFault(Exception exception) =>
         exception is Opc.Ua.ServiceResultException or EndpointNotOfferedException or ServerCertificateChangedException
-            or TimeoutException or System.Net.Sockets.SocketException or InvalidOperationException;
+            or CredentialMissingException or TimeoutException or System.Net.Sockets.SocketException or InvalidOperationException;
 
     /// <summary>The endpoints a server offers, strongest first. The first one is the one to register.</summary>
     private static async Task<IResult> RankEndpoints([FromQuery] string url, MachineSupervisor supervisor, CancellationToken cancellationToken)
@@ -44,7 +57,7 @@ internal static class MachineEndpoints
 
         try
         {
-            return Json(Views.Ranking(url, await supervisor.RankEndpointsAsync(url, cancellationToken).ConfigureAwait(false)));
+            return Json(Views.Ranking(await supervisor.OfferAsync(url, cancellationToken).ConfigureAwait(false)));
         }
         catch (Exception exception) when (IsServerFault(exception))
         {
@@ -69,6 +82,42 @@ internal static class MachineEndpoints
             return Problem(StatusCodes.Status502BadGateway, [$"The server at {url} did not answer: {exception.Message}"]);
         }
     }
+
+    /// <summary>The servers with a stored user, without the passwords.</summary>
+    private static IResult ListUsers(MachineSupervisor supervisor) =>
+        Json(new StoredUserListView([.. supervisor.Users.Select(user => new StoredUserView(user.Url, user.User))]));
+
+    /// <summary>
+    /// Stores the user and password a person entered for a server, after the server accepted them. The
+    /// card of the chat sends this from the server of the app, never the language model.
+    /// </summary>
+    private static async Task<IResult> SaveUser([FromBody] UserRequest request, MachineSupervisor supervisor, CancellationToken cancellationToken)
+    {
+        if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var parsed) || parsed.Scheme != "opc.tcp")
+        {
+            return Problem(StatusCodes.Status400BadRequest, ["url: must be an opc.tcp:// URL."]);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.User) || string.IsNullOrEmpty(request.Password))
+        {
+            return Problem(StatusCodes.Status400BadRequest, ["user and password: both are required."]);
+        }
+
+        try
+        {
+            return await supervisor.SaveUserAsync(request.Url, new Credential(request.User.Trim(), request.Password), cancellationToken).ConfigureAwait(false) is { } refused
+                ? Problem(StatusCodes.Status409Conflict, [refused])
+                : Results.NoContent();
+        }
+        catch (Exception exception) when (IsServerFault(exception))
+        {
+            return Problem(StatusCodes.Status502BadGateway, [$"The server at {request.Url} did not answer: {exception.Message}"]);
+        }
+    }
+
+    /// <summary>Forgets the user of a server.</summary>
+    private static IResult RemoveUser([FromQuery] string url, MachineSupervisor supervisor) =>
+        supervisor.RemoveUser(url) ? Results.NoContent() : Problem(StatusCodes.Status404NotFound, [$"No user is stored for {url}."]);
 
     private static IResult List(MachineSupervisor supervisor) =>
         Json(new ServerListView([.. supervisor.Machines.Select(machine => Views.Server(machine, supervisor.SharingSession(machine)))]));

@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using Opc.Ua;
 using Opc.Ua.Client;
 using Opc.Ua.Client.Discovery;
@@ -48,20 +49,43 @@ internal sealed class EndpointNotOfferedException : Exception
     }
 }
 
+/// <summary>A session with a user is wanted, and no password is stored for that user and server.</summary>
+internal sealed class CredentialMissingException : InvalidOperationException
+{
+    /// <summary>Creates the exception.</summary>
+    public CredentialMissingException()
+    {
+    }
+
+    /// <summary>Creates the exception with a message.</summary>
+    public CredentialMissingException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>Creates the exception with a message and a cause.</summary>
+    public CredentialMissingException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
 /// <summary>
 /// What the adapter does with an OPC UA server before a session exists: ask for its endpoints and
-/// open a session on the one a registration names.
+/// open a session on the one a registration names, without a user or with the user it names.
 /// </summary>
 internal sealed class OpcUaClient : ISessionConnector
 {
     private readonly IOpcUaDiscoveryService _discovery;
     private readonly IManagedSessionFactory _sessions;
+    private readonly CredentialStore _credentials;
 
     /// <summary>Creates the client on the services of the OPC UA stack.</summary>
-    public OpcUaClient(IOpcUaDiscoveryService discovery, IManagedSessionFactory sessions)
+    public OpcUaClient(IOpcUaDiscoveryService discovery, IManagedSessionFactory sessions, CredentialStore credentials)
     {
         _discovery = discovery ?? throw new ArgumentNullException(nameof(discovery));
         _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
+        _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
     }
 
     /// <summary>The endpoints the server at <paramref name="url"/> offers.</summary>
@@ -77,19 +101,41 @@ internal sealed class OpcUaClient : ISessionConnector
     }
 
     /// <summary>
-    /// Opens a session on the endpoint with the security the registration names. The server must
-    /// present the certificate the registration was made with, if it names one.
+    /// Opens a session on the endpoint with the security the registration names, and with its user
+    /// if it names one: the password comes from the credential store, and goes over an encrypted
+    /// endpoint only. The server must present the certificate the registration was made with, if it
+    /// names one.
     /// </summary>
+    /// <param name="endpoint">The endpoint, with the user if the session has one.</param>
+    /// <param name="cancellationToken">Cancels the connect.</param>
+    /// <param name="trial">A user and password to try instead of the stored ones, before they are stored.</param>
     public async Task<(ManagedSession Session, string? ServerCertificateThumbprint)> ConnectAsync(
-        EndpointRegistration endpoint, CancellationToken cancellationToken)
+        EndpointRegistration endpoint, CancellationToken cancellationToken, Credential? trial = null)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
+        Credential? credential = null;
+        if (endpoint.User is { } user)
+        {
+            credential = trial ?? _credentials.Find(endpoint.Url);
+            if (credential is null || !string.Equals(credential.User, user, StringComparison.Ordinal))
+            {
+                throw new CredentialMissingException(
+                    $"No password is stored for the user {user} at {endpoint.Url}. A person enters it on the endpoints card of the chat.");
+            }
+
+            if (endpoint.SecurityMode != SecurityMode.SignAndEncrypt)
+            {
+                throw new EndpointNotOfferedException($"A user logs in at {endpoint.Url} over an encrypted endpoint only.");
+            }
+        }
+
         EndpointDescription? selected = null;
         foreach (var description in await _discovery.GetEndpointsAsync(endpoint.Url, ct: cancellationToken).ConfigureAwait(false))
         {
             var offered = Offered(description);
             if (offered.SecurityMode == endpoint.SecurityMode
                 && string.Equals(offered.SecurityPolicy, endpoint.SecurityPolicy, StringComparison.Ordinal)
+                && (credential is null ? offered.Anonymous : offered.UserName)
                 && description.EndpointUrl?.StartsWith("opc.tcp://", StringComparison.OrdinalIgnoreCase) == true)
             {
                 selected = description;
@@ -100,7 +146,8 @@ internal sealed class OpcUaClient : ISessionConnector
         if (selected is null)
         {
             throw new EndpointNotOfferedException(
-                $"The server at {endpoint.Url} offers no endpoint with {endpoint.SecurityMode} and {endpoint.SecurityPolicy}.");
+                $"The server at {endpoint.Url} offers no endpoint with {endpoint.SecurityMode} and {endpoint.SecurityPolicy}" +
+                (credential is null ? " for a session without a user." : " for a session with a user name."));
         }
 
         var thumbprint = Thumbprint(selected);
@@ -120,7 +167,15 @@ internal sealed class OpcUaClient : ISessionConnector
             selected.EndpointUrl = new UriBuilder(announced) { Host = reached.IdnHost, Port = reached.Port }.ToString();
         }
 
-        var session = await _sessions.ConnectAsync(new ConfiguredEndpoint(null, selected, null), cancellationToken).ConfigureAwait(false);
+        var configured = new ConfiguredEndpoint(null, selected, null);
+        var session = credential is null
+            ? await _sessions.ConnectAsync(configured, cancellationToken).ConfigureAwait(false)
+            : await _sessions.ConnectAsync(
+                configured,
+                builder => builder
+                    .WithUserIdentity(new UserIdentity(credential.User, Encoding.UTF8.GetBytes(credential.Password)))
+                    .WithReconnectPolicy(new RefusedUserPolicy()),
+                cancellationToken).ConfigureAwait(false);
         return (session, thumbprint);
     }
 
@@ -134,9 +189,11 @@ internal sealed class OpcUaClient : ISessionConnector
     private static OfferedEndpoint Offered(EndpointDescription description)
     {
         var anonymous = false;
+        var userName = false;
         foreach (var token in description.UserIdentityTokens)
         {
             anonymous |= token.TokenType == UserTokenType.Anonymous;
+            userName |= token.TokenType == UserTokenType.UserName;
         }
 
         var mode = description.SecurityMode switch
@@ -150,7 +207,8 @@ internal sealed class OpcUaClient : ISessionConnector
             mode,
             EndpointRanking.ShortName(description.SecurityPolicyUri),
             anonymous,
-            Thumbprint(description));
+            Thumbprint(description),
+            userName);
     }
 
     // A thumbprint identifies a certificate; it protects nothing here, so SHA-1 is what tools show.

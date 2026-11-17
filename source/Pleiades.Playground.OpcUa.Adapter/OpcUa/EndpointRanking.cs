@@ -8,12 +8,14 @@ namespace Pleiades.Playground.OpcUa.Adapter.OpcUa;
 /// <param name="SecurityPolicy">The short name of the policy, for example <c>Basic256Sha256</c>.</param>
 /// <param name="Anonymous">Whether the endpoint accepts a session without a user.</param>
 /// <param name="ServerCertificateThumbprint">SHA-1 thumbprint of the certificate the server presents.</param>
+/// <param name="UserName">Whether the endpoint accepts a session with a user name and a password.</param>
 internal sealed record OfferedEndpoint(
     string Url,
     SecurityMode SecurityMode,
     string SecurityPolicy,
     bool Anonymous,
-    string? ServerCertificateThumbprint);
+    string? ServerCertificateThumbprint,
+    bool UserName = false);
 
 /// <summary>An offered endpoint with its place in the order.</summary>
 /// <param name="Endpoint">The endpoint.</param>
@@ -73,12 +75,16 @@ internal static class EndpointRanking
         return ((int)mode * 100) + strength;
     }
 
-    /// <summary>The endpoints a session without a user can use, strongest first.</summary>
-    public static IReadOnlyList<RankedEndpoint> Rank(IEnumerable<OfferedEndpoint> offered)
+    /// <summary>
+    /// The endpoints a session can use, strongest first: without a user, or with a user name and a
+    /// password. A password goes over an encrypted endpoint only, so an endpoint that only signs, or
+    /// does neither, is not offered to a session with a user at all.
+    /// </summary>
+    public static IReadOnlyList<RankedEndpoint> Rank(IEnumerable<OfferedEndpoint> offered, bool withUser = false)
     {
         ArgumentNullException.ThrowIfNull(offered);
         var ordered = offered
-            .Where(endpoint => endpoint.Anonymous)
+            .Where(endpoint => withUser ? endpoint.UserName && endpoint.SecurityMode == SecurityMode.SignAndEncrypt : endpoint.Anonymous)
             .Select(endpoint => (endpoint, score: Score(endpoint.SecurityMode, endpoint.SecurityPolicy)))
             .OrderByDescending(pair => pair.score)
             .ToList();

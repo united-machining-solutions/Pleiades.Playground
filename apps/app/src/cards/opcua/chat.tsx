@@ -1,5 +1,5 @@
 import { CircleAlertIcon, CircleCheckIcon, NetworkIcon, ServerIcon, Trash2Icon } from "lucide-react"
-import { Fragment, useState } from "react"
+import { Fragment, useId, useState } from "react"
 
 import type { ChatTool, ToolLabel } from "@/chat/tool-results.ts"
 import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
@@ -20,6 +20,8 @@ import { Button } from "@pleiades/ui/components/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@pleiades/ui/components/collapsible"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@pleiades/ui/components/field"
+import { Input } from "@pleiades/ui/components/input"
 import {
   Item,
   ItemActions,
@@ -31,7 +33,7 @@ import {
 } from "@pleiades/ui/components/item"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@pleiades/ui/components/table"
 
-import { commitProposal, removeMachine } from "@/opcua/adapter.ts"
+import { commitProposal, removeMachine, storeUser } from "@/opcua/adapter.ts"
 import type { Outcome } from "@/opcua/adapter.ts"
 import {
   machineListOf,
@@ -42,6 +44,7 @@ import {
   securityOf,
   serverListOf,
   shownValue,
+  userStep,
 } from "./results.ts"
 import type {
   MachineList,
@@ -405,25 +408,115 @@ function ShownProposal({ values }: { values: Proposal }) {
   )
 }
 
-function Endpoints({ values }: { values: RankedEndpoints }) {
+/**
+ * The user name and password of a server, typed by the person. They go from here to the server of the
+ * app and on to the adapter, which tries them on the server before it keeps them. They are never part
+ * of the chat, so the language model does not see them.
+ */
+function UserForm({ url, user }: { url: string; user?: string }) {
+  const id = useId()
+  const [outcome, setOutcome] = useState<Outcome>()
+  const [busy, setBusy] = useState(false)
+  const store = async (form: HTMLFormElement) => {
+    const data = new FormData(form)
+    setBusy(true)
+    const result = await storeUser({
+      data: { url, user: String(data.get("user") ?? ""), password: String(data.get("password") ?? "") },
+    })
+    setBusy(false)
+    if (result.ok) form.reset()
+    setOutcome(result)
+  }
+  if (outcome?.ok) {
+    return <Done outcome={outcome} done="The user is stored. Tell the chat to go on: the scan logs in with it." />
+  }
   return (
-    <Card className="gap-0 py-0">
-      <ItemGroup className="gap-0">
-        {values.endpoints.map((endpoint, position) => (
-          <Fragment key={`${endpoint.securityMode}/${endpoint.securityPolicy}`}>
-            {position > 0 && <ItemSeparator className="my-0" />}
-            <Item size="sm">
-              <ItemContent>
-                <ItemTitle>
-                  {securityOf(endpoint)}
-                  {endpoint.recommended && <Badge variant="secondary">Recommended</Badge>}
-                  {endpoint.weak && <Badge variant="outline">Weak</Badge>}
-                </ItemTitle>
-              </ItemContent>
-            </Item>
-          </Fragment>
-        ))}
-      </ItemGroup>
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(event) => {
+        event.preventDefault()
+        void store(event.currentTarget)
+      }}
+    >
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor={`${id}-user`}>User name</FieldLabel>
+          <Input id={`${id}-user`} name="user" autoComplete="username" defaultValue={user} required />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`${id}-password`}>Password</FieldLabel>
+          <Input id={`${id}-password`} name="password" type="password" autoComplete="current-password" required />
+          <FieldDescription>
+            Goes to the OPC UA adapter, not into the chat. The adapter tries it on the server before it keeps it.
+          </FieldDescription>
+        </Field>
+      </FieldGroup>
+      {outcome && <Done outcome={outcome} done="" />}
+      <Button type="submit" disabled={busy}>
+        {busy ? "Trying the user" : "Store the user"}
+      </Button>
+    </form>
+  )
+}
+
+function EndpointList({ values }: { values: RankedEndpoints }) {
+  return (
+    <ItemGroup className="gap-0">
+      {values.endpoints.map((endpoint, position) => (
+        <Fragment key={`${endpoint.securityMode}/${endpoint.securityPolicy}`}>
+          {position > 0 && <ItemSeparator className="my-0" />}
+          <Item size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {securityOf({ ...endpoint, user: values.user })}
+                {endpoint.recommended && <Badge variant="secondary">Recommended</Badge>}
+                {endpoint.weak && <Badge variant="outline">Weak</Badge>}
+              </ItemTitle>
+            </ItemContent>
+          </Item>
+        </Fragment>
+      ))}
+    </ItemGroup>
+  )
+}
+
+function Endpoints({ values }: { values: RankedEndpoints }) {
+  const step = userStep(values)
+  if (step === "none") {
+    return (
+      <Card className="gap-0 py-0">
+        <EndpointList values={values} />
+      </Card>
+    )
+  }
+  if (step === "required") {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>The server wants a user</CardTitle>
+          <CardDescription>
+            {values.url} accepts no session without one. Enter its user name and password here, never in the chat.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <UserForm url={values.url} />
+        </CardContent>
+      </Card>
+    )
+  }
+  return (
+    <Card className="gap-0 pb-0">
+      <CardFooter className="flex-col items-stretch pb-3">
+        <Collapsible>
+          <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
+            {values.user ? `Logs in as ${values.user}: change the user` : "Log in with a user instead"}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-3">
+            <UserForm url={values.url} user={values.user} />
+          </CollapsibleContent>
+        </Collapsible>
+      </CardFooter>
+      <EndpointList values={values} />
     </Card>
   )
 }

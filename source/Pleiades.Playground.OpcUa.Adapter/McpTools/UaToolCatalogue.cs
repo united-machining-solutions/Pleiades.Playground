@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using Pleiades.Playground.OpcUa.Adapter.Registrations;
 
 namespace Pleiades.Playground.OpcUa.Adapter.McpTools;
 
@@ -62,9 +63,9 @@ internal static class UaToolCatalogue
                 tool.ProtocolTool.Annotations ??= new ToolAnnotations();
                 tool.ProtocolTool.Annotations.ReadOnlyHint = true;
                 tool.ProtocolTool.Annotations.DestructiveHint = false;
-                if (renamed == AnonymousConnect.ToolName)
+                if (renamed == ScanConnect.ToolName)
                 {
-                    AnonymousConnect.Strip(tool.ProtocolTool);
+                    ScanConnect.Strip(tool.ProtocolTool);
                 }
 
                 tools.Add(tool);
@@ -74,13 +75,15 @@ internal static class UaToolCatalogue
 }
 
 /// <summary>
-/// The connect tool of the library, for anonymous sessions only. The library accepts a user name
-/// and a password, but a password typed into the chat would go through the language model, and the
-/// adapter runs every machine without a user anyway. So the arguments of a user are taken out of the
-/// tool (<see cref="Strip"/>), and a call that brings them all the same is refused by a filter of the
-/// MCP server before it reaches the tool (<see cref="Filter"/>).
+/// The connect tool of the library, without a user from the language model. The library accepts a
+/// user name and a password, but a password typed into the chat would go through the model. So the
+/// arguments of a user are taken out of the tool (<see cref="Strip"/>), and a call that brings them
+/// all the same is refused by a filter of the MCP server before it reaches the tool
+/// (<see cref="Filter"/>). If a person stored a user for the server, the filter puts it into the call
+/// on the side of the server: the scan logs in as the running machines will, and the model never
+/// sees the password.
 /// </summary>
-internal static class AnonymousConnect
+internal static class ScanConnect
 {
     /// <summary>The name of the tool on this server.</summary>
     public const string ToolName = "opcua_ua_connect";
@@ -90,25 +93,67 @@ internal static class AnonymousConnect
 
     /// <summary>What the model reads when it passes a user.</summary>
     public const string Refusal =
-        "This adapter opens anonymous sessions only. Never ask the person for a user name or a password, and never " +
-        "pass one: a password does not belong in the chat. If the server accepts no anonymous session, tell the " +
-        "person that the adapter does not support a user yet.";
+        "Never pass a user name or a password, and never ask the person for one in the chat: a password does not " +
+        "belong in the chat. If the server wants a user, the card of opcua_endpoint_rank asks the person for it; " +
+        "once it is stored, this tool logs in with it by itself.";
 
     /// <summary>Takes the arguments of a user out of the schema of the connect tool, and says so in its description.</summary>
     public static void Strip(Tool tool)
     {
         ArgumentNullException.ThrowIfNull(tool);
         tool.InputSchema = WithoutUser(tool.InputSchema);
-        tool.Description = $"{tool.Description} The session is anonymous: this tool takes no user name and no password.";
+        tool.Description =
+            $"{tool.Description} This tool takes no user name and no password: if a person stored a user for the server, " +
+            "the session logs in with it by itself, else it is anonymous.";
     }
 
-    /// <summary>Refuses a call of the connect tool that passes a user, before the tool or a server sees it.</summary>
+    /// <summary>
+    /// Refuses a call of the connect tool that passes a user, before the tool or a server sees it, and
+    /// puts the stored user of the server into a call that passes none.
+    /// </summary>
     public static McpRequestHandler<CallToolRequestParams, CallToolResult> Filter(
         McpRequestHandler<CallToolRequestParams, CallToolResult> next) =>
         (request, cancellationToken) =>
-            string.Equals(request.Params?.Name, ToolName, StringComparison.Ordinal) && UserIn(request.Params?.Arguments).Count > 0
-                ? ValueTask.FromResult(Refused())
-                : next(request, cancellationToken);
+        {
+            if (request.Params is not { } call || !string.Equals(call.Name, ToolName, StringComparison.Ordinal))
+            {
+                return next(request, cancellationToken);
+            }
+
+            if (UserIn(call.Arguments).Count > 0)
+            {
+                return ValueTask.FromResult(Refused());
+            }
+
+            var credentials = request.Services?.GetService(typeof(CredentialStore)) as CredentialStore;
+            if (call.Arguments is { } arguments
+                && arguments.TryGetValue("endpointUrl", out var url)
+                && url.ValueKind == JsonValueKind.String
+                && credentials?.Find(url.GetString() ?? string.Empty) is { } credential)
+            {
+                call.Arguments = WithUser(arguments, credential);
+            }
+
+            return next(request, cancellationToken);
+        };
+
+    /// <summary>
+    /// The arguments of a connect call with a stored user: a user name and a password, over an encrypted
+    /// endpoint only.
+    /// </summary>
+    public static Dictionary<string, JsonElement> WithUser(IDictionary<string, JsonElement> arguments, Credential credential)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(credential);
+        var withUser = new Dictionary<string, JsonElement>(arguments, StringComparer.Ordinal)
+        {
+            ["authType"] = JsonSerializer.SerializeToElement("UserName"),
+            ["username"] = JsonSerializer.SerializeToElement(credential.User),
+            ["password"] = JsonSerializer.SerializeToElement(credential.Password),
+            ["securityMode"] = JsonSerializer.SerializeToElement("SignAndEncrypt"),
+        };
+        return withUser;
+    }
 
     /// <summary>The answer to a call that passes a user.</summary>
     public static CallToolResult Refused() => new()

@@ -31,6 +31,10 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
      `opc.tcp://host:port`. Do not try other ports, other spellings or IP addresses of your own: an address
      you guessed may be another machine.
    - An address the person gave is used as it is, without the default. Drop a slash at its end.
+   - `needsUser` true and `user` empty: the server wants a user. The card of the result asks the person for
+     user name and password. Say so in one sentence, never ask for them in the chat, and stop. When the person
+     says it is done, call `opcua_endpoint_rank` again; with `user` set, go on. Every later connect logs in with
+     that user by itself.
 2. **Machines.** `opcua_machine_list` with the same address. It lists the machines the server serves, each
    with its `node`, its `path` below Objects and the serial number read below it.
    - One machine: a server of one machine. Scan it as below; `machineNode` may stay out.
@@ -46,8 +50,8 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
 3. **Session.** `opcua_ua_connect` with `endpointUrl`, `autoAcceptCerts: true` and `name: "scan"`. Leave the
    security arguments out: the tool takes the strongest endpoint by itself. Pass `sessionName: "scan"` to every
    later `opcua_ua_*` call. The person sees the thumbprint of the certificate on the proposal and confirms it
-   there. The session is anonymous: never ask the person for a user name or a password, and never pass one. If
-   the server accepts no anonymous session, say that the adapter does not support a user yet.
+   there. Never pass a user name or a password: if a person stored a user for the server, the session logs in
+   with it by itself, else it is anonymous.
 4. **Namespaces.** `opcua_ua_read_value` of `i=2255`: the namespace array. Position `n` is the URI of
    `ns=n`. You need it for every node of the registration.
 5. **The machine.** `opcua_ua_browse_all` from the `node` of the machine, as `opcua_machine_list` gave it, with

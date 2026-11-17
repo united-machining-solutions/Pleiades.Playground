@@ -73,6 +73,13 @@ internal sealed record EndpointRegistration
     public string? ServerCertificateThumbprint { get; init; }
 
     /// <summary>
+    /// The user name of the session, if the server wants a user. The password is not here: it is in
+    /// the credential store, where a person put it. Null for a session without a user.
+    /// </summary>
+    [Description("Leave out. The adapter fills it in when a person stored a user for this server.")]
+    public string? User { get; init; }
+
+    /// <summary>
     /// Must be true to register an endpoint that is not the strongest one the server offers, or one
     /// without encryption. A decision of a person, never a default.
     /// </summary>

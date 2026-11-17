@@ -4,14 +4,15 @@ namespace Pleiades.Playground.OpcUa.Adapter.OpcUa;
 
 /// <summary>
 /// What makes two registrations one session: the same server, reached at the same address, with
-/// the same security and the same certificate. Several machines behind one aggregation server have
-/// the same key and share one session.
+/// the same security, the same certificate and the same user. Several machines behind one aggregation
+/// server have the same key and share one session.
 /// </summary>
 /// <param name="Url">The address, normalized by <see cref="Normalize"/>.</param>
 /// <param name="SecurityMode">The message security mode.</param>
 /// <param name="SecurityPolicy">The short name of the security policy.</param>
 /// <param name="Thumbprint">The thumbprint of the certificate the server is known by, upper case, or empty.</param>
-internal readonly record struct EndpointKey(string Url, SecurityMode SecurityMode, string SecurityPolicy, string Thumbprint)
+/// <param name="User">The user the session logs in with, or empty for a session without a user.</param>
+internal readonly record struct EndpointKey(string Url, SecurityMode SecurityMode, string SecurityPolicy, string Thumbprint, string User = "")
 {
     /// <summary>The port of OPC UA (IANA), for an address that names none.</summary>
     public const int DefaultPort = 4840;
@@ -24,7 +25,8 @@ internal readonly record struct EndpointKey(string Url, SecurityMode SecurityMod
             Normalize(endpoint.Url),
             endpoint.SecurityMode,
             endpoint.SecurityPolicy,
-            endpoint.ServerCertificateThumbprint?.ToUpperInvariant() ?? string.Empty);
+            endpoint.ServerCertificateThumbprint?.ToUpperInvariant() ?? string.Empty,
+            endpoint.User ?? string.Empty);
     }
 
     /// <summary>

@@ -42,7 +42,9 @@ internal sealed class DiscoveryTools(MachineSupervisor supervisor)
          "Ask an OPC UA server for its endpoints and order them from strongest to weakest security. The first one, " +
          "marked recommended, is the one a registration must name. Also returns the thumbprint of the certificate " +
          "the server presents. Call it first when a person names a server address. A machine named without an " +
-         "address has the default endpoint opc.tcp://<machine>:4840; if that does not answer, ask the person for the endpoint.")]
+         "address has the default endpoint opc.tcp://<machine>:4840; if that does not answer, ask the person for the endpoint. " +
+         "needsUser true and user null: the server wants a user. The card of this result asks the person for user name and " +
+         "password; never ask for them in the chat. Wait until the person says it is done, then call this tool again.")]
     public async Task<EndpointRankView> RankEndpoints(
         [Description("Address of the server, for example opc.tcp://192.168.1.20:4840, or opc.tcp://<machine>:4840 for a machine named without an address.")] string url,
         CancellationToken cancellationToken = default)
@@ -54,7 +56,7 @@ internal sealed class DiscoveryTools(MachineSupervisor supervisor)
 
         try
         {
-            return Views.Ranking(url, await supervisor.RankEndpointsAsync(url, cancellationToken).ConfigureAwait(false));
+            return Views.Ranking(await supervisor.OfferAsync(url, cancellationToken).ConfigureAwait(false));
         }
         catch (Exception exception) when (MachineEndpoints.IsServerFault(exception))
         {

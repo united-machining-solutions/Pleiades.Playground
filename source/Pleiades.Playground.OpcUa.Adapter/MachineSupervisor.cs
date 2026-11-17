@@ -22,6 +22,22 @@ internal sealed record RegistrationOutcome(
     public bool Registered => Registration is not null && Problems.Count == 0;
 }
 
+/// <summary>The endpoints a server offers, and the user a person stored for it.</summary>
+/// <param name="Url">The address that was asked.</param>
+/// <param name="Offered">Every endpoint of the server.</param>
+/// <param name="User">The user a person stored for this server, or null.</param>
+internal sealed record EndpointOffer(string Url, IReadOnlyList<OfferedEndpoint> Offered, string? User)
+{
+    /// <summary>The endpoints a session can use, strongest first: with the stored user if there is one, else without a user.</summary>
+    public IReadOnlyList<RankedEndpoint> Ranked => EndpointRanking.Rank(Offered, withUser: User is not null);
+
+    /// <summary>True if the server accepts no session without a user.</summary>
+    public bool NeedsUser => Offered.Count > 0 && !Offered.Any(endpoint => endpoint.Anonymous);
+
+    /// <summary>True if the server accepts a user name and a password on an encrypted endpoint.</summary>
+    public bool AcceptsUser => Offered.Any(endpoint => endpoint.UserName && endpoint.SecurityMode == SecurityMode.SignAndEncrypt);
+}
+
 /// <summary>What an OPC UA server serves: its endpoints and its machines.</summary>
 /// <param name="Url">The address that was asked.</param>
 /// <param name="Endpoints">The endpoints of the server, strongest first. The machines were read on the first one.</param>
@@ -48,6 +64,7 @@ internal sealed class MachineSupervisor : BackgroundService
     private readonly RegistrationProbe _probe;
     private readonly IMachinePublisher _publisher;
     private readonly DraftStore _drafts;
+    private readonly CredentialStore _credentials;
     private readonly Config _config;
     private readonly ILogger<MachineSupervisor> _logger;
     private CancellationToken _stopping;
@@ -59,9 +76,11 @@ internal sealed class MachineSupervisor : BackgroundService
         RegistrationProbe probe,
         IMachinePublisher publisher,
         DraftStore drafts,
+        CredentialStore credentials,
         IOptions<Config> config,
         ILogger<MachineSupervisor> logger)
     {
+        _credentials = credentials;
         _store = store;
         _alertStore = alertStore;
         _client = client;
@@ -92,14 +111,26 @@ internal sealed class MachineSupervisor : BackgroundService
     public async Task<ServedMachines> FindMachinesAsync(string url, CancellationToken cancellationToken)
     {
         url = EndpointKey.Trim(url);
-        var endpoints = await RankEndpointsAsync(url, cancellationToken).ConfigureAwait(false);
+        var offer = await OfferAsync(url, cancellationToken).ConfigureAwait(false);
+        var endpoints = offer.Ranked;
         if (endpoints.Count == 0)
         {
+            if (offer.NeedsUser && offer.User is null)
+            {
+                throw new CredentialMissingException(WantsUser(url, offer));
+            }
+
             return new ServedMachines(url, endpoints, []);
         }
 
         var best = endpoints[0].Endpoint;
-        var endpoint = new EndpointRegistration { Url = url, SecurityMode = best.SecurityMode, SecurityPolicy = best.SecurityPolicy };
+        var endpoint = new EndpointRegistration
+        {
+            Url = url,
+            SecurityMode = best.SecurityMode,
+            SecurityPolicy = best.SecurityPolicy,
+            User = offer.User,
+        };
         var (session, _) = await _client.ConnectAsync(endpoint, cancellationToken).ConfigureAwait(false);
         var shared = new ManagedEndpointSession(session);
         await using (shared.ConfigureAwait(false))
@@ -116,9 +147,84 @@ internal sealed class MachineSupervisor : BackgroundService
         }
     }
 
-    /// <summary>The endpoints of a server, strongest first.</summary>
+    /// <summary>The endpoints of a server, and the user a person stored for it.</summary>
+    public async Task<EndpointOffer> OfferAsync(string url, CancellationToken cancellationToken)
+    {
+        url = EndpointKey.Trim(url);
+        var offered = await _client.GetEndpointsAsync(url, cancellationToken).ConfigureAwait(false);
+        return new EndpointOffer(url, offered, _credentials.Find(url)?.User);
+    }
+
+    /// <summary>The endpoints of a server a session can use, strongest first.</summary>
     public async Task<IReadOnlyList<RankedEndpoint>> RankEndpointsAsync(string url, CancellationToken cancellationToken) =>
-        EndpointRanking.Rank(await _client.GetEndpointsAsync(url, cancellationToken).ConfigureAwait(false));
+        (await OfferAsync(url, cancellationToken).ConfigureAwait(false)).Ranked;
+
+    /// <summary>
+    /// Stores the user and password a person entered for a server, after the server accepted them in
+    /// a session of its strongest encrypted endpoint. Returns why not, or null if they are stored.
+    /// </summary>
+    public async Task<string?> SaveUserAsync(string url, Credential credential, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(credential);
+        url = EndpointKey.Trim(url);
+        var offer = await OfferAsync(url, cancellationToken).ConfigureAwait(false);
+        var ranked = EndpointRanking.Rank(offer.Offered, withUser: true);
+        if (ranked.Count == 0)
+        {
+            return $"The server at {url} accepts no user name and password on an encrypted endpoint.";
+        }
+
+        // Tried before it is kept: a wrong password is told the person now, not by a machine that does not connect.
+        using var trial = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        trial.CancelAfter(UserTrialTimeout);
+        try
+        {
+            var best = ranked[0].Endpoint;
+            var endpoint = new EndpointRegistration { Url = url, SecurityMode = best.SecurityMode, SecurityPolicy = best.SecurityPolicy, User = credential.User };
+            var (session, _) = await _client.ConnectAsync(endpoint, trial.Token, credential).ConfigureAwait(false);
+            var tried = new ManagedEndpointSession(session);
+            await using (tried.ConfigureAwait(false))
+            {
+                await tried.CloseAsync().ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return $"The server at {url} did not accept the user {credential.User} within {UserTrialTimeout.TotalSeconds:0} seconds.";
+        }
+        catch (Exception exception) when (MachineEndpointsFault(exception))
+        {
+            return $"The server at {url} did not accept the user {credential.User}: {exception.Message}";
+        }
+
+        _credentials.Save(url, credential);
+        _logger.UserStored(url, credential.User);
+        return null;
+    }
+
+    private static readonly TimeSpan UserTrialTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>Forgets the user of a server. Machines registered with it do not connect any more.</summary>
+    public bool RemoveUser(string url)
+    {
+        var removed = _credentials.Remove(EndpointKey.Trim(url));
+        if (removed)
+        {
+            _logger.UserRemoved(EndpointKey.Trim(url));
+        }
+
+        return removed;
+    }
+
+    /// <summary>The servers with a stored user, without the passwords.</summary>
+    public IReadOnlyList<StoredUser> Users => _credentials.Users;
+
+    private static string WantsUser(string url, EndpointOffer offer) =>
+        offer.AcceptsUser
+            ? $"The server at {url} accepts no session without a user. A person enters a user name and a password on the endpoints card of the chat (opcua_endpoint_rank); never in the chat itself."
+            : $"The server at {url} accepts no session without a user, and no user name with a password on an encrypted endpoint.";
+
+    private static bool MachineEndpointsFault(Exception exception) => Api.MachineEndpoints.IsServerFault(exception);
 
     /// <summary>
     /// Checks a registration against its server and, unless <paramref name="dryRun"/>, stores it and
@@ -130,6 +236,12 @@ internal sealed class MachineSupervisor : BackgroundService
         ArgumentNullException.ThrowIfNull(registration);
         registration = registration with { Endpoint = registration.Endpoint with { Url = EndpointKey.Trim(registration.Endpoint.Url) } };
 
+        // The user a person stored for the server is the user of the session; the password stays in the store.
+        if (registration.Endpoint.User is null && _credentials.Find(registration.Endpoint.Url) is { } storedUser)
+        {
+            registration = registration with { Endpoint = registration.Endpoint with { User = storedUser.User } };
+        }
+
         // What the adapter knows of a namespace is not left to the scan.
         registration = KnownMappings.Apply(registration);
         var problems = RegistrationValidator.Validate(registration);
@@ -139,13 +251,19 @@ internal sealed class MachineSupervisor : BackgroundService
         }
 
         // The strongest endpoint the server offers is taken, unless a person decided otherwise.
-        var endpoints = await RankEndpointsAsync(registration.Endpoint.Url, cancellationToken).ConfigureAwait(false);
+        var offer = await OfferAsync(registration.Endpoint.Url, cancellationToken).ConfigureAwait(false);
+        var endpoints = EndpointRanking.Rank(offer.Offered, withUser: registration.Endpoint.User is not null);
         var chosen = endpoints.FirstOrDefault(ranked =>
             ranked.Endpoint.SecurityMode == registration.Endpoint.SecurityMode
             && ranked.Endpoint.SecurityPolicy == registration.Endpoint.SecurityPolicy);
         if (chosen is null)
         {
-            return new RegistrationOutcome(null, ["endpoint: the server offers no such endpoint for a session without a user."], endpoints, null);
+            var problem = registration.Endpoint.User is null && offer.NeedsUser
+                ? $"endpoint: {WantsUser(registration.Endpoint.Url, offer)} Then propose again."
+                : registration.Endpoint.User is null
+                    ? "endpoint: the server offers no such endpoint for a session without a user."
+                    : "endpoint: the server offers no such endpoint for a session with a user name.";
+            return new RegistrationOutcome(null, [problem], endpoints, null);
         }
 
         if ((!chosen.Recommended || chosen.Weak) && !registration.Endpoint.AllowWeaker)

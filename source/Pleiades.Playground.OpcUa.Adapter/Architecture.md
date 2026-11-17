@@ -77,6 +77,8 @@ and the certificate of the adapter.
 │   └── <serial>.json        the registration of one machine
 ├── alerts/
 │   └── <serial>.json        the alarms of that machine that stand
+├── secrets/
+│   └── credentials.json     the user and password of each server that wants one
 └── pki/
     ├── certs/               the certificates of the adapter, public part (.der)
     └── private/             the same with their private keys (.pfx)
@@ -84,7 +86,8 @@ and the certificate of the adapter.
 
 | What | Where | Written by | Read |
 |---|---|---|---|
-| Endpoint of a machine: `url`, `securityMode`, `securityPolicy`, `allowWeaker` | `machines/<serial>.json`, `endpoint` | [`RegistrationStore`](Registrations/RegistrationStore.cs), when a registration is added or replaced | At start and when the machine is added |
+| Endpoint of a machine: `url`, `securityMode`, `securityPolicy`, `allowWeaker`, `user` | `machines/<serial>.json`, `endpoint` | [`RegistrationStore`](Registrations/RegistrationStore.cs), when a registration is added or replaced | At start and when the machine is added |
+| Password of the user of a server | `secrets/credentials.json`, one entry per server address, readable by the adapter only (the folder `0700`, the file `0600`) | [`CredentialStore`](Registrations/CredentialStore.cs), when a person enters a user on the card in the chat (`PUT /users`) and the server accepted it | On every connect with that user, by the running machines and by a scan; never sent back |
 | Certificate of the server, pinned | `machines/<serial>.json`, `endpoint.serverCertificateThumbprint` (SHA-1) | The adapter, from the certificate the server presented at the registration | On every connect: another certificate is refused, the machine says why in `lastError` |
 | Machine on a server of several machines | `machines/<serial>.json`, `machineNode` | The registration | By the checks of a new registration, and by the alarm filter |
 | Nodes, units, conversions, alarm type | `machines/<serial>.json`, `elements`, `alerts` | The registration | When the machine is attached to its session |

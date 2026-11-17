@@ -220,8 +220,9 @@ All notable changes are documented here. The format follows
   `opcua_machine_list`, each with the serial number read on the server, get one registration each, and share
   one session per endpoint. The simulator of the stack runs definition `K09`, machine `A1121O0001`. Known
   mappings: for a namespace whose meaning is fixed the adapter sets an element itself, so far
-  `Identification.Model` of a TRUMPF MachineTool instance. The connect tool of the chat takes no user name or
-  password.
+  `Identification.Model` of a TRUMPF MachineTool instance. A server that wants a user: a person enters user
+  name and password in a card of the chat, the adapter tries them and keeps them in its data volume, and every
+  session of that server logs in with them; the password never enters the chat.
 
 ### Changed
 

@@ -1,8 +1,9 @@
 import { createServerFn } from "@tanstack/react-start"
 
-// The two steps of a person: adding a machine a scan proposed, and removing one. They go to the
-// management API of the OPC UA adapter from the server of the app, never from the browser and
-// never from the language model: no tool of the chat can do either.
+// The steps of a person: adding a machine a scan proposed, removing one, and storing the user of a
+// server that wants one. They go to the management API of the OPC UA adapter from the server of the
+// app, never from the browser and never from the language model: no tool of the chat can do any of
+// them, and a password never enters the chat.
 
 /** Where the management API of the adapter answers, or undefined if the app has no adapter. */
 export function adapterUrl(env: NodeJS.ProcessEnv = process.env): string | undefined {
@@ -13,11 +14,15 @@ export function adapterUrl(env: NodeJS.ProcessEnv = process.env): string | undef
 /** What became of a click: done, or why not in a sentence. */
 export type Outcome = { ok: true } | { ok: false; reason: string }
 
-async function send(path: string, method: "POST" | "DELETE"): Promise<Outcome> {
+async function send(path: string, method: "POST" | "PUT" | "DELETE", payload?: unknown): Promise<Outcome> {
   const base = adapterUrl()
   if (!base) return { ok: false, reason: "The app has no OPC UA adapter (OPCUA_ADAPTER_URL is empty)." }
   try {
-    const response = await fetch(`${base}${path}`, { method, signal: AbortSignal.timeout(90_000) })
+    const response = await fetch(`${base}${path}`, {
+      method,
+      signal: AbortSignal.timeout(90_000),
+      ...(payload !== undefined && { headers: { "content-type": "application/json" }, body: JSON.stringify(payload) }),
+    })
     if (response.ok) return { ok: true }
     // The adapter says why, one reason a line.
     const body = (await response.json().catch(() => ({}))) as { problems?: Array<string> }
@@ -42,6 +47,28 @@ export const removeMachine = createServerFn({ method: "POST" })
     return serialNumber
   })
   .handler(({ data: serialNumber }) => send(`/machines/${encodeURIComponent(serialNumber)}`, "DELETE"))
+
+/** A user name and a password for an OPC UA server, as a person typed them into the card. */
+export type UserOfServer = { url: string; user: string; password: string }
+
+/** Checks what the card sends: an opc.tcp address, a user name, and a password that is not empty. */
+export function userOfServer(value: unknown): UserOfServer {
+  const given = (value ?? {}) as Partial<Record<keyof UserOfServer, unknown>>
+  const url = typeof given.url === "string" ? given.url.trim() : ""
+  const user = typeof given.user === "string" ? given.user.trim() : ""
+  const password = typeof given.password === "string" ? given.password : ""
+  if (!/^opc\.tcp:\/\/[^\s/]+/i.test(url)) throw new Error("The server is named by its opc.tcp:// address.")
+  if (!user || !password) throw new Error("A user name and a password are both needed.")
+  return { url, user, password }
+}
+
+/**
+ * Stores the user of a server. The adapter tries it on the server first and keeps it only if the
+ * server accepts it; the password is not sent back, and the language model never sees it.
+ */
+export const storeUser = createServerFn({ method: "POST" })
+  .validator(userOfServer)
+  .handler(({ data }) => send("/users", "PUT", data))
 
 /**
  * Whether the adapter answers. The chat offers the OPC UA commands only then. Asked at most every

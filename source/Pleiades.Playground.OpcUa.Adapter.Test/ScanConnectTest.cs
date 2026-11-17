@@ -4,7 +4,7 @@ using Pleiades.Playground.OpcUa.Adapter.McpTools;
 namespace Pleiades.Playground.OpcUa.Adapter.Test;
 
 [TestClass]
-public class AnonymousConnectTest
+public class ScanConnectTest
 {
     private static Dictionary<string, JsonElement> Arguments(string json) =>
         JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json)!;
@@ -14,18 +14,18 @@ public class AnonymousConnectTest
     {
         CollectionAssert.AreEqual(
             new[] { "authType", "username", "password" },
-            AnonymousConnect.UserIn(Arguments("""{"endpointUrl":"opc.tcp://m:4840","authType":"UserName","username":"admin","password":"admin"}""")).ToArray());
+            ScanConnect.UserIn(Arguments("""{"endpointUrl":"opc.tcp://m:4840","authType":"UserName","username":"admin","password":"admin"}""")).ToArray());
         CollectionAssert.AreEqual(
             new[] { "password" },
-            AnonymousConnect.UserIn(Arguments("""{"endpointUrl":"opc.tcp://m:4840","Password":"secret"}""")).ToArray());
+            ScanConnect.UserIn(Arguments("""{"endpointUrl":"opc.tcp://m:4840","Password":"secret"}""")).ToArray());
     }
 
     [TestMethod]
     public void An_anonymous_call_passes()
     {
-        Assert.IsEmpty(AnonymousConnect.UserIn(Arguments("""{"endpointUrl":"opc.tcp://m:4840","autoAcceptCerts":true,"name":"scan"}""")));
-        Assert.IsEmpty(AnonymousConnect.UserIn(Arguments("""{"endpointUrl":"opc.tcp://m:4840","authType":"Anonymous","username":null,"password":""}""")));
-        Assert.IsEmpty(AnonymousConnect.UserIn(null));
+        Assert.IsEmpty(ScanConnect.UserIn(Arguments("""{"endpointUrl":"opc.tcp://m:4840","autoAcceptCerts":true,"name":"scan"}""")));
+        Assert.IsEmpty(ScanConnect.UserIn(Arguments("""{"endpointUrl":"opc.tcp://m:4840","authType":"Anonymous","username":null,"password":""}""")));
+        Assert.IsEmpty(ScanConnect.UserIn(null));
     }
 
     [TestMethod]
@@ -45,7 +45,7 @@ public class AnonymousConnectTest
             required = new[] { "endpointUrl", "username" },
         });
 
-        var stripped = AnonymousConnect.WithoutUser(schema);
+        var stripped = ScanConnect.WithoutUser(schema);
 
         var properties = stripped.GetProperty("properties").EnumerateObject().Select(property => property.Name).ToArray();
         CollectionAssert.AreEqual(new[] { "endpointUrl", "name" }, properties);

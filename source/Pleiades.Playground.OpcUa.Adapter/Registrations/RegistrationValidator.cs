@@ -34,6 +34,12 @@ internal static class RegistrationValidator
             problems.Add("endpoint.url: must be an opc.tcp:// URL.");
         }
 
+        if (registration.Endpoint.User is { } user
+            && (string.IsNullOrWhiteSpace(user) || registration.Endpoint.SecurityMode != SecurityMode.SignAndEncrypt))
+        {
+            problems.Add("endpoint.user: a user logs in over an encrypted endpoint only (SignAndEncrypt), with a user name that is not empty.");
+        }
+
         if (string.IsNullOrWhiteSpace(registration.Endpoint.SecurityPolicy))
         {
             problems.Add("endpoint.securityPolicy: is required, for example Aes256_Sha256_RsaPss.");

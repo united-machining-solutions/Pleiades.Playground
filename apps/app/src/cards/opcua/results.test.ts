@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { machineListOf, mappingOf, needingALook, proposalOf, securityOf, serverListOf, shownValue } from "./results.ts"
+import { machineListOf, mappingOf, needingALook, proposalOf, securityOf, serverListOf, shownValue, userStep } from "./results.ts"
 
 const server = {
   serialNumber: "A0280O0001",
@@ -70,4 +70,16 @@ test("a value is shown with its unit and without binary noise", () => {
 test("the security of an endpoint is said in words", () => {
   assert.equal(securityOf(server.endpoint as never), "Encrypted, Aes256_Sha256_RsaPss")
   assert.equal(securityOf({ securityMode: "None", securityPolicy: "None" }), "No security")
+  assert.equal(
+    securityOf({ securityMode: "SignAndEncrypt", securityPolicy: "Aes256_Sha256_RsaPss", user: "operator" }),
+    "Encrypted, Aes256_Sha256_RsaPss, user operator",
+  )
+})
+
+test("the endpoints card asks for a user only where the server takes one", () => {
+  assert.equal(userStep({ needsUser: true, acceptsUser: true }), "required")
+  assert.equal(userStep({ needsUser: true, acceptsUser: true, user: "operator" }), "optional")
+  assert.equal(userStep({ needsUser: false, acceptsUser: true }), "optional")
+  assert.equal(userStep({ needsUser: true, acceptsUser: false }), "none")
+  assert.equal(userStep({}), "none")
 })
