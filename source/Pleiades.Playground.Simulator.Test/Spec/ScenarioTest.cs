@@ -34,10 +34,14 @@ public sealed class ScenarioTest
         var programs = config.Scenario.Jobs.Select(j => j.Program).ToHashSet();
         var started = messages.OfType<SpecEvent>().Where(e => e.Path == SpecElements.ProgramExecutionStarted).ToList();
         Assert.IsTrue(started.Count > 10, $"{name}: {started.Count} program executions");
-        Assert.IsTrue(started.All(e => programs.Contains(e.Value["ActiveProgram"]!.GetValue<string>())), "the programs of the scenario");
+        Assert.IsTrue(started.All(e => programs.Contains(e.Value["ActiveWorkMaster"]!.GetValue<string>())), "the programs of the scenario");
         Assert.IsTrue(messages.OfType<SpecEvent>().Any(e => e.Path == SpecElements.JobOrderEnded));
-        var seqs = messages.OfType<SpecEvent>().Select(e => e.Seq).ToList();
-        CollectionAssert.AreEqual(Enumerable.Range(1, seqs.Count).Select(i => (long)i).ToList(), seqs);
+        foreach (var group in messages.OfType<SpecEvent>().GroupBy(e => SpecElements.EventGroup(e.Path)))
+        {
+            var seqs = group.Select(e => e.Seq).ToList();
+            CollectionAssert.AreEqual(Enumerable.Range(1, seqs.Count).Select(i => (long)i).ToList(), seqs, group.Key);
+        }
+        Assert.AreEqual(config.Scenario.Model, messages.OfType<SpecValue>().Single(v => v.Path == SpecElements.Model).Value!.GetValue<string>());
         var bearing = SpecElements.ExtensionPath(config.ManufacturerDomain, SpecElements.BearingTemperature);
         Assert.IsTrue(messages.OfType<SpecValue>().Any(v => v.Path == bearing), "its signal of the manufacturer");
     }
@@ -49,6 +53,14 @@ public sealed class ScenarioTest
         Assert.AreEqual(programs.Count, programs.Distinct().Count());
         var firstNumbers = Names.Select(n => Settings((string)n[0]).Resolve().Scenario.FirstJobOrderNumber).ToList();
         Assert.AreEqual(firstNumbers.Count, firstNumbers.Distinct().Count(), "job order ids do not repeat between machines");
+    }
+
+    [TestMethod]
+    public void Scenarios_OfTheDemoStack_IdentifyDifferentMachines()
+    {
+        var models = Names.Select(n => Settings((string)n[0]).Resolve().Scenario.Model).ToList();
+        Assert.AreEqual(models.Count, models.Distinct().Count());
+        Assert.IsTrue(Names.All(n => Settings((string)n[0]).Resolve().Scenario.Unavailable.Count == 0), "every element available by default");
     }
 
     [TestMethod]
@@ -86,6 +98,10 @@ public sealed class ScenarioTest
             {
                 Seed = 7,
                 JobOrderRetention = scenario.JobOrderRetention,
+                Model = scenario.Model,
+                ProductCode = scenario.ProductCode,
+                YearOfConstruction = scenario.YearOfConstruction,
+                SoftwareRevision = scenario.SoftwareRevision,
                 QueuedJobOrders = scenario.QueuedJobOrders,
                 FirstJobOrderNumber = scenario.FirstJobOrderNumber,
                 Jobs = scenario.Jobs,

@@ -59,7 +59,8 @@ internal sealed class VirtualMachine
     private double _feedOverride;
     private double _spindleOverride;
     private long _heartbeat;
-    private long _seq;
+    private readonly Dictionary<string, long> _seq = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _unavailable;
     private double _bearingTemperature;
     private readonly string _bearingPath;
     private DateTimeOffset _nextHeartbeat;
@@ -73,6 +74,12 @@ internal sealed class VirtualMachine
         _identity = identity;
         _config = config;
         _scenario = config.Scenario;
+        _unavailable = [.. _scenario.Unavailable];
+        foreach (var path in _unavailable.Where(p => !SpecElements.MayBeUnavailable.Contains(p)))
+        {
+            throw new ArgumentException(
+                $"'{path}' may not be unavailable; the model allows it for {string.Join(", ", SpecElements.MayBeUnavailable)}.", nameof(config));
+        }
         _jobTemplates = _scenario.Jobs.Count > 0 ? _scenario.Jobs : [new JobTemplate()];
         _feedOverrideSteps = _scenario.FeedOverrideSteps.Count > 0 ? _scenario.FeedOverrideSteps : [1.0];
         _spindleOverrideSteps = _scenario.SpindleOverrideSteps.Count > 0 ? _scenario.SpindleOverrideSteps : [1.0];
@@ -155,12 +162,17 @@ internal sealed class VirtualMachine
         Set(SpecElements.Manufacturer, _identity.Manufacturer);
         Set(SpecElements.SerialNumber, _identity.SerialNumber);
         Set(SpecElements.ProductInstanceUri, _identity.ProductInstanceUri);
+        Set(SpecElements.Model, _scenario.Model);
+        Set(SpecElements.ManufacturerUri, string.IsNullOrWhiteSpace(_config.ManufacturerUri) ? $"https://{_config.ManufacturerDomain}" : _config.ManufacturerUri);
+        Set(SpecElements.ProductCode, _scenario.ProductCode);
+        Set(SpecElements.YearOfConstruction, (long)_scenario.YearOfConstruction);
+        Set(SpecElements.SoftwareRevision, _scenario.SoftwareRevision);
         _heartbeat = 1;
         Set(SpecElements.Heartbeat, _heartbeat);
         _nextHeartbeat = _now + _config.HeartbeatInterval;
         SetStatus(NotExecuting, "Processing");
         Set(SpecElements.ChannelState, "Reset");
-        Set(SpecElements.ActiveProgram, (JsonNode?)null);
+        Set(SpecElements.ActiveWorkMaster, (JsonNode?)null);
         Set(SpecElements.ProgramExecution, (JsonNode?)null);
         Set(SpecElements.FeedOverride, _feedOverride);
         Set(SpecElements.SpindleIsRotating, false);
@@ -222,7 +234,7 @@ internal sealed class VirtualMachine
         AddJobOrder();
         PromoteNextJobOrder();
 
-        Set(SpecElements.ActiveProgram, job.Template.Program);
+        Set(SpecElements.ActiveWorkMaster, job.Template.Program);
         EnterPhase(Phase.Setup, _scenario.SetupTime);
     }
 
@@ -232,7 +244,7 @@ internal sealed class VirtualMachine
         var executionId = NewId();
         _execution = new Execution(executionId, _now, _energy, job);
 
-        Set(SpecElements.ActiveProgram, job.Template.Program, executionId);
+        Set(SpecElements.ActiveWorkMaster, job.Template.Program, executionId);
         ChangeExecutionState(_execution, "Running", SpecElements.ProgramExecutionStarted);
         EnterPhase(Phase.Executing, TimeSpan.Zero);
     }
@@ -255,7 +267,7 @@ internal sealed class VirtualMachine
             job.JobResult = "Successful";
             ChangeJobState(job, "Ended");
             _activeJob = null;
-            Set(SpecElements.ActiveProgram, job.Template.Program);
+            Set(SpecElements.ActiveWorkMaster, job.Template.Program);
             EnterPhase(Phase.Idle, _scenario.IdleTime);
         }
         else
@@ -287,7 +299,7 @@ internal sealed class VirtualMachine
             ChangeJob(job);
         }
 
-        Set(SpecElements.ActiveProgram, job.Template.Program);
+        Set(SpecElements.ActiveWorkMaster, job.Template.Program);
         var eventPath = completed ? SpecElements.ProgramExecutionEnded : SpecElements.ProgramExecutionAborted;
         ChangeExecutionState(execution, state, eventPath, sums =>
         {
@@ -297,7 +309,10 @@ internal sealed class VirtualMachine
         });
     }
 
-    /// <summary>Sets the state of a program execution: its snapshot, and the event named after the new state.</summary>
+    /// <summary>
+    /// Sets the state of a program execution: its snapshot, and the event named after the new state. At the end the
+    /// snapshot carries the sums too, and keeps them until the next program execution begins.
+    /// </summary>
     private void ChangeExecutionState(Execution execution, string state, string eventPath, Action<JsonObject>? addSums = null)
     {
         execution.State = state;
@@ -305,14 +320,13 @@ internal sealed class VirtualMachine
         {
             ["ExecutionId"] = execution.Id,
             ["JobOrderID"] = execution.Job.Id,
-            ["ActiveProgram"] = execution.Job.Template.Program,
+            ["ActiveWorkMaster"] = execution.Job.Template.Program,
             ["State"] = state,
             ["StartTime"] = SpecWire.Timestamp(execution.Start),
         };
+        addSums?.Invoke(snapshot);
         Set(SpecElements.ProgramExecution, snapshot, execution.Id);
-        var value = (JsonObject)snapshot.DeepClone();
-        addSums?.Invoke(value);
-        Emit(eventPath, value);
+        Emit(eventPath, (JsonObject)snapshot.DeepClone());
     }
 
     /// <summary>Interrupts the program execution; a failure interrupts the job order too, a program stop does not.</summary>
@@ -631,6 +645,12 @@ internal sealed class VirtualMachine
 
     private void Set(string path, JsonNode? value, string? correlationId = null)
     {
+        // An element the machine lacks for good: value null, once.
+        if (_unavailable.Contains(path))
+        {
+            value = null;
+            correlationId = null;
+        }
         if (_values.TryGetValue(path, out var current)
             && current.CorrelationId == correlationId
             && JsonNode.DeepEquals(current.Value, value))
@@ -662,9 +682,18 @@ internal sealed class VirtualMachine
         Set(path, JsonValue.Create(value));
     }
 
+    /// <summary>Says an event; <c>seq</c> counts the events of its group.</summary>
     private void Emit(string path, JsonObject value)
     {
-        _pending.Add(new SpecEvent(path, _now, ++_seq, value));
+        // A machine without alert information has no alert events either.
+        if (path.StartsWith("Notification.", StringComparison.Ordinal) && _unavailable.Contains(SpecElements.ActiveAlerts))
+        {
+            return;
+        }
+        var group = SpecElements.EventGroup(path);
+        var seq = _seq.GetValueOrDefault(group) + 1;
+        _seq[group] = seq;
+        _pending.Add(new SpecEvent(path, _now, seq, value));
     }
 
     private List<SpecMessage> Flush()
@@ -759,19 +788,19 @@ internal sealed class VirtualMachine
         {
             var json = new JsonObject
             {
-                ["id"] = Id,
-                ["code"] = Template.Code,
-                ["text"] = Template.Text,
-                ["severity"] = Template.Severity,
+                [nameof(Id)] = Id,
+                ["ErrorCode"] = Template.Code,
+                ["Message"] = Template.Text,
+                ["Severity"] = Template.Severity,
             };
             if (SeverityValue is { } value)
             {
-                json["severityValue"] = value;
+                json[nameof(SeverityValue)] = value;
             }
-            json["since"] = SpecWire.Timestamp(Since);
+            json["Time"] = SpecWire.Timestamp(Since);
             if (Template.Source is { Length: > 0 } source)
             {
-                json["source"] = source;
+                json["SourceName"] = source;
             }
             if (CorrelationId is not null)
             {

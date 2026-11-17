@@ -97,7 +97,7 @@ All notable changes are documented here. The format follows
   the tokens with their measured contrast, every component of `packages/ui` in its variants and states
   with fixed values in the words of the demo, three rules as Do and Don't, and the machine card of the card
   catalogue. A test fails when a component of `packages/ui` has no block on the page.
-- Spec output of the simulator, a draft of the MQTT binding of the data model 0.13.1: below
+- Spec output of the simulator, a draft of the MQTT binding of the data model, now after the draft of 0.15.0: below
   `simulators/{SerialNumber}/`, with a namespace level as in OPC UA (`umati`, the domain of a manufacturer, `events`), a virtual machine, a state machine driven by a scenario, publishes the manifest, values,
   snapshots and lists retained and the events of program executions, job orders and alerts not retained, with
   the last will `Connection/State = Disconnected`. Every simulator of the demo stack publishes it, each with a
@@ -117,6 +117,13 @@ All notable changes are documented here. The format follows
   follows the spindle and is named in the manifest as `x-example-com.Spindle.1.BearingTemperature` with type and
   unit, and the binding maps `x-<domain>.<path>` to `<domain>/<path>`. `umati` and `events` are reserved.
   `machines/{SerialNumber}/` stays as it is.
+  After the draft of 0.15.0: `Production.ActiveProgram` is `Production.ActiveWorkMaster`; the program
+  execution snapshot keeps the sums from its end until the next one begins; `seq` counts within each group of
+  events (`Production`, `Notification`); alerts carry `Id`, `ErrorCode`, `Message`, `Severity`, `SeverityValue`,
+  `Time` and `SourceName`; ended job orders stay as long as the machine plans them, one shift by default, without
+  a least time; the identification carries `Model`, `ManufacturerUri`, `ProductCode`, `YearOfConstruction` and
+  `SoftwareRevision`; and a scenario may name elements the machine lacks for good (`Unavailable`), published
+  once as `null` and named `"available": false` in the manifest.
   With 0.13.1 a cancelled job order, aborted without having run, carries `EndTime` but neither `StartTime` nor
   `ProducedQuantity`, and passes the schemas of the model as it is.
 

@@ -6,9 +6,6 @@ namespace Pleiades.Playground.Simulator.Spec;
 /// <summary>The manifest of the virtual machine: model version, profiles, elements and events it delivers.</summary>
 internal static class SpecManifest
 {
-    /// <summary>The least retention of ended job orders the data model allows, in seconds.</summary>
-    public const double MinimumJobOrderRetention = 86_400;
-
     public static JsonObject Build(MachineIdentity identity, SpecOutputConfig config)
     {
         ArgumentNullException.ThrowIfNull(identity);
@@ -23,24 +20,20 @@ internal static class SpecManifest
             ["heartbeatInterval"] = config.HeartbeatInterval.TotalSeconds,
         };
 
-        // A shorter retention is a demo setting that the model does not allow; then the manifest says nothing.
-        var retention = config.Scenario.JobOrderRetention.TotalSeconds;
-        if (retention >= MinimumJobOrderRetention)
-        {
-            manifest["jobOrderRetention"] = retention;
-        }
+        // How long ended job orders stay: the machine decides, the model sets no least time.
+        manifest["jobOrderRetention"] = config.Scenario.JobOrderRetention.TotalSeconds;
 
         manifest["instances"] = new JsonObject
         {
             ["Channel"] = new JsonObject { ["1"] = "CHAN1" },
             ["Spindle"] = new JsonObject { ["1"] = "S1" },
         };
-        manifest["elements"] = new JsonArray([.. SpecElements.ElementsFor(config.ManufacturerDomain).Select(e => (JsonNode)Element(e))]);
+        manifest["elements"] = new JsonArray([.. SpecElements.ElementsFor(config.ManufacturerDomain).Select(e => (JsonNode)Element(e, config.Scenario.Unavailable))]);
         manifest["events"] = new JsonArray([.. SpecElements.Events.Select(e => (JsonNode)e)]);
         return manifest;
     }
 
-    private static JsonObject Element(SpecElement element)
+    private static JsonObject Element(SpecElement element, List<string> unavailable)
     {
         var json = new JsonObject
         {
@@ -50,6 +43,10 @@ internal static class SpecManifest
         if (element.CorrelationId)
         {
             json["correlationId"] = true;
+        }
+        if (unavailable.Contains(element.Path))
+        {
+            json["available"] = false;
         }
         if (element.Extension is { } extension)
         {

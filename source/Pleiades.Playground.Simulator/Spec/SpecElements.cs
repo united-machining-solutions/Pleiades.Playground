@@ -7,19 +7,24 @@ namespace Pleiades.Playground.Simulator.Spec;
 /// </summary>
 internal static class SpecElements
 {
-    public const string ModelVersion = "0.13.1";
+    public const string ModelVersion = "0.15.0";
     public const string BindingVersion = "0.1.0-draft";
 
     public const string Manufacturer = "Identification.Manufacturer";
     public const string SerialNumber = "Identification.SerialNumber";
     public const string ProductInstanceUri = "Identification.ProductInstanceUri";
+    public const string Model = "Identification.Model";
+    public const string ManufacturerUri = "Identification.ManufacturerUri";
+    public const string ProductCode = "Identification.ProductCode";
+    public const string YearOfConstruction = "Identification.YearOfConstruction";
+    public const string SoftwareRevision = "Identification.SoftwareRevision";
     public const string Heartbeat = "Connection.Heartbeat";
     public const string ConnectionState = "Connection.State";
     public const string Status = "State.Status";
     public const string FeedOverride = "State.FeedOverride";
     public const string ChannelState = "Channel.1.ChannelState";
     public const string JobOrders = "Production.JobOrders";
-    public const string ActiveProgram = "Production.ActiveProgram";
+    public const string ActiveWorkMaster = "Production.ActiveWorkMaster";
     public const string ProgramExecution = "Production.ProgramExecution";
     public const string PartsProducedInLifetime = "OperationCounters.PartsProducedInLifetime";
     public const string PowerOnDuration = "OperationCounters.PowerOnDuration";
@@ -78,13 +83,18 @@ internal static class SpecElements
         new(Manufacturer, null, "adapter", false),
         new(SerialNumber, null, "adapter", false),
         new(ProductInstanceUri, null, "adapter", false),
+        new(Model, null, "adapter", false),
+        new(ManufacturerUri, null, "adapter", false),
+        new(ProductCode, null, "adapter", false),
+        new(YearOfConstruction, null, "adapter", false),
+        new(SoftwareRevision, null, "adapter", false),
         new(Heartbeat, null, "adapter", false),
         new(ConnectionState, null, "adapter", false),
         new(Status, null, "source", false),
         new(FeedOverride, UnitOne, "source", false),
         new(ChannelState, null, "source", true),
         new(JobOrders, null, "source", false),
-        new(ActiveProgram, null, "source", true),
+        new(ActiveWorkMaster, null, "source", true),
         new(ProgramExecution, null, "source", true),
         new(PartsProducedInLifetime, UnitPiece, "source", false),
         new(ActiveAlerts, null, "source", true),
@@ -131,6 +141,22 @@ internal static class SpecElements
             .. Elements,
             .. Extensions.Select(e => new SpecElement(ExtensionPath(manufacturerDomain, e.Path), e.UnitName, "source", false, e)),
         ];
+    }
+
+    /// <summary>
+    /// The elements of the model a machine may lack for good: the manifest then says <c>"available": false</c>, and
+    /// the value is <see langword="null"/> once and for all.
+    /// </summary>
+    public static readonly IReadOnlySet<string> MayBeUnavailable = new HashSet<string>(StringComparer.Ordinal)
+    {
+        Status, ActiveAlerts, PowerOnDuration, YearOfConstruction, SoftwareRevision,
+    };
+
+    /// <summary>The group of an event, the first segment of its path; <c>seq</c> counts within it.</summary>
+    public static string EventGroup(string eventPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventPath);
+        return eventPath.Split('.')[0];
     }
 
     /// <summary>The unit name of a numeric element, or <see langword="null"/> when it has none.</summary>

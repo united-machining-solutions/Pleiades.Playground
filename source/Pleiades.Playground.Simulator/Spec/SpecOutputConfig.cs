@@ -30,6 +30,9 @@ internal sealed class SpecOutputConfig
     /// </summary>
     public string? ProductInstanceUri { get; init; }
 
+    /// <summary>Web address of the manufacturer, <c>Identification.ManufacturerUri</c>. Empty: <c>https://{ManufacturerDomain}</c>.</summary>
+    public string? ManufacturerUri { get; init; }
+
     /// <summary>Interval of <c>Connection.Heartbeat</c>; the manifest names it.</summary>
     public TimeSpan HeartbeatInterval { get; init; } = TimeSpan.FromSeconds(10);
 
@@ -85,6 +88,7 @@ internal sealed class SpecOutputConfig
             Manufacturer = Manufacturer,
             ManufacturerDomain = ManufacturerDomain,
             ProductInstanceUri = ProductInstanceUri,
+            ManufacturerUri = ManufacturerUri,
             HeartbeatInterval = HeartbeatInterval,
             MeasurementInterval = MeasurementInterval,
             TickInterval = TickInterval,
@@ -109,10 +113,33 @@ internal sealed class ScenarioConfig
     public int? Seed { get; init; }
 
     /// <summary>
-    /// How long ended and aborted job orders stay in <c>Production.JobOrders</c>. The data model asks for at least
-    /// 24 hours. A shorter time is allowed for a demo; the manifest then leaves out <c>jobOrderRetention</c>.
+    /// How long ended and aborted job orders stay in <c>Production.JobOrders</c>: as long as they stand in the plan
+    /// of the machine, here one shift. The model sets no least time; the manifest names this one as
+    /// <c>jobOrderRetention</c>.
     /// </summary>
-    public TimeSpan JobOrderRetention { get; init; } = TimeSpan.FromHours(24);
+    public TimeSpan JobOrderRetention { get; init; } = TimeSpan.FromHours(8);
+
+    /// <summary>Model of the machine, <c>Identification.Model</c>.</summary>
+    public string Model { get; init; } = "GM-500";
+
+    /// <summary>Product code of the machine, <c>Identification.ProductCode</c>.</summary>
+    public string ProductCode { get; init; } = "GM-500-A";
+
+    /// <summary>Year the machine was built, <c>Identification.YearOfConstruction</c>.</summary>
+    [Range(1000, 9999)]
+    public int YearOfConstruction { get; init; } = 2023;
+
+    /// <summary>Software revision of the machine, <c>Identification.SoftwareRevision</c>.</summary>
+    public string SoftwareRevision { get; init; } = "4.95.2";
+
+    /// <summary>
+    /// Elements of the model this machine lacks for good, among those the model allows (State.Status,
+    /// Notification.ActiveAlerts, OperationCounters.PowerOnDuration, Identification.YearOfConstruction,
+    /// Identification.SoftwareRevision). Each is published once with <c>value: null</c> and named in the manifest
+    /// with <c>"available": false</c>. Empty by default.
+    /// </summary>
+    [SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "Configuration binding")]
+    public List<string> Unavailable { get; set; } = [];
 
     /// <summary>How many job orders wait in the list besides the active one.</summary>
     [Range(1, 10)]

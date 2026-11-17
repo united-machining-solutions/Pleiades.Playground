@@ -51,10 +51,6 @@ internal sealed partial class SpecOutputService : BackgroundService
         var counters = SpecCounterStore.Load(_spec.PersistenceFilePath, _spec.Scenario);
         _machine = new VirtualMachine(identity, _spec, counters, start);
         _machine.TakeInitialMessages();
-        if (_spec.Scenario.JobOrderRetention.TotalSeconds < SpecManifest.MinimumJobOrderRetention)
-        {
-            LogShortRetention(_spec.Scenario.JobOrderRetention);
-        }
         // Fails at the start when the domain of the manufacturer gives a reserved namespace.
         SpecWire.Namespace(SpecElements.ExtensionPrefix(_spec.ManufacturerDomain));
         LogStarting(SpecWire.Root, _config.SerialNumber);
@@ -178,10 +174,6 @@ internal sealed partial class SpecOutputService : BackgroundService
 
     [LoggerMessage(EventId = 102, Level = LogLevel.Information, Message = "Spec output is stopping")]
     private partial void LogStopping();
-
-    [LoggerMessage(EventId = 103, Level = LogLevel.Warning,
-        Message = "Job orders stay {Retention} in the list, less than the 24 hours of the data model; the manifest leaves out jobOrderRetention")]
-    private partial void LogShortRetention(TimeSpan retention);
 
     [LoggerMessage(EventId = 104, Level = LogLevel.Warning, Message = "Saving the counters to {File} failed")]
     private partial void LogSaveFailed(string file, Exception exception);
