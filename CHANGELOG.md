@@ -204,6 +204,18 @@ All notable changes are documented here. The format follows
   goes to `oem/Production/ActiveProgram`. Any element but the five every adapter delivers may be unavailable.
   The production events below `machines/` take the `id` of the CloudEvent as `Id`, and the work master id as
   `WorkMaster`.
+  With 0.17.0: paths follow the profiles (`JobMonitoring.JobOrders`, `WorkMasterMonitoring.ActiveWorkMaster`,
+  `WorkMasterMonitoring.ProgramExecution`, and their events), and so do the topics of the events
+  (`events/jobmonitoring`, `events/workmastermonitoring`, `events/notifications`, each with its own `sequence`).
+  A job order and its result are two lists: `JobMonitoring.JobOrders` (what is ordered, with `WorkMasterID`,
+  `OrderNumbers`, `RunsPlanned`, `JobExecutionMode` and planned times `null`) and `JobMonitoring.JobOrderResults`
+  (from the start: quantities, runs, `EndTime` `null` and `JobResult` `Unknown` until the end), every field always
+  there; `JobOrderResultChanged` carries a changed result, `JobOrderChanged` a changed job order (the planner now
+  changes `RunsPlanned` of a waiting one). `Identification.SoftwareRevision` is gone; `Components.Software` lists
+  `Manufacturer`, `ComponentName` and `SoftwareRevision`. The program signal moves to
+  `oem/WorkMasterMonitoring/ActiveProgram`. The production events below `machines/` keep their form: a job order
+  event carries the job order and its result, a changed result is a `Changed`, and `Seq` counts them apart from
+  the groups of the model.
 
 ### Changed
 

@@ -180,7 +180,7 @@ sites/demo/weather/AirTemperature         { "timestamp": "2026-11-16T09:10:00Z",
 
 ## Spec binding (draft)
 
-A proposal for the MQTT binding of the data model, version 0.16.0 (see [`../datamodel`](../datamodel/README.md)),
+A proposal for the MQTT binding of the data model, version 0.17.0 (see [`../datamodel`](../datamodel/README.md)),
 to be settled at the umati hackathon. Here everything is as the model says: paths, types, units, snapshots,
 lists, events, manifest and connection. The binding of the playground above stays as it is; the two trees live
 side by side on the same broker. Why this tree may use other units than the playground: see
@@ -215,14 +215,16 @@ simulators/{SerialNumber}/events/<topic of the group>          not retained  eve
   `+` or `#`. The machine is identified by the serial number in the topic and by its manifest:
   `machine.ProductInstanceUri`, the globally unique id the model asks for, and the values below
   `umati/Identification/` (`Manufacturer`, `SerialNumber`, `ProductInstanceUri`, `Model`, `ManufacturerUri`,
-  `ProductCode`, `YearOfConstruction`, `SoftwareRevision`). `ProductInstanceUri` contains
+  `ProductCode`, `YearOfConstruction`). `ProductInstanceUri` contains
   `/` and `:` and cannot be a topic level.
 - Every segment of the path is one topic level, without encoding: `Channel.1.ChannelState` becomes
   `umati/Channel/1/ChannelState`.
-- A snapshot is one topic (`umati/State/Status`), and so is a list (`umati/Production/JobOrders`, always the
+- The first segment of a path below the identification and the state is its profile, so the tree follows the
+  profiles: `umati/JobMonitoring/…`, `umati/WorkMasterMonitoring/…`.
+- A snapshot is one topic (`umati/State/Status`), and so is a list (`umati/JobMonitoring/JobOrders`, always the
   whole list).
-- Every event lies below the level `events/`, on one topic per group (`events/production`,
-  `events/notifications`), so `simulators/+/events/+` subscribes to exactly the events.
+- Every event lies below the level `events/`, on one topic per group (`events/jobmonitoring`,
+  `events/workmastermonitoring`, `events/notifications`), so `simulators/+/events/+` subscribes to exactly the events.
 - Every message has QoS 1. Values and the manifest have the MQTT 5 content type `application/json`, events
   `application/cloudevents+json; charset=utf-8`.
 
@@ -230,9 +232,11 @@ simulators/{SerialNumber}/events/<topic of the group>          not retained  eve
 simulators/P-04/umati/Manifest
 simulators/P-04/umati/State/Status
 simulators/P-04/umati/Spindle/1/IsRotating
-simulators/P-04/umati/Production/JobOrders
+simulators/P-04/umati/JobMonitoring/JobOrders
+simulators/P-04/umati/JobMonitoring/JobOrderResults
 simulators/P-04/oem/Spindle/1/BearingTemperature
-simulators/P-04/events/production
+simulators/P-04/events/jobmonitoring
+simulators/P-04/events/workmastermonitoring
 simulators/P-04/events/notifications
 ```
 
@@ -268,9 +272,9 @@ An event is a CloudEvent 1.0 in the JSON format, structured mode, as the model a
 
 ```json
 { "specversion": "1.0", "id": "0f4c4a51-8e2b-5d6a-9c1f-4b7e2d913a60", "source": "https://example.com/P-04",
-  "type": "Production.ProgramExecutionEnded", "time": "2026-11-17T09:21:40.000Z",
+  "type": "WorkMasterMonitoring.ProgramExecutionEnded", "time": "2026-11-17T09:21:40.000Z",
   "sequence": "20261117T065812Z.000000001842", "correlationid": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001",
-  "dataschema": "urn:umati2:datamodel:0.16.0:event.schema.json",
+  "dataschema": "urn:umati2:datamodel:0.17.0:event.schema.json",
   "data": { "ExecutionId": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001", "JobOrderID": "4711/01", "ActiveWorkMaster": "WM-SHAFT-4711",
             "State": "Ended", "StartTime": "2026-11-17T08:31:00.000Z",
             "Duration": 3040.0, "PartsProduced": 1, "EnergyElectricity": 1850.5 } }
@@ -280,15 +284,16 @@ The rules for events, so that a consumer can keep nothing but the events and sti
 
 | Rule | What | Why |
 |---|---|---|
-| Topic per group | An event is published on `simulators/{SerialNumber}/events/<topic>`, one topic per group of events, the group being the first segment of its path. The binding names the topic of each group, in lower case (table below): every job order and program execution event on `events/production`, every alert event on `events/notifications`. A group without a name in the table is not published. The attribute `type`, the full path of the model such as `Production.JobOrderStarted`, tells the events of a topic apart. | MQTT keeps the order of messages only within one topic. On one topic `JobOrderStarted` and the `ProgramExecutionStarted` that follows arrive in the order they came up. One subscription per group is enough; `simulators/+/events/+` gets them all. The binding of the playground does the same with one topic for all notifications, `machines/{SerialNumber}/events/notifications`, and the spec binding keeps its name. |
-| CloudEvent | `specversion` `1.0`; `id` a UUID, the same when the event goes out again; `source` the `ProductInstanceUri` of the machine, as a valid URI reference; `type` the path of the event; `time` its source time; `sequence` the start of the adapter (`yyyyMMddTHHmmssZ`), a dot and a count of twelve digits that counts the events of the machine within their group (`Production`, `Notification`), from 1 and without a gap: one count per topic of events; `correlationid` the `ExecutionId` on the events of a program execution, and on an alert or notification that came up in one; `dataschema` the event schema of the model version; `data` the flat struct of the event. A new start of the adapter begins a new prefix and counts from 1 again. | A consumer finds a duplicate by `source` and `id`, and a gap by the count in `sequence`, in any technology; a comparison of strings orders the events of a group. After a gap or a new prefix it reads the state again: `Production.JobOrders` and `Production.ProgramExecution` after a gap in `Production`, `Notification.ActiveAlerts` after a gap in `Notification`. |
+| Topic per group | An event is published on `simulators/{SerialNumber}/events/<topic>`, one topic per group of events, the group being the first segment of its path. The binding names the topic of each group, in lower case (table below): every event of a job order and its result on `events/jobmonitoring`, every event of a program execution on `events/workmastermonitoring`, every alert event on `events/notifications`. A group without a name in the table is not published. The attribute `type`, the full path of the model such as `JobMonitoring.JobOrderStarted`, tells the events of a topic apart. | MQTT keeps the order of messages only within one topic. On one topic `JobOrderStarted` and the `JobOrderResultChanged` that follows arrive in the order they came up; between two groups, such as a job order and its program execution, only `time` orders them. One subscription per group is enough; `simulators/+/events/+` gets them all. The binding of the playground does the same with one topic for all notifications, `machines/{SerialNumber}/events/notifications`, and the spec binding keeps its name. |
+| CloudEvent | `specversion` `1.0`; `id` a UUID, the same when the event goes out again; `source` the `ProductInstanceUri` of the machine, as a valid URI reference; `type` the path of the event; `time` its source time; `sequence` the start of the adapter (`yyyyMMddTHHmmssZ`), a dot and a count of twelve digits that counts the events of the machine within their group (`JobMonitoring`, `WorkMasterMonitoring`, `Notification`), from 1 and without a gap: one count per topic of events; `correlationid` the `ExecutionId` on the events of a program execution, and on an alert or notification that came up in one; `dataschema` the event schema of the model version; `data` the flat struct of the event. A new start of the adapter begins a new prefix and counts from 1 again. | A consumer finds a duplicate by `source` and `id`, and a gap by the count in `sequence`, in any technology; a comparison of strings orders the events of a group. After a gap or a new prefix it reads the state again: `JobMonitoring.JobOrders` and `JobMonitoring.JobOrderResults` after a gap in `JobMonitoring`, `WorkMasterMonitoring.ProgramExecution` after a gap in `WorkMasterMonitoring`, `Notification.ActiveAlerts` after a gap in `Notification`. |
 | Delivery | QoS 1, not retained. | QoS 1 delivers at least once; a duplicate is caught by `id`. A retained event would be a state, and a state is a value. |
 | Outbox | While the broker is away the adapter keeps the events in the order they came up and sends them after the next connect, with their source time and their `id`. The outbox is bounded; when it is full the oldest event is dropped and logged, and its count stays a gap in `sequence`: nothing is numbered again. Values need no outbox, every connect publishes them whole. | Without an outbox the events of a broker outage are lost unnoticed. |
 | Consumer | A consumer that keeps events subscribes with a persistent session: Clean Start false, a session expiry of for example 24 hours, QoS 1. Several instances of one consumer share the events with a shared subscription, `$share/<group>/simulators/+/events/+`. | The broker holds the events while the consumer restarts. |
 
 | Group of events (first segment of `type`) | Topic below `simulators/{SerialNumber}/events/` |
 |---|---|
-| `Production` | `production` |
+| `JobMonitoring` | `jobmonitoring` |
+| `WorkMasterMonitoring` | `workmastermonitoring` |
 | `Notification` | `notifications` |
 
 - An adapter that names the events of a list in its manifest publishes one for every change of the list, the
@@ -300,10 +305,19 @@ The rules for events, so that a consumer can keep nothing but the events and sti
   `ProgramExecutionInterrupted`, `ProgramExecutionResumed`, `ProgramExecutionEnded`, `ProgramExecutionAborted`.
   Each carries the whole entry or snapshot after the change; the last two also the sums over the program
   execution, its interruptions included.
-- `JobOrderChanged` comes only without a change of state, when another discrete field changes, such as a
-  quantity. A field that keeps running, such as `ActualProductionTime`, does not bring one on its own; an event
-  carries its value at the moment of the change. A job order taken back before it started leaves with
-  `JobOrderRemoved`, without a change of state.
+- A job order and its result are two lists, as in ISA-95: `JobMonitoring.JobOrders`, what is ordered
+  (`JobOrderID`, `State`, `StateSince`, `JobName`, `WorkMasterID`, `OrderNumbers`, `RunsPlanned`,
+  `JobExecutionMode`, `PlannedStartTime`, `PlannedEndTime`), and `JobMonitoring.JobOrderResults`, what comes of
+  it (`JobOrderID`, `StartTime`, `EndTime`, `ProducedQuantity`, `GoodQuantity`, `RunsCompleted`,
+  `ActualProductionTime`, `JobResult`). Every field is always there: `EndTime` is `null` until the end,
+  `JobResult` `Unknown` until the end, a planned time `null` when the machine does not know it. A result comes
+  with `JobOrderStarted` and goes with `JobOrderRemoved`; it has no events of its own for that. A job order that
+  never started, a cancelled one too, has no result.
+- The events of a job order carry its entry, `JobOrderResultChanged` the entry of its result. `JobOrderChanged`
+  comes only without a change of state, when another field of the job order changes, such as `RunsPlanned`;
+  `JobOrderResultChanged` when the result changes, a quantity, its end. A field that keeps running, such as
+  `ActualProductionTime`, does not bring one on its own; an event carries its value at the moment of the change.
+  A job order taken back before it started leaves with `JobOrderRemoved`, without a change of state.
 - Whoever needs the current state reads the value, not the events.
 - `sequence` belongs to the model: every event carries it, counted from 1 per machine and group. The manifest
   names every event as `{path, correlationId}`; `correlationId: true` says the adapter sends `correlationid`
@@ -365,9 +379,9 @@ simulator runs `Config:SpecOutput:Scenario`.
 
 | Simulator | Topics below | Scenario | Jobs | Profiles | Signals of the manufacturer |
 |---|---|---|---|---|---|
-| P-04 | `simulators/P-04/` | default | shafts, flanges, bushings; cycles of 45 s to 90 s, up to 15 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/Production/ActiveProgram` |
-| P-07 | `simulators/P-07/` | `housings` | housings, cover plates, gearbox housings; cycles of 2.5 min to 7 min, up to 21 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/Production/ActiveProgram` |
-| M-02 | `simulators/M-02/` | `small-parts` | pins, spacers, nozzles in large quantities; cycles of 20 s to 50 s, up to 7 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/Production/ActiveProgram` |
+| P-04 | `simulators/P-04/` | default | shafts, flanges, bushings; cycles of 45 s to 90 s, up to 15 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
+| P-07 | `simulators/P-07/` | `housings` | housings, cover plates, gearbox housings; cycles of 2.5 min to 7 min, up to 21 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
+| M-02 | `simulators/M-02/` | `small-parts` | pins, spacers, nozzles in large quantities; cycles of 20 s to 50 s, up to 7 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
 
 All three are machine tools with one channel and one spindle and declare the same profiles: `Core`,
 `IdentificationExtended`, `Components`, `MonitoringExtended`, `ChannelMonitoring`, `Spindle`,
@@ -391,8 +405,12 @@ Each virtual machine works like this:
   `Notification.NotificationEvent` to the operator (`Scenario:ProgramStopCode`, `ProgramStopText`) with the
   `ExecutionId` as `correlationid`.
 - Now and then the planner changes a waiting job order (`Scenario:QueueChangesPerHour`): it revokes its release,
-  cancels it (`JobOrderCancelled`: aborted without having run, so with `EndTime` but without `StartTime` and
-  `ProducedQuantity`) or takes it back (`JobOrderRemoved`).
+  cancels it (`JobOrderCancelled`: aborted without having run, so without a result), takes it back
+  (`JobOrderRemoved`) or changes the runs it plans (`JobOrderChanged`).
+- A job order names its work master (`WorkMasterID`), the same id as `WorkMasterMonitoring.ActiveWorkMaster`
+  while it runs, an order number of the ERP (`OrderNumbers`, `SO-` and its number), its runs (`RunsPlanned`, the
+  quantity of the job) and `ProductionMode`; the machine knows no planned times. Its result counts one run per
+  part made; `JobResult` is `Successful` at its end, `Unsuccessful` when a failure aborts it.
 - `Executing` in `State/Status`, `Active` in `Channel/1/ChannelState`, a turning spindle and a program execution
   always come together. Channel and active work master carry the `ExecutionId` as `correlationId`; the
   program execution snapshot names it inside, as `ExecutionId`, and carries no `correlationId`.
@@ -406,20 +424,21 @@ Each virtual machine works like this:
 - Ended and aborted job orders stay in the list as long as they stand in the plan of the machine: one shift,
   8 hours, by default (`Scenario:JobOrderRetention`). The model sets no least time; the manifest names the
   retention as `jobOrderRetention`. The history of job orders lies in their events.
-- The program execution snapshot (`umati/Production/ProgramExecution`) carries, from its end until the next
+- The program execution snapshot (`umati/WorkMasterMonitoring/ProgramExecution`) carries, from its end until the next
   program execution begins, the sums `Duration`, `PartsProduced` and `EnergyElectricity`, the same as its end
   event. `EnergyCompressedAir` is left out: the virtual machine has no compressed air.
 - Each job of a scenario names its work master, an id of its own such as `WM-SHAFT-4711`
   (`Scenario:Jobs:WorkMaster`; without one, `WM-` and the name of the program). It is
-  `Production.ActiveWorkMaster`, and `ActiveWorkMaster` in the snapshot and the events of a program execution.
-  The NC program that carries it out (`Scenario:Jobs:Program`, such as `SHAFT_4711.MPF`) has no element in the
-  model; the virtual machine publishes it as a signal of the manufacturer, `x-example-com.Production.ActiveProgram`
-  on `oem/Production/ActiveProgram`, and nowhere else.
-- Each scenario names its machine: `Model`, `ProductCode`, `YearOfConstruction`, `SoftwareRevision`,
-  `MonthOfConstruction`, `InitialOperationDate`, `DeviceClass`; `ManufacturerUri` is `https://{ManufacturerDomain}`
-  unless set. `Components.Software` lists its software after SoftwareType (`Manufacturer`, `Model`,
-  `SoftwareRevision`, `DeviceClass`): a control, an operator interface and a third component of each scenario
-  (`Scenario:Software`).
+  `WorkMasterMonitoring.ActiveWorkMaster`, `ActiveWorkMaster` in the snapshot and the events of a program
+  execution, and `WorkMasterID` of its job order. The NC program that carries it out (`Scenario:Jobs:Program`,
+  such as `SHAFT_4711.MPF`) has no element in the model; the virtual machine publishes it as a signal of the
+  manufacturer, `x-example-com.WorkMasterMonitoring.ActiveProgram` on `oem/WorkMasterMonitoring/ActiveProgram`,
+  and nowhere else.
+- Each scenario names its machine: `Model`, `ProductCode`, `YearOfConstruction`, `MonthOfConstruction`,
+  `InitialOperationDate`, `DeviceClass`; `ManufacturerUri` is `https://{ManufacturerDomain}` unless set. The
+  model has no software revision of the whole machine: `Components.Software` lists the revision of each
+  component (`Manufacturer`, `ComponentName`, `SoftwareRevision`; `Manufacturer` and `ComponentName` name an
+  entry): a control, an operator interface and a third component of each scenario (`Scenario:Software`).
 - Channel 1 has the feed override of the machine, `ChannelMode` `Automatic`, and `JogManual` while it is set up,
   a rapid override of 1 and the name `CHAN1`; spindle 1 is not used as an axis and is named `S1`.
 - `OperationCounters.OperationDuration` grows while a program runs. A scenario may let the machine warm up after
@@ -445,11 +464,11 @@ Each virtual machine works like this:
 | Path below `simulators/{SerialNumber}/` | Kind | Unit |
 |---|---|---|
 | `umati/Manifest` | manifest | – |
-| `umati/Identification/Manufacturer`, `umati/Identification/SerialNumber`, `umati/Identification/ProductInstanceUri`, `umati/Identification/Model`, `umati/Identification/ManufacturerUri`, `umati/Identification/ProductCode`, `umati/Identification/SoftwareRevision`, `umati/Identification/DeviceClass` | string | – |
+| `umati/Identification/Manufacturer`, `umati/Identification/SerialNumber`, `umati/Identification/ProductInstanceUri`, `umati/Identification/Model`, `umati/Identification/ManufacturerUri`, `umati/Identification/ProductCode`, `umati/Identification/DeviceClass` | string | – |
 | `umati/Identification/YearOfConstruction`, `umati/Identification/MonthOfConstruction` | integer | – |
 | `umati/Identification/InitialOperationDate` | date and time | – |
 | `umati/Identification/HardwareRevision`, `umati/Identification/AssetId`, `umati/Identification/ComponentName`, `umati/Identification/Location` | `null`, `"available": false` | – |
-| `umati/Components/Software` | list after SoftwareType | – |
+| `umati/Components/Software` | list: `Manufacturer`, `ComponentName`, `SoftwareRevision` | – |
 | `umati/Connection/State` | enum: `Initializing`, `Running`, `CommunicationFault`, `Shutdown` | – |
 | `umati/Connection/Heartbeat` | integer | – |
 | `umati/State/Status` | snapshot | – |
@@ -459,9 +478,10 @@ Each virtual machine works like this:
 | `umati/Channel/1/FeedOverride`, `umati/Channel/1/RapidOverride` | number | `one` |
 | `umati/Channel/1/ChannelMode` | enum | – |
 | `umati/Channel/1/Name` | string | – |
-| `umati/Production/ActiveWorkMaster` | string, the id of the work master, `correlationId` | – |
-| `umati/Production/ProgramExecution` | snapshot with `State`, `StartTime` and, after the end, the sums | – |
-| `umati/Production/JobOrders` | list | – |
+| `umati/WorkMasterMonitoring/ActiveWorkMaster` | string, the id of the work master, `correlationId` | – |
+| `umati/WorkMasterMonitoring/ProgramExecution` | snapshot with `State`, `StartTime` and, after the end, the sums | – |
+| `umati/JobMonitoring/JobOrders` | list: what is ordered | – |
+| `umati/JobMonitoring/JobOrderResults` | list: what comes of it, an entry from the start | – |
 | `umati/OperationCounters/PartsProducedInLifetime` | integer | `piece` |
 | `umati/OperationCounters/PowerOnDuration`, `umati/OperationCounters/OperationDuration` | number | `second` |
 | `umati/Notification/ActiveAlerts` | list | – |
@@ -471,8 +491,9 @@ Each virtual machine works like this:
 | `umati/Consumption/Electricity/Main/AcActivePowerTotal` | number | `watt` |
 | `umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `wattHour` |
 | `oem/Spindle/1/BearingTemperature` | number, signal of the manufacturer (`x-example-com.Spindle.1.BearingTemperature` in the manifest) | `degreeCelsius` |
-| `oem/Production/ActiveProgram` | string, signal of the manufacturer (`x-example-com.Production.ActiveProgram`): the NC program of the active work master | – |
-| `events/production` | CloudEvents `Production.ProgramExecution<Started, Interrupted, Resumed, Ended, Aborted>` and `Production.JobOrder<Added, Released, Revoked, Started, Interrupted, Resumed, Ended, Aborted, Cancelled, Changed, Removed>` | – |
+| `oem/WorkMasterMonitoring/ActiveProgram` | string, signal of the manufacturer (`x-example-com.WorkMasterMonitoring.ActiveProgram`): the NC program of the active work master | – |
+| `events/jobmonitoring` | CloudEvents `JobMonitoring.JobOrder<Added, Released, Revoked, Started, Interrupted, Resumed, Ended, Aborted, Cancelled, Changed, ResultChanged, Removed>` | – |
+| `events/workmastermonitoring` | CloudEvents `WorkMasterMonitoring.ProgramExecution<Started, Interrupted, Resumed, Ended, Aborted>` | – |
 | `events/notifications` | CloudEvents `Notification.AlertRaised`, `Notification.AlertChanged`, `Notification.AlertCleared`, `Notification.NotificationEvent` | – |
 
 The tests of the simulator check every message against the JSON schemas of the model when a clone of it lies
@@ -497,10 +518,17 @@ next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; withou
   broken connection of the adapter does not say. Open: a last will with `CommunicationFault`, a value of the
   binding of its own, or no last will at all.
 - The work master. The virtual machine sends a work master id of its own (`WM-SHAFT-4711`) and the NC program
-  only as a signal of the manufacturer, `oem/Production/ActiveProgram`; the model has no element for the
+  only as a signal of the manufacturer, `oem/WorkMasterMonitoring/ActiveProgram`; the model has no element for the
   program, and its catalogue still says the work master of a machine tool is mostly the name of the NC program.
   Open: whether the model wants an element for the program (for example in `ProgramExecution`), or the work master
   stays the program name on machines without a work master of their own.
+- The planned times of a job order. The model asks for `PlannedStartTime` and `PlannedEndTime` and allows `null`;
+  the virtual machine knows no plan and sends `null`. `OrderNumbers` is made up (`SO-` and the number of the job
+  order).
+- The stack light. `Stacklight` with the now mandatory `SignalColor` and `SignalMode` is not declared: the
+  virtual machine has no stack light.
+- The production events below `machines/` stay as they were: a job order event there carries the job order and
+  its result in one, and a `JobOrderResultChanged` of the model is a `Changed` of the job order there.
 - During a `CommunicationFault` the virtual machine runs on and its events are lost; the gap shows in `sequence`.
   A real adapter that does not see the machine numbers no events it does not see, so it has no gap; it only has
   `CommunicationFault` and `Running` to tell its consumers to read the state again.

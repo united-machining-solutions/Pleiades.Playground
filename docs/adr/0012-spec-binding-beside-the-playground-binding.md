@@ -8,7 +8,7 @@ date: 2026-11-15
 
 ## Context
 
-The data model referenced in [`contracts/datamodel`](../../contracts/datamodel/README.md) (0.16.0) asks for things
+The data model referenced in [`contracts/datamodel`](../../contracts/datamodel/README.md) (0.17.0) asks for things
 the binding of the playground does not do: energy in watt hours, snapshots and lists as one value, events,
 a manifest and retained values. [ADR-0002](0002-si-units-joule-and-one.md) puts energy in joule, and
 [ADR-0003](0003-naming.md) puts every topic below `machines/{SerialNumber}/`. The services, the example app and
@@ -23,8 +23,8 @@ exactly after the model, to find a compromise for the differences.
 - ADR-0002 and ADR-0003 keep applying to `machines/` and `sites/`. They do not apply to `simulators/`.
 - Events are meant to be stored, and a store of events must miss none. The model makes each event a CloudEvent
   with a UUID `id` and a `sequence` per group; the binding adds what MQTT needs: events lie in a subtree of their
-  own, one topic per group (`simulators/{SerialNumber}/events/production`, `…/events/notifications`, the latter
-  named as in the binding of the playground), so that MQTT keeps the order of a group, go out with QoS 1 and the
+  own, one topic per group (`simulators/{SerialNumber}/events/jobmonitoring`, `…/events/workmastermonitoring`,
+  `…/events/notifications`, the last named as in the binding of the playground), so that MQTT keeps the order of a group, go out with QoS 1 and the
   content type `application/cloudevents+json; charset=utf-8`, and wait in a bounded outbox while the broker is
   away, with the same `id` when they go out later. The schemas of the model check an event as it is.
 - `Connection.State` is the state of the adapter (`Initializing`, `Running`, `CommunicationFault`, `Shutdown`).
