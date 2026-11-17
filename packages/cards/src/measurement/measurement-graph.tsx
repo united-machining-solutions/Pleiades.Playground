@@ -7,8 +7,8 @@ import { clock } from "../machine/format.ts"
 import type { MachineMeasurements, MeasurementSeries } from "./contract.ts"
 import { axisNumber, clockWithSeconds, measuredValue, quantityLabel, unitSign } from "./words.ts"
 
-/** One quantity of the result, with the minutes the result is about. */
-type QuantitySeries = MeasurementSeries["quantities"][number] & Pick<MeasurementSeries, "from" | "to">
+/** One quantity of the result, with the minutes the result is about and the instants of its lines. */
+type QuantitySeries = MeasurementSeries["quantities"][number] & Pick<MeasurementSeries, "from" | "to" | "instants">
 
 
 /** How many machines the categorical colours of the theme name, `--chart-1` and on. */
@@ -45,11 +45,11 @@ export function MeasurementGraph({
 
   // Every line has the same instants: a row for each, with the value of each machine. A yes or no
   // is drawn as 1 or 0.
-  const rows = (lines[0]?.points ?? []).map((point, index) => ({
-    at: Date.parse(point.at),
+  const rows = series.instants.map((at, index) => ({
+    at: Date.parse(at),
     ...Object.fromEntries(
       lines.map((line) => {
-        const value = line.points[index]?.value ?? null
+        const value = line.values[index] ?? null
         return [keyOf(line.machine), typeof value === "boolean" ? Number(value) : value]
       }),
     ),

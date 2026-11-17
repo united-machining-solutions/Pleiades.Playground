@@ -54,21 +54,19 @@ export type MeasurementList = z.infer<typeof measurementList>
 /** How many points a line of a graph has: one every five seconds over a quarter of an hour. */
 export const SERIES_SLOTS = 180
 
-export const point = z.object({
-  at: instant.describe("The end of a slot. Every line of a result has the same instants."),
-  value: z
-    .union([z.number(), z.boolean()])
-    .nullable()
-    .describe(
-      `The value that held at \`at\`: the newest one measured before. Null if there is none, or if the machine was silent since, more than ${SILENT_AFTER_SECONDS} seconds without a sign of life.`,
-    ),
-})
-export type Point = z.infer<typeof point>
+/** A value of a line at one instant. */
+export const lineValue = z
+  .union([z.number(), z.boolean()])
+  .nullable()
+  .describe(
+    `The value that held at its instant: the newest one measured before. Null if there is none, or if the machine was silent since, more than ${SILENT_AFTER_SECONDS} seconds without a sign of life.`,
+  )
+export type LineValue = z.infer<typeof lineValue>
 
 export const measurementLine = z.object({
   machine: serialNumber,
   topic: z.string().describe("The MQTT topic the values come from."),
-  points: z.array(point).describe("The values between `from` and `to`, one for each slot, oldest first."),
+  values: z.array(lineValue).describe("One for each of `instants` of the result, in that order."),
 })
 export type MeasurementLine = z.infer<typeof measurementLine>
 
@@ -76,10 +74,14 @@ export type MeasurementLine = z.infer<typeof measurementLine>
  * The values of every machine over the last minutes: what the graphs of the measurements draw,
  * one graph for each quantity and a line for each machine in it. They grow with time, so they are
  * not part of what a language model reads: a page that draws the graphs asks for them.
+ *
+ * Every line has the same instants, so they stand once, in `instants`, and a line carries only
+ * its values: a result is a fraction of the size, and a page reads it again every few seconds.
  */
 export const measurementSeries = z.object({
   from: instant,
   to: instant,
+  instants: z.array(instant).describe("The end of each slot, oldest first: the same for every line."),
   quantities: z.array(
     z.object({
       quantity,

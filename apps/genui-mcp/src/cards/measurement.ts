@@ -57,7 +57,7 @@ const measurementSeriesTool = toolDefinition({
       .max(2000)
       .optional()
       .describe(
-        `How many points a line has, ${SERIES_SLOTS} if omitted. Each point is the value that held at the end of its slot, the same instants for every line.`,
+        `How many values a line has, ${SERIES_SLOTS} if omitted. Each is the value that held at the end of its slot; the instants stand once in the result, the same for every line.`,
       ),
   }),
   outputSchema: measurementSeries,

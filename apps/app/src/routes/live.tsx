@@ -70,7 +70,7 @@ function LiveValues() {
     )
   }
 
-  const { from, to, quantities } = series.values
+  const { from, to, instants, quantities } = series.values
   // A machine that is no longer there, from an old link, shows as none: the choice says so.
   const shown = chosen === undefined ? machines : machines.filter((one) => one === chosen)
   const choose = (machine: string | undefined) =>
@@ -107,7 +107,7 @@ function LiveValues() {
         {quantities.map((one) => (
           <MeasurementGraph
             key={one.quantity}
-            series={{ ...one, lines: one.lines.filter((line) => shown.includes(line.machine)), from, to }}
+            series={{ ...one, lines: one.lines.filter((line) => shown.includes(line.machine)), from, to, instants }}
             // Every machine, chosen or not, so that each keeps its colour.
             machines={machines}
             current={now.filter((measured) => shown.includes(measured.machine))}

@@ -1,6 +1,6 @@
 import { SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
 import { QUANTITIES, SERIES_SLOTS } from "@pleiades/cards/measurement/contract.ts"
-import type { Measurement, MeasurementList, MeasurementSeries, Point, Quantity } from "@pleiades/cards/measurement/contract.ts"
+import type { LineValue, Measurement, MeasurementList, MeasurementSeries, Quantity } from "@pleiades/cards/measurement/contract.ts"
 
 import { listTopics, readNewest, readTimelines } from "./apis.ts"
 import type { Apis, Newest } from "./apis.ts"
@@ -83,32 +83,34 @@ export async function listMeasurements(apis: Apis, now = new Date(), machine?: s
 export const SERIES_MINUTES = 15
 export const MOST_MINUTES = 60
 
+/** A value as it was measured. */
+type Measured = { at: string; value: number | boolean }
+
+/** The instants of every line: the time between `from` and `to` cut into `slots` slots, the end of each. */
+export function slotEnds(from: Date, to: Date, slots: number): Array<string> {
+  const width = (to.getTime() - from.getTime()) / slots
+  return Array.from({ length: slots }, (_, slot) => new Date(from.getTime() + (slot + 1) * width).toISOString())
+}
+
 /**
- * A line on the same instants as every other line: the time between `from` and `to` is cut into
- * `slots` slots, and each slot shows the value that held at its end, the newest one measured
- * before it. A value holds until the next one, but not across a silence of the machine
- * (`silent`, see liveness.ts): what it was then is not known, and the slot has no value until the
- * next one. A value is kept as it was measured, never averaged, so a yes or no stays one.
+ * A line on the same instants as every other line: at each of `instants` the value that held, the
+ * newest one measured before it. A value holds until the next one, but not across a silence of
+ * the machine (`silent`, see liveness.ts): what it was then is not known, and the line has no
+ * value until the next one. A value is kept as it was measured, never averaged, so a yes or no
+ * stays one.
  */
 export function slotted(
-  points: ReadonlyArray<Point>,
-  from: Date,
-  to: Date,
-  slots: number,
+  measured: ReadonlyArray<Measured>,
+  instants: ReadonlyArray<string>,
   silent: ReadonlyArray<Stretch>,
-): Array<Point> {
-  const sorted = [...points].sort((a, b) => a.at.localeCompare(b.at))
-  const width = (to.getTime() - from.getTime()) / slots
-  const slotted: Array<Point> = []
+): Array<LineValue> {
+  const sorted = [...measured].sort((a, b) => a.at.localeCompare(b.at))
   let next = 0
-  let held: Point | undefined
-  for (let slot = 1; slot <= slots; slot++) {
-    const end = new Date(from.getTime() + slot * width).toISOString()
+  let held: Measured | undefined
+  return instants.map((end) => {
     while (next < sorted.length && sorted[next]!.at <= end) held = sorted[next++]
-    const known = held !== undefined && !silentBetween(silent, held.at, end)
-    slotted.push({ at: end, value: known ? held!.value : null })
-  }
-  return slotted
+    return held !== undefined && !silentBetween(silent, held.at, end) ? held.value : null
+  })
 }
 
 /**
@@ -148,13 +150,14 @@ export async function listMeasurementSeries(
     }),
   )
 
+  const instants = slotEnds(from, now, slots)
   const quantities = QUANTITIES.map((quantity, index) => {
     const lines = serialNumbers.flatMap((machine, row) => {
       const before = held[row]?.[index]
-      const points = [...(before ? [{ at: before.at, value: before.value }] : []), ...samplesOf(quantity, machine)]
-      if (points.length === 0) return []
+      const measured = [...(before ? [{ at: before.at, value: before.value }] : []), ...samplesOf(quantity, machine)]
+      if (measured.length === 0) return []
       const topic = topicOf(machine, quantity)
-      return [{ machine, topic, points: slotted(points, from, now, slots, silent.get(machine) ?? []) }]
+      return [{ machine, topic, values: slotted(measured, instants, silent.get(machine) ?? []) }]
     })
     const unit =
       timelines[index]?.find((one) => one.unit !== null)?.unit ??
@@ -162,5 +165,5 @@ export async function listMeasurementSeries(
       null
     return { quantity, unit, lines }
   })
-  return { from: from.toISOString(), to: now.toISOString(), quantities }
+  return { from: from.toISOString(), to: now.toISOString(), instants, quantities }
 }

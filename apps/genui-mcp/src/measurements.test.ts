@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { afterEach, mock, test } from "node:test"
 
 import { silences } from "./liveness.ts"
-import { listMeasurementSeries, listMeasurements, measurementOf, slotted } from "./measurements.ts"
+import { listMeasurementSeries, listMeasurements, measurementOf, slotEnds, slotted } from "./measurements.ts"
 
 const apis = { timeseriesUrl: "http://timeseries:8080", eventsUrl: "http://events:8080" }
 const now = new Date("2026-11-16T09:30:00.000Z")
@@ -148,10 +148,11 @@ test("a line shows at the end of each slot the value that held, as it was measur
   const from = new Date("2026-11-16T09:00:00.000Z")
   const to = new Date("2026-11-16T09:02:00.000Z")
   const at = (second: number) => new Date(from.getTime() + second * 1000).toISOString()
+  const instants = slotEnds(from, to, 12)
   const slots = (points: Array<{ at: string; value: boolean }>, signs: Array<string>) =>
-    slotted(points, from, to, 12, silences(signs, from.toISOString(), to.toISOString())).map((one) => [
-      one.at.slice(14, 19),
-      one.value,
+    slotted(points, instants, silences(signs, from.toISOString(), to.toISOString())).map((value, index) => [
+      instants[index]?.slice(14, 19),
+      value,
     ])
   const points = [
     { at: at(3), value: true },
@@ -187,7 +188,7 @@ test("a line shows at the end of each slot the value that held, as it was measur
     slots([{ at: at(3), value: true }, { at: at(105), value: false }], gap).map(([, value]) => value),
     [true, true, true, true, true, true, null, null, null, null, false, false],
   )
-  assert.equal(slotted([], from, to, 4, []).every((one) => one.value === null), true)
+  assert.deepEqual(slotted([], slotEnds(from, to, 4), []), [null, null, null, null])
 })
 
 test("the series give a line for each machine and quantity, from the value that held where they begin", async () => {
@@ -213,23 +214,26 @@ test("the series give a line for each machine and quantity, from the value that 
     temperatures?.lines.map((line) => line.machine),
     ["P-04", "P-07"],
   )
-  // Every line has a point for each slot of five seconds, on the same instants.
+  // The instants stand once: the end of each slot of five seconds. Every line has a value for each.
+  assert.equal(series.instants.length, 180)
+  assert.equal(series.instants[0], "2026-11-16T09:15:05.000Z")
+  assert.equal(series.instants.at(-1), now.toISOString())
   const [p04, p07] = temperatures?.lines ?? []
-  assert.equal(p04?.points.length, 180)
-  assert.deepEqual(p04?.points.map((one) => one.at), p07?.points.map((one) => one.at))
-  assert.equal(p04?.points.at(-1)?.at, now.toISOString())
-  assert.equal(p04?.points.at(-1)?.value, 46)
+  assert.equal(p04?.values.length, 180)
+  assert.equal(p07?.values.length, 180)
+  const at = (instant: string) => series.instants.indexOf(instant)
+  assert.equal(p04?.values.at(-1), 46)
   // 45 holds for the 90 seconds until 46: the heartbeat says the machine was there.
-  assert.equal(p04?.points.find((one) => one.at === ago(60))?.value, 45)
-  assert.equal(p04?.points.find((one) => one.at === ago(300))?.value, null)
-  assert.equal(p07?.points.at(-1)?.value, 47.5)
+  assert.equal(p04?.values[at(ago(60))], 45)
+  assert.equal(p04?.values[at(ago(300))], null)
+  assert.equal(p07?.values.at(-1), 47.5)
   // The spindle of P-07 rotates since before the lines begin.
   const rotating = series.quantities.find((one) => one.quantity === "spindleRotating")
   assert.deepEqual(
     rotating?.lines.map((line) => line.machine),
     ["P-07"],
   )
-  assert.equal(rotating?.lines[0]?.points.every((one) => one.value === true), true)
+  assert.equal(rotating?.lines[0]?.values.every((value) => value === true), true)
   assert.deepEqual(series.quantities.find((one) => one.quantity === "activePower")?.lines, [])
   // One request for each quantity over all machines at once, and the value that held before, for each machine.
   const timelines = requested.filter((url) => url.pathname.includes("/topics/machines/*/") && !url.pathname.endsWith("Heartbeat"))
