@@ -171,10 +171,10 @@ swirls while it thinks, and waves run through it while it speaks. It also keeps 
 error of a machine turns it red, and the assistant tells you what happened, shows the hall and suggests a
 step.
 
-Speech is recognised and spoken in the browser, with no server: Whisper listens and Piper speaks. The first
-time, the browser downloads both from the internet, about 140 MB, and keeps them; a quiet line at the bottom
-says how far it is. From then on both work without a network. Until the voice of Piper is there, the voice
-of the system speaks. An answer needs the language model of stop 4.
+With the hub of the hackathon as the language model, the transcription model of the hub listens: the app
+sends what you said to it, and nothing needs to be downloaded. Without the hub, Whisper listens in the
+browser: the first time, the browser downloads it from the internet, about 80 MB, and keeps it; a quiet line
+at the bottom says how far it is. From then on it works without a network. The voice of the system speaks. An answer needs the language model of stop 4.
 
 Two answers belong to the assistant. `genui_shopfloor_show` draws the hall as a plan, the running machines
 greyed out and over each other one its reason. `genui_view_show` lets the language model lay out a view

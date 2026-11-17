@@ -102,8 +102,10 @@ the backend of the running demo stack answers.
   may say about a tool, `blocks.ts` turns an answer into blocks, and `answer.tsx` draws what the model writes
   ([TanStack Markdown](https://tanstack.com/markdown)).
 - `src/voice/`: the speech of the assistant page, `src/routes/assistant.tsx`, all in the browser.
-  `whisper.ts` recognises speech, `piper.ts` speaks with a voice of Piper, and `voice.ts` records, reads
-  answers aloud sentence by sentence and falls back to the voice of the system. `cloud.tsx` is the cloud of
+  `transcribe.ts` sends a recording to the transcription model of the endpoint of `LLM_BASE_URL`, the hub
+  (`openai/gpt-transcribe`, or `TRANSCRIBE_MODEL`), through `src/routes/api/transcribe.ts`; without an
+  endpoint, `whisper.ts` recognises speech in the browser. `voice.ts` records and reads answers aloud with the voice of the
+  system. `piper.ts` can speak with a voice of Piper instead, once the page loads it; it does not yet. `cloud.tsx` is the cloud of
   points on a canvas, coloured by the tokens of the theme; `faults.ts` watches the hall for new errors.
   `src/shopfloor/` and `src/view/` are the hall plan and the view in the chat, like `src/machines/chat.tsx`.
 - The [shadcn/ui](https://ui.shadcn.com) components come from [`packages/ui`](../../packages/ui/README.md),

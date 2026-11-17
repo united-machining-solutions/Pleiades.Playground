@@ -17,8 +17,7 @@ import type { VoiceState } from "@/voice/voice.ts"
 import { faultBriefing, faultInWords, useNewFaults } from "@/voice/faults.ts"
 import type { Fault } from "@/voice/faults.ts"
 import { useShownCards } from "@/voice/shown.ts"
-import { loadPiper } from "@/voice/piper.ts"
-import { loadWhisper } from "@/voice/whisper.ts"
+import { loadRecognition } from "@/voice/transcribe.ts"
 import { Cloud } from "@/voice/cloud.tsx"
 
 // The assistant: a black screen with a cloud of points that greets, listens and speaks, and nothing else.
@@ -63,34 +62,18 @@ function Assistant() {
   const latest = useRef({ state, panel })
   latest.current = { state, panel }
 
-  // The speech recognition loads as the screen opens: from the cache of the browser, or the first
-  // time from the internet. Until it is there, a quiet line at the bottom says how far it is.
+  // The speech recognition gets ready as the screen opens. With the endpoint of the language model,
+  // the hub, there is nothing to load. Without it, Whisper loads: from the cache of the browser, or
+  // the first time from the internet, and a quiet line at the bottom says how far it is.
   const [recognition, setRecognition] = useState<string | undefined>("Spracherkennung wird geladen …")
   useEffect(() => {
     let open = true
-    loadWhisper((share) => open && setRecognition(`Spracherkennung wird geladen … ${Math.round(share * 100)} %`)).then(
+    loadRecognition((share) => open && setRecognition(`Spracherkennung wird geladen … ${Math.round(share * 100)} %`)).then(
       () => open && setRecognition(undefined),
       (error: unknown) =>
         open &&
         setRecognition(
           `Spracherkennung nicht geladen. Einmal mit Internet öffnen, danach geht es offline. (${error instanceof Error ? error.message : String(error)})`,
-        ),
-    )
-    return () => {
-      open = false
-    }
-  }, [])
-
-  // The voice loads the same way. Until it is there, the voice of the system speaks.
-  const [voice, setVoice] = useState<string | undefined>("Stimme wird geladen …")
-  useEffect(() => {
-    let open = true
-    loadPiper((share) => open && setVoice(`Stimme wird geladen … ${Math.round(share * 100)} %`)).then(
-      () => open && setVoice(undefined),
-      (error: unknown) =>
-        open &&
-        setVoice(
-          `Stimme nicht geladen, es spricht die Stimme des Systems. Einmal mit Internet öffnen, danach geht es offline. (${error instanceof Error ? error.message : String(error)})`,
         ),
     )
     return () => {
@@ -209,8 +192,8 @@ function Assistant() {
       <p className="sr-only" aria-live="polite">
         {said[state]}
       </p>
-      {(problem ?? recognition ?? voice) && (
-        <p className="absolute bottom-6 px-4 text-sm text-white/50">{problem ?? recognition ?? voice}</p>
+      {(problem ?? recognition) && (
+        <p className="absolute bottom-6 px-4 text-sm text-white/50">{problem ?? recognition}</p>
       )}
     </div>
   )

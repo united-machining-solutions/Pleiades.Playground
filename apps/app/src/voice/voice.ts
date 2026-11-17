@@ -2,14 +2,15 @@ import { useEffect, useRef, useSyncExternalStore } from "react"
 
 import { piperIfReady, sentencesOf } from "./piper.ts"
 import type { PiperSession } from "./piper.ts"
-import { transcribe } from "./whisper.ts"
+import { transcribe } from "./transcribe.ts"
 
 // Speech for the assistant page: the browser listens to a question and reads an answer aloud.
 //
 // - Speaking uses Piper, a voice that runs in the browser (piper.ts), once it has loaded. Until then,
 //   or without it, it uses the voices of the system (speechSynthesis). Neither needs a network.
-// - Listening records the microphone while the key is held and recognises the speech with Whisper in
-//   the browser (whisper.ts). After its model is loaded once, it needs no network either.
+// - Listening records the microphone while the key is held and recognises the speech (transcribe.ts):
+//   with the transcription model of the language model's endpoint, such as the hub, or else with
+//   Whisper in the browser, which needs no network once its model is loaded.
 //
 // Answers are read aloud only while voice is on: the assistant page turns it on while it is open.
 
