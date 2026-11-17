@@ -173,6 +173,9 @@ catalogs:
     '@huggingface/transformers':
       specifier: 4.3.2
       version: 4.3.2
+    '@mintplex-labs/piper-tts-web':
+      specifier: 1.0.5
+      version: 1.0.5
     '@modelcontextprotocol/ext-apps':
       specifier: 2.0.4
       version: 2.0.4
@@ -300,6 +303,9 @@ importers:
       '@huggingface/transformers':
         specifier: 'catalog:'
         version: 4.3.2(@types/node@26.6.6)
+      '@mintplex-labs/piper-tts-web':
+        specifier: 'catalog:'
+        version: 1.0.5(onnxruntime-web@1.31.0-dev.20260914-8d85527a0)
       '@pleiades/cards':
         specifier: workspace:*
         version: link:../../packages/cards
@@ -964,6 +970,11 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@mintplex-labs/piper-tts-web@1.0.5':
+    resolution: {integrity: sha512-1TtpoY562U7isDJdCBVcVNQjsyryWLRZYuUxyCNswsbPkaN3hMScJeG4d8AAwMkoCrkmrskSuD+5AsXpa16TUg==}
+    peerDependencies:
+      onnxruntime-web: ^1.18.0
 
   '@modelcontextprotocol/client@2.4.0':
     resolution: {integrity: sha512-LgrD2OphHuG12vfKFKz6SOnq7bKHQmhGJIAYdD+MZBn2npHEyry6uD8zvktodtl5CQM85MO0anUyD9JwmUmxww==}
@@ -2649,6 +2660,7 @@ packages:
   postcss-selector-parser@7.2.0:
     resolution: {integrity: sha512-Khh/tERVBn0I1499dvBSHY0pWJloMJWUxDsOBM0CCDPAcVZ10Jl2L1qy1f19uEX22spa8Mv7DCdEQJc0cGwBhQ==}
     engines: {node: '>=4'}
+    deprecated: Double-escapes CSS Modules class names (#362). Use 7.2.1.
 
   postcss@8.5.32:
     resolution: {integrity: sha512-LJlKCCAUFKOuZxipUdYw1NzIITEsPcgyOG9LkvRJvuKj/bRzbuRY0ARXvL0pWGpsZvn8jku+LMep2eU0seHp8g==}
@@ -3544,6 +3556,10 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
+
+  '@mintplex-labs/piper-tts-web@1.0.5(onnxruntime-web@1.31.0-dev.20260914-8d85527a0)':
+    dependencies:
+      onnxruntime-web: 1.31.0-dev.20260914-8d85527a0
 
   '@modelcontextprotocol/client@2.4.0':
     dependencies:

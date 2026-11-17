@@ -17,9 +17,11 @@ import type { VoiceState } from "@/voice/voice.ts"
 import { faultBriefing, faultInWords, useNewFaults } from "@/voice/faults.ts"
 import type { Fault } from "@/voice/faults.ts"
 import { useShownCards } from "@/voice/shown.ts"
+import { loadPiper } from "@/voice/piper.ts"
 import { loadWhisper } from "@/voice/whisper.ts"
+import { Cloud } from "@/voice/cloud.tsx"
 
-// The assistant: a black screen with an orb that greets, listens and speaks, and nothing else.
+// The assistant: a black screen with a cloud of points that greets, listens and speaks, and nothing else.
 //
 // - The first press of the space bar greets: a browser speaks only after a key or a click.
 // - Then hold the space bar, speak, and let go: the question goes to the chat, which runs behind
@@ -28,7 +30,7 @@ import { loadWhisper } from "@/voice/whisper.ts"
 //
 // The demo speaks German, so do the words of this page.
 
-/** Who the orb greets. */
+/** Who the cloud greets. */
 const GREETED = "Kathrin"
 const GREETING = `Hallo ${GREETED}, was kann ich für dich tun?`
 
@@ -39,7 +41,7 @@ export const Route = createFileRoute("/assistant")({
   component: Assistant,
 })
 
-/** For a screen reader: what the orb shows by moving. */
+/** For a screen reader: what the cloud shows by moving. */
 const said: Record<VoiceState, string> = {
   idle: "Leertaste halten und sprechen.",
   listening: "Ich höre zu.",
@@ -79,15 +81,32 @@ function Assistant() {
     }
   }, [])
 
+  // The voice loads the same way. Until it is there, the voice of the system speaks.
+  const [voice, setVoice] = useState<string | undefined>("Stimme wird geladen …")
+  useEffect(() => {
+    let open = true
+    loadPiper((share) => open && setVoice(`Stimme wird geladen … ${Math.round(share * 100)} %`)).then(
+      () => open && setVoice(undefined),
+      (error: unknown) =>
+        open &&
+        setVoice(
+          `Stimme nicht geladen, es spricht die Stimme des Systems. Einmal mit Internet öffnen, danach geht es offline. (${error instanceof Error ? error.message : String(error)})`,
+        ),
+    )
+    return () => {
+      open = false
+    }
+  }, [])
+
   // Answers are read aloud while this screen is open.
   useEffect(() => {
     setVoiceEnabled(true)
     return () => setVoiceEnabled(false)
   }, [])
 
-  // The orb keeps an eye on the hall. A new fault turns it red at once, and the assistant speaks
+  // The cloud keeps an eye on the hall. A new fault turns it red at once, and the assistant speaks
   // first: it is told what happened and says it in its own words, with the shop floor. Without a
-  // language model, the orb says the fault itself.
+  // language model, the page says the fault itself.
   const { chatStatus } = root.useLoaderData()
   const [alert, setAlert] = useState<Fault>()
   const alarmed = useNewFaults((fault) => {
@@ -161,13 +180,13 @@ function Assistant() {
   }, [navigate])
 
   return (
-    // The whole screen, over the app: black, with the orb and the greeting and nothing else.
-    // With the cards of an answer, the orb gets smaller and moves up, and the cards stand below it.
+    // The whole screen, over the app: black, with the cloud and the greeting and nothing else.
+    // With the cards of an answer, the cloud gets smaller and moves up, and the cards stand below it.
     <div
       className={`fixed inset-0 z-50 flex flex-col items-center gap-8 overflow-y-auto bg-black px-4 py-10 text-center ${cards.length > 0 ? "justify-start" : "justify-center"}`}
     >
       <div className={`flex shrink-0 items-center justify-center transition-all duration-500 ${cards.length > 0 ? "h-36 scale-50" : "h-72"}`}>
-        <Orb state={state} alarm={alarmed.length > 0} />
+        <Cloud state={state} alarm={alarmed.length > 0} />
       </div>
       <div className="flex flex-col gap-4">
         {cards.length === 0 && !alert && (
@@ -190,61 +209,9 @@ function Assistant() {
       <p className="sr-only" aria-live="polite">
         {said[state]}
       </p>
-      {(problem ?? recognition) && (
-        <p className="absolute bottom-6 px-4 text-sm text-white/50">{problem ?? recognition}</p>
+      {(problem ?? recognition ?? voice) && (
+        <p className="absolute bottom-6 px-4 text-sm text-white/50">{problem ?? recognition ?? voice}</p>
       )}
-    </div>
-  )
-}
-
-/** How the orb moves: it breathes while it waits, and pulses faster while it listens, thinks or speaks. */
-const motion: Record<VoiceState, { glow: string; ring: string; core: string }> = {
-  idle: {
-    glow: "opacity-50 motion-safe:animate-[pulse_4s_ease-in-out_infinite]",
-    ring: "opacity-0",
-    core: "motion-safe:animate-[pulse_4s_ease-in-out_infinite]",
-  },
-  listening: {
-    glow: "opacity-90 scale-110",
-    ring: "opacity-60 motion-safe:animate-ping",
-    core: "scale-105",
-  },
-  thinking: {
-    glow: "opacity-80 motion-safe:animate-pulse",
-    ring: "opacity-0",
-    core: "motion-safe:animate-[pulse_1.2s_ease-in-out_infinite]",
-  },
-  speaking: {
-    glow: "opacity-100 scale-125 motion-safe:animate-pulse",
-    ring: "opacity-40 motion-safe:animate-[ping_1.4s_cubic-bezier(0,0,0.2,1)_infinite]",
-    core: "scale-110",
-  },
-}
-
-/** The orb is blue, and red while a machine has an open error. */
-const colour = {
-  calm: {
-    glow: "bg-primary",
-    ring: "border-primary/60",
-    core: "bg-[radial-gradient(circle_at_32%_28%,oklch(0.9_0.08_220),var(--primary)_55%,oklch(0.22_0.1_275))] shadow-primary/60",
-  },
-  alarm: {
-    glow: "bg-state-alarm",
-    ring: "border-state-alarm/60",
-    core: "bg-[radial-gradient(circle_at_32%_28%,oklch(0.9_0.08_25),var(--state-alarm)_55%,oklch(0.25_0.1_15))] shadow-state-alarm/60",
-  },
-}
-
-function Orb({ state, alarm }: { state: VoiceState; alarm: boolean }) {
-  const { glow, ring, core } = motion[state]
-  const paint = colour[alarm ? "alarm" : "calm"]
-  return (
-    <div aria-hidden className="relative grid size-72 place-items-center">
-      <span className={`absolute inset-6 rounded-full blur-3xl transition-all duration-500 ${paint.glow} ${glow}`} />
-      <span className={`absolute inset-10 rounded-full border-4 transition-opacity ${paint.ring} ${ring}`} />
-      <span
-        className={`relative size-48 rounded-full shadow-[0_0_80px] transition-transform duration-500 ${paint.core} ${core}`}
-      />
     </div>
   )
 }

@@ -1,10 +1,13 @@
 import { useEffect, useRef, useSyncExternalStore } from "react"
 
+import { piperIfReady, sentencesOf } from "./piper.ts"
+import type { PiperSession } from "./piper.ts"
 import { transcribe } from "./whisper.ts"
 
 // Speech for the assistant page: the browser listens to a question and reads an answer aloud.
 //
-// - Speaking uses the voices of the system (speechSynthesis). It needs no network.
+// - Speaking uses Piper, a voice that runs in the browser (piper.ts), once it has loaded. Until then,
+//   or without it, it uses the voices of the system (speechSynthesis). Neither needs a network.
 // - Listening records the microphone while the key is held and recognises the speech with Whisper in
 //   the browser (whisper.ts). After its model is loaded once, it needs no network either.
 //
@@ -41,7 +44,7 @@ export function useVoiceState(): VoiceState {
 /** Turns reading aloud on or off. Turning it off stops what is being read. */
 export function setVoiceEnabled(on: boolean) {
   enabled = on
-  if (!on && typeof speechSynthesis !== "undefined") speechSynthesis.cancel()
+  if (!on) stopSound()
 }
 
 export function voiceEnabled(): boolean {
@@ -65,8 +68,11 @@ function voiceFor(language: string): SpeechSynthesisVoice | undefined {
  * refuses to before a first click on the page.
  */
 export function speak(text: string): Promise<void> {
-  if (!canSpeak() || text.trim() === "") return Promise.resolve()
-  speechSynthesis.cancel()
+  if (text.trim() === "") return Promise.resolve()
+  stopSound()
+  const piper = piperIfReady()
+  if (piper) return speakWithPiper(piper, text)
+  if (!canSpeak()) return Promise.resolve()
   return new Promise((resolve) => {
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = VOICE_LANGUAGE
@@ -84,8 +90,60 @@ export function speak(text: string): Promise<void> {
 }
 
 export function stopSpeaking() {
-  if (canSpeak()) speechSynthesis.cancel()
+  stopSound()
   setState(thinking ? "thinking" : "idle")
+}
+
+/** Counts what was said, so that a sentence of an earlier answer that comes late stays silent. */
+let turn = 0
+/** Ends the sentence that sounds now. */
+let hush: (() => void) | undefined
+
+/** Stops every sound: the voice of Piper and that of the system. */
+function stopSound() {
+  turn++
+  hush?.()
+  if (canSpeak()) speechSynthesis.cancel()
+}
+
+/** Reads a text with Piper, a sentence at a time: the next sentence is made while one sounds. */
+async function speakWithPiper(piper: PiperSession, text: string): Promise<void> {
+  const mine = ++turn
+  const sentences = sentencesOf(text)
+  const make = (sentence: string) => piper.predict(sentence).catch(() => undefined)
+  let next = make(sentences[0])
+  try {
+    for (let index = 0; index < sentences.length; index++) {
+      const sound = await next
+      if (mine !== turn) return
+      if (index + 1 < sentences.length) next = make(sentences[index + 1])
+      // A sentence Piper cannot say is left out; the others are still read.
+      if (!sound) continue
+      setState("speaking")
+      await play(sound)
+      if (mine !== turn) return
+    }
+  } finally {
+    if (mine === turn) setState(thinking ? "thinking" : "idle")
+  }
+}
+
+/** Plays a sound, and resolves when it has ended or was stopped. */
+function play(sound: Blob): Promise<void> {
+  const address = URL.createObjectURL(sound)
+  const audio = new Audio(address)
+  return new Promise((resolve) => {
+    const done = () => {
+      hush = undefined
+      audio.pause()
+      URL.revokeObjectURL(address)
+      resolve()
+    }
+    hush = done
+    audio.onended = done
+    audio.onerror = done
+    audio.play().catch(done)
+  })
 }
 
 /**

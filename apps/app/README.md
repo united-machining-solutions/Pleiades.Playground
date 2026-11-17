@@ -101,6 +101,11 @@ the backend of the running demo stack answers.
   which tool, and its server which tools a language model does not get. `tool-results.ts` says what a card
   may say about a tool, `blocks.ts` turns an answer into blocks, and `answer.tsx` draws what the model writes
   ([TanStack Markdown](https://tanstack.com/markdown)).
+- `src/voice/`: the speech of the assistant page, `src/routes/assistant.tsx`, all in the browser.
+  `whisper.ts` recognises speech, `piper.ts` speaks with a voice of Piper, and `voice.ts` records, reads
+  answers aloud sentence by sentence and falls back to the voice of the system. `cloud.tsx` is the cloud of
+  points on a canvas, coloured by the tokens of the theme; `faults.ts` watches the hall for new errors.
+  `src/shopfloor/` and `src/view/` are the hall plan and the view in the chat, like `src/machines/chat.tsx`.
 - The [shadcn/ui](https://ui.shadcn.com) components come from [`packages/ui`](../../packages/ui/README.md),
   imported as `@pleiades/ui/components/<name>`. `components.json` holds the settings of the preset
   `b5JNecjwG` and tells `shadcn add` to write a new component there. The layout follows the block

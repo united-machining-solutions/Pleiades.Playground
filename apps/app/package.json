@@ -13,6 +13,7 @@
   "dependencies": {
     "@fontsource-variable/roboto": "catalog:",
     "@huggingface/transformers": "catalog:",
+    "@mintplex-labs/piper-tts-web": "catalog:",
     "@pleiades/cards": "workspace:*",
     "@pleiades/ui": "workspace:*",
     "@tanstack/ai": "catalog:",
