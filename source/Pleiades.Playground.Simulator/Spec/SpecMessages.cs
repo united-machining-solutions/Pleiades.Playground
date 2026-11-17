@@ -27,55 +27,41 @@ internal static class SpecWire
     /// The root of every topic of the spec binding. The output stands for the simulator of a machine; it lies below
     /// <c>simulators/{SerialNumber}/</c>, beside <c>machines/{SerialNumber}/</c> of the binding of the playground.
     /// Below the serial number comes a namespace level, as namespaces in OPC UA: <c>umati</c> for the elements of
-    /// the model, the domain of a manufacturer for its signals, and <c>events</c> for the events.
+    /// the model, <c>oem</c> for the signals the machine manufacturer defines, and <c>events</c> for the events.
     /// </summary>
     public const string Root = "simulators";
 
     /// <summary>The namespace of the elements of the model and of the manifest.</summary>
     public const string ModelLevel = "umati";
 
+    /// <summary>The namespace of the signals the machine manufacturer defines.</summary>
+    public const string OemLevel = "oem";
+
     /// <summary>The MQTT 5 content type of every payload.</summary>
     public const string ContentType = "application/json";
 
-    /// <summary>The names of the namespace level that no manufacturer may use.</summary>
-    public static readonly IReadOnlySet<string> ReservedNamespaces = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ModelLevel, "events" };
-
-    /// <summary>
-    /// The namespace of a manufacturer for the prefix segment of the model: <c>x-example-com</c> becomes
-    /// <c>example-com</c>, the domain with <c>-</c> for every dot.
-    /// </summary>
-    /// <exception cref="ArgumentException">The segment is no prefix of the model, or its namespace is reserved.</exception>
-    public static string Namespace(string prefixSegment)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(prefixSegment);
-        if (!prefixSegment.StartsWith("x-", StringComparison.Ordinal) || prefixSegment.Length < 3
-            || !prefixSegment.Skip(2).All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-'))
-        {
-            throw new ArgumentException($"'{prefixSegment}' is no prefix x-<domain> of the model.", nameof(prefixSegment));
-        }
-        var name = prefixSegment[2..];
-        if (ReservedNamespaces.Contains(name))
-        {
-            throw new ArgumentException($"The namespace '{name}' is reserved; no manufacturer may use it.", nameof(prefixSegment));
-        }
-        return name;
-    }
+    /// <summary>The names of the namespace level; the binding uses no others.</summary>
+    public static readonly IReadOnlySet<string> ReservedNamespaces = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ModelLevel, OemLevel, "events" };
 
     /// <summary>
     /// The topic of an element, every dot of its path a topic level, below its namespace. An element of the model
     /// goes below <c>umati/</c>. A signal of the manufacturer, whose path begins with the one prefix segment
-    /// <c>x-&lt;domain&gt;</c> of the model, goes below the namespace of the manufacturer: the binding maps
-    /// <c>x-&lt;domain&gt;.&lt;path&gt;</c> to <c>&lt;domain&gt;/&lt;path&gt;</c>, so the signal lies at the same place of the tree as
-    /// the elements of the model, only in another namespace.
+    /// <c>x-&lt;domain&gt;</c> of the model, goes below <c>oem/</c>: the binding maps <c>x-&lt;domain&gt;.&lt;path&gt;</c> to
+    /// <c>oem/&lt;path&gt;</c>, so the signal lies at the same place of the tree as the elements of the model, only in
+    /// another namespace. The domain of the manufacturer stays in the manifest; the topic carries none.
     /// </summary>
+    /// <exception cref="ArgumentException">A path with <c>x-</c> has no valid prefix segment.</exception>
     public static string Topic(string serialNumber, string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         if (path.StartsWith("x-", StringComparison.Ordinal))
         {
             var dot = path.IndexOf('.', StringComparison.Ordinal);
-            var name = Namespace(path[..dot]);
-            return $"{Root}/{serialNumber}/{name}/{path[(dot + 1)..].Replace('.', '/')}";
+            if (dot < 3 || !path[2..dot].All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-'))
+            {
+                throw new ArgumentException($"'{path}' has no prefix x-<domain> of the model.", nameof(path));
+            }
+            return $"{Root}/{serialNumber}/{OemLevel}/{path[(dot + 1)..].Replace('.', '/')}";
         }
         return $"{Root}/{serialNumber}/{ModelLevel}/{path.Replace('.', '/')}";
     }

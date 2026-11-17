@@ -51,8 +51,6 @@ internal sealed partial class SpecOutputService : BackgroundService
         var counters = SpecCounterStore.Load(_spec.PersistenceFilePath, _spec.Scenario);
         _machine = new VirtualMachine(identity, _spec, counters, start);
         _machine.TakeInitialMessages();
-        // Fails at the start when the domain of the manufacturer gives a reserved namespace.
-        SpecWire.Namespace(SpecElements.ExtensionPrefix(_spec.ManufacturerDomain));
         LogStarting(SpecWire.Root, _config.SerialNumber);
 
         // Both are disposed once the loop has ended and the client is stopped, in the finally block below.

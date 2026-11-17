@@ -31,11 +31,11 @@ exactly after the model, to find a compromise for the differences.
   nothing mixes with the persistence and the app. The machine is identified by that serial number and by the
   manifest, which carries the globally unique `ProductInstanceUri` of the model.
 - Below the serial number comes a namespace level, as the namespaces of OPC UA: `umati` for the elements of the
-  model, the domain of a manufacturer (`example-com`) for its signals, `events` for the events. Below every
+  model, `oem` for the signals the machine manufacturer defines, `events` for the events. Below every
   namespace the tree is built the same way, so a signal of a manufacturer lies at the same place as the elements
   of the model, only in another namespace. In the manifest it has the prefix segment `x-<domain>` the model asks
-  for, with type and unit; the binding maps `x-<domain>.<path>` to `<domain>/<path>`. `umati` and `events` are
-  reserved. Consumers ignore what they do not know.
+  for, with type and unit; the binding maps `x-<domain>.<path>` to `oem/<path>`, so the domain stands only in the
+  manifest. `umati`, `oem` and `events` are the reserved names. Consumers ignore what they do not know.
 - The second tree is an option of the simulator (`Config:SpecOutput:Enabled`), not a service of its own. One
   container stays one machine; the image, the health check and the logging are those of the simulator.
 - A virtual machine, a state machine driven by a scenario, produces the second tree. The topics below

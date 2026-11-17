@@ -661,7 +661,7 @@ public sealed class VirtualMachineTest
     {
         var path = SpecElements.ExtensionPath("example.com", SpecElements.BearingTemperature);
         Assert.AreEqual("x-example-com.Spindle.1.BearingTemperature", path);
-        Assert.AreEqual("simulators/P-04/example-com/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", path), "the prefix maps to its namespace");
+        Assert.AreEqual("simulators/P-04/oem/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", path), "the prefix maps to oem/");
         Assert.AreEqual("x-example-com", SpecElements.ExtensionPrefix("Example.COM"), "lower case, like the machine id");
 
         var run = MachineRun.For(TimeSpan.FromHours(1));
@@ -672,40 +672,34 @@ public sealed class VirtualMachineTest
     }
 
     [TestMethod]
-    public void Namespace_OfAManufacturer_IsItsDomainAndTheTreeBelowIsTheSame()
+    public void Oem_HoldsTheSignalsOfTheManufacturer_AtTheSamePlaceOfTheTree()
     {
-        Assert.AreEqual("example-com", SpecWire.Namespace("x-example-com"));
-        Assert.AreEqual("machines-example-org", SpecWire.Namespace(SpecElements.ExtensionPrefix("machines.example.org")));
-
         // The same place in the tree, only another namespace: the model and the manufacturer side by side.
         var model = SpecWire.Topic("P-04", SpecElements.SpindleIsRotating);
-        var vendor = SpecWire.Topic("P-04", "x-example-com.Spindle.1.BearingTemperature");
+        var oem = SpecWire.Topic("P-04", "x-example-com.Spindle.1.BearingTemperature");
         Assert.AreEqual("simulators/P-04/umati/Spindle/1/IsRotating", model);
-        Assert.AreEqual("simulators/P-04/example-com/Spindle/1/BearingTemperature", vendor);
-        Assert.AreEqual(model.Split('/')[3..5].Aggregate((a, b) => a + "/" + b), vendor.Split('/')[3..5].Aggregate((a, b) => a + "/" + b));
+        Assert.AreEqual("simulators/P-04/oem/Spindle/1/BearingTemperature", oem);
+        Assert.AreEqual(string.Join('/', model.Split('/')[3..5]), string.Join('/', oem.Split('/')[3..5]));
 
-        // Back from the topic to the path of the manifest.
-        var levels = vendor.Split('/');
-        Assert.AreEqual("x-example-com.Spindle.1.BearingTemperature", $"x-{levels[2]}.{string.Join('.', levels[3..])}");
+        // Every domain goes to oem/; the domain stays in the manifest only.
+        Assert.AreEqual("simulators/P-04/oem/Process/DressingCount", SpecWire.Topic("P-04", "x-machines-example-org.Process.DressingCount"));
+        Assert.IsFalse(oem.Contains("example", StringComparison.Ordinal), "no domain in the topic");
+        Assert.ThrowsExactly<ArgumentException>(() => SpecWire.Topic("P-04", "x-.Spindle.1.BearingTemperature"));
+        Assert.ThrowsExactly<ArgumentException>(() => SpecWire.Topic("P-04", "x-Example.Spindle.1.BearingTemperature"));
     }
 
     [TestMethod]
-    public void Namespace_UmatiAndEvents_AreReserved()
+    public void Namespace_UmatiOemAndEvents_AreTheOnlyNames()
     {
-        CollectionAssert.AreEquivalent(new[] { "umati", "events" }, SpecWire.ReservedNamespaces.ToList());
-        Assert.ThrowsExactly<ArgumentException>(() => SpecWire.Namespace("x-umati"));
-        Assert.ThrowsExactly<ArgumentException>(() => SpecWire.Namespace("x-events"));
-        Assert.ThrowsExactly<ArgumentException>(() => SpecWire.Topic("P-04", "x-events.Spindle.1.BearingTemperature"));
-        Assert.ThrowsExactly<ArgumentException>(() => SpecWire.Namespace(SpecElements.ExtensionPrefix("umati")));
-        Assert.ThrowsExactly<ArgumentException>(() => SpecWire.Namespace("example-com"), "a namespace comes only from a prefix x-<domain>");
+        CollectionAssert.AreEquivalent(new[] { "umati", "oem", "events" }, SpecWire.ReservedNamespaces.ToList());
 
-        // No topic of the virtual machine lies below a namespace other than umati, example-com and events.
+        // No topic of the virtual machine lies below another namespace.
         var run = MachineRun.For(TimeSpan.FromHours(1));
         var namespaces = run.Messages.OfType<SpecValue>().Select(v => SpecWire.Topic("P-04", v.Path).Split('/')[2])
             .Concat(run.Messages.OfType<SpecEvent>().Select(e => SpecWire.EventTopic("P-04", e.Path).Split('/')[2]))
             .Append(SpecWire.ManifestTopic("P-04").Split('/')[2])
             .ToHashSet();
-        CollectionAssert.AreEquivalent(new[] { "umati", "example-com", "events" }, namespaces.ToList());
+        CollectionAssert.AreEquivalent(new[] { "umati", "oem", "events" }, namespaces.ToList());
     }
 
     [TestMethod]
@@ -773,7 +767,7 @@ public sealed class VirtualMachineTest
         Assert.AreEqual("simulators/P-04/umati/Channel/1/ChannelState", SpecWire.Topic("P-04", "Channel.1.ChannelState"));
         Assert.AreEqual("simulators/P-04/umati/State/Status", SpecWire.Topic("P-04", SpecElements.Status));
         Assert.AreEqual("simulators/P-04/umati/Manifest", SpecWire.ManifestTopic("P-04"));
-        Assert.AreEqual("simulators/P-04/example-com/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", "x-example-com.Spindle.1.BearingTemperature"));
+        Assert.AreEqual("simulators/P-04/oem/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", "x-example-com.Spindle.1.BearingTemperature"));
         Assert.AreEqual("simulators/P-04/umati/Connection/State", SpecPublisher.LastWill("P-04", MachineRun.Start).Topic, "the last will");
     }
 

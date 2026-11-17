@@ -152,20 +152,20 @@ No service of the playground reads it yet.
 ### Topics
 
 The tree lies below a root of its own, `simulators/`. Below the serial number comes a namespace level, as the
-namespaces of OPC UA: one namespace for the model, one per manufacturer, and below each the tree is built the
-same way.
+namespaces of OPC UA: one namespace for the model, one for the signals the machine manufacturer defines, and
+below each the tree is built the same way.
 
 ```text
 simulators/{SerialNumber}/umati/Manifest                       retained      the manifest
 simulators/{SerialNumber}/umati/<path, every "." a level>      retained      an element of the model: value, snapshot or list
-simulators/{SerialNumber}/<domain>/<path, every "." a level>   retained      a signal of the manufacturer
+simulators/{SerialNumber}/oem/<path, every "." a level>        retained      a signal the machine manufacturer defines
 simulators/{SerialNumber}/events/<topic of the group>          not retained  event
 ```
 
-- The namespace level is the third level. `umati` holds the elements of the model and the manifest; the domain of
-  a manufacturer with `-` for every dot, for example `example-com`, holds its signals; `events` holds the
-  events.
-- `umati` and `events` are reserved names of the namespace level: no manufacturer may use them.
+- The namespace level is the third level. `umati` holds the elements of the model and the manifest; `oem`, the
+  signals defined by the machine manufacturer; `events`, the events. The topic carries no domain and no URI of
+  the manufacturer; who the manufacturer is says the manifest.
+- `umati`, `oem` and `events` are the reserved names of the namespace level; the binding uses no others.
 
 - `simulators/` is the root: the output stands for the simulator of a machine. It lies beside `machines/`, so
   nothing mixes with the persistence and the app, which subscribe to `machines/+/umati/#`, `machines/+/vendor/#`
@@ -189,7 +189,7 @@ simulators/P-04/umati/Manifest
 simulators/P-04/umati/State/Status
 simulators/P-04/umati/Spindle/1/IsRotating
 simulators/P-04/umati/Production/JobOrders
-simulators/P-04/example-com/Spindle/1/BearingTemperature
+simulators/P-04/oem/Spindle/1/BearingTemperature
 simulators/P-04/events/production
 simulators/P-04/events/notifications
 ```
@@ -199,7 +199,7 @@ Because the tree below every namespace is built the same way, wildcards cut acro
 | Subscription | What it gives |
 |---|---|
 | `simulators/+/umati/#` | only the elements of the model, of every simulator |
-| `simulators/+/example-com/#` | only the signals of one manufacturer |
+| `simulators/+/oem/#` | only the signals the machine manufacturers define |
 | `simulators/P-04/+/Spindle/1/#` | everything about spindle 1 of P-04, whatever the namespace |
 | `simulators/+/+/Spindle/+/BearingTemperature` | the bearing temperature of every spindle, whatever the namespace |
 | `simulators/+/events/+` | every event |
@@ -283,20 +283,19 @@ in `degreeCelsius` in both.
 
 ### Signals of the manufacturer
 
-The signals of the manufacturer lie in the same tree as the elements of the model, in the namespace of their
-manufacturer:
+The signals the machine manufacturer defines lie in the same tree as the elements of the model, in the namespace
+`oem`:
 
 - In the model a signal of the manufacturer begins with exactly one prefix segment `x-<domain>`, the internet
   domain of the manufacturer with `-` for every dot (rule for names of the model). The manifest lists it so,
   for example `x-example-com.Spindle.1.BearingTemperature`, with its `type` and, for a number, its `unit`
   (`code` and `name`) and a `description`.
-- The binding maps `x-<domain>.<path>` to `<domain>/<path>`: the prefix segment without `x-` becomes the
-  namespace, the rest of the path becomes topic levels. `x-example-com.Spindle.1.BearingTemperature` lies on
-  `simulators/P-04/example-com/Spindle/1/BearingTemperature`, at the same place of the tree as
-  `simulators/P-04/umati/Spindle/1/IsRotating`, only in another namespace. Back from the topic, `x-` before the
-  namespace gives the path of the manifest. An element of the model never lies outside `umati`, a signal of the
-  manufacturer never in `umati`.
-- A domain whose namespace would be `umati` or `events` is refused.
+- The binding maps `x-<domain>.<path>` to `oem/<path>`: the prefix segment is left out, the rest of the path
+  becomes topic levels. `x-example-com.Spindle.1.BearingTemperature` lies on
+  `simulators/P-04/oem/Spindle/1/BearingTemperature`, at the same place of the tree as
+  `simulators/P-04/umati/Spindle/1/IsRotating`, only in another namespace. The domain of the manufacturer stands
+  only in the manifest; back from the topic, the manifest gives the full path. An element of the model never lies
+  outside `umati`, a signal of the manufacturer never in `umati`.
 - It has the same envelope as an element of the model, `{timestamp, value, unit}`, retained, QoS 1. The `unit` is
   the `name` the manifest gives; the value follows the rules of the model for units, a temperature in
   `degreeCelsius`, energy in `wattHour`.
@@ -313,15 +312,15 @@ simulator runs `Config:SpecOutput:Scenario`.
 
 | Simulator | Topics below | Scenario | Jobs | Profiles | Signals of the manufacturer |
 |---|---|---|---|---|---|
-| P-04 | `simulators/P-04/` | default | shafts, flanges, bushings; cycles of 45 s to 90 s, up to 15 kW | Core, Production, Spindle, Energy, AlertsEvents | `example-com/Spindle/1/BearingTemperature` |
-| P-07 | `simulators/P-07/` | `housings` | housings, cover plates, gearbox housings; cycles of 2.5 min to 7 min, up to 21 kW | Core, Production, Spindle, Energy, AlertsEvents | `example-com/Spindle/1/BearingTemperature` |
-| M-02 | `simulators/M-02/` | `small-parts` | pins, spacers, nozzles in large quantities; cycles of 20 s to 50 s, up to 7 kW | Core, Production, Spindle, Energy, AlertsEvents | `example-com/Spindle/1/BearingTemperature` |
+| P-04 | `simulators/P-04/` | default | shafts, flanges, bushings; cycles of 45 s to 90 s, up to 15 kW | Core, Production, Spindle, Energy, AlertsEvents | `oem/Spindle/1/BearingTemperature` |
+| P-07 | `simulators/P-07/` | `housings` | housings, cover plates, gearbox housings; cycles of 2.5 min to 7 min, up to 21 kW | Core, Production, Spindle, Energy, AlertsEvents | `oem/Spindle/1/BearingTemperature` |
+| M-02 | `simulators/M-02/` | `small-parts` | pins, spacers, nozzles in large quantities; cycles of 20 s to 50 s, up to 7 kW | Core, Production, Spindle, Energy, AlertsEvents | `oem/Spindle/1/BearingTemperature` |
 
 All three deliver the same kind of values below `machines/` today, a spindle included, so all three are machine
 tools with a spindle and declare the same profiles. Each scenario has its own alerts, job order numbers and
 counters. The signals of the manufacturer are those the simulator delivers below
 `machines/{SerialNumber}/vendor/` today, here derived from the virtual machine and published in the namespace
-`example-com`.
+`oem`.
 
 Each virtual machine works like this:
 
@@ -384,7 +383,7 @@ Each virtual machine works like this:
 | `umati/Spindle/1/Override` | number | `one` |
 | `umati/Consumption/Electricity/Main/AcActivePowerTotal` | number | `watt` |
 | `umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `wattHour` |
-| `example-com/Spindle/1/BearingTemperature` | number, signal of the manufacturer (`x-example-com.Spindle.1.BearingTemperature` in the manifest) | `degreeCelsius` |
+| `oem/Spindle/1/BearingTemperature` | number, signal of the manufacturer (`x-example-com.Spindle.1.BearingTemperature` in the manifest) | `degreeCelsius` |
 | `events/production` | events `Production.ProgramExecution<Started, Interrupted, Resumed, Ended, Aborted>` and `Production.JobOrder<Added, Released, Revoked, Started, Interrupted, Resumed, Ended, Aborted, Cancelled, Changed, Removed>` | – |
 | `events/notifications` | events `Notification.AlertRaised`, `Notification.AlertChanged`, `Notification.AlertCleared` | – |
 
@@ -398,8 +397,9 @@ next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; withou
   unique on the broker of the playground but not across manufacturers; the manufacturer and the globally unique
   `ProductInstanceUri` are in the manifest and below `umati/Identification/`. Whether a binding needs more in
   the topic is open.
-- The namespace level and the mapping of the prefix `x-<domain>` to it are proposals of this binding, as are the
-  reserved names `umati` and `events`.
+- The namespace level, the mapping of the prefix `x-<domain>` to `oem`, and the reserved names `umati`, `oem`
+  and `events` are proposals of this binding. With one namespace `oem`, two manufacturers below one machine would
+  share it; their paths must then differ.
 - The topic per group below `events/`, the fields `seq` and `seqEpoch`, the outbox and the persistent session of a consumer
   are proposals of this binding. Whether `seq` and `seqEpoch` belong to the model (they would serve every
   technology), and whether `seqEpoch` belongs in each event or in the manifest, is open. Here it is in each
