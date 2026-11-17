@@ -88,6 +88,7 @@ workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your
 | Something of your own in the demo | `/build-your-own`, or "I would like to see which machine stood still the longest." The agent finds out whether that is a page, a card or a source, and builds it. |
 | To see the demo | "Start the stack and show me what the simulator publishes for one machine." |
 | A new value | "Add the topic `…` to the simulator and to the MQTT binding, with its SI unit." |
+| To share what you built | "Open a pull request." The agent brings the branch up to date, pushes it and opens the pull request with the template filled in from what it did and checked. |
 | To know why a check is red | "Why is pull request 12 red?" The agent reads `gh pr checks` and `gh run view --log-failed`. |
 | A review before you ask a person | "Review the diff of this branch against `main` for correctness." |
 | A decision recorded | "Write an ADR for this decision." |
