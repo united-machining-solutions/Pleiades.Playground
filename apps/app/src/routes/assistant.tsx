@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react"
 import { pickModel, useChatPanel } from "@/chat/ask.ts"
 import {
   askFollowUp,
+  remembering,
+  setSentenceVoice,
   canListen,
   listen,
   setVoiceEnabled,
@@ -20,6 +22,7 @@ import { useShownCards } from "@/voice/shown.ts"
 import { loadRecognition } from "@/voice/transcribe.ts"
 import { useWakeWord } from "@/voice/wake.ts"
 import { greetingFor } from "@/voice/greeting.ts"
+import { tom, tomAvailable } from "@/voice/tom.ts"
 import { usePresence } from "@/titan/faces/presence.ts"
 import { Cloud } from "@/voice/cloud.tsx"
 
@@ -36,6 +39,8 @@ import { Cloud } from "@/voice/cloud.tsx"
 
 /** What Titan says when it is called by its name alone. */
 const AWAKE = "Ja?"
+/** What Titan says when it is started. */
+const READY = "Titan ist bereit."
 
 const root = getRouteApi("__root__")
 
@@ -92,6 +97,22 @@ function Assistant() {
   useEffect(() => {
     setVoiceEnabled(true)
     return () => setVoiceEnabled(false)
+  }, [])
+
+  // Titan speaks with the voice of Tom when its service runs (apps/titan-voice), else as before. It
+  // takes a few seconds a sentence, so what Titan says often is made at once and kept.
+  useEffect(() => {
+    let open = true
+    void tomAvailable().then((available) => {
+      if (!open || !available) return
+      const voice = remembering(tom)
+      setSentenceVoice(voice)
+      for (const sentence of [AWAKE, READY, greetingFor(undefined, [])]) void voice.predict(sentence).catch(() => undefined)
+    })
+    return () => {
+      open = false
+      setSentenceVoice(undefined)
+    }
   }, [])
 
   // The cloud keeps an eye on the hall. A new fault turns it red at once, and the assistant speaks
@@ -165,7 +186,7 @@ function Assistant() {
       greeted.current = true
       // The camera greets whoever stands in front of it; until then a short sound says Titan is there.
       setStarted(true)
-      void speak("Titan ist bereit.")
+      void speak(READY)
       return true
     }
 

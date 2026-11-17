@@ -69,6 +69,26 @@ export function setSentenceVoice(voice: SentenceVoice | undefined) {
   sentenceVoice = voice
 }
 
+/**
+ * A voice that keeps the sounds it made, the last `keep` sentences: what Titan says often, a greeting
+ * or "Ja?", then sounds at once even with a slow voice.
+ */
+export function remembering(voice: SentenceVoice, keep = 50): SentenceVoice {
+  const sounds = new Map<string, Promise<Blob>>()
+  return {
+    predict(sentence) {
+      let sound = sounds.get(sentence)
+      if (!sound) {
+        sound = voice.predict(sentence)
+        sound.catch(() => sounds.delete(sentence))
+        sounds.set(sentence, sound)
+        if (sounds.size > keep) sounds.delete(sounds.keys().next().value as string)
+      }
+      return sound
+    },
+  }
+}
+
 function currentVoice(): SentenceVoice | undefined {
   return sentenceVoice ?? piperIfReady()
 }

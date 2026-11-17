@@ -105,7 +105,9 @@ the backend of the running demo stack answers.
   `transcribe.ts` sends a recording to the transcription model of the endpoint of `LLM_BASE_URL`, the hub
   (`openai/gpt-transcribe`, or `TRANSCRIBE_MODEL`), through `src/routes/api/transcribe.ts`; without an
   endpoint, `whisper.ts` recognises speech in the browser. `voice.ts` records and reads answers aloud with the voice of the
-  system. `piper.ts` can speak with a voice of Piper instead, once the page loads it; it does not yet. `cloud.tsx` is the cloud of
+  system. `piper.ts` can speak with a voice of Piper instead, once the page loads it; it does not yet. `tom.ts` speaks in the voice of Tom through
+  `src/routes/api/speak.ts` and the local service [`titan-voice`](../titan-voice/README.md), where
+  `TITAN_VOICE_URL` names it. `cloud.tsx` is the cloud of
   points on a canvas, coloured by the tokens of the theme; `faults.ts` watches the hall for new errors.
   `src/shopfloor/` and `src/view/` are the hall plan and the view in the chat, like `src/machines/chat.tsx`.
 - The [shadcn/ui](https://ui.shadcn.com) components come from [`packages/ui`](../../packages/ui/README.md),
