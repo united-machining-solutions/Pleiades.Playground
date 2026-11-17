@@ -130,6 +130,13 @@ the tool's and the wording is the model's: the card says 6 minutes of running, t
 minutes". The stack had just started, so most of the 8 hours have no data. The card on the left is one minute
 newer than the one in the chat: the page reads again, an answer shows what was true when it was given.
 
+The panel works like a chat app on a phone: a list and a chat, with a way back. The head says what is open. In a
+chat it says the name of the chat, which is its first question, on one line and cut where it is too long; the
+button "All chats" at its left leads back to the list, and the page beside the panel stays where it is. The
+list, headed "Chats", shows the chats so far, and the field at its foot begins a new one, with the questions to
+begin with above it. Close the panel and open it again, and the chat you left is there. The chats are kept in
+the memory of the app's server and are gone when it restarts.
+
 Under an answer that has ended and for which the chat drew a card, the chat offers "Save as page". It keeps all
 the cards of that answer, in their order, as a page titled with your question, and opens the page beside the
 chat, which stays open. No language model is asked: the app reads the tool calls from the answer it already
@@ -181,7 +188,8 @@ writes it down, see [Dictation](../apps/app/README.md#dictation). The picture of
 at the right of the field.
 
 **In the code:** [`apps/app/src/chat/`](../apps/app/src/chat). `chat-sidebar.tsx` is the panel with the model
-picker, `save-as-page.tsx` the row under an answer with "Save as page" (the recipe of an answer is read in
+picker and the head with the way back to the list, `chat-name.ts` what a chat is called,
+`save-as-page.tsx` the row under an answer with "Save as page" (the recipe of an answer is read in
 [`pages/from-answer.ts`](../apps/app/src/pages/from-answer.ts)), `dictate.tsx` the microphone, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
 reads which models the settings name, `cards.tsx` lists what the app draws for which tool, card by card, and
 `suggestions.ts` holds the three questions.

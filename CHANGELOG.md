@@ -241,6 +241,12 @@ All notable changes are documented here. The format follows
   the `package.json` (`catalogMode: strict` and an empty `savePrefix` in `pnpm-workspace.yaml`). Before,
   `pnpm add` and `shadcn add` wrote a version with a `^` into the `package.json`, and moving it into the
   catalog was a step by hand.
+- The chat panel works like a chat app on a phone, a list and a chat with a way back. In a chat the head says
+  what the chat is called, on one line and cut where it is too long: its first question, which the head shows
+  from the moment it is asked. A button "All chats" at the left of the head leads back to the list. The list
+  is the start view, now headed "Chats"; its field begins a new chat. "New chat" is gone from the head of a
+  chat, since it led to the same view the way back leads to. Without a language model the head still says
+  "Chat". After "All chats" or a chat of the list the focus is on the heading of the view it leads to.
 
 ### Fixed
 

@@ -32,7 +32,13 @@ harness.
   with "Save to my pages". A link that holds no page says so, and a part whose tool the app has no card for
   says so too, the rest of the page is whole. Why:
   [ADR-0013](../../docs/adr/0013-a-page-from-the-chat-is-a-recipe-kept-in-the-browser.md).
-- **Chat** is the panel on the right, with "New chat" and the chats so far. It opens from the button in the
+- **Chat** is the panel on the right. It works like a chat app on a phone: a list and a chat, with a way
+  back. The list, headed "Chats", shows the chats so far and, below them, the field that begins a new
+  chat, with questions to begin with. A chat says in its head what it is called, on one line and cut where it
+  is too long, and "All chats" at the left of the head leads back to the list; there is no "New chat" in a
+  chat, a new one begins in the field of the list. A chat is called by its first question, up to 80
+  characters, which the panel shows from the moment it is asked. Without a language model the head says
+  "Chat". The panel opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
   of a tool call itself: a card of the catalogue, or a list with the same rows as Home. An answer is drawn
@@ -184,7 +190,10 @@ the backend of the running demo stack answers.
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a
   tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat`, the choice of the model and stop,
-  which also cancels the turn in the harness (`createHarnessClient(...).cancel()`),
+  which also cancels the turn in the harness (`createHarnessClient(...).cancel()`), and holds its head:
+  the title of the view, or in a chat a way back and the name of the chat; `chat-name.ts` next to it says
+  what a chat is called (`chatName`, `nameOfQuestion`), `ask.ts` which chat the panel shows, in the URL
+  (`?chat=`: `new` is the list), and where the first question of a new chat waits,
   `save-as-page.tsx` the row under an answer with "Save as page" (chrome of the app, never part of a card),
   `dictate.tsx` the microphone in its field and `dictation.server.ts` the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for
