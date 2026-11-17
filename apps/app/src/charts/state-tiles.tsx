@@ -91,12 +91,12 @@ export function StateTotalsTile({ shows }: { shows: ReadonlyArray<MachineShow> }
 /** The states from bottom to top: what needs a person most lies lowest. */
 const levels: ReadonlyArray<State> = ["no-data", "alarm", "stopped", "setup", "running"]
 
-/** How far back the step line reaches. */
-const HISTORY_MS = 30 * 60_000
+/** How far back the step line reaches: the page asks for the spans of this much time only. */
+export const HISTORY_MS = 30 * 60_000
 
 const historyConfig = { level: { label: "State", color: "var(--chart-single)" } } satisfies ChartConfig
 
-/** History: the state of one machine over the last hours, as a step line. */
+/** History: the state of one machine over the last 30 minutes, as a step line. */
 export function StateHistoryTile({
   machine,
   from,
@@ -129,7 +129,7 @@ export function StateHistoryTile({
       </CardHeader>
       <CardContent>
         {spans === null || points.length === 0 ? (
-          <p className="text-sm text-muted-foreground">The states of these hours could not be read.</p>
+          <p className="text-sm text-muted-foreground">The states of the last 30 minutes could not be read.</p>
         ) : (
           <ChartContainer config={historyConfig} className="aspect-auto h-48 w-full">
             <LineChart data={points} margin={{ left: 0, right: 8, top: 8 }}>
