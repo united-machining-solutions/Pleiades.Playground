@@ -149,6 +149,9 @@ All notable changes are documented here. The format follows
   the line of a call is a `TraceCollapsible` once its result is there, with the result as text in a
   `CodeBlock` (JSON indented). `code-block` is new in `packages/ui`; it brings `shiki`, which only its
   highlighting hook loads, and the app does not use that hook.
+- The page "Charts" (`/charts`) in the example application: the groups of Home, and below them how long each
+  machine was in each state over the last hours, as stacked bars, and its state over the last 30 minutes, as
+  a step line per machine. The charts are the chart of shadcn/ui; `recharts` is new in the app.
 
 ### Changed
 
