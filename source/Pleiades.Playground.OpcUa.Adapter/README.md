@@ -220,6 +220,36 @@ Every element of a registration has one of five states. The chat and the API sho
 | Missing | The server does not offer the element (with the reason) |
 | Ok | The node is the element |
 
+## Known mappings
+
+For namespaces whose meaning is fixed, the mapping is not left to the judgement of the model. The adapter
+knows these rules ([`Mapping/KnownMappings.cs`](Mapping/KnownMappings.cs)) and applies them to every
+registration before it is checked, proposed or stored, from the chat and from `PUT /machines` alike. An
+element a rule covers is set by the rule, whatever the scan proposed for it, and is no longer missing.
+Applying the rules twice changes nothing more.
+
+There is one rule so far:
+
+| When the node of | is in the namespace | the element | is |
+|---|---|---|---|
+| `Identification.SerialNumber` | `http://trumpf.com/UA/MachineTool/` | `Identification.Model` | the same node, `Derived`: the TRUMPF instance has no `Identification/Model` and names the machine by its serial number |
+
+A rule compares the namespace as written, without a prefix. That has three consequences:
+
+- **On the server of a TRUMPF machine** the rule applies. The K09 simulator of the stack registers
+  `Identification.Model` from the node of its serial number, `i=3005`, with the value `A1121O0001`.
+- **Behind a gateway** the namespace carries the prefix of the gateway, for example
+  `urn:A1121O0001:TRUMPF:OpcSimulator/http://trumpf.com/UA/MachineTool/`, and the rule does not apply: the
+  registration has the model only if the scan mapped it.
+- **The machine list** of an endpoint names the model differently: for a TRUMPF machine it takes the part
+  before the dot of the display name of the TRUMPF root, `TruMatic` for `TruMatic.A1121O0001`
+  ([Machines behind a gateway](#machines-behind-a-gateway)). The rule gives the serial number instead.
+
+A registration that is stored already keeps its mapping until it is replaced: `/rescan` proposes the change.
+A rule is code with a unit test ([`KnownMappingsTest.cs`](../Pleiades.Playground.OpcUa.Adapter.Test/KnownMappingsTest.cs)).
+The rules and the machine list are to agree on the model, and the rules are to match a namespace behind the
+prefix of a gateway; both are open.
+
 ## Management API
 
 | Request | What it does |
@@ -384,8 +414,8 @@ stays across deployments.
 - **Machines of one kind behind a gateway.** Map the first machine, and let the adapter carry the mapping over
   to the next ones by their browse paths, so a gateway of ten machines does not take ten scans. A button that
   adds every proposal of one gateway at once.
-- **Strict mappings for known namespaces.** Where a server uses a namespace whose meaning is fixed, the mapping
-  should not be left to the judgement of the model. For example:
+- **More [known mappings](#known-mappings).** The first rule takes one element from the node of another. More
+  rules need a browse path from the machine instance, resolved on the server. For example:
   - `http://opcfoundation.org/UA/MachineTool/` (OPC 40501-1), with `http://opcfoundation.org/UA/Machinery/`
     (OPC 40001-1): identification, `MachineryItemState`, `MachineryOperationMode`, operation counters,
     channels and spindles by their browse paths and data types;

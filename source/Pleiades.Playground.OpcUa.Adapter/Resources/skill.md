@@ -110,6 +110,20 @@ having, goes into the area `vendor` with a path of your choice in the same form,
 `Notification.ActiveAlerts` and `Production.JobOrders` are no values here. Alarms travel as events, see
 `alerts`. Do not map them as elements.
 
+## What the adapter maps itself
+
+For some namespaces the adapter knows the mapping. When you propose, it sets those elements itself, whatever
+you proposed for them, and takes them out of `missing`. Their evidence begins with "Known mapping of the
+adapter". Do not search for them, and do not tell the person they are unclear.
+
+| Namespace of the node of `Identification.SerialNumber` | Element | Set to |
+|---|---|---|
+| `http://trumpf.com/UA/MachineTool/` | `Identification.Model` | the node of `Identification.SerialNumber`, `Derived` |
+
+The namespace is compared as written. Behind a gateway it carries a prefix, for example
+`urn:A1121O0001:TRUMPF:OpcSimulator/http://trumpf.com/UA/MachineTool/`, and the adapter sets nothing: map
+those elements yourself, or leave them in `missing`.
+
 ## Rules of a registration
 
 - **Node.** With the namespace as a URI: `nsu=http://example.com/;i=3003`. A browse gives `ns=7;i=3003`: take

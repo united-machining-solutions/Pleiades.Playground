@@ -218,7 +218,10 @@ All notable changes are documented here. The format follows
   adds with a button; `/opcua`, `/mapping`, `/rescan` and `/help` list servers, show mismatched and unclear
   mappings and scan again. Machines behind an OPC UA aggregation server (a gateway) are listed by
   `opcua_machine_list`, each with the serial number read on the server, get one registration each, and share
-  one session per endpoint. The simulator of the stack runs definition `K09`, machine `A1121O0001`.
+  one session per endpoint. The simulator of the stack runs definition `K09`, machine `A1121O0001`. Known
+  mappings: for a namespace whose meaning is fixed the adapter sets an element itself, so far
+  `Identification.Model` of a TRUMPF MachineTool instance. The connect tool of the chat takes no user name or
+  password.
 
 ### Changed
 

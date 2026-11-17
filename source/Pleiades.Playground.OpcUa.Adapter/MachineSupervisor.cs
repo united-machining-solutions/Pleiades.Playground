@@ -130,6 +130,8 @@ internal sealed class MachineSupervisor : BackgroundService
         ArgumentNullException.ThrowIfNull(registration);
         registration = registration with { Endpoint = registration.Endpoint with { Url = EndpointKey.Trim(registration.Endpoint.Url) } };
 
+        // What the adapter knows of a namespace is not left to the scan.
+        registration = KnownMappings.Apply(registration);
         var problems = RegistrationValidator.Validate(registration);
         if (problems.Count > 0)
         {
@@ -211,7 +213,7 @@ internal sealed class MachineSupervisor : BackgroundService
     {
         var outcome = await RegisterAsync(registration, dryRun: true, cancellationToken).ConfigureAwait(false);
         var stored = Find(registration.SerialNumber)?.Registration;
-        var tried = outcome.Registration ?? registration;
+        var tried = outcome.Registration ?? KnownMappings.Apply(registration);
         var rows = outcome.Probe is null ? [] : Views.Rows(tried, outcome.Probe);
         var endpoint = Views.Endpoint(tried.Endpoint) with
         {
