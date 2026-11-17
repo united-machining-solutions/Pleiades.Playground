@@ -11,7 +11,7 @@ through the stops in your running stack, see [`AGENTS.md`](../AGENTS.md).
 2. [Home](#2-home)
 3. [The page of one machine](#3-the-page-of-one-machine)
 4. [The chat beside the page](#4-the-chat-beside-the-page)
-5. [The assistant you talk to](#5-the-assistant-you-talk-to)
+5. [Titan, the assistant you talk to](#5-titan-the-assistant-you-talk-to)
 6. [When a machine goes silent](#6-when-a-machine-goes-silent)
 7. [Where to change what](#7-where-to-change-what)
 
@@ -159,12 +159,23 @@ from the card file of the backend: in alarm since 15:39 with "Spindle overtemper
 program, and the states of the last eight hours as a band with their sums. Below the card the chat says the
 same in two paragraphs.](images/tour/machine-card-in-host.png)
 
-## 5. The assistant you talk to
+## 5. Titan, the assistant you talk to
 
-<http://localhost:5600/assistant>, "Assistant" in the sidebar, is the chat without a keyboard: a black screen
-with a cloud of glowing points that greets, listens and speaks German. The first press of the space bar
-greets; then hold the space bar, ask, and let go. The question goes to the chat of stop 4, the answer is read
-aloud, and its cards stand below the cloud. Escape leaves the screen.
+<http://localhost:5600/assistant>, "Titan" in the sidebar, is Titan: the chat without a keyboard, a black screen
+with a cloud of glowing points that greets, listens and speaks German. A first click or press of the space bar
+starts it. Then say "Hey Titan" and the question, or "Hey Titan" alone and the question after its "Ja?";
+holding the space bar works too. The question goes to the chat of stop 4, the answer is read aloud sentence by
+sentence while it arrives, and its cards stand below the cloud. Escape leaves the screen.
+
+Titan answers first, then adds at most one hint nobody asked for and one suggestion, and says plainly when
+the data cannot answer. Its chats begin with the fastest model the settings name (Haiku at the hub).
+
+With a camera, Titan greets whoever steps in front of it: by name when the face is known, and straight away
+with the machines that stand still with an error. Faces are enrolled at <http://localhost:5600/titan/gesichter>
+("Gesichter"); what describes a face stays in that browser, and no photo is kept. With the voice service of
+[`apps/titan-voice`](../apps/titan-voice/README.md) running, Titan speaks with the voice of Tom, who agreed to
+it; without it, the voice of the system speaks. What Titan knows stands on one screen at
+<http://localhost:5600/lagebild> ("Lagebild"): the hall plan and every machine.
 
 The cloud shows what the assistant does: it breathes while it waits, draws together while it listens,
 swirls while it thinks, and waves run through it while it speaks. It also keeps an eye on the hall: a new
@@ -174,15 +185,17 @@ step.
 With the hub of the hackathon as the language model, the transcription model of the hub listens: the app
 sends what you said to it, and nothing needs to be downloaded. Without the hub, Whisper listens in the
 browser: the first time, the browser downloads it from the internet, about 80 MB, and keeps it; a quiet line
-at the bottom says how far it is. From then on it works without a network. The voice of the system speaks. An answer needs the language model of stop 4.
+at the bottom says how far it is. From then on it works without a network. An answer needs the language
+model of stop 4.
 
 Two answers belong to the assistant. `genui_shopfloor_show` draws the hall as a plan, the running machines
 greyed out and over each other one its reason. `genui_view_show` lets the language model lay out a view
 from blocks; it never writes a number, every value is computed by the backend, with its source.
 
 **In the code:** [`apps/app/src/routes/assistant.tsx`](../apps/app/src/routes/assistant.tsx) is the page,
-[`apps/app/src/voice/`](../apps/app/src/voice) the cloud (`cloud.tsx`), listening (`whisper.ts`), speaking
-(`piper.ts`, `voice.ts`) and the watch over the hall (`faults.ts`). The plan of the hall is
+[`apps/app/src/voice/`](../apps/app/src/voice) the cloud (`cloud.tsx`), listening (`transcribe.ts`, `wake.ts` for
+"Hey Titan"), speaking (`voice.ts`, `tom.ts`), the greeting (`greeting.ts`) and the watch over the hall (`faults.ts`);
+[`apps/app/src/titan/faces/`](../apps/app/src/titan/faces) the faces. The plan of the hall is
 [`apps/genui-mcp/src/hall.ts`](../apps/genui-mcp/src/hall.ts), its card
 [`packages/cards/src/shopfloor/`](../packages/cards/src/shopfloor), and the blocks of a view
 [`apps/genui-mcp/src/views.ts`](../apps/genui-mcp/src/views.ts).

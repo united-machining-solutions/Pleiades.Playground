@@ -24,6 +24,7 @@ import { useWakeWord } from "@/voice/wake.ts"
 import { greetingFor } from "@/voice/greeting.ts"
 import { tom, tomAvailable } from "@/voice/tom.ts"
 import { usePresence } from "@/titan/faces/presence.ts"
+import { listPeople } from "@/titan/faces/store.ts"
 import { Cloud } from "@/voice/cloud.tsx"
 
 // Titan: a black screen with a cloud of points that greets, listens and speaks, and nothing else.
@@ -107,7 +108,13 @@ function Assistant() {
       if (!open || !available) return
       const voice = remembering(tom)
       setSentenceVoice(voice)
-      for (const sentence of [AWAKE, READY, greetingFor(undefined, [])]) void voice.predict(sentence).catch(() => undefined)
+      // The greetings of the people whose faces Titan knows too, one after the other.
+      void listPeople()
+        .catch(() => [])
+        .then((people) => [AWAKE, READY, greetingFor(undefined, []), ...people.map((one) => greetingFor(one.name, []))])
+        .then(async (sentences) => {
+          for (const sentence of sentences) if (open) await voice.predict(sentence).catch(() => undefined)
+        })
     })
     return () => {
       open = false
