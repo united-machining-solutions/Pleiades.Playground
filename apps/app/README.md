@@ -10,6 +10,9 @@ harness.
   [card catalogue](../../packages/cards/README.md): what the machine does now and what it did over the last
   hours. It needs no language model. Home leads to it. For a machine the backend does not know, the page
   says so and does not ask again.
+- **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
+  machine, and reads them again every ten seconds. A choice above the graphs shows one machine or all of
+  them, and stays in the URL (`?machine=`).
 - **Chat** is the panel on the right, with "New chat" and the chats so far. It opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
@@ -28,7 +31,7 @@ everything else works.
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app` |
 | Version | At the bottom of the sidebar: `0.0.142 · 7a83c2f` for an image of the workflow "Images", linked to its commit; `dev` for a build of your own, with the commit of the checkout under `vite dev` |
-| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. The language models of the chat, see below. |
+| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); the app draws nothing for their results, the answer says them. The language models of the chat, see below. |
 
 ## Language models
 
@@ -126,9 +129,10 @@ the backend of the running demo stack answers.
 - `src/cards/`: a folder for each card, named like the card. `machine/chat.tsx` is the machine card in the
   chat: what a call of each of its tools is called, what the chat draws for a result (`results.ts` checks it
   against the contract), and which tool only a card calls. Which value of the binding is which state, the
-  signs and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
+  signs and the wording come from [`@pleiades/cards`](../../packages/cards/README.md). `measurement/chat.tsx`
+  is the measurement card in the chat: the cards of `genui_measurement_list`, without graphs.
 - `src/machines/`: what the pages and the chat both take of a machine. `get-machines.ts` holds the server
-  functions that call the backend as a typed MCP client, `card-tools.ts` the name of the tool only a card
+  functions that call the backend as a typed MCP client, `card-tools.ts` the names of the tools only a card
   calls, `machine-item.tsx` draws a machine as a row or a tile. A card folder imports from here, never the
   other way.
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)

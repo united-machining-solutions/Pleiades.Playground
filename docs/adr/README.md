@@ -20,3 +20,4 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0009](0009-shadcn-components-in-one-package.md) | The shadcn/ui components live in one package, `packages/ui` | proposed |
 | [0010](0010-language-models-through-one-gateway.md) | The chat takes its language models from a LiteLLM gateway | proposed |
 | [0011](0011-a-brand-is-a-block-of-theme-tokens.md) | A brand is a block of theme tokens, switched by one attribute | proposed |
+| [0012](0012-headless-ultimaker-tool-service.md) | Headless Ultimaker 3 slicing and explicit print operations | proposed |
