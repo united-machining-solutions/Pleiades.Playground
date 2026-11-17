@@ -3,4 +3,8 @@
     <PackageReference Include="Moq" />
     <ProjectReference Include="../Pleiades.Playground.Ultimaker.Telemetry/Pleiades.Playground.Ultimaker.Telemetry.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The answers of the faulted printer, kept once, next to the tests of the API. -->
+    <None Include="../Pleiades.Playground.Ultimaker.Api.Test/Fixtures/**" Link="Fixtures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -11,6 +11,10 @@ internal sealed class TelemetryOptions
     public string PrinterBaseUrl { get; set; } = "http://ultimaker.local/";
     public string SerialNumber { get; set; } = "UM3-01";
     public int PollIntervalSecond { get; set; } = 2;
+    /// <summary>How often the printer log and job history are read for faults.</summary>
+    public int FaultPollIntervalSecond { get; set; } = 30;
+    /// <summary>How many of the newest log lines one fault poll reads.</summary>
+    public int FaultLogLines { get; set; } = 500;
 }
 
 internal sealed class TelemetryState

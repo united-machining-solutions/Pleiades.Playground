@@ -4,4 +4,7 @@
     <ProjectReference Include="../Pleiades.Playground.Ultimaker.Api/Pleiades.Playground.Ultimaker.Api.csproj" />
     <ProjectReference Include="../Pleiades.Playground.Mcp.Testing/Pleiades.Playground.Mcp.Testing.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Fixtures/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

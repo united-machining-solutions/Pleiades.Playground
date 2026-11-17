@@ -10,7 +10,8 @@ builder.Services.AddOptions<UltimakerOptions>().BindConfiguration("Ultimaker")
     .Validate(o => Uri.TryCreate(o.PrinterBaseUrl, UriKind.Absolute, out var uri)
         && (uri.Scheme == "http" || uri.Scheme == "https") && string.IsNullOrEmpty(uri.UserInfo), "PrinterBaseUrl must be an HTTP(S) URL without credentials.")
     .Validate(o => o.MaximumModelBytes is > 0 and <= 20 * 1024 * 1024 && o.SliceTimeoutSecond is > 0 and <= 1800,
-        "Model limit must be at most 20 MiB and slice timeout at most 1800 seconds.").ValidateOnStart();
+        "Model limit must be at most 20 MiB and slice timeout at most 1800 seconds.")
+    .Validate(o => o.FaultLogLines is >= 50 and <= 20000, "FaultLogLines must be 50..20000.").ValidateOnStart();
 builder.Services.AddPleiadesHttpJsonOptions();
 builder.Services.AddPleiadesForwardedHeaders();
 var auth = builder.Configuration.GetSection("Config:Auth");
@@ -57,6 +58,7 @@ app.MapOpenApi().RequireFeatureRead("ultimaker");
 app.MapPleiadesMcp().RequireFeatureRead("ultimaker");
 app.MapGet("/profiles", () => new[] { CuraSlicer.Profile }).RequireFeatureRead("ultimaker");
 app.MapGet("/printer", (PrinterClient printer, CancellationToken ct) => printer.StatusAsync(ct)).RequireFeatureRead("ultimaker");
+app.MapGet("/printer/faults", (PrinterClient printer, CancellationToken ct) => printer.FaultsAsync(ct)).RequireFeatureRead("ultimaker");
 app.MapPost("/models", (HttpRequest request, ArtifactStore store, CancellationToken ct) => store.StoreModelAsync(request.Body, ct))
     .RequireFeatureWrite("ultimaker");
 app.MapPost("/slices", (SliceRequest request, CuraSlicer slicer, CancellationToken ct) => slicer.SliceAsync(request, ct))

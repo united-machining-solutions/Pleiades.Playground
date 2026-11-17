@@ -9,6 +9,9 @@ All notable changes are documented here. The format follows
 
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
+- Ultimaker services: the reason a print failed. The tool `ultimaker_printer_faults` and the route
+  `GET /printer/faults` return the faults of the printer log and the failed or aborted jobs; the telemetry
+  adapter publishes them as notification events that come and go, which the Events API stores.
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,

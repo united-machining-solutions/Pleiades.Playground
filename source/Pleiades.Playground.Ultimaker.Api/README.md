@@ -145,6 +145,13 @@ job is `GET /printer/print/history/{jobId}` / `ultimaker_print_get`. Pages accep
 Unknown states/results are preserved; missing dates/numbers remain null. All durations use second,
 progress is a fraction and timestamps are UTC. A finished job is not a part-quality assessment.
 
+`GET /printer/faults` / `ultimaker_printer_faults` tell why the printer stopped: the faults in the newest
+lines of its system log (UTC time, manufacturer code, level, English text) and the failed or aborted jobs
+of its history. It needs no pairing and only reads. The printer has no route for faults and keeps the
+status `idle` while a message stands on its display, so this is read from the log; its line format is the
+one of firmware 5.3.0 and is not documented by the manufacturer. An empty list is no proof of a healthy
+printer. `Ultimaker:FaultLogLines` (50..20000, default 5000) sets how many lines are read.
+
 `GET /slices/{id}/prints` / `ultimaker_slice_prints` list the local submission journal. Each attempt
 is persisted before upload and bound to printer UUID, slice ID and SHA-256. Accepted responses add
 the printer job UUID. Current/history results join by those exact printer/job IDs, never by name.

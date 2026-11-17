@@ -12,6 +12,10 @@ internal sealed class UltimakerTools(ArtifactStore store, CuraSlicer slicer, Pri
      Description("Read the configured Ultimaker model, firmware, status, print cores and loaded material UUIDs. Temperatures are kelvin.")]
     public Task<PrinterStatus> Status(CancellationToken cancellationToken) => Guard(() => printer.StatusAsync(cancellationToken));
 
+    [McpServerTool(Name = "ultimaker_printer_faults", ReadOnly = true, Idempotent = true, Destructive = false),
+     Description("Read why the printer stopped: the faults in the newest lines of its system log (UTC time, manufacturer code, level and English text) and the failed or aborted jobs of its history. LogSince says how far back the log was read. An empty list is no proof of a healthy printer: the display can show a message the printer reports nowhere else, and the status stays idle.")]
+    public Task<PrinterFaultReport> Faults(CancellationToken cancellationToken) => Guard(() => printer.FaultsAsync(cancellationToken));
+
     [McpServerTool(Name = "ultimaker_profiles_list", ReadOnly = true, Idempotent = true, Destructive = false),
      Description("List supported slicing profiles. Initial support: Ultimaker 3, PLA, left AA 0.4. Dimensions are metre.")]
     public SlicingProfile[] Profiles() => [CuraSlicer.Profile];

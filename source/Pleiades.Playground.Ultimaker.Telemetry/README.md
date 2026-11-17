@@ -25,7 +25,8 @@ Secrets are configured by the operator, never logged or copied into code.
 
 ## Observations and units
 
-The adapter polls GET /api/v1/printer and GET /api/v1/print_job. The temperature.html page uses a
+The adapter polls GET /api/v1/printer and GET /api/v1/print_job, and for faults GET /api/v1/system/log
+and GET /api/v1/history/print_jobs. The temperature.html page uses a
 diagnostic history buffer; its opaque heater/flow/step signals are not assigned guessed units.
 We use the live snapshots for bed/nozzle current and target temperatures, XYZ position, fan
 fraction, known material length, printer/job states, progress and duration estimates.
@@ -45,6 +46,19 @@ Abrupt process loss is detected by a missing heartbeat; the counter resets on pr
 The shared MQTT client reconnects and has a bounded outgoing queue. The adapter skips sensor
 publishing while disconnected from the broker. Consumers must still respect timestamps and age.
 
+## Faults as notification events
+
+Every 30 seconds the adapter reads the 500 newest lines of GET /api/v1/system/log and the 10 newest
+jobs of the history. A fault line and a job that ended `Failed` or `Aborted` become notification events
+on `machines/{SerialNumber}/events/notifications`; the Events persistence stores them, and the Events API
+pairs coming and going into intervals. A fault goes when the next job starts, a failed job when the
+printer reports the build plate as cleared. The contract table says which identifier and level each has.
+The printer log names hosts and users: only time, code and text of a fault are published, and nothing of
+the log is written to the adapter's own log. `Config:FaultPollIntervalSecond` (5..600) and
+`Config:FaultLogLines` (50..5000) change the defaults.
+
+## Health
+
 `/health` checks broker connectivity; `/healthcheck` also reports whether printer observations are
 fresh. This distinguishes an alive adapter from an unreachable printer.
 
@@ -57,8 +71,9 @@ times. The existing `genui_machine_list` discovers UM3-01 from stored connection
 The existing card focuses on state; numeric temperatures are available through Timeseries.
 
 Run `dotnet test --project source/Pleiades.Playground.Ultimaker.Telemetry.Test/Pleiades.Playground.Ultimaker.Telemetry.Test.csproj`.
-The tests cover unit conversion, unknown-value handling, state mapping and an independent heartbeat
-while the printer request is blocked. Build and run the container to verify the actual broker path.
+The tests cover unit conversion, unknown-value handling, state mapping, an independent heartbeat
+while the printer request is blocked, and the notification events of a printer whose levelling failed,
+replayed from its log. Build and run the container to verify the actual broker path.
 The Images workflow publishes `ghcr.io/united-machining-solutions/pleiades.playground.ultimaker.telemetry`
 after a merge to main or release tag. Enable `COMPOSE_PROFILES=ultimaker` in the deployment computer's
 private .env; see [deployment](../../docs/deployment.md#enable-the-ultimaker-services).
