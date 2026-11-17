@@ -1,0 +1,6 @@
+<Project Sdk="MSTest.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Moq" />
+    <ProjectReference Include="../Pleiades.Playground.Ultimaker.Telemetry/Pleiades.Playground.Ultimaker.Telemetry.csproj" />
+  </ItemGroup>
+</Project>

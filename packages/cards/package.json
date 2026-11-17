@@ -14,13 +14,17 @@
   },
   "peerDependencies": {
     "@pleiades/ui": "workspace:*",
-    "react": "catalog:"
+    "react": "catalog:",
+    "recharts": "catalog:"
   },
   "peerDependenciesMeta": {
     "@pleiades/ui": {
       "optional": true
     },
     "react": {
+      "optional": true
+    },
+    "recharts": {
       "optional": true
     }
   },
@@ -29,6 +33,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "react": "catalog:",
+    "recharts": "catalog:",
     "typescript": "catalog:"
   }
 }
