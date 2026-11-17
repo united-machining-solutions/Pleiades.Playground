@@ -70,8 +70,9 @@ docker compose --profile opcua up -d --build --wait
 ```
 
 Or write `COMPOSE_PROFILES=opcua` into `.env`. The simulated machine is the TRUMPF OPC UA simulator with its
-definition `L26`, a TruLaser. This repository does not publish its image: `OPC_SIMULATOR_IMAGE` in `.env` names
-one that is on the computer or in a registry.
+definition `L26`, a TruLaser, from the image that umati publishes,
+[`ghcr.io/umati/trumpf/edge/opc-simulator:1.3.0`](https://github.com/orgs/umati/packages/container/package/trumpf%2Fedge%2Fopc-simulator)
+(amd64 only). `OPC_SIMULATOR_IMAGE` in `.env` names another one, for example a build of your own.
 
 | | |
 |---|---|
@@ -106,9 +107,9 @@ Its nodes, units and derivations are not a template to copy: every server is sca
 decides from what that server offers. The guide of the model says so, and the adapter refuses a registration
 whose nodes the server does not have.
 
-An image of the simulator built before its machine numbers were replaced reports `A0280E0062` instead of
-`A0280O0001`: the example registration is then refused or publishes under the wrong number. Build the image from
-the current source of the simulator, or scan the server again.
+The image of umati, `1.3.0`, reports `A0280O0001`. An image of the simulator built before its machine numbers
+were replaced reports `A0280E0062` instead: the example registration is then refused or publishes under the wrong
+number.
 
 ## In the chat
 
@@ -283,8 +284,16 @@ Not verified: a discovery through the chat from the first question to the click,
 - Sessions to a server are anonymous only; a user name or a user certificate is not supported yet.
 - One registration is one session: the adapter knows no server that serves several machines.
 - `PartsProducedInLifetime` is not offered by the simulator; `Production.JobOrders` is not published.
-- The image of the simulator is local only (`OPC_SIMULATOR_IMAGE`), and the workflow that builds the images
-  does not know the adapter.
+- The job of CI that starts the stack runs without the profile `opcua`: the adapter is built and tested, but
+  not started there.
+
+## Deployment
+
+The workflow "Images" builds the image of the adapter with the others, and "Deploy" starts the stack from them
+([deployment](../../docs/deployment.md)). The adapter runs there only if the `.env` of the deployment has
+`COMPOSE_PROFILES=opcua`; without it the deployment is the stack without OPC UA, as before. The image of the
+simulator is pulled from umati; it is built for amd64 only, so the computer of the deployment needs that
+architecture for it.
 
 ## Next steps
 
@@ -312,6 +321,7 @@ Not verified: a discovery through the chat from the first question to the click,
 - A discovery through the chat with a language model, from `/discover A0280O0001` to the click, as an
   automated end-to-end test.
 - A server that is not TRUMPF's, before the proof of concept counts as done.
-- An issue for the new service and its topics, a contract under `contracts/` for the management API and the MCP
-  tools, a stop in the [tour](../../docs/tour.md), and the adapter in the workflow that builds the images.
+- The issue for the new service ([#105](https://github.com/united-machining-solutions/Pleiades.Playground/issues/105)),
+  a contract under `contracts/` for the management API and the MCP tools, a stop in the
+  [tour](../../docs/tour.md), and a CI job that starts the stack with the profile `opcua`.
 - Sessions with a user name or a user certificate.

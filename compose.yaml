@@ -408,11 +408,11 @@ services:
     volumes:
       - opcua_adapter_data:/data
 
-  # A machine to try the adapter with: the TRUMPF OPC UA simulator with a TruLaser. The image is not
-  # published by this repository; OPC_SIMULATOR_IMAGE names the one on this computer or in a registry.
+  # A machine to try the adapter with: the TRUMPF OPC UA simulator with a TruLaser, as umati publishes
+  # it. OPC_SIMULATOR_IMAGE names another image of it, for example one built on this computer.
   opc-simulator:
     profiles: [opcua]
-    image: ${OPC_SIMULATOR_IMAGE:-opc-simulator:latest}
+    image: ${OPC_SIMULATOR_IMAGE:-ghcr.io/umati/trumpf/edge/opc-simulator:1.3.0}
     restart: unless-stopped
     # The name the server announces in its endpoints and carries in its certificate.
     hostname: A0280O0001

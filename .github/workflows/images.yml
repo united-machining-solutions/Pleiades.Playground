@@ -56,6 +56,9 @@ jobs:
           - image: pleiades.playground.juicebar.api
             context: source
             file: source/Pleiades.Playground.JuiceBar.Api/Dockerfile
+          - image: pleiades.playground.opcua.adapter
+            context: source
+            file: source/Pleiades.Playground.OpcUa.Adapter/Dockerfile
           - image: pleiades.playground.genui.mcp
             context: .
             file: apps/genui-mcp/Dockerfile
