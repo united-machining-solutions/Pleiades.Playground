@@ -187,7 +187,7 @@ All notable changes are documented here. The format follows
 - Events: the persistence takes `application/cloudevents+json` from `machines/+/events/jobs`, `…/workmasters`
   and `…/notifications` with QoS 1 in a persistent session (`Config:MqttSource:SessionExpiry`), and the Events
   API keeps the CloudEvents as they came in one collection `MachineEvent`, unique by `source` and `id`. It serves
-  `/machineEvents` with `/machineEvents/gaps`, `/alerts/active`, `/alerts/pairs` and `/alerts/statistics` (by
+  `/machineEvents` (by machine, group, type, correlation id, job order and time) with `/machineEvents/gaps`, `/alerts/active`, `/alerts/pairs` and `/alerts/statistics` (by
   NE 107 severity), `/jobOrders` with `/jobOrders/{mId}/{jobOrderId}`, and `/programExecutions`, and the MCP
   tools `events_machine_events_query`, `events_sequence_gaps_query`, `events_active_alerts_query`,
   `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query` and

@@ -98,6 +98,7 @@ internal static class MachineEvents
     /// <param name="group">Optional group: JobMonitoring, WorkMasterMonitoring or Notification.</param>
     /// <param name="type">Optional type of the CloudEvent. Example: Notification.AlertRaised</param>
     /// <param name="correlationId">Optional ExecutionId of a program execution.</param>
+    /// <param name="jobOrderId">Optional job order: the field JobOrderID of the data. Example: 4711/01</param>
     /// <param name="from">Optional earliest time of the event (inclusive). Example: 2026-11-17T06:00:00Z</param>
     /// <param name="to">Optional latest time of the event (inclusive). Example: 2026-11-17T18:00:00Z</param>
     /// <param name="paging">Pagination parameters (skip, take, sorting by time).</param>
@@ -109,6 +110,7 @@ internal static class MachineEvents
         [FromQuery] string? group,
         [FromQuery] string? type,
         [FromQuery] string? correlationId,
+        [FromQuery] string? jobOrderId,
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
         [AsParameters] PagedRequest paging,
@@ -117,7 +119,7 @@ internal static class MachineEvents
     {
         var page = paging.Validated();
         var (items, totalCount) = await repository.QueryAsync(
-            new MachineEventFilter(mId, group, type, correlationId, null, from, to), page.Skip, page.Take, page.Sorting, cancellationToken)
+            new MachineEventFilter(mId, group, type, correlationId, jobOrderId, from, to), page.Skip, page.Take, page.Sorting, cancellationToken)
             .ConfigureAwait(false);
         return TypedResults.Ok(PagedResponse.Create(MachineEventMapper.ToDtos(items), totalCount, page));
     }

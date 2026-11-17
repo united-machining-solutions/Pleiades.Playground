@@ -33,6 +33,7 @@ internal sealed class MachineEventTools(IMachineEventRepository repository)
         [Description("Group filter: JobMonitoring, WorkMasterMonitoring or Notification")] string? group = null,
         [Description("Type filter, e.g. Notification.AlertRaised")] string? type = null,
         [Description("ExecutionId of a program execution")] string? correlationId = null,
+        [Description("Job order, the field JobOrderID of the data, e.g. '4711/01'")] string? jobOrderId = null,
         [Description("Start of time range (ISO 8601, e.g. '2026-11-17T06:00:00Z')")] DateTime? fromDate = null,
         [Description("End of time range (ISO 8601)")] DateTime? toDate = null,
         [Description("Number of records to skip (default: 0)")] int skip = 0,
@@ -42,7 +43,7 @@ internal sealed class MachineEventTools(IMachineEventRepository repository)
     {
         var page = EventToolArguments.Page(skip, take);
         var (items, totalCount) = await repository.QueryAsync(
-            new MachineEventFilter(mId, ParseGroup(group), type, correlationId, null, fromDate, toDate),
+            new MachineEventFilter(mId, ParseGroup(group), type, correlationId, jobOrderId, fromDate, toDate),
             page.Skip, page.Take, EventToolArguments.ParseSorting(sortDirection), cancellationToken).ConfigureAwait(false);
         return new PagedResponse<MachineEventDtoV1>(MachineEventMapper.ToDtos(items), totalCount, page.Skip, page.Take);
     }

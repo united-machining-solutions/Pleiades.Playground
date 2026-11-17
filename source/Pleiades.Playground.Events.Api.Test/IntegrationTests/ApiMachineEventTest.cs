@@ -130,6 +130,34 @@ public sealed class ApiMachineEventTest
     }
 
     [TestMethod]
+    public async Task GetMachineEvents_FiltersByJobOrder()
+    {
+        using var api = new Api();
+
+        using var response = await api.Client.GetAsync(
+            new Uri("/machineEvents?jobOrderId=4711%2F01", UriKind.Relative), TestContext.CancellationToken);
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        api.Repository.Verify(r => r.QueryAsync(
+            It.Is<MachineEventFilter>(f => f.JobOrderId == "4711/01" && f.MId == null),
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [TestMethod]
+    public async Task McpTool_MachineEvents_FiltersByJobOrder()
+    {
+        var repository = new Mock<IMachineEventRepository>();
+        repository.Setup(r => r.QueryAsync(It.IsAny<MachineEventFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(([], 0));
+
+        await new McpTools.MachineEventTools(repository.Object).QueryMachineEvents(jobOrderId: "4711/01", cancellationToken: TestContext.CancellationToken);
+
+        repository.Verify(r => r.QueryAsync(
+            It.Is<MachineEventFilter>(f => f.JobOrderId == "4711/01"),
+            It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [TestMethod]
     public async Task Alerts_ActivePairsAndStatistics()
     {
         using var api = new Api();
