@@ -188,6 +188,22 @@ All notable changes are documented here. The format follows
   once as `null` and named `"available": false` in the manifest.
   With 0.13.1 a cancelled job order, aborted without having run, carries `EndTime` but neither `StartTime` nor
   `ProducedQuantity`, and passes the schemas of the model as it is.
+  With 0.16.0: events are CloudEvents 1.0 in structured mode (`id` a UUID that stays the same in the outbox,
+  `source` the `ProductInstanceUri`, `type` the path, `time`, `sequence` per group as the start of the run and a
+  count of twelve digits, `correlationid` on program executions and alerts, `dataschema`, `data`), with the
+  content type `application/cloudevents+json; charset=utf-8`; `seq` and `seqEpoch` are gone. `Connection/State`
+  says `Initializing`, then every value, then `Running`; `CommunicationFault` when a scenario lets the adapter
+  lose the machine (`CommunicationFaultInterval`, off by default); `Shutdown` at a clean stop; the last will is
+  `CommunicationFault`. The manifest declares the profiles `Core`, `IdentificationExtended`, `Components`,
+  `MonitoringExtended`, `ChannelMonitoring`, `Spindle`, `EnergyElectricity`, `JobMonitoring`,
+  `WorkMasterMonitoring` and `AlertsEvents`, each delivered whole or `"available": false`, and names its events as
+  `{path, correlationId}`. New: `Components.Software` per scenario, `MonthOfConstruction`,
+  `InitialOperationDate`, `DeviceClass`, `OperationDuration`, `IsWarmUp`, the feed override, mode, rapid override
+  and name of channel 1, `IsUsedAsAxis` and name of spindle 1, and a `Notification.NotificationEvent` at each
+  program stop. `Production.ActiveWorkMaster` is a work master id of its own (`WM-SHAFT-4711`); the NC program
+  goes to `oem/Production/ActiveProgram`. Any element but the five every adapter delivers may be unavailable.
+  The production events below `machines/` take the `id` of the CloudEvent as `Id`, and the work master id as
+  `WorkMaster`.
 
 ### Changed
 

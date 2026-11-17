@@ -8,7 +8,7 @@ date: 2026-11-15
 
 ## Context
 
-The data model referenced in [`contracts/datamodel`](../../contracts/datamodel/README.md) (0.15.0) asks for things
+The data model referenced in [`contracts/datamodel`](../../contracts/datamodel/README.md) (0.16.0) asks for things
 the binding of the playground does not do: energy in watt hours, snapshots and lists as one value, events,
 a manifest and retained values. [ADR-0002](0002-si-units-joule-and-one.md) puts energy in joule, and
 [ADR-0003](0003-naming.md) puts every topic below `machines/{SerialNumber}/`. The services, the example app and
@@ -21,12 +21,15 @@ exactly after the model, to find a compromise for the differences.
   types and units (energy in `wattHour`), its snapshots, lists, events and manifest. Its topics are described in
   [`contracts/mqtt`, "Spec binding"](../../contracts/mqtt/README.md#spec-binding-draft).
 - ADR-0002 and ADR-0003 keep applying to `machines/` and `sites/`. They do not apply to `simulators/`.
-- Events are meant to be stored, and a store of events must miss none. So the binding adds to the model what
-  that needs: events lie in a subtree of their own, one topic per group (`simulators/{SerialNumber}/events/production`,
-  `…/events/notifications`, the latter named as in the binding of the playground), so that MQTT keeps the order
-  of a group, carry the binding fields `seq`
-  and `seqEpoch`, go out with QoS 1 and wait in a bounded outbox while the broker is away. The model is not
-  changed; its schemas check an event once the binding fields are taken off, as with `unit`.
+- Events are meant to be stored, and a store of events must miss none. The model makes each event a CloudEvent
+  with a UUID `id` and a `sequence` per group; the binding adds what MQTT needs: events lie in a subtree of their
+  own, one topic per group (`simulators/{SerialNumber}/events/production`, `…/events/notifications`, the latter
+  named as in the binding of the playground), so that MQTT keeps the order of a group, go out with QoS 1 and the
+  content type `application/cloudevents+json; charset=utf-8`, and wait in a bounded outbox while the broker is
+  away, with the same `id` when they go out later. The schemas of the model check an event as it is.
+- `Connection.State` is the state of the adapter (`Initializing`, `Running`, `CommunicationFault`, `Shutdown`).
+  The model needs no last will; the binding keeps one as a quicker sign, with `CommunicationFault`, and names
+  the choice as open.
 - The second tree lies below a root of its own, `simulators/{SerialNumber}/`, with the same serial number as below `machines/`, so that
   nothing mixes with the persistence and the app. The machine is identified by that serial number and by the
   manifest, which carries the globally unique `ProductInstanceUri` of the model.
@@ -47,8 +50,9 @@ exactly after the model, to find a compromise for the differences.
 
 - The broker carries energy in two units, in two trees. A consumer reads one tree or the other, never both.
 - No consumer changes. Persistence, APIs, app and chat do not read `simulators/` until the hackathon decides how.
-- A consumer that keeps events, such as a persistence of the playground, can find every gap: by `seqEpoch` and
-  `seq`, whether the gap comes from a full outbox or from a broker that lost its session.
+- A consumer that keeps events, such as a persistence of the playground, can find every gap and every
+  duplicate: by the count in `sequence` and by `id`, whether the gap comes from a full outbox or from a broker
+  that lost its session. A new prefix of `sequence` shows a restart of the adapter.
 - A machine with both outputs tells two stories: the values below `machines/` are not consistent with those
   below `simulators/`. Once the consumers read the second tree, the generators can go, or follow the virtual machine.
 - The decision ends with the hackathon: either the binding of the playground moves to the model, or the model
