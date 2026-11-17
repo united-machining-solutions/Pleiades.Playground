@@ -41,7 +41,7 @@ const QUESTION = `What did ${SHOWN_TITLE} do over the last 8 hours?`
 /** How long a language model may take for its answer, tool calls included. */
 const ANSWER_TIMEOUT = 120_000
 /** The machine of the stop "When a machine goes silent", and the service that simulates it. */
-const SILENT = { machine: "M-02", service: "simulator-m-02" }
+const SILENT = { machine: "MM-120 M-02", service: "simulator-m-02" }
 /** A machine counts as silent after 30 seconds, and Home reads again every ten: two minutes are plenty. */
 const SILENCE_TIMEOUT = 120_000
 
