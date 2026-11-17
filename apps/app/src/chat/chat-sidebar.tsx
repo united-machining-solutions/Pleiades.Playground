@@ -236,9 +236,11 @@ function Conversation({ threadId }: { threadId: string }) {
   // The further servers this chat has switched off. The harness keeps them with the chat, as it keeps
   // the model, and the server of the app gives the model no tool of a server that is off.
   // A switch shows what the harness holds: it moves once the harness has taken it, and stays where it
-  // was when the harness did not.
-  const [off, setOff] = useState(() => pickedSwitchedOff(chatStatus.servers))
+  // was when the harness did not. Until the chat has opened, the panel does not know what the harness
+  // holds: the switches wait (`settled`), and they keep waiting when the harness did not say.
+  const [off, setOff] = useState<Array<string>>([])
   const offNow = useRef(off)
+  const [settled, setSettled] = useState(false)
   const hold = (next: Array<string>) => {
     offNow.current = next
     setOff(next)
@@ -293,21 +295,30 @@ function Conversation({ threadId }: { threadId: string }) {
         if (model !== undefined && model !== chatStatus.models[0]) await switchTo(model)
         // And without the servers switched off last. The question goes out only once the harness has
         // taken every one of them: a model must not get the tools of a server the person switched off.
-        // A switch the harness did not take shows on again, which is what the chat has.
+        // A switch shows off only once the harness has taken it.
         let taken = true
-        for (const name of offNow.current) {
-          if (await tell(name, false)) continue
-          taken = false
-          hold(afterSwitch(offNow.current, name, true))
+        for (const name of pickedSwitchedOff(chatStatus.servers)) {
+          if (await tell(name, false)) hold(afterSwitch(offNow.current, name, false))
+          else taken = false
         }
+        setSettled(true)
         if (taken) void sendMessage(first)
         else setServerError((reason) => `${reason ?? "A server could not be switched off."} The question was not sent: ask it again.`)
       } else {
-        // A chat from before keeps the model it picked.
-        // And the servers it switched off.
-        const picked = await fetchChatSettings(threadId)
-        setModel(picked.model ?? chatStatus.models[0])
-        hold(picked.off)
+        // A chat from before keeps the model it picked, and the servers it switched off. When the
+        // harness does not say, the chat says so and its switches stay locked: they would show the
+        // switches of another chat.
+        try {
+          const picked = await fetchChatSettings(threadId)
+          setModel(picked.model ?? chatStatus.models[0])
+          hold(picked.off)
+          setSettled(true)
+        } catch (problem) {
+          setModel(chatStatus.models[0])
+          setServerError(
+            `The chat did not say what it has switched off (${problem instanceof Error ? problem.message : String(problem)}). Its tools cannot be switched until it does: open the chat again.`,
+          )
+        }
       }
     })()
     return () => {
@@ -415,7 +426,7 @@ function Conversation({ threadId }: { threadId: string }) {
                   <MessageScrollerItem messageId="server-error">
                     <Alert>
                       <CircleAlertIcon />
-                      <AlertTitle>The tools were not changed</AlertTitle>
+                      <AlertTitle>The tools of this chat</AlertTitle>
                       <AlertDescription>{serverError}</AlertDescription>
                     </Alert>
                   </MessageScrollerItem>
@@ -447,6 +458,7 @@ function Conversation({ threadId }: { threadId: string }) {
         model={model}
         onModel={choose}
         off={off}
+        settled={settled}
         onSwitch={(name, on) => void switchServer(name, on)}
         dictation={chatStatus.dictation}
       />
@@ -559,6 +571,7 @@ function Composer({
   model,
   onModel,
   off,
+  settled = true,
   onSwitch,
   dictation,
 }: {
@@ -571,6 +584,7 @@ function Composer({
   model: string | undefined
   onModel: (name: string) => void
   off: ReadonlyArray<string>
+  settled?: boolean
   onSwitch: (name: string, on: boolean) => void
   dictation: boolean
 }) {
@@ -626,7 +640,7 @@ function Composer({
           {/* The second line of the field: the tools and, with a choice of models, the model on the
               left, dictation and send on the right. */}
           <InputGroupAddon align="block-end">
-            <ToolsMenu off={off} onSwitch={onSwitch} />
+            <ToolsMenu off={off} settled={settled} onSwitch={onSwitch} />
             {choice && (
               <DropdownMenu>
                 <DropdownMenuTrigger render={<InputGroupButton variant="ghost" aria-label={`Model: ${model}`} />}>

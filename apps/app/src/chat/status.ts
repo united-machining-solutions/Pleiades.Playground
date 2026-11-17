@@ -71,10 +71,13 @@ export async function fetchChats(): Promise<Array<ChatEntry>> {
   }))
 }
 
-/** What a chat has picked: its model, undefined while the first one answers, and the servers it switched off. */
+/**
+ * What a chat has picked: its model, undefined while the first one answers, and the servers it switched
+ * off. Rejects when the harness does not say: a panel must not show switches it did not read.
+ */
 export async function fetchChatSettings(threadId: string): Promise<{ model: string | undefined; off: Array<string> }> {
   const response = await fetch(`/api/harness/describe?threadId=${encodeURIComponent(threadId)}`)
-  if (!response.ok) return { model: undefined, off: [] }
+  if (!response.ok) throw new Error(`the harness answered ${response.status}`)
   const description = (await response.json()) as { settings?: { model?: string } }
   return { model: description.settings?.model, off: switchedOffOf(description) }
 }

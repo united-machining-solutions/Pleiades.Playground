@@ -40,10 +40,13 @@ function toolsLine(server: ListedServer, tools: ReadonlyArray<unknown>): string 
  */
 export function ToolsMenu({
   off,
+  settled = true,
   onSwitch,
 }: {
   /** The further servers this chat has switched off, by name. */
   off: ReadonlyArray<string>
+  /** Whether the panel knows what the chat has switched off. Until it does, the switches wait. */
+  settled?: boolean
   onSwitch: (name: string, on: boolean) => void
 }) {
   const [servers, setServers] = useState<Array<ListedServer> | "failed">()
@@ -54,7 +57,15 @@ export function ToolsMenu({
   }
   return (
     <Popover onOpenChange={read}>
-      <PopoverTrigger render={<InputGroupButton variant="ghost" aria-label="Tools of this chat" />}>
+      {/* The label is what a screen reader hears in place of the content, so it says what is off too. */}
+      <PopoverTrigger
+        render={
+          <InputGroupButton
+            variant="ghost"
+            aria-label={off.length > 0 ? `Tools of this chat, ${off.length} off` : "Tools of this chat"}
+          />
+        }
+      >
         <WrenchIcon data-icon="inline-start" />
         Tools
         {/* What is off shows without opening the list. */}
@@ -81,7 +92,7 @@ export function ToolsMenu({
               {servers.map((server, index) => (
                 <Fragment key={server.name}>
                   {index > 0 && <ItemSeparator className="my-0" />}
-                  <ServerItem server={server} on={!off.includes(server.name)} onSwitch={onSwitch} />
+                  <ServerItem server={server} on={!off.includes(server.name)} settled={settled} onSwitch={onSwitch} />
                 </Fragment>
               ))}
             </ItemGroup>
@@ -98,10 +109,12 @@ export function ToolsMenu({
 function ServerItem({
   server,
   on,
+  settled,
   onSwitch,
 }: {
   server: ListedServer
   on: boolean
+  settled: boolean
   onSwitch: (name: string, on: boolean) => void
 }) {
   // A tool only a card calls is not for the model, so it is not a tool of the chat.
@@ -128,6 +141,7 @@ function ServerItem({
           <Switch
             aria-label={`Use ${server.name} in this chat`}
             checked={on}
+            disabled={!settled}
             onCheckedChange={(checked) => onSwitch(server.name, checked)}
           />
         </ItemActions>
