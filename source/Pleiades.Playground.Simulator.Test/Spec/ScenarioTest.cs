@@ -72,6 +72,22 @@ public sealed class ScenarioTest
     }
 
     [TestMethod]
+    [DataRow("", 4)]
+    [DataRow("housings", 4)]
+    [DataRow("small-parts", 3)]
+    public void Stacklight_OfEachScenario_HasItsLamps_SmallPartsWithoutBlue(string name, int lamps)
+    {
+        var config = Settings(name).Resolve();
+        var machine = new VirtualMachine(new MachineIdentity(config.Manufacturer, "X-01", "https://example.com/X-01"), Seeded(config),
+            new MachineCounters(1, 1, 1), MachineRun.Start);
+
+        var elements = machine.TakeInitialMessages().OfType<SpecValue>().Last(v => v.Path == SpecElements.StackElement).Value!.AsArray();
+
+        Assert.HasCount(lamps, elements);
+        Assert.AreEqual(lamps == 4, elements.Any(e => e!["SignalColor"]!.GetValue<string>() == "Blue"));
+    }
+
+    [TestMethod]
     public void Manifest_NamesTheSameProfilesForEverySimulator()
     {
         // Every simulator of the stack is a machine tool with one channel and one spindle, so every one declares
@@ -107,6 +123,7 @@ public sealed class ScenarioTest
                 QueuedJobOrders = scenario.QueuedJobOrders,
                 FirstJobOrderNumber = scenario.FirstJobOrderNumber,
                 Jobs = scenario.Jobs,
+                StacklightLamps = scenario.StacklightLamps,
                 SetupTime = scenario.SetupTime,
                 LoadTime = scenario.LoadTime,
                 IdleTime = scenario.IdleTime,

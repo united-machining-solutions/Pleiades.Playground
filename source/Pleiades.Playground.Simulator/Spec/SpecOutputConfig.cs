@@ -264,6 +264,13 @@ internal sealed class ScenarioConfig
     public List<AlertTemplate> Alerts { get; set; } = [];
 
     /// <summary>
+    /// The lamps of the stack light from <c>NumberInList</c> 0, by colour (Red, Yellow, Green, Blue, ...). Empty: red,
+    /// yellow, green and blue.
+    /// </summary>
+    [SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "Configuration binding")]
+    public List<string> StacklightLamps { get; set; } = [];
+
+    /// <summary>
     /// Temperature of the spindle bearing, a signal of the manufacturer, while the spindle stands, in degrees
     /// Celsius. The bearing warms towards <see cref="BearingTemperatureRunning"/> while the spindle turns (scaled by
     /// the spindle override) and cools back while it stands.

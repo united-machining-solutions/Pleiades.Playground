@@ -72,6 +72,7 @@ internal sealed class VirtualMachine
     private readonly Dictionary<string, long> _seq = new(StringComparer.Ordinal);
     private readonly DateTimeOffset _warmUpEnd;
     private readonly string _programPath;
+    private readonly List<string> _stacklightLamps;
     private readonly HashSet<string> _unavailable;
     private double _bearingTemperature;
     private readonly string _bearingPath;
@@ -102,6 +103,7 @@ internal sealed class VirtualMachine
         _warmUpEnd = start + _scenario.WarmUpTime;
         _bearingPath = SpecElements.ExtensionPath(config.ManufacturerDomain, SpecElements.BearingTemperature);
         _programPath = SpecElements.ExtensionPath(config.ManufacturerDomain, SpecElements.ActiveProgram);
+        _stacklightLamps = _scenario.StacklightLamps.Count > 0 ? _scenario.StacklightLamps : [.. StacklightRules.FourLamps];
         _bearingTemperature = _scenario.BearingTemperatureIdle;
         _nextJobNumber = _scenario.FirstJobOrderNumber;
         _powerOnDuration = counters.PowerOnDuration;
@@ -211,6 +213,7 @@ internal sealed class VirtualMachine
         Set(SpecElements.SpindleIsRotating, false);
         Set(SpecElements.SpindleIsUsedAsAxis, false);
         Set(SpecElements.SpindleName, SpindleName);
+        Set(SpecElements.StacklightMode, "Segmented");
         Set(SpecElements.SpindleOverride, _spindleOverride);
         Set(SpecElements.PartsProducedInLifetime, _partsProduced);
         // The first list comes with its events too, so that the events alone give the same list.
@@ -845,9 +848,24 @@ internal sealed class VirtualMachine
             _alertsChanged = false;
             Set(SpecElements.ActiveAlerts, new JsonArray([.. _alerts.Select(a => (JsonNode)a.ToJson())]));
         }
+        // The whole list, retained, whenever a lamp changes; Set sends nothing when it stays the same.
+        Set(SpecElements.StackElement, StacklightRules.StackElements(_stacklightLamps, StacklightState()));
         var messages = _pending.ToList();
         _pending.Clear();
         return messages;
+    }
+
+    /// <summary>The state the stack light shows, from the phase of the machine and its active alerts.</summary>
+    private StacklightInput StacklightState()
+    {
+        return new StacklightInput(
+            Executing: _phase == Phase.Executing,
+            Interrupted: _phase == Phase.Interrupted,
+            Setup: _phase == Phase.Setup,
+            OperatorAsked: _phase == Phase.Idle,
+            Failure: _alerts.Any(a => a.Template.Severity == "Failure"),
+            Warning: _alerts.Any(a => a.Template.Severity is "OffSpec" or "CheckFunction"),
+            Maintenance: _alerts.Any(a => a.Template.Severity == "MaintenanceRequired"));
     }
 
     private string NewId()

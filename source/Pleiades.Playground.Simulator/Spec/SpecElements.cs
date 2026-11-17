@@ -47,6 +47,8 @@ internal static class SpecElements
     public const string SpindleOverride = "Spindle.1.Override";
     public const string SpindleIsUsedAsAxis = "Spindle.1.IsUsedAsAxis";
     public const string SpindleName = "Spindle.1.Name";
+    public const string StacklightMode = "Stacklight.StacklightMode";
+    public const string StackElement = "Stacklight.StackElement";
     public const string ActivePower = "Consumption.Electricity.Main.AcActivePowerTotal";
     public const string ActiveEnergy = "Consumption.Electricity.Main.AcActiveEnergyTotalImportHp";
 
@@ -103,7 +105,7 @@ internal static class SpecElements
     public static readonly IReadOnlyList<string> Profiles =
     [
         "Core", "IdentificationExtended", "Components", "MonitoringExtended", "ChannelMonitoring", "Spindle",
-        "EnergyElectricity", "JobMonitoring", "WorkMasterMonitoring", "AlertsEvents",
+        "Stacklight", "EnergyElectricity", "JobMonitoring", "WorkMasterMonitoring", "AlertsEvents",
     ];
 
     /// <summary>
@@ -152,6 +154,9 @@ internal static class SpecElements
         new(SpindleOverride, UnitOne, "source", false),
         new(SpindleIsUsedAsAxis, null, "source", false),
         new(SpindleName, null, "adapter", false),
+        // Stacklight
+        new(StacklightMode, null, "adapter", false),
+        new(StackElement, null, "source", false),
         // EnergyElectricity
         new(ActivePower, UnitWatt, "source", false),
         new(ActiveEnergy, UnitWattHour, "source", false),

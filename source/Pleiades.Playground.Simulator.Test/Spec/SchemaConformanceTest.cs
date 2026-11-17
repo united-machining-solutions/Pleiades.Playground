@@ -76,7 +76,7 @@ public sealed partial class SchemaConformanceTest
         CollectionAssert.AreEqual(new[]
         {
             "Core", "IdentificationExtended", "Components", "MonitoringExtended", "ChannelMonitoring", "Spindle",
-            "EnergyElectricity", "JobMonitoring", "WorkMasterMonitoring", "AlertsEvents",
+            "Stacklight", "EnergyElectricity", "JobMonitoring", "WorkMasterMonitoring", "AlertsEvents",
         }, profiles);
 
         // The schema refuses a declared profile that misses an element or an event: drop each one in turn.
