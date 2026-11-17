@@ -847,9 +847,9 @@ public sealed class VirtualMachineTest
     [TestMethod]
     public void Event_GoesBelowTheEventsLevelAsACloudEvent()
     {
-        Assert.AreEqual("machines/P-04/events/jobmonitoring", SpecWire.EventTopic("P-04", SpecElements.JobOrderChanged));
-        Assert.AreEqual("machines/P-04/events/jobmonitoring", SpecWire.EventTopic("P-04", SpecElements.JobOrderResultChanged));
-        Assert.AreEqual("machines/P-04/events/workmastermonitoring", SpecWire.EventTopic("P-04", SpecElements.ProgramExecutionStarted));
+        Assert.AreEqual("machines/P-04/events/jobs", SpecWire.EventTopic("P-04", SpecElements.JobOrderChanged));
+        Assert.AreEqual("machines/P-04/events/jobs", SpecWire.EventTopic("P-04", SpecElements.JobOrderResultChanged));
+        Assert.AreEqual("machines/P-04/events/workmasters", SpecWire.EventTopic("P-04", SpecElements.ProgramExecutionStarted));
         Assert.ThrowsExactly<ArgumentException>(() => SpecWire.EventTopic("P-04", "Production.JobOrderChanged"), "no group Production since 0.17.0");
         Assert.AreEqual("machines/P-04/events/notifications", SpecWire.EventTopic("P-04", SpecElements.AlertRaised));
         Assert.ThrowsExactly<ArgumentException>(() => SpecWire.EventTopic("P-04", "Maintenance.TaskDue"), "a group without a name");
@@ -1023,7 +1023,7 @@ public sealed class VirtualMachineTest
         Assert.AreEqual($"alcyone-machines_{config.Scenario.Model}_P-04", machineId);
         Assert.AreEqual(machineId, SpecManifest.Build(identity, config)["machineId"]!.GetValue<string>());
         Assert.AreEqual($"machines/{machineId}/umati/Connection/State", SpecPublisher.LastWill(machineId, MachineRun.Start).Topic);
-        Assert.AreEqual($"machines/{machineId}/events/jobmonitoring", SpecWire.EventTopic(machineId, SpecElements.JobOrderAdded));
+        Assert.AreEqual($"machines/{machineId}/events/jobs", SpecWire.EventTopic(machineId, SpecElements.JobOrderAdded));
         Assert.AreEqual($"machines/{machineId}/oem/Spindle/1/BearingTemperature",
             SpecWire.Topic(machineId, SpecElements.ExtensionPath("alcyone-machines.example", SpecElements.BearingTemperature)));
     }

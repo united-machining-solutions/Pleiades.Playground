@@ -28,7 +28,7 @@ exactly after the model, to find a compromise for the differences.
   not apply to `machines/`, which carries the units of the model.
 - Events are meant to be stored, and a store of events must miss none. The model makes each event a CloudEvent
   with a UUID `id` and a `sequence` per group; the binding adds what MQTT needs: one topic per group
-  (`events/jobmonitoring`, `events/workmastermonitoring`, `events/notifications`), so that MQTT keeps the order of
+  (`events/jobs`, `events/workmasters`, `events/notifications`), so that MQTT keeps the order of
   a group, QoS 1, the content type `application/cloudevents+json; charset=utf-8`, and a bounded outbox while the
   broker is away, with the same `id` when they go out later.
 - `Connection.State` is the state of the adapter (`Initializing`, `Running`, `CommunicationFault`, `Shutdown`).

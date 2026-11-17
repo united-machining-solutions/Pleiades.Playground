@@ -27,7 +27,7 @@ public sealed class SpecPublisherTest
 
         var events = client.Published.Where(m => m.Topic.Contains("/events/", StringComparison.Ordinal)).ToList();
         Assert.HasCount(2, events);
-        Assert.IsTrue(events.All(m => m.Topic == $"machines/{SerialNumber}/events/jobmonitoring"));
+        Assert.IsTrue(events.All(m => m.Topic == $"machines/{SerialNumber}/events/jobs"));
         Assert.IsTrue(events.All(m => !m.Retain && m.QualityOfServiceLevel == MqttQualityOfServiceLevel.AtLeastOnce));
         Assert.IsTrue(events.All(m => m.ContentType == "application/cloudevents+json; charset=utf-8"));
         CollectionAssert.AreEqual(new long[] { 1, 2 }, events.Select(Seq).ToList());
@@ -49,9 +49,9 @@ public sealed class SpecPublisherTest
 
         var topics = client.Published.Select(m => m.Topic).Distinct().ToList();
         CollectionAssert.AreEquivalent(
-            new[] { $"machines/{SerialNumber}/events/jobmonitoring", $"machines/{SerialNumber}/events/workmastermonitoring", $"machines/{SerialNumber}/events/notifications" },
+            new[] { $"machines/{SerialNumber}/events/jobs", $"machines/{SerialNumber}/events/workmasters", $"machines/{SerialNumber}/events/notifications" },
             topics, "one topic per group, none per event");
-        foreach (var (group, name) in new[] { ("JobMonitoring", "jobmonitoring"), ("WorkMasterMonitoring", "workmastermonitoring"), ("Notification", "notifications") })
+        foreach (var (group, name) in new[] { ("JobMonitoring", "jobs"), ("WorkMasterMonitoring", "workmasters"), ("Notification", "notifications") })
         {
             var onTopic = client.Published.Where(m => m.Topic == $"machines/{SerialNumber}/events/{name}").Select(Payload).ToList();
             var expected = events.Where(e => e.Path.StartsWith(group + ".", StringComparison.Ordinal)).ToList();

@@ -8,8 +8,8 @@ All notable changes are documented here. The format follows
 ### Changed
 
 - One tree for machines: `machines/{MachineId}/` follows the data model, in the structure of the former spec
-  tree (`umati/Manifest`, `umati/<path>`, `oem/<path>`, CloudEvents on `events/jobmonitoring`,
-  `events/workmastermonitoring` and `events/notifications`), in the units of the model (energy in `wattHour`).
+  tree (`umati/Manifest`, `umati/<path>`, `oem/<path>`, CloudEvents on `events/jobs`, `events/workmasters` and
+  `events/notifications`, each topic named after the subject of its events and counting its own `sequence`), in the units of the model (energy in `wattHour`).
   The root `simulators/` is gone. The simulator publishes only this tree, from its virtual machine, which always
   runs; the value generators, the notification generator, the job and work master events of the playground
   binding, `Config:SpecOutput:Enabled`, `Config:ProductionEvents` and the second MQTT client are gone from it.
@@ -221,7 +221,7 @@ All notable changes are documented here. The format follows
   `WorkMaster`.
   With 0.17.0: paths follow the profiles (`JobMonitoring.JobOrders`, `WorkMasterMonitoring.ActiveWorkMaster`,
   `WorkMasterMonitoring.ProgramExecution`, and their events), and so do the topics of the events
-  (`events/jobmonitoring`, `events/workmastermonitoring`, `events/notifications`, each with its own `sequence`).
+  (today `events/jobs`, `events/workmasters`, `events/notifications`, each with its own `sequence`).
   A job order and its result are two lists: `JobMonitoring.JobOrders` (what is ordered, with `WorkMasterID`,
   `OrderNumbers`, `RunsPlanned`, `JobExecutionMode` and planned times `null`) and `JobMonitoring.JobOrderResults`
   (from the start: quantities, runs, `EndTime` `null` and `JobResult` `Unknown` until the end), every field always

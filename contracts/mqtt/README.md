@@ -18,7 +18,7 @@ they move to the new tree in a second step.
 machines/{MachineId}/umati/Manifest      the manifest of the machine
 machines/{MachineId}/umati/<path>        an element of the data model
 machines/{MachineId}/oem/<path>          a signal the machine manufacturer defines
-machines/{MachineId}/events/<group>      CloudEvents: jobmonitoring, workmastermonitoring, notifications
+machines/{MachineId}/events/<group>      CloudEvents: jobs, workmasters, notifications
 sites/{SiteId}/{Source}/<path>           values about a place, in the names of one source
 ```
 
@@ -152,8 +152,8 @@ machines/{MachineId}/events/<topic of the group>          not retained  event
   profiles: `umati/JobMonitoring/…`, `umati/WorkMasterMonitoring/…`.
 - A snapshot is one topic (`umati/State/Status`), and so is a list (`umati/JobMonitoring/JobOrders`, always the
   whole list).
-- Every event lies below the level `events/`, on one topic per group (`events/jobmonitoring`,
-  `events/workmastermonitoring`, `events/notifications`), so `machines/+/events/+` subscribes to exactly the events.
+- Every event lies below the level `events/`, on one topic per group (`events/jobs`,
+  `events/workmasters`, `events/notifications`), so `machines/+/events/+` subscribes to exactly the events.
 - Every message has QoS 1. Values and the manifest have the MQTT 5 content type `application/json`, events
   `application/cloudevents+json; charset=utf-8`.
 
@@ -164,8 +164,8 @@ machines/alcyone-machines_AX-400_P-04/umati/Spindle/1/IsRotating
 machines/alcyone-machines_AX-400_P-04/umati/JobMonitoring/JobOrders
 machines/alcyone-machines_AX-400_P-04/umati/JobMonitoring/JobOrderResults
 machines/alcyone-machines_AX-400_P-04/oem/Spindle/1/BearingTemperature
-machines/alcyone-machines_AX-400_P-04/events/jobmonitoring
-machines/alcyone-machines_AX-400_P-04/events/workmastermonitoring
+machines/alcyone-machines_AX-400_P-04/events/jobs
+machines/alcyone-machines_AX-400_P-04/events/workmasters
 machines/alcyone-machines_AX-400_P-04/events/notifications
 ```
 
@@ -251,7 +251,7 @@ The rules for events, so that a consumer can keep nothing but the events and sti
 
 | Rule | What | Why |
 |---|---|---|
-| Topic per group | An event is published on `machines/{MachineId}/events/<topic>`, one topic per group of events, the group being the first segment of its path. The binding names the topic of each group, in lower case (table below): every event of a job order and its result on `events/jobmonitoring`, every event of a program execution on `events/workmastermonitoring`, every alert event on `events/notifications`. A group without a name in the table is not published. The attribute `type`, the full path of the model such as `JobMonitoring.JobOrderStarted`, tells the events of a topic apart. | MQTT keeps the order of messages only within one topic. On one topic `JobOrderStarted` and the `JobOrderResultChanged` that follows arrive in the order they came up; between two groups, such as a job order and its program execution, only `time` orders them. One subscription per group is enough; `machines/+/events/+` gets them all. The binding of the playground does the same with one topic for all notifications, `machines/{SerialNumber}/events/notifications`, and the spec binding keeps its name. |
+| Topic per group | An event is published on `machines/{MachineId}/events/<topic>`, one topic per group of events, the group being the first segment of its path. The binding names the topic of each group, in lower case (table below): every event of a job order and its result on `events/jobs`, every event of a program execution on `events/workmasters`, every alert event on `events/notifications`. A group without a name in the table is not published. The topic names the subject of the events, not the profile: the profiles are called …Monitoring, but the events of a job order may come from a job management (ordering) one day too. The attribute `type`, the full path of the model such as `JobMonitoring.JobOrderStarted`, tells the events of a topic apart. | MQTT keeps the order of messages only within one topic. On one topic `JobOrderStarted` and the `JobOrderResultChanged` that follows arrive in the order they came up; between two groups, such as a job order and its program execution, only `time` orders them. One subscription per group is enough; `machines/+/events/+` gets them all. The binding of the playground does the same with one topic for all notifications, `machines/{SerialNumber}/events/notifications`, and the spec binding keeps its name. |
 | CloudEvent | `specversion` `1.0`; `id` a UUID, the same when the event goes out again; `source` the `ProductInstanceUri` of the machine, as a valid URI reference; `type` the path of the event; `time` its source time; `sequence` the start of the adapter (`yyyyMMddTHHmmssZ`), a dot and a count of twelve digits that counts the events of the machine within their group (`JobMonitoring`, `WorkMasterMonitoring`, `Notification`), from 1 and without a gap: one count per topic of events; `correlationid` the `ExecutionId` on the events of a program execution, and on an alert or notification that came up in one; `dataschema` the event schema of the model version; `data` the flat struct of the event. A new start of the adapter begins a new prefix and counts from 1 again. | A consumer finds a duplicate by `source` and `id`, and a gap by the count in `sequence`, in any technology; a comparison of strings orders the events of a group. After a gap or a new prefix it reads the state again: `JobMonitoring.JobOrders` and `JobMonitoring.JobOrderResults` after a gap in `JobMonitoring`, `WorkMasterMonitoring.ProgramExecution` after a gap in `WorkMasterMonitoring`, `Notification.ActiveAlerts` after a gap in `Notification`. |
 | Delivery | QoS 1, not retained. | QoS 1 delivers at least once; a duplicate is caught by `id`. A retained event would be a state, and a state is a value. |
 | Outbox | While the broker is away the adapter keeps the events in the order they came up and sends them after the next connect, with their source time and their `id`. The outbox is bounded; when it is full the oldest event is dropped and logged, and its count stays a gap in `sequence`: nothing is numbered again. Values need no outbox, every connect publishes them whole. | Without an outbox the events of a broker outage are lost unnoticed. |
@@ -259,8 +259,8 @@ The rules for events, so that a consumer can keep nothing but the events and sti
 
 | Group of events (first segment of `type`) | Topic below `machines/{MachineId}/events/` |
 |---|---|
-| `JobMonitoring` | `jobmonitoring` |
-| `WorkMasterMonitoring` | `workmastermonitoring` |
+| `JobMonitoring` | `jobs` |
+| `WorkMasterMonitoring` | `workmasters` |
 | `Notification` | `notifications` |
 
 - An adapter that names the events of a list in its manifest publishes one for every change of the list, the
@@ -500,8 +500,8 @@ Each virtual machine works like this:
 | `umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `wattHour` |
 | `oem/Spindle/1/BearingTemperature` | number, signal of the manufacturer (`x-alcyone-machines-example.Spindle.1.BearingTemperature` in the manifest) | `degreeCelsius` |
 | `oem/WorkMasterMonitoring/ActiveProgram` | string, signal of the manufacturer (`x-alcyone-machines-example.WorkMasterMonitoring.ActiveProgram`): the NC program of the active work master | – |
-| `events/jobmonitoring` | CloudEvents `JobMonitoring.JobOrder<Added, Released, Revoked, Started, Interrupted, Resumed, Ended, Aborted, Cancelled, Changed, ResultChanged, Removed>` | – |
-| `events/workmastermonitoring` | CloudEvents `WorkMasterMonitoring.ProgramExecution<Started, Interrupted, Resumed, Ended, Aborted>` | – |
+| `events/jobs` | CloudEvents `JobMonitoring.JobOrder<Added, Released, Revoked, Started, Interrupted, Resumed, Ended, Aborted, Cancelled, Changed, ResultChanged, Removed>` | – |
+| `events/workmasters` | CloudEvents `WorkMasterMonitoring.ProgramExecution<Started, Interrupted, Resumed, Ended, Aborted>` | – |
 | `events/notifications` | CloudEvents `Notification.AlertRaised`, `Notification.AlertChanged`, `Notification.AlertCleared`, `Notification.NotificationEvent` | – |
 
 The tests of the simulator check every message against the JSON schemas of the model when a clone of it lies
