@@ -18,16 +18,30 @@ const backend = "genui"
  * name in lower case and an http(s) address is left out, and so is a second entry of a name.
  */
 export function furtherServers(settings: Settings = process.env): Record<string, string> {
+  return read(settings).servers
+}
+
+/**
+ * The entries of APP_MCP_SERVERS that were left out, each by what stands before its `=`, so that a typing
+ * mistake shows in the log of the server and not only in a chat that lacks tools. Never the address.
+ */
+export function leftOut(settings: Settings = process.env): Array<string> {
+  return read(settings).leftOut
+}
+
+function read(settings: Settings): { servers: Record<string, string>; leftOut: Array<string> } {
   const servers: Record<string, string> = {}
+  const leftOut: Array<string> = []
   for (const entry of (settings.APP_MCP_SERVERS ?? "").split(",")) {
+    if (entry.trim() === "") continue
     const at = entry.indexOf("=")
-    const name = entry.slice(0, Math.max(at, 0)).trim()
-    const url = entry.slice(at + 1).trim()
-    if (!/^[a-z][a-z0-9]*$/.test(name) || name === backend || name in servers) continue
-    if (!/^https?:\/\/\S+$/.test(url) || !URL.canParse(url)) continue
-    servers[name] = url
+    const name = (at < 0 ? entry : entry.slice(0, at)).trim()
+    const url = at < 0 ? "" : entry.slice(at + 1).trim()
+    const named = /^[a-z][a-z0-9]*$/.test(name) && name !== backend && !(name in servers)
+    if (named && /^https?:\/\/\S+$/.test(url) && URL.canParse(url)) servers[name] = url
+    else leftOut.push(name)
   }
-  return servers
+  return { servers, leftOut }
 }
 
 export function mcpServers(settings: Settings = process.env): Record<string, Server> {

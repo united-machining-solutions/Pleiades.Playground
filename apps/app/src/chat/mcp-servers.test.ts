@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { furtherInstructions, furtherServers, mcpServers } from "./mcp-servers.ts"
+import { furtherInstructions, furtherServers, leftOut, mcpServers } from "./mcp-servers.ts"
 
 test("without a setting the chat has the generative UI backend and nothing else", () => {
   const servers = mcpServers({})
@@ -31,4 +31,11 @@ test("an entry that is no name and address is left out, and the backend cannot b
     }),
     { a: "http://a/mcp" },
   )
+})
+
+test("what was left out is named, without its address, so a typing mistake shows", () => {
+  const settings = { APP_MCP_SERVERS: "Juicebar=http://some-host:8080/mcp, ultimaker ,ok=http://ok/mcp," }
+  assert.deepEqual(leftOut(settings), ["Juicebar", "ultimaker"])
+  assert.deepEqual(furtherServers(settings), { ok: "http://ok/mcp" })
+  assert.deepEqual(leftOut({}), [])
 })

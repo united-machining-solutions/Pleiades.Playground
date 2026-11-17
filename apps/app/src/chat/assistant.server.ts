@@ -12,7 +12,7 @@ import type { ChatSettings } from "./gateway.ts"
 import { withTimeZone } from "./local-times.ts"
 import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
-import { furtherInstructions, mcpServers } from "./mcp-servers.ts"
+import { furtherInstructions, leftOut, mcpServers } from "./mcp-servers.ts"
 import { forModel } from "./tool-results.ts"
 
 // The agent harness of the app. It runs on the server only: the keys of the language models stay
@@ -30,6 +30,11 @@ const tools = mcp({ servers: mcpServers() })
 
 // The further servers have no card in the app, so the model is told to say their values.
 const further = furtherInstructions()
+
+// A typing mistake in the setting shows here, once, when the server starts.
+for (const name of leftOut()) {
+  console.warn(`APP_MCP_SERVERS: the entry "${name}" is left out. An entry is name=address, the name in lower case.`)
+}
 
 // A tool that only a card calls is not for the model. The plugin above has no setting for that,
 // so this one takes those tools out of every turn, after the servers listed theirs. Which tools
