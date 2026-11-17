@@ -10,7 +10,7 @@ All notable changes are documented here. The format follows
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
-  and `genui_measurement_series`, the lines of the graphs.
+  and `genui_measurement_series`, the lines of the graphs, which the card file draws below the cards.
 
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
@@ -26,8 +26,9 @@ All notable changes are documented here. The format follows
   `genui_machine_list`, which reads the Timeseries and Events APIs.
 - Example application `app` (TanStack Start, shadcn/ui) in the demo stack on port 5600. Home lists
   what every machine does now, with the values of `genui_machine_list`. A chat next to the page (TanStack AI
-  harness) answers questions with the same tools. Its language models come from the settings: OpenAI,
-  Anthropic, and any endpoint that speaks OpenAI's chat completions. With several models a chat picks one.
+  harness) answers questions with the same tools. Its language models come from a LiteLLM gateway, with two
+  settings, `LLM_BASE_URL` and `LLM_API_KEY`: the chat offers the models the gateway marks for chat, in its
+  order, and a chat picks one. `host.docker.internal` reaches the computer from the app on Linux too.
 - Card catalogue `packages/cards`: for each card its contract (zod) and its React component. The first card
   is the machine card: what one machine does now and which states it went through over the last hours. The
   tool `genui_machine_show` returns its values, the app shows it on a page per machine
@@ -59,6 +60,11 @@ All notable changes are documented here. The format follows
 - CI checks the links between the files of the repository (`.github/scripts/check-doc-links.mjs`): a moved
   or renamed file and a reworded heading cannot leave a dead pointer in the documentation. The pull request
   template, `CONTRIBUTING.md` and `AGENTS.md` ask to keep the tour current with a change to the demo.
+- CI checks what a pull request says (`.github/scripts/check-pull-request.mjs`, the workflow "Pull request"):
+  the title is a Conventional Commit, the template is filled in, a change to a contract links its issue, and
+  a `feat`, a `fix` or a breaking change (`!`) has its line here or says why not. The failure says what to
+  do about each, with the commands, so a person or a coding agent can act on it. It runs again when the title
+  or the text is edited, and leaves drafts and Dependabot alone.
 - About the name (`docs/name.md`): where the name Pleiades comes from, what it stands for and what it does
   not, how Taurus, Pleiades and this playground relate, and how to write it. `README.md` says it in two
   sentences.
@@ -105,25 +111,64 @@ All notable changes are documented here. The format follows
   the tokens with their measured contrast, every component of `packages/ui` in its variants and states
   with fixed values in the words of the demo, three rules as Do and Don't, and the machine card of the card
   catalogue. A test fails when a component of `packages/ui` has no block on the page.
+- The skill `setup` gives the chat the language models of the hackathon hub: a router that speaks OpenAI's chat
+  completions behind one address and one key, with a root certificate of its own. The skill checks that the
+  file holds that certificate alone, by its fingerprint, and hands it to the app with a `compose.override.yaml`
+  that stays on the computer. It points `LLM_BASE_URL` and `LLM_API_KEY` at the router with
+  `${OPENAI_BASE_URL}` and `${UMS_AI_KEY}` of the profile, and asks the router from inside the app which chat
+  models and which speech-to-text model it offers.
+- Stack: a LiteLLM gateway of its own, with the profile `gateway` (`docker compose --profile gateway up -d`),
+  for a key of Anthropic or OpenAI without the gateway of the hackathon. It reads `ANTHROPIC_API_KEY` and
+  `OPENAI_API_KEY` from `.env`, takes `LLM_API_KEY` as its master key and its models from
+  `stacks/litellm/config.yaml`, publishes no port, and
+  without the profile neither starts nor downloads (`LITELLM_VERSION`, `v1.109.1`).
+- Dictation in the chat field of the example application: a microphone next to send. The browser records,
+  the server route `/api/transcribe` has a speech-to-text model write down what was said, and the text goes
+  into the field, to send like a typed question. The model gets the names of the machines as its prompt.
+  The model is the first one the gateway marks for speech to text; without one the field has no microphone.
+  A recording
+  stops after two minutes, and the route answers a body over 32 MiB with 413, as the agent harness does.
+- "Thinking" in the chat: while an answer is coming and nothing in it moves, a running line of a `Trace`
+  says so, and its title shimmers. It stands where the answer will be until the answer shows anything, after
+  the shadcn chatbot template, and under the last step or card while the model reads its result, until the
+  next step or text comes. Before, the chat showed nothing in those times.
+- The example application wears umati: the sign of umati is the icon of the page, and the coloured umati
+  wordmark stands at the top of the sidebar in place of the name. Both are trademarks of VDW e.V. and not
+  covered by the licences of this repository (`NOTICE`).
+- Brands (`packages/ui/brands`): a brand is a `DESIGN.md` and, written from it, one block of theme tokens
+  that holds while `<html>` carries `data-brand`. It sets the colour roles, the radius, the font and a
+  logo; the colours of an error, a chart and a state of a machine stay the same in every brand, and no
+  component changes. The example application has the switch at the top of its sidebar, the design system
+  the same choice at the top of its page, where the contrast of every colour role is measured under the
+  brand. One brand comes along, `example`, which is not a company. A card served to another host wears no
+  brand. The skill `add-brand` (`.claude/skills/`) leads a coding agent through a new one. Why: ADR-0011.
+- The example application names its build at the bottom of the sidebar: the version and the short commit,
+  `0.0.142 · 7a83c2f`, as a link to the commit. The workflow "Images" passes both, and the repository, to the
+  image build as `VERSION`, `REVISION` and `SOURCE`; the build reads them as `APP_VERSION`, `APP_REVISION`
+  and `APP_SOURCE`. A build without them is `dev`; `vite dev` adds the commit of the checkout.
+- Stop in the chat field: while an answer comes, send is stop, after the pattern Prompt Input of shadcn.
+  It stops reading the answer (`stop` of `useChat`) and cancels the turn on the server
+  (`createHarnessClient(...).cancel()`), so that the model stops writing, the chat keeps what was shown,
+  and the next question does not wait for the rest.
+- A step in the chat opens to what its tool gave back, or why it failed, after the pattern Tool of shadcn:
+  the line of a call is a `TraceCollapsible` once its result is there, with the result as text in a
+  `CodeBlock` (JSON indented). `code-block` is new in `packages/ui`; it brings `shiki`, which only its
+  highlighting hook loads, and the app does not use that hook.
 
 ### Changed
 
-- Chat: the models of Anthropic are offered before those of OpenAI. With keys for both, the first model of
-  `ANTHROPIC_MODELS` answers until a chat picks another; with the names of `.env.example` that is Claude Haiku.
+- `app`, for those who run `main`: the chat takes its models from a LiteLLM gateway, with two settings,
+  `LLM_BASE_URL` and `LLM_API_KEY`. The settings `ANTHROPIC_*`, `OPENAI_*`, `OPENAI_TRANSCRIPTION_MODEL`,
+  `LLM_MODELS` and `LLM_TRANSCRIPTION_MODEL` and the package `@tanstack/ai-anthropic` are gone. A `.env` that
+  sets only the keys of Anthropic or OpenAI gives the chat no model: set the address and the key of the gateway.
 - MQTT: MQTTnet 5 replaces MQTTnet 4. MQTTnet 5 ships no managed client, so `Pleiades.Playground.Mqtt.Extensions`
   now carries its own `ManagedMqttClient`: it reconnects every 10 s, subscribes again on every new connection
   and queues outgoing messages while there is none. Topics, payloads and content types on the broker are
   unchanged.
-- `app`: the setting `LLM_MODEL` is now `LLM_MODELS` and takes several names, separated by commas. A `.env`
-  that still names `LLM_MODEL` gives the chat no model: rename the line. The blocks `OPENAI_*` and
-  `ANTHROPIC_*` are new beside it.
 - `genui-mcp`: the origins a card file may load from are a setting, `CARD_RESOURCE_DOMAINS`, and no longer
   the font origin of one host in the code. Without it a card names none. A host that serves its font from
   an origin of its own needs it set, or the card falls back to a system font there.
 - The images of `genui-mcp` and `app` carry `LICENSE` and `NOTICE` under `/app`.
-- Stack: a key alone enables the chat. `compose.yaml` fills in the model names of `.env.example` for
-  `ANTHROPIC_MODELS` and `OPENAI_MODELS` where the line is missing or empty. Where a block was begun and is
-  not complete, the chat panel names the setting that is empty.
 - Stack: the image of the simulator is built once, by `simulator-p-04`, and no longer once per simulator.
 - `README.md` starts the stack with `--wait` and shows the two lines that enable the chat. The development
   setup has three more known issues: a download that breaks off, `pnpm` through the path, and a key that
@@ -153,6 +198,11 @@ All notable changes are documented here. The format follows
   `src/chat/cards.tsx`. The card files are built from every page under `apps/genui-mcp/ui/`. For a caller
   nothing changed: the lists of tools and resources, the description, the guide and the card file are the
   same, byte for byte. The recipe `create-card` names the new places.
+- `app`: the cards of the chat have a place of their own, `src/cards/<name>/`, named like the card everywhere
+  else. The machine card moved there from `src/machines/`, which keeps what the pages and the chat both take
+  of a machine: the server functions, the name of the tool only a card calls, and the row; a card folder
+  imports from there, never the other way. Nothing a person sees changed. A card on a branch of your own
+  moves from `src/<name>/` to `src/cards/<name>/`. The recipe `create-card` names the new place.
 - The shadcn/ui components live in one package, `packages/ui` (`@pleiades/ui`), laid out as the monorepo
   template of shadcn lays it out. The example app and the card catalogue import a component as
   `@pleiades/ui/components/<name>`, and `shadcn add` writes a new one there; before, twenty lay in the app
@@ -169,6 +219,14 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- `app`: a question asked outside the chat ("Ask why", the field in the header) is answered under
+  `vite dev` too. React ran the effect that sends it twice there (StrictMode); `useChat` detached after the
+  first run and cut off its stream, and the second run found the question taken: it stood in the chat and
+  no answer came. The effect now waits one tick, so only the run that stays sends it. The build was not
+  affected.
+- `app`: dictation works in Firefox. Firefox recorded Ogg and reported no type once the recording had
+  stopped, so the file went out named WebM, and the speech-to-text model refused it ("Audio file might be
+  corrupted or unsupported"). The recorder now asks for WebM with Opus.
 - `ui`: the buttons of a disabled number field are dimmed once, with the group, and no longer twice. The
   undo of their own dimming lost to `disabled:opacity-50` in the built stylesheet, so they stood at a
   quarter.

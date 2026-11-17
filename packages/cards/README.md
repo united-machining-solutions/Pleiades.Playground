@@ -12,7 +12,7 @@ generative UI backend. Its contract and its component lie next to each other, so
 |---|---|---|---|
 | Machine: what one machine does now, since when, with which program, and the states of the last hours | `genui_machine_show` | `machineShow` in `src/machine/contract.ts` | `MachineCard` in `src/machine/machine-card.tsx` |
 | Measurement: the newest physical values of every machine, each in the unit it was published in | `genui_measurement_list` | `measurementList` in `src/measurement/contract.ts` | `MeasurementCards` in `src/measurement/measurement-card.tsx` |
-| Measurement graph: one quantity of every machine over the last minutes, a line for each machine | `genui_measurement_series`, called by the page `/live` of the example app. No card draws it yet: neither the chat nor the card file of the measurements | `measurementSeries` in `src/measurement/contract.ts` | `MeasurementGraph` in `src/measurement/measurement-graph.tsx` |
+| Measurement graph: one quantity of every machine over the last minutes, a line for each machine | `genui_measurement_series`, called by the card file of the measurements below its cards, and by the page `/live` of the example app. The chat draws no graph | `measurementSeries` in `src/measurement/contract.ts` | `MeasurementGraph` in `src/measurement/measurement-graph.tsx` |
 
 The list of machines, the result of `genui_machine_list`, has a contract here too (`machineList`), but no
 card: an application draws it with rows of its own and checks what it gets against the contract.
@@ -71,7 +71,7 @@ Both import the theme from [`packages/ui`](../ui/README.md), so the card looks t
    [`contracts/mcp`](../../contracts/mcp/README.md).
 3. Write the component with the inferred type as its properties.
 4. In the application, say what the chat draws for a result of the tool: a module for the card, like
-   `src/machines/chat.tsx`, and one line in `src/chat/cards.tsx`.
+   `src/cards/machine/chat.tsx`, and one line in `src/chat/cards.tsx`.
 5. For other hosts, add a page for the card under `apps/genui-mcp/ui/` and link it from the tool. The build
    finds the page by itself.
 6. If the card shows a series, keep it out of the contract of the card: give it a contract and a tool of its

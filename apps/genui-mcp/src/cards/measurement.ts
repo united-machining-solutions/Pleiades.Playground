@@ -10,13 +10,15 @@ import { inTimeZoneOf, knownTimeZone } from "../time.ts"
 import { inWords, readOnly, timeZone } from "../tool.ts"
 import type { Context } from "../tool.ts"
 
-// The measurement card: the newest physical values of every machine. What reads them is in
-// measurements.ts.
+import { MEASUREMENT_CARD_URI, MEASUREMENT_SERIES_TOOL } from "./measurement.names.ts"
 
-export const MEASUREMENT_CARD_URI = "ui://genui/measurement"
+// The measurement card: the newest physical values of every machine, and the graphs of the last
+// minutes, which the card asks for itself. What reads them is in measurements.ts.
+
+export { MEASUREMENT_CARD_URI, MEASUREMENT_SERIES_TOOL }
 
 const shownAsCard =
-  "Where the host shows MCP Apps, the person already sees this result as the measurement card: a card for each machine with these values. Then a sentence or two is the whole answer. Do not list the values again."
+  "Where the host shows MCP Apps, the person already sees this result as the measurement card: a card for each machine with these values, and graphs of the last minutes. Then a sentence or two is the whole answer. Do not list the values again."
 
 const measurementListTool = toolDefinition({
   name: "genui_measurement_list",
@@ -36,12 +38,10 @@ const measurementListTool = toolDefinition({
   return inWords(list, `${measurementListInWords(list)}\n\n${shownAsCard}`)
 })
 
-export const MEASUREMENT_SERIES_TOOL = "genui_measurement_series"
-
 const measurementSeriesTool = toolDefinition({
   name: MEASUREMENT_SERIES_TOOL,
   description:
-    "List the values of every physical quantity of every machine over the last minutes, a line for each machine: what the graphs of the measurements draw. A page of an application calls it; no card asks for it yet. A language model does not need it to say what a machine measures now: that is genui_measurement_list.",
+    "List the values of every physical quantity of every machine over the last minutes, a line for each machine: what the graphs of the measurements draw. The measurement card calls it after genui_measurement_list. A language model does not need it to say what a machine measures now: that is genui_measurement_list.",
   inputSchema: z.object({
     minutes: z
       .number()
@@ -61,8 +61,8 @@ const measurementSeriesTool = toolDefinition({
       ),
   }),
   outputSchema: measurementSeries,
-  // Not for a language model: a host that shows MCP Apps does not offer it to one. Today the page
-  // "Live values" of the example app calls it; no card file asks for it yet.
+  // Only a card calls this tool: a host that shows MCP Apps does not offer it to its language model.
+  // The card file asks for it through its host, the page "Live values" of the example app itself.
   metadata: { title: "List measurement series", annotations: readOnly, _meta: { ui: { visibility: ["app"] } } },
 }).server<Context>(async (input, ctx) => {
   const series = await listMeasurementSeries(ctx.context.apis, input.minutes, input.slots)
@@ -94,15 +94,15 @@ than 30 seconds without a sign of life, or where there is no value: then it is
 the last value known, not what the machine measures now.
 
 The values over the last minutes, a line for each machine, are what a graph draws. They grow with
-time, so they are not in that result: a page that draws graphs asks \`genui_measurement_series\` for
-them. You do not need it.
+time, so they are not in that result: the card asks \`genui_measurement_series\` for them itself.
+You do not need it.
 `
 
 export const measurementCard = card({
   tools: [measurementListTool, measurementSeriesTool],
   describes: [
     "- genui_measurement_list: every machine with the newest value of each physical quantity.",
-    "- genui_measurement_series: the values of every quantity over the last minutes, for the graphs of a page.",
+    "- genui_measurement_series: the values of every quantity over the last minutes, for the graphs of the card. A card calls it.",
   ],
   guide: measurementGuide,
   file: { name: "measurement", uri: MEASUREMENT_CARD_URI },

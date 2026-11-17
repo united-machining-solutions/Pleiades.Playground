@@ -4,10 +4,10 @@ import { Card } from "@pleiades/ui/components/card"
 import { Fragment } from "react"
 
 import type { ChatTool } from "@/chat/tool-results.ts"
+import { MachineRow } from "@/machines/machine-item.tsx"
 import { ItemGroup, ItemSeparator } from "@pleiades/ui/components/item"
 
-import { SPAN_LIST_TOOL } from "./card-tools.ts"
-import { MachineRow } from "./machine-item.tsx"
+import { SPAN_LIST_TOOL } from "@/machines/card-tools.ts"
 import { machineListOf, machineShowOf } from "./results.ts"
 import { ShownMachine } from "./shown-machine.tsx"
 
@@ -55,6 +55,6 @@ export const machineTools: ReadonlyArray<ChatTool> = [
       return values && <ListedMachines values={values} />
     },
   },
-  // The spans of the band: the card asks for them itself, see get-machines.ts.
+  // The spans of the band: the card asks for them itself, see machines/get-machines.ts.
   { name: SPAN_LIST_TOOL, cardOnly: true },
 ]

@@ -73,7 +73,8 @@ export type MeasurementLine = z.infer<typeof measurementLine>
 /**
  * The values of every machine over the last minutes: what the graphs of the measurements draw,
  * one graph for each quantity and a line for each machine in it. They grow with time, so they are
- * not part of what a language model reads: a page that draws the graphs asks for them.
+ * not part of what a language model reads: the card file and the page that draw the graphs ask
+ * for them.
  *
  * Every line has the same instants, so they stand once, in `instants`, and a line carries only
  * its values: a result is a fraction of the size, and a page reads it again every few seconds.

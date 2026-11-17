@@ -2,7 +2,7 @@ import { MeasurementCards } from "@pleiades/cards/measurement/measurement-card.t
 
 import type { ChatTool } from "@/chat/tool-results.ts"
 
-import { MEASUREMENT_SERIES_TOOL } from "./card-tools.ts"
+import { MEASUREMENT_SERIES_TOOL } from "@/machines/card-tools.ts"
 import { measurementListOf } from "./results.ts"
 
 // The measurement card in the chat: what a call of its tool is called, and what the chat draws for

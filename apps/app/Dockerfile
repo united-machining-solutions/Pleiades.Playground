@@ -4,10 +4,17 @@
 FROM --platform=$BUILDPLATFORM node:26.13-alpine3.24 AS build
 WORKDIR /repo
 COPY . .
+# The build the sidebar of the app names: the workflow "Images" passes the version, the commit and the
+# repository, as the image labels org.opencontainers.image.version, .revision and .source say them.
+# A build without them is "dev". The build reads them as APP_VERSION, APP_REVISION and APP_SOURCE, names
+# that no other tool sets (apps/app/vite.config.ts).
+ARG VERSION=dev
+ARG REVISION=
+ARG SOURCE=
 # pnpm in the version that package.json names as "packageManager".
 RUN npm install --global --ignore-scripts "$(node --print 'require("./package.json").packageManager')" && \
     pnpm install --frozen-lockfile && \
-    pnpm --filter @pleiades/app build
+    APP_VERSION="$VERSION" APP_REVISION="$REVISION" APP_SOURCE="$SOURCE" pnpm --filter @pleiades/app build
 
 # The Alpine minor is pinned on purpose, as in the images under source/.
 FROM node:26.13-alpine3.24 AS final

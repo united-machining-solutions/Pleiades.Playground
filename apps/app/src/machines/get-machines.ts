@@ -4,8 +4,7 @@ import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
-import { MEASUREMENT_SERIES_TOOL } from "../measurements/card-tools.ts"
-import { SPAN_LIST_TOOL } from "./card-tools.ts"
+import { MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL } from "./card-tools.ts"
 
 // The values come from the generative UI backend. These functions run on the server of the app:
 // the browser never talks to the backend itself.
@@ -63,17 +62,19 @@ function textOf(result: unknown): string | undefined {
   return texts[0]
 }
 
+/** What every machine does now, for code on the server. The browser asks with `getMachines`. */
+export function listMachines(): Promise<Answer<MachineList>> {
+  return ask(async (backend) => {
+    const result = await backend.callTool("genui_machine_list", {})
+    if (result.isError || !result.structuredContent) {
+      throw new Refused(textOf(result) ?? "genui_machine_list returned no values.")
+    }
+    return result.structuredContent
+  })
+}
+
 /** What every machine does now. */
-export const getMachines = createServerFn({ method: "GET" }).handler(
-  (): Promise<Answer<MachineList>> =>
-    ask(async (backend) => {
-      const result = await backend.callTool("genui_machine_list", {})
-      if (result.isError || !result.structuredContent) {
-        throw new Refused(textOf(result) ?? "genui_machine_list returned no values.")
-      }
-      return result.structuredContent
-    }),
-)
+export const getMachines = createServerFn({ method: "GET" }).handler(() => listMachines())
 
 /** One machine, and how long each state lasted over the last hours: the values of the machine card. */
 export const getMachine = createServerFn({ method: "GET" })

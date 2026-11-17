@@ -66,6 +66,18 @@ node .github/scripts/check-doc-links.mjs
 It checks that every link between files of this repository still has its target, the pointers of the tour
 into the code included. The same checks run in CI on every pull request.
 
+Once the pull request is open:
+
+```bash
+node .github/scripts/check-pull-request.mjs <number>
+```
+
+It checks what no file holds: that the title is a Conventional Commit, because it becomes the commit on
+`main`; that the template is filled in; that a change to a contract links its issue; and that a `feat`, a
+`fix` or a breaking change (`!` in the title) has its line in `CHANGELOG.md`, or says on that line of the
+checklist why not. Each thing that is missing comes with what to do about it. It needs the GitHub CLI. CI
+runs it whenever the title, the text or the commits of a pull request change, and leaves a draft alone.
+
 ## Working with a coding agent
 
 Agents are welcome. You stay responsible for the change: you sign off the commits and you review the diff before

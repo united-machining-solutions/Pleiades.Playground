@@ -242,3 +242,23 @@ test("the series give a line for each machine and quantity, from the value that 
   assert.equal(held.length, 14)
   assert.equal(held.every((url) => url.searchParams.get("stopTime") === series.from), true)
 })
+
+test("a topic below the path of a machine is not a line of that machine", async () => {
+  mock.method(globalThis, "fetch", async (input: Parameters<typeof fetch>[0]) => {
+    const url = new URL(String(input))
+    // The wildcard of the Timeseries API reaches over several levels.
+    if (url.pathname.endsWith("Spindle/1/Override")) {
+      return Response.json({
+        series: [
+          { topic: "machines/P-04/umati/Spindle/1/Override", unit: "one", timestamps: [micros("2026-11-16T09:29:50.000Z")], values: [0.95] },
+          { topic: "machines/P-04/extra/umati/Spindle/1/Override", unit: "one", timestamps: [micros("2026-11-16T09:29:50.000Z")], values: [0.5] },
+        ],
+      })
+    }
+    return Response.json({ series: [] })
+  })
+
+  const series = await listMeasurementSeries(apis, 15, 180, now)
+  const override = series.quantities.find((one) => one.quantity === "spindleOverride")
+  assert.deepEqual(override?.lines.map((line) => line.topic), ["machines/P-04/umati/Spindle/1/Override"])
+})
