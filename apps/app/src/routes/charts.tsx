@@ -1,3 +1,4 @@
+import { titleOf } from "@pleiades/cards/machine/in-words.ts"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { createFileRoute } from "@tanstack/react-router"
@@ -69,7 +70,7 @@ function Charts() {
         {machines.map(({ show, from, spans }) => (
           <StateHistoryTile
             key={show.machine.machine}
-            machine={show.machine.machine}
+            machine={titleOf(show.machine)}
             from={from}
             to={show.history.to}
             spans={spans}
