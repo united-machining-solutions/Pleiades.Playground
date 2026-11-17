@@ -22,6 +22,8 @@ async function transcribe({ request }: { request: Request }) {
   form.append("file", recording, transcriptionFile(recording.type || request.headers.get("content-type") || ""))
   form.append("model", hub.model)
   form.append("language", "de")
+  // The words of the demo, so that they are written as the app writes them.
+  form.append("prompt", "Hey Titan. Die Maschinen P-04, P-07 und M-02. Lagebild, Halle, Störung, Spindel.")
   const answer = await fetch(`${hub.baseURL.replace(/\/$/, "")}/audio/transcriptions`, {
     method: "POST",
     headers: { Authorization: `Bearer ${hub.apiKey}` },

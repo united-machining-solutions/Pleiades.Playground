@@ -2,7 +2,7 @@ import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-route
 import { SparklesIcon } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
-import { useChatPanel } from "@/chat/ask.ts"
+import { pickModel, useChatPanel } from "@/chat/ask.ts"
 import {
   askFollowUp,
   canListen,
@@ -18,13 +18,16 @@ import { faultBriefing, faultInWords, useNewFaults } from "@/voice/faults.ts"
 import type { Fault } from "@/voice/faults.ts"
 import { useShownCards } from "@/voice/shown.ts"
 import { loadRecognition } from "@/voice/transcribe.ts"
+import { useWakeWord } from "@/voice/wake.ts"
 import { Cloud } from "@/voice/cloud.tsx"
 
-// The assistant: a black screen with a cloud of points that greets, listens and speaks, and nothing else.
+// Titan: a black screen with a cloud of points that greets, listens and speaks, and nothing else.
 //
-// - The first press of the space bar greets: a browser speaks only after a key or a click.
-// - Then hold the space bar, speak, and let go: the question goes to the chat, which runs behind
-//   this screen, and its answer is read aloud. A follow-up goes on in the same chat.
+// - The first press of the space bar or a click starts Titan and greets: a browser speaks only after
+//   a key or a click.
+// - Then say "Hey Titan" and the question, or hold the space bar, speak, and let go: the question
+//   goes to the chat, which runs behind this screen, and its answer is read aloud. A follow-up goes
+//   on in the same chat.
 // - Escape leaves the screen.
 //
 // The demo speaks German, so do the words of this page.
@@ -32,17 +35,19 @@ import { Cloud } from "@/voice/cloud.tsx"
 /** Who the cloud greets. */
 const GREETED = "Kathrin"
 const GREETING = `Hallo ${GREETED}, was kann ich für dich tun?`
+/** What Titan says when it is called by its name alone. */
+const AWAKE = "Ja?"
 
 const root = getRouteApi("__root__")
 
 export const Route = createFileRoute("/assistant")({
-  staticData: { nav: { title: "Assistant", icon: SparklesIcon, order: 1 } },
+  staticData: { nav: { title: "Titan", icon: SparklesIcon, order: 1 } },
   component: Assistant,
 })
 
 /** For a screen reader: what the cloud shows by moving. */
 const said: Record<VoiceState, string> = {
-  idle: "Leertaste halten und sprechen.",
+  idle: "„Hey Titan“ sagen, oder die Leertaste halten und sprechen.",
   listening: "Ich höre zu.",
   thinking: "Ich denke nach.",
   speaking: "Ich spreche.",
@@ -57,6 +62,8 @@ function Assistant() {
   /** What the speech recognition heard last, so the person sees what was asked. */
   const [heard, setHeard] = useState<string>()
   const greeted = useRef(false)
+  /** Titan was started by a key or a click: from then on it may speak, and it listens for its name. */
+  const [started, setStarted] = useState(false)
   const holding = useRef(false)
   // The handlers of the keys read the newest values without being bound again.
   const latest = useRef({ state, panel })
@@ -91,6 +98,12 @@ function Assistant() {
   // first: it is told what happened and says it in its own words, with the shop floor. Without a
   // language model, the page says the fault itself.
   const { chatStatus } = root.useLoaderData()
+  // Titan talks: the model that answers fastest begins its chats. Haiku took about a second for a
+  // sentence at the hub, the others two to five. Without it, the first model of the settings answers.
+  useEffect(() => {
+    const fastest = chatStatus.models.find((model) => /haiku/i.test(model))
+    if (fastest) pickModel(fastest)
+  }, [chatStatus.models])
   const [alert, setAlert] = useState<Fault>()
   const alarmed = useNewFaults((fault) => {
     setAlert(fault)
@@ -105,11 +118,37 @@ function Assistant() {
     if (alert && !alarmed.includes(alert.machine)) setAlert(undefined)
   }, [alert, alarmed])
 
+  // "Hey Titan": listens while Titan is started and does nothing else, so it never hears itself.
+  useWakeWord({
+    enabled: started && state === "idle",
+    onWake: () => {
+      setProblem(undefined)
+      setHeard(undefined)
+      void speak(AWAKE)
+    },
+    onQuestion: (question) => {
+      setProblem(undefined)
+      setHeard(question)
+      if (!askFollowUp(question)) latest.current.panel.ask(question)
+    },
+    onProblem: setProblem,
+  })
+
   useEffect(() => {
     const ask = (question: string) => {
       setProblem(undefined)
       if (!askFollowUp(question)) latest.current.panel.ask(question)
     }
+
+    const start = () => {
+      if (greeted.current) return false
+      greeted.current = true
+      setStarted(true)
+      void speak(GREETING)
+      return true
+    }
+
+    const onClick = () => void start()
 
     const onDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -123,11 +162,7 @@ function Assistant() {
       if (event.repeat || holding.current) return
       holding.current = true
       setProblem(undefined)
-      if (!greeted.current) {
-        greeted.current = true
-        void speak(GREETING)
-        return
-      }
+      if (start()) return
       if (!canListen()) {
         setProblem("Dieser Browser kann nicht aufnehmen. Nimm Chrome oder Edge.")
         return
@@ -156,9 +191,11 @@ function Assistant() {
 
     window.addEventListener("keydown", onDown)
     window.addEventListener("keyup", onUp)
+    window.addEventListener("click", onClick)
     return () => {
       window.removeEventListener("keydown", onDown)
       window.removeEventListener("keyup", onUp)
+      window.removeEventListener("click", onClick)
     }
   }, [navigate])
 
@@ -181,6 +218,7 @@ function Assistant() {
           </p>
         )}
         {heard && <p className="text-lg font-light text-white/60">„{heard}“</p>}
+        {!started && <p className="text-base font-light text-white/50">Leertaste drücken oder klicken, um Titan zu starten.</p>}
       </div>
       {cards.length > 0 && (
         <div className="flex w-full max-w-3xl flex-col gap-4 text-left motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4">

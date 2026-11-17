@@ -1,13 +1,14 @@
 import { useEffect, useRef, useSyncExternalStore } from "react"
 
 import { piperIfReady, sentencesOf } from "./piper.ts"
-import type { PiperSession } from "./piper.ts"
 import { transcribe } from "./transcribe.ts"
 
 // Speech for the assistant page: the browser listens to a question and reads an answer aloud.
 //
-// - Speaking uses Piper, a voice that runs in the browser (piper.ts), once it has loaded. Until then,
-//   or without it, it uses the voices of the system (speechSynthesis). Neither needs a network.
+// - Speaking goes sentence by sentence through a queue, so that an answer is read while it still
+//   arrives. A sentence sounds with the voice the page set (setSentenceVoice: Tom's, tom.ts), else
+//   with Piper (piper.ts) once it has loaded, else with the voices of the system (speechSynthesis).
+//   The next sentence is made while one sounds; a sentence a voice cannot make, the system says.
 // - Listening records the microphone while the key is held and recognises the speech (transcribe.ts):
 //   with the transcription model of the language model's endpoint, such as the hub, or else with
 //   Whisper in the browser, which needs no network once its model is loaded.
@@ -58,41 +59,24 @@ export function canSpeak(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window
 }
 
+/** A voice that makes the sound of a sentence: Tom's (tom.ts) or Piper's (piper.ts). */
+export type SentenceVoice = { predict: (sentence: string) => Promise<Blob> }
+
+let sentenceVoice: SentenceVoice | undefined
+
+/** The voice the page has, Tom's for example; none for Piper once it is loaded, else the system. */
+export function setSentenceVoice(voice: SentenceVoice | undefined) {
+  sentenceVoice = voice
+}
+
+function currentVoice(): SentenceVoice | undefined {
+  return sentenceVoice ?? piperIfReady()
+}
+
 /** A voice of the system in the language, if it has one. Local voices first: they need no network. */
 function voiceFor(language: string): SpeechSynthesisVoice | undefined {
   const voices = speechSynthesis.getVoices().filter((one) => one.lang.replace("_", "-").startsWith(language.slice(0, 2)))
   return voices.find((one) => one.lang === language && one.localService) ?? voices.find((one) => one.localService) ?? voices[0]
-}
-
-/**
- * Reads a text aloud. Resolves when it has been read, or at once if the browser cannot speak or
- * refuses to before a first click on the page.
- */
-export function speak(text: string): Promise<void> {
-  if (text.trim() === "") return Promise.resolve()
-  stopSound()
-  const piper = piperIfReady()
-  if (piper) return speakWithPiper(piper, text)
-  if (!canSpeak()) return Promise.resolve()
-  return new Promise((resolve) => {
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = VOICE_LANGUAGE
-    const voice = voiceFor(VOICE_LANGUAGE)
-    if (voice) utterance.voice = voice
-    const done = () => {
-      setState(thinking ? "thinking" : "idle")
-      resolve()
-    }
-    utterance.onstart = () => setState("speaking")
-    utterance.onend = done
-    utterance.onerror = done
-    speechSynthesis.speak(utterance)
-  })
-}
-
-export function stopSpeaking() {
-  stopSound()
-  setState(thinking ? "thinking" : "idle")
 }
 
 /** Counts what was said, so that a sentence of an earlier answer that comes late stays silent. */
@@ -100,33 +84,93 @@ let turn = 0
 /** Ends the sentence that sounds now. */
 let hush: (() => void) | undefined
 
-/** Stops every sound: the voice of Piper and that of the system. */
+/** A sentence that waits to be said, with its sound once that is being made. */
+type Queued = { sentence: string; sound?: Promise<Blob | undefined> }
+let queue: Array<Queued> = []
+/** The queue being said, until it is empty or stopped. */
+let saying: Promise<void> | undefined
+
+/** Stops every sound and forgets what waits. */
 function stopSound() {
   turn++
+  queue = []
+  saying = undefined
   hush?.()
   if (canSpeak()) speechSynthesis.cancel()
 }
 
-/** Reads a text with Piper, a sentence at a time: the next sentence is made while one sounds. */
-async function speakWithPiper(piper: PiperSession, text: string): Promise<void> {
-  const mine = ++turn
-  const sentences = sentencesOf(text)
-  const make = (sentence: string) => piper.predict(sentence).catch(() => undefined)
-  let next = make(sentences[0])
+/**
+ * Says a text after what is being said now. Resolves when everything said so far has been said,
+ * or at once if the browser cannot speak or refuses to before a first click on the page.
+ */
+export function sayNext(text: string): Promise<void> {
+  for (const sentence of sentencesOf(text)) queue.push({ sentence })
+  saying ??= sayQueue(turn)
+  return saying
+}
+
+/** Reads a text aloud, after stopping what is being said. */
+export function speak(text: string): Promise<void> {
+  stopSound()
+  if (text.trim() === "") return Promise.resolve()
+  return sayNext(text)
+}
+
+export function stopSpeaking() {
+  stopSound()
+  setState(thinking ? "thinking" : "idle")
+}
+
+function make(voice: SentenceVoice, sentence: string): Promise<Blob | undefined> {
+  return voice.predict(sentence).catch(() => undefined)
+}
+
+async function sayQueue(mine: number): Promise<void> {
   try {
-    for (let index = 0; index < sentences.length; index++) {
-      const sound = await next
+    while (queue.length > 0) {
+      const one = queue.shift() as Queued
+      const voice = currentVoice()
+      if (voice) {
+        one.sound ??= make(voice, one.sentence)
+        // The next sentence is made while this one sounds.
+        if (queue[0]) queue[0].sound ??= make(voice, queue[0].sentence)
+      }
+      const sound = await one.sound
       if (mine !== turn) return
-      if (index + 1 < sentences.length) next = make(sentences[index + 1])
-      // A sentence Piper cannot say is left out; the others are still read.
-      if (!sound) continue
-      setState("speaking")
-      await play(sound)
+      if (sound) {
+        setState("speaking")
+        await play(sound)
+      } else {
+        await speakWithSystem(one.sentence)
+      }
       if (mine !== turn) return
     }
   } finally {
-    if (mine === turn) setState(thinking ? "thinking" : "idle")
+    if (mine === turn) {
+      saying = undefined
+      setState(thinking ? "thinking" : "idle")
+    }
   }
+}
+
+/** Says one sentence with a voice of the system. */
+function speakWithSystem(sentence: string): Promise<void> {
+  if (!canSpeak()) return Promise.resolve()
+  return new Promise((resolve) => {
+    const utterance = new SpeechSynthesisUtterance(sentence)
+    utterance.lang = VOICE_LANGUAGE
+    const voice = voiceFor(VOICE_LANGUAGE)
+    if (voice) utterance.voice = voice
+    const done = () => {
+      hush = undefined
+      resolve()
+    }
+    hush = done
+    utterance.onstart = () => setState("speaking")
+    utterance.onend = done
+    utterance.onerror = done
+    speechSynthesis.speak(utterance)
+  })
 }
 
 /** Plays a sound, and resolves when it has ended or was stopped. */
@@ -145,6 +189,16 @@ function play(sound: Blob): Promise<void> {
     audio.onerror = done
     audio.play().catch(done)
   })
+}
+
+/**
+ * Where the complete sentences of a text that still grows end, after `from`: the end of the last
+ * mark of a sentence that has a space or a line after it. `from` if there is none yet.
+ */
+export function sentencesEnd(text: string, from: number): number {
+  let end = from
+  for (const match of text.slice(from).matchAll(/[.!?…:]["“”«»)]*\s+|\n\s*\n/g)) end = from + match.index + match[0].length
+  return end
 }
 
 /**
@@ -254,18 +308,26 @@ function wordsOf(message: ChatMessage): string {
  * is complete, while voice is on.
  */
 export function useSpokenAnswers(messages: ReadonlyArray<ChatMessage>, isLoading: boolean) {
-  const spoken = useRef<string | undefined>(undefined)
-  const wasLoading = useRef(isLoading)
+  // How far the newest answer has been handed to the voice. An answer that was there when the chat
+  // opened has been said already.
+  const said = useRef<{ id?: string; at: number } | undefined>(undefined)
   useEffect(() => {
     thinking = isLoading
     if (state !== "speaking" && state !== "listening") setState(isLoading ? "thinking" : "idle")
-    const finished = wasLoading.current && !isLoading
-    wasLoading.current = isLoading
-    if (!finished || !enabled) return
     const last = messages.at(-1)
-    if (!last || last.role !== "assistant" || spoken.current === last.id) return
-    spoken.current = last.id
-    void speak(forSpeech(wordsOf(last)))
+    if (said.current === undefined) {
+      said.current = last?.role === "assistant" && !isLoading ? { id: last.id, at: wordsOf(last).length } : { at: 0 }
+      if (said.current.id) return
+    }
+    if (!enabled || !last || last.role !== "assistant") return
+    if (said.current.id !== last.id) said.current = { id: last.id, at: 0 }
+    // While the answer arrives, each complete sentence is said at once; the rest when it is complete.
+    const words = wordsOf(last)
+    const end = isLoading ? sentencesEnd(words, said.current.at) : words.length
+    if (end <= said.current.at) return
+    const piece = forSpeech(words.slice(said.current.at, end))
+    said.current.at = end
+    if (piece) void sayNext(piece)
   }, [messages, isLoading])
   useEffect(
     () => () => {
