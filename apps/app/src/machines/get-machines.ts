@@ -1,4 +1,5 @@
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
+import type { ShopfloorShow } from "@pleiades/cards/shopfloor/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
@@ -68,6 +69,18 @@ export const getMachines = createServerFn({ method: "GET" }).handler(
       const result = await backend.callTool("genui_machine_list", {})
       if (result.isError || !result.structuredContent) {
         throw new Refused(textOf(result) ?? "genui_machine_list returned no values.")
+      }
+      return result.structuredContent
+    }),
+)
+
+/** The hall: every machine at its place, whether it runs, and why not: the values of the shop floor card. */
+export const getShopfloor = createServerFn({ method: "GET" }).handler(
+  (): Promise<Answer<ShopfloorShow>> =>
+    ask(async (backend) => {
+      const result = await backend.callTool("genui_shopfloor_show", {})
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? "genui_shopfloor_show returned no values.")
       }
       return result.structuredContent
     }),

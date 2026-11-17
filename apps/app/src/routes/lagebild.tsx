@@ -1,0 +1,117 @@
+import type { MachineList } from "@pleiades/cards/machine/contract.ts"
+import { clock } from "@pleiades/cards/machine/format.ts"
+import { stateOf } from "@pleiades/cards/machine/state.ts"
+import { ShopfloorCard } from "@pleiades/cards/shopfloor/shopfloor-card.tsx"
+import { Badge } from "@pleiades/ui/components/badge"
+import { Card } from "@pleiades/ui/components/card"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
+import { ItemGroup, ItemSeparator } from "@pleiades/ui/components/item"
+import { Skeleton } from "@pleiades/ui/components/skeleton"
+import { createFileRoute } from "@tanstack/react-router"
+import { ClipboardListIcon, FactoryIcon } from "lucide-react"
+import { Fragment } from "react"
+import type { ReactNode } from "react"
+
+import { useChatPanel } from "@/chat/ask.ts"
+import { NoAnswer } from "@/components/no-answer.tsx"
+import { useLive } from "@/hooks/use-live.ts"
+import { getMachines, getShopfloor } from "@/machines/get-machines.ts"
+import { MachineRow } from "@/machines/machine-item.tsx"
+
+/**
+ * Das Lagebild: what the assistant tells about the hall, black on white on one screen. Top to bottom
+ * the shop floor card and the machines with their state, program, open warnings and errors, in the
+ * order the backend returns them. The page asks and draws; it computes nothing.
+ */
+export const Route = createFileRoute("/lagebild")({
+  staticData: { nav: { title: "Lagebild", icon: ClipboardListIcon } },
+  // Each answer on its own: if one is missing, the other still stands, and the page keeps trying.
+  loader: async () => {
+    const [shopfloor, machines] = await Promise.all([
+      getShopfloor().catch((error: unknown) => ({ values: null, error: String(error) })),
+      getMachines().catch((error: unknown) => ({ values: null, error: String(error) })),
+    ])
+    return { shopfloor, machines }
+  },
+  component: Lagebild,
+  pendingComponent: Loading,
+})
+
+function Lagebild() {
+  const { shopfloor, machines } = Route.useLoaderData()
+  const { ask } = useChatPanel()
+  useLive()
+
+  const asOf = machines.values?.asOf ?? shopfloor.values?.asOf
+  return (
+    <Page line={asOf ? `live · Stand ${clock(asOf)}` : undefined}>
+      <section className="flex flex-col gap-2.5">
+        <h2 className="font-medium">Halle</h2>
+        {shopfloor.values ? <ShopfloorCard {...shopfloor.values} /> : <NoAnswer error={shopfloor.error} />}
+      </section>
+      <section className="flex flex-col gap-2.5">
+        <h2 className="flex items-center gap-2 font-medium">
+          Maschinen
+          {machines.values && <Badge variant="secondary">{machines.values.machines.length}</Badge>}
+        </h2>
+        {machines.values === null ? (
+          <NoAnswer error={machines.error} />
+        ) : machines.values.machines.length === 0 ? (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <FactoryIcon />
+              </EmptyMedia>
+              <EmptyTitle>Keine Maschinen</EmptyTitle>
+              <EmptyDescription>Keine Maschine hat in den letzten 24 Stunden einen Wert gesendet.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        ) : (
+          <Machines values={machines.values} onAsk={ask} />
+        )}
+      </section>
+    </Page>
+  )
+}
+
+/** The machines in the order of the backend, with the same rows as Home and the chat. */
+function Machines({ values: { asOf, machines }, onAsk }: { values: MachineList; onAsk: (question: string) => void }) {
+  return (
+    <Card className="gap-0 py-0">
+      <ItemGroup className="gap-0">
+        {machines.map((machine, index) => (
+          <Fragment key={machine.machine}>
+            {index > 0 && <ItemSeparator className="my-0" />}
+            <MachineRow machine={machine} state={stateOf(machine, asOf)} asOf={asOf} onAsk={onAsk} />
+          </Fragment>
+        ))}
+      </ItemGroup>
+    </Card>
+  )
+}
+
+function Page({ line, children }: { line?: string; children: ReactNode }) {
+  return (
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Lagebild</h1>
+        {line && <p className="text-sm text-muted-foreground">{line}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function Loading() {
+  return (
+    <Page>
+      <div className="flex flex-col gap-2.5">
+        <Skeleton className="h-6 w-28" />
+        <Skeleton className="h-72 w-full" />
+        <Skeleton className="h-6 w-28" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
+      </div>
+    </Page>
+  )
+}
