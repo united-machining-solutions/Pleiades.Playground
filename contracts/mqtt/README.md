@@ -505,7 +505,9 @@ Each virtual machine works like this:
   `"available": false`; without `ActiveAlerts` there are no alert or notification events either. By default
   nothing is unavailable.
 - The counters (power-on duration, operation duration, energy, parts) only grow; they are kept in `/data` across
-  restarts.
+  restarts, and so is the number of the next job order: a new run goes on from it and gives no job order id of a
+  run before it again. With `Scenario:Seed` the start of the run goes into the random numbers too, so a restart
+  gives other ids of program executions and alerts.
 - Its signal of the manufacturer, the temperature of the spindle bearing, warms towards a running temperature
   while the spindle turns (scaled by the spindle override) and cools back while it stands
   (`Scenario:BearingTemperatureIdle`, `BearingTemperatureRunning`, `BearingTimeConstant`).

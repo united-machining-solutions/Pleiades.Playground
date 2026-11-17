@@ -130,7 +130,10 @@ internal sealed class SpecOutputConfig
     Justification = "Bound by the configuration binder")]
 internal sealed class ScenarioConfig
 {
-    /// <summary>Seed of the random numbers; empty for a different run each start.</summary>
+    /// <summary>
+    /// Seed of the random numbers, taken together with the start of the run: the same seed and start give the same
+    /// run, another start other ids. Empty for a different run each start.
+    /// </summary>
     public int? Seed { get; init; }
 
     /// <summary>
