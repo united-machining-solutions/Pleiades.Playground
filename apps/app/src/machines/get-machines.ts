@@ -119,6 +119,44 @@ export const getMeasurementSeries = createServerFn({ method: "GET" }).handler(
     }),
 )
 
+/** The values of the page Charts: each machine with the sums of its last hours, and its recent spans. */
+export type Charts = {
+  asOf: string
+  machines: Array<{ show: MachineShow; from: string; spans: Array<Span> | null }>
+}
+
+/**
+ * Everything the page Charts draws, over one connection: the list, then for each machine its values
+ * and its spans of the last `recent` milliseconds only, not of all its hours. A machine without
+ * values is left out; one without spans keeps its sums.
+ */
+export const getCharts = createServerFn({ method: "GET" })
+  .validator((recent: number) => recent)
+  .handler(
+    ({ data: recent }): Promise<Answer<Charts>> =>
+      ask(async (backend) => {
+        const list = await backend.callTool("genui_machine_list", {})
+        if (list.isError || !list.structuredContent) {
+          throw new Refused(textOf(list) ?? "genui_machine_list returned no values.")
+        }
+        const machines = await Promise.all(
+          list.structuredContent.machines.map(async ({ machine }) => {
+            const show = await backend.callTool("genui_machine_show", { machine })
+            if (show.isError || !show.structuredContent) return null
+            const { history } = show.structuredContent
+            const from = new Date(Math.max(Date.parse(history.from), Date.parse(history.to) - recent)).toISOString()
+            const spans = await backend.callTool(SPAN_LIST_TOOL, { machine, from, to: history.to })
+            return {
+              show: show.structuredContent,
+              from,
+              spans: spans.isError || !spans.structuredContent ? null : spans.structuredContent.spans,
+            }
+          }),
+        )
+        return { asOf: list.structuredContent.asOf, machines: machines.filter((one) => one !== null) }
+      }),
+  )
+
 /**
  * The spans of a card's band, for the hours its values are about. They are not among the values,
  * because a language model reads those. Null if they are not to be had: the card stands without

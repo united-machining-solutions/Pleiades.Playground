@@ -115,7 +115,8 @@ the backend of the running demo stack answers.
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
-  `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `health.ts`, `api/harness/$.ts` and
+  `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `charts.tsx` the last hours of every
+  machine as charts (drawn by `src/charts/state-tiles.tsx`), `health.ts`, `api/harness/$.ts` and
   `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
   (`nav`: a title, an icon, an order). `src/components/app-sidebar.tsx` reads the entries from the routes
   and names no page, and `nav.ts` next to it puts them in order and finds the one a person is under. The

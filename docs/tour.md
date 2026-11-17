@@ -87,6 +87,16 @@ this tour.
 a graph. The lines are the result of the tool `genui_measurement_series`
 ([`apps/genui-mcp/src/measurements.ts`](../apps/genui-mcp/src/measurements.ts)).
 
+The page "Charts" in the sidebar, <http://localhost:5600/charts>, shows the last hours of every machine as charts:
+one bar per machine with how long it was in each state, and a tile per machine with its state over the last 30
+minutes.
+
+**In the code:** [`apps/app/src/routes/charts.tsx`](../apps/app/src/routes/charts.tsx) is the page,
+[`apps/app/src/charts/state-tiles.tsx`](../apps/app/src/charts/state-tiles.tsx) draws the two charts with the
+chart of shadcn/ui. The values are those of the machine card, from `genui_machine_show` and `genui_span_list`,
+read by one server function, `getCharts` in
+[`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts).
+
 ## 3. The page of one machine
 
 A click on a machine opens its page, here <http://localhost:5600/machines/P-04>. It shows the machine card:
