@@ -1,0 +1,125 @@
+# OPC UA adapter: architecture
+
+How the adapter runs several machines, what it publishes to the broker, and where it keeps its OPC UA
+configuration. What the adapter does and why is in the [README](README.md).
+
+## Machines, sessions and topics
+
+The example has two machines behind a gateway and one machine with an OPC UA server of its own:
+
+```text
+  OPC UA servers
+  ┌────────────────────────────────────────────┐   ┌────────────────────────────┐
+  │ gateway opc.tcp://opcgateway:11878         │   │ server of one machine      │
+  │  ┌──────────────────┐ ┌──────────────────┐ │   │  ┌──────────────────────┐  │
+  │  │ A0280O0001       │ │ A1121O0001       │ │   │  │ M3                   │  │
+  │  │ TruLaser, i=3000 │ │ TruMatic, i=3000 │ │   │  │ opc.tcp://M3:4840    │  │
+  │  └──────────────────┘ └──────────────────┘ │   │  └──────────────────────┘  │
+  └─────────────────────┬──────────────────────┘   └─────────────┬──────────────┘
+                        │ one session, SignAndEncrypt            │ one session
+  ┌─────────────────────┼────────────────────────────────────────┼──────────────┐
+  │ opcua-adapter       │   MachineSupervisor, SessionPool       │              │
+  │  ┌──────────────────┴──────────────────────────┐   ┌─────────┴────────────┐ │
+  │  │ SharedSession opcgateway:11878              │   │ SharedSession M3     │ │
+  │  │  ┌───────────────────┐ ┌───────────────────┐│   │  ┌─────────────────┐ │ │
+  │  │  │ MachineConnection │ │ MachineConnection ││   │  │MachineConnection│ │ │
+  │  │  │ A0280O0001        │ │ A1121O0001        ││   │  │ M3              │ │ │
+  │  │  │ own subscription  │ │ own subscription  ││   │  │ own subscription│ │ │
+  │  │  │ heartbeat, alarms │ │ heartbeat, alarms ││   │  │heartbeat, alarms│ │ │
+  │  │  └───────────────────┘ └───────────────────┘│   │  └─────────────────┘ │ │
+  │  └─────────────────────────────────────────────┘   └──────────────────────┘ │
+  └─────────────────────┬───────────────────────────────────────────────────────┘
+                        │ publish by the MQTT binding
+  ┌─────────────────────┴──────────────────────────────┐   ┌────────────────────┐
+  │ MQTT broker                                        ├──▶│ timeseries         │
+  │  machines/{serial}/umati/<Group>/<Element>         │   │ values, connection │
+  │  machines/{serial}/vendor/<Group>/<Element>        │   └────────────────────┘
+  │  machines/{serial}/umati/Connection/State          │   ┌────────────────────┐
+  │  machines/{serial}/umati/Connection/Heartbeat      ├──▶│ events             │
+  │  machines/{serial}/events/notifications            │   │ alarms             │
+  └────────────────────────────────────────────────────┘   └────────────────────┘
+```
+
+| Part | Code | What it does |
+|---|---|---|
+| `MachineSupervisor` | [`MachineSupervisor.cs`](MachineSupervisor.cs) | Loads the registrations at start, adds, replaces and removes machines at run time, checks a registration against its server. |
+| `SessionPool` | [`OpcUa/SharedSession.cs`](OpcUa/SharedSession.cs) | One `SharedSession` per endpoint: the same address (case and a slash at the end do not count), security mode, security policy and server certificate. Opened with the first machine of the endpoint, closed with the last one. |
+| `SharedSession` | [`OpcUa/SharedSession.cs`](OpcUa/SharedSession.cs) | Connects, watches the keep-alive, connects again with a back-off of 2 to 60 seconds. Attaches every machine to the session; a machine that cannot be attached is tried again every 30 seconds while the others go on. |
+| `MachineConnection` | [`OpcUa/MachineConnection.cs`](OpcUa/MachineConnection.cs) | One per registered machine: its own subscription on the session, its own `Connected` or `Disconnected`, its heartbeat and its alarms. Behind a gateway it keeps the alarms whose source or condition lies in one of its namespaces. |
+| `MachineFinder`, `TrumpfMachines` | [`OpcUa/MachineFinder.cs`](OpcUa/MachineFinder.cs), [`OpcUa/TrumpfMachines.cs`](OpcUa/TrumpfMachines.cs) | Lists the machines of an endpoint for `opcua_machine_list`: every object with an `Identification` and a `SerialNumber`, and a TRUMPF machine by the root of its interface and its MachineTool instance `i=3000`. |
+| `MachineChecks` | [`Registrations/MachineChecks.cs`](Registrations/MachineChecks.cs) | Refuses a registration that names no `machineNode` on a server of several machines, whose serial number is not the one read on the server, or that takes a node of another machine. |
+
+### Topics
+
+Every machine publishes under its serial number, after the [MQTT binding](../../contracts/mqtt/README.md):
+
+| Topic below `machines/{serial}/` | What | When |
+|---|---|---|
+| `umati/<Group>/<Element>` | An element of the data model, for example `umati/State/MachineryItemState`, `umati/Channel/1/ChannelState` | On a change, with the time of the source |
+| `vendor/<Group>/<Element>` | A value of the maker, for example `vendor/ActivityMeters/DrivesOnDuration` | On a change |
+| `umati/Connection/State` | `Connected` or `Disconnected` of this machine | When the machine is attached to its session or leaves it, or the session is lost |
+| `umati/Connection/Heartbeat` | A counter | Every ten seconds while the machine is registered, also while it does not answer |
+| `events/notifications` | An alarm `Raised` or `Reset` | When an alarm condition becomes active or ends |
+
+Two machines on one session publish under two serial numbers; nothing on the broker says that they share a
+session. The timeseries persistence stores the values and the connection, the events persistence the alarms.
+
+## Where the configuration is kept
+
+Everything that outlives a restart is in one directory, `Config:DataDirectory`, `/data` by default. In the
+demo stack that is the Docker volume `opcua_adapter_data` (`pleiades-playground_opcua_adapter_data`), mounted
+at `/data`. `docker compose down` keeps it; `docker compose down -v` deletes it, and with it every registration
+and the certificate of the adapter.
+
+```text
+/data
+├── machines/
+│   └── <serial>.json        the registration of one machine
+├── alerts/
+│   └── <serial>.json        the alarms of that machine that stand
+└── pki/
+    ├── certs/               the certificates of the adapter, public part (.der)
+    └── private/             the same with their private keys (.pfx)
+```
+
+| What | Where | Written by | Read |
+|---|---|---|---|
+| Endpoint of a machine: `url`, `securityMode`, `securityPolicy`, `allowWeaker` | `machines/<serial>.json`, `endpoint` | [`RegistrationStore`](Registrations/RegistrationStore.cs), when a registration is added or replaced | At start and when the machine is added |
+| Certificate of the server, pinned | `machines/<serial>.json`, `endpoint.serverCertificateThumbprint` (SHA-1) | The adapter, from the certificate the server presented at the registration | On every connect: another certificate is refused, the machine says why in `lastError` |
+| Machine on a server of several machines | `machines/<serial>.json`, `machineNode` | The registration | By the checks of a new registration, and by the alarm filter |
+| Nodes, units, conversions, alarm type | `machines/<serial>.json`, `elements`, `alerts` | The registration | When the machine is attached to its session |
+| Namespaces of the server at the scan | `machines/<serial>.json`, `discovery.namespaces` | The adapter, when it stores the registration | By a person who compares a rescan |
+| Alarms that stand | `alerts/<serial>.json` | [`AlertStore`](Registrations/AlertStore.cs), on every change | At start, so an alarm that ended while the adapter was down is reset |
+| Certificate of the adapter, the client certificate of every session | `pki/certs`, `pki/private`, one RSA certificate and ECC ones (NistP256, NistP384, BrainpoolP256r1, BrainpoolP384r1) | The OPC UA stack, at the first start, if there is none | On every connect and every scan |
+| Application name and URI of the adapter | Not a file: `Pleiades Playground OPC UA Adapter` and `Config:ApplicationUri` (`urn:pleiades:playground:opcua:adapter`) | [`Program.cs`](Program.cs), at every start | They are in the certificate the stack creates |
+
+The file name of a machine is its serial number, escaped as a URI. The registration is the
+[sample](samples/trumpf-trumatic-k09.registration.json) in form, with the thumbprint and the namespaces the
+adapter added.
+
+What is not kept:
+
+- **Sessions.** Held in memory and opened again at start, from the registrations.
+- **Proposals of the chat.** In memory, for 30 minutes ([`DraftStore`](Registrations/DraftStore.cs)); a
+  proposal is gone after a restart, and the server is scanned again.
+- **A trust list of servers.** The stack accepts the certificate of every server; the adapter itself holds
+  each machine to the thumbprint in its registration. A server that renews its certificate on purpose needs
+  its machines registered again.
+- **The scan sessions of the OPC UA MCP library.** In memory; they use the same certificate as the running
+  machines, so a server trusts the adapter once for both.
+
+The other side: a server, or a gateway, has to trust the certificate of the adapter once. Which file that is
+depends on the server; for the UaGateway the certificate lies in `pki/pkiserver/rejected` after the first try
+and is moved to `pki/pkiserver/trusted/certs`, see [the README](README.md#a-gateway-on-the-development-computer).
+
+### Looking at it
+
+```bash
+docker run --rm -v pleiades-playground_opcua_adapter_data:/data alpine find /data
+```
+
+```bash
+curl http://localhost:5530/machines/A1121O0001
+```
+
+The second one gives the stored registration of a machine together with what it does now.

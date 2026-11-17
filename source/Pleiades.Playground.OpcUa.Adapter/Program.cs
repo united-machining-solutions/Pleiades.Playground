@@ -101,6 +101,7 @@ builder.Services
         mcp.DiscoveryFlow.Add("A gateway serves several machines under one address: opcua_machine_list lists them, and each gets a proposal of its own with its machineNode.");
     })
     .WithOpcUaMcpFilters()
+    .WithRequestFilters(filters => filters.AddCallToolFilter(AnonymousConnect.Filter))
     .WithOpcUaCoreTools(McpToolProfile.Services)
     .WithPleiadesToolsFromAssembly();
 builder.Services.PostConfigure<McpServerOptions>(UaToolCatalogue.Apply);

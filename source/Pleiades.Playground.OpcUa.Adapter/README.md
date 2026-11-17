@@ -6,6 +6,9 @@ nodes each registration names, and publishes their values to the broker by the
 [MQTT binding](../../contracts/mqtt/README.md). From there a machine is stored and shown like a simulated
 one, without a change to another service.
 
+How machines, sessions and topics fit together, and where the adapter keeps its OPC UA configuration (endpoints,
+pinned server certificates, its own certificate): [Architecture](Architecture.md).
+
 > **Status: proof of concept**, on the branch `feat/opcua-adapter-poc`. It has not been agreed in an issue yet,
 > as [Contributing](../../CONTRIBUTING.md#how-to-contribute) asks for a new service. The management API below is
 > a proposal and has no contract under `contracts/`. It was tried against one kind of server, the TRUMPF OPC UA
@@ -288,6 +291,9 @@ After a reconnect, and after a restart of the adapter, the server is asked for t
 - The adapter is one OPC UA client, with one certificate in `/data/pki`. A server that does not accept unknown
   clients has to trust it once.
 - Not in the proof of concept: a session with a user name or a user certificate. Every session is anonymous.
+  The connect tool of the chat, `opcua_ua_connect`, takes no user name and no password, although the library
+  behind it would: a password typed into the chat would go through the language model. A call that passes one
+  all the same is refused before it reaches a server.
 
 ## Restart, removal, a server that changed
 

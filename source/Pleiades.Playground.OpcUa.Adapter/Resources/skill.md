@@ -46,7 +46,8 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
 3. **Session.** `opcua_ua_connect` with `endpointUrl`, `autoAcceptCerts: true` and `name: "scan"`. Leave the
    security arguments out: the tool takes the strongest endpoint by itself. Pass `sessionName: "scan"` to every
    later `opcua_ua_*` call. The person sees the thumbprint of the certificate on the proposal and confirms it
-   there.
+   there. The session is anonymous: never ask the person for a user name or a password, and never pass one. If
+   the server accepts no anonymous session, say that the adapter does not support a user yet.
 4. **Namespaces.** `opcua_ua_read_value` of `i=2255`: the namespace array. Position `n` is the URI of
    `ns=n`. You need it for every node of the registration.
 5. **The machine.** `opcua_ua_browse_all` from the `node` of the machine, as `opcua_machine_list` gave it, with
