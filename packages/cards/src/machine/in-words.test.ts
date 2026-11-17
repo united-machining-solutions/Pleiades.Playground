@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { Machine, Reading } from "./contract.ts"
-import { machineInWords, machineListInWords, machineShowInWords, spanListInWords } from "./in-words.ts"
+import { labelOf, machineInWords, machineListInWords, machineShowInWords, spanListInWords } from "./in-words.ts"
 
 // The instants are written as a tool writes them for a person in Zurich: local, with the offset.
 const asOf = "2026-11-16T10:30:00.000+01:00"
@@ -124,4 +124,13 @@ test("an adapter that is not Running says nothing current about the machine", ()
   for (const state of ["Initializing", "CommunicationFault", "Shutdown"]) {
     assert.match(machineInWords(machine({ connection: reading(state) }), asOf), /^P-04: No data/, state)
   }
+})
+
+test("a label where only the machine id is known is its model and serial number", () => {
+  assert.equal(labelOf("alcyone-machines_AX-400_P-04"), "AX-400 P-04")
+  assert.equal(labelOf("unknown_JuiceBar_JUICEBAR-01"), "JuiceBar JUICEBAR-01")
+  // An id that is not of the three parts of the binding stays as it is.
+  assert.equal(labelOf("P-04"), "P-04")
+  assert.equal(labelOf("a_b"), "a_b")
+  assert.equal(labelOf("a__c"), "a__c")
 })

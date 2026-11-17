@@ -18,6 +18,17 @@ export function titleOf(machine: Machine): string {
   return [machine.identity.model, machine.identity.serialNumber].filter(Boolean).join(" ") || machine.machine
 }
 
+/**
+ * A machine in a label where only its id is known, as in a legend of measurements: its model and
+ * serial number, the last two parts of a machine id of the binding, `<manufacturer>_<model>_<serial
+ * number>`, in which `_` separates the parts and occurs in none. So `alcyone-machines_AX-400_P-04` is
+ * "AX-400 P-04", as `titleOf` writes it from the identification. An id of another shape stays as it is.
+ */
+export function labelOf(machineId: string): string {
+  const parts = machineId.split("_")
+  return parts.length === 3 && parts.every(Boolean) ? `${parts[1]} ${parts[2]}` : machineId
+}
+
 /** A machine by what it is, its manufacturer, model and serial number, and its id. */
 export function nameOf(machine: Machine): string {
   const { manufacturer, model, serialNumber } = machine.identity

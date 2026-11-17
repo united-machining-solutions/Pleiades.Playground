@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@plei
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@pleiades/ui/components/chart"
 import type { ChartConfig } from "@pleiades/ui/components/chart"
 import { clock } from "../machine/format.ts"
+import { labelOf } from "../machine/in-words.ts"
 import type { MachineMeasurements, MeasurementSeries } from "./contract.ts"
 import { axisNumber, clockWithSeconds, measuredValue, quantityLabel, unitSign } from "./words.ts"
 
@@ -39,7 +40,7 @@ export function MeasurementGraph({
   const config = Object.fromEntries(
     lines.map((line) => [
       keyOf(line.machine),
-      { label: line.machine, color: `var(--chart-${(machines.indexOf(line.machine) % COLOURS) + 1})` },
+      { label: labelOf(line.machine), color: `var(--chart-${(machines.indexOf(line.machine) % COLOURS) + 1})` },
     ]),
   ) satisfies ChartConfig
 
@@ -72,7 +73,7 @@ export function MeasurementGraph({
             {now.map(({ machine, measured }, index) => (
               <span key={machine}>
                 {index > 0 && " · "}
-                {machine} <span className={measured.stale ? undefined : "text-foreground"}>{measuredValue(measured)}</span>
+                {labelOf(machine)} <span className={measured.stale ? undefined : "text-foreground"}>{measuredValue(measured)}</span>
                 {measured.stale && " (not current)"}
               </span>
             ))}

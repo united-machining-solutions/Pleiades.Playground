@@ -1,4 +1,5 @@
 import { clock } from "@pleiades/cards/machine/format.ts"
+import { labelOf } from "@pleiades/cards/machine/in-words.ts"
 import { MeasurementGraph } from "@pleiades/cards/measurement/measurement-graph.tsx"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
@@ -104,13 +105,13 @@ function LiveValues() {
       >
         <ToggleGroupItem value={ALL}>All machines</ToggleGroupItem>
         {machines.map((machine) => (
-          <ToggleGroupItem key={machine} value={machine}>
-            {machine}
+          <ToggleGroupItem key={machine} value={machine} aria-label={machine}>
+            {labelOf(machine)}
           </ToggleGroupItem>
         ))}
         {chosen !== undefined && !machines.includes(chosen) && (
           <ToggleGroupItem value={chosen} disabled>
-            {chosen}, no data
+            {labelOf(chosen)}, no data
           </ToggleGroupItem>
         )}
       </ToggleGroup>
