@@ -7,6 +7,7 @@ import { ChatSidebar } from "@/chat/chat-sidebar.tsx"
 import { fetchChats, getChatStatus } from "@/chat/status.ts"
 import { AppSidebar } from "@/components/app-sidebar.tsx"
 import { AskAnything } from "@/components/ask-anything.tsx"
+import { AutoUpdate } from "@/components/auto-update.tsx"
 import { PageBreadcrumb } from "@/components/page-breadcrumb.tsx"
 import { brandScript } from "@pleiades/ui/brands"
 import { Button } from "@pleiades/ui/components/button"
@@ -98,10 +99,11 @@ function Layout() {
               <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4 data-vertical:self-center" />
               <PageBreadcrumb />
               <AskAnything />
+              {/* Left of the chat: how often Home and the page of a machine read their values again. */}
+              <AutoUpdate className="ml-auto" />
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="ml-auto"
                 aria-label={chat ? "Close the chat" : "Open the chat"}
                 aria-pressed={Boolean(chat)}
                 onClick={chat ? panel.close : panel.open}

@@ -7,6 +7,8 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: an auto update in the header, left of the chat, sets how often Home and the page of a
+  machine read their values again (1s, 5s, 10s or 30s; 1s by default). The choice is remembered.
 - Optional Ultimaker 3 services: CuraEngine slicing over REST/MCP, printer-side header validation,
   current jobs and history with durable slice associations, and a separate MQTT telemetry adapter.
   Both containers are part of the root Compose stack and image-publication workflow, enabled for
