@@ -1,0 +1,213 @@
+apiVersion: margo/v1alpha1
+kind: ApplicationDescription
+id: com-github-united-machining-solutions-pleiades-playground
+metadata:
+  name: Pleiades Playground
+  version: "0.0.0" # overwritten by `bart` from the git tag or --version
+  description: >-
+    An open playground for machine data: simulated machines publish to an MQTT broker, services store time
+    series and events, and an example app with a chat shows them.
+  catalog:
+    organization:
+      - name: United Machining Solutions
+        site: https://github.com/united-machining-solutions
+    application:
+      tagline: Machine data over MQTT, REST and MCP, with an example app and a chat.
+      icon: icon.svg
+      descriptionFile: description.md
+      releaseNotes: release-notes.md
+      licenseFile: license.txt
+      site: https://github.com/united-machining-solutions/Pleiades.Playground
+      tags: ["playground", "mqtt", "mcp", "machine-data"]
+deploymentProfiles:
+  - type: compose
+    id: default
+    components:
+      - name: default
+        properties:
+          repository: oci://example.com/pleiades-playground # overwritten by `bart`, this is just a placeholder
+          revision: "0.0.0" # overwritten by `bart`, this is just a placeholder
+    requiredResources:
+      cpu:
+        cores: 2
+        architectures:
+          - amd64
+          - arm64
+      # Estimates for twelve containers and 30 days of retained data, not measured.
+      memory: 4Gi
+      storage: 20Gi
+
+# Each parameter sets the ${VAR} of the same name in compose/compose.yaml.
+parameters:
+  appHost:
+    value: "pleiades.example.internal"
+    targets:
+      - pointer: APP_HOST
+        components: ["default"]
+  serverHost:
+    value: "device.example.internal"
+    targets:
+      - pointer: SERVER_HOST
+        components: ["default"]
+  httpBind:
+    value: "127.0.0.1"
+    targets:
+      - pointer: HTTP_BIND
+        components: ["default"]
+  httpPort:
+    value: 80
+    targets:
+      - pointer: HTTP_PORT
+        components: ["default"]
+  appBind:
+    value: "127.0.0.1"
+    targets:
+      - pointer: APP_BIND
+        components: ["default"]
+  appPort:
+    value: 5600
+    targets:
+      - pointer: APP_PORT
+        components: ["default"]
+  mqttPort:
+    value: 1883
+    targets:
+      - pointer: MQTT_PORT
+        components: ["default"]
+  mqttWsPort:
+    value: 9001
+    targets:
+      - pointer: MQTT_WS_PORT
+        components: ["default"]
+  timeseriesApiPort:
+    value: 5500
+    targets:
+      - pointer: TIMESERIES_API_PORT
+        components: ["default"]
+  eventsApiPort:
+    value: 5510
+    targets:
+      - pointer: EVENTS_API_PORT
+        components: ["default"]
+  genuiMcpPort:
+    value: 5520
+    targets:
+      - pointer: GENUI_MCP_PORT
+        components: ["default"]
+  dataRetention:
+    value: "30.00:00:00"
+    targets:
+      - pointer: DATA_RETENTION
+        components: ["default"]
+  cardResourceDomains:
+    value: ""
+    targets:
+      - pointer: CARD_RESOURCE_DOMAINS
+        components: ["default"]
+  llmBaseUrl:
+    value: ""
+    targets:
+      - pointer: LLM_BASE_URL
+        components: ["default"]
+  llmApiKey:
+    value: ""
+    targets:
+      - pointer: LLM_API_KEY
+        components: ["default"]
+
+configuration:
+  sections:
+    - name: Network
+      settings:
+        - parameter: appHost
+          name: Host name of the app
+          description: >-
+            The name (a CNAME of the device) under which Traefik serves the example app on the HTTP port. The
+            default is a placeholder; set the name of your device.
+          schema: hostName
+        - parameter: serverHost
+          name: Host name of the device
+          description: >-
+            The name of the device itself (its A record); Traefik serves the example app under it as well. The
+            default is a placeholder; set the name of your device.
+          schema: hostName
+        - parameter: httpBind
+          name: Address of Traefik
+          description: >-
+            The address Traefik answers on. 127.0.0.1 keeps it on the device; 0.0.0.0 opens the example app to
+            the network under its host names. The chat has no sign-in and spends the key of its language model,
+            so open it only to a network you control.
+          schema: bindAddress
+        - parameter: httpPort
+          name: HTTP port of Traefik
+          schema: port
+        - parameter: appBind
+          name: Address of the example app
+          description: >-
+            The address the example app answers on. 127.0.0.1 keeps it on the device; 0.0.0.0 opens it to the
+            network. The chat has no sign-in and spends the key of its language model, so open it only to a
+            network you control.
+          schema: bindAddress
+        - parameter: appPort
+          name: Port of the example app
+          schema: port
+        - parameter: mqttPort
+          name: Port of the MQTT broker
+          description: The broker accepts anonymous clients. Do not expose it to a network you do not control.
+          schema: port
+        - parameter: mqttWsPort
+          name: Port of the MQTT broker over WebSockets
+          schema: port
+        - parameter: timeseriesApiPort
+          name: Port of the time series API
+          schema: port
+        - parameter: eventsApiPort
+          name: Port of the events API
+          schema: port
+        - parameter: genuiMcpPort
+          name: Port of the generative UI MCP server
+          schema: port
+    - name: Data
+      settings:
+        - parameter: dataRetention
+          name: Retention
+          description: How long time series and events are kept, as days.hours:minutes:seconds.
+          schema: timeSpan
+        - parameter: cardResourceDomains
+          name: Card resource domains
+          description: The origins a card may load the font of its host from, comma separated; none if empty.
+          schema: optionalText
+    - name: Language model
+      settings:
+        - parameter: llmBaseUrl
+          name: Base URL of the LiteLLM gateway
+          description: >-
+            The address up to /v1, as the app reaches it from its container. The chat offers the models the
+            gateway marks for chat. A gateway on the device itself is http://host.docker.internal:<port>/v1.
+            Without it the chat says so; everything else works.
+          schema: optionalText
+        - parameter: llmApiKey
+          name: API key of the LiteLLM gateway
+          description: The key the gateway gave you. It stays on the device.
+          schema: optionalText
+  schema:
+    - name: port
+      dataType: integer
+      minValue: 1
+      maxValue: 65535
+      allowEmpty: false
+    - name: hostName
+      dataType: string
+      regexMatch: "^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$"
+      allowEmpty: false
+    - name: bindAddress
+      dataType: string
+      regexMatch: "^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$"
+      allowEmpty: false
+    - name: timeSpan
+      dataType: string
+      regexMatch: "^[0-9]+\\.[0-9]{2}:[0-9]{2}:[0-9]{2}$"
+      allowEmpty: false
+    - name: optionalText
+      dataType: string
+      allowEmpty: true

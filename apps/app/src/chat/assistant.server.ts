@@ -12,14 +12,17 @@ import type { ChatSettings } from "./gateway.ts"
 import { withTimeZone } from "./local-times.ts"
 import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
-import { furtherInstructions, leftOut, mcpServers } from "./mcp-servers.ts"
+import { leftOut, mcpServers, serverSwitch } from "./mcp-servers.ts"
 import { forModel } from "./tool-results.ts"
 
 // The agent harness of the app. It runs on the server only: the keys of the language models stay
 // here, and the browser talks to /api/harness.
 
 const instructions = `You help people in a machine shop understand what their machines do.
-Read values with the tools and never invent one. If the tools do not give a reason, say that none is recorded.
+Read values with the tools and never invent one. If the tools do not give a reason, say that your tools show none.
+If no tool gives what the person asks for, say that your tools do not show it, not that it does not exist: it may be recorded where your tools do not reach.
+Then, where a place fits the question, say in one sentence where to ask: the maker of the machine or its manuals for a fault or a specification, the maintenance records for a service, the people at the machine for what happened there.
+If none fits, say only that your tools do not show it. Name a maker, a person or an address only when a tool result names one, and say nothing about what they will do or know.
 Answer in a few plain sentences. The app shows the values of a tool call next to your answer, so do not repeat them as a list or a table.
 The tools write every time as the clock of the person you answer shows it. Say a time the way a clock does, for example 09:30: take the hours and minutes as they stand in the result, do not convert them, and name no time zone and no offset.`
 
@@ -28,8 +31,15 @@ The tools write every time as the clock of the person you answer shows it. Say a
 // Created once, shared by all chats.
 const tools = mcp({ servers: mcpServers() })
 
-// The further servers have no card in the app, so the model is told to say their values.
-const further = furtherInstructions()
+// A chat switches a further server off and on (the panel "Tools" of the chat). The setting is the chat's,
+// kept by the harness, and it holds here, on the server: before every turn the tools of a server that is
+// off are taken out of what the model gets, and the model is told only about the servers that are on.
+// Which servers there are is read once, here, as it is for the connections above.
+const switches = serverSwitch()
+const switchPlugin = definePlugin({
+  name: "pleiades/server-switch",
+  setup: (ctx) => switches.forChat((key) => ctx.config.get(key)),
+})
 
 // A typing mistake in the setting shows here, once, when the server starts.
 for (const name of leftOut()) {
@@ -92,11 +102,12 @@ function build(settings: ModelSettings | undefined): Handler | null {
       // name. The harness keeps that choice with the chat.
       adapter: models[first],
       models,
-      // Of a chat's settings the browser may change the model, and nothing else.
-      expose: { settings: ["model"] },
+      // Of a chat's settings the browser may change the model and switch a further server off and
+      // on, and nothing else.
+      expose: { settings: ["model"], config: switches.exposed },
       middleware: [localTimes],
-      systemPrompts: further ? [instructions, further] : [instructions],
-      plugins: () => [tools, modelTools],
+      systemPrompts: [instructions],
+      plugins: () => [tools, switchPlugin, modelTools],
     }),
     // The demo has no sign-in: every request runs without a user.
     openAccess: true,

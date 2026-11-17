@@ -80,9 +80,9 @@ pnpm typecheck && pnpm test && pnpm build
 docker compose up -d --build --wait
 ```
 
-Every container reports healthy. <http://localhost:5500/> and <http://localhost:5510/> show the Swagger UI of the
-two APIs, and <http://localhost:5600/> shows the example app (on this computer only, see `APP_BIND` in
-`.env.example`). Stop the stack with `docker compose down`; add `--volumes` to drop the stored data.
+Every container reports healthy. <http://localhost:5500/>, <http://localhost:5510/> and <http://localhost:5540/>
+show the Swagger UI of the Timeseries, Events and Sites APIs, and <http://localhost:5600/> shows the example app
+(on this computer only, see `APP_BIND` in `.env.example`; the Sites API likewise, `SITES_BIND`). Stop the stack with `docker compose down`; add `--volumes` to drop the stored data.
 
 ## Known issues
 

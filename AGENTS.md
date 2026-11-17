@@ -38,6 +38,10 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
 - Do not commit, push or publish unless asked.
 - When asked: work on a branch, never on `main`; one topic per pull request; sign off every commit
   (`git commit -s`) and add a `Co-Authored-By` trailer that names you; fill in the pull request template.
+  When you push a branch for a person, offer to open its pull request, and open it yourself
+  (`gh pr create --body-file`): GitHub's page knows only the commits and leaves the template empty. Before
+  you open it, merge `origin/main` (`--signoff`, and after a conflict `git commit -s --no-edit`): a pull
+  request with a conflict runs no check. If the person opens it on GitHub, give them the filled-in text.
   When a pull request is open, or its check "Pull request says what it is" fails, run
   `node .github/scripts/check-pull-request.mjs <number>` and do what it says, also where a person opened it.
 - Use the GitHub CLI (`gh`) for pull requests, checks and logs. The person signs in; never ask for a token and
