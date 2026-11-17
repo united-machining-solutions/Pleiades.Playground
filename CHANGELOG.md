@@ -163,6 +163,12 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- `app`: Home, the page of a machine and Live values are live from the broker (ADR-0013). They read what the
+  backend knows once, and then hear every value at the broker, MQTT over WebSocket, the moment it is
+  published, instead of reading everything again every ten seconds. The browser must reach the broker's
+  WebSocket: `MQTT_WS_PORT` at the host of the page, or `MQTT_WS_URL` behind a proxy. The topics of the
+  machine card and the measurement card are in their contracts in `@pleiades/cards` (`READING_PATHS`,
+  `NOTIFICATIONS_PATH`, `QUANTITY_PATHS`), and `genui-mcp` reads the same ones.
 - `app`, for those who run `main`: the chat takes its models from a LiteLLM gateway, with two settings,
   `LLM_BASE_URL` and `LLM_API_KEY`. The settings `ANTHROPIC_*`, `OPENAI_*`, `OPENAI_TRANSCRIPTION_MODEL`,
   `LLM_MODELS` and `LLM_TRANSCRIPTION_MODEL` and the package `@tanstack/ai-anthropic` are gone. A `.env` that

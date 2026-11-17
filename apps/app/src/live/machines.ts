@@ -1,0 +1,157 @@
+import { NOTIFICATIONS_PATH, READING_PATHS, SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
+import type { Machine, MachineList, MachineShow, Notification, Reading, ReadingName, Span } from "@pleiades/cards/machine/contract.ts"
+import { stateOf, stateOrder } from "@pleiades/cards/machine/state.ts"
+
+import { filterOf, machineOf, notificationOf, valueOf } from "./messages.ts"
+import type { NotificationEvent, Value } from "./messages.ts"
+
+// What a machine does now, kept up to date from the broker. The backend gives what held when a
+// page was read; every value the broker sends after that is laid onto it here, by the rules the
+// backend reads the stored values with (apps/genui-mcp/src/machines.ts).
+
+const names = Object.keys(READING_PATHS) as Array<ReadingName>
+
+/** The topics a page subscribes to for what a machine does now: of one machine, or of every one. */
+export function machineFilters(machine = "+"): Array<string> {
+  return [...names.map((name) => filterOf(READING_PATHS[name], machine)), filterOf(NOTIFICATIONS_PATH, machine)]
+}
+
+/** A machine the page has not heard of yet: nothing is known about it but its topics. */
+export function unknownMachine(machine: string): Machine {
+  const reading = (name: ReadingName): Reading => ({
+    value: null,
+    at: null,
+    since: null,
+    sinceIsLowerBound: false,
+    topic: filterOf(READING_PATHS[name], machine),
+  })
+  return {
+    machine,
+    connection: reading("connection"),
+    heartbeat: reading("heartbeat"),
+    itemState: reading("itemState"),
+    operationMode: reading("operationMode"),
+    program: reading("program"),
+    lastValueAt: null,
+    notifications: [],
+  }
+}
+
+/**
+ * A new value of a reading. A value holds until the next one of its topic, so its run goes on while
+ * the value stays the same: `since` stays. A run does not go on across a silence of the machine,
+ * more than SILENT_AFTER_SECONDS without a sign of life: what the value was then is not known.
+ */
+export function withValue(machine: Machine, name: ReadingName, value: Value): Machine {
+  const reading = machine[name]
+  // The page knows this value already, or a newer one.
+  if (reading.at !== null && value.at <= reading.at) return machine
+  const text = String(value.value)
+  const silentBefore =
+    machine.lastValueAt === null || Date.parse(value.at) - Date.parse(machine.lastValueAt) > SILENT_AFTER_SECONDS * 1000
+  const goesOn = text === reading.value && !silentBefore
+  // The first value of a reading the page knew nothing of may have held before: since then at least.
+  const first = reading.at === null
+  return {
+    ...machine,
+    [name]: {
+      ...reading,
+      value: text,
+      at: value.at,
+      since: goesOn ? reading.since : value.at,
+      sinceIsLowerBound: goesOn ? reading.sinceIsLowerBound : first,
+    },
+    lastValueAt: machine.lastValueAt === null || value.at > machine.lastValueAt ? value.at : machine.lastValueAt,
+  }
+}
+
+/** A warning or an error that is raised, or one that goes. Other levels are not shown. */
+export function withNotification(machine: Machine, event: NotificationEvent): Machine {
+  const known = machine.notifications.some((one) => one.correlationId === event.correlationId)
+  if (event.action === "Reset") {
+    return known
+      ? { ...machine, notifications: machine.notifications.filter((one) => one.correlationId !== event.correlationId) }
+      : machine
+  }
+  const level = event.level === "Error" ? "Error" : event.level === "Warning" ? "Warning" : null
+  if (known || level === null) return machine
+  const raised: Notification = {
+    correlationId: event.correlationId,
+    notificationId: event.notificationId,
+    level,
+    title: event.title,
+    raisedAt: event.at,
+    topic: filterOf(NOTIFICATIONS_PATH, machine.machine),
+  }
+  // The newest first, as the backend lists them.
+  const notifications = [...machine.notifications, raised].sort((a, b) => b.raisedAt.localeCompare(a.raisedAt))
+  return { ...machine, notifications }
+}
+
+/** What a message of the broker does to a machine. A topic the page does not show leaves it as it is. */
+export function machineWith(machine: Machine, topic: string, payload: string): Machine {
+  if (topic === filterOf(NOTIFICATIONS_PATH, machine.machine)) {
+    const event = notificationOf(payload)
+    return event ? withNotification(machine, event) : machine
+  }
+  const name = names.find((one) => machine[one].topic === topic)
+  const value = name && valueOf(payload)
+  return name && value ? withValue(machine, name, value) : machine
+}
+
+/** What a message does to the list of machines. A machine the list does not know yet joins it. */
+export function listWith(list: MachineList, topic: string, payload: string): MachineList {
+  const serial = machineOf(topic)
+  if (serial === undefined) return list
+  const known = list.machines.some((one) => one.machine === serial)
+  const machines = known ? list.machines : [...list.machines, unknownMachine(serial)].sort((a, b) => a.machine.localeCompare(b.machine))
+  let changed = !known
+  const next = machines.map((one) => {
+    if (one.machine !== serial) return one
+    const updated = machineWith(one, topic, payload)
+    changed ||= updated !== one
+    return updated
+  })
+  return changed ? { ...list, machines: next } : list
+}
+
+/** The list at a later instant: whether a machine is silent is read against the clock. */
+export function listAt(list: MachineList, now: string): MachineList {
+  return now > list.asOf ? { ...list, asOf: now } : list
+}
+
+/** The page of one machine: the values of its card and the spans of its band. */
+export type MachinePage = { show: MachineShow; spans: ReadonlyArray<Span> | null }
+
+export function pageWith(page: MachinePage, topic: string, payload: string): MachinePage {
+  const machine = machineWith(page.show.machine, topic, payload)
+  return machine === page.show.machine ? page : { ...page, show: { ...page.show, machine } }
+}
+
+/**
+ * The page at a later instant. The history goes on to `now`: the time since its end is added to
+ * the state the machine is in now, in the sums and at the end of the band. Where the history
+ * begins stays, so a page that stays open shows more than the hours it was read with.
+ */
+export function pageAt(page: MachinePage, now: string): MachinePage {
+  const { show, spans } = page
+  const { history } = show
+  if (now <= history.to) return page
+  const state = stateOf(show.machine, now)
+  const seconds = (Date.parse(now) - Date.parse(history.to)) / 1000
+  const totals = stateOrder.flatMap((one) => {
+    const total = (history.totals.find((entry) => entry.state === one)?.seconds ?? 0) + (one === state ? seconds : 0)
+    return total > 0 ? [{ state: one, seconds: total }] : []
+  })
+  const last = spans?.at(-1)
+  const nextSpans =
+    spans === null
+      ? null
+      : last !== undefined && last.state === state && last.to === history.to
+        ? [...spans.slice(0, -1), { ...last, to: now }]
+        : [...spans, { state, from: history.to, to: now }]
+  return {
+    show: { ...show, asOf: now > show.asOf ? now : show.asOf, history: { ...history, to: now, totals } },
+    spans: nextSpans,
+  }
+}

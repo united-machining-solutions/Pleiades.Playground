@@ -89,7 +89,13 @@ tour.
    Counting the rows you draw is wording too, as Home counts its machines. Adding up values, comparing
    machines or putting things in a new order is not: that answer is missing, so stop and take
    `create-card`. Keep the order the tool returned.
-5. If the values change, read them again the way Home does, with `useLive()`.
+5. If the values change, do not read them again on a clock: keep the page live from the broker, the way
+   Home does, with `useLive(loaded, live)` of `src/hooks/use-live.ts`. `live` names the topic filters of
+   the values the page shows and what a message and the clock do to them; the functions for machines and
+   for measurements are in `src/live/`, and the topics come from the contracts of `@pleiades/cards`
+   (`READING_PATHS`, `QUANTITY_PATHS`). A page whose values are not among those needs functions of its own
+   there, with tests, by the rules the tool of the backend reads the stored values with. If the read in the
+   loader failed, `useRetry()` asks again. See ADR-0013.
 6. Give the page its entry in the sidebar, in the route itself:
    `staticData: { nav: { title: "Warnings", icon: TriangleAlertIcon } }`, with an icon of `lucide-react`,
    as `src/routes/index.tsx` does for Home. The sidebar reads its entries from the routes and marks the

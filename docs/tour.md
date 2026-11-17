@@ -61,7 +61,9 @@ port and setting. The three simulated machines, P-04, P-07 and M-02, are the thr
 ## 2. Home
 
 Home asks "what needs you?". It sorts the machines by what they do now: first the ones in alarm, stopped or
-without data, then the ones in setup, then the running ones, and it reads them again every ten seconds.
+without data, then the ones in setup, then the running ones. It is live: the page reads the list once, and
+from then on the browser hears every value at the broker, MQTT over WebSocket on port 9001, the moment a
+machine publishes it.
 
 ![Home with the heading Machines. Under "Needs you" are two rows, P-04 and P-07, both stopped, each with a
 button "Ask why". Under "Running" is one tile, M-02.](images/tour/home.png)
@@ -75,7 +77,9 @@ field "Ask a question" in the header starts a chat too.
 groups, [`apps/app/src/machines/machine-item.tsx`](../apps/app/src/machines/machine-item.tsx) draws a row and a
 tile. The values are the result of the tool `genui_machine_list`
 ([`apps/genui-mcp/src/machines.ts`](../apps/genui-mcp/src/machines.ts)). Which value is which state is decided
-in one file, [`packages/cards/src/machine/state.ts`](../packages/cards/src/machine/state.ts).
+in one file, [`packages/cards/src/machine/state.ts`](../packages/cards/src/machine/state.ts). What the broker
+sends is laid onto the list in [`apps/app/src/live/`](../apps/app/src/live/), and
+[`apps/app/src/hooks/use-live.ts`](../apps/app/src/hooks/use-live.ts) keeps a page live.
 
 The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
 physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
