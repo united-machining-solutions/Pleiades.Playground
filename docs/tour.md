@@ -105,20 +105,26 @@ live from the broker, as Home is.
 ## 3. The page of one machine
 
 A click on a machine opens its page, here <http://localhost:5600/machines/P-04>. It shows the machine card:
-what the machine does now, and what it did over the last eight hours. It needs no language model.
+what the machine does now, and what it did over the last hours. It needs no language model. The title is a
+switcher: a click on it opens the list of every machine with its state, to search by serial number or by
+state, and Enter opens the one picked. The buttons 1 h, 8 h and 24 h at the right choose how many hours the
+card goes back; the choice is in the address, `?hours=8`, and stays when you switch to another machine. The
+page is live like Home: the band keeps its length and moves on with the clock.
 
-![The page Machines / P-04 with the machine card. The card says Stopped, no alarm and no reason recorded,
-since 20:36, program SHAFT_4711.MPF. Below is a band of the last 8 hours, the total duration of each state,
-and the MQTT topics the values were read from.](images/tour/machine-page.png)
+![The page Machines / P-04. The title P-04 has an arrow for the switcher, and at the right stand the buttons 1 h,
+8 h and 24 h, with 8 h chosen. Under the title it says "live · now 23:36". The machine card says Running, since
+23:34, program SHAFT_4711.MPF. Below is a band of the last 8 hours, the total duration of each state, and the
+MQTT topics the values were read from.](images/tour/machine-page.png)
 
 The card has three parts. On top is the state with its reason, since when it holds, and the active program.
-In the middle is the band: one stripe from eight hours ago until now, coloured by state, and below it the
-total of each state. The hatched part of this band is "No data": the stack of the picture had been running
-for about two hours, and before that nobody published. At the bottom the card names the topics it read, so
-every value can be traced to the broker.
+In the middle is the band: one stripe from the chosen number of hours ago until now, coloured by state, and
+below it the total of each state. The hatched part of this band is "No data": the stack of the picture had been
+running for about three hours, and before that nobody published. At the bottom the card names the topics it
+read, so every value can be traced to the broker.
 
 **In the code:** [`apps/app/src/routes/machines.$machine.tsx`](../apps/app/src/routes/machines.%24machine.tsx)
-is the page. The card is
+is the page, and the choice of the hours and the list of the switcher are in
+[`apps/app/src/machines/switcher.ts`](../apps/app/src/machines/switcher.ts). The card is
 [`packages/cards/src/machine/machine-card.tsx`](../packages/cards/src/machine/machine-card.tsx), its band
 [`state-band.tsx`](../packages/cards/src/machine/state-band.tsx), and the shape of its values the contract in
 [`contract.ts`](../packages/cards/src/machine/contract.ts). The tool `genui_machine_show` returns the values
