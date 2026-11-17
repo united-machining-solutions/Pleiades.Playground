@@ -28,13 +28,27 @@ public sealed partial class SchemaConformanceTest
     }
 
     [TestMethod]
-    public void Validator_RejectsWhatTheModelRejects()
+    [DataRow("runtime-values.schema.json", "runtime")]
+    [DataRow("event.schema.json", "event")]
+    [DataRow("manifest.schema.json", "manifest")]
+    public void Validator_AcceptsTheExamplesAndRejectsWhatTheModelRejects(string schemaName, string prefix)
     {
-        var runtime = Schema("runtime-values.schema.json");
-        Assert.IsTrue(Validate(runtime, File.ReadAllText(Path.Combine(_model, "examples", "runtime-example.json"))).IsValid);
-        foreach (var invalid in Directory.GetFiles(Path.Combine(_model, "examples", "invalid"), "runtime-*.json"))
+        var schema = Schema(schemaName);
+        var examples = Directory.GetFiles(Path.Combine(_model, "examples"), "*.json")
+            .Where(f => Path.GetFileName(f).StartsWith(prefix, StringComparison.Ordinal)
+                || (prefix == "event" && Path.GetFileName(f).EndsWith("-example.json", StringComparison.Ordinal)
+                    && !Path.GetFileName(f).StartsWith("runtime", StringComparison.Ordinal) && !Path.GetFileName(f).StartsWith("manifest", StringComparison.Ordinal)))
+            .ToList();
+        Assert.IsNotEmpty(examples, prefix);
+        foreach (var valid in examples)
         {
-            Assert.IsFalse(Validate(runtime, File.ReadAllText(invalid)).IsValid, Path.GetFileName(invalid));
+            AssertValid(schema, File.ReadAllText(valid), Path.GetFileName(valid));
+        }
+        var invalids = Directory.GetFiles(Path.Combine(_model, "examples", "invalid"), $"{prefix}-*.json");
+        Assert.IsNotEmpty(invalids, prefix);
+        foreach (var invalid in invalids)
+        {
+            Assert.IsFalse(Validate(schema, File.ReadAllText(invalid)).IsValid, Path.GetFileName(invalid));
         }
     }
 
@@ -45,11 +59,50 @@ public sealed partial class SchemaConformanceTest
         AssertValid(Schema("manifest.schema.json"), manifest.ToJsonString(), "manifest");
 
         // The schema takes a signal of the manufacturer with type, unit and description.
-        var extension = manifest["elements"]!.AsArray().Single(e => e!["path"]!.GetValue<string>().StartsWith("x-", StringComparison.Ordinal))!;
-        Assert.AreEqual("x-example-com.Spindle.1.BearingTemperature", extension["path"]!.GetValue<string>());
+        var extension = manifest["elements"]!.AsArray().Single(e => e!["path"]!.GetValue<string>() == "x-example-com.Spindle.1.BearingTemperature")!;
         Assert.AreEqual("number", extension["type"]!.GetValue<string>());
         Assert.AreEqual("CEL", extension["unit"]!["code"]!.GetValue<string>());
         Assert.AreEqual("degreeCelsius", extension["unit"]!["name"]!.GetValue<string>());
+        var program = manifest["elements"]!.AsArray().Single(e => e!["path"]!.GetValue<string>() == "x-example-com.Production.ActiveProgram")!;
+        Assert.AreEqual("string", program["type"]!.GetValue<string>());
+        Assert.IsNull(program["unit"], "a text has no unit");
+    }
+
+    [TestMethod]
+    public void Manifest_DeclaresTheProfilesItDelivers_AndTheSchemaHoldsThemWhole()
+    {
+        var manifest = SpecManifest.Build(Identity(), MachineRun.Config());
+        var profiles = manifest["profiles"]!.AsArray().Select(p => p!.GetValue<string>()).ToList();
+        CollectionAssert.AreEqual(new[]
+        {
+            "Core", "IdentificationExtended", "Components", "MonitoringExtended", "ChannelMonitoring", "Spindle",
+            "EnergyElectricity", "JobMonitoring", "WorkMasterMonitoring", "AlertsEvents",
+        }, profiles);
+
+        // The schema refuses a declared profile that misses an element or an event: drop each one in turn.
+        var schema = Schema("manifest.schema.json");
+        foreach (var list in new[] { "elements", "events" })
+        {
+            var entries = manifest[list]!.AsArray();
+            for (var i = 0; i < entries.Count; i++)
+            {
+                var path = entries[i]!["path"]!.GetValue<string>();
+                if (path.StartsWith("x-", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                var without = manifest.DeepClone().AsObject();
+                without[list]!.AsArray().RemoveAt(i);
+                Assert.IsFalse(Validate(schema, without.ToJsonString()).IsValid, $"the manifest without {path}");
+            }
+        }
+
+        // What the machine does not deliver of a declared profile, the manifest says so.
+        var unavailable = manifest["elements"]!.AsArray().Where(e => e!["available"]?.GetValue<bool>() == false).Select(e => e!["path"]!.GetValue<string>()).ToList();
+        CollectionAssert.AreEquivalent(SpecElements.NotDelivered.ToList(), unavailable);
+        var correlated = manifest["events"]!.AsArray().Where(e => e!["correlationId"]?.GetValue<bool>() == true).Select(e => e!["path"]!.GetValue<string>()).ToList();
+        Assert.IsTrue(correlated.All(p => p.StartsWith("Production.ProgramExecution", StringComparison.Ordinal) || p.StartsWith("Notification.", StringComparison.Ordinal)));
+        Assert.HasCount(9, correlated);
     }
 
     [TestMethod]
@@ -59,8 +112,8 @@ public sealed partial class SchemaConformanceTest
         var units = CatalogUnits();
         var run = MachineRun.For(TimeSpan.FromHours(6), MachineRun.Config(TimeSpan.FromMinutes(20)));
         var values = run.Messages.OfType<SpecValue>()
-            .Append(new SpecValue(SpecElements.ConnectionState, JsonValue.Create("Disconnected"), null, MachineRun.Start, null))
-            .Append(new SpecValue(SpecElements.ConnectionState, JsonValue.Create("Connected"), null, MachineRun.Start, null))
+            .Concat(new[] { SpecPublisher.Initializing, SpecPublisher.Running, SpecPublisher.CommunicationFault, SpecPublisher.Shutdown }
+                .Select(state => new SpecValue(SpecElements.ConnectionState, JsonValue.Create(state), null, MachineRun.Start, null)))
             .ToList();
 
         Assert.IsTrue(values.Count > 1000);
@@ -95,22 +148,38 @@ public sealed partial class SchemaConformanceTest
     {
         var schema = Schema("event.schema.json");
         var manifest = SpecManifest.Build(Identity(), MachineRun.Config());
-        var named = manifest["events"]!.AsArray().Select(e => e!.GetValue<string>()).ToHashSet();
+        var named = manifest["events"]!.AsArray().ToDictionary(e => e!["path"]!.GetValue<string>(), e => e!["correlationId"]?.GetValue<bool>() == true);
         var run = MachineRun.For(TimeSpan.FromHours(6), MachineRun.Config(TimeSpan.FromMinutes(20)));
         var events = run.Messages.OfType<SpecEvent>().ToList();
 
-        CollectionAssert.AreEquivalent(named.ToList(), events.Select(e => e.Path).Distinct().ToList(), "every event of the manifest comes");
+        CollectionAssert.AreEquivalent(named.Keys.ToList(), events.Select(e => e.Path).Distinct().ToList(), "every event of the manifest comes");
         foreach (var specEvent in events)
         {
-            // What goes on the wire, parsed back.
-            var wire = JsonNode.Parse(SpecWire.Event(specEvent, run.Machine.SeqEpoch).ToJsonString())!.AsObject();
-            Assert.AreEqual(specEvent.Seq, wire["seq"]!.GetValue<long>());
-            Assert.AreEqual(run.Machine.SeqEpoch, wire["seqEpoch"]!.GetValue<string>());
+            // What goes on the wire, parsed back: a CloudEvent, which goes to the schema as it is.
+            var wire = JsonNode.Parse(SpecWire.Event(specEvent, Identity().ProductInstanceUri).ToJsonString())!.AsObject();
+            Assert.AreEqual(Identity().ProductInstanceUri, wire["source"]!.GetValue<string>());
+            Assert.AreEqual(specEvent.Path, wire["type"]!.GetValue<string>());
+            Assert.AreEqual(specEvent.Sequence, wire["sequence"]!.GetValue<string>());
 
-            // seq and seqEpoch are in the envelope of the model: the event goes to the schema as it is.
+            // A program execution names itself; an alert names the program execution it came up in, if any.
+            var correlationId = (string?)wire["correlationid"];
+            if (specEvent.Path.StartsWith("Production.ProgramExecution", StringComparison.Ordinal))
+            {
+                Assert.AreEqual(wire["data"]!["ExecutionId"]!.GetValue<string>(), correlationId, specEvent.Path);
+            }
+            else if (specEvent.Path.StartsWith("Notification.", StringComparison.Ordinal))
+            {
+                Assert.AreEqual((string?)wire["data"]!["correlationId"], correlationId, specEvent.Path);
+            }
+            else
+            {
+                Assert.IsNull(correlationId, specEvent.Path);
+            }
+            Assert.IsTrue(correlationId is null || named[specEvent.Path], $"the manifest says {specEvent.Path} carries a correlationid");
+
             if (specEvent.Path == SpecElements.JobOrderCancelled)
             {
-                Assert.AreEqual(1, Cancelled(wire["value"]!.AsObject()), "JobOrderCancelled carries a job order that never ran");
+                Assert.AreEqual(1, Cancelled(wire["data"]!.AsObject()), "JobOrderCancelled carries a job order that never ran");
             }
             AssertValid(schema, wire.ToJsonString(), specEvent.Path);
         }
@@ -213,8 +282,8 @@ public sealed partial class SchemaConformanceTest
     /// <summary>The path of the catalog for a path at runtime: instance keys become their placeholders.</summary>
     private static string CatalogPath(string path)
     {
-        path = InstanceKey().Replace(path, "$1.<n>.");
-        return MeasuringPoint().Replace(path, "Consumption.$1.<MeasuringPoint>.");
+        path = InstanceKey().Replace(path, m => $"{m.Groups[1].Value}.{{{m.Groups[1].Value.ToLowerInvariant()}}}.");
+        return MeasuringPoint().Replace(path, "Consumption.$1.{measuringPoint}.");
     }
 
     private static string? Locate()

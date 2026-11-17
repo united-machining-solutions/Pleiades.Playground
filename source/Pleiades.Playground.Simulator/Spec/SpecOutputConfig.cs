@@ -132,10 +132,43 @@ internal sealed class ScenarioConfig
     /// <summary>Software revision of the machine, <c>Identification.SoftwareRevision</c>.</summary>
     public string SoftwareRevision { get; init; } = "4.95.2";
 
+    /// <summary>Month the machine was built, <c>Identification.MonthOfConstruction</c>.</summary>
+    [Range(1, 12)]
+    public int MonthOfConstruction { get; init; } = 6;
+
+    /// <summary>Day the machine first went into operation, <c>Identification.InitialOperationDate</c>.</summary>
+    public DateTimeOffset InitialOperationDate { get; init; } = new(2023, 9, 1, 0, 0, 0, TimeSpan.Zero);
+
+    /// <summary>Kind of machine, <c>Identification.DeviceClass</c>.</summary>
+    public string DeviceClass { get; init; } = "Machine tool";
+
     /// <summary>
-    /// Elements of the model this machine lacks for good, among those the model allows (State.Status,
-    /// Notification.ActiveAlerts, OperationCounters.PowerOnDuration, Identification.YearOfConstruction,
-    /// Identification.SoftwareRevision). Each is published once with <c>value: null</c> and named in the manifest
+    /// The software components of the machine, <c>Components.Software</c>. Empty: a control and an operator
+    /// interface of the manufacturer.
+    /// </summary>
+    [SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "Configuration binding")]
+    public List<SoftwareTemplate> Software { get; set; } = [];
+
+    /// <summary>
+    /// How long the machine warms up after its start (<c>State.IsWarmUp</c>); it starts no job order meanwhile.
+    /// Zero: no warm-up.
+    /// </summary>
+    public TimeSpan WarmUpTime { get; init; } = TimeSpan.Zero;
+
+    /// <summary>
+    /// How often the adapter loses the machine: every this long it cannot reach it for
+    /// <see cref="CommunicationFaultDuration"/>, and <c>Connection.State</c> says <c>CommunicationFault</c>. Empty
+    /// (the default): never.
+    /// </summary>
+    public TimeSpan? CommunicationFaultInterval { get; init; }
+
+    /// <summary>How long the adapter cannot reach the machine at each communication fault.</summary>
+    public TimeSpan CommunicationFaultDuration { get; init; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// Elements of the model this machine lacks for good: any element it publishes but the five every adapter
+    /// delivers (Connection.Heartbeat, Connection.State, Identification.Manufacturer, Identification.SerialNumber,
+    /// Identification.ProductInstanceUri). Each is published once with <c>value: null</c> and named in the manifest
     /// with <c>"available": false</c>. Empty by default.
     /// </summary>
     [SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "Configuration binding")]
@@ -191,6 +224,12 @@ internal sealed class ScenarioConfig
     /// <summary>How long a program stop lasts.</summary>
     public TimeSpan ProgramStopDuration { get; init; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>Code of the message a program stop gives, a <c>Notification.NotificationEvent</c>.</summary>
+    public string ProgramStopCode { get; init; } = "M00";
+
+    /// <summary>English text of the message a program stop gives.</summary>
+    public string ProgramStopText { get; init; } = "Programmed stop, waiting for the operator";
+
     /// <summary>
     /// How often per hour the planner changes a waiting job order: it revokes its release, cancels it (it ends as
     /// aborted without having run) or takes it back (it leaves the list).
@@ -239,6 +278,9 @@ internal sealed class ScenarioConfig
 
     /// <summary>Parts produced at the first start.</summary>
     public long InitialPartsProduced { get; init; } = 184_223;
+
+    /// <summary>Seconds the machine had been operating at the first start, a part of the power-on duration.</summary>
+    public double InitialOperationDuration { get; init; } = 18_921_600;
 }
 
 /// <summary>A job the virtual machine works through as a job order.</summary>
@@ -249,8 +291,22 @@ internal sealed class JobTemplate
     /// <summary>Readable name of the job order.</summary>
     public string JobName { get; init; } = "Shaft";
 
-    /// <summary>Program that makes one part; one program execution per part.</summary>
+    /// <summary>
+    /// Id of the work master the job order carries out, <c>Production.ActiveWorkMaster</c>. Empty: <c>WM-</c> and
+    /// the name of <see cref="Program"/> without its extension.
+    /// </summary>
+    public string? WorkMaster { get; init; }
+
+    /// <summary>
+    /// NC program that carries out the work master and makes one part; one program execution per part. The model
+    /// has no element for it; the binding sends it as a signal of the manufacturer.
+    /// </summary>
     public string Program { get; init; } = "SHAFT.MPF";
+
+    /// <summary>The id of the work master, <see cref="WorkMaster"/> or the one made from <see cref="Program"/>.</summary>
+    public string WorkMasterId => string.IsNullOrWhiteSpace(WorkMaster)
+        ? $"WM-{Path.GetFileNameWithoutExtension(Program).ToUpperInvariant()}"
+        : WorkMaster;
 
     /// <summary>Parts to make.</summary>
     [Range(1, 100_000)]
@@ -299,4 +355,25 @@ internal sealed class AlertTemplate
     /// <summary>The severity value after the change.</summary>
     [Range(1, 1000)]
     public int? ChangedSeverityValue { get; init; }
+}
+
+/// <summary>A software component of the machine, an entry of <c>Components.Software</c>.</summary>
+[SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Bound by the configuration binder")]
+internal sealed class SoftwareTemplate
+{
+    /// <summary>Who makes the software.</summary>
+    [Required]
+    public string Manufacturer { get; init; } = string.Empty;
+
+    /// <summary>Name of the software.</summary>
+    [Required]
+    public string Model { get; init; } = string.Empty;
+
+    /// <summary>Revision of the software.</summary>
+    [Required]
+    public string SoftwareRevision { get; init; } = string.Empty;
+
+    /// <summary>Kind of software; empty for none.</summary>
+    public string? DeviceClass { get; init; }
 }

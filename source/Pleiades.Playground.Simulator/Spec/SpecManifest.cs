@@ -25,15 +25,26 @@ internal static class SpecManifest
 
         manifest["instances"] = new JsonObject
         {
-            ["Channel"] = new JsonObject { ["1"] = "CHAN1" },
-            ["Spindle"] = new JsonObject { ["1"] = "S1" },
+            ["Channel"] = new JsonObject { ["1"] = VirtualMachine.ChannelName },
+            ["Spindle"] = new JsonObject { ["1"] = VirtualMachine.SpindleName },
         };
-        manifest["elements"] = new JsonArray([.. SpecElements.ElementsFor(config.ManufacturerDomain).Select(e => (JsonNode)Element(e, config.Scenario.Unavailable))]);
-        manifest["events"] = new JsonArray([.. SpecElements.Events.Select(e => (JsonNode)e)]);
+        var unavailable = new HashSet<string>(config.Scenario.Unavailable.Concat(SpecElements.NotDelivered), StringComparer.Ordinal);
+        manifest["elements"] = new JsonArray([.. SpecElements.ElementsFor(config.ManufacturerDomain).Select(e => (JsonNode)Element(e, unavailable))]);
+        manifest["events"] = new JsonArray([.. SpecElements.Events.Select(e => (JsonNode)Event(e))]);
         return manifest;
     }
 
-    private static JsonObject Element(SpecElement element, List<string> unavailable)
+    private static JsonObject Event(SpecEventInfo info)
+    {
+        var json = new JsonObject { ["path"] = info.Path };
+        if (info.CorrelationId)
+        {
+            json["correlationId"] = true;
+        }
+        return json;
+    }
+
+    private static JsonObject Element(SpecElement element, HashSet<string> unavailable)
     {
         var json = new JsonObject
         {
@@ -51,7 +62,10 @@ internal static class SpecManifest
         if (element.Extension is { } extension)
         {
             json["type"] = extension.Type;
-            json["unit"] = new JsonObject { ["code"] = extension.UnitCode, ["name"] = extension.UnitName };
+            if (extension.UnitCode is not null)
+            {
+                json["unit"] = new JsonObject { ["code"] = extension.UnitCode, ["name"] = extension.UnitName };
+            }
             json["description"] = extension.Description;
         }
         return json;

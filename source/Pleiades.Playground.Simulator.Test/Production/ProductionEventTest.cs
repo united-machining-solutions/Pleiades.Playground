@@ -13,14 +13,12 @@ namespace Pleiades.Playground.Simulator.Test.Production;
 [TestClass]
 public sealed class ProductionEventTest
 {
-    private const string Epoch = "2026-11-17T06:00:00.000Z";
-
     [TestMethod]
     public void EveryJobOrderAndProgramExecutionEvent_BecomesAProductionEvent_AndNothingElse()
     {
         var run = MachineRun.For(TimeSpan.FromHours(6));
         var events = run.Messages.OfType<SpecEvent>().ToList();
-        var production = events.Select(e => (Spec: e, Dto: ProductionEventMapper.From(e, "P-04", Epoch))).ToList();
+        var production = events.Select(e => (Spec: e, Dto: ProductionEventMapper.From(e, "P-04"))).ToList();
 
         Assert.IsTrue(production.Where(p => p.Spec.Path.StartsWith("Production.", StringComparison.Ordinal)).All(p => p.Dto is not null));
         Assert.IsTrue(production.Where(p => p.Spec.Path.StartsWith("Notification.", StringComparison.Ordinal)).All(p => p.Dto is null),
@@ -41,7 +39,7 @@ public sealed class ProductionEventTest
     {
         var run = MachineRun.For(TimeSpan.FromHours(2));
         var ended = run.EventsOf(SpecElements.ProgramExecutionEnded).First();
-        var dto = ProductionEventMapper.From(ended, "P-04", Epoch)!;
+        var dto = ProductionEventMapper.From(ended, "P-04")!;
 
         Assert.AreEqual(ProductionSubject.ProgramExecution, dto.Subject);
         Assert.AreEqual(ProductionAction.Ended, dto.Action);
@@ -55,10 +53,10 @@ public sealed class ProductionEventTest
         Assert.AreEqual(1, dto.PartsProduced);
         Assert.IsNull(dto.EnergyCompressedAir, "the machine has no compressed air");
         Assert.AreEqual(ended.Timestamp.UtcDateTime, dto.Timestamp);
-        Assert.AreEqual($"P-04:{Epoch}:{ended.Seq}", dto.Id);
+        Assert.AreEqual(ended.Id, dto.Id, "the id of the CloudEvent of the spec output");
         Assert.AreEqual(ended.Seq, dto.Seq);
 
-        var started = ProductionEventMapper.From(run.EventsOf(SpecElements.ProgramExecutionStarted).First(), "P-04", Epoch)!;
+        var started = ProductionEventMapper.From(run.EventsOf(SpecElements.ProgramExecutionStarted).First(), "P-04")!;
         Assert.IsNull(started.Duration, "sums only at the end");
         Assert.IsNotNull(started.StartTime);
     }
@@ -68,7 +66,7 @@ public sealed class ProductionEventTest
     {
         var run = MachineRun.For(TimeSpan.FromHours(2));
         var ended = run.EventsOf(SpecElements.JobOrderEnded).First();
-        var dto = ProductionEventMapper.From(ended, "P-04", Epoch)!;
+        var dto = ProductionEventMapper.From(ended, "P-04")!;
 
         Assert.AreEqual(ProductionSubject.JobOrder, dto.Subject);
         Assert.AreEqual(ProductionAction.Ended, dto.Action);
@@ -85,7 +83,7 @@ public sealed class ProductionEventTest
     public async Task Output_PublishesOnTheProductionTopic_WithQos1_NotRetained()
     {
         using var client = new FakeClient { IsConnected = true };
-        var output = new ProductionEventOutput(client, "P-04", Epoch);
+        var output = new ProductionEventOutput(client, "P-04");
         var run = MachineRun.For(TimeSpan.FromHours(1));
 
         await output.PublishAsync(run.Messages);

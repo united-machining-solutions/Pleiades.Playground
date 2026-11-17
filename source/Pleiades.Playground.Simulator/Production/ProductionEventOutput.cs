@@ -10,7 +10,7 @@ namespace Pleiades.Playground.Simulator.Production;
 /// on <c>machines/{SerialNumber}/events/production</c>: content type <c>productioneventdtov1</c>, QoS 1, not
 /// retained. It uses the connection of the generators, whose client keeps what it cannot send yet.
 /// </summary>
-internal sealed class ProductionEventOutput(IManagedMqttClient client, string serialNumber, string seqEpoch)
+internal sealed class ProductionEventOutput(IManagedMqttClient client, string serialNumber)
 {
     /// <summary>The topic of the production events of a machine.</summary>
     public static string Topic(string serialNumber) => $"machines/{serialNumber}/events/production";
@@ -21,7 +21,7 @@ internal sealed class ProductionEventOutput(IManagedMqttClient client, string se
         ArgumentNullException.ThrowIfNull(messages);
         foreach (var specEvent in messages.OfType<SpecEvent>())
         {
-            if (ProductionEventMapper.From(specEvent, serialNumber, seqEpoch) is { } production)
+            if (ProductionEventMapper.From(specEvent, serialNumber) is { } production)
             {
                 await client.Publish(Topic(serialNumber), production, MqttQualityOfServiceLevel.AtLeastOnce, retainMessage: false)
                     .ConfigureAwait(false);

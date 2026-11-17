@@ -23,9 +23,7 @@ internal static class ProductionEventMapper
     /// </summary>
     /// <param name="specEvent">The event of the virtual machine.</param>
     /// <param name="serialNumber">The serial number of the machine, the <c>MId</c>.</param>
-    /// <param name="seqEpoch">The start of the run of the virtual machine; with the serial number and the number of
-    /// the event it makes the id, so a repeated delivery repeats the id.</param>
-    public static ProductionEventDtoV1? From(SpecEvent specEvent, string serialNumber, string seqEpoch)
+    public static ProductionEventDtoV1? From(SpecEvent specEvent, string serialNumber)
     {
         ArgumentNullException.ThrowIfNull(specEvent);
         var (subject, action) = specEvent.Path switch
@@ -47,7 +45,9 @@ internal static class ProductionEventMapper
         return new ProductionEventDtoV1
         {
             Timestamp = specEvent.Timestamp.UtcDateTime,
-            Id = string.Create(CultureInfo.InvariantCulture, $"{serialNumber}:{seqEpoch}:{specEvent.Seq}"),
+            // The id of the CloudEvent of the spec output: the same event has the same id in both bindings, and a
+            // repeated delivery repeats it.
+            Id = specEvent.Id,
             MId = serialNumber,
             Subject = subject.Value,
             Action = Enum.Parse<ProductionAction>(action),

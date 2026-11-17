@@ -14,7 +14,8 @@ namespace Pleiades.Playground.Simulator.Test.Spec;
 public sealed class SpecPublisherTest
 {
     private const string SerialNumber = "P-04";
-    private const string Epoch = "2026-11-17T06:00:00.000Z";
+    private const string Prefix = "20261117T060000Z";
+    private const string Source = "https://example.com/P-04";
 
     [TestMethod]
     public async Task Events_GoBelowEventsWithQos1AndNotRetained()
@@ -28,11 +29,12 @@ public sealed class SpecPublisherTest
         Assert.HasCount(2, events);
         Assert.IsTrue(events.All(m => m.Topic == $"simulators/{SerialNumber}/events/production"));
         Assert.IsTrue(events.All(m => !m.Retain && m.QualityOfServiceLevel == MqttQualityOfServiceLevel.AtLeastOnce));
-        Assert.IsTrue(events.All(m => m.ContentType == SpecWire.ContentType));
+        Assert.IsTrue(events.All(m => m.ContentType == "application/cloudevents+json; charset=utf-8"));
         CollectionAssert.AreEqual(new long[] { 1, 2 }, events.Select(Seq).ToList());
 
         var value = client.Published.Single(m => m.Topic.EndsWith("/State/FeedOverride", StringComparison.Ordinal));
         Assert.IsTrue(value.Retain);
+        Assert.AreEqual("application/json", value.ContentType);
     }
 
     [TestMethod]
@@ -52,15 +54,16 @@ public sealed class SpecPublisherTest
         {
             var onTopic = client.Published.Where(m => m.Topic == $"simulators/{SerialNumber}/events/{name}").Select(Payload).ToList();
             var expected = events.Where(e => e.Path.StartsWith(group + ".", StringComparison.Ordinal)).ToList();
-            CollectionAssert.AreEqual(expected.Select(e => e.Path).ToList(), onTopic.Select(p => p["event"]!.GetValue<string>()).ToList(),
+            CollectionAssert.AreEqual(expected.Select(e => e.Path).ToList(), onTopic.Select(p => p["type"]!.GetValue<string>()).ToList(),
                 $"the events of {group} in the order they came up");
-            var seqs = onTopic.Select(p => p["seq"]!.GetValue<long>()).ToList();
-            Assert.IsTrue(seqs.Zip(seqs.Skip(1)).All(p => p.Second > p.First), $"seq grows on {group}");
+            var sequences = onTopic.Select(p => p["sequence"]!.GetValue<string>()).ToList();
+            Assert.IsTrue(sequences.Zip(sequences.Skip(1)).All(p => string.CompareOrdinal(p.Second, p.First) > 0), $"sequence grows on {group}, as a string");
+            CollectionAssert.AreEqual(expected.Select(e => e.Id).ToList(), onTopic.Select(p => p["id"]!.GetValue<string>()).ToList());
         }
 
         // Job order and program execution share the topic: a job order starts before its first program execution.
         var production = client.Published.Where(m => m.Topic.EndsWith("/events/production", StringComparison.Ordinal))
-            .Select(m => Payload(m)["event"]!.GetValue<string>()).ToList();
+            .Select(m => Payload(m)["type"]!.GetValue<string>()).ToList();
         Assert.IsTrue(production.IndexOf(SpecElements.JobOrderStarted) < production.IndexOf(SpecElements.ProgramExecutionStarted));
     }
 
@@ -80,13 +83,15 @@ public sealed class SpecPublisherTest
 
         var topics = client.Published.Select(m => m.Topic).ToList();
         Assert.AreEqual($"simulators/{SerialNumber}/umati/Connection/State", topics[0]);
+        Assert.AreEqual("Initializing", Payload(client.Published[0])["value"]!.GetValue<string>());
         Assert.AreEqual($"simulators/{SerialNumber}/umati/Manifest", topics[1]);
         Assert.AreEqual($"simulators/{SerialNumber}/umati/Connection/State", topics[3]);
-        Assert.AreEqual("Connected", Payload(client.Published[3])["value"]!.GetValue<string>());
+        Assert.AreEqual("Running", Payload(client.Published[3])["value"]!.GetValue<string>());
 
         var events = client.Published.Skip(4).ToList();
-        CollectionAssert.AreEqual(new long[] { 1, 2, 3 }, events.Select(Seq).ToList(), "in their order, after Connected");
-        Assert.AreEqual(SpecWire.Timestamp(MachineRun.Start.AddSeconds(1)), Payload(events[0])["timestamp"]!.GetValue<string>(), "with their source time");
+        CollectionAssert.AreEqual(new long[] { 1, 2, 3 }, events.Select(Seq).ToList(), "in their order, after Running");
+        Assert.AreEqual(SpecWire.Timestamp(MachineRun.Start.AddSeconds(1)), Payload(events[0])["time"]!.GetValue<string>(), "with their source time");
+        Assert.AreEqual(Event(1).Id, Payload(events[0])["id"]!.GetValue<string>(), "with the id they had when they came up");
         Assert.AreEqual(0, publisher.Buffered);
     }
 
@@ -108,9 +113,64 @@ public sealed class SpecPublisherTest
         CollectionAssert.AreEqual(new long[] { 3, 4, 5, 6 }, seqs, "1 and 2 are gone, nothing is renumbered");
     }
 
+    [TestMethod]
+    public async Task ConnectionState_InitializingThenRunning_OnlyAtTheFirstConnect()
+    {
+        using var client = new FakeClient { IsConnected = true };
+        using var publisher = Publisher(client, 10);
+        var value = new SpecValue(SpecElements.FeedOverride, JsonValue.Create(1.0), "one", MachineRun.Start, null);
+
+        await publisher.PublishStateAsync([value], MachineRun.Start);
+        Assert.AreEqual("Initializing Manifest FeedOverride Running", Trace(client), "after the start: Initializing, every value, Running");
+
+        client.Published.Clear();
+        await publisher.PublishStateAsync([value], MachineRun.Start.AddMinutes(5));
+        Assert.AreEqual("Manifest FeedOverride Running", Trace(client), "a reconnect to the broker does not start the adapter again");
+
+        client.Published.Clear();
+        await publisher.PublishConnectionStateAsync(SpecPublisher.CommunicationFault, MachineRun.Start.AddMinutes(6));
+        await publisher.PublishStateAsync([value], MachineRun.Start.AddMinutes(7));
+        await publisher.PublishConnectionStateAsync(SpecPublisher.Shutdown, MachineRun.Start.AddMinutes(8));
+        Assert.AreEqual("CommunicationFault Manifest FeedOverride Running Shutdown", Trace(client),
+            "the machine lost and found again: every value anew, then Running; Shutdown at a clean stop");
+    }
+
+    [TestMethod]
+    public async Task ConnectionState_AtAConnectWhileTheMachineIsLost_IsCommunicationFault()
+    {
+        using var client = new FakeClient { IsConnected = true };
+        using var publisher = Publisher(client, 10);
+
+        await publisher.PublishStateAsync([], MachineRun.Start, reachable: false);
+
+        Assert.AreEqual("Initializing Manifest CommunicationFault", Trace(client));
+    }
+
+    [TestMethod]
+    public async Task ConnectionState_WithoutBroker_GoesNowhere()
+    {
+        using var client = new FakeClient { IsConnected = false };
+        using var publisher = Publisher(client, 10);
+
+        await publisher.PublishConnectionStateAsync(SpecPublisher.CommunicationFault, MachineRun.Start);
+
+        Assert.IsEmpty(client.Published, "the next connect publishes the state");
+    }
+
+    [TestMethod]
+    public void LastWill_IsCommunicationFault_RetainedOnConnectionState()
+    {
+        var (topic, payload) = SpecPublisher.LastWill(SerialNumber, MachineRun.Start);
+        var will = JsonNode.Parse(Encoding.UTF8.GetString(payload))!.AsObject();
+
+        Assert.AreEqual($"simulators/{SerialNumber}/umati/Connection/State", topic);
+        Assert.AreEqual("CommunicationFault", will["value"]!.GetValue<string>());
+        Assert.AreEqual(SpecWire.Timestamp(MachineRun.Start), will["timestamp"]!.GetValue<string>());
+    }
+
     private static SpecPublisher Publisher(FakeClient client, int capacity)
     {
-        return new SpecPublisher(client, SerialNumber, new JsonObject { ["modelVersion"] = "0.13.1" }, Epoch, capacity, NullLogger.Instance);
+        return new SpecPublisher(client, SerialNumber, new JsonObject { ["modelVersion"] = "0.16.0" }, Source, capacity, NullLogger.Instance);
     }
 
     private static SpecValue Value(int second)
@@ -120,8 +180,9 @@ public sealed class SpecPublisherTest
 
     private static SpecEvent Event(long seq)
     {
+        var sequence = SpecWire.Sequence(Prefix, seq);
         return new SpecEvent(SpecElements.JobOrderChanged, MachineRun.Start.AddSeconds(seq), seq,
-            new JsonObject { ["JobOrderID"] = "4711/01", ["State"] = "AllowedToStart" });
+            new JsonObject { ["JobOrderID"] = "4711/01", ["State"] = "AllowedToStart" }, SpecWire.NameUuid($"{Source} Production {sequence}"), sequence);
     }
 
     private static JsonObject Payload(MqttApplicationMessage message)
@@ -129,10 +190,22 @@ public sealed class SpecPublisherTest
         return JsonNode.Parse(Encoding.UTF8.GetString(message.Payload))!.AsObject();
     }
 
+    /// <summary>The count of an event, from its <c>sequence</c>; the prefix is the start of the run.</summary>
     private static long Seq(MqttApplicationMessage message)
     {
         var payload = Payload(message);
-        Assert.AreEqual(Epoch, payload["seqEpoch"]!.GetValue<string>());
-        return payload["seq"]!.GetValue<long>();
+        Assert.AreEqual(Source, payload["source"]!.GetValue<string>());
+        var sequence = payload["sequence"]!.GetValue<string>().Split('.');
+        Assert.AreEqual(Prefix, sequence[0]);
+        Assert.AreEqual(12, sequence[1].Length);
+        return long.Parse(sequence[1], System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>What went out, in short: the value of each Connection/State, the last level of every other topic.</summary>
+    private static string Trace(FakeClient client)
+    {
+        return string.Join(' ', client.Published.Select(m => m.Topic.EndsWith("/Connection/State", StringComparison.Ordinal)
+            ? Payload(m)["value"]!.GetValue<string>()
+            : m.Topic[(m.Topic.LastIndexOf('/') + 1)..]));
     }
 }

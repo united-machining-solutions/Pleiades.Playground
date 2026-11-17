@@ -12,7 +12,8 @@ internal sealed record MachineIdentity(string Manufacturer, string SerialNumber,
 /// <param name="PowerOnDuration">Seconds the machine has been powered.</param>
 /// <param name="Energy">Electric energy taken in, in watt hours.</param>
 /// <param name="PartsProduced">Parts produced in the lifetime of the machine.</param>
-internal sealed record MachineCounters(double PowerOnDuration, double Energy, long PartsProduced);
+/// <param name="OperationDuration">Seconds the machine has been operating: running a program.</param>
+internal sealed record MachineCounters(double PowerOnDuration, double Energy, long PartsProduced, double OperationDuration = 0);
 
 /// <summary>
 /// A machine tool as a state machine, driven by a scenario. Every value and event follows from one state, so they
@@ -28,6 +29,12 @@ internal sealed class VirtualMachine
 {
     private const string NotExecuting = "NotExecuting";
     private const string Executing = "Executing";
+
+    /// <summary>Name of channel 1 in the control; the manifest names it under <c>instances</c>.</summary>
+    public const string ChannelName = "CHAN1";
+
+    /// <summary>Name of spindle 1 in the control; the manifest names it under <c>instances</c>.</summary>
+    public const string SpindleName = "S1";
 
     private readonly MachineIdentity _identity;
     private readonly SpecOutputConfig _config;
@@ -53,13 +60,17 @@ internal sealed class VirtualMachine
     private bool _alertsChanged;
 
     private double _powerOnDuration;
+    private double _operationDuration;
     private double _energy;
     private long _partsProduced;
     private double _power;
     private double _feedOverride;
     private double _spindleOverride;
     private long _heartbeat;
+    private long _notifications;
     private readonly Dictionary<string, long> _seq = new(StringComparer.Ordinal);
+    private readonly DateTimeOffset _warmUpEnd;
+    private readonly string _programPath;
     private readonly HashSet<string> _unavailable;
     private double _bearingTemperature;
     private readonly string _bearingPath;
@@ -78,20 +89,24 @@ internal sealed class VirtualMachine
         foreach (var path in _unavailable.Where(p => !SpecElements.MayBeUnavailable.Contains(p)))
         {
             throw new ArgumentException(
-                $"'{path}' may not be unavailable; the model allows it for {string.Join(", ", SpecElements.MayBeUnavailable)}.", nameof(config));
+                $"'{path}' may not be unavailable; the model allows it for every element but {string.Join(", ", SpecElements.AlwaysAvailable)}.", nameof(config));
         }
+        _unavailable.UnionWith(SpecElements.NotDelivered);
         _jobTemplates = _scenario.Jobs.Count > 0 ? _scenario.Jobs : [new JobTemplate()];
         _feedOverrideSteps = _scenario.FeedOverrideSteps.Count > 0 ? _scenario.FeedOverrideSteps : [1.0];
         _spindleOverrideSteps = _scenario.SpindleOverrideSteps.Count > 0 ? _scenario.SpindleOverrideSteps : [1.0];
         _random = _scenario.Seed is { } seed ? new Random(seed) : new Random();
         _now = start;
-        SeqEpoch = SpecWire.Timestamp(start);
+        SequencePrefix = SpecWire.SequencePrefix(start);
+        _warmUpEnd = start + _scenario.WarmUpTime;
         _bearingPath = SpecElements.ExtensionPath(config.ManufacturerDomain, SpecElements.BearingTemperature);
+        _programPath = SpecElements.ExtensionPath(config.ManufacturerDomain, SpecElements.ActiveProgram);
         _bearingTemperature = _scenario.BearingTemperatureIdle;
         _nextJobNumber = _scenario.FirstJobOrderNumber;
         _powerOnDuration = counters.PowerOnDuration;
         _energy = counters.Energy;
         _partsProduced = counters.PartsProduced;
+        _operationDuration = counters.OperationDuration;
         _feedOverride = _feedOverrideSteps[0];
         _spindleOverride = _spindleOverrideSteps[0];
         Initialise();
@@ -108,10 +123,10 @@ internal sealed class VirtualMachine
     }
 
     /// <summary>
-    /// The epoch of the event numbers: the start of this machine in UTC. <see cref="SpecEvent.Seq"/> counts from 1
-    /// within it; a new start begins a new epoch.
+    /// The prefix of the event numbers: the start of this machine in UTC, <c>yyyyMMddTHHmmssZ</c>.
+    /// <see cref="SpecEvent.Seq"/> counts from 1 within it in each group; a new start begins a new prefix.
     /// </summary>
-    public string SeqEpoch { get; }
+    public string SequencePrefix { get; }
 
     /// <summary>The time the machine has reached.</summary>
     public DateTimeOffset Now => _now;
@@ -120,7 +135,7 @@ internal sealed class VirtualMachine
     public IReadOnlyCollection<SpecValue> Values => _values.Values;
 
     /// <summary>The counters to keep across a restart.</summary>
-    public MachineCounters Counters => new(_powerOnDuration, _energy, _partsProduced);
+    public MachineCounters Counters => new(_powerOnDuration, _energy, _partsProduced, _operationDuration);
 
     /// <summary>
     /// The values set when the machine was created, all of them. Call once, before the first <see cref="Advance"/>.
@@ -142,10 +157,15 @@ internal sealed class VirtualMachine
         // The power published since the last step held until now; the energy is its integral.
         _energy += _power * elapsed.TotalHours;
         _powerOnDuration += elapsed.TotalSeconds;
+        if (_phase == Phase.Executing)
+        {
+            _operationDuration += elapsed.TotalSeconds;
+        }
         WarmBearing(elapsed);
         _now = now;
 
         ChangeOverrides(elapsed);
+        EndWarmUp();
         UpdateAlerts();
         RunPhase(elapsed);
         RaiseAlerts(elapsed);
@@ -167,15 +187,30 @@ internal sealed class VirtualMachine
         Set(SpecElements.ProductCode, _scenario.ProductCode);
         Set(SpecElements.YearOfConstruction, (long)_scenario.YearOfConstruction);
         Set(SpecElements.SoftwareRevision, _scenario.SoftwareRevision);
+        Set(SpecElements.MonthOfConstruction, (long)_scenario.MonthOfConstruction);
+        Set(SpecElements.InitialOperationDate, SpecWire.Timestamp(_scenario.InitialOperationDate));
+        Set(SpecElements.DeviceClass, _scenario.DeviceClass);
+        foreach (var path in SpecElements.NotDelivered)
+        {
+            Set(path, (JsonNode?)null);
+        }
+        Set(SpecElements.Software, new JsonArray([.. Software().Select(s => (JsonNode)s)]));
         _heartbeat = 1;
         Set(SpecElements.Heartbeat, _heartbeat);
         _nextHeartbeat = _now + _config.HeartbeatInterval;
         SetStatus(NotExecuting, "Processing");
+        Set(SpecElements.IsWarmUp, _now < _warmUpEnd);
         Set(SpecElements.ChannelState, "Reset");
+        Set(SpecElements.ChannelMode, "Automatic");
+        Set(SpecElements.ChannelName, ChannelName);
+        Set(SpecElements.RapidOverride, 1.0);
         Set(SpecElements.ActiveWorkMaster, (JsonNode?)null);
+        Set(_programPath, (JsonNode?)null);
         Set(SpecElements.ProgramExecution, (JsonNode?)null);
-        Set(SpecElements.FeedOverride, _feedOverride);
+        SetFeedOverride();
         Set(SpecElements.SpindleIsRotating, false);
+        Set(SpecElements.SpindleIsUsedAsAxis, false);
+        Set(SpecElements.SpindleName, SpindleName);
         Set(SpecElements.SpindleOverride, _spindleOverride);
         Set(SpecElements.PartsProducedInLifetime, _partsProduced);
         // The first list comes with its events too, so that the events alone give the same list.
@@ -195,7 +230,7 @@ internal sealed class VirtualMachine
     {
         switch (_phase)
         {
-            case Phase.Idle when _now >= _phaseEnd && !HasFailure():
+            case Phase.Idle when _now >= _phaseEnd && _now >= _warmUpEnd && !HasFailure():
                 StartJobOrder();
                 break;
             case Phase.Setup when _now >= _phaseEnd:
@@ -234,7 +269,7 @@ internal sealed class VirtualMachine
         AddJobOrder();
         PromoteNextJobOrder();
 
-        Set(SpecElements.ActiveWorkMaster, job.Template.Program);
+        SetWorkMaster(job, null);
         EnterPhase(Phase.Setup, _scenario.SetupTime);
     }
 
@@ -244,7 +279,7 @@ internal sealed class VirtualMachine
         var executionId = NewId();
         _execution = new Execution(executionId, _now, _energy, job);
 
-        Set(SpecElements.ActiveWorkMaster, job.Template.Program, executionId);
+        SetWorkMaster(job, executionId);
         ChangeExecutionState(_execution, "Running", SpecElements.ProgramExecutionStarted);
         EnterPhase(Phase.Executing, TimeSpan.Zero);
     }
@@ -267,7 +302,7 @@ internal sealed class VirtualMachine
             job.JobResult = "Successful";
             ChangeJobState(job, "Ended");
             _activeJob = null;
-            Set(SpecElements.ActiveWorkMaster, job.Template.Program);
+            SetWorkMaster(job, null);
             EnterPhase(Phase.Idle, _scenario.IdleTime);
         }
         else
@@ -299,7 +334,7 @@ internal sealed class VirtualMachine
             ChangeJob(job);
         }
 
-        Set(SpecElements.ActiveWorkMaster, job.Template.Program);
+        SetWorkMaster(job, null);
         var eventPath = completed ? SpecElements.ProgramExecutionEnded : SpecElements.ProgramExecutionAborted;
         ChangeExecutionState(execution, state, eventPath, sums =>
         {
@@ -320,14 +355,14 @@ internal sealed class VirtualMachine
         {
             ["ExecutionId"] = execution.Id,
             ["JobOrderID"] = execution.Job.Id,
-            ["ActiveWorkMaster"] = execution.Job.Template.Program,
+            ["ActiveWorkMaster"] = execution.Job.Template.WorkMasterId,
             ["State"] = state,
             ["StartTime"] = SpecWire.Timestamp(execution.Start),
         };
         addSums?.Invoke(snapshot);
         // The snapshot names its ExecutionId inside; it carries no correlationId.
         Set(SpecElements.ProgramExecution, snapshot);
-        Emit(eventPath, (JsonObject)snapshot.DeepClone());
+        Emit(eventPath, (JsonObject)snapshot.DeepClone(), execution.Id);
     }
 
     /// <summary>Interrupts the program execution; a failure interrupts the job order too, a program stop does not.</summary>
@@ -368,7 +403,20 @@ internal sealed class VirtualMachine
     {
         if (_phase == Phase.Executing && _random.NextDouble() < _scenario.ProgramStopsPerHour * elapsed.TotalHours)
         {
+            var executionId = _execution!.Id;
+            _notifications++;
             InterruptExecution(interruptJob: false, _scenario.ProgramStopDuration);
+            // The stop gives a message to the operator: an alert without a category, that does not stay.
+            Emit(SpecElements.NotificationEvent, new JsonObject
+            {
+                ["Id"] = SpecWire.NameUuid(string.Create(CultureInfo.InvariantCulture,
+                    $"{_identity.ProductInstanceUri} {SequencePrefix} notification {_notifications}")),
+                ["ErrorCode"] = _scenario.ProgramStopCode,
+                ["Message"] = _scenario.ProgramStopText,
+                ["Time"] = SpecWire.Timestamp(_now),
+                ["SourceName"] = ChannelName,
+                ["correlationId"] = executionId,
+            }, executionId);
         }
     }
 
@@ -421,6 +469,7 @@ internal sealed class VirtualMachine
             case Phase.Setup:
                 SetStatus(NotExecuting, "Setup");
                 Set(SpecElements.ChannelState, "Reset");
+                Set(SpecElements.ChannelMode, "JogManual");
                 break;
             case Phase.Executing:
                 SetStatus(Executing, "Processing");
@@ -435,6 +484,10 @@ internal sealed class VirtualMachine
                 Set(SpecElements.ChannelState, "Reset");
                 break;
         }
+        if (phase != Phase.Setup)
+        {
+            Set(SpecElements.ChannelMode, "Automatic");
+        }
         Set(SpecElements.SpindleIsRotating, phase == Phase.Executing);
         UpdatePower();
     }
@@ -447,14 +500,14 @@ internal sealed class VirtualMachine
             {
                 _alerts.Remove(alert);
                 _alertsChanged = true;
-                Emit(SpecElements.AlertCleared, alert.ToJson());
+                Emit(SpecElements.AlertCleared, alert.ToJson(), alert.CorrelationId);
             }
             else if (!alert.Changed && alert.Template.ChangeAfter is { } after && _now >= alert.Since + after)
             {
                 alert.Changed = true;
                 alert.SeverityValue = alert.Template.ChangedSeverityValue ?? alert.SeverityValue;
                 _alertsChanged = true;
-                Emit(SpecElements.AlertChanged, alert.ToJson());
+                Emit(SpecElements.AlertChanged, alert.ToJson(), alert.CorrelationId);
             }
         }
     }
@@ -476,7 +529,7 @@ internal sealed class VirtualMachine
             var alert = new ActiveAlert(NewId(), template, _now, _execution?.Id);
             _alerts.Add(alert);
             _alertsChanged = true;
-            Emit(SpecElements.AlertRaised, alert.ToJson());
+            Emit(SpecElements.AlertRaised, alert.ToJson(), alert.CorrelationId);
 
             if (isFailure)
             {
@@ -502,12 +555,62 @@ internal sealed class VirtualMachine
         if (_feedOverrideSteps.Count > 1 && _random.NextDouble() < _scenario.FeedOverrideChangesPerHour * elapsed.TotalHours)
         {
             _feedOverride = NextStep(_feedOverrideSteps, _feedOverride);
-            Set(SpecElements.FeedOverride, _feedOverride);
+            SetFeedOverride();
         }
         if (_spindleOverrideSteps.Count > 1 && _random.NextDouble() < _scenario.SpindleOverrideChangesPerHour * elapsed.TotalHours)
         {
             _spindleOverride = NextStep(_spindleOverrideSteps, _spindleOverride);
             Set(SpecElements.SpindleOverride, _spindleOverride);
+        }
+    }
+
+    /// <summary>The feed override of the machine is the one of its only channel.</summary>
+    private void SetFeedOverride()
+    {
+        Set(SpecElements.FeedOverride, _feedOverride);
+        Set(SpecElements.ChannelFeedOverride, _feedOverride);
+    }
+
+    private void EndWarmUp()
+    {
+        if (_now >= _warmUpEnd)
+        {
+            Set(SpecElements.IsWarmUp, false);
+        }
+    }
+
+    /// <summary>
+    /// The work master the machine carries out, with the program that carries it out as a signal of the
+    /// manufacturer. While a program runs the work master carries its ExecutionId.
+    /// </summary>
+    private void SetWorkMaster(JobOrder job, string? executionId)
+    {
+        Set(SpecElements.ActiveWorkMaster, job.Template.WorkMasterId, executionId);
+        Set(_programPath, job.Template.Program);
+    }
+
+    private IEnumerable<JsonObject> Software()
+    {
+        var software = _scenario.Software.Count > 0
+            ? _scenario.Software
+            :
+            [
+                new SoftwareTemplate { Manufacturer = "Example Controls", Model = "NC kernel", SoftwareRevision = "6.3.2", DeviceClass = "CNC" },
+                new SoftwareTemplate { Manufacturer = _identity.Manufacturer, Model = "Operator interface", SoftwareRevision = _scenario.SoftwareRevision, DeviceClass = "HMI" },
+            ];
+        foreach (var entry in software)
+        {
+            var json = new JsonObject
+            {
+                ["Manufacturer"] = entry.Manufacturer,
+                ["Model"] = entry.Model,
+                ["SoftwareRevision"] = entry.SoftwareRevision,
+            };
+            if (!string.IsNullOrWhiteSpace(entry.DeviceClass))
+            {
+                json["DeviceClass"] = entry.DeviceClass;
+            }
+            yield return json;
         }
     }
 
@@ -605,6 +708,7 @@ internal sealed class VirtualMachine
     {
         Set(SpecElements.ActiveEnergy, Math.Round(_energy, 3));
         Set(SpecElements.PowerOnDuration, Math.Round(_powerOnDuration));
+        Set(SpecElements.OperationDuration, Math.Round(_operationDuration));
         Set(_bearingPath, Math.Round(_bearingTemperature, 1));
         _nextMeasurement = _now + _config.MeasurementInterval;
     }
@@ -683,8 +787,12 @@ internal sealed class VirtualMachine
         Set(path, JsonValue.Create(value));
     }
 
-    /// <summary>Says an event; <c>seq</c> counts the events of its group.</summary>
-    private void Emit(string path, JsonObject value)
+    /// <summary>
+    /// Says an event; <c>sequence</c> counts the events of its group, and the id follows from the machine, the group and
+    /// the sequence. An event of a program execution
+    /// carries its ExecutionId as <paramref name="correlationId"/>.
+    /// </summary>
+    private void Emit(string path, JsonObject value, string? correlationId = null)
     {
         // A machine without alert information has no alert events either.
         if (path.StartsWith("Notification.", StringComparison.Ordinal) && _unavailable.Contains(SpecElements.ActiveAlerts))
@@ -694,7 +802,9 @@ internal sealed class VirtualMachine
         var group = SpecElements.EventGroup(path);
         var seq = _seq.GetValueOrDefault(group) + 1;
         _seq[group] = seq;
-        _pending.Add(new SpecEvent(path, _now, seq, value));
+        var sequence = SpecWire.Sequence(SequencePrefix, seq);
+        var id = SpecWire.NameUuid($"{_identity.ProductInstanceUri} {group} {sequence}");
+        _pending.Add(new SpecEvent(path, _now, seq, value, id, sequence, correlationId));
     }
 
     private List<SpecMessage> Flush()

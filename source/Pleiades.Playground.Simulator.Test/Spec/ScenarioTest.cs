@@ -31,10 +31,12 @@ public sealed class ScenarioTest
             messages.AddRange(machine.Advance(now));
         }
 
-        var programs = config.Scenario.Jobs.Select(j => j.Program).ToHashSet();
+        var workMasters = config.Scenario.Jobs.Select(j => j.WorkMasterId).ToHashSet();
+        Assert.IsTrue(workMasters.All(w => w.StartsWith("WM-", StringComparison.Ordinal)), "work masters of their own, not program names");
+        Assert.IsTrue(config.Scenario.Software.Count > 0, "software of its own");
         var started = messages.OfType<SpecEvent>().Where(e => e.Path == SpecElements.ProgramExecutionStarted).ToList();
         Assert.IsTrue(started.Count > 10, $"{name}: {started.Count} program executions");
-        Assert.IsTrue(started.All(e => programs.Contains(e.Value["ActiveWorkMaster"]!.GetValue<string>())), "the programs of the scenario");
+        Assert.IsTrue(started.All(e => workMasters.Contains(e.Value["ActiveWorkMaster"]!.GetValue<string>())), "the work masters of the scenario");
         Assert.IsTrue(messages.OfType<SpecEvent>().Any(e => e.Path == SpecElements.JobOrderEnded));
         foreach (var group in messages.OfType<SpecEvent>().GroupBy(e => SpecElements.EventGroup(e.Path)))
         {
@@ -72,13 +74,13 @@ public sealed class ScenarioTest
     [TestMethod]
     public void Manifest_NamesTheSameProfilesForEverySimulator()
     {
-        // Every simulator of the stack delivers the same kind of values below machines/ today, spindle included,
-        // so every one declares the profiles of a machine tool with a spindle.
+        // Every simulator of the stack is a machine tool with one channel and one spindle, so every one declares
+        // the same profiles.
         foreach (var name in Names.Select(n => (string)n[0]))
         {
             var config = Settings(name).Resolve();
             var manifest = SpecManifest.Build(new MachineIdentity(config.Manufacturer, "X-01", "https://example.com/X-01"), config);
-            CollectionAssert.AreEqual(new[] { "Core", "Production", "Spindle", "Energy", "AlertsEvents" },
+            CollectionAssert.AreEqual(SpecElements.Profiles.ToList(),
                 manifest["profiles"]!.AsArray().Select(p => p!.GetValue<string>()).ToList(), name);
         }
     }

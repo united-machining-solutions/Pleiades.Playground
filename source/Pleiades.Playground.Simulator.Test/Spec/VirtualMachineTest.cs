@@ -260,7 +260,7 @@ public sealed class VirtualMachineTest
             var isNumber = value.Value is JsonValue v && v.GetValueKind() == System.Text.Json.JsonValueKind.Number;
             Assert.AreEqual(isNumber ? SpecElements.UnitOf(value.Path) : null, (string?)envelope["unit"], value.Path);
         }
-        CollectionAssert.IsSubsetOf(SpecElements.Events.ToList(), run.Messages.OfType<SpecEvent>().Select(e => e.Path).Distinct().ToList());
+        CollectionAssert.IsSubsetOf(SpecElements.Events.Select(e => e.Path).ToList(), run.Messages.OfType<SpecEvent>().Select(e => e.Path).Distinct().ToList());
         var published = run.Messages.OfType<SpecValue>().Select(v => v.Path).ToHashSet();
         paths.Remove(SpecElements.ConnectionState); // the output sets it, not the machine
         CollectionAssert.AreEquivalent(paths.ToList(), published.ToList());
@@ -288,7 +288,13 @@ public sealed class VirtualMachineTest
         }
         CollectionAssert.AreEquivalent(new[] { "Production", "Notification" },
             run.Messages.OfType<SpecEvent>().Select(e => SpecElements.EventGroup(e.Path)).Distinct().ToList());
-        Assert.AreEqual(SpecWire.Timestamp(MachineRun.Start), run.Machine.SeqEpoch);
+        Assert.AreEqual("20261117T060000Z", run.Machine.SequencePrefix);
+        foreach (var specEvent in run.Messages.OfType<SpecEvent>())
+        {
+            Assert.AreEqual(SpecWire.Sequence(run.Machine.SequencePrefix, specEvent.Seq), specEvent.Sequence);
+        }
+        var ids = run.Messages.OfType<SpecEvent>().Select(e => e.Id).ToList();
+        Assert.AreEqual(ids.Count, ids.Distinct().Count(), "every event has an id of its own");
     }
 
     [TestMethod]
@@ -568,7 +574,7 @@ public sealed class VirtualMachineTest
     {
         var run = MachineRun.For(SixHours);
         var alerts = run.ValuesOf(SpecElements.ActiveAlerts).SelectMany(v => v.Value!.AsArray().Select(a => a!.AsObject()))
-            .Concat(run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("Notification.", StringComparison.Ordinal)).Select(e => e.Value))
+            .Concat(run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("Notification.Alert", StringComparison.Ordinal)).Select(e => e.Value))
             .ToList();
         Assert.IsTrue(alerts.Count > 50);
         var allowed = new[] { "Id", "ErrorCode", "Message", "Severity", "SeverityValue", "Time", "SourceName", "correlationId" };
@@ -581,6 +587,128 @@ public sealed class VirtualMachineTest
             }
         }
         Assert.IsTrue(alerts.Any(a => a.ContainsKey("SeverityValue")) && alerts.Any(a => a.ContainsKey("SourceName")));
+    }
+
+    [TestMethod]
+    public void WorkMaster_IsAnIdOfItsOwn_AndTheProgramASignalOfTheManufacturer()
+    {
+        var run = MachineRun.For(TimeSpan.FromHours(2));
+        var program = SpecElements.ExtensionPath("example.com", SpecElements.ActiveProgram);
+        var started = run.EventsOf(SpecElements.ProgramExecutionStarted).First();
+        var template = MachineRun.Config().Scenario.Jobs.Single(j => j.WorkMasterId == started.Value["ActiveWorkMaster"]!.GetValue<string>());
+
+        Assert.AreEqual("WM-SHAFT-4711", new JobTemplate { Program = "shaft-4711.mpf", WorkMaster = "WM-SHAFT-4711" }.WorkMasterId);
+        Assert.AreEqual("WM-SHAFT", new JobTemplate().WorkMasterId, "made from the program without one");
+        var workMaster = run.ValuesOf(SpecElements.ActiveWorkMaster).Last(v => v.Timestamp <= started.Timestamp);
+        Assert.AreEqual(template.WorkMasterId, workMaster.Value!.GetValue<string>());
+        Assert.AreEqual(started.CorrelationId, workMaster.CorrelationId, "while it runs, the work master carries the ExecutionId");
+        var activeProgram = run.ValuesOf(program).Last(v => v.Timestamp <= started.Timestamp);
+        Assert.AreEqual(template.Program, activeProgram.Value!.GetValue<string>());
+        Assert.IsNull(activeProgram.CorrelationId);
+        Assert.IsTrue(run.Messages.OfType<SpecEvent>().All(e => !e.Value.ToJsonString().Contains(".MPF", StringComparison.Ordinal)),
+            "no event carries the program");
+    }
+
+    [TestMethod]
+    public void ChannelAndSpindle_DeliverTheirProfilesWhole()
+    {
+        var run = MachineRun.For(SixHours);
+        var feed = run.ValuesOf(SpecElements.FeedOverride).Select(v => (v.Timestamp, v.Value!.GetValue<double>())).ToList();
+        var channelFeed = run.ValuesOf(SpecElements.ChannelFeedOverride).Select(v => (v.Timestamp, v.Value!.GetValue<double>())).ToList();
+        Assert.IsTrue(feed.Count > 1);
+        CollectionAssert.AreEqual(feed, channelFeed, "one channel: its feed override is the one of the machine");
+
+        var modes = run.ValuesOf(SpecElements.ChannelMode).Select(v => v.Value!.GetValue<string>()).ToList();
+        CollectionAssert.AreEquivalent(new[] { "Automatic", "JogManual" }, modes.Distinct().ToList(), "manual while it is set up");
+        Assert.AreEqual(1.0, run.ValuesOf(SpecElements.RapidOverride).Single().Value!.GetValue<double>());
+        Assert.AreEqual("CHAN1", run.ValuesOf(SpecElements.ChannelName).Single().Value!.GetValue<string>());
+        Assert.IsFalse(run.ValuesOf(SpecElements.SpindleIsUsedAsAxis).Single().Value!.GetValue<bool>());
+        Assert.AreEqual("S1", run.ValuesOf(SpecElements.SpindleName).Single().Value!.GetValue<string>());
+    }
+
+    [TestMethod]
+    public void OperationDuration_GrowsOnlyWhileAProgramRuns()
+    {
+        var run = MachineRun.For(SixHours);
+        var operation = run.ValuesOf(SpecElements.OperationDuration).Select(v => v.Value!.GetValue<double>()).ToList();
+        var powerOn = run.ValuesOf(SpecElements.PowerOnDuration).Select(v => v.Value!.GetValue<double>()).ToList();
+        Assert.IsTrue(operation.Zip(operation.Skip(1)).All(p => p.Second >= p.First), "it only grows");
+        var operated = operation[^1] - operation[0];
+        Assert.IsTrue(operated > 0 && operated < powerOn[^1] - powerOn[0], "a part of the power-on duration");
+
+        var executions = run.EventsOf(SpecElements.ProgramExecutionEnded).Concat(run.EventsOf(SpecElements.ProgramExecutionAborted))
+            .Sum(e => e.Value["Duration"]!.GetValue<double>());
+        Assert.IsTrue(operated <= executions + 60, $"no more than the program executions: {operated} s, {executions} s");
+        Assert.AreEqual(run.Machine.Counters.OperationDuration, operation[^1], 60, "kept with the counters");
+    }
+
+    [TestMethod]
+    public void WarmUp_HoldsTheFirstJobOrderBack()
+    {
+        var config = MachineRun.Config();
+        var warmUp = new ScenarioConfig
+        {
+            Seed = config.Scenario.Seed,
+            Jobs = config.Scenario.Jobs,
+            WarmUpTime = TimeSpan.FromMinutes(10),
+        };
+        var run = MachineRun.For(TimeSpan.FromHours(1), new SpecOutputConfig { Scenario = warmUp });
+
+        var isWarmUp = run.ValuesOf(SpecElements.IsWarmUp).ToList();
+        Assert.HasCount(2, isWarmUp);
+        Assert.IsTrue(isWarmUp[0].Value!.GetValue<bool>());
+        Assert.IsFalse(isWarmUp[1].Value!.GetValue<bool>());
+        Assert.AreEqual(MachineRun.Start.AddMinutes(10), isWarmUp[1].Timestamp);
+        Assert.IsTrue(run.EventsOf(SpecElements.JobOrderStarted).First().Timestamp >= isWarmUp[1].Timestamp);
+        Assert.IsFalse(MachineRun.For(TimeSpan.FromMinutes(1)).ValuesOf(SpecElements.IsWarmUp).Single().Value!.GetValue<bool>(), "no warm-up by default");
+    }
+
+    [TestMethod]
+    public void Software_IsAListAfterSoftwareType()
+    {
+        var run = MachineRun.For(TimeSpan.FromMinutes(1));
+        var software = run.ValuesOf(SpecElements.Software).Single().Value!.AsArray().Select(s => s!.AsObject()).ToList();
+
+        Assert.IsTrue(software.Count >= 2);
+        foreach (var entry in software)
+        {
+            CollectionAssert.IsSubsetOf(entry.Select(p => p.Key).ToList(), new[] { "Manufacturer", "Model", "SoftwareRevision", "DeviceClass" });
+            Assert.IsFalse(string.IsNullOrWhiteSpace((string?)entry["Model"]));
+        }
+        Assert.AreEqual(software.Count, software.Select(s => $"{s["Manufacturer"]}/{s["Model"]}").Distinct().Count(), "Manufacturer and Model name an entry");
+        Assert.AreEqual("simulators/P-04/umati/Components/Software", SpecWire.Topic("P-04", SpecElements.Software));
+    }
+
+    [TestMethod]
+    public void ProgramStop_GivesANotificationOfThatProgramExecution()
+    {
+        var run = MachineRun.For(SixHours);
+        var notifications = run.EventsOf(SpecElements.NotificationEvent).ToList();
+        Assert.IsNotEmpty(notifications);
+        foreach (var notification in notifications)
+        {
+            Assert.IsFalse(notification.Value.ContainsKey("Severity"), "a notification has no category");
+            Assert.AreEqual("M00", notification.Value["ErrorCode"]!.GetValue<string>());
+            Assert.AreEqual(notification.CorrelationId, notification.Value["correlationId"]!.GetValue<string>());
+            var interrupted = run.EventsOf(SpecElements.ProgramExecutionInterrupted).Single(e => e.Timestamp == notification.Timestamp);
+            Assert.AreEqual(interrupted.CorrelationId, notification.CorrelationId);
+        }
+    }
+
+    [TestMethod]
+    public void CommunicationFaults_FallAtTheEndOfEveryInterval_AndAreOffByDefault()
+    {
+        var faults = new CommunicationFaults(TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(1), MachineRun.Start);
+        Assert.IsFalse(faults.IsFaulted(MachineRun.Start));
+        Assert.IsFalse(faults.IsFaulted(MachineRun.Start.AddMinutes(28.9)));
+        Assert.IsTrue(faults.IsFaulted(MachineRun.Start.AddMinutes(29)));
+        Assert.IsTrue(faults.IsFaulted(MachineRun.Start.AddMinutes(29.9)));
+        Assert.IsFalse(faults.IsFaulted(MachineRun.Start.AddMinutes(30)));
+        Assert.IsTrue(faults.IsFaulted(MachineRun.Start.AddMinutes(59.5)));
+
+        Assert.IsNull(new ScenarioConfig().CommunicationFaultInterval);
+        var never = new CommunicationFaults(null, TimeSpan.FromMinutes(1), MachineRun.Start);
+        Assert.IsFalse(Enumerable.Range(0, 1440).Any(m => never.IsFaulted(MachineRun.Start.AddMinutes(m))));
     }
 
     [TestMethod]
@@ -614,7 +742,8 @@ public sealed class VirtualMachineTest
         var identity = new MachineIdentity("Example Machine Tools", "P-04", "https://example.com/P-04");
         var elements = SpecManifest.Build(identity, config)["elements"]!.AsArray().Select(e => e!.AsObject()).ToList();
         var unavailable = elements.Where(e => e["available"]?.GetValue<bool>() == false).Select(e => e["path"]!.GetValue<string>()).ToList();
-        CollectionAssert.AreEquivalent(config.Scenario.Unavailable, unavailable);
+        CollectionAssert.AreEquivalent(config.Scenario.Unavailable.Concat(SpecElements.NotDelivered).ToList(), unavailable,
+            "the scenario's own and what the virtual machine never delivers");
 
         // The rest of the machine runs on.
         Assert.IsTrue(run.EventsOf(SpecElements.ProgramExecutionEnded).Any());
@@ -634,26 +763,51 @@ public sealed class VirtualMachineTest
     [TestMethod]
     public void Unavailable_IsRefusedWhereTheModelDoesNotAllowIt()
     {
-        var config = MachineRun.Config();
-        config.Scenario.Unavailable = [SpecElements.Manufacturer];
-        Assert.ThrowsExactly<ArgumentException>(() => MachineRun.For(TimeSpan.FromSeconds(1), config));
+        foreach (var path in new[] { SpecElements.Manufacturer, SpecElements.SerialNumber, SpecElements.ProductInstanceUri, SpecElements.Heartbeat, SpecElements.ConnectionState })
+        {
+            var config = MachineRun.Config();
+            config.Scenario.Unavailable = [path];
+            Assert.ThrowsExactly<ArgumentException>(() => MachineRun.For(TimeSpan.FromSeconds(1), config), path);
+        }
         CollectionAssert.AreEquivalent(
-            new[] { SpecElements.Status, SpecElements.ActiveAlerts, SpecElements.PowerOnDuration, SpecElements.YearOfConstruction, SpecElements.SoftwareRevision },
-            SpecElements.MayBeUnavailable.ToList());
+            SpecElements.Elements.Select(e => e.Path).Except(SpecElements.AlwaysAvailable).ToList(),
+            SpecElements.MayBeUnavailable.ToList(), "every element but the five");
+
+        var feedOverride = MachineRun.Config();
+        feedOverride.Scenario.Unavailable = [SpecElements.FeedOverride];
+        var run = MachineRun.For(TimeSpan.FromMinutes(10), feedOverride);
+        Assert.IsTrue(run.ValuesOf(SpecElements.FeedOverride).All(v => v.Value is null), "a machine without a feed override");
     }
 
     [TestMethod]
-    public void Event_GoesBelowTheEventsLevelWithSeqAndEpoch()
+    public void Event_GoesBelowTheEventsLevelAsACloudEvent()
     {
         Assert.AreEqual("simulators/P-04/events/production", SpecWire.EventTopic("P-04", SpecElements.JobOrderChanged));
         Assert.AreEqual("simulators/P-04/events/production", SpecWire.EventTopic("P-04", SpecElements.ProgramExecutionStarted));
         Assert.AreEqual("simulators/P-04/events/notifications", SpecWire.EventTopic("P-04", SpecElements.AlertRaised));
         Assert.ThrowsExactly<ArgumentException>(() => SpecWire.EventTopic("P-04", "Maintenance.TaskDue"), "a group without a name");
-        CollectionAssert.IsSubsetOf(SpecElements.Events.Select(e => e.Split('.')[0]).Distinct().ToList(), SpecWire.EventTopicNames.Keys.ToList(),
+        CollectionAssert.IsSubsetOf(SpecElements.Events.Select(e => e.Path.Split('.')[0]).Distinct().ToList(), SpecWire.EventTopicNames.Keys.ToList(),
             "every event of the manifest has a topic");
-        var wire = SpecWire.Event(new SpecEvent(SpecElements.AlertCleared, MachineRun.Start, 7, new JsonObject { ["Id"] = "a" }), "2026-11-17T06:00:00.000Z");
-        CollectionAssert.AreEqual(new[] { "event", "timestamp", "seq", "seqEpoch", "value" }, wire.Select(p => p.Key).ToList());
-        Assert.AreEqual(7, wire["seq"]!.GetValue<long>());
+
+        var id = SpecWire.NameUuid("https://example.com/P-04 Notification 20261117T060000Z.000000000007");
+        var specEvent = new SpecEvent(SpecElements.AlertCleared, MachineRun.Start, 7, new JsonObject { ["Id"] = "a" }, id,
+            SpecWire.Sequence("20261117T060000Z", 7), "exec-1");
+        var wire = SpecWire.Event(specEvent, "https://example.com/P 04");
+        CollectionAssert.AreEqual(new[] { "specversion", "id", "source", "type", "time", "sequence", "correlationid", "dataschema", "data" },
+            wire.Select(p => p.Key).ToList());
+        Assert.AreEqual("1.0", wire["specversion"]!.GetValue<string>());
+        Assert.AreEqual(id, wire["id"]!.GetValue<string>());
+        Assert.AreEqual(5, Guid.Parse(id).Version, "a UUID made from a name");
+        Assert.AreEqual("https://example.com/P%2004", wire["source"]!.GetValue<string>(), "a space is encoded");
+        Assert.AreEqual(SpecElements.AlertCleared, wire["type"]!.GetValue<string>());
+        Assert.AreEqual("2026-11-17T06:00:00.000Z", wire["time"]!.GetValue<string>());
+        Assert.AreEqual("20261117T060000Z.000000000007", wire["sequence"]!.GetValue<string>());
+        Assert.AreEqual("exec-1", wire["correlationid"]!.GetValue<string>());
+        Assert.AreEqual("urn:umati2:datamodel:0.16.0:event.schema.json", wire["dataschema"]!.GetValue<string>());
+        Assert.AreEqual("a", wire["data"]!["Id"]!.GetValue<string>());
+
+        var withoutCorrelation = SpecWire.Event(specEvent with { CorrelationId = null }, "https://example.com/P-04");
+        Assert.IsFalse(withoutCorrelation.ContainsKey("correlationid"), "only where the event belongs to a program execution");
     }
 
     [TestMethod]
@@ -754,7 +908,7 @@ public sealed class VirtualMachineTest
         {
             Assert.IsTrue(extension["path"]!.GetValue<string>().StartsWith("x-example-com.", StringComparison.Ordinal));
             Assert.IsNotNull(extension["type"]);
-            Assert.IsNotNull(extension["unit"]!["code"]);
+            Assert.AreEqual(extension["type"]!.GetValue<string>() == "number", extension["unit"]?["code"] is not null, "a number has a unit, a text none");
             Assert.IsNotNull(extension["description"]);
         }
         Assert.IsTrue(elements.Where(e => !e["path"]!.GetValue<string>().StartsWith("x-", StringComparison.Ordinal))
@@ -790,7 +944,7 @@ public sealed class VirtualMachineTest
         return string.Join('\n', run.Messages.Select(m => m switch
         {
             SpecValue v => SpecWire.Envelope(v).ToJsonString(),
-            SpecEvent e => SpecWire.Event(e, run.Machine.SeqEpoch).ToJsonString(),
+            SpecEvent e => SpecWire.Event(e, "https://example.com/P-04").ToJsonString(),
             _ => string.Empty,
         }));
     }
