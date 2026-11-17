@@ -166,17 +166,17 @@ services:
     depends_on:
       genui-mcp:
         condition: service_healthy
+    # A model server on the device is host.docker.internal. Docker Desktop knows the name; this line
+    # gives it to Docker Engine on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       GENUI_MCP_URL: http://genui-mcp:8080/mcp
-      # The chat needs at least one language model; everything else works without one. A block counts
-      # once its key is set, so a key alone is enough.
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODELS: ${OPENAI_MODELS:-gpt-6-luna,gpt-6.1-sol,gpt-6-astra}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      ANTHROPIC_MODELS: ${ANTHROPIC_MODELS:-claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5,claude-fable-5-2}
+      # The chat needs a language model; everything else works without one. The models come from a LiteLLM
+      # gateway: the app offers those it marks for chat, and dictation takes the first it marks for speech
+      # to text.
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODELS: ${LLM_MODELS:-}
 
   # The reverse proxy in front of the example app, found by its host name. Not in compose.yaml at the root.
   traefik:

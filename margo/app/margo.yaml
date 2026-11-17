@@ -99,26 +99,6 @@ parameters:
     targets:
       - pointer: CARD_RESOURCE_DOMAINS
         components: ["default"]
-  openaiApiKey:
-    value: ""
-    targets:
-      - pointer: OPENAI_API_KEY
-        components: ["default"]
-  openaiModels:
-    value: "gpt-6-luna,gpt-6.1-sol,gpt-6-astra"
-    targets:
-      - pointer: OPENAI_MODELS
-        components: ["default"]
-  anthropicApiKey:
-    value: ""
-    targets:
-      - pointer: ANTHROPIC_API_KEY
-        components: ["default"]
-  anthropicModels:
-    value: "claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5,claude-fable-5-2"
-    targets:
-      - pointer: ANTHROPIC_MODELS
-        components: ["default"]
   llmBaseUrl:
     value: ""
     targets:
@@ -128,11 +108,6 @@ parameters:
     value: ""
     targets:
       - pointer: LLM_API_KEY
-        components: ["default"]
-  llmModels:
-    value: ""
-    targets:
-      - pointer: LLM_MODELS
         components: ["default"]
 
 configuration:
@@ -190,27 +165,16 @@ configuration:
           schema: optionalText
     - name: Language model
       settings:
-        - parameter: openaiApiKey
-          name: OpenAI API key
-          description: The chat needs at least one language model; a key alone is enough.
-          schema: optionalText
-        - parameter: openaiModels
-          name: OpenAI models
-          schema: optionalText
-        - parameter: anthropicApiKey
-          name: Anthropic API key
-          schema: optionalText
-        - parameter: anthropicModels
-          name: Anthropic models
-          schema: optionalText
         - parameter: llmBaseUrl
-          name: Base URL of an OpenAI-compatible endpoint
+          name: Base URL of the LiteLLM gateway
+          description: >-
+            The address up to /v1, as the app reaches it from its container. The chat offers the models the
+            gateway marks for chat. A gateway on the device itself is http://host.docker.internal:<port>/v1.
+            Without it the chat says so; everything else works.
           schema: optionalText
         - parameter: llmApiKey
-          name: API key of the OpenAI-compatible endpoint
-          schema: optionalText
-        - parameter: llmModels
-          name: Models of the OpenAI-compatible endpoint
+          name: API key of the LiteLLM gateway
+          description: The key the gateway gave you. It stays on the device.
           schema: optionalText
   schema:
     - name: port
