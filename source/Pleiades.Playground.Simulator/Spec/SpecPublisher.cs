@@ -19,7 +19,7 @@ namespace Pleiades.Playground.Simulator.Spec;
 internal sealed partial class SpecPublisher : IDisposable
 {
     private readonly IManagedMqttClient _client;
-    private readonly string _serialNumber;
+    private readonly string _machineId;
     private readonly JsonObject _manifest;
     private readonly string _source;
     private readonly int _capacity;
@@ -47,17 +47,17 @@ internal sealed partial class SpecPublisher : IDisposable
     public const string LastWillState = CommunicationFault;
 
     /// <param name="client">The MQTT connection of the spec output.</param>
-    /// <param name="serialNumber">The serial number of the machine, a level of every topic.</param>
+    /// <param name="machineId">The machine id of the spec binding, a level of every topic.</param>
     /// <param name="manifest">The manifest, published at each connect.</param>
     /// <param name="source">The ProductInstanceUri of the machine, the <c>source</c> of every event.</param>
     /// <param name="capacity">How many events the outbox holds.</param>
     /// <param name="logger">The logger.</param>
-    public SpecPublisher(IManagedMqttClient client, string serialNumber, JsonObject manifest, string source, int capacity, ILogger logger)
+    public SpecPublisher(IManagedMqttClient client, string machineId, JsonObject manifest, string source, int capacity, ILogger logger)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentOutOfRangeException.ThrowIfLessThan(capacity, 1);
         _client = client;
-        _serialNumber = serialNumber;
+        _machineId = machineId;
         _manifest = manifest;
         _source = source;
         _capacity = capacity;
@@ -131,7 +131,7 @@ internal sealed partial class SpecPublisher : IDisposable
             {
                 await _client.EnqueueAsync(ValueMessage(ConnectionState(Initializing, now))).ConfigureAwait(false);
             }
-            await _client.EnqueueAsync(Message(SpecWire.ManifestTopic(_serialNumber), _manifest, retain: true)).ConfigureAwait(false);
+            await _client.EnqueueAsync(Message(SpecWire.ManifestTopic(_machineId), _manifest, retain: true)).ConfigureAwait(false);
             foreach (var value in values)
             {
                 await _client.EnqueueAsync(ValueMessage(value)).ConfigureAwait(false);
@@ -171,10 +171,10 @@ internal sealed partial class SpecPublisher : IDisposable
     /// The last will: <c>Connection/State</c> <see cref="LastWillState"/>, as the broker publishes it when the
     /// connection breaks off.
     /// </summary>
-    public static (string Topic, byte[] Payload) LastWill(string serialNumber, DateTimeOffset timestamp)
+    public static (string Topic, byte[] Payload) LastWill(string machineId, DateTimeOffset timestamp)
     {
         var will = ConnectionState(LastWillState, timestamp);
-        return (SpecWire.Topic(serialNumber, SpecElements.ConnectionState), Encoding.UTF8.GetBytes(SpecWire.Envelope(will).ToJsonString()));
+        return (SpecWire.Topic(machineId, SpecElements.ConnectionState), Encoding.UTF8.GetBytes(SpecWire.Envelope(will).ToJsonString()));
     }
 
     public void Dispose()
@@ -208,7 +208,7 @@ internal sealed partial class SpecPublisher : IDisposable
                     return;
                 }
             }
-            await _client.EnqueueAsync(Message(SpecWire.EventTopic(_serialNumber, next.Path), SpecWire.Event(next, _source), retain: false,
+            await _client.EnqueueAsync(Message(SpecWire.EventTopic(_machineId, next.Path), SpecWire.Event(next, _source), retain: false,
                     SpecWire.EventContentType))
                 .ConfigureAwait(false);
         }
@@ -221,7 +221,7 @@ internal sealed partial class SpecPublisher : IDisposable
 
     private MqttApplicationMessage ValueMessage(SpecValue value)
     {
-        return Message(SpecWire.Topic(_serialNumber, value.Path), SpecWire.Envelope(value), retain: true);
+        return Message(SpecWire.Topic(_machineId, value.Path), SpecWire.Envelope(value), retain: true);
     }
 
     private static MqttApplicationMessage Message(string topic, JsonObject payload, bool retain, string contentType = SpecWire.ContentType)

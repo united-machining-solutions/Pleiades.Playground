@@ -184,7 +184,7 @@ internal sealed class VirtualMachine
         Set(SpecElements.SerialNumber, _identity.SerialNumber);
         Set(SpecElements.ProductInstanceUri, _identity.ProductInstanceUri);
         Set(SpecElements.Model, _scenario.Model);
-        Set(SpecElements.ManufacturerUri, string.IsNullOrWhiteSpace(_config.ManufacturerUri) ? $"https://{_config.ManufacturerDomain}" : _config.ManufacturerUri);
+        Set(SpecElements.ManufacturerUri, _config.EffectiveManufacturerUri);
         Set(SpecElements.ProductCode, _scenario.ProductCode);
         Set(SpecElements.YearOfConstruction, (long)_scenario.YearOfConstruction);
         Set(SpecElements.MonthOfConstruction, (long)_scenario.MonthOfConstruction);

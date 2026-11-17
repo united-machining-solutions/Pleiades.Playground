@@ -6,6 +6,17 @@ namespace Pleiades.Playground.Simulator.Spec;
 /// <summary>The manifest of the virtual machine: model version, profiles, elements and events it delivers.</summary>
 internal static class SpecManifest
 {
+    /// <summary>
+    /// The machine id of the spec binding for this machine, from the values it publishes: its ManufacturerUri, Model
+    /// and SerialNumber.
+    /// </summary>
+    public static string MachineId(MachineIdentity identity, SpecOutputConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        ArgumentNullException.ThrowIfNull(config);
+        return SpecWire.MachineId(config.EffectiveManufacturerUri, config.Scenario.Model, identity.SerialNumber);
+    }
+
     public static JsonObject Build(MachineIdentity identity, SpecOutputConfig config)
     {
         ArgumentNullException.ThrowIfNull(identity);
@@ -15,6 +26,8 @@ internal static class SpecManifest
         {
             ["modelVersion"] = SpecElements.ModelVersion,
             ["bindingVersion"] = SpecElements.BindingVersion,
+            // A field of the binding: the level of the topics, so that no consumer has to form it.
+            ["machineId"] = MachineId(identity, config),
             ["machine"] = new JsonObject { ["ProductInstanceUri"] = identity.ProductInstanceUri },
             ["profiles"] = new JsonArray([.. SpecElements.Profiles.Select(p => (JsonNode)p)]),
             ["heartbeatInterval"] = config.HeartbeatInterval.TotalSeconds,

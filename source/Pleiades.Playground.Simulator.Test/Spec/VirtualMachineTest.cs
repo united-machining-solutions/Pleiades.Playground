@@ -983,7 +983,48 @@ public sealed class VirtualMachineTest
     }
 
     [TestMethod]
-    public void Topics_LieBelowTheSerialNumberOfTheSimulator_SplitLikeThePlaygroundTree()
+    [DataRow("https://example.com", "GX-400", "P-04", "example-com_GX-400_P-04")]
+    [DataRow("https://www.example.com/products", "GX-400", "P-04", "example-com_GX-400_P-04")]
+    [DataRow("https://müller-maschinen.de", "Schleifer 5/2", "SN 0815#a", "mueller-maschinen-de_Schleifer-5-2_SN-0815-a")]
+    [DataRow("https://example.com", "Größe Ä Ö Ü", "Café_01", "example-com_Groesse-Ae-Oe-Ue_Cafe-01")]
+    [DataRow("https://example.com", "--a  +  b--", "x//y", "example-com_a-b_x-y")]
+    [DataRow("example machine tools", "", "  ", "example-machine-tools_unknown_unknown")]
+    public void MachineId_IsManufacturerModelAndSerialNumber_EachPartNormalised(string manufacturerAddress, string model, string serialNumber, string expected)
+    {
+        Assert.AreEqual(expected, SpecWire.MachineId(manufacturerAddress, model, serialNumber));
+    }
+
+    [TestMethod]
+    public void MachineIdPart_IsAtMost64Characters_WithoutASeparatorOrAWildcard()
+    {
+        var part = SpecWire.MachineIdPart(new string('A', 70) + "_+/#.");
+        Assert.HasCount(64, part);
+        Assert.AreEqual(new string('A', 64), part);
+        Assert.AreEqual(new string('x', 63), SpecWire.MachineIdPart(new string('x', 63) + "-yz"), "a cut part ends without a hyphen");
+        foreach (var bad in new[] { "_", "+", "#", "/", ".", " " })
+        {
+            Assert.IsFalse(SpecWire.MachineId("https://a.b", $"m{bad}x", $"s{bad}y").Split('_').Any(p => p.Contains(bad, StringComparison.Ordinal)), bad);
+        }
+        Assert.HasCount(3, SpecWire.MachineId("https://a.b", "m_x", "s_y").Split('_'), "_ separates the three parts only");
+    }
+
+    [TestMethod]
+    public void MachineId_OfEveryScenario_NamesTheManifestTheTopicsAndTheLastWill()
+    {
+        var identity = new MachineIdentity("Example Machine Tools", "P-04", "https://example.com/P-04");
+        var config = MachineRun.Config();
+        var machineId = SpecManifest.MachineId(identity, config);
+
+        Assert.AreEqual($"example-com_{config.Scenario.Model}_P-04", machineId);
+        Assert.AreEqual(machineId, SpecManifest.Build(identity, config)["machineId"]!.GetValue<string>());
+        Assert.AreEqual($"simulators/{machineId}/umati/Connection/State", SpecPublisher.LastWill(machineId, MachineRun.Start).Topic);
+        Assert.AreEqual($"simulators/{machineId}/events/jobmonitoring", SpecWire.EventTopic(machineId, SpecElements.JobOrderAdded));
+        Assert.AreEqual($"simulators/{machineId}/oem/Spindle/1/BearingTemperature",
+            SpecWire.Topic(machineId, SpecElements.ExtensionPath("example.com", SpecElements.BearingTemperature)));
+    }
+
+    [TestMethod]
+    public void Topics_LieBelowTheMachineIdOfTheSimulator_SplitLikeThePlaygroundTree()
     {
         Assert.AreEqual("simulators/P-04/umati/Channel/1/ChannelState", SpecWire.Topic("P-04", "Channel.1.ChannelState"));
         Assert.AreEqual("simulators/P-04/umati/State/Status", SpecWire.Topic("P-04", SpecElements.Status));

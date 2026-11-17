@@ -15,7 +15,7 @@ namespace Pleiades.Playground.Simulator.Spec;
 /// Runs the virtual machine and hands what it says in each step to its outputs, each of them switched on its own:
 /// <list type="bullet">
 /// <item>the spec output (<c>Config:SpecOutput:Enabled</c>): the manifest, every value retained and the events not
-/// retained, below <c>simulators/{SerialNumber}/</c>, on an MQTT connection of its own with the last will
+/// retained, below <c>simulators/{MachineId}/</c> (<c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>), on an MQTT connection of its own with the last will
 /// <c>Connection/State = CommunicationFault</c>. A scenario may let the adapter lose the machine now and then
 /// (<see cref="ScenarioConfig.CommunicationFaultInterval"/>): meanwhile only the heartbeat goes out;</item>
 /// <item>the production events (<c>Config:ProductionEvents:Enabled</c>): the job order and program execution events
@@ -37,6 +37,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
 
     private VirtualMachine? _machine;
     private JsonObject _manifest = [];
+    private string _machineId = string.Empty;
     private bool _faulted;
 
     public VirtualMachineService(
@@ -65,6 +66,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
                 ? $"https://{_spec.ManufacturerDomain}/{_config.SerialNumber}"
                 : _spec.ProductInstanceUri);
         _manifest = SpecManifest.Build(identity, _spec);
+        _machineId = SpecManifest.MachineId(identity, _spec);
         var counters = SpecCounterStore.Load(_spec.PersistenceFilePath, _spec.Scenario);
         _machine = new VirtualMachine(identity, _spec, counters, start);
         _machine.TakeInitialMessages();
@@ -88,9 +90,9 @@ internal sealed partial class VirtualMachineService : BackgroundService
         {
             if (_spec.Enabled)
             {
-                LogStarting(SpecWire.Root, _config.SerialNumber);
+                LogStarting(SpecWire.Root, _machineId);
                 client = new MqttClientFactory().CreateManagedMqttClientWithLogger(_loggerFactory);
-                publisher = new SpecPublisher(client, _config.SerialNumber, _manifest, identity.ProductInstanceUri, _spec.EventBufferSize, _logger);
+                publisher = new SpecPublisher(client, _machineId, _manifest, identity.ProductInstanceUri, _spec.EventBufferSize, _logger);
                 var connected = publisher;
                 // The handler only runs while the client is started; the client is stopped before either is disposed.
 #pragma warning disable CA2025
@@ -234,7 +236,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
         // The broker publishes the last will when the connection breaks off. Its timestamp is the time of the
         // connect: the binding has no way to put the time of the break into it. The model needs no last will (the
         // heartbeat tells whether the adapter lives); here it tells sooner, with the value closest to it.
-        var (willTopic, willPayload) = SpecPublisher.LastWill(_config.SerialNumber, start);
+        var (willTopic, willPayload) = SpecPublisher.LastWill(_machineId, start);
         var options = new MqttClientOptionsBuilder()
             .WithConfig(mqtt)
             .WithWillTopic(willTopic)
@@ -263,8 +265,8 @@ internal sealed partial class VirtualMachineService : BackgroundService
         }
     }
 
-    [LoggerMessage(EventId = 100, Level = LogLevel.Information, Message = "Spec output publishes the virtual machine below {Root}/{SerialNumber}/")]
-    private partial void LogStarting(string root, string serialNumber);
+    [LoggerMessage(EventId = 100, Level = LogLevel.Information, Message = "Spec output publishes the virtual machine below {Root}/{MachineId}/")]
+    private partial void LogStarting(string root, string machineId);
 
     [LoggerMessage(EventId = 101, Level = LogLevel.Information, Message = "Job and work master events of the virtual machine go to machines/{SerialNumber}/events/jobs and /workmasters")]
     private partial void LogProductionEvents(string serialNumber);

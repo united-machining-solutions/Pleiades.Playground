@@ -33,11 +33,72 @@ internal static class SpecWire
 {
     /// <summary>
     /// The root of every topic of the spec binding. The output stands for the simulator of a machine; it lies below
-    /// <c>simulators/{SerialNumber}/</c>, beside <c>machines/{SerialNumber}/</c> of the binding of the playground.
-    /// Below the serial number comes a namespace level, as namespaces in OPC UA: <c>umati</c> for the elements of
+    /// <c>simulators/{MachineId}/</c>, beside <c>machines/{SerialNumber}/</c> of the binding of the playground.
+    /// Below the machine id comes a namespace level, as namespaces in OPC UA: <c>umati</c> for the elements of
     /// the model, <c>oem</c> for the signals the machine manufacturer defines, and <c>events</c> for the events.
     /// </summary>
     public const string Root = "simulators";
+
+    /// <summary>The most characters of one part of a machine id.</summary>
+    public const int MachineIdPartLength = 64;
+
+    /// <summary>
+    /// The machine id of the spec binding, <c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>, for example
+    /// <c>example-com_GX-400_P-04</c>. The manufacturer is the domain of its <c>ManufacturerUri</c> without a leading
+    /// <c>www.</c>, every dot a <c>-</c>: it stays when the company is renamed. Each part is normalised
+    /// (<see cref="MachineIdPart"/>); <c>_</c> separates the parts and never occurs in one.
+    /// </summary>
+    public static string MachineId(string manufacturerUri, string model, string serialNumber)
+    {
+        ArgumentNullException.ThrowIfNull(manufacturerUri);
+        var manufacturer = Uri.TryCreate(manufacturerUri, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(uri.Host)
+            ? uri.Host
+            : manufacturerUri;
+        if (manufacturer.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
+        {
+            manufacturer = manufacturer[4..];
+        }
+        return string.Join('_', MachineIdPart(manufacturer), MachineIdPart(model), MachineIdPart(serialNumber));
+    }
+
+    /// <summary>
+    /// One part of a machine id: ä, ö, ü and ß written out (<c>ae</c>, <c>oe</c>, <c>ue</c>, <c>ss</c>), other accents
+    /// dropped, every character but <c>A-Z</c>, <c>a-z</c>, <c>0-9</c> and <c>-</c> a <c>-</c>, several <c>-</c> one,
+    /// none at the start or the end, at most <see cref="MachineIdPartLength"/> characters. An empty part is
+    /// <c>unknown</c>. So a part holds nothing MQTT, NATS or a file name would read otherwise.
+    /// </summary>
+    public static string MachineIdPart(string? text)
+    {
+        var written = (text ?? string.Empty)
+            .Replace("ä", "ae", StringComparison.Ordinal).Replace("ö", "oe", StringComparison.Ordinal).Replace("ü", "ue", StringComparison.Ordinal)
+            .Replace("Ä", "Ae", StringComparison.Ordinal).Replace("Ö", "Oe", StringComparison.Ordinal).Replace("Ü", "Ue", StringComparison.Ordinal)
+            .Replace("ß", "ss", StringComparison.Ordinal)
+            .Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(written.Length);
+        foreach (var c in written)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.NonSpacingMark)
+            {
+                continue;
+            }
+            var allowed = char.IsAsciiLetterOrDigit(c) || c == '-';
+            if (allowed || (builder.Length > 0 && builder[^1] != '-'))
+            {
+                builder.Append(allowed ? c : '-');
+            }
+        }
+        var part = builder.ToString();
+        while (part.Contains("--", StringComparison.Ordinal))
+        {
+            part = part.Replace("--", "-", StringComparison.Ordinal);
+        }
+        part = part.Trim('-');
+        if (part.Length > MachineIdPartLength)
+        {
+            part = part[..MachineIdPartLength].TrimEnd('-');
+        }
+        return part.Length == 0 ? "unknown" : part;
+    }
 
     /// <summary>The namespace of the elements of the model and of the manifest.</summary>
     public const string ModelLevel = "umati";
@@ -65,7 +126,7 @@ internal static class SpecWire
     /// another namespace. The domain of the manufacturer stays in the manifest; the topic carries none.
     /// </summary>
     /// <exception cref="ArgumentException">A path with <c>x-</c> has no valid prefix segment.</exception>
-    public static string Topic(string serialNumber, string path)
+    public static string Topic(string machineId, string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         if (path.StartsWith("x-", StringComparison.Ordinal))
@@ -75,9 +136,9 @@ internal static class SpecWire
             {
                 throw new ArgumentException($"'{path}' has no prefix x-<domain> of the model.", nameof(path));
             }
-            return $"{Root}/{serialNumber}/{OemLevel}/{path[(dot + 1)..].Replace('.', '/')}";
+            return $"{Root}/{machineId}/{OemLevel}/{path[(dot + 1)..].Replace('.', '/')}";
         }
-        return $"{Root}/{serialNumber}/{ModelLevel}/{path.Replace('.', '/')}";
+        return $"{Root}/{machineId}/{ModelLevel}/{path.Replace('.', '/')}";
     }
 
     /// <summary>The level below the machine under which every event lies.</summary>
@@ -102,7 +163,7 @@ internal static class SpecWire
     /// tells them apart.
     /// </summary>
     /// <exception cref="ArgumentException">The group of the event has no topic name.</exception>
-    public static string EventTopic(string serialNumber, string path)
+    public static string EventTopic(string machineId, string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var group = path.Split('.')[0];
@@ -110,13 +171,13 @@ internal static class SpecWire
         {
             throw new ArgumentException($"The group '{group}' of the event '{path}' has no topic name.", nameof(path));
         }
-        return $"{Root}/{serialNumber}/{EventsLevel}/{name}";
+        return $"{Root}/{machineId}/{EventsLevel}/{name}";
     }
 
     /// <summary>The topic of the manifest, below <c>umati/</c>.</summary>
-    public static string ManifestTopic(string serialNumber)
+    public static string ManifestTopic(string machineId)
     {
-        return $"{Root}/{serialNumber}/{ModelLevel}/Manifest";
+        return $"{Root}/{machineId}/{ModelLevel}/Manifest";
     }
 
     /// <summary>Source time in UTC, ISO 8601 with milliseconds and <c>Z</c>.</summary>

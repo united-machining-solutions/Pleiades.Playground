@@ -33,6 +33,9 @@ internal sealed class SpecOutputConfig
     /// <summary>Web address of the manufacturer, <c>Identification.ManufacturerUri</c>. Empty: <c>https://{ManufacturerDomain}</c>.</summary>
     public string? ManufacturerUri { get; init; }
 
+    /// <summary>The value of <c>Identification.ManufacturerUri</c>: <see cref="ManufacturerUri"/>, or the one of the domain.</summary>
+    public string EffectiveManufacturerUri => string.IsNullOrWhiteSpace(ManufacturerUri) ? $"https://{ManufacturerDomain}" : ManufacturerUri;
+
     /// <summary>Interval of <c>Connection.Heartbeat</c>; the manifest names it.</summary>
     public TimeSpan HeartbeatInterval { get; init; } = TimeSpan.FromSeconds(10);
 

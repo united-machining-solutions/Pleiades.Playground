@@ -55,7 +55,7 @@ public sealed partial class SchemaConformanceTest
     [TestMethod]
     public void Manifest_IsValid()
     {
-        var manifest = SpecManifest.Build(Identity(), MachineRun.Config());
+        var manifest = ModelManifest();
         AssertValid(Schema("manifest.schema.json"), manifest.ToJsonString(), "manifest");
 
         // The schema takes a signal of the manufacturer with type, unit and description.
@@ -71,7 +71,7 @@ public sealed partial class SchemaConformanceTest
     [TestMethod]
     public void Manifest_DeclaresTheProfilesItDelivers_AndTheSchemaHoldsThemWhole()
     {
-        var manifest = SpecManifest.Build(Identity(), MachineRun.Config());
+        var manifest = ModelManifest();
         var profiles = manifest["profiles"]!.AsArray().Select(p => p!.GetValue<string>()).ToList();
         CollectionAssert.AreEqual(new[]
         {
@@ -193,6 +193,18 @@ public sealed partial class SchemaConformanceTest
         var manifest = SpecManifest.Build(Identity(), MachineRun.Config());
         var element = manifest["elements"]!.AsArray().Single(e => e!["path"]!.GetValue<string>() == path)!;
         return element["unit"]?["name"]?.GetValue<string>();
+    }
+
+    /// <summary>
+    /// The manifest as the model knows it: without <c>machineId</c>, which the binding adds (the schema of the
+    /// manifest allows no field besides its own), as the unit is taken off a value.
+    /// </summary>
+    private static JsonObject ModelManifest()
+    {
+        var manifest = SpecManifest.Build(Identity(), MachineRun.Config());
+        Assert.AreEqual("example-com_GM-500_P-04", manifest["machineId"]!.GetValue<string>(), "the binding names the machine id");
+        manifest.Remove("machineId");
+        return manifest;
     }
 
     private static MachineIdentity Identity()
