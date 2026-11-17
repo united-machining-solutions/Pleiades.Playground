@@ -217,3 +217,76 @@ export async function readRaised(
     goneAt: pair.timestampGone === null ? null : new Date(pair.timestampGone).toISOString(),
   }))
 }
+
+/** The newest value of one topic: when, what, and in which unit. A yes or no has no unit. */
+export type Newest = { at: string; value: number | boolean; unit: string | null }
+
+const newestAnswer = z.object({
+  series: z.array(
+    z.object({
+      topic: z.string(),
+      unit: z.string().nullish(),
+      timestamps: z.array(z.number()),
+      values: z.array(z.union([z.number(), z.boolean()]).nullable()),
+    }),
+  ),
+})
+
+/**
+ * The newest value of one topic before `to`, however old, or null if it never had one. A number
+ * keeps the unit the Timeseries API stored with it.
+ */
+export async function readNewest(
+  apis: Apis,
+  kind: "baseUnitValues" | "booleanValues",
+  topic: string,
+  to: Date,
+): Promise<Newest | null> {
+  const url = between(
+    new URL(`/timeseries/${kind}/topics/${inPath(topic)}`, apis.timeseriesUrl),
+    ["startTime", "stopTime"],
+    EVER,
+    to,
+  )
+  url.searchParams.set("limit", "1")
+  url.searchParams.set("sorting", "Descending")
+  const { series } = await getJson("Timeseries API", url, newestAnswer)
+  const found = series.find((one) => one.topic === topic)
+  const value = found?.values[0]
+  const timestamp = found?.timestamps[0]
+  if (value == null || timestamp === undefined) return null
+  return { at: fromMicroseconds(timestamp), value, unit: found?.unit ?? null }
+}
+
+/** The values of a topic between two instants, oldest first, with the unit they were stored in. */
+export type Timeline = { topic: string; unit: string | null; samples: Array<{ at: string; value: number | boolean }> }
+
+/**
+ * The values of a topic between the two instants, oldest first. The topic may contain `*` as a
+ * wildcard and then yields one timeline per topic.
+ */
+export async function readTimelines(
+  apis: Apis,
+  kind: "baseUnitValues" | "booleanValues",
+  topic: string,
+  from: Date,
+  to: Date,
+): Promise<Array<Timeline>> {
+  const url = between(
+    new URL(`/timeseries/${kind}/topics/${inPath(topic)}`, apis.timeseriesUrl),
+    ["startTime", "stopTime"],
+    from,
+    to,
+  )
+  const { series } = await getJson("Timeseries API", url, newestAnswer)
+  return series.map((one) => ({
+    topic: one.topic,
+    unit: one.unit ?? null,
+    samples: one.timestamps
+      .flatMap((timestamp, index) => {
+        const value = one.values[index]
+        return value == null ? [] : [{ at: fromMicroseconds(timestamp), value }]
+      })
+      .sort((a, b) => a.at.localeCompare(b.at)),
+  }))
+}

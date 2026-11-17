@@ -10,7 +10,8 @@ the server is the source of truth for tool names and parameters.
 |---|---|---|
 | Timeseries | `http://localhost:5500/mcp` | `timeseries_topics_query`, `timeseries_baseunit_query`, `timeseries_string_query`, `timeseries_boolean_query`, `timeseries_statistics_query` |
 | Events | `http://localhost:5510/mcp` | `events_notification_query`, `events_notification_pairs`, `events_notification_message_stats`, `events_notification_level_distribution`, `events_notification_time_buckets` |
-| Generative UI | `http://localhost:5520/mcp` | `genui_machine_list`, `genui_machine_show`, and for cards `genui_span_list` |
+| Generative UI | `http://localhost:5520/mcp` | `genui_machine_list`, `genui_machine_show`, `genui_measurement_list`, and for cards `genui_span_list` and `genui_measurement_series` |
+| Ultimaker (optional) | `http://localhost:5530/mcp` | Profile selection, STL storage, slicing, validation, artifacts and explicit printer pairing/start; see [contract](../ultimaker/README.md) |
 
 The generative UI server is not an API of its own: it reads the two servers above over REST and returns what
 a display needs, each value with the topic or notification it comes from. Its results are answers, not raw
@@ -19,6 +20,10 @@ data: the text of a result says in words what the values are, so its tools need 
 draws the result with it. What a language model reads of a result is short; a series, such as the states of
 a machine over the last hours, is fetched by the card itself with a tool that only a card calls
 (`genui_span_list`).
+
+The chat of the example app has the tools of the generative UI server. The setting `APP_MCP_SERVERS` gives it
+the tools of further servers of this table, for example `ultimaker=http://ultimaker-api:8080/mcp`: all of
+them, under their own names. A server that does not answer has no tools until it does.
 
 Example entry for an MCP client:
 

@@ -64,4 +64,10 @@
   <Folder Name="/Simulator/">
     <Project Path="Pleiades.Playground.Simulator/Pleiades.Playground.Simulator.csproj" />
   </Folder>
+  <Folder Name="/Ultimaker/">
+    <Project Path="Pleiades.Playground.Ultimaker.Api.Test/Pleiades.Playground.Ultimaker.Api.Test.csproj" />
+    <Project Path="Pleiades.Playground.Ultimaker.Api/Pleiades.Playground.Ultimaker.Api.csproj" />
+    <Project Path="Pleiades.Playground.Ultimaker.Telemetry.Test/Pleiades.Playground.Ultimaker.Telemetry.Test.csproj" />
+    <Project Path="Pleiades.Playground.Ultimaker.Telemetry/Pleiades.Playground.Ultimaker.Telemetry.csproj" />
+  </Folder>
 </Solution>

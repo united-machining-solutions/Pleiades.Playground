@@ -6,6 +6,7 @@ Each API serves its own description; that document is the contract.
 |---|---|---|
 | Timeseries API | `http://localhost:5500/openapi/v1.json` | `http://localhost:5500/` |
 | Events API | `http://localhost:5510/openapi/v1.json` | `http://localhost:5510/` |
+| Ultimaker API (optional) | `http://localhost:5530/openapi/v1.json` | No Swagger UI; see [service guide](../../source/Pleiades.Playground.Ultimaker.Api/README.md) |
 
 Snapshots of both documents will be committed here once the first release is tagged, so that a change to an API
 shows up as a diff in review.
