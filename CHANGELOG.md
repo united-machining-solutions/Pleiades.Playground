@@ -9,6 +9,12 @@ All notable changes are documented here. The format follows
 
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
+- Example app: the button "Tools" in the message field of the chat lists the servers that give the chat
+  tools, says whether each one answers, and names its tools. A chat switches a further server off and on
+  there; the server of the app gives the model no tool of a server that is off.
+- Example app: where no tool answers a question, the chat says that its tools do not show it, not that it
+  does not exist, and where a place fits the question names where to ask, such as the maker of the machine
+  or the maintenance records.
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
@@ -17,6 +23,10 @@ All notable changes are documented here. The format follows
   current jobs and history with durable slice associations, and a separate MQTT telemetry adapter.
   Both containers are part of the root Compose stack and image-publication workflow, enabled for
   deployment with COMPOSE_PROFILES=ultimaker.
+- Optional juice bar service `juicebar-api` (Compose profile `juicebar`, port 5550): the card and the state of
+  a machine that runs MixerControl over REST and MCP, an order on request, and its state on the broker below
+  `machines/{SerialNumber}/`. It never starts the production; `JUICEBAR_ENABLE_ORDERING=false` makes it
+  read-only.
 
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
@@ -26,6 +36,9 @@ All notable changes are documented here. The format follows
   `DEPLOY_ENABLED` is `true`.
 - Shared libraries for logging, JSON, authorization, health checks, MQTT and the MCP server standard.
 - Demo stack (`compose.yaml`), contracts and CI.
+- Margo app (`margo/`): the demo stack as a Margo application, from the published images, validated,
+  packaged and pushed with `bart`. A version tag pushes it to the staging registry with the images of that
+  version (workflow "Margo push", called by "Images"); CI validates it when `margo/` changes.
 - TypeScript workspace for `apps/` and `packages/`: pinned Node.js and pnpm, one version catalog, a shared
   TypeScript configuration and a CI job.
 - Generative UI backend `genui-mcp` in the demo stack on port 5520: an MCP server with the tool
@@ -167,7 +180,7 @@ All notable changes are documented here. The format follows
   `/pages` lists the pages of the browser, and is reached through the breadcrumb; a page is renamed, pinned
   and deleted from its head. A pinned page stands in the sidebar on the top level, beside Home, and the
   others stand under it in a group "Pages" that folds, a plain row each, the newest first; with no page to
-  list there is no group. Why: ADR-0013.
+  list there is no group. Why: ADR-0014.
 - "Save as page" under an answer of the chat: it keeps all the cards of the answer, in their order, as a page
   titled with the question, and opens it beside the chat. It needs no language model, the app reads the tool
   calls from the answer it already has, and it stands only under an answer that has ended and for which the
@@ -186,6 +199,12 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- `app`: Home, the page of a machine, Live values and Charts are live from the broker (ADR-0013). They read what the
+  backend knows once, and then hear every value at the broker, MQTT over WebSocket, the moment it is
+  published, instead of reading everything again every ten seconds. The browser must reach the broker's
+  WebSocket: `MQTT_WS_PORT` at the host of the page, or `MQTT_WS_URL` behind a proxy. The topics of the
+  machine card and the measurement card are in their contracts in `@pleiades/cards` (`READING_PATHS`,
+  `NOTIFICATIONS_PATH`, `QUANTITY_PATHS`), and `genui-mcp` reads the same ones.
 - `app`, for those who run `main`: the chat takes its models from a LiteLLM gateway, with two settings,
   `LLM_BASE_URL` and `LLM_API_KEY`. The settings `ANTHROPIC_*`, `OPENAI_*`, `OPENAI_TRANSCRIPTION_MODEL`,
   `LLM_MODELS` and `LLM_TRANSCRIPTION_MODEL` and the package `@tanstack/ai-anthropic` are gone. A `.env` that

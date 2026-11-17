@@ -4,7 +4,7 @@ status: proposed
 date: 2026-11-17
 ---
 
-# ADR-0013: A page from the chat is a recipe, kept in the browser
+# ADR-0014: A page from the chat is a recipe, kept in the browser
 
 ## Context
 

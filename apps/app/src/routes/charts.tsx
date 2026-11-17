@@ -1,4 +1,3 @@
-import { clock } from "@pleiades/cards/machine/format.ts"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { createFileRoute } from "@tanstack/react-router"
@@ -7,8 +6,18 @@ import type { ReactNode } from "react"
 
 import { HISTORY_MS, StateHistoryTile, StateTotalsTile } from "@/charts/state-tiles.tsx"
 import { NoAnswer } from "@/components/no-answer.tsx"
-import { useLive } from "@/hooks/use-live.ts"
+import { liveness, useLive, useRetry } from "@/hooks/use-live.ts"
+import type { Live } from "@/hooks/use-live.ts"
+import { chartsAt, chartsWith, machineFilters } from "@/live/machines.ts"
+import type { ChartsPage } from "@/live/machines.ts"
 import { getCharts } from "@/machines/get-machines.ts"
+
+/** The page is read once, from the backend; then every value of every machine comes from the broker. */
+const live: Live<ChartsPage | null> = {
+  filters: machineFilters(),
+  message: (page, topic, payload, now) => page && chartsWith(page, topic, payload, now),
+  at: (page, now) => page && chartsAt(page, now),
+}
 
 /**
  * Charts: the last hours of every machine, as charts. What needs a person now is Home's question;
@@ -25,17 +34,18 @@ export const Route = createFileRoute("/charts")({
 
 function Charts() {
   const answer = Route.useLoaderData()
-  useLive()
+  const { values: page, connected } = useLive<ChartsPage | null>(answer.values, live)
+  useRetry(answer.values === null)
 
-  if (answer.values === null) {
+  if (answer.values === null || page === null) {
     return (
       <Page>
-        <NoAnswer error={answer.error} />
+        <NoAnswer error={answer.error ?? ""} />
       </Page>
     )
   }
 
-  const { asOf, machines } = answer.values
+  const { asOf, machines } = page
   if (machines.length === 0) {
     return (
       <Page>
@@ -53,7 +63,7 @@ function Charts() {
   }
 
   return (
-    <Page line={`${machines.length} ${machines.length === 1 ? "machine" : "machines"} · live · now ${clock(asOf)}`}>
+    <Page line={`${machines.length} ${machines.length === 1 ? "machine" : "machines"} · ${liveness(connected, asOf)}`}>
       <StateTotalsTile shows={machines.map((one) => one.show)} />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(20rem,1fr))] gap-4">
         {machines.map(({ show, from, spans }) => (

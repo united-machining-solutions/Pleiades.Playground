@@ -18,6 +18,20 @@ export const QUANTITIES = [
 export const quantity = z.enum(QUANTITIES)
 export type Quantity = z.infer<typeof quantity>
 
+/**
+ * Where each quantity is published, below `machines/{SerialNumber}/`. The backend reads the stored
+ * values of these topics, and a page that is live subscribes to them at the broker.
+ */
+export const QUANTITY_PATHS: Record<Quantity, string> = {
+  activePower: "umati/Consumption/Electricity/Main/AcActivePowerTotal",
+  energyImported: "umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp",
+  bearingTemperature: "vendor/Spindle/1/BearingTemperature",
+  spindleRotating: "umati/Spindle/1/IsRotating",
+  feedOverride: "umati/State/FeedOverride",
+  spindleOverride: "umati/Spindle/1/Override",
+  powerOnDuration: "umati/OperationCounters/PowerOnDuration",
+}
+
 export const measurement = z.object({
   quantity,
   value: z

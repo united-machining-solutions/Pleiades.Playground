@@ -1,14 +1,17 @@
-import { clock } from "@pleiades/cards/machine/format.ts"
 import { MachineCard } from "@pleiades/cards/machine/machine-card.tsx"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { Link, createFileRoute, notFound } from "@tanstack/react-router"
 import { SearchXIcon } from "lucide-react"
+import { useMemo } from "react"
 import type { ReactNode } from "react"
 
 import { NoAnswer } from "@/components/no-answer.tsx"
 import { buttonVariants } from "@pleiades/ui/components/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
-import { useLive } from "@/hooks/use-live.ts"
+import { liveness, useLive, useRetry } from "@/hooks/use-live.ts"
+import type { Live } from "@/hooks/use-live.ts"
+import { machineFilters, pageAt, pageWith } from "@/live/machines.ts"
+import type { MachinePage } from "@/live/machines.ts"
 import { getMachine, getMachines, getSpans } from "@/machines/get-machines.ts"
 
 /**
@@ -43,10 +46,22 @@ export const Route = createFileRoute("/machines/$machine")({
 function Machine() {
   const { answer, spans } = Route.useLoaderData()
   const { machine } = Route.useParams()
-  useLive()
+  // What the backend read when the page was opened: the card, and the history up to then.
+  const loaded = useMemo(() => (answer.values ? { show: answer.values, spans } : null), [answer, spans])
+  // From then on the values of the machine come from the broker, and its history goes on with them.
+  const live = useMemo(
+    (): Live<MachinePage | null> => ({
+      filters: machineFilters(machine),
+      message: (page, topic, payload, now) => page && pageWith(page, topic, payload, now),
+      at: (page, now) => page && pageAt(page, now),
+    }),
+    [machine],
+  )
+  const { values: page, connected } = useLive(loaded, live)
+  useRetry(answer.values === null)
   return (
-    <Page machine={machine} line={answer.values ? `live · now ${clock(answer.values.asOf)}` : undefined}>
-      {answer.values ? <MachineCard {...answer.values} spans={spans} /> : <NoAnswer error={answer.error} />}
+    <Page machine={machine} line={page ? liveness(connected, page.show.asOf) : undefined}>
+      {page ? <MachineCard {...page.show} spans={page.spans} /> : <NoAnswer error={answer.error ?? ""} />}
     </Page>
   )
 }

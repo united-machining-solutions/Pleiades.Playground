@@ -53,6 +53,10 @@ The separate [Ultimaker telemetry adapter](source/Pleiades.Playground.Ultimaker.
 publishes read-only printer observations to the existing broker and time-series persistence.
 For deployment from published images, enable `COMPOSE_PROFILES=ultimaker` and configure the printer
 URL in the server's private .env; see [deployment](docs/deployment.md#enable-the-ultimaker-services).
+An optional [juice bar service](source/Pleiades.Playground.JuiceBar.Api/README.md) puts a machine that mixes
+drinks behind REST and MCP and publishes its state to the broker. It is started only with the `juicebar`
+Compose profile and needs a machine that runs MixerControl; it places orders and never starts the production.
+For a deployment, see [deployment](docs/deployment.md#enable-the-juice-bar-service).
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo; only
 the chat of the example app needs a language model, through a LiteLLM gateway:
 
@@ -99,6 +103,7 @@ stacks/       Configuration of third-party containers (broker)
 docs/         Architecture, decisions (ADR) and guides
 .github/      CI workflows and templates
 compose.yaml  The demo stack
+margo/        The demo stack as a Margo app, packaged and published with bart
 ```
 
 Project and image names follow one pattern: `Pleiades.Playground.<Area>.<Part>` in .NET and
