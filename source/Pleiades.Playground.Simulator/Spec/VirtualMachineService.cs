@@ -7,20 +7,29 @@ using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Protocol;
 using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Simulator.Production;
 
 namespace Pleiades.Playground.Simulator.Spec;
 
 /// <summary>
-/// Publishes the virtual machine after the spec binding of contracts/mqtt: the manifest, every value retained and
-/// the events not retained, below <c>simulators/{SerialNumber}/</c>. It has its own MQTT connection, with the last will
-/// <c>Connection/State = Disconnected</c>, beside the connection of the generators.
+/// Runs the virtual machine and hands what it says in each step to its outputs, each of them switched on its own:
+/// <list type="bullet">
+/// <item>the spec output (<c>Config:SpecOutput:Enabled</c>): the manifest, every value retained and the events not
+/// retained, below <c>simulators/{SerialNumber}/</c>, on an MQTT connection of its own with the last will
+/// <c>Connection/State = Disconnected</c>;</item>
+/// <item>the production events (<c>Config:ProductionEvents:Enabled</c>): the job order and program execution events
+/// in the binding of the playground, on <c>machines/{SerialNumber}/events/production</c>, over the connection of the
+/// generators.</item>
+/// </list>
+/// The scenario of the virtual machine is the one of <c>Config:SpecOutput</c> in both cases.
 /// </summary>
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Instantiated by DI")]
-internal sealed partial class SpecOutputService : BackgroundService
+internal sealed partial class VirtualMachineService : BackgroundService
 {
     private readonly Config _config;
     private readonly SpecOutputConfig _spec;
-    private readonly ILogger<SpecOutputService> _logger;
+    private readonly ILogger<VirtualMachineService> _logger;
+    private readonly IManagedMqttClient _playgroundClient;
     private readonly ILoggerFactory _loggerFactory;
     private readonly TimeProvider _timeProvider;
     private readonly Lock _lock = new();
@@ -28,10 +37,16 @@ internal sealed partial class SpecOutputService : BackgroundService
     private VirtualMachine? _machine;
     private JsonObject _manifest = [];
 
-    public SpecOutputService(IOptions<Config> config, ILogger<SpecOutputService> logger, ILoggerFactory loggerFactory, TimeProvider timeProvider)
+    public VirtualMachineService(
+        IOptions<Config> config,
+        ILogger<VirtualMachineService> logger,
+        ILoggerFactory loggerFactory,
+        TimeProvider timeProvider,
+        IManagedMqttClient playgroundClient)
     {
         ArgumentNullException.ThrowIfNull(config);
         _config = config.Value;
+        _playgroundClient = playgroundClient;
         _spec = _config.SpecOutput.Resolve();
         _logger = logger;
         _loggerFactory = loggerFactory;
@@ -51,15 +66,28 @@ internal sealed partial class SpecOutputService : BackgroundService
         var counters = SpecCounterStore.Load(_spec.PersistenceFilePath, _spec.Scenario);
         _machine = new VirtualMachine(identity, _spec, counters, start);
         _machine.TakeInitialMessages();
-        LogStarting(SpecWire.Root, _config.SerialNumber);
 
-        // Both are disposed once the loop has ended and the client is stopped, in the finally block below.
-#pragma warning disable CA2025
-        using var client = new MqttClientFactory().CreateManagedMqttClientWithLogger(_loggerFactory);
-        using var publisher = new SpecPublisher(client, _config.SerialNumber, _manifest, _machine.SeqEpoch, _spec.EventBufferSize, _logger);
-        client.ConnectedAsync += _ => OnConnectedAsync(publisher);
-#pragma warning restore CA2025
-        await client.StartAsync(CreateOptions(start)).ConfigureAwait(false);
+        var production = _config.ProductionEvents.Enabled
+            ? new ProductionEventOutput(_playgroundClient, _config.SerialNumber, _machine.SeqEpoch)
+            : null;
+        if (production is not null)
+        {
+            LogProductionEvents(ProductionEventOutput.Topic(_config.SerialNumber));
+        }
+
+        // The spec output has a connection of its own; client and publisher are disposed once the loop has ended
+        // and the client is stopped, in the finally block below.
+        IManagedMqttClient? client = null;
+        SpecPublisher? publisher = null;
+        if (_spec.Enabled)
+        {
+            LogStarting(SpecWire.Root, _config.SerialNumber);
+            client = new MqttClientFactory().CreateManagedMqttClientWithLogger(_loggerFactory);
+            publisher = new SpecPublisher(client, _config.SerialNumber, _manifest, _machine.SeqEpoch, _spec.EventBufferSize, _logger);
+            var connected = publisher;
+            client.ConnectedAsync += _ => OnConnectedAsync(connected);
+            await client.StartAsync(CreateOptions(start)).ConfigureAwait(false);
+        }
 
         var lastSaved = start;
         using var timer = new PeriodicTimer(_spec.TickInterval, _timeProvider);
@@ -76,7 +104,14 @@ internal sealed partial class SpecOutputService : BackgroundService
                     current = _machine.Counters;
                 }
 
-                await publisher.PublishAsync(messages).ConfigureAwait(false);
+                if (publisher is not null)
+                {
+                    await publisher.PublishAsync(messages).ConfigureAwait(false);
+                }
+                if (production is not null)
+                {
+                    await production.PublishAsync(messages).ConfigureAwait(false);
+                }
 
                 if (now - lastSaved >= TimeSpan.FromSeconds(30))
                 {
@@ -92,7 +127,12 @@ internal sealed partial class SpecOutputService : BackgroundService
         finally
         {
             SaveCounters(_machine.Counters);
-            await DisconnectAsync(client, publisher).ConfigureAwait(false);
+            if (client is not null && publisher is not null)
+            {
+                await DisconnectAsync(client, publisher).ConfigureAwait(false);
+            }
+            publisher?.Dispose();
+            client?.Dispose();
         }
     }
 
@@ -170,7 +210,10 @@ internal sealed partial class SpecOutputService : BackgroundService
     [LoggerMessage(EventId = 100, Level = LogLevel.Information, Message = "Spec output publishes the virtual machine below {Root}/{SerialNumber}/")]
     private partial void LogStarting(string root, string serialNumber);
 
-    [LoggerMessage(EventId = 102, Level = LogLevel.Information, Message = "Spec output is stopping")]
+    [LoggerMessage(EventId = 101, Level = LogLevel.Information, Message = "Production events of the virtual machine go to {Topic}")]
+    private partial void LogProductionEvents(string topic);
+
+    [LoggerMessage(EventId = 102, Level = LogLevel.Information, Message = "Virtual machine is stopping")]
     private partial void LogStopping();
 
     [LoggerMessage(EventId = 104, Level = LogLevel.Warning, Message = "Saving the counters to {File} failed")]

@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Pleiades.Playground.Common.Logging.Loki.Configuration;
 using Pleiades.Playground.Events.Generators.NotificationEvent;
 using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Simulator.Production;
 using Pleiades.Playground.Simulator.Spec;
 using Pleiades.Playground.Timeseries.Generators.BaseUnitValue;
 using Pleiades.Playground.Timeseries.Generators.BooleanValue;
@@ -60,6 +61,13 @@ internal sealed class Config
     /// generators. Off unless enabled.
     /// </summary>
     public SpecOutputConfig SpecOutput { get; init; } = new();
+
+    /// <summary>
+    /// The production events of the virtual machine, job orders and program executions, on
+    /// <c>machines/{SerialNumber}/events/production</c>. On by default; the virtual machine runs with the scenario
+    /// of <see cref="SpecOutput"/> whether the spec output is on or not.
+    /// </summary>
+    public ProductionEventsConfig ProductionEvents { get; init; } = new();
 
     /// <summary>
     /// Loki logging configuration.

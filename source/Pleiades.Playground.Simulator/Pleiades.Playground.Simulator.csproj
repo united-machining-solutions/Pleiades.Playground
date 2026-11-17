@@ -30,5 +30,6 @@
     <ProjectReference Include="..\Pleiades.Playground.Timeseries.Common\Pleiades.Playground.Timeseries.Common.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.Timeseries.Generators\Pleiades.Playground.Timeseries.Generators.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.Events.Generators\Pleiades.Playground.Events.Generators.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Events.DataTransferObjects\Pleiades.Playground.Events.DataTransferObjects.csproj" />
   </ItemGroup>
 </Project>
