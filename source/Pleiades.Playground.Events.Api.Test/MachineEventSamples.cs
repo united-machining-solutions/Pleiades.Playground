@@ -29,7 +29,7 @@ internal static class MachineEventSamples
             ["type"] = type,
             ["time"] = Iso(Start.AddMinutes(minute)),
             ["sequence"] = $"{Prefix}.{count:D12}",
-            ["dataschema"] = "urn:umati2:datamodel:0.17.0:event.schema.json",
+            ["dataschema"] = "urn:umati2:datamodel:0.17.1:event.schema.json",
             ["data"] = data,
         };
         if (correlationId is not null)

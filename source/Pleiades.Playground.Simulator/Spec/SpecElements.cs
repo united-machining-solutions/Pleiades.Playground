@@ -7,7 +7,7 @@ namespace Pleiades.Playground.Simulator.Spec;
 /// </summary>
 internal static class SpecElements
 {
-    public const string ModelVersion = "0.17.0";
+    public const string ModelVersion = "0.17.1";
     public const string BindingVersion = "0.1.0-draft";
 
     public const string Manufacturer = "Identification.Manufacturer";

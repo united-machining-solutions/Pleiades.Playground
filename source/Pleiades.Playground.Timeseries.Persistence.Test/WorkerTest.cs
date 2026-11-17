@@ -215,7 +215,7 @@ public class WorkerTest : IDisposable
         await DeliverModelValue(mqtt, $"{MachineTopic}/Production/ActiveWorkMaster",
             """{ "timestamp": "2026-11-17T09:15:02.123Z", "value": null }""").ConfigureAwait(false);
         await DeliverModelValue(mqtt, $"{MachineTopic}/Manifest",
-            """{ "modelVersion": "0.17.0", "machineId": "alcyone-machines_AX-400_P-04", "profiles": ["Core"] }""").ConfigureAwait(false);
+            """{ "modelVersion": "0.17.1", "machineId": "alcyone-machines_AX-400_P-04", "profiles": ["Core"] }""").ConfigureAwait(false);
         await Task.Delay(_waitBeforeCheckDelay).ConfigureAwait(false);
 
         Assert.AreEqual("Executing", _stringUnitValues[$"{MachineTopic}/State/Status/MachineryItemState"].Value);

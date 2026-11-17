@@ -870,7 +870,7 @@ public sealed class VirtualMachineTest
         Assert.AreEqual("2026-11-17T06:00:00.000Z", wire["time"]!.GetValue<string>());
         Assert.AreEqual("20261117T060000Z.000000000007", wire["sequence"]!.GetValue<string>());
         Assert.AreEqual("exec-1", wire["correlationid"]!.GetValue<string>());
-        Assert.AreEqual("urn:umati2:datamodel:0.17.0:event.schema.json", wire["dataschema"]!.GetValue<string>());
+        Assert.AreEqual("urn:umati2:datamodel:0.17.1:event.schema.json", wire["dataschema"]!.GetValue<string>());
         Assert.AreEqual("a", wire["data"]!["Id"]!.GetValue<string>());
 
         var withoutCorrelation = SpecWire.Event(specEvent with { CorrelationId = null }, "https://www.alcyone-machines.example/GM-500/P-04");

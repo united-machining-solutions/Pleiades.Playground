@@ -121,7 +121,7 @@ sites/demo/weather/AirTemperature         { "timestamp": "2026-11-16T09:10:00Z",
 
 ## Machines: the binding of the data model
 
-A proposal for the MQTT binding of the data model, version 0.17.0 (see [`../datamodel`](../datamodel/README.md)),
+A proposal for the MQTT binding of the data model, version 0.17.1 (see [`../datamodel`](../datamodel/README.md)),
 to be settled at the umati hackathon. Here everything is as the model says: paths, types, units, snapshots,
 lists, events, manifest and connection. It is the binding of `machines/`; why: see
 [ADR-0012](../../docs/adr/0012-spec-binding-beside-the-playground-binding.md).
@@ -249,7 +249,7 @@ An event is a CloudEvent 1.0 in the JSON format, structured mode, as the model a
 { "specversion": "1.0", "id": "0f4c4a51-8e2b-5d6a-9c1f-4b7e2d913a60", "source": "https://www.alcyone-machines.example/AX-400/P-04",
   "type": "WorkMasterMonitoring.ProgramExecutionEnded", "time": "2026-11-17T09:21:40.000Z",
   "sequence": "20261117T065812Z.000000001842", "correlationid": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001",
-  "dataschema": "urn:umati2:datamodel:0.17.0:event.schema.json",
+  "dataschema": "urn:umati2:datamodel:0.17.1:event.schema.json",
   "data": { "ExecutionId": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001", "JobOrderID": "4711/01", "ActiveWorkMaster": "WM-SHAFT-4711",
             "State": "Ended", "StartTime": "2026-11-17T08:31:00.000Z",
             "Duration": 3040.0, "PartsProduced": 1, "EnergyElectricity": 1850.5 } }
@@ -529,8 +529,8 @@ next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; withou
 - The namespace level, the mapping of the prefix `x-<domain>` to `oem`, and the reserved names `umati`, `oem`
   and `events` are proposals of this binding. With one namespace `oem`, two manufacturers below one machine would
   share it; their paths must then differ.
-- The topic per group below `events/`, the outbox and the persistent session of a consumer are proposals of this
-  binding. The model counts `sequence` per group, so that a gap on a topic is a gap in the number; a router that
+- The topic of each group below `events/` (`jobs`, `workmasters`, `notifications`) is in the model since 0.17.1;
+  the outbox and the persistent session of a consumer are proposals of this binding. The model counts `sequence` per group, so that a gap on a topic is a gap in the number; a router that
   reads `sequence` over the whole `source`, as the CloudEvents extension does, sees jumps between the groups.
 - The last will. The model needs none and has no value for an adapter that is gone, since `Disconnected` is no
   more. This binding keeps the last will and sets `CommunicationFault`, the value that comes closest: the values

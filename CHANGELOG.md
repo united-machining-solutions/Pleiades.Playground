@@ -31,6 +31,9 @@ All notable changes are documented here. The format follows
 - The machine card shows the work master instead of the program, the job order that runs, and alerts with their
   NE 107 severity; a machine whose adapter is not `Running` has no data.
 
+- The data model is pinned to 0.17.1 (`3a799d5`), which names the event topics `events/jobs` and
+  `events/workmasters` as the simulator already publishes them; the manifest and `dataschema` carry 0.17.1.
+
 ### Removed
 
 - `NotificationEventDtoV1`, `JobEventDtoV1` and `WorkMasterEventDtoV1`, their collections, endpoints

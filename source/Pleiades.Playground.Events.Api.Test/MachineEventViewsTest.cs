@@ -29,7 +29,7 @@ public sealed class MachineEventViewsTest
         Assert.AreEqual(42, dao.SequenceCount);
         Assert.AreEqual("exec-1", dao.CorrelationId);
         Assert.AreEqual(Start.AddMinutes(4), dao.Time);
-        Assert.AreEqual("urn:umati2:datamodel:0.17.0:event.schema.json", dao.Event["dataschema"].AsString, "the whole event is kept");
+        Assert.AreEqual("urn:umati2:datamodel:0.17.1:event.schema.json", dao.Event["dataschema"].AsString, "the whole event is kept");
 
         var dto = MachineEventMapper.ToDto(dao);
         Assert.AreEqual("e-42", dto.Id);
