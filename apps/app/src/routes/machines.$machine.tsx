@@ -1,4 +1,4 @@
-import { clock } from "@pleiades/cards/machine/format.ts"
+import type { MachineList } from "@pleiades/cards/machine/contract.ts"
 import { MachineCard } from "@pleiades/cards/machine/machine-card.tsx"
 import { stateLabel } from "@pleiades/cards/machine/state.ts"
 import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
@@ -17,13 +17,24 @@ import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { Link, createFileRoute, notFound, useNavigate } from "@tanstack/react-router"
 import { SearchXIcon } from "lucide-react"
+import { useMemo } from "react"
 import type { ReactNode } from "react"
 
 import { NoAnswer } from "@/components/no-answer.tsx"
-import { useLive } from "@/hooks/use-live.ts"
+import { liveness, useLive, useRetry } from "@/hooks/use-live.ts"
+import type { Live } from "@/hooks/use-live.ts"
+import { listAt, listWith, machineFilters, pageAt, pageWith } from "@/live/machines.ts"
+import type { MachinePage } from "@/live/machines.ts"
 import { getMachine, getMachines, getSpans } from "@/machines/get-machines.ts"
 import { HOURS, choicesOf, chosenHours, hoursOf, matches } from "@/machines/switcher.ts"
 import type { Choice, Hours } from "@/machines/switcher.ts"
+
+/** The list of machines of the switcher, kept up to date from the broker as Home keeps its list. */
+const listLive: Live<MachineList | null> = {
+  filters: machineFilters(),
+  message: (list, topic, payload, now) => list && listWith(list, topic, payload, now),
+  at: (list, now) => list && listAt(list, now),
+}
 
 /**
  * One machine. The page asks the backend for the values of a card and draws the card, without a
@@ -40,7 +51,7 @@ export const Route = createFileRoute("/machines/$machine")({
   // The router keeps the keys of the address that this function does not return, so `hours` is
   // returned even where it is nothing: otherwise `?hours=3` would stay in the search as it is.
   validateSearch: (search): { hours?: Hours | undefined } => ({ hours: hoursOf(search.hours) }),
-  // Only the length of the history is chosen: the window rolls along, the last hours up to now.
+  // Only the length of the history is chosen, in the address. The page rolls it on to now (`pageAt`).
   loaderDeps: ({ search }) => ({ hours: chosenHours(search.hours) }),
   loader: async ({ params, deps }) => {
     // The list serves the switcher, and tells a machine that is away from one that is unknown.
@@ -51,16 +62,16 @@ export const Route = createFileRoute("/machines/$machine")({
       })),
       getMachines().catch(() => null),
     ])
-    const choices = list?.values ? choicesOf(list.values) : null
+    const machines = list?.values ?? null
     if (!answer.values) {
       // A backend that is away comes back, and the page keeps trying. A machine the backend does
       // not know does not: the list tells the two apart.
-      if (choices && !choices.some((one) => one.machine === params.machine)) throw notFound()
-      return { answer, spans: null, choices }
+      if (machines && !machines.machines.some((one) => one.machine === params.machine)) throw notFound()
+      return { answer, spans: null, list: machines }
     }
     const { from, to } = answer.values.history
     const spans = await getSpans({ data: { machine: params.machine, from, to } }).catch(() => null)
-    return { answer, spans, choices }
+    return { answer, spans, list: machines }
   },
   component: Machine,
   pendingComponent: Loading,
@@ -68,18 +79,35 @@ export const Route = createFileRoute("/machines/$machine")({
 })
 
 function Machine() {
-  const { answer, spans, choices } = Route.useLoaderData()
+  const { answer, spans, list } = Route.useLoaderData()
   const { machine } = Route.useParams()
   const { hours } = Route.useSearch()
-  useLive()
+  // What the backend read when the page was opened: the card, and the history up to then.
+  const loaded = useMemo(() => (answer.values ? { show: answer.values, spans } : null), [answer, spans])
+  // From then on the values of the machine come from the broker, and its history goes on with them: it
+  // keeps the length that was read, the hours of the address, and rolls on to now.
+  const live = useMemo(
+    (): Live<MachinePage | null> => ({
+      filters: machineFilters(machine),
+      message: (page, topic, payload, now) => page && pageWith(page, topic, payload, now),
+      at: (page, now) => page && pageAt(page, now),
+    }),
+    [machine],
+  )
+  const { values: page, connected } = useLive(loaded, live)
+  // The list of machines of the switcher stays as live as the page: a machine that falls silent or goes
+  // into alarm shows so in the list. The broker is asked once for a topic, however many pages hear it.
+  const { values: machines } = useLive(list, listLive)
+  const choices = useMemo(() => (machines ? choicesOf(machines) : null), [machines])
+  useRetry(answer.values === null)
   return (
     <Page
       machine={machine}
       choices={choices}
-      line={answer.values ? `live · now ${clock(answer.values.asOf)}` : undefined}
-      actions={answer.values && <HistoryHours hours={chosenHours(hours)} />}
+      line={page ? liveness(connected, page.show.asOf) : undefined}
+      actions={page && <HistoryHours hours={chosenHours(hours)} />}
     >
-      {answer.values ? <MachineCard {...answer.values} spans={spans} /> : <NoAnswer error={answer.error} />}
+      {page ? <MachineCard {...page.show} spans={page.spans} /> : <NoAnswer error={answer.error ?? ""} />}
     </Page>
   )
 }

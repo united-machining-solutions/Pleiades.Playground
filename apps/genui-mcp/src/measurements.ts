@@ -1,5 +1,5 @@
 import { SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
-import { QUANTITIES, SERIES_SLOTS } from "@pleiades/cards/measurement/contract.ts"
+import { QUANTITIES, QUANTITY_PATHS, SERIES_SLOTS } from "@pleiades/cards/measurement/contract.ts"
 import type { LineValue, Measurement, MeasurementList, MeasurementSeries, Quantity } from "@pleiades/cards/measurement/contract.ts"
 
 import { listTopics, readNewest, readTimelines } from "./apis.ts"
@@ -14,13 +14,13 @@ import { secondsBefore } from "./time.ts"
 
 /** Where a quantity is published below `machines/{SerialNumber}/`, and whether it is a number or a yes or no. */
 export const sources: Record<Quantity, { path: string; kind: "baseUnitValues" | "booleanValues" }> = {
-  activePower: { path: "umati/Consumption/Electricity/Main/AcActivePowerTotal", kind: "baseUnitValues" },
-  energyImported: { path: "umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp", kind: "baseUnitValues" },
-  bearingTemperature: { path: "vendor/Spindle/1/BearingTemperature", kind: "baseUnitValues" },
-  spindleRotating: { path: "umati/Spindle/1/IsRotating", kind: "booleanValues" },
-  feedOverride: { path: "umati/State/FeedOverride", kind: "baseUnitValues" },
-  spindleOverride: { path: "umati/Spindle/1/Override", kind: "baseUnitValues" },
-  powerOnDuration: { path: "umati/OperationCounters/PowerOnDuration", kind: "baseUnitValues" },
+  activePower: { path: QUANTITY_PATHS.activePower, kind: "baseUnitValues" },
+  energyImported: { path: QUANTITY_PATHS.energyImported, kind: "baseUnitValues" },
+  bearingTemperature: { path: QUANTITY_PATHS.bearingTemperature, kind: "baseUnitValues" },
+  spindleRotating: { path: QUANTITY_PATHS.spindleRotating, kind: "booleanValues" },
+  feedOverride: { path: QUANTITY_PATHS.feedOverride, kind: "baseUnitValues" },
+  spindleOverride: { path: QUANTITY_PATHS.spindleOverride, kind: "baseUnitValues" },
+  powerOnDuration: { path: QUANTITY_PATHS.powerOnDuration, kind: "baseUnitValues" },
 }
 
 export function topicOf(machine: string, quantity: Quantity): string {

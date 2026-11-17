@@ -5,14 +5,14 @@ the app. The server delivers the document, the server routes and the server func
 harness.
 
 - **Home** asks "what needs you?": it lists the machines of the demo stack, first those in alarm, stopped or
-  without data, then those in setup, then the running ones, and reads them again every ten seconds.
+  without data, then those in setup, then the running ones. It is live: see below.
 - **A page per machine** (`/machines/P-04`) shows the machine card of the
   [card catalogue](../../packages/cards/README.md): what the machine does now and what it did over the last
   hours. It needs no language model. Home leads to it. For a machine the backend does not know, the page
   says so and does not ask again.
 - **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
-  machine, and reads them again every ten seconds. A choice above the graphs shows one machine or all of
-  them, and stays in the URL (`?machine=`).
+  machine, live. A choice above the graphs shows one machine or all of them, and stays in the URL
+  (`?machine=`).
 - **Chat** is the panel on the right, with "New chat" and the chats so far. It opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
@@ -22,8 +22,19 @@ harness.
   the URL (`?chat=`), and the page stays where it is: you chat about what you see. Everything about the chat
   is in that panel: the pages on the left stay the same without it.
 
-The values always come from `genui-mcp`. Without a language model the chat says which settings are missing;
-everything else works.
+The values come from `genui-mcp`, and what is live comes from the broker. Without a language model the chat says
+which settings are missing; everything else works.
+
+**Live, not read again** ([ADR-0013](../../docs/adr/0013-live-values-from-the-broker.md)). Home, the page of a
+machine, Live values and Charts read once, in their loader, what `genui-mcp` knows: what held when the page was opened,
+and the history before it. From then on the browser subscribes at the broker, MQTT over WebSocket, to the
+topics the page shows, and every value appears the moment a machine publishes it: a state, a program, a warning
+that is raised or reset, a point of a graph. The clock of the page moves on by itself, by the clock of the
+server, so a machine that falls silent shows "No data" after 30 seconds, and the history of a machine keeps its
+length and rolls on to now. A value stamped more than 30 seconds ahead of that clock is left out, as the backend
+would not show it yet either. The line under the title
+says "live" while the browser hears the broker, and "not live" while it does not; the page then reads again
+once the broker is back, for what it missed. A page reads on a clock only while the backend has not answered.
 
 | | |
 |---|---|
@@ -31,7 +42,7 @@ everything else works.
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app` |
 | Version | At the bottom of the sidebar: `0.0.142 · 7a83c2f` for an image of the workflow "Images", linked to its commit; `dev` for a build of your own, with the commit of the checkout under `vite dev` |
-| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); the app draws nothing for their results, the answer says them. The language models of the chat, see below. |
+| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `MQTT_WS_PORT`, the port the browser reaches the broker's WebSocket on, at the host of the page (9001 if unset); or `MQTT_WS_URL`, the whole address, for a broker behind a proxy (`wss://…`). `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); the app draws nothing for their results, the answer says them, and a chat switches each of them off and on under "Tools" in its message field. The language models of the chat, see below. |
 
 ## Language models
 
@@ -115,7 +126,8 @@ the backend of the running demo stack answers.
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
-  `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `health.ts`, `api/harness/$.ts` and
+  `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `charts.tsx` the last hours of every
+  machine as charts (drawn by `src/charts/state-tiles.tsx`), `health.ts`, `api/harness/$.ts` and
   `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
   (`nav`: a title, an icon, an order). `src/components/app-sidebar.tsx` reads the entries from the routes
   and names no page, and `nav.ts` next to it puts them in order and finds the one a person is under. The
@@ -134,8 +146,16 @@ the backend of the running demo stack answers.
   functions that call the backend as a typed MCP client, `card-tools.ts` the names of the tools only a card
   calls, `machine-item.tsx` draws a machine as a row or a tile. A card folder imports from here, never the
   other way.
+- `src/live/`: what keeps a page live. `broker.ts` is the one connection of the browser to the broker, MQTT
+  over WebSocket, which only subscribes; `broker-address.ts` the server function that says where the broker
+  is. `messages.ts` reads what the binding publishes, `machines.ts` and `measurements.ts` lay a message, and
+  the passing of time, onto what the backend read, by the rules of `genui-mcp`; each has its tests.
+  `src/hooks/use-live.ts` puts it together for a route: `useLive(loaded, live)`.
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
+  `mcp-servers.ts` reads the servers whose tools the chat has and holds a chat to the ones it left on,
+  `server-list.ts` asks each of them for its tools, and `tools-menu.tsx` is the list "Tools" in the message
+  field, where a chat switches a further server off and on.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a
   tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat`, the choice of the model and stop,
   which also cancels the turn in the harness (`createHarnessClient(...).cancel()`),

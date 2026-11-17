@@ -1,5 +1,5 @@
-import { BAND_SLOTS, SILENT_AFTER_SECONDS, serialNumber } from "@pleiades/cards/machine/contract.ts"
-import type { Machine, MachineList, MachineShow, Reading, Span, SpanList } from "@pleiades/cards/machine/contract.ts"
+import { BAND_SLOTS, NOTIFICATIONS_PATH, READING_PATHS, SILENT_AFTER_SECONDS, serialNumber } from "@pleiades/cards/machine/contract.ts"
+import type { Machine, MachineList, MachineShow, Reading, ReadingName, Span, SpanList } from "@pleiades/cards/machine/contract.ts"
 
 import { EVER, listTopics, readNumbers, readOpenNotifications, readRaised, readStrings } from "./apis.ts"
 import type { Apis, OpenNotification, Sample, Series } from "./apis.ts"
@@ -24,14 +24,7 @@ export const HISTORY_HOURS = 8
 /** How many hours a history covers at most. */
 export const MOST_HOURS = 24
 
-const paths = {
-  connection: "umati/Connection/State",
-  heartbeat: "umati/Connection/Heartbeat",
-  itemState: "umati/State/MachineryItemState",
-  operationMode: "umati/State/MachineryOperationMode",
-  program: "umati/Production/ActiveProgram",
-} as const
-type ReadingName = keyof typeof paths
+const paths = READING_PATHS
 const names = Object.keys(paths) as Array<ReadingName>
 
 /** The heartbeat counts, the other readings are text. */
@@ -133,7 +126,7 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
         read("operationMode"),
         read("program"),
       ])
-      const topic = `machines/${serialNumber}/events/notifications`
+      const topic = `machines/${serialNumber}/${NOTIFICATIONS_PATH}`
       return {
         machine: serialNumber,
         connection,
