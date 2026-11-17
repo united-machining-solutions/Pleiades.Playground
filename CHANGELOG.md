@@ -12,9 +12,9 @@ All notable changes are documented here. The format follows
 - Example app: the button "Tools" in the message field of the chat lists the servers that give the chat
   tools, says whether each one answers, and names its tools. A chat switches a further server off and on
   there; the server of the app gives the model no tool of a server that is off.
-- Ultimaker services: the reason a print failed. The tool `ultimaker_printer_faults` and the route
-  `GET /printer/faults` return the faults of the printer log and the failed or aborted jobs; the telemetry
-  adapter publishes them as notification events that come and go, which the Events API stores.
+- Example app: where no tool answers a question, the chat says that its tools do not show it, not that it
+  does not exist, and where a place fits the question names where to ask, such as the maker of the machine
+  or the maintenance records.
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
@@ -23,6 +23,13 @@ All notable changes are documented here. The format follows
   current jobs and history with durable slice associations, and a separate MQTT telemetry adapter.
   Both containers are part of the root Compose stack and image-publication workflow, enabled for
   deployment with COMPOSE_PROFILES=ultimaker.
+- Ultimaker services: the reason a print failed. The tool `ultimaker_printer_faults` and the route
+  `GET /printer/faults` return the faults of the printer log and the failed or aborted jobs; the telemetry
+  adapter publishes them as notification events that come and go, which the Events API stores.
+- Optional juice bar service `juicebar-api` (Compose profile `juicebar`, port 5550): the card and the state of
+  a machine that runs MixerControl over REST and MCP, an order on request, and its state on the broker below
+  `machines/{SerialNumber}/`. It never starts the production; `JUICEBAR_ENABLE_ORDERING=false` makes it
+  read-only.
 
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.

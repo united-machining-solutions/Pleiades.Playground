@@ -70,4 +70,8 @@
     <Project Path="Pleiades.Playground.Ultimaker.Telemetry.Test/Pleiades.Playground.Ultimaker.Telemetry.Test.csproj" />
     <Project Path="Pleiades.Playground.Ultimaker.Telemetry/Pleiades.Playground.Ultimaker.Telemetry.csproj" />
   </Folder>
+  <Folder Name="/JuiceBar/">
+    <Project Path="Pleiades.Playground.JuiceBar.Api/Pleiades.Playground.JuiceBar.Api.csproj" />
+    <Project Path="Pleiades.Playground.JuiceBar.Api.Test/Pleiades.Playground.JuiceBar.Api.Test.csproj" />
+  </Folder>
 </Solution>
