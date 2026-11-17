@@ -179,6 +179,10 @@ All notable changes are documented here. The format follows
   holds no page says so, and a part without a card in that app says so while the rest of the page is whole.
   The links of the app now carry only the search that the page they lead to validates (`search.strict`), so
   the recipe does not follow a person from the page that was opened from a link.
+- The page "Charts" (`/charts`) in the example application: how long each machine was in each state over
+  the last hours, as stacked bars, and its state over the last 30 minutes, as a step line per machine. One
+  server function, `getCharts`, reads the values over one connection, the spans of the last 30 minutes only.
+  The charts are the chart of shadcn/ui; `recharts` is new in the app.
 
 ### Changed
 
