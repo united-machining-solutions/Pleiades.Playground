@@ -148,8 +148,9 @@ chat has no language model" says.
   could not check, and where you left the recipe. This hand-over becomes the text of the pull request.
 - Offer to keep it: "Shall I save this as a commit on your branch?" Commit only on a yes, signed off
   (`git commit -s`), with a `Co-Authored-By` trailer that names you.
-- Then offer to share it: "Shall I put it on GitHub as a pull request, so that others can see it?" Nothing
-  leaves this computer before a yes. A yes is for every step of "Share it", and you take them yourself.
+- Then offer to share it: "Shall I put it on GitHub as a pull request? The repository is public: anyone can
+  see it." Nothing leaves this computer before a yes. A yes publishes the branch and the text, it is for
+  every step of "Share it", and you take them yourself.
 
 ### Share it
 
@@ -157,24 +158,31 @@ The way into the shared repository is a pull request ([CONTRIBUTING.md](../../..
 it, because you know what was built and checked. A pull request opened on GitHub's page knows only the
 commits: at most their message stands above an empty template, and whoever reviews it learns nothing.
 
-1. Bring the branch up to date: `git fetch origin`, then `git merge --signoff origin/main`. A pull request
-   with a conflict runs no check at all. A conflict in a file of your change is yours to resolve; one in a
-   file you did not touch is not: stop and say so, a helper resolves it. If the merge brought anything, run
-   the checks of the recipe again: what the pull request says has to hold after the merge.
-2. Push the branch: `git push -u origin HEAD`. The person is signed in to `gh`; if not, `gh auth login` is
-   theirs to run.
-3. Copy `.github/PULL_REQUEST_TEMPLATE.md` to a file outside the repository and fill in every section from
+1. Add the line of the change to `CHANGELOG.md`, under `[Unreleased]`, in `Added`, `Changed` or `Fixed`,
+   and commit it, signed off. The check of item 6 asks for it for a `feat` or a `fix`, and what this skill
+   builds is mostly a `feat`. It is also the file that conflicts most often, so it goes in before the
+   merge, which then resolves it once.
+2. Bring the branch up to date: `git fetch origin`, then `git merge --signoff origin/main`. A pull request
+   with a conflict runs no check at all. A conflict in a file of your change is yours to resolve; after
+   you resolved it, `git commit -s --no-edit`, since the commit git writes after a conflict has no
+   sign-off. A conflict in a file you did not touch is not yours: `git merge --abort`, push nothing, and
+   say so; a helper resolves it. If the merge brought anything, run the checks of the recipe again: what
+   the pull request says has to hold after the merge. If they fail, push nothing and say which.
+3. `gh auth status`. If the person is not signed in, stop before the push: `gh auth login` is theirs to run.
+   Then push the branch: `git push -u origin HEAD`. If the push is refused, stop, say what is missing and
+   who can give it, and try no other remote. Never ask for a token.
+4. Copy `.github/PULL_REQUEST_TEMPLATE.md` to a file outside the repository and fill in every section from
    your hand-over, in English whatever language you speak with the person: under "What and why" one or two
    sentences, and below them each place you left the recipe and the issue a contract or a source needs;
    tick what you ran, and say on a line that does not apply why not; after "Not verified:" what you could
    not check. Take the comments out.
-4. `gh pr create --base main --title "<type>(<scope>): <what changes>" --body-file <file>`. The title is a
+5. `gh pr create --base main --title "<type>(<scope>): <what changes>" --body-file <file>`. The title is a
    Conventional Commit and becomes the commit on `main`.
-5. `node .github/scripts/check-pull-request.mjs <number>`, and do what it says until it passes. Then give
+6. `node .github/scripts/check-pull-request.mjs <number>`, and do what it says until it passes. Then give
    the person the address of the pull request.
 
 If the person would rather open it on GitHub themselves, give them the title and the filled-in text to put in
-place of what GitHub suggests. If they have opened one already, ask for its number and go on with item 5.
+place of what GitHub suggests. If they have opened one already, ask for its number and go on with item 6.
 
 ## When the chat has no language model
 
