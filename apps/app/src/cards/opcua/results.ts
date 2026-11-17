@@ -32,6 +32,10 @@ export type Server = {
   mapping: MappingSummary
   needsRescan: boolean
   scannedAt?: string
+  /** The object of the machine on a server of several machines, a gateway. */
+  machineNode?: string
+  /** The other machines on the same session: behind the same gateway. */
+  sessionSharedWith?: Array<string>
 }
 
 export type MappingState = "Ok" | "Derived" | "Unclear" | "Mismatch" | "Missing"
@@ -79,6 +83,26 @@ export type RankedEndpoints = {
   url: string
   certificateThumbprint?: string
   endpoints: Array<{ securityMode: SecurityMode; securityPolicy: string; recommended: boolean; weak: boolean }>
+}
+
+/** A machine an OPC UA server serves, as `opcua_machine_list` gives it. */
+export type ServedMachine = {
+  node: string
+  path: string
+  displayName: string
+  serialNumber?: string
+  manufacturer?: string
+  model?: string
+  productInstanceUri?: string
+  added: boolean
+  addedAt?: string
+}
+
+export type MachineList = {
+  url: string
+  endpoint?: { securityMode: SecurityMode; securityPolicy: string; recommended: boolean; weak: boolean }
+  gateway: boolean
+  machines: Array<ServedMachine>
 }
 
 type Json = Record<string, unknown>
@@ -152,6 +176,20 @@ export function rankedEndpointsOf(content: unknown): RankedEndpoints | null {
     Array.isArray(value.endpoints) &&
     value.endpoints.every((one) => isObject(one) && isString(one.securityMode) && isString(one.securityPolicy))
     ? (value as RankedEndpoints)
+    : null
+}
+
+/** The machines in the result of `opcua_machine_list`. */
+export function machineListOf(content: unknown): MachineList | null {
+  const value = jsonOf(content)
+  return isObject(value) &&
+    isString(value.url) &&
+    typeof value.gateway === "boolean" &&
+    Array.isArray(value.machines) &&
+    value.machines.every(
+      (one) => isObject(one) && isString(one.node) && isString(one.path) && typeof one.added === "boolean",
+    )
+    ? (value as MachineList)
     : null
 }
 

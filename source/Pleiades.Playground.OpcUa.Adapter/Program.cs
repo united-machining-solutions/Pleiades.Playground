@@ -97,7 +97,8 @@ builder.Services
         mcp.Domains.Add("Registration: proposing a mapping; a person confirms it, no tool adds a machine");
         mcp.DiscoveryFlow.Add("Call opcua_get_skill_guide before the first scan: it has the procedure and the elements of the data model.");
         mcp.DiscoveryFlow.Add("Use opcua_server_list for what is added, opcua_mapping_show for one machine.");
-        mcp.DiscoveryFlow.Add("To add a server: opcua_endpoint_rank, opcua_ua_connect, opcua_ua_browse_all, opcua_ua_read_values, then opcua_registration_propose.");
+        mcp.DiscoveryFlow.Add("To add a server: opcua_endpoint_rank, opcua_machine_list, opcua_ua_connect, opcua_ua_browse_all, opcua_ua_read_values, then opcua_registration_propose.");
+        mcp.DiscoveryFlow.Add("A gateway serves several machines under one address: opcua_machine_list lists them, and each gets a proposal of its own with its machineNode.");
     })
     .WithOpcUaMcpFilters()
     .WithOpcUaCoreTools(McpToolProfile.Services)

@@ -20,6 +20,7 @@ internal static class MachineEndpoints
     public static void MapMachineEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/endpoints", RankEndpoints);
+        app.MapGet("/endpoints/machines", FindMachines);
         app.MapGet("/machines", List);
         app.MapGet("/machines/{serialNumber}", Show);
         app.MapGet("/machines/{serialNumber}/mapping", Mapping);
@@ -51,8 +52,26 @@ internal static class MachineEndpoints
         }
     }
 
+    /// <summary>The machines a server serves: one, or several behind an aggregation server.</summary>
+    private static async Task<IResult> FindMachines([FromQuery] string url, MachineSupervisor supervisor, CancellationToken cancellationToken)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) || parsed.Scheme != "opc.tcp")
+        {
+            return Problem(StatusCodes.Status400BadRequest, ["url: must be an opc.tcp:// URL."]);
+        }
+
+        try
+        {
+            return Json(Views.Machines(await supervisor.FindMachinesAsync(url, cancellationToken).ConfigureAwait(false), supervisor.Machines));
+        }
+        catch (Exception exception) when (IsServerFault(exception))
+        {
+            return Problem(StatusCodes.Status502BadGateway, [$"The server at {url} did not answer: {exception.Message}"]);
+        }
+    }
+
     private static IResult List(MachineSupervisor supervisor) =>
-        Json(new ServerListView([.. supervisor.Machines.Select(Views.Server)]));
+        Json(new ServerListView([.. supervisor.Machines.Select(machine => Views.Server(machine, supervisor.SharingSession(machine)))]));
 
     private static IResult Show(string serialNumber, MachineSupervisor supervisor) =>
         supervisor.Find(serialNumber) is { } connection
@@ -60,7 +79,7 @@ internal static class MachineEndpoints
             : NotAdded(serialNumber);
 
     private static IResult Mapping(string serialNumber, MachineSupervisor supervisor) =>
-        supervisor.Find(serialNumber) is { } connection ? Json(Views.Mapping(connection)) : NotAdded(serialNumber);
+        supervisor.Find(serialNumber) is { } connection ? Json(Views.Mapping(connection, supervisor.SharingSession(connection))) : NotAdded(serialNumber);
 
     /// <summary>
     /// Registers a machine, or replaces its registration. With <c>?dryRun=true</c> the registration is

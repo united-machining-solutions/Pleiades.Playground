@@ -22,6 +22,12 @@ internal sealed record RegistrationOutcome(
     public bool Registered => Registration is not null && Problems.Count == 0;
 }
 
+/// <summary>What an OPC UA server serves: its endpoints and its machines.</summary>
+/// <param name="Url">The address that was asked.</param>
+/// <param name="Endpoints">The endpoints of the server, strongest first. The machines were read on the first one.</param>
+/// <param name="Machines">The machines found below Objects.</param>
+internal sealed record ServedMachines(string Url, IReadOnlyList<RankedEndpoint> Endpoints, IReadOnlyList<FoundMachine> Machines);
+
 /// <summary>
 /// Keeps every registered machine running. At start it reads the stored registrations and connects
 /// each: no discovery, no language model, nothing but the files. A machine is added and removed at
@@ -32,6 +38,9 @@ internal sealed record RegistrationOutcome(
 internal sealed class MachineSupervisor : BackgroundService
 {
     private readonly ConcurrentDictionary<string, Running> _machines = new(StringComparer.Ordinal);
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "Disposed asynchronously at the end of ExecuteAsync, after every machine left it.")]
+    private readonly SessionPool _pool;
     private readonly SemaphoreSlim _changes = new(1, 1);
     private readonly RegistrationStore _store;
     private readonly AlertStore _alertStore;
@@ -61,6 +70,7 @@ internal sealed class MachineSupervisor : BackgroundService
         _drafts = drafts;
         _config = config.Value;
         _logger = logger;
+        _pool = new SessionPool(client, logger);
     }
 
     /// <summary>The machines that are registered, by serial number.</summary>
@@ -70,6 +80,41 @@ internal sealed class MachineSupervisor : BackgroundService
     /// <summary>The connection of one machine, or null if it is not registered.</summary>
     public MachineConnection? Find(string serialNumber) =>
         _machines.TryGetValue(serialNumber, out var running) ? running.Connection : null;
+
+    /// <summary>The serial numbers of the machines that share the session of this machine, itself included.</summary>
+    public IReadOnlyList<string> SharingSession(MachineConnection connection) =>
+        _pool.Find(connection.Registration.Endpoint)?.Names.Order(StringComparer.Ordinal).ToList() ?? [connection.Registration.SerialNumber];
+
+    /// <summary>
+    /// The machines a server serves, read on its strongest endpoint: one for the server of a machine,
+    /// several for an aggregation server. Nothing is stored.
+    /// </summary>
+    public async Task<ServedMachines> FindMachinesAsync(string url, CancellationToken cancellationToken)
+    {
+        url = EndpointKey.Trim(url);
+        var endpoints = await RankEndpointsAsync(url, cancellationToken).ConfigureAwait(false);
+        if (endpoints.Count == 0)
+        {
+            return new ServedMachines(url, endpoints, []);
+        }
+
+        var best = endpoints[0].Endpoint;
+        var endpoint = new EndpointRegistration { Url = url, SecurityMode = best.SecurityMode, SecurityPolicy = best.SecurityPolicy };
+        var (session, _) = await _client.ConnectAsync(endpoint, cancellationToken).ConfigureAwait(false);
+        var shared = new ManagedEndpointSession(session);
+        await using (shared.ConfigureAwait(false))
+        {
+            try
+            {
+                var machines = await MachineFinder.FindAsync(new UaAddressSpace(session), cancellationToken).ConfigureAwait(false);
+                return new ServedMachines(url, endpoints, machines);
+            }
+            finally
+            {
+                await shared.CloseAsync().ConfigureAwait(false);
+            }
+        }
+    }
 
     /// <summary>The endpoints of a server, strongest first.</summary>
     public async Task<IReadOnlyList<RankedEndpoint>> RankEndpointsAsync(string url, CancellationToken cancellationToken) =>
@@ -82,6 +127,9 @@ internal sealed class MachineSupervisor : BackgroundService
     /// </summary>
     public async Task<RegistrationOutcome> RegisterAsync(MachineRegistration registration, bool dryRun, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(registration);
+        registration = registration with { Endpoint = registration.Endpoint with { Url = EndpointKey.Trim(registration.Endpoint.Url) } };
+
         var problems = RegistrationValidator.Validate(registration);
         if (problems.Count > 0)
         {
@@ -118,6 +166,13 @@ internal sealed class MachineSupervisor : BackgroundService
                 probe);
         }
 
+        // On a server of several machines the registration has to be the machine it says it is.
+        var mismatch = MachineChecks.Problems(registration, probe.Machines, probe.SerialNumber);
+        if (mismatch.Count > 0)
+        {
+            return new RegistrationOutcome(null, mismatch, endpoints, probe);
+        }
+
         // The certificate the server presents now is the one this machine is known by from here on.
         var stored = registration with
         {
@@ -137,7 +192,7 @@ internal sealed class MachineSupervisor : BackgroundService
         {
             await StopAsync(stored.SerialNumber).ConfigureAwait(false);
             _store.Save(stored);
-            Start(stored);
+            await StartAsync(stored).ConfigureAwait(false);
         }
         finally
         {
@@ -236,7 +291,7 @@ internal sealed class MachineSupervisor : BackgroundService
         _logger.RegistrationsLoaded(registrations.Count, _config.DataDirectory);
         foreach (var registration in registrations)
         {
-            Start(registration);
+            await StartAsync(registration).ConfigureAwait(false);
         }
 
         try
@@ -248,7 +303,12 @@ internal sealed class MachineSupervisor : BackgroundService
             // The service stops: every machine says Disconnected before the broker connection goes.
         }
 
-        await Task.WhenAll(_machines.Keys.ToList().Select(StopAsync)).ConfigureAwait(false);
+        foreach (var serialNumber in _machines.Keys.ToList())
+        {
+            await StopAsync(serialNumber).ConfigureAwait(false);
+        }
+
+        await _pool.DisposeAsync().ConfigureAwait(false);
     }
 
     public override void Dispose()
@@ -257,10 +317,10 @@ internal sealed class MachineSupervisor : BackgroundService
         base.Dispose();
     }
 
-    private void Start(MachineRegistration registration)
+    private async Task StartAsync(MachineRegistration registration)
     {
         var connection = new MachineConnection(
-            registration, _client, _publisher, _alertStore, _config.HeartbeatInterval, _config.SamplingInterval, _logger);
+            registration, _publisher, _alertStore, _config.HeartbeatInterval, _config.SamplingInterval, _logger);
 #pragma warning disable CA2000 // Disposed in StopAsync, when the machine is stopped.
         var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_stopping);
 #pragma warning restore CA2000
@@ -280,8 +340,15 @@ internal sealed class MachineSupervisor : BackgroundService
             },
             CancellationToken.None);
         _machines[registration.SerialNumber] = new Running(connection, cancellation, task);
+
+        // The machine takes the session of its endpoint; the first machine on an endpoint opens it.
+        await _pool.AddAsync(connection, _stopping).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Stops a machine: it leaves the session of its endpoint, which closes only with the last
+    /// machine on it, and its heartbeat ends.
+    /// </summary>
     private async Task StopAsync(string serialNumber)
     {
         if (!_machines.TryRemove(serialNumber, out var running))
@@ -289,6 +356,7 @@ internal sealed class MachineSupervisor : BackgroundService
             return;
         }
 
+        await _pool.RemoveAsync(running.Connection).ConfigureAwait(false);
         await running.Cancellation.CancelAsync().ConfigureAwait(false);
         await running.Task.ConfigureAwait(false);
         running.Cancellation.Dispose();

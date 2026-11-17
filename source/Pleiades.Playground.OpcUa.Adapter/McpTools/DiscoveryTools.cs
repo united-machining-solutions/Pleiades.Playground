@@ -22,7 +22,7 @@ internal sealed class DiscoveryTools(MachineSupervisor supervisor)
          "List the OPC UA servers that are added to the platform: serial number of the machine, endpoint address, " +
          "security of the session, connection state, profiles of the data model, and how many elements are mapped " +
          "without doubt (ok), derived, unclear, mismatched or missing. Use it for 'which OPC UA machines are there'.")]
-    public ServerListView ListServers() => new([.. supervisor.Machines.Select(Views.Server)]);
+    public ServerListView ListServers() => new([.. supervisor.Machines.Select(machine => Views.Server(machine, supervisor.SharingSession(machine)))]);
 
     [McpServerTool(Name = "opcua_mapping_show", ReadOnly = true),
      Description(
@@ -33,7 +33,7 @@ internal sealed class DiscoveryTools(MachineSupervisor supervisor)
     public MappingView ShowMapping(
         [Description("Serial number of the machine, as opcua_server_list names it.")] string serialNumber) =>
         supervisor.Find(serialNumber) is { } connection
-            ? Views.Mapping(connection)
+            ? Views.Mapping(connection, supervisor.SharingSession(connection))
             : throw new McpException(
                 $"No machine '{serialNumber}' is added. Added: {string.Join(", ", supervisor.Machines.Select(one => one.Registration.SerialNumber).DefaultIfEmpty("none"))}.");
 
@@ -63,6 +63,33 @@ internal sealed class DiscoveryTools(MachineSupervisor supervisor)
                 $"The server at {url} did not answer: {exception.Message} " +
                 "If this address was assumed from a machine name, ask the person for the endpoint (opc.tcp://host:port); do not guess another one.",
                 exception);
+        }
+    }
+
+    [McpServerTool(Name = "opcua_machine_list", ReadOnly = true, OpenWorld = true),
+     Description(
+         "List the machines an OPC UA server serves, read on its strongest endpoint: each with its node (machineNode), " +
+         "where it is below Objects, and the serial number, manufacturer and model read below it. A server of one " +
+         "machine lists one; an aggregation server (a gateway) lists several, and gateway is true. Call it after " +
+         "opcua_endpoint_rank for every address. For a gateway, scan each machine from its node and propose one " +
+         "registration per machine, with its machineNode and the serial number listed here. Added says which " +
+         "machines are on the platform already.")]
+    public async Task<MachineListView> ListMachines(
+        [Description("Address of the server as the person gave it, for example opc.tcp://opcgateway:11878.")] string url,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var parsed) || parsed.Scheme != "opc.tcp")
+        {
+            throw new McpException("url must be an opc.tcp:// address, for example opc.tcp://192.168.1.20:4840.");
+        }
+
+        try
+        {
+            return Views.Machines(await supervisor.FindMachinesAsync(url, cancellationToken).ConfigureAwait(false), supervisor.Machines);
+        }
+        catch (Exception exception) when (MachineEndpoints.IsServerFault(exception))
+        {
+            throw new McpException($"The server at {url} could not be read: {exception.Message}", exception);
         }
     }
 

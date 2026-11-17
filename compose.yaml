@@ -407,15 +407,17 @@ services:
     volumes:
       - opcua_adapter_data:/data
 
-  # A machine to try the adapter with: the TRUMPF OPC UA simulator with a TruLaser, as umati publishes
-  # it. It is not registered with the adapter: a person adds it in the chat, /discover A0280O0001.
-  # OPC_SIMULATOR_IMAGE names another image of it, for example one built on this computer.
+  # A machine to try the adapter with: the TRUMPF OPC UA simulator with a TruMatic, definition K09, as
+  # umati publishes it. It is not registered with the adapter: a person adds it in the chat,
+  # /discover A1121O0001. OPC_SIMULATOR_IMAGE names another image of it, for example one built on this
+  # computer.
   opc-simulator:
     image: ${OPC_SIMULATOR_IMAGE:-ghcr.io/umati/trumpf/edge/opc-simulator:1.3.1}
     restart: unless-stopped
-    # The name the server announces in its endpoints and carries in its certificate.
-    hostname: A0280O0001
-    command: ["run", "-c", "/opt/opcsim/samples/definitions/L26.simulation.yaml"]
+    # The name the server announces in its endpoints and carries in its certificate, and the machine
+    # of the definition.
+    hostname: A1121O0001
+    command: ["run", "-c", "/opt/opcsim/samples/definitions/K09.simulation.yaml"]
     ports:
       # The web UI of the simulator. Its OPC UA port, 4840, is reached inside the demo network only.
       - "${OPC_SIMULATOR_UI_PORT:-8090}:8080"

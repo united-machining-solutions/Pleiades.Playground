@@ -1,4 +1,4 @@
-import { CircleAlertIcon, CircleCheckIcon, ServerIcon, Trash2Icon } from "lucide-react"
+import { CircleAlertIcon, CircleCheckIcon, NetworkIcon, ServerIcon, Trash2Icon } from "lucide-react"
 import { Fragment, useState } from "react"
 
 import type { ChatTool, ToolLabel } from "@/chat/tool-results.ts"
@@ -33,10 +33,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 import { commitProposal, removeMachine } from "@/opcua/adapter.ts"
 import type { Outcome } from "@/opcua/adapter.ts"
-import { mappingOf, needingALook, proposalOf, rankedEndpointsOf, securityOf, serverListOf, shownValue } from "./results.ts"
-import type { MappingRow, MappingState, MappingSummary, Mapping, Proposal, RankedEndpoints, Server, ServerList } from "./results.ts"
+import {
+  machineListOf,
+  mappingOf,
+  needingALook,
+  proposalOf,
+  rankedEndpointsOf,
+  securityOf,
+  serverListOf,
+  shownValue,
+} from "./results.ts"
+import type {
+  MachineList,
+  MappingRow,
+  MappingState,
+  MappingSummary,
+  Mapping,
+  Proposal,
+  RankedEndpoints,
+  Server,
+  ServerList,
+} from "./results.ts"
 
-// The OPC UA cards in the chat: the added servers, the mapping of one, and a proposal after a scan.
+// The OPC UA cards in the chat: the added servers, the machines a server serves, the mapping of one,
+// and a proposal after a scan.
 // chat/cards.tsx lists this module. Adding and removing a machine are buttons here, never tools of
 // the language model.
 
@@ -137,6 +157,7 @@ function Done({ outcome, done }: { outcome: Outcome; done: string }) {
 
 /** Remove, after the person confirmed it. */
 function RemoveServer({ server, onRemoved }: { server: Server; onRemoved: (outcome: Outcome) => void }) {
+  const shared = server.sessionSharedWith ?? []
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const remove = async () => {
@@ -156,8 +177,10 @@ function RemoveServer({ server, onRemoved }: { server: Server; onRemoved: (outco
           </AlertDialogMedia>
           <AlertDialogTitle>Remove {server.serialNumber}?</AlertDialogTitle>
           <AlertDialogDescription>
-            The adapter closes its session to {server.endpoint.url} and forgets the registration. The values the
-            machine sent stay stored. To add it again, scan the server again.
+            {shared.length > 0
+              ? `The adapter takes it off the session to ${server.endpoint.url}, which stays open for ${shared.join(", ")}, and forgets the registration.`
+              : `The adapter closes its session to ${server.endpoint.url} and forgets the registration.`}{" "}
+            The values the machine sent stay stored. To add it again, scan the server again.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -184,6 +207,9 @@ function ServerRow({ server }: { server: Server }) {
         <ItemDescription>
           <span className="text-foreground">{server.endpoint.url}</span> · {securityOf(server.endpoint)}
           {server.lastError && ` · ${server.lastError}`}
+          {(server.sessionSharedWith?.length ?? 0) > 0 && (
+            <span className="block">One session with {server.sessionSharedWith?.join(", ")}</span>
+          )}
         </ItemDescription>
         <Counts summary={server.mapping} />
       </ItemContent>
@@ -218,6 +244,56 @@ function Servers({ values }: { values: ServerList }) {
           <Fragment key={server.serialNumber}>
             {position > 0 && <ItemSeparator className="my-0" />}
             <ServerRow server={server} />
+          </Fragment>
+        ))}
+      </ItemGroup>
+    </Card>
+  )
+}
+
+/** The machines a server serves. A gateway serves several; each is added by its own proposal. */
+function ServedMachines({ values }: { values: MachineList }) {
+  if (values.machines.length === 0) {
+    return (
+      <Empty className="border">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <NetworkIcon />
+          </EmptyMedia>
+          <EmptyTitle>No machine found</EmptyTitle>
+          <EmptyDescription>
+            {values.url} serves no object with an Identification and a serial number. A gateway may not reach its machines.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    )
+  }
+  return (
+    <Card className="gap-0 pb-0">
+      <CardHeader className="pb-4">
+        <CardTitle>
+          {values.machines.length === 1 ? "One machine" : `${values.machines.length} machines`} at {values.url}
+        </CardTitle>
+        <CardDescription>
+          {values.gateway ? "A gateway: the machines share one session. " : ""}
+          {values.endpoint && securityOf(values.endpoint)}
+        </CardDescription>
+      </CardHeader>
+      <ItemGroup className="gap-0">
+        {values.machines.map((machine) => (
+          <Fragment key={machine.node}>
+            <ItemSeparator className="my-0" />
+            <Item size="sm">
+              <ItemContent>
+                <ItemTitle>
+                  {machine.serialNumber ?? "No serial number"}
+                  {machine.added && <Badge variant="secondary">Added</Badge>}
+                </ItemTitle>
+                <ItemDescription>
+                  {[machine.path, machine.manufacturer, machine.model].filter(Boolean).join(" · ")}
+                </ItemDescription>
+              </ItemContent>
+            </Item>
           </Fragment>
         ))}
       </ItemGroup>
@@ -361,6 +437,14 @@ export const opcuaTools: ReadonlyArray<ChatTool> = [
     draw(content) {
       const values = serverListOf(content)
       return values && <Servers values={values} />
+    },
+  },
+  {
+    name: "opcua_machine_list",
+    label: label("Looking for the machines of the server", "Looked for the machines of the server", "Failed to look for the machines"),
+    draw(content) {
+      const values = machineListOf(content)
+      return values && <ServedMachines values={values} />
     },
   },
   {

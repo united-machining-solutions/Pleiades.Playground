@@ -22,9 +22,17 @@ internal sealed record ProbedElement(
 /// <param name="ServerCertificateThumbprint">The certificate the server presented.</param>
 /// <param name="Namespaces">The namespaces the server has now.</param>
 /// <param name="Elements">Every element with what its node gave.</param>
+/// <param name="Machines">The machines the server serves: one, or several behind an aggregation server.</param>
 internal sealed record ProbeResult(
-    string? ServerCertificateThumbprint, IReadOnlyList<string> Namespaces, IReadOnlyList<ProbedElement> Elements)
+    string? ServerCertificateThumbprint,
+    IReadOnlyList<string> Namespaces,
+    IReadOnlyList<ProbedElement> Elements,
+    IReadOnlyList<FoundMachine> Machines)
 {
+    /// <summary>The value of the element <c>Identification.SerialNumber</c>, if it was read.</summary>
+    public string? SerialNumber =>
+        Elements.FirstOrDefault(element => element.Area == "umati" && element.Path == MachineChecks.SerialNumberPath)?.Raw;
+
     /// <summary>The elements whose node the server does not have.</summary>
     public IReadOnlyList<ProbedElement> NotFound => [.. Elements.Where(element => !element.NodeFound)];
 }
@@ -63,7 +71,18 @@ internal sealed class RegistrationProbe
                 namespaces.Add(session.NamespaceUris.GetString(index) ?? string.Empty);
             }
 
-            return new ProbeResult(thumbprint, namespaces, elements);
+            IReadOnlyList<FoundMachine> machines;
+            try
+            {
+                machines = await MachineFinder.FindAsync(new UaAddressSpace(session), cancellationToken).ConfigureAwait(false);
+            }
+            catch (ServiceResultException)
+            {
+                // A server that does not let itself be browsed is taken as a server of one machine.
+                machines = [];
+            }
+
+            return new ProbeResult(thumbprint, namespaces, elements, machines);
         }
     }
 

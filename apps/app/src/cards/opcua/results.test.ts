@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { mappingOf, needingALook, proposalOf, securityOf, serverListOf, shownValue } from "./results.ts"
+import { machineListOf, mappingOf, needingALook, proposalOf, securityOf, serverListOf, shownValue } from "./results.ts"
 
 const server = {
   serialNumber: "A0280O0001",
@@ -17,6 +17,28 @@ test("a server list of the adapter is read, anything else is not", () => {
   assert.deepEqual(serverListOf(JSON.stringify({ servers: [] }))?.servers, [])
   assert.equal(serverListOf(JSON.stringify({ servers: [{ serialNumber: "x" }] })), null)
   assert.equal(serverListOf("not json"), null)
+})
+
+test("the machines of a gateway are read, anything else is not", () => {
+  const list = machineListOf(
+    JSON.stringify({
+      url: "opc.tcp://opcgateway:11878",
+      gateway: true,
+      machines: [
+        { node: "nsu=urn:a;i=1", path: "opcsim/Machines/TruLaser", displayName: "TruLaser", serialNumber: "A0280O0001", added: true },
+        { node: "nsu=urn:b;i=1", path: "localhost/Machines/TruBend", displayName: "TruBend", added: false },
+      ],
+    }),
+  )
+  assert.equal(list?.gateway, true)
+  assert.deepEqual(list?.machines.map((machine) => machine.serialNumber ?? "none"), ["A0280O0001", "none"])
+  assert.equal(machineListOf(JSON.stringify({ url: "x", gateway: false, machines: [{ node: "n" }] })), null)
+  assert.equal(machineListOf(JSON.stringify({ servers: [] })), null)
+})
+
+test("a server on the session of a gateway names the machines it shares it with", () => {
+  const shared = { ...server, machineNode: "nsu=urn:a;i=1", sessionSharedWith: ["B0000X0002"] }
+  assert.deepEqual(serverListOf(JSON.stringify({ servers: [shared] }))?.servers[0]?.sessionSharedWith, ["B0000X0002"])
 })
 
 test("a mapping is read with its rows", () => {

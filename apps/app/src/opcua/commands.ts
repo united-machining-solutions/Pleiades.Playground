@@ -7,13 +7,14 @@
 export const DEFAULT_PORT = 4840
 
 /**
- * The endpoint of what the person named. An address is taken as it is; a machine alone, for
- * example `A0280O0001`, is its host name with the port of OPC UA. `assumed` says the latter: if it
- * does not answer, the person is asked for the endpoint instead of guessing another one.
+ * The endpoint of what the person named. An address is taken as it is, without a slash at its end;
+ * it may be a gateway that serves several machines. A machine alone, for example `A1121O0001`, is
+ * its host name with the port of OPC UA. `assumed` says the latter: if it does not answer, the
+ * person is asked for the endpoint instead of guessing another one.
  */
 export function endpointOf(target: string): { url: string; assumed: boolean } {
   const trimmed = target.trim()
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return { url: trimmed, assumed: false }
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return { url: trimmed.replace(/\/+$/, ""), assumed: false }
   return { url: `opc.tcp://${trimmed}:${DEFAULT_PORT}`, assumed: true }
 }
 
@@ -52,7 +53,7 @@ export const commands: ReadonlyArray<ChatCommand> = [
     name: "discover",
     argument: "machine or opc.tcp://host:port",
     opcua: true,
-    summary: `Scan an OPC UA server and propose its registration; a machine alone means opc.tcp://<machine>:${DEFAULT_PORT}. You add it with a button.`,
+    summary: `Scan an OPC UA server and propose a registration for each machine it serves, also behind a gateway; a machine alone means opc.tcp://<machine>:${DEFAULT_PORT}. You add each with a button.`,
     question: (target) => {
       const endpoint = endpointOf(target)
       if (endpoint.assumed) {
@@ -62,7 +63,10 @@ export const commands: ReadonlyArray<ChatCommand> = [
           `If it answers, scan it, match its nodes to the data model and propose its registration.`
         )
       }
-      return `Discover the OPC UA server at ${endpoint.url}: scan it, match its nodes to the data model and propose its registration.`
+      return (
+        `Discover the OPC UA server at ${endpoint.url}. It may be a gateway that serves several machines: list its machines first. ` +
+        `For each machine that is not added yet, scan it, match its nodes to the data model and propose its registration.`
+      )
     },
   },
   {

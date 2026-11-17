@@ -31,6 +31,14 @@ internal sealed record MachineRegistration
     /// <summary>The server and the security it is reached with.</summary>
     public EndpointRegistration Endpoint { get; init; } = new();
 
+    /// <summary>
+    /// The object of this machine on its server, with the namespace as a URI. Required when the
+    /// server serves several machines, an aggregation server for example: it says which of them
+    /// this registration is. Machines on one endpoint share one session.
+    /// </summary>
+    [Description("The object of the machine on the server, as opcua_machine_list names it (node). Required if the server serves several machines; leave it out for a server of one machine.")]
+    public string? MachineNode { get; init; }
+
     /// <summary>One entry per value the adapter publishes.</summary>
     public IReadOnlyList<ElementRegistration> Elements { get; init; } = [];
 

@@ -33,7 +33,16 @@ test("a machine alone gets the port of OPC UA, and the model asks if it does not
 test("an address is scanned as it is, without the default", () => {
   const typed = readTyped("/discover opc.tcp://10.0.0.7:4841", all)
   const text = typed.kind === "question" ? typed.text : ""
-  assert.match(text, /^Discover the OPC UA server at opc\.tcp:\/\/10\.0\.0\.7:4841/)
+  assert.match(text, /^Discover the OPC UA server at opc\.tcp:\/\/10\.0\.0\.7:4841\./)
+  assert.doesNotMatch(text, /4840/)
+})
+
+test("an address may be a gateway: its machines are listed first, and its slash at the end is dropped", () => {
+  assert.deepEqual(endpointOf("opc.tcp://opcgateway:11878/"), { url: "opc.tcp://opcgateway:11878", assumed: false })
+  const typed = readTyped("/discover opc.tcp://opcgateway:11878/", all)
+  const text = typed.kind === "question" ? typed.text : ""
+  assert.match(text, /opc\.tcp:\/\/opcgateway:11878\. It may be a gateway/)
+  assert.match(text, /list its machines first/)
   assert.doesNotMatch(text, /4840/)
 })
 

@@ -39,6 +39,11 @@ internal static class RegistrationValidator
             problems.Add("endpoint.securityPolicy: is required, for example Aes256_Sha256_RsaPss.");
         }
 
+        if (registration.MachineNode is not null && !IsPortableNode(registration.MachineNode))
+        {
+            problems.Add("machineNode: must carry the namespace as a URI, 'nsu=<uri>;s=<text>', as opcua_machine_list names it.");
+        }
+
         if (registration.Elements.Count == 0)
         {
             problems.Add("elements: at least one element is required.");

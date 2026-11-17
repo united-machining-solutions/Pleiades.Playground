@@ -60,7 +60,7 @@ timeseries-persistence   Up 3 minutes (healthy)
 | <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
 | `localhost:1883` | The MQTT broker the simulators publish to. |
 | <http://localhost:5530/machines> | The OPC UA adapter: the machines added over OPC UA. It answers on this computer only. |
-| <http://localhost:8090/> | The web UI of the simulated OPC UA machine, A0280O0001. |
+| <http://localhost:8090/> | The web UI of the simulated OPC UA machine, A1121O0001. |
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
 port and setting. The three simulated machines, P-04, P-07 and M-02, are the three `simulator-*` services.
@@ -247,11 +247,11 @@ reads which models the settings name, `cards.tsx` lists what the app draws for w
 ### Add a machine that speaks OPC UA
 
 Type `/` in the chat field: the list of commands opens, and `/help` explains them. Ask
-`/discover A0280O0001`, and the model scans the OPC UA server of the simulated machine, matches its nodes to
+`/discover A1121O0001`, and the model scans the OPC UA server of the simulated machine, matches its nodes to
 the data model and shows a proposal: the endpoint with the strongest security, every element with its value,
 and what is derived, unclear or missing. The machine is added only when you press "Add machine" on the
 proposal; from then on it is on Home like the others, also after a restart. `/opcua` lists the added servers,
-with a button to remove one, and `/mapping A0280O0001` shows what needs a look.
+with a button to remove one, and `/mapping A1121O0001` shows what needs a look.
 
 **In the code:** [`apps/app/src/opcua/`](../apps/app/src/opcua) holds the commands and the cards of the chat,
 and the adapter is [`source/Pleiades.Playground.OpcUa.Adapter`](../source/Pleiades.Playground.OpcUa.Adapter/README.md).

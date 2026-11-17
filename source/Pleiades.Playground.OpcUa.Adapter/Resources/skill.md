@@ -13,6 +13,7 @@ You never add or remove a machine yourself, and you never say that one was added
 | See the OPC UA servers that are added, with their endpoints | `opcua_server_list` |
 | See mismatches and unclear mappings of one machine | `opcua_mapping_show` |
 | Add a new OPC UA server | the scan below, ending in `opcua_registration_propose` |
+| Add the machines behind a gateway, "Add machine via OPC UA server at opc.tcp://opcgateway:11878/" | the scan below for each machine `opcua_machine_list` gives, one proposal each |
 | Add the OPC UA server of a machine, named without an address | the scan below, at the default endpoint (step 1) |
 | Scan an added server again, because it supports more now | the scan below; the proposal says what would change |
 | Remove a server | nothing: the list of servers shows a Remove button, tell the person to use it |
@@ -24,37 +25,54 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
 
 1. **Endpoints.** `opcua_endpoint_rank` with the address the person gave. The first endpoint is the one to
    register: its `securityMode` and `securityPolicy` go into the registration. Never choose a weaker one.
-   - If the person names only a machine, for example "add the OPC UA server of A0280O0001", assume the
-     default endpoint: the machine as host name and the port of OPC UA, `opc.tcp://A0280O0001:4840`.
+   - If the person names only a machine, for example "add the OPC UA server of A1121O0001", assume the
+     default endpoint: the machine as host name and the port of OPC UA, `opc.tcp://A1121O0001:4840`.
    - If that address does not answer, stop and ask the person for the endpoint, in one sentence with the form
      `opc.tcp://host:port`. Do not try other ports, other spellings or IP addresses of your own: an address
      you guessed may be another machine.
-   - An address the person gave is used as it is, without the default.
-2. **Session.** `opcua_ua_connect` with `endpointUrl`, `autoAcceptCerts: true` and `name: "scan"`. Leave the
+   - An address the person gave is used as it is, without the default. Drop a slash at its end.
+2. **Machines.** `opcua_machine_list` with the same address. It lists the machines the server serves, each
+   with its `node`, its `path` below Objects and the serial number read below it.
+   - One machine: a server of one machine. Scan it as below; `machineNode` may stay out.
+   - Several machines (`gateway: true`): an aggregation server. Every machine is reached at the address the
+     person gave, never at `opc.tcp://<machine>:4840`. Do steps 3 to 9 once per machine that is not `added`
+     yet, each from its own `node`, and propose one registration per machine, with `machineNode` set to its
+     `node` and `serialNumber` set to the serial number of the list. Open the session of step 3 once for all.
+   - A machine without a serial number cannot be registered: say so, and leave it.
+   - A TRUMPF machine behind a gateway is listed by its MachineTool instance, `i=3000` in the namespace the
+     gateway prefixed for it. No browse from Objects leads there; browse from that `node`, as step 5 says.
+   - No machine: the server has no object with an `Identification`. A gateway may not reach its machines
+     right now. Say so; scan the server as below only if the person wants it.
+3. **Session.** `opcua_ua_connect` with `endpointUrl`, `autoAcceptCerts: true` and `name: "scan"`. Leave the
    security arguments out: the tool takes the strongest endpoint by itself. Pass `sessionName: "scan"` to every
    later `opcua_ua_*` call. The person sees the thumbprint of the certificate on the proposal and confirms it
    there.
-3. **Namespaces.** `opcua_ua_read_value` of `i=2255`: the namespace array. Position `n` is the URI of
+4. **Namespaces.** `opcua_ua_read_value` of `i=2255`: the namespace array. Position `n` is the URI of
    `ns=n`. You need it for every node of the registration.
-4. **The machine.** `opcua_ua_browse_all` from `i=85` (Objects) with `maxDepth` 2 to find the machine: below
-   `Machines` (OPC 40001-1) if the server follows the Companion Specifications, otherwise the object of the
-   maker. Then `opcua_ua_browse_all` from the machine with `maxDepth` 5 and `maxResults` 600.
-5. **The elements.** For every element of the table below, find the node. Read the candidates with
+5. **The machine.** `opcua_ua_browse_all` from the `node` of the machine, as `opcua_machine_list` gave it, with
+   `maxDepth` 5 and `maxResults` 600. On a gateway, stay below that node: a node of another machine is
+   refused.
+6. **The elements.** For every element of the table below, find the node. Read the candidates with
    `opcua_ua_read_values`, several nodes in one call. For a number, find its unit: the `EngineeringUnits` and
    `EURange` below the node. For an enumeration, find its values: `opcua_ua_read_node` gives the `dataType`,
    and the `EnumValues` or `EnumStrings` below that data type give the names. Do not guess a unit or an
    enumeration: read it.
-6. **What the Companion Specification does not give.** Look in the namespace of the maker for the elements
-   that are still open, for example a power-on time or an energy meter. Browse it from its root object.
-7. **Alarms.** If the server has an alarm type of its own (a subtype of `AlarmConditionType`, `i=2915`),
+7. **What the Companion Specification does not give.** Look in the namespace of the maker for the elements
+   that are still open, for example a power-on time or an energy meter. Browse it from its root object; on a
+   gateway, from the root object below the folder of this machine.
+8. **Alarms.** If the server has an alarm type of its own (a subtype of `AlarmConditionType`, `i=2915`),
    name it in `alerts.eventType`, and the field with the code of the maker in `alerts.codeField`. If you find
-   none, leave `alerts` out and say so.
-8. **Propose.** `opcua_registration_propose`. If `accepted` is false, read `problems`, correct and propose
-   again. Then `opcua_ua_disconnect` with `sessionName: "scan"`.
-9. **Tell the person** in two sentences what the proposal covers and what needs their attention. They add the
-   machine with the button on the proposal.
+   none, leave `alerts` out and say so. On a gateway the adapter keeps to each machine the alarms whose source
+   lies in its namespaces.
+9. **Propose.** `opcua_registration_propose`. If `accepted` is false, read `problems`, correct and propose
+   again. After the last machine, `opcua_ua_disconnect` with `name: "scan"`.
+10. **Tell the person** in two sentences what the proposals cover and what needs their attention. They add each
+   machine with the button on its proposal.
 
-Work in few calls: browse wide once, then read many nodes at once. A scan needs ten to twenty calls.
+Work in few calls: browse wide once, then read many nodes at once. A scan needs ten to twenty calls per
+machine. Machines of one kind behind one gateway have the same structure in their own namespaces: map the
+first one fully, then find the same browse paths below the next ones and read them to check, instead of
+browsing each from scratch.
 
 ## The elements
 
@@ -126,7 +144,8 @@ alarm type, or follows no Companion Specification at all.
 - Never copy a node, a namespace, a unit or a derivation from the example or from another machine. Take each
   from what this server offers: browse it, read it.
 - Find the serial number on this server (`Identification/SerialNumber` or what the maker names so) and read it.
-  Do not take it from the example, from the address or from the host name.
+  Do not take it from the example, from the address or from the host name. The adapter compares it with the
+  value it reads, and refuses a registration whose serial number differs.
 - If the server has no node for an element of Core, derive it only from a signal you read on this server, mark
   it `Derived` and say from what. If you cannot, put it into `missing`.
 

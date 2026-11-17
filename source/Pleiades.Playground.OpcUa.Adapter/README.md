@@ -1,8 +1,9 @@
 # OPC UA adapter (proof of concept)
 
 Brings machines that speak OPC UA into the stack. The adapter holds a session to the OPC UA server of every
-registered machine, subscribes to the nodes its registration names, and publishes their values to the broker by
-the [MQTT binding](../../contracts/mqtt/README.md). From there a machine is stored and shown like a simulated
+registered machine, one session per endpoint, so the machines behind one gateway share it. It subscribes to the
+nodes each registration names, and publishes their values to the broker by the
+[MQTT binding](../../contracts/mqtt/README.md). From there a machine is stored and shown like a simulated
 one, without a change to another service.
 
 > **Status: proof of concept**, on the branch `feat/opcua-adapter-poc`. It has not been agreed in an issue yet,
@@ -32,7 +33,7 @@ A machine with an OPC UA server becomes a machine of the platform like the simul
 | Who adds and removes a machine | A person, with a button on a card in the chat. No tool of the MCP server adds or removes one |
 | How a machine is added and removed | The management API of the adapter; the registrations live in its volume |
 | Lists of Core (`Notification.ActiveAlerts`, `Production.JobOrders`) | By the MQTT binding: alarms as notification events, job orders not published |
-| Test server | The TRUMPF OPC UA simulator, definition `L26`, machine `A0280O0001` |
+| Test server | The TRUMPF OPC UA simulator: in the stack definition `K09`, machine `A1121O0001`; first tried with definition `L26`, machine `A0280O0001` |
 | Optional or not | Part of the stack, locally, in CI and in the deployment: no compose profile |
 
 ## The idea: discover once, run from the registration
@@ -49,8 +50,8 @@ there again after every restart, as long as the volume `/data` is.
 ```text
   chat (example app) ──MCP──▶ opcua-adapter /mcp
      │  cards: server list, mapping, proposal          ├─ opcua_ua_*  (OPC UA MCP library: find, connect, browse, read)
-     │                                                 └─ opcua_server_list, opcua_mapping_show,
-     │                                                    opcua_endpoint_rank, opcua_registration_propose
+     │                                                 └─ opcua_server_list, opcua_mapping_show, opcua_endpoint_rank,
+     │                                                    opcua_machine_list, opcua_registration_propose
      └─ button "Add machine" / "Remove" ──REST──▶ opcua-adapter /drafts/{id}/commit, /machines/{serialNumber}
 
   opcua-adapter ──OPC UA (SignAndEncrypt)──▶ OPC UA server of the machine
@@ -70,11 +71,11 @@ The adapter and a simulated machine are part of the demo stack. They start with 
 docker compose up -d --build --wait
 ```
 
-The simulated machine is the TRUMPF OPC UA simulator with its definition `L26`, a TruLaser, from the image
+The simulated machine is the TRUMPF OPC UA simulator with its definition `K09`, a TruMatic, from the image
 that umati publishes for amd64 and arm64,
 [`ghcr.io/umati/trumpf/edge/opc-simulator:1.3.1`](https://github.com/orgs/umati/packages/container/package/trumpf%2Fedge%2Fopc-simulator).
 `OPC_SIMULATOR_IMAGE` in `.env` names another one, for example a build of your own. The simulator is not
-registered at the start: the stack shows it once a person adds it in the chat, `/discover A0280O0001`, or with
+registered at the start: the stack shows it once a person adds it in the chat, `/discover A1121O0001`, or with
 the request below.
 
 | | |
@@ -88,17 +89,21 @@ Register the simulated machine without the chat, with the registration that ship
 
 ```bash
 curl -X PUT -H "content-type: application/json" \
-  --data-binary @source/Pleiades.Playground.OpcUa.Adapter/samples/trumpf-trulaser-l26.registration.json \
-  http://localhost:5530/machines/A0280O0001
+  --data-binary @source/Pleiades.Playground.OpcUa.Adapter/samples/trumpf-trumatic-k09.registration.json \
+  http://localhost:5530/machines/A1121O0001
 ```
 
-The machine `A0280O0001` then appears in the example app, <http://localhost:5600/>, beside the simulated ones.
+The machine `A1121O0001` then appears in the example app, <http://localhost:5600/>, beside the simulated ones.
 
 ## The example is TRUMPF-specific
 
-The simulator, its machine `A0280O0001` and the example registration
-([`samples/trumpf-trulaser-l26.registration.json`](samples/trumpf-trulaser-l26.registration.json)) are
-TRUMPF-specific. The simulator serves the address space of a TRUMPF TruLaser: a MachineTool instance after
+The simulator, its machines and the example registrations are TRUMPF-specific:
+[`samples/trumpf-trumatic-k09.registration.json`](samples/trumpf-trumatic-k09.registration.json) for the
+TruMatic `A1121O0001` of definition `K09`, the one in the stack, and
+[`samples/trumpf-trulaser-l26.registration.json`](samples/trumpf-trulaser-l26.registration.json) for the
+TruLaser `A0280O0001` of definition `L26`, the first one scanned. The two differ only in the machine: every
+definition of the simulator has the same nodes. The simulator serves the address space of a TRUMPF machine:
+a MachineTool instance after
 OPC 40501-1 in the namespace `http://trumpf.com/UA/MachineTool/`, and beside it the TRUMPF interface
 `http://trumpf.com/TRUMPF-Interfaces/` with the power-on time, the energy meter and the alarm type
 `TcMachineAlarmType`. Every node of the example names one of these namespaces.
@@ -110,9 +115,9 @@ Its nodes, units and derivations are not a template to copy: every server is sca
 decides from what that server offers. The guide of the model says so, and the adapter refuses a registration
 whose nodes the server does not have.
 
-The images of umati, `1.3.0` and later, report `A0280O0001`. An image of the simulator built before its machine numbers
-were replaced reports `A0280E0062` instead: the example registration is then refused or publishes under the wrong
-number.
+The images of umati, `1.3.0` and later, report `A0280O0001` for `L26`. An image of the simulator built before its
+machine numbers were replaced reports `A0280E0062` instead: the example registration of `L26` is then refused or
+publishes under the wrong number. The machine of `K09` is `A1121O0001` in the image `1.3.1`.
 
 ## In the chat
 
@@ -124,7 +129,7 @@ adapter (`OPCUA_MCP_URL`).
 |---|---|---|---|
 | `/help` | Lists the commands with a sentence each, without asking the model | none | the list of commands |
 | `/opcua` | Lists the added OPC UA servers with endpoint, security, state and mapping health | `opcua_server_list` | server list card, with a Remove button per server |
-| `/discover <machine or opc.tcp://host:port>` | Scans a server and proposes its registration | `opcua_endpoint_rank`, `opcua_ua_*`, `opcua_registration_propose` | proposal card, with the button "Add machine" |
+| `/discover <machine or opc.tcp://host:port>` | Scans a server and proposes a registration for each machine it serves | `opcua_endpoint_rank`, `opcua_machine_list`, `opcua_ua_*`, `opcua_registration_propose` | the machines of the server, and a proposal card per machine, each with the button "Add machine" |
 | `/mapping <serial number>` | Shows mismatches and unclear mappings of one machine | `opcua_mapping_show` | mapping card, what needs a look first |
 | `/rescan <serial number>` | Scans an added server again and says what would change | as `/discover` | proposal card with the changes, with the button "Replace registration" |
 
@@ -135,12 +140,70 @@ A machine named without an address gets the default endpoint, its name as host n
 
 | The person asks | Endpoint scanned |
 |---|---|
-| `/discover A0280O0001`, or "add the OPC UA server of A0280O0001" | `opc.tcp://A0280O0001:4840` |
+| `/discover A1121O0001`, or "add the OPC UA server of A1121O0001" | `opc.tcp://A1121O0001:4840` |
 | `/discover opc.tcp://10.0.0.7:4841` | `opc.tcp://10.0.0.7:4841`, as given |
 
 If the default endpoint does not answer, the chat asks for the endpoint. It tries no other port and no other
 address of its own: a guessed address may be another machine. In the demo stack the simulator answers under its
-host name `A0280O0001`.
+host name `A1121O0001`.
+
+An address may be a gateway that serves several machines, "Add machine via OPC UA server at
+opc.tcp://opcgateway:11878/": the default endpoint does not apply, since the machine is not the host. See
+[Machines behind a gateway](#machines-behind-a-gateway).
+
+## Machines behind a gateway
+
+An aggregation server, a gateway, serves the address spaces of several machines under one endpoint, each
+machine below `Machines` (OPC 40001-1) or a folder of the gateway. The adapter treats every machine as a
+machine of its own, with a registration of its own, and every machine on one endpoint shares one session.
+
+- **Which machines.** `opcua_machine_list`, or `GET /endpoints/machines?url=`, connects with the strongest
+  endpoint and lists every object below Objects that has an `Identification` with a `SerialNumber`, with its
+  node, its path and the serial number read below it. That is code, not the judgement of the model. A server of
+  one machine lists one.
+- **TRUMPF machines behind a gateway.** A gateway may leave the `Machines` folder of OPC 40001-1 out, as the
+  TRUMPF OPC gateway does: its MachineTool instance is then on the gateway, but no browse from Objects leads to
+  it. Two facts of every TRUMPF machine find it anyway ([`OpcUa/TrumpfMachines.cs`](OpcUa/TrumpfMachines.cs)):
+  the root of its TRUMPF interface is `s=1` in `http://trumpf.com/TRUMPF-Interfaces/`, with the display name
+  `<Model>.<SerialNumber>`, and its MachineTool instance is `i=3000` in `http://trumpf.com/UA/MachineTool/`.
+  The gateway puts the same prefix before both namespaces of one machine, `urn:A1121O0001:TRUMPF:OpcSimulator/`
+  for example. The list names the instance as the machine, with the identification read below it and the model
+  from the display name; the scan browses from there, and the registration has the nodes of the instance in the
+  prefixed namespaces.
+- **One registration per machine.** The chat scans each machine from its node and proposes one registration per
+  machine, with `machineNode` and the serial number from the list. A person adds each with the button on its
+  proposal.
+- **Checks.** On a server of several machines a registration is refused (409) if it names no `machineNode`, if
+  its serial number is not the one read below that machine, or if one of its nodes lies in a namespace that only
+  another machine of the endpoint has. On every server the serial number has to be the value its element
+  `Identification.SerialNumber` reads.
+- **One session per endpoint.** Machines with the same address (case and a slash at the end do not count), the
+  same security and the same server certificate share one session. Each machine keeps a subscription of its own
+  on it, says `Connected` and `Disconnected` itself, and is tried again on its own if its nodes fail, while the
+  session and the other machines go on. A lost session makes every machine on it `Disconnected`.
+- **Removal.** The machine leaves the session: its subscription is deleted, it says `Disconnected` and its alarms
+  are reset. The session closes only with the last machine of its endpoint.
+- **Alarms.** A gateway reports the alarms of all its machines at its Server object. A machine with a
+  `machineNode` keeps those whose source or condition lies in one of its namespaces: those of its elements and
+  of its node. That needs a gateway that gives every machine namespaces of its own, as the UaGateway of Unified
+  Automation does with `NamespacePrefixOption` `ServerUri`.
+
+### A gateway on the development computer
+
+The gateway is not part of the stack and not of `compose.yaml`: its image is not public. A gateway that runs as
+a container of its own, here named `opcgateway`, is reached by the adapter once both are in one network:
+
+```bash
+docker network connect pleiades-playground_default opcgateway
+```
+
+The gateway has to trust the adapter once. After the first try, the certificate of the adapter,
+`Pleiades Playground OPC UA Adapter [<thumbprint>].der`, lies among the rejected certificates of the gateway; for
+the UaGateway that is `pki/pkiserver/rejected` in its configuration folder. Move it to `pki/pkiserver/trusted/certs`.
+`GET /endpoints/machines?url=opc.tcp://opcgateway:11878` then lists the machines the gateway reaches. A gateway
+that reaches none of its machines lists none: its own folders hold nothing then. The UaGateway reaches a machine
+in the way its configuration names, for example by reverse connect, where the server of the machine dials in to
+the gateway.
 
 ## The mapping review
 
@@ -159,16 +222,17 @@ Every element of a registration has one of five states. The chat and the API sho
 | Request | What it does |
 |---|---|
 | `GET /endpoints?url=opc.tcp://host:4840` | The endpoints the server offers, strongest first. The first one is the one to register. |
+| `GET /endpoints/machines?url=opc.tcp://host:4840` | The machines the server serves, with node, path and serial number: one, or several behind a gateway. |
 | `PUT /machines/{SerialNumber}?dryRun=true` | Tries a registration: connects, reads every node once, and answers with each raw and converted value. Nothing is stored or published. |
 | `PUT /machines/{SerialNumber}` | Registers the machine, or replaces its registration, and starts it. |
 | `POST /drafts/{draftId}/commit` | Registers what a proposal of the chat holds. The button on the proposal sends it; a draft works once and is kept for 30 minutes. |
-| `GET /machines` | The registered machines with their state. |
+| `GET /machines` | The registered machines with their state, and the machines each shares its session with. |
 | `GET /machines/{SerialNumber}` | One machine: its registration, the last value of every element, the alarms that stand. |
 | `GET /machines/{SerialNumber}/mapping` | The mapping review of one machine, element by element. |
 | `DELETE /machines/{SerialNumber}` | Removes the machine. |
 
 A registration is refused with the reasons, one per line of `problems`: `400` if it is malformed, `409` if it
-does not fit its server, `502` if the server does not answer.
+does not fit its server or is not the machine it says it is, `502` if the server does not answer.
 
 The API has no sign-in. Whoever reaches its port can add and remove machines, so the port answers on this
 computer only unless `OPCUA_ADAPTER_BIND` opens it.
@@ -183,6 +247,8 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
   `OperationCounters.PowerOnDuration`.
 - `endpoint`: the URL, `securityMode` and `securityPolicy`. `serverCertificateThumbprint` is filled in by
   the adapter at the first connect.
+- `machineNode`: the object of the machine, as `opcua_machine_list` names it. Required on a server of several
+  machines; left out on a server of one.
 - `elements`: one per value.
   - `path` and `area` give the topic: `Channel[1].ChannelState` in the area `umati` is
     `machines/{SerialNumber}/umati/Channel/1/ChannelState`; the area `vendor` is for a value of the maker.
@@ -228,8 +294,9 @@ After a reconnect, and after a restart of the adapter, the server is asked for t
 - **Restart.** The registrations are files in `/data/machines`, one per machine. At start the adapter reads
   them and connects. `docker compose down` keeps the volume; `docker compose down -v` deletes it, and with it
   every registration.
-- **Removal.** The session is closed, `Disconnected` is published, the alarms that stand are reset and the
-  registration is deleted. What the machine published stays stored until the retention ends.
+- **Removal.** The machine leaves its session, `Disconnected` is published, the alarms that stand are reset and
+  the registration is deleted. The session closes with the last machine of its endpoint. What the machine
+  published stays stored until the retention ends.
 - **A server that changed.** If a registered node is gone, the element says so and the machine has
   `needsRescan: true`. `/rescan` is the discovery again; its proposal says what would change, and the button
   replaces the registration. The subscription is built anew without a restart of the service. That is also how
@@ -269,12 +336,21 @@ What the scan of the TRUMPF simulator found, and what it did not. Another server
   registration deleted.
 - The MCP endpoint of the adapter: an encrypted scan session through the hosted library, a proposal with 2
   derived and 2 unclear elements, a commit that works once and answers 404 the second time.
-- The default endpoint: in the stack the adapter resolves `A0280O0001` and gets the endpoints of
-  `opc.tcp://A0280O0001:4840`.
-- Checks: the solution builds and its tests pass, the 54 of the adapter among them; `pnpm typecheck`,
+- The default endpoint: in the stack the adapter resolves `A1121O0001` and gets the endpoints of
+  `opc.tcp://A1121O0001:4840`; the example registration of `K09` registers it and its values are stored.
+- Behind a gateway, the UaGateway `opcgateway` of TRUMPF with two simulators, `L26` (`A0280O0001`) and `K09`
+  (`A1121O0001`): the list names both by their MachineTool instances, with serial number, manufacturer, model and
+  product instance URI read on the gateway. Both registrations read all 15 elements Good, and both machines run
+  on one session of the adapter (one session in the session list of the gateway), their values and alarms each
+  under their own serial number. A registration without `machineNode`, with a node of the other machine, or with
+  the serial number of the other machine is refused with 409. Removing the first machine keeps the session, and
+  the other machine goes on publishing; removing the second closes it.
+- Checks: the solution builds and its tests pass, the 85 of the adapter among them; `pnpm typecheck`,
   `pnpm test` and `pnpm build` pass with the chat commands and cards.
 
-Not verified: a discovery through the chat from the first question to the click, with a language model.
+Not verified: a discovery through the chat from the first question to the click, with a language model; for a
+gateway too. The gateway registrations were tried from the example registration with the prefixed namespaces,
+not from a scan of the model.
 
 ## Known limits
 
@@ -285,7 +361,9 @@ Not verified: a discovery through the chat from the first question to the click,
   repository warns about it at start.
 - The MCP endpoint has no sign-in, like the other services of the demo; every request is the one demo caller.
 - Sessions to a server are anonymous only; a user name or a user certificate is not supported yet.
-- One registration is one session: the adapter knows no server that serves several machines.
+- Behind a gateway, each machine is scanned on its own; a mapping is not yet carried over to the next machine
+  of the same kind. Alarms are kept apart by namespace, so a gateway that gives its machines common namespaces
+  reports the alarms of each to all.
 - `PartsProducedInLifetime` is not offered by the simulator; `Production.JobOrders` is not published.
 
 ## Deployment
@@ -297,15 +375,9 @@ stays across deployments.
 
 ## Next steps
 
-- **Machines behind an OPC UA aggregation server.** A gateway serves the address spaces of several machines
-  under one endpoint, each machine below `Machines` (OPC 40001-1) or a folder of the gateway. A sample runs on
-  the development computer as the Docker container `opcgateway`, with three aggregated machines. To do:
-  - a scan that lists every machine of one endpoint and proposes one registration per machine, each with the
-    serial number read below that machine;
-  - one session per endpoint, shared by the machines behind it, instead of one per registration;
-  - a removal that closes the session only with the last machine of its endpoint;
-  - in the chat, a gateway is named by its address: the default endpoint `opc.tcp://<machine>:4840` does not
-    apply, since the machine is not the host.
+- **Machines of one kind behind a gateway.** Map the first machine, and let the adapter carry the mapping over
+  to the next ones by their browse paths, so a gateway of ten machines does not take ten scans. A button that
+  adds every proposal of one gateway at once.
 - **Strict mappings for known namespaces.** Where a server uses a namespace whose meaning is fixed, the mapping
   should not be left to the judgement of the model. For example:
   - `http://opcfoundation.org/UA/MachineTool/` (OPC 40501-1), with `http://opcfoundation.org/UA/Machinery/`

@@ -24,6 +24,8 @@ internal sealed record EndpointView(string Url, SecurityMode SecurityMode, strin
 /// <param name="Mapping">How many elements are in which state.</param>
 /// <param name="NeedsRescan">A registered node is gone from the server: scan it again.</param>
 /// <param name="ScannedAt">When the server was last scanned.</param>
+/// <param name="MachineNode">The object of the machine on a server that serves several machines.</param>
+/// <param name="SessionSharedWith">The other machines on the same session, behind the same endpoint. Empty for a server of one machine.</param>
 internal sealed record ServerView(
     string SerialNumber,
     string? DisplayName,
@@ -33,7 +35,9 @@ internal sealed record ServerView(
     IReadOnlyList<string> Profiles,
     MappingSummary Mapping,
     bool NeedsRescan,
-    DateTimeOffset? ScannedAt);
+    DateTimeOffset? ScannedAt,
+    string? MachineNode,
+    IReadOnlyList<string> SessionSharedWith);
 
 /// <summary>The added OPC UA servers.</summary>
 /// <param name="Servers">One entry per machine.</param>
@@ -56,6 +60,34 @@ internal sealed record RankedEndpointView(SecurityMode SecurityMode, string Secu
 /// <param name="CertificateThumbprint">SHA-1 thumbprint of the certificate the server presents.</param>
 /// <param name="Endpoints">The endpoints a session without a user can use.</param>
 internal sealed record EndpointRankView(string Url, string? CertificateThumbprint, IReadOnlyList<RankedEndpointView> Endpoints);
+
+/// <summary>A machine an OPC UA server serves.</summary>
+/// <param name="Node">The object of the machine: the <c>machineNode</c> of its registration.</param>
+/// <param name="Path">Where it is below Objects, by names.</param>
+/// <param name="DisplayName">Its name on the server.</param>
+/// <param name="SerialNumber">The serial number read below it: the <c>serialNumber</c> of its registration. Null if it has none.</param>
+/// <param name="Manufacturer">Its manufacturer, as read.</param>
+/// <param name="Model">Its model, as read.</param>
+/// <param name="ProductInstanceUri">Its product instance URI, as read.</param>
+/// <param name="Added">Whether a machine with this serial number is added already.</param>
+/// <param name="AddedAt">The endpoint it is added at, if it is added.</param>
+internal sealed record ServedMachineView(
+    string Node,
+    string Path,
+    string DisplayName,
+    string? SerialNumber,
+    string? Manufacturer,
+    string? Model,
+    string? ProductInstanceUri,
+    bool Added,
+    string? AddedAt);
+
+/// <summary>The machines an OPC UA server serves.</summary>
+/// <param name="Url">The address of the server.</param>
+/// <param name="Endpoint">The strongest endpoint: the machines were read on it, and a registration names it.</param>
+/// <param name="Gateway">True if the server serves more than one machine: every registration then names its machineNode.</param>
+/// <param name="Machines">The machines, the ones nearest to Objects first.</param>
+internal sealed record MachineListView(string Url, RankedEndpointView? Endpoint, bool Gateway, IReadOnlyList<ServedMachineView> Machines);
 
 /// <summary>A registration that was tried against its server and waits for a person's yes.</summary>
 /// <param name="Accepted">True if the proposal is kept and can be added. False: see <paramref name="Problems"/>.</param>
@@ -90,10 +122,12 @@ internal static class Views
     public static EndpointView Endpoint(EndpointRegistration endpoint) =>
         new(endpoint.Url, endpoint.SecurityMode, endpoint.SecurityPolicy, endpoint.ServerCertificateThumbprint);
 
-    public static ServerView Server(MachineConnection connection) => Mapping(connection).Server;
+    public static ServerView Server(MachineConnection connection, IReadOnlyList<string> sharing) => Mapping(connection, sharing).Server;
 
-    public static MappingView Mapping(MachineConnection connection)
+    public static MappingView Mapping(MachineConnection connection, IReadOnlyList<string> sharing)
     {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(sharing);
         var registration = connection.Registration;
         var status = connection.Status;
         var rows = MappingReview.Rows(
@@ -113,7 +147,9 @@ internal static class Views
             registration.Profiles,
             MappingReview.Summary(rows),
             status.NeedsRescan,
-            registration.Discovery?.At);
+            registration.Discovery?.At,
+            registration.MachineNode,
+            [.. sharing.Where(serialNumber => !string.Equals(serialNumber, registration.SerialNumber, StringComparison.Ordinal))]);
         return new MappingView(server, rows);
     }
 
@@ -122,6 +158,31 @@ internal static class Views
             url,
             ranked.Count > 0 ? ranked[0].Endpoint.ServerCertificateThumbprint : null,
             [.. ranked.Select(one => new RankedEndpointView(one.Endpoint.SecurityMode, one.Endpoint.SecurityPolicy, one.Recommended, one.Weak))]);
+
+    public static MachineListView Machines(ServedMachines served, IReadOnlyList<MachineConnection> added)
+    {
+        ArgumentNullException.ThrowIfNull(served);
+        ArgumentNullException.ThrowIfNull(added);
+        var best = served.Endpoints.Count > 0 ? served.Endpoints[0] : null;
+        return new MachineListView(
+            served.Url,
+            best is null ? null : new RankedEndpointView(best.Endpoint.SecurityMode, best.Endpoint.SecurityPolicy, best.Recommended, best.Weak),
+            served.Machines.Count > 1,
+            [.. served.Machines.Select(machine =>
+            {
+                var registered = added.FirstOrDefault(one => string.Equals(one.Registration.SerialNumber, machine.SerialNumber, StringComparison.Ordinal));
+                return new ServedMachineView(
+                    machine.Node,
+                    machine.Path,
+                    machine.DisplayName,
+                    machine.SerialNumber,
+                    machine.Manufacturer,
+                    machine.Model,
+                    machine.ProductInstanceUri,
+                    registered is not null,
+                    registered?.Registration.Endpoint.Url);
+            })]);
+    }
 
     public static IReadOnlyList<MappingRow> Rows(MachineRegistration registration, ProbeResult probe) =>
         MappingReview.Rows(

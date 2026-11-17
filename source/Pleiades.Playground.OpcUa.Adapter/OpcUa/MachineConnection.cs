@@ -34,16 +34,16 @@ internal sealed record MachineStatus(
     IReadOnlyList<OpenAlert> OpenAlerts);
 
 /// <summary>
-/// Runs one registered machine: holds the session, subscribes to the nodes of the registration and
-/// publishes what they report. It needs nothing but the registration, so it starts the same way
-/// after every restart.
+/// Runs one registered machine on the session of its endpoint: subscribes to the nodes of the
+/// registration and publishes what they report. The session belongs to <see cref="SharedSession"/>,
+/// which several machines behind one aggregation server share. A machine needs nothing but the
+/// registration, so it starts the same way after every restart.
 /// </summary>
-internal sealed class MachineConnection
+internal sealed class MachineConnection : ISessionTenant
 {
     private const string Pending = "Pending";
     private const string Good = "Good";
 
-    private readonly OpcUaClient _client;
     private readonly IMachinePublisher _publisher;
     private readonly AlertStore _alertStore;
     private readonly TimeSpan _heartbeatInterval;
@@ -52,15 +52,16 @@ internal sealed class MachineConnection
     private readonly Lock _gate = new();
     private readonly ElementRuntime[] _elements;
     private readonly AlertTracker _alerts;
+    private readonly IReadOnlySet<string> _namespaces;
 
     private string _state = "Disconnected";
     private string? _lastError;
     private DateTime? _connectedSince;
+    private Subscription? _subscription;
 
-    /// <summary>Creates the connection. Nothing happens before <see cref="RunAsync"/>.</summary>
+    /// <summary>Creates the connection. Nothing happens before <see cref="RunAsync"/> and a session.</summary>
     public MachineConnection(
         MachineRegistration registration,
-        OpcUaClient client,
         IMachinePublisher publisher,
         AlertStore alertStore,
         TimeSpan heartbeatInterval,
@@ -68,7 +69,6 @@ internal sealed class MachineConnection
         ILogger logger)
     {
         Registration = registration ?? throw new ArgumentNullException(nameof(registration));
-        _client = client ?? throw new ArgumentNullException(nameof(client));
         _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
         _alertStore = alertStore ?? throw new ArgumentNullException(nameof(alertStore));
         _heartbeatInterval = heartbeatInterval;
@@ -76,10 +76,17 @@ internal sealed class MachineConnection
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _elements = [.. registration.Elements.Select(element => new ElementRuntime(element, Topics.Value(registration.SerialNumber, element.Area, element.Path)))];
         _alerts = new AlertTracker(alertStore.Load(registration.SerialNumber));
+        _namespaces = MachineNamespaces.Of(registration);
     }
 
     /// <summary>The registration this connection runs.</summary>
     public MachineRegistration Registration { get; }
+
+    /// <inheritdoc />
+    public string Name => Registration.SerialNumber;
+
+    /// <inheritdoc />
+    public EndpointRegistration Endpoint => Registration.Endpoint;
 
     /// <summary>What the machine does right now.</summary>
     public MachineStatus Status
@@ -99,29 +106,26 @@ internal sealed class MachineConnection
         }
     }
 
-    /// <summary>Runs until cancelled: connects, publishes, and connects again whenever the session is lost.</summary>
+    /// <summary>
+    /// Says <c>Disconnected</c> once, then the heartbeat until cancelled. The values come from the
+    /// session of the endpoint, once it attaches this machine.
+    /// </summary>
     public async Task RunAsync(CancellationToken cancellationToken)
     {
-        var serialNumber = Registration.SerialNumber;
-        await _publisher.PublishConnectionAsync(serialNumber, connected: false).ConfigureAwait(false);
+        await _publisher.PublishConnectionAsync(Registration.SerialNumber, connected: false).ConfigureAwait(false);
         try
         {
-            await Task.WhenAll(HeartbeatAsync(cancellationToken), ConnectLoopAsync(cancellationToken)).ConfigureAwait(false);
+            await HeartbeatAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // Stopped on purpose: by a removal, a new registration or the end of the service.
         }
-        finally
-        {
-            // Disconnected is on the broker already: from the start, or from the end of the last session.
-            SetState("Disconnected", null);
-        }
     }
 
     /// <summary>
     /// Resets every alarm that stands. For a machine that is removed: nobody watches it from here on,
-    /// so an alarm the adapter raised would stay open for ever. Call it after <see cref="RunAsync"/> ended.
+    /// so an alarm the adapter raised would stay open for ever. Call it after the machine left its session.
     /// </summary>
     public async Task ResetOpenAlertsAsync()
     {
@@ -135,6 +139,69 @@ internal sealed class MachineConnection
         foreach (var reset in resets)
         {
             await _publisher.PublishAlertAsync(Registration.SerialNumber, reset).ConfigureAwait(false);
+        }
+    }
+
+    /// <inheritdoc />
+    public void SessionConnecting()
+    {
+        lock (_gate)
+        {
+            if (_state != "Connected")
+            {
+                _state = "Connecting";
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task AttachAsync(IEndpointSession session, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        try
+        {
+            _subscription = await SubscribeAsync(session.Session, cancellationToken).ConfigureAwait(false);
+            await WaitForFirstValuesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            await RemoveSubscriptionAsync(session).ConfigureAwait(false);
+            SetState("Disconnected", exception.Message);
+            throw;
+        }
+
+        await _publisher.PublishConnectionAsync(Registration.SerialNumber, connected: true).ConfigureAwait(false);
+        SetState("Connected", null);
+        _logger.MachineConnected(Registration.SerialNumber, Registration.Endpoint.Url, Registration.Endpoint.SecurityMode.ToString(), Registration.Endpoint.SecurityPolicy);
+    }
+
+    /// <inheritdoc />
+    public async Task DetachAsync(IEndpointSession session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        await RemoveSubscriptionAsync(session).ConfigureAwait(false);
+        await SessionDownAsync(null).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task SessionDownAsync(string? reason)
+    {
+        // The subscription goes with the session; a session that is gone is not asked to delete it.
+        _subscription = null;
+        bool wasConnected;
+        lock (_gate)
+        {
+            wasConnected = _state == "Connected";
+        }
+
+        SetState("Disconnected", reason);
+        if (wasConnected)
+        {
+            await _publisher.PublishConnectionAsync(Registration.SerialNumber, connected: false).ConfigureAwait(false);
+            if (reason is not null)
+            {
+                _logger.MachineSessionLost(Registration.SerialNumber);
+            }
         }
     }
 
@@ -153,60 +220,27 @@ internal sealed class MachineConnection
         while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false));
     }
 
-    private async Task ConnectLoopAsync(CancellationToken cancellationToken)
+    private async Task RemoveSubscriptionAsync(IEndpointSession session)
     {
-        var delay = TimeSpan.FromSeconds(2);
-        while (!cancellationToken.IsCancellationRequested)
+        if (Interlocked.Exchange(ref _subscription, null) is not { } subscription)
         {
-            ManagedSession? session = null;
-            var connected = false;
-            try
-            {
-                SetState("Connecting", _lastError);
-                (session, _) = await _client.ConnectAsync(Registration.Endpoint, cancellationToken).ConfigureAwait(false);
-                await SubscribeAsync(session, cancellationToken).ConfigureAwait(false);
-                await WaitForFirstValuesAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
 
-                await _publisher.PublishConnectionAsync(Registration.SerialNumber, connected: true).ConfigureAwait(false);
-                connected = true;
-                SetState("Connected", null);
-                _logger.MachineConnected(Registration.SerialNumber, Registration.Endpoint.Url, Registration.Endpoint.SecurityMode.ToString(), Registration.Endpoint.SecurityPolicy);
-                delay = TimeSpan.FromSeconds(2);
-
-                await WatchAsync(session, cancellationToken).ConfigureAwait(false);
-                SetState("Disconnected", "The session was lost.");
-                _logger.MachineSessionLost(Registration.SerialNumber);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-#pragma warning disable CA1031 // Whatever a server or the network throws: this machine waits and tries again, the others go on.
-            catch (Exception exception)
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await session.Session.RemoveSubscriptionAsync(subscription, timeout.Token).ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // A subscription that cannot be deleted ends with the session; nothing else depends on it.
+        catch (Exception exception)
 #pragma warning restore CA1031
-            {
-                SetState("Disconnected", exception.Message);
-                _logger.MachineConnectFailed(Registration.SerialNumber, exception.Message, delay.TotalSeconds);
-            }
-            finally
-            {
-                if (session is not null)
-                {
-                    await CloseAsync(session).ConfigureAwait(false);
-                }
-
-                if (connected)
-                {
-                    await _publisher.PublishConnectionAsync(Registration.SerialNumber, connected: false).ConfigureAwait(false);
-                }
-            }
-
-            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-            delay = TimeSpan.FromSeconds(Math.Min(60, delay.TotalSeconds * 2));
+        {
+            _logger.SessionCloseFailed(Registration.SerialNumber, exception.Message);
         }
     }
 
-    private async Task SubscribeAsync(ManagedSession session, CancellationToken cancellationToken)
+    private async Task<Subscription> SubscribeAsync(ISession session, CancellationToken cancellationToken)
     {
         var interval = (int)_samplingInterval.TotalMilliseconds;
 #pragma warning disable CA2000, CS0618 // The session owns its subscriptions and disposes them. The classic subscription is the one tried against the simulator; the managed model of the stack 2.0 is a later step.
@@ -272,6 +306,8 @@ internal sealed class MachineConnection
                 _logger.AlertsNotMonitored(Registration.SerialNumber, alertItem.Status.Error?.ToString() ?? "Bad");
             }
         }
+
+        return subscription;
     }
 
     private MonitoredItem? AlertItem(ISession session, Subscription subscription)
@@ -314,6 +350,7 @@ internal sealed class MachineConnection
         Select(ObjectTypeIds.ConditionType, Attributes.NodeId);
         Select(ObjectTypeIds.ConditionType, Attributes.Value, new QualifiedName(BrowseNames.ConditionName));
         Select(ObjectTypeIds.AlarmConditionType, Attributes.Value, new QualifiedName(BrowseNames.ActiveState), new QualifiedName(BrowseNames.Id));
+        Select(ObjectTypeIds.BaseEventType, Attributes.Value, new QualifiedName(BrowseNames.SourceNode));
         if (CodeField(session, alerts.CodeField) is { } code)
         {
             Select(eventType, Attributes.Value, code);
@@ -332,7 +369,7 @@ internal sealed class MachineConnection
         {
             if (e.NotificationValue is EventFieldList list)
             {
-                OnEvent(list, eventType);
+                OnEvent(list, eventType, session.NamespaceUris);
             }
         };
         subscription.AddItem(item);
@@ -359,10 +396,10 @@ internal sealed class MachineConnection
         Forget(_publisher.PublishValueAsync(Registration.SerialNumber, runtime.Element, converted!, timestamp));
     }
 
-    private void OnEvent(EventFieldList list, NodeId alarmType)
+    private void OnEvent(EventFieldList list, NodeId alarmType, NamespaceTable namespaces)
     {
         var fields = list.EventFields;
-        if (fields.Count < 7 || fields[0].AsBoxedObject(Variant.BoxingBehavior.Legacy) is not NodeId eventType)
+        if (fields.Count < 8 || fields[0].AsBoxedObject(Variant.BoxingBehavior.Legacy) is not NodeId eventType)
         {
             return;
         }
@@ -380,7 +417,10 @@ internal sealed class MachineConnection
             {
                 changes = _alerts.EndRefresh(DateTime.UtcNow);
             }
-            else if (eventType.Equals(alarmType) && fields[4].AsBoxedObject(Variant.BoxingBehavior.Legacy) is NodeId condition && fields[6].AsBoxedObject(Variant.BoxingBehavior.Legacy) is bool active)
+            else if (eventType.Equals(alarmType)
+                && fields[4].AsBoxedObject(Variant.BoxingBehavior.Legacy) is NodeId condition
+                && fields[6].AsBoxedObject(Variant.BoxingBehavior.Legacy) is bool active
+                && IsOwnAlarm(condition, fields[7].AsBoxedObject(Variant.BoxingBehavior.Legacy) is NodeId source ? source : NodeId.Null, namespaces))
             {
                 var at = fields[1].AsBoxedObject(Variant.BoxingBehavior.Legacy) switch
                 {
@@ -390,7 +430,7 @@ internal sealed class MachineConnection
                 };
                 var title = TextOf(fields[2].AsBoxedObject(Variant.BoxingBehavior.Legacy)) ?? string.Empty;
                 var severity = fields[3].AsBoxedObject(Variant.BoxingBehavior.Legacy) is IConvertible number ? number.ToInt32(System.Globalization.CultureInfo.InvariantCulture) : 0;
-                var code = (fields.Count > 7 ? TextOf(fields[7].AsBoxedObject(Variant.BoxingBehavior.Legacy)) : null) ?? TextOf(fields[5].AsBoxedObject(Variant.BoxingBehavior.Legacy)) ?? condition.ToString();
+                var code = (fields.Count > 8 ? TextOf(fields[8].AsBoxedObject(Variant.BoxingBehavior.Legacy)) : null) ?? TextOf(fields[5].AsBoxedObject(Variant.BoxingBehavior.Legacy)) ?? condition.ToString();
                 var change = _alerts.Observe(condition.ToString(), active, code, title, severity, at > DateTime.UtcNow ? DateTime.UtcNow : at);
                 changes = change is null ? [] : [change];
             }
@@ -424,32 +464,22 @@ internal sealed class MachineConnection
         }
     }
 
-    /// <summary>Returns when the session has been without a sign of life for a few seconds.</summary>
-    private static async Task WatchAsync(ManagedSession session, CancellationToken cancellationToken)
+    /// <summary>
+    /// Whether an alarm is this machine's. On a server of one machine every alarm is. Behind an
+    /// aggregation server (the registration names its <c>machineNode</c>) the alarms of all machines
+    /// arrive at the Server object: an alarm is this machine's if its source or its condition lies in
+    /// a namespace of this machine.
+    /// </summary>
+    private bool IsOwnAlarm(NodeId condition, NodeId source, NamespaceTable namespaces)
     {
-        var silent = 0;
-        while (silent < 3)
+        if (Registration.MachineNode is null || _namespaces.Count == 0)
         {
-            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
-            silent = session.Connected && !session.KeepAliveStopped ? 0 : silent + 1;
-        }
-    }
-
-    private async Task CloseAsync(ManagedSession session)
-    {
-        try
-        {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await session.CloseAsync(timeout.Token).ConfigureAwait(false);
-        }
-#pragma warning disable CA1031 // Closing a session that is already gone may fail in any way, and none of them matters.
-        catch (Exception exception)
-#pragma warning restore CA1031
-        {
-            _logger.SessionCloseFailed(Registration.SerialNumber, exception.Message);
+            return true;
         }
 
-        await session.DisposeAsync().ConfigureAwait(false);
+        bool Own(NodeId node) =>
+            !node.IsNull && namespaces.GetString(node.NamespaceIndex) is { } uri && _namespaces.Contains(uri);
+        return Own(source) || Own(condition);
     }
 
     private void SetState(string state, string? error)

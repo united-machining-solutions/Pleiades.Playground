@@ -32,7 +32,9 @@ const opcuaUrl = process.env.OPCUA_MCP_URL?.trim() || undefined
 
 const opcuaInstructions = `OPC UA machines: the tools named opcua_* belong to the OPC UA adapter. Read opcua_get_skill_guide before you scan a server, and follow it.
 You can list the added OPC UA servers, show the mapping of one, and scan a server and propose its registration.
-A machine named without an address, for example A0280O0001, has the endpoint opc.tcp://A0280O0001:4840. If that endpoint does not answer, ask the person for the endpoint; do not try another address of your own. You cannot add or remove a machine: the person does that with the buttons of the cards. Never say that a machine was added or removed.`
+A machine named without an address, for example A1121O0001, has the endpoint opc.tcp://A1121O0001:4840. If that endpoint does not answer, ask the person for the endpoint; do not try another address of your own.
+An address the person gives may be a gateway that serves several machines: call opcua_machine_list for it, and propose one registration per machine that is not added yet, each with its machineNode and the serial number the list gives. A machine found behind an address is reached at that address, never at opc.tcp://<machine>:4840.
+You cannot add or remove a machine: the person does that with the buttons of the cards. Never say that a machine was added or removed.`
 
 // The tools of the generative UI backend, of the OPC UA adapter if the app has one, and of the further
 // servers the settings name, under their own names (mcp-servers.ts). A server that does not answer has no

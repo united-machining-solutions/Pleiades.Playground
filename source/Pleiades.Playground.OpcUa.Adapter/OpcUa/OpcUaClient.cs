@@ -52,7 +52,7 @@ internal sealed class EndpointNotOfferedException : Exception
 /// What the adapter does with an OPC UA server before a session exists: ask for its endpoints and
 /// open a session on the one a registration names.
 /// </summary>
-internal sealed class OpcUaClient
+internal sealed class OpcUaClient : ISessionConnector
 {
     private readonly IOpcUaDiscoveryService _discovery;
     private readonly IManagedSessionFactory _sessions;
@@ -124,6 +124,13 @@ internal sealed class OpcUaClient
         return (session, thumbprint);
     }
 
+    /// <inheritdoc />
+    async Task<IEndpointSession> ISessionConnector.ConnectAsync(EndpointRegistration endpoint, CancellationToken cancellationToken)
+    {
+        var (session, _) = await ConnectAsync(endpoint, cancellationToken).ConfigureAwait(false);
+        return new ManagedEndpointSession(session);
+    }
+
     private static OfferedEndpoint Offered(EndpointDescription description)
     {
         var anonymous = false;
@@ -151,4 +158,33 @@ internal sealed class OpcUaClient
     private static string? Thumbprint(EndpointDescription description) =>
         description.ServerCertificate.IsEmpty ? null : Convert.ToHexString(SHA1.HashData(description.ServerCertificate.Span));
 #pragma warning restore CA5350
+}
+
+/// <summary>A session of the OPC UA stack, as a machine on it sees it.</summary>
+internal sealed class ManagedEndpointSession(ManagedSession session) : IEndpointSession
+{
+    /// <inheritdoc />
+    public ISession Session => session;
+
+    /// <inheritdoc />
+    public bool IsAlive => session.Connected && !session.KeepAliveStopped;
+
+    /// <inheritdoc />
+    public async Task CloseAsync()
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await session.CloseAsync(timeout.Token).ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // Closing a session that is already gone may fail in any way, and none of them matters.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            // The server forgets the session after its timeout.
+        }
+    }
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => session.DisposeAsync();
 }
