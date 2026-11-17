@@ -1,0 +1,55 @@
+name: Deploy
+
+# Starts the demo stack on one computer from the images of `main`, with docker compose.
+# It runs after the workflow "Images" has published them for a push to main, and never for a pull request.
+# It is off until the repository variable DEPLOY_ENABLED is "true": see docs/deployment.md.
+on:
+  workflow_run:
+    workflows: [Images]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; a newer one waits for the one that runs.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy the demo stack
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+    # A runner of our own, on the computer that runs the stack. The environment admits the branch main only.
+    runs-on: [self-hosted, pleiades-deploy]
+    environment: demo
+    env:
+      # The folder on the runner that holds `.env` and, if the computer needs one, `compose.override.yaml`.
+      DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+      COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.COMMIT }}
+      - name: Start the stack from the published images
+        run: |
+          set -euo pipefail
+          if [ -z "$DEPLOY_DIR" ] || [ ! -f "$DEPLOY_DIR/.env" ]; then
+            echo "::error::DEPLOY_DIR is not set, or it holds no .env. See docs/deployment.md."
+            exit 1
+          fi
+          files=(-f compose.yaml)
+          if [ -f "$DEPLOY_DIR/compose.override.yaml" ]; then
+            files+=(-f "$DEPLOY_DIR/compose.override.yaml")
+          fi
+          # The images of exactly this commit, as "Images" tagged them.
+          export PLEIADES_VERSION="sha-${COMMIT:0:7}"
+          compose=(docker compose --env-file "$DEPLOY_DIR/.env" "${files[@]}")
+          "${compose[@]}" pull --quiet
+          "${compose[@]}" up -d --no-build --wait --wait-timeout 300 --remove-orphans
+          "${compose[@]}" ps --format 'table {{.Service}}\t{{.Image}}\t{{.Status}}'

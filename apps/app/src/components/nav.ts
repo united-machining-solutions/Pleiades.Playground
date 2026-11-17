@@ -25,12 +25,20 @@ export type NavPage = NavEntry & { path: string; crumb?: Crumb }
 
 type RouteLike = { fullPath: string; options: { staticData?: { nav?: NavEntry; crumb?: Crumb } } }
 
+/**
+ * The path a route answers on. An index route ends in a slash, "/alarms/", and is the page of
+ * "/alarms": a page that gets a detail page becomes a layout, and its list moves to the index route.
+ */
+function pathOf(fullPath: string): string {
+  return fullPath.length > 1 && fullPath.endsWith("/") ? fullPath.slice(0, -1) : fullPath
+}
+
 /** The pages that name an entry, in the order of the sidebar. */
 export function navPages(routes: ReadonlyArray<RouteLike>): Array<NavPage> {
   return routes
     .flatMap((route) => {
       const { nav, crumb } = route.options.staticData ?? {}
-      return nav ? [{ ...nav, path: route.fullPath, crumb }] : []
+      return nav ? [{ ...nav, path: pathOf(route.fullPath), crumb }] : []
     })
     .sort((a, b) => (a.order ?? 100) - (b.order ?? 100) || a.title.localeCompare(b.title))
 }
@@ -60,17 +68,22 @@ type ShownPage = {
 /**
  * The breadcrumb of a page: the entry of the sidebar it stands under, if that is another page, and
  * then the page itself. A page is called by its `crumb`, or by the title of its entry. So a new
- * page with an entry has its breadcrumb without a word about it.
+ * page with an entry has its breadcrumb without a word about it. The index route of an entry is its
+ * page: it is called like the entry, unless it says otherwise, and never links to itself.
  */
 export function crumbsOf(pages: ReadonlyArray<NavPage>, page: ShownPage): Array<CrumbStep> {
   const text = (crumb: Crumb | undefined, params: Record<string, string>) =>
     typeof crumb === "function" ? crumb(params) : crumb
   const steps: Array<CrumbStep> = []
   const under = activePage(pages, page.pathname)
-  if (under && under.path !== page.fullPath) {
+  const isEntry = under !== undefined && under.path === pathOf(page.fullPath)
+  if (under && !isEntry) {
     steps.push({ title: text(under.crumb, {}) ?? under.title, path: under.path })
   }
-  const own = text(page.staticData?.crumb, page.params) ?? page.staticData?.nav?.title
+  const own =
+    text(page.staticData?.crumb, page.params) ??
+    page.staticData?.nav?.title ??
+    (isEntry ? (text(under.crumb, page.params) ?? under.title) : undefined)
   if (own) steps.push({ title: own })
   return steps
 }

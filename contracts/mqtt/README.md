@@ -142,7 +142,7 @@ A proposal for the MQTT binding of the data model, version 0.15.0 (see [`../data
 to be settled at the umati hackathon. Here everything is as the model says: paths, types, units, snapshots,
 lists, events, manifest and connection. The binding of the playground above stays as it is; the two trees live
 side by side on the same broker. Why this tree may use other units than the playground: see
-[ADR-0010](../../docs/adr/0010-spec-binding-beside-the-playground-binding.md).
+[ADR-0012](../../docs/adr/0012-spec-binding-beside-the-playground-binding.md).
 
 In the demo stack every simulator (P-04, P-07, M-02) publishes this tree in addition to its topics below
 `machines/{SerialNumber}/`.

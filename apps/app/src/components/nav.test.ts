@@ -104,6 +104,40 @@ test("a page under another entry than Home stands behind that entry", () => {
   )
 })
 
+// A page that gets a detail page becomes a layout, and its list moves to the index route, "/alarms/".
+const withDetail = [...withCrumbs, route("/alarms", { title: "Alarms" }), route("/alarms/"), route("/alarms/$alarm")]
+
+test("the index route of an entry is its page: called like the entry, and no link to itself", () => {
+  for (const pathname of ["/alarms", "/alarms/"]) {
+    assert.deepEqual(crumbsOf(navPages(withDetail), { fullPath: "/alarms/", pathname, params: {} }), [{ title: "Alarms" }])
+  }
+})
+
+test("a detail page stands behind the entry whose list became an index route", () => {
+  assert.deepEqual(
+    crumbsOf(navPages(withDetail), {
+      fullPath: "/alarms/$alarm",
+      pathname: "/alarms/7",
+      params: { alarm: "7" },
+      staticData: { crumb: (params) => `Alarm ${params.alarm}` },
+    }),
+    [{ title: "Alarms", path: "/alarms" }, { title: "Alarm 7" }],
+  )
+})
+
+test("an entry named by the index route itself stands on the path of its layout", () => {
+  const pages = navPages([route("/", { title: "Home", order: 0 }), route("/alarms"), route("/alarms/", { title: "Alarms" })])
+  assert.deepEqual(
+    pages.map((page) => page.path),
+    ["/", "/alarms"],
+  )
+  assert.equal(activePage(pages, "/alarms/7")?.title, "Alarms")
+  assert.deepEqual(
+    crumbsOf(pages, { fullPath: "/alarms/", pathname: "/alarms", params: {}, staticData: { nav: { title: "Alarms", icon } } }),
+    [{ title: "Alarms" }],
+  )
+})
+
 test("a page that says nothing about itself shows only where it stands", () => {
   assert.deepEqual(
     crumbsOf(navPages(withCrumbs), { fullPath: "/about", pathname: "/about", params: {} }),

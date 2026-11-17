@@ -4,7 +4,7 @@ status: proposed
 date: 2026-11-15
 ---
 
-# ADR-0010: The spec binding beside the binding of the playground
+# ADR-0012: The spec binding beside the binding of the playground
 
 ## Context
 
