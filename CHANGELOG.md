@@ -5,49 +5,6 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
-### Changed
-
-- One tree for machines: `machines/{MachineId}/` follows the data model, in the structure of the former spec
-  tree (`umati/Manifest`, `umati/<path>`, `oem/<path>`, CloudEvents on `events/jobs`, `events/workmasters` and
-  `events/notifications`, each topic named after the subject of its events and counting its own `sequence`), in the units of the model (energy in `wattHour`).
-  The root `simulators/` is gone. The simulator publishes only this tree, from its virtual machine, which always
-  runs; the value generators, the notification generator, the job and work master events of the playground
-  binding, `Config:SpecOutput:Enabled`, `Config:ProductionEvents` and the second MQTT client are gone from it.
-  ADR-0013 and ADR-0002 say so.
-- The stack reads this tree. A machine is named by its machine id everywhere: in the stores, the APIs, the MCP
-  tools, genui-mcp and the address of its page (`/machines/alcyone-machines_AX-400_P-04`); the app shows its
-  manufacturer, model and serial number from the identification.
-- Timeseries persistence: subscribes to `machines/+/umati/#`, `machines/+/oem/#` and `sites/+/#`, keeps a value
-  with the unit it came with (new in `BaseUnit`: `wattHour`, `piece`, `kilogramPerSecond`), keeps a snapshot
-  such as `State/Status` field by field, and keeps no lists, no `null` and no manifest.
-- Events: the persistence takes `application/cloudevents+json` from `machines/+/events/jobs`, `…/workmasters`
-  and `…/notifications` with QoS 1 in a persistent session (`Config:MqttSource:SessionExpiry`), and the Events
-  API keeps the CloudEvents as they came in one collection `MachineEvent`, unique by `source` and `id`. It serves
-  `/machineEvents` with `/machineEvents/gaps`, `/alerts/active`, `/alerts/pairs` and `/alerts/statistics` (by
-  NE 107 severity), `/jobOrders` with `/jobOrders/{mId}/{jobOrderId}`, and `/programExecutions`, and the MCP
-  tools `events_machine_events_query`, `events_sequence_gaps_query`, `events_active_alerts_query`,
-  `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query` and
-  `events_program_executions_query`.
-- The machine card shows the work master instead of the program, the job order that runs, and alerts with their
-  NE 107 severity; a machine whose adapter is not `Running` has no data.
-
-- The data model is pinned to 0.17.1 (`3a799d5`), which names the event topics `events/jobs` and
-  `events/workmasters` as the simulator already publishes them; the manifest and `dataschema` carry 0.17.1.
-
-- The measurement card and the Ultimaker telemetry follow the tree of the data model: the card names a machine
-  by its machine id and reads the bearing temperature below `oem/` (energy shows in `Wh`); the telemetry
-  publishes below `machines/ultimaker_UM3_UM3-01/` (`ULTIMAKER_SERIAL_NUMBER` instead of
-  `ULTIMAKER_MACHINE_ID`), its signals below `oem/Ultimaker/`, `State/Status/MachineryItemState`, the adapter
-  states `Running` and `CommunicationFault`, and its identification.
-
-### Removed
-
-- `NotificationEventDtoV1`, `JobEventDtoV1` and `WorkMasterEventDtoV1`, their collections, endpoints
-  (`/notificationEvents`, `/jobEvents`, `/workMasterEvents`) and MCP tools (`events_notification_*`,
-  `events_job_events_query`, `events_work_master_events_query`).
-- The libraries `Pleiades.Playground.Events.Generators` and `Pleiades.Playground.Timeseries.Generators`, which
-  nothing used any more.
-
 ### Added
 
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
@@ -203,77 +160,45 @@ All notable changes are documented here. The format follows
   the line of a call is a `TraceCollapsible` once its result is there, with the result as text in a
   `CodeBlock` (JSON indented). `code-block` is new in `packages/ui`; it brings `shiki`, which only its
   highlighting hook loads, and the app does not use that hook.
-- Spec output of the simulator, a draft of the MQTT binding of the data model 0.15.0: below
-  `simulators/{SerialNumber}/`, with a namespace level as in OPC UA (`umati`, `oem` for the signals the machine manufacturer defines, `events`), a virtual machine, a state machine driven by a scenario, publishes the manifest, values,
-  snapshots and lists retained and the events of program executions, job orders and alerts not retained, with
-  the last will `Connection/State = Disconnected`. Every simulator of the demo stack publishes it, each with a
-  scenario of its own (`Config:SpecOutput:ScenarioName`: P-04 the default, P-07 `housings`, M-02
-  `small-parts`), in addition to its topics below `machines/{SerialNumber}/`, which stay as they are. Its tests check the consistency of the machine and,
-  with a clone of the model next to the repository, every message against the schemas of the model
-  (`contracts/mqtt`, ADR-0013). Its events lie below `simulators/{SerialNumber}/events/`, one topic per group
-  (`events/production`, `events/notifications`) so that a group arrives in order, carry `seq` and `seqEpoch`,
-  so that a gap or a duplicate shows, and wait in a bounded outbox (`EventBufferSize`, 10 000) while the broker
-  is away; the oldest is dropped when it is full. The first job orders come with their `JobOrderAdded`, and
-  `JobOrderChanged` never comes for a running time alone. Following the model 0.13.0, a change of state of a
-  job order or a program execution brings its transition event (`JobOrderStarted`, `ProgramExecutionResumed`
-  and so on) instead of `JobOrderChanged`, the program execution snapshot carries `State` and `StartTime` and
-  stays after its end, and the scenario now also stops programs, revokes, cancels and takes back job orders.
-  The signal of the manufacturer, the temperature of the spindle bearing, comes in the same tree below
-  `oem/Spindle/1/BearingTemperature`, in the namespace `oem`, in `degreeCelsius`; it
-  follows the spindle and is named in the manifest as `x-alcyone-machines-example.Spindle.1.BearingTemperature` with type and
-  unit, and the binding maps `x-<domain>.<path>` to `oem/<path>`. `umati`, `oem` and `events` are reserved.
-  `machines/{SerialNumber}/` stays as it is.
-  With 0.15.0: `Production.ActiveProgram` is `Production.ActiveWorkMaster`; the program execution snapshot
-  keeps the sums from its end until the next one begins and carries no `correlationId`; `seq` counts within each group of
-  events (`Production`, `Notification`); alerts carry `Id`, `ErrorCode`, `Message`, `Severity`, `SeverityValue`,
-  `Time` and `SourceName`; ended job orders stay as long as the machine plans them, one shift by default, without
-  a least time; the identification carries `Model`, `ManufacturerUri`, `ProductCode`, `YearOfConstruction` and
-  `SoftwareRevision`; and a scenario may name elements the machine lacks for good (`Unavailable`), published
-  once as `null` and named `"available": false` in the manifest.
-  With 0.13.1 a cancelled job order, aborted without having run, carries `EndTime` but neither `StartTime` nor
-  `ProducedQuantity`, and passes the schemas of the model as it is.
-  With 0.16.0: events are CloudEvents 1.0 in structured mode (`id` a UUID that stays the same in the outbox,
-  `source` the `ProductInstanceUri`, `type` the path, `time`, `sequence` per group as the start of the run and a
-  count of twelve digits, `correlationid` on program executions and alerts, `dataschema`, `data`), with the
-  content type `application/cloudevents+json; charset=utf-8`; `seq` and `seqEpoch` are gone. `Connection/State`
-  says `Initializing`, then every value, then `Running`; `CommunicationFault` when a scenario lets the adapter
-  lose the machine (`CommunicationFaultInterval`, off by default); `Shutdown` at a clean stop; the last will is
-  `CommunicationFault`. The manifest declares the profiles `Core`, `IdentificationExtended`, `Components`,
-  `MonitoringExtended`, `ChannelMonitoring`, `Spindle`, `EnergyElectricity`, `JobMonitoring`,
-  `WorkMasterMonitoring` and `AlertsEvents`, each delivered whole or `"available": false`, and names its events as
-  `{path, correlationId}`. New: `Components.Software` per scenario, `MonthOfConstruction`,
-  `InitialOperationDate`, `DeviceClass`, `OperationDuration`, `IsWarmUp`, the feed override, mode, rapid override
-  and name of channel 1, `IsUsedAsAxis` and name of spindle 1, and a `Notification.NotificationEvent` at each
-  program stop. `Production.ActiveWorkMaster` is a work master id of its own (`WM-SHAFT-4711`); the NC program
-  goes to `oem/Production/ActiveProgram`. Any element but the five every adapter delivers may be unavailable.
-  The production events below `machines/` take the `id` of the CloudEvent as `Id`, and the work master id as
-  `WorkMaster`.
-  With 0.17.0: paths follow the profiles (`JobMonitoring.JobOrders`, `WorkMasterMonitoring.ActiveWorkMaster`,
-  `WorkMasterMonitoring.ProgramExecution`, and their events), and so do the topics of the events
-  (today `events/jobs`, `events/workmasters`, `events/notifications`, each with its own `sequence`).
-  A job order and its result are two lists: `JobMonitoring.JobOrders` (what is ordered, with `WorkMasterID`,
-  `OrderNumbers`, `RunsPlanned`, `JobExecutionMode` and planned times `null`) and `JobMonitoring.JobOrderResults`
-  (from the start: quantities, runs, `EndTime` `null` and `JobResult` `Unknown` until the end), every field always
-  there; `JobOrderResultChanged` carries a changed result, `JobOrderChanged` a changed job order (the planner now
-  changes `RunsPlanned` of a waiting one). `Identification.SoftwareRevision` is gone; `Components.Software` lists
-  `Manufacturer`, `ComponentName` and `SoftwareRevision`. The program signal moves to
-  `oem/WorkMasterMonitoring/ActiveProgram`. The production events below `machines/` keep their form: a job order
-  event carries the job order and its result, a changed result is a `Changed`, and `Seq` counts them apart from
-  the groups of the model.
-  The spec tree lies below `simulators/<manufacturer>_<model>_<serial number>/`, for example
-  `simulators/alcyone-machines_AX-400_P-04/`: the domain of `ManufacturerUri` without `www.` and without its
-  top-level domain, `Model` and `SerialNumber`, each part
-  normalised (only `A-Z`, `a-z`, `0-9` and `-`, umlauts written out, at most 64 characters), named in the
-  manifest as `machineId`; the last will too. The spec output shows a stack light (`Stacklight`, `Segmented`):
-  red, yellow, green and blue, M-02 without blue, following the state of the virtual machine and its alerts.
-  Every simulator has a made-up manufacturer of its own, named after the Pleiades: P-04 Alcyone Machine Works
-  (`AX-400`, `alcyone-machines_AX-400_P-04`), P-07 Taygeta Precision (`TP-800`, `taygeta-precision_TP-800_P-07`),
-  M-02 Merope Microtec (`MM-120`, `merope-microtec_MM-120_M-02`), each on a domain below `.example` with its
-  `ProductInstanceUri` `{ManufacturerUri}/{Model}/{SerialNumber}`, its own prefix of its signals and all its
-  software (NC kernel, PLC, HMI and one more) of its own (`Scenario:Manufacturer`, `Scenario:ManufacturerUri`).
 
 ### Changed
 
+- `machines/{machineId}/` carries the umati data model 0.17.1 instead of the binding of the playground
+  ([`contracts/mqtt`](contracts/mqtt/README.md), ADR-0013; [`contracts/datamodel`](contracts/datamodel/README.md)
+  refers to commit `3a799d5`): `umati/Manifest`, `umati/<path>`, `oem/<path>` for the signals of the
+  manufacturer, and CloudEvents on `events/jobs`, `events/workmasters` and `events/notifications`, each topic
+  counting its own `sequence`. Values carry the units of the model, energy in `wattHour` (ADR-0002). The machine
+  id is `<manufacturer>_<model>_<serial number>`, for example `alcyone-machines_AX-400_P-04`.
+- Simulator: a virtual machine publishes this tree: snapshots and lists retained; job orders and their results,
+  program executions and alerts with their NE 107 severity as CloudEvents, not retained, waiting in a bounded
+  outbox while the broker is away; a stack light; `Connection/State` `Initializing`, `Running`,
+  `CommunicationFault` and `Shutdown`. Each simulator of the stack has a scenario of its own
+  (`Config:SpecOutput:ScenarioName`: P-04 the default, P-07 `housings`, M-02 `small-parts`) and a made-up
+  manufacturer on a domain below `.example`: Alcyone Machine Works (`alcyone-machines_AX-400_P-04`), Taygeta
+  Precision (`taygeta-precision_TP-800_P-07`) and Merope Microtec (`merope-microtec_MM-120_M-02`). Its tests
+  check every message against the JSON schemas of the model with JsonSchema.Net when a clone of the model lies
+  next to the repository or in `UMATI_DATAMODEL_DIR`. The value and notification generators are gone.
+- The stack reads this tree. A machine is named by its machine id everywhere: in the stores, the APIs, the MCP
+  tools, genui-mcp and the address of its page (`/machines/alcyone-machines_AX-400_P-04`); the app shows its
+  manufacturer, model and serial number from the identification.
+- Timeseries persistence: subscribes to `machines/+/umati/#`, `machines/+/oem/#` and `sites/+/#`, keeps a value
+  with the unit it came with (new in `BaseUnit`: `wattHour`, `piece`, `kilogramPerSecond`), keeps a snapshot
+  such as `State/Status` field by field, and keeps no lists, no `null` and no manifest.
+- Events: the persistence takes `application/cloudevents+json` from `machines/+/events/jobs`, `…/workmasters`
+  and `…/notifications` with QoS 1 in a persistent session (`Config:MqttSource:SessionExpiry`), and the Events
+  API keeps the CloudEvents as they came in one collection `MachineEvent`, unique by `source` and `id`. It serves
+  `/machineEvents` with `/machineEvents/gaps`, `/alerts/active`, `/alerts/pairs` and `/alerts/statistics` (by
+  NE 107 severity), `/jobOrders` with `/jobOrders/{mId}/{jobOrderId}`, and `/programExecutions`, and the MCP
+  tools `events_machine_events_query`, `events_sequence_gaps_query`, `events_active_alerts_query`,
+  `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query` and
+  `events_program_executions_query`.
+- The machine card shows the work master instead of the program, the job order that runs, and alerts with their
+  NE 107 severity; a machine whose adapter is not `Running` has no data.
+- The measurement card and the Ultimaker telemetry follow this tree: the card names a machine by its machine id
+  and reads the bearing temperature below `oem/` (energy shows in `Wh`); the telemetry publishes below
+  `machines/ultimaker_UM3_UM3-01/` (`ULTIMAKER_SERIAL_NUMBER` instead of `ULTIMAKER_MACHINE_ID`), its signals
+  below `oem/Ultimaker/`, `State/Status/MachineryItemState`, the adapter states `Running` and
+  `CommunicationFault`, and its identification.
 - `app`, for those who run `main`: the chat takes its models from a LiteLLM gateway, with two settings,
   `LLM_BASE_URL` and `LLM_API_KEY`. The settings `ANTHROPIC_*`, `OPENAI_*`, `OPENAI_TRANSCRIPTION_MODEL`,
   `LLM_MODELS` and `LLM_TRANSCRIPTION_MODEL` and the package `@tanstack/ai-anthropic` are gone. A `.env` that
@@ -333,6 +258,12 @@ All notable changes are documented here. The format follows
   the `package.json` (`catalogMode: strict` and an empty `savePrefix` in `pnpm-workspace.yaml`). Before,
   `pnpm add` and `shadcn add` wrote a version with a `^` into the `package.json`, and moving it into the
   catalog was a step by hand.
+
+### Removed
+
+- `NotificationEventDtoV1`, its collection, the endpoints `/notificationEvents` and the MCP tools
+  `events_notification_*`.
+- The libraries `Pleiades.Playground.Events.Generators` and `Pleiades.Playground.Timeseries.Generators`.
 
 ### Fixed
 
