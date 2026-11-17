@@ -117,9 +117,29 @@ public sealed class ProductionRunnerTest
         await sim.Actions.AcknowledgeAlarmsAsync();
         await sim.NotificationAsync(CuttingNotifications.EndNcp);
 
+        var running = sim.Received.OfType<CuttingNotification>().Where(n => n.Name == CuttingNotifications.MachineRunning).ToList();
+        Assert.HasCount(2, running, "Once at the start, once when the program runs on.");
+        Assert.AreEqual("LASER_1", running[1].Field(2));
         Assert.AreEqual("LASER_1", stopped.Field(2));
         CollectionAssert.AreEqual(new[] { "M1", "12345678", "Nozzle damaged" }, alarm.Fields.Take(3).ToArray());
         Assert.AreEqual("-10", refused.Field(3));
+    }
+
+    [TestMethod]
+    public async Task AnAlarmWithoutAProgram_Acknowledged_LeavesTheMachineStandingWithoutAFault()
+    {
+        await using var sim = await SimulatorHarness.StartAsync(CuttingMachineType.Laser2D);
+        await sim.ConnectAsync();
+
+        await sim.Actions.RaiseAlarmAsync(12_345_678, "Nozzle damaged");
+        await sim.NotificationAsync(CuttingNotifications.CurrentAlarms);
+        await sim.Actions.AcknowledgeAlarmsAsync();
+        var stopped = await sim.NotificationAsync(CuttingNotifications.MachineStopped, n => n.Field(4) == "2");
+
+        Assert.AreEqual(string.Empty, stopped.Field(2), "No program runs.");
+        Assert.IsFalse(sim.Machine.HasAlarms);
+        Assert.IsFalse(sim.Received.OfType<CuttingNotification>().Any(n => n.Name == CuttingNotifications.MachineRunning),
+            "Without a program the machine does not run.");
     }
 
     [TestMethod]

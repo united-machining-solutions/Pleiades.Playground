@@ -8,7 +8,8 @@
       "applicationUrl": "http://localhost:5611",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "Config__MachineType": "Laser2D"
+        "Config__MachineType": "Laser2D",
+        "Config__SerialNumber": "L-01"
       }
     },
     "Tube": {
@@ -19,6 +20,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "Config__MachineType": "Tube",
+        "Config__SerialNumber": "T-01",
         "Config__ExchangeDirectory": "../../.cutting/exchange-tube",
         "Config__StatePath": "../../.cutting/state-tube.json"
       }
@@ -31,6 +33,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "Config__MachineType": "Punch",
+        "Config__SerialNumber": "PU-01",
         "Config__ExchangeDirectory": "../../.cutting/exchange-punch",
         "Config__StatePath": "../../.cutting/state-punch.json"
       }

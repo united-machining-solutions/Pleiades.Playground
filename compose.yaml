@@ -270,7 +270,8 @@ services:
       Config__MqttDestination__ClientId: simulator-m-02
 
   # Cutting simulators: one machine each, speaking the telegram protocol through files in a volume of its own.
-  # Its adapter (below) mounts the same volume at /exchange. Simulators and adapters start only with the profile:
+  # Its adapter (below) mounts the same volume at /exchange and takes the serial number from here (YAML anchor):
+  # the simulator only shows it, the telegrams do not carry it. Simulators and adapters start only with the profile:
   # docker compose --profile cutting up -d --build --wait
   # As above, only the first one builds or pulls the image.
   cutting-laser-2d:
@@ -284,6 +285,7 @@ services:
       Config__MachineType: Laser2D
       Config__MachineNumber: "1"
       Config__MachineName: 2D laser
+      Config__SerialNumber: &cutting-laser-2d-serial L-01
     volumes:
       - cutting-laser-2d-exchange:/exchange
       - cutting-laser-2d-data:/data
@@ -297,6 +299,7 @@ services:
       Config__MachineType: Tube
       Config__MachineNumber: "1"
       Config__MachineName: Tube laser
+      Config__SerialNumber: &cutting-tube-serial T-01
     volumes:
       - cutting-tube-exchange:/exchange
       - cutting-tube-data:/data
@@ -310,6 +313,7 @@ services:
       Config__MachineType: Punch
       Config__MachineNumber: "1"
       Config__MachineName: Punching machine
+      Config__SerialNumber: &cutting-punch-serial PU-01
     volumes:
       - cutting-punch-exchange:/exchange
       - cutting-punch-data:/data
@@ -327,7 +331,7 @@ services:
       cutting-laser-2d:
         condition: service_started
     environment:
-      Config__SerialNumber: L-01
+      Config__SerialNumber: *cutting-laser-2d-serial
       Config__MachineNumber: "1"
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: cutting-adapter-l-01
@@ -342,7 +346,7 @@ services:
       cutting-tube:
         condition: service_started
     environment:
-      Config__SerialNumber: T-01
+      Config__SerialNumber: *cutting-tube-serial
       Config__MachineNumber: "1"
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: cutting-adapter-t-01
@@ -357,7 +361,7 @@ services:
       cutting-punch:
         condition: service_started
     environment:
-      Config__SerialNumber: PU-01
+      Config__SerialNumber: *cutting-punch-serial
       Config__MachineNumber: "1"
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: cutting-adapter-pu-01

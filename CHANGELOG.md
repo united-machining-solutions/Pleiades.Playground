@@ -12,7 +12,8 @@ All notable changes are documented here. The format follows
 - Simulator for values, states and notifications of several machines.
 - Cutting machines (`--profile cutting`): simulators of a 2D laser, a tube laser and a punching machine that take
   their jobs through telegram files, each with a web page, and one adapter per machine that publishes it to the
-  broker as `L-01`, `T-01` and `PU-01`.
+  broker as `L-01`, `T-01` and `PU-01`. The web page shows the serial number, and an endless mode writes new
+  orders into the plan and refills the stacks, so that a machine produces without anyone at it.
 - Deployment (`docs/deployment.md`): the workflow "Deploy" starts the stack with `docker compose` on a runner of
   your own, from the images of the commit that was merged into `main`. It is off until the variable
   `DEPLOY_ENABLED` is `true`.

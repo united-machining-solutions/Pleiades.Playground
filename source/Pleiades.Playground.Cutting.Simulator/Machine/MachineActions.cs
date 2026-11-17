@@ -45,16 +45,20 @@ internal sealed class MachineActions(CuttingMachine machine, CuttingLink link)
         await link.SendAsync(telegrams, CancellationToken.None).ConfigureAwait(false);
     }
 
-    /// <summary>Acknowledges all alarms; a program that was running runs on (§5.8).</summary>
+    /// <summary>
+    /// Acknowledges all alarms and says how the machine stands then. A program that was running runs on
+    /// (<c>MaschineLaeuft</c>, §5.8), which at a real machine takes a press of NC start as well. Without one the
+    /// machine stands without a fault (<c>MaschineSteht</c> reason 2, §5.9). The protocol has no notification for an
+    /// alarm that goes; a host learns it from this state.
+    /// </summary>
     public async Task AcknowledgeAlarmsAsync()
     {
         machine.ClearAlarms();
         var program = machine.Snapshot().CurrentProgram;
-        if (program.Length > 0)
-        {
-            await link.NotifyAsync(CuttingNotifications.MachineRunning, MachineNumber, program, link.Timestamp)
-                .ConfigureAwait(false);
-        }
+        var notification = program.Length > 0
+            ? CuttingNotification.Create(CuttingNotifications.MachineRunning, MachineNumber, program, link.Timestamp)
+            : CuttingNotification.Create(CuttingNotifications.MachineStopped, MachineNumber, program, link.Timestamp, "2");
+        await link.SendAsync([notification], CancellationToken.None).ConfigureAwait(false);
     }
 
     /// <summary>Turns the feed rate potentiometer (§5.11).</summary>

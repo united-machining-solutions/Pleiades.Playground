@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
 using Pleiades.Playground.Cutting.Protocol.Model;
 using Pleiades.Playground.Cutting.Simulator.Machine.Variants;
@@ -13,6 +15,9 @@ internal sealed class CuttingMachine
 {
     private const int MaxSequence = 999;
 
+    /// <summary>How many done orders of the endless mode stay in the plan; older ones are cleared away.</summary>
+    private const int KeepGeneratedDone = 10;
+
     private readonly Lock _lock = new();
     private readonly Config _config;
     private readonly List<ProductionOrder> _orders = [];
@@ -26,9 +31,11 @@ internal sealed class CuttingMachine
     private bool _productionActive;
     private bool _abortRequested;
     private bool _autoRun;
+    private bool _endless;
     private double _timeScale;
     private int _feedrate = 100;
     private int _nextSequence = 1;
+    private int _nextGenerated = 1;
     private int _palletChangerPosition = 4;
     private int _sheetLoadAcknowledge = 1;
     private StopMode _stopMode;
@@ -46,6 +53,7 @@ internal sealed class CuttingMachine
         _config = config.Value;
         Variant = variant;
         _autoRun = _config.AutoRun;
+        _endless = _config.EndlessMode;
         _timeScale = _config.TimeScale;
         _locations.AddRange(variant.InitialLocations());
     }
@@ -79,12 +87,14 @@ internal sealed class CuttingMachine
                 Type = Type,
                 MachineNumber = MachineNumber,
                 DisplayName = _config.DisplayName,
+                SerialNumber = _config.SerialNumber,
                 Online = _online,
                 HostConnected = _hostConnected,
                 State = StateUnlocked(),
                 ProductionActive = _productionActive,
                 StopMode = _stopMode,
                 AutoRun = _autoRun,
+                EndlessMode = _endless,
                 TimeScale = _timeScale,
                 Feedrate = _feedrate,
                 CurrentProgram = _currentProgram,
@@ -153,6 +163,25 @@ internal sealed class CuttingMachine
     public void SetAutoRun(bool autoRun)
     {
         Update(() => _autoRun = autoRun);
+    }
+
+    public bool EndlessMode => Read(() => _endless);
+
+    /// <summary>
+    /// Switches the endless mode. Switched on, it starts the plan as the start button would, also with an empty
+    /// plan; switched off, the plan runs out with the orders it holds.
+    /// </summary>
+    public void SetEndlessMode(bool endless)
+    {
+        Update(() =>
+        {
+            _endless = endless;
+            if (endless && _online && _alarms.Count == 0 && !_productionActive)
+            {
+                _productionActive = true;
+                _stopMode = StopMode.None;
+            }
+        });
     }
 
     public void SetTimeScale(double timeScale)
@@ -382,6 +411,7 @@ internal sealed class CuttingMachine
 
     /// <summary>
     /// Starts the plan (§4.1 with <c>*</c>): 0, -1 without a free order, -4 when a program runs, -10 with an alarm.
+    /// In endless mode an empty plan starts as well: the machine writes its next order itself.
     /// </summary>
     public int StartPlan()
     {
@@ -397,7 +427,7 @@ internal sealed class CuttingMachine
                 return -4;
             }
 
-            if (!_orders.Exists(o => o.IsRunnable))
+            if (!_endless && !_orders.Exists(o => o.IsRunnable))
             {
                 return -1;
             }
@@ -478,7 +508,7 @@ internal sealed class CuttingMachine
 
     /// <summary>
     /// The next program run, or <see langword="null"/>. Starts the plan when <see cref="Config.AutoRun"/> is on
-    /// and ends it when no order is left.
+    /// and ends it when no order is left; in endless mode it writes a new order instead.
     /// </summary>
     public ProductionJob? TakeNextJob()
     {
@@ -514,8 +544,9 @@ internal sealed class CuttingMachine
 
     private ProductionJob? NextPlanJobUnlocked(ref bool? changed)
     {
+        // In endless mode there is always a next order, so AutoRun starts the plan also when it is empty.
         var next = _orders.Find(o => o.IsRunnable);
-        if (!_productionActive && _autoRun && next is not null)
+        if (!_productionActive && _autoRun && (next is not null || _endless))
         {
             _productionActive = true;
             changed = true;
@@ -524,6 +555,12 @@ internal sealed class CuttingMachine
         if (!_productionActive)
         {
             return null;
+        }
+
+        if (next is null && _endless)
+        {
+            next = GenerateOrderUnlocked();
+            changed = true;
         }
 
         if (next is null)
@@ -535,6 +572,64 @@ internal sealed class CuttingMachine
         }
 
         return new ProductionJob(next.Sequence, next.NcProgram);
+    }
+
+    /// <summary>
+    /// Writes the next order of the endless mode into the plan: the demo orders of the machine type in turn, each
+    /// with a new name and quantity, three to a job. Clears away done orders of its own beyond the last few, so that
+    /// the plan does not run full. Returns <see langword="null"/> when no sequence number is free.
+    /// </summary>
+    private ProductionOrder? GenerateOrderUnlocked()
+    {
+        var done = _orders.FindAll(o => o.Generated && o.Status == CuttingOrderStatus.Completed);
+        foreach (var order in done.Take(Math.Max(0, done.Count - KeepGeneratedDone)))
+        {
+            _orders.Remove(order);
+        }
+
+        var templates = Variant.DemoOrders();
+        if (templates.Count == 0)
+        {
+            return null;
+        }
+
+        var sequence = NextFreeSequence();
+        if (sequence < 0)
+        {
+            return null;
+        }
+
+        string name;
+        int number;
+        do
+        {
+            number = _nextGenerated;
+            _nextGenerated = (_nextGenerated % 99_999) + 1;
+            name = string.Create(CultureInfo.InvariantCulture, $"{Prefix(templates[0].Name)}-E{number:D5}");
+        }
+        while (_orders.Exists(o => string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase)));
+
+        var template = templates[(number - 1) % templates.Count];
+        var generated = template with
+        {
+            Sequence = sequence,
+            Name = name,
+            JobName = string.Create(CultureInfo.InvariantCulture, $"JOB-E{((number - 1) / 3) + 1:D4}"),
+            Target = RandomNumberGenerator.GetInt32(1, 6),
+            Actual = 0,
+            Status = CuttingOrderStatus.Free,
+            Generated = true,
+        };
+        _orders.Add(generated);
+        _archive.Add(generated.NcProgram);
+        return generated;
+
+        // "L-1001" gives "L": the generated names keep the letter of the machine type.
+        static string Prefix(string name)
+        {
+            var dash = name.IndexOf('-', StringComparison.Ordinal);
+            return dash > 0 ? name[..dash] : "E";
+        }
     }
 
     public void SetOrderStatus(int sequence, CuttingOrderStatus status)
@@ -680,9 +775,11 @@ internal sealed class CuttingMachine
             {
                 Type = Type,
                 AutoRun = _autoRun,
+                EndlessMode = _endless,
                 TimeScale = _timeScale,
                 Feedrate = _feedrate,
                 NextSequence = _nextSequence,
+                NextGeneratedNumber = _nextGenerated,
                 PalletChangerPosition = _palletChangerPosition,
                 Orders = [.. _orders],
                 Archive = [.. _archive],
@@ -697,6 +794,8 @@ internal sealed class CuttingMachine
         Update(() =>
         {
             _autoRun = state.AutoRun;
+            _endless = state.EndlessMode ?? _config.EndlessMode;
+            _nextGenerated = Math.Clamp(state.NextGeneratedNumber, 1, 99_999);
             _timeScale = state.TimeScale > 0 ? state.TimeScale : _config.TimeScale;
             _feedrate = state.Feedrate;
             _nextSequence = Math.Max(1, state.NextSequence);

@@ -59,7 +59,7 @@ internal sealed class SimulatorHarness : IAsyncDisposable
         Actions = new MachineActions(Machine, link);
         Dispatcher = new CommandDispatcher(Machine, Actions, link, config);
         _linkService = new CuttingLinkService(_machineChannel, Machine, Actions, Dispatcher, Log, config, NullLogger<CuttingLinkService>.Instance);
-        _runner = new ProductionRunner(Machine, link, config, NullLogger<ProductionRunner>.Instance);
+        _runner = new ProductionRunner(Machine, link, Actions, config, NullLogger<ProductionRunner>.Instance);
     }
 
     public CuttingMachine Machine { get; }
