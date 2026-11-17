@@ -4,12 +4,12 @@ This guide helps AI agents effectively use the Timeseries API tools to query sen
 
 ## Domain Overview
 
-The Timeseries API provides access to **high-frequency sensor data** stored in MongoDB time-series collections from Pleiades industrial machines. Data is organized by **topics** (MQTT-style hierarchical paths like `machines/9000-0001/sensors/temperature`). Topics identify specific sensors or signals on a machine.
+The Timeseries API provides access to **high-frequency sensor data** stored in MongoDB time-series collections from Pleiades industrial machines. Data is organized by **topics**, the MQTT topics of the umati data model: `machines/{machineId}/umati/<path>` for an element of the model and `machines/{machineId}/oem/<path>` for a signal of the manufacturer. The machine id is `<manufacturer>_<model>_<serial number>`, e.g. `alcyone-machines_AX-400_P-04`. A snapshot such as `State/Status` is stored field by field: `machines/{machineId}/umati/State/Status/MachineryItemState`. The identification of a machine lies below `umati/Identification/` (`Manufacturer`, `Model`, `SerialNumber`).
 
 ## Data Types
 
 ### Base Unit Values (`timeseries_baseunit_query`)
-Numeric time-series with a physical unit (BaseUnit enum: Meter, Newton, Celsius, etc.). These are the most common sensor signals — force, acceleration, temperature, position, velocity, etc.
+Numeric time-series with the unit they came in, never converted: a machine sends the units of the data model (energy in `wattHour`, power in `watt`, durations in `second`, overrides in `one`, temperatures in `degreeCelsius`, parts in `piece`). Convert for display only (1 kWh = 1000 Wh).
 
 ### String Values (`timeseries_string_query`)
 String time-series — status messages, machine states, identifiers that change over time.
@@ -20,7 +20,7 @@ Boolean time-series — on/off states, limit switches, digital signals.
 ## Core Concepts
 
 ### Topics
-Topics are hierarchical paths identifying data sources (e.g. `machines/9000-0001/sensors/spindleSpeed`). Use `timeseries_topics_query` to discover available topics in a time range. Topics support the wildcard `*` (matches any sequence of characters).
+Topics are hierarchical paths identifying data sources (e.g. `machines/alcyone-machines_AX-400_P-04/umati/Spindle/1/Override`). Use `timeseries_topics_query` to discover available topics in a time range. Topics support the wildcard `*` (matches any sequence of characters).
 
 ### Downsampling
 When `downsample=true`, the API reduces data points to the specified limit while preserving visual shape:
@@ -61,7 +61,7 @@ All queries require `startTime` and `stopTime` (ISO 8601). The time range is inc
   the same instant, with nothing in the response saying so. Narrow the topic to avoid it.
 - **`downsample=true` is the opposite, and on a wide wildcard it is the more expensive one**: the
   query then carries *no* limit at all, so everything in the time range is read, and `limit` becomes
-  the target point count **per series**. `machines/*/sensors/*` with `limit=1000` and
+  the target point count **per series**. `machines/*/umati/Consumption/Electricity/Main/*` with `limit=1000` and
   `downsample=true` reads the whole window and returns up to 1000 points for *each* matched signal -
   it is a way to shape the response, not a way to bound the query.
 - Default timeout is 30 seconds. Increase for large time ranges.
