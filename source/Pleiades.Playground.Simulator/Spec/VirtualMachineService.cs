@@ -72,7 +72,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
             : null;
         if (production is not null)
         {
-            LogProductionEvents(ProductionEventOutput.Topic(_config.SerialNumber));
+            LogProductionEvents(_config.SerialNumber);
         }
 
         // The spec output has a connection of its own; client and publisher are disposed once the loop has ended
@@ -85,7 +85,10 @@ internal sealed partial class VirtualMachineService : BackgroundService
             client = new MqttClientFactory().CreateManagedMqttClientWithLogger(_loggerFactory);
             publisher = new SpecPublisher(client, _config.SerialNumber, _manifest, _machine.SeqEpoch, _spec.EventBufferSize, _logger);
             var connected = publisher;
+            // The handler only runs while the client is started; the client is stopped before either is disposed.
+#pragma warning disable CA2025
             client.ConnectedAsync += _ => OnConnectedAsync(connected);
+#pragma warning restore CA2025
             await client.StartAsync(CreateOptions(start)).ConfigureAwait(false);
         }
 
@@ -210,8 +213,8 @@ internal sealed partial class VirtualMachineService : BackgroundService
     [LoggerMessage(EventId = 100, Level = LogLevel.Information, Message = "Spec output publishes the virtual machine below {Root}/{SerialNumber}/")]
     private partial void LogStarting(string root, string serialNumber);
 
-    [LoggerMessage(EventId = 101, Level = LogLevel.Information, Message = "Production events of the virtual machine go to {Topic}")]
-    private partial void LogProductionEvents(string topic);
+    [LoggerMessage(EventId = 101, Level = LogLevel.Information, Message = "Production events of the virtual machine go to machines/{SerialNumber}/events/production")]
+    private partial void LogProductionEvents(string serialNumber);
 
     [LoggerMessage(EventId = 102, Level = LogLevel.Information, Message = "Virtual machine is stopping")]
     private partial void LogStopping();
