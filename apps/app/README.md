@@ -24,7 +24,9 @@ harness.
   the chat draws for that tool, so it shows what holds now and needs no language model. A part whose tool
   the app has no card for stays where it is and says so; the rest of the page is whole. A page can be
   renamed, pinned and deleted from its head. A pinned page stands in the sidebar on the top level, beside
-  Home; "Pages" lists them all. Another browser, or a private window, has pages of its own. "Share" in the
+  Home; under it a group "Pages", which folds, lists the pages that are not pinned, the newest first, and
+  there is no group where there is nothing to list. `/pages` lists them all and is reached through the
+  breadcrumb. Another browser, or a private window, has pages of its own. "Share" in the
   head gives a link that carries the recipe and no value, which answers for which machines and hours: whoever
   opens it, at `/pages/open`, sees the values of now, with no language model and no chat, and keeps the page
   with "Save to my pages". A link that holds no page says so, and a part whose tool the app has no card for
@@ -135,9 +137,13 @@ the backend of the running demo stack answers.
   `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `pages.index.tsx` the list of the pages
   kept in this browser, `pages.$page.tsx` one of them and `pages.open.tsx` one opened from a link; `health.ts`, `api/harness/$.ts` and
   `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
-  (`nav`: a title, an icon, an order). `src/components/app-sidebar.tsx` reads the entries from the routes
-  and names no page, adds the pinned pages of this browser beside them, and `nav.ts` next to it puts them
-  in order (order, then title) and finds the one a person is under. The
+  (`nav`: a title, an icon, an order; `sidebar: false` for an entry that is no row, `/pages`, which the
+  pages kept in this browser stand under). `src/components/app-sidebar.tsx` reads the entries from the
+  routes and names no page, adds the pinned pages of this browser beside them, and `nav.ts` next to it puts
+  them in order (order, then title), leaves out the entries that are no row (`sidebarPages`) and finds the
+  one a person is under. Under the rows stands `page-group.tsx`, the group "Pages" of the pages that are not
+  pinned: `Collapsible` around a `SidebarGroup`, as the docs of the sidebar have it, open when the app
+  starts and as a person leaves it until a reload. The
   breadcrumb of the header, `page-breadcrumb.tsx`, reads the same: a page is called by the title of its
   entry, or by `crumb` in its `staticData`, and a page without an entry stands behind the one it is under.
 - `src/pages/`: the pages kept from the chat. `recipe.ts` is the recipe and its schema (zod): its shape
@@ -152,7 +158,8 @@ the backend of the running demo stack answers.
   the tool of a part, only a tool the chat draws (`parts.ts`), with the time zone of the browser, and
   returns what the chat hands to `draw`. `drawn-part.tsx` asks the parts of a recipe for a loader
   (`answerParts`) and draws one (`DrawnPart`): the card of the chat, or what is missing. `pinned.ts`
-  makes the entries of the sidebar for the pinned pages. A route that opens a link is input from outside at its
+  makes the entries of the sidebar for the pinned pages, `listed.ts` the rows of the group for the others
+  and the row that is marked: none for a pinned page, the list of the pages or a page opened from a link. A route that opens a link is input from outside at its
   door: `pages.open.tsx` lets in nothing but `decodeRecipe`, keeps its parameter while the chat panel opens
   and closes (`retainSearchParams`), and the router has `search.strict`, so a link to any other page does not
   carry the recipe along (`router.tsx`). `from-answer.ts` reads the recipe from an answer

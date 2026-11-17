@@ -39,8 +39,12 @@ does.
   tools, machines and hours, never a value. Whoever opens it sees the values of that moment, with no
   language model and no chat, and keeps the page in their own browser. A recipe from a link is input from
   outside: only what `recipeOf` accepts is a page, and nothing in the link says where the app goes next.
-- A pinned page is an entry of the sidebar on the top level, beside Home. The entry "Pages" lists every page
-  of the browser, pinned or not. A page is one column, and the order of its parts is its only arrangement.
+- A pinned page is an entry of the sidebar on the top level, beside Home. Under the entries a group
+  "Pages", which folds, lists the pages of the browser that are not pinned, as plain rows, the newest first;
+  a pinned page is not listed a second time, and with no page to list there is no group. The route `/pages`,
+  with every page of the browser, pinned or not, is no entry of the sidebar: it is reached through the
+  breadcrumb, "Pages" before the title of a page. A page is one column, and the order of its parts is its
+  only arrangement.
 
 ## Consequences
 
