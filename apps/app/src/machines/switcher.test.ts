@@ -3,7 +3,7 @@ import { test } from "node:test"
 
 import type { Machine, MachineList } from "@pleiades/cards/machine/contract.ts"
 
-import { choicesOf, hoursBetween, hoursOf, matches } from "./switcher.ts"
+import { DEFAULT_HOURS, choicesOf, chosenHours, hoursOf, matches } from "./switcher.ts"
 
 test("the hours of the address are one of the three the page offers", () => {
   assert.equal(hoursOf(1), 1)
@@ -18,10 +18,13 @@ test("any other hours are no hours: the history of the default is shown", () => 
   }
 })
 
-test("the hours a history covers are read from its two instants", () => {
-  assert.equal(hoursBetween("2026-11-17T08:00:00Z", "2026-11-17T16:00:00Z"), 8)
-  assert.equal(hoursBetween("2026-11-16T16:00:00Z", "2026-11-17T16:00:00Z"), 24)
-  assert.equal(hoursBetween("2026-11-17T13:00:00Z", "2026-11-17T16:00:00Z"), undefined)
+test("the chosen hours are the ones of the address, or the default for anything else", () => {
+  assert.equal(DEFAULT_HOURS, 8)
+  assert.equal(chosenHours(1), 1)
+  assert.equal(chosenHours("24"), 24)
+  assert.equal(chosenHours(undefined), 8)
+  assert.equal(chosenHours(3), 8)
+  assert.equal(chosenHours("many"), 8)
 })
 
 const asOf = "2026-11-17T16:00:00Z"

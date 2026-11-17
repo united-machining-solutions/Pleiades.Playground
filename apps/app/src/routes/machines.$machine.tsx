@@ -22,7 +22,7 @@ import type { ReactNode } from "react"
 import { NoAnswer } from "@/components/no-answer.tsx"
 import { useLive } from "@/hooks/use-live.ts"
 import { getMachine, getMachines, getSpans } from "@/machines/get-machines.ts"
-import { HOURS, choicesOf, hoursBetween, hoursOf, matches } from "@/machines/switcher.ts"
+import { HOURS, choicesOf, chosenHours, hoursOf, matches } from "@/machines/switcher.ts"
 import type { Choice, Hours } from "@/machines/switcher.ts"
 
 /**
@@ -40,7 +40,8 @@ export const Route = createFileRoute("/machines/$machine")({
   // The router keeps the keys of the address that this function does not return, so `hours` is
   // returned even where it is nothing: otherwise `?hours=3` would stay in the search as it is.
   validateSearch: (search): { hours?: Hours | undefined } => ({ hours: hoursOf(search.hours) }),
-  loaderDeps: ({ search }) => ({ hours: search.hours }),
+  // Only the length of the history is chosen: the window rolls along, the last hours up to now.
+  loaderDeps: ({ search }) => ({ hours: chosenHours(search.hours) }),
   loader: async ({ params, deps }) => {
     // The list serves the switcher, and tells a machine that is away from one that is unknown.
     const [answer, list] = await Promise.all([
@@ -69,16 +70,14 @@ export const Route = createFileRoute("/machines/$machine")({
 function Machine() {
   const { answer, spans, choices } = Route.useLoaderData()
   const { machine } = Route.useParams()
+  const { hours } = Route.useSearch()
   useLive()
   return (
     <Page
       machine={machine}
       choices={choices}
       line={answer.values ? `live · now ${clock(answer.values.asOf)}` : undefined}
-      // The hours the card shows are the truth about the history, whatever the address says.
-      actions={
-        answer.values && <HistoryHours hours={hoursBetween(answer.values.history.from, answer.values.history.to)} />
-      }
+      actions={answer.values && <HistoryHours hours={chosenHours(hours)} />}
     >
       {answer.values ? <MachineCard {...answer.values} spans={spans} /> : <NoAnswer error={answer.error} />}
     </Page>
@@ -177,7 +176,7 @@ function MachineSwitcher({ machine, choices }: { machine: string; choices: Array
 }
 
 /** How far back the history of the card goes. One is always chosen: pressing the chosen one changes nothing. */
-function HistoryHours({ hours }: { hours: Hours | undefined }) {
+function HistoryHours({ hours }: { hours: Hours }) {
   const navigate = useNavigate()
   return (
     <ToggleGroup
@@ -185,7 +184,7 @@ function HistoryHours({ hours }: { hours: Hours | undefined }) {
       size="sm"
       spacing={0}
       aria-label="History"
-      value={hours === undefined ? [] : [String(hours)]}
+      value={[String(hours)]}
       onValueChange={(chosen) => {
         const next = hoursOf(chosen[0])
         if (next !== undefined && next !== hours) {

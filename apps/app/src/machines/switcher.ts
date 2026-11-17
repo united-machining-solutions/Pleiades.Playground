@@ -7,15 +7,21 @@ export type Hours = (typeof HOURS)[number]
 
 /**
  * The `hours` of the address as the page offers it, or nothing: an address that carries anything
- * else, such as `?hours=3` or `?hours=many`, shows the history of the backend's own default.
+ * else, such as `?hours=3` or `?hours=many`, is the default: see `chosenHours`.
  */
 export function hoursOf(raw: unknown): Hours | undefined {
   return HOURS.find((hours) => hours === Number(raw))
 }
 
-/** How many whole hours lie between two instants: what the history a card was read for covers. */
-export function hoursBetween(from: string, to: string): Hours | undefined {
-  return hoursOf(Math.round((Date.parse(to) - Date.parse(from)) / 3_600_000))
+/** How far back the history goes if the address says nothing valid. */
+export const DEFAULT_HOURS: Hours = 8
+
+/**
+ * The hours the page shows: the length of the history, which the window rolls along to now. Only
+ * the length is chosen, it comes from the address and from nothing the card has read.
+ */
+export function chosenHours(raw: unknown): Hours {
+  return hoursOf(raw) ?? DEFAULT_HOURS
 }
 
 /** One entry of the machine switcher: a machine and what it does now. */
