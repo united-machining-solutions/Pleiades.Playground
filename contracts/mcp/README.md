@@ -9,7 +9,7 @@ the server is the source of truth for tool names and parameters.
 | Server | URL | Tools |
 |---|---|---|
 | Timeseries | `http://localhost:5500/mcp` | `timeseries_topics_query`, `timeseries_baseunit_query`, `timeseries_string_query`, `timeseries_boolean_query`, `timeseries_statistics_query` |
-| Events | `http://localhost:5510/mcp` | `events_notification_query`, `events_notification_pairs`, `events_notification_message_stats`, `events_notification_level_distribution`, `events_notification_time_buckets`, `events_job_events_query`, `events_job_orders_query`, `events_work_master_events_query`, `events_program_executions_query` |
+| Events | `http://localhost:5510/mcp` | `events_machine_events_query`, `events_sequence_gaps_query`, `events_active_alerts_query`, `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query`, `events_program_executions_query` |
 | Generative UI | `http://localhost:5520/mcp` | `genui_machine_list`, `genui_machine_show`, and for cards `genui_span_list` |
 
 The generative UI server is not an API of its own: it reads the two servers above over REST and returns what

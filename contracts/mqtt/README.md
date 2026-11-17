@@ -84,16 +84,24 @@ A machine below `machines/` carries the units of the data model instead, energy 
 
 ## Replaced: the earlier binding of `machines/`
 
-Until this step `machines/{SerialNumber}/` carried a binding of the playground: values in coherent SI units
-(energy in `joule`) below `umati/` and `vendor/` with the content types `baseunitvaluedto`, `stringvaluedto` and
-`booleanvaluedto`, and events as DTOs of the Events API on `events/notifications` (`notificationeventdtov1`),
-`events/jobs` (`jobeventdtov1`) and `events/workmasters` (`workmastereventdtov1`). The data model is now the
-binding of `machines/`; the simulators publish nothing of the earlier one.
+Until now `machines/{SerialNumber}/` carried a binding of the playground: values in coherent SI units below
+`umati/` and `vendor/` and events as DTOs of the Events API. The data model is now the binding of `machines/`,
+and the stack reads only it; the earlier text of this section is in the history of this file.
 
-The DTOs and the stores for them stay in the code for now: the Events persistence still routes the three content
-types, the Timeseries persistence still subscribes to `machines/+/umati/#` and `machines/+/vendor/#`, and the
-APIs and MCP tools serve what they stored. A second step moves them to the CloudEvents and the topics of the data
-model. The earlier text of this section is in the history of this file.
+### How the stack stores it
+
+- The Timeseries persistence subscribes to `machines/+/umati/#`, `machines/+/oem/#` and `sites/+/#`. It keeps a
+  value with the unit it came with (`wattHour`, `degreeCelsius` …) and converts nothing; a number without a unit
+  is kept as `one`. A snapshot such as `State/Status` is kept field by field, as
+  `machines/{MachineId}/umati/State/Status/MachineryItemState`; its strings and booleans become series, its numbers
+  carry no unit and are not kept. Lists (`JobOrders`, `ActiveAlerts`, the software of the identification), `null`
+  and the manifest are no series: job orders and alerts come from the views of the Events API, the identification
+  from its single values.
+- The Events persistence subscribes to `machines/+/events/jobs`, `machines/+/events/workmasters` and
+  `machines/+/events/notifications` with QoS 1 in a persistent session (Clean Start false, a fixed client id and a
+  session expiry of one day), takes what has the content type `application/cloudevents+json`, and stores the
+  CloudEvent as it came with the machine id of its topic. `source` and `id` together are unique, so an event the
+  broker delivers twice is stored once.
 
 ### Example topics of a source
 
@@ -312,8 +320,8 @@ The rules for events, so that a consumer can keep nothing but the events and sti
 
 ### Units
 
-Exactly those of the catalogue: energy in `wattHour`, a temperature in `degreeCelsius`. Places below `sites/`
-keep the coherent SI units of [ADR-0002](../../docs/adr/0002-si-units-joule-and-one.md).
+Exactly those of the catalogue: energy in `wattHour`, a temperature in `degreeCelsius`. The stores keep them as
+they came and convert nothing. Places below `sites/` keep the coherent SI units of [ADR-0002](../../docs/adr/0002-si-units-joule-and-one.md).
 
 ### Signals of the manufacturer
 
@@ -514,8 +522,7 @@ next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; withou
   id"), unique across manufacturers as long as a manufacturer gives a serial number once per model; globally
   unique stays `ProductInstanceUri` (open question 4 of the model). The manifest names it as `machineId`, a field
   the schema of the manifest of the model does not know: it passes the schema only once `machineId` is taken off,
-  as `unit` from a value. Persistence, app and genui-mcp still name a machine by its serial number; they take
-  the machine id in the second step.
+  as `unit` from a value. Persistence, APIs, app and genui-mcp name a machine by this id.
 - The order of the lamps. The model takes `NumberInList` from OPC 10000-200, which counts from the base of the
   stack light; here 0 is red, the lamp at the top of a usual machine tool. Either the list or the counting has to
   change once the group decides.

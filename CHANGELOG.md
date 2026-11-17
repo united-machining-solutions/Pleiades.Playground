@@ -13,24 +13,33 @@ All notable changes are documented here. The format follows
   The root `simulators/` is gone. The simulator publishes only this tree, from its virtual machine, which always
   runs; the value generators, the notification generator, the job and work master events of the playground
   binding, `Config:SpecOutput:Enabled`, `Config:ProductionEvents` and the second MQTT client are gone from it.
-  ADR-0012 and ADR-0002 say so. Persistence, APIs, MCP tools, genui-mcp and the app still read the earlier
-  binding and show no data of the simulators until a second step moves them.
+  ADR-0012 and ADR-0002 say so.
+- The stack reads this tree. A machine is named by its machine id everywhere: in the stores, the APIs, the MCP
+  tools, genui-mcp and the address of its page (`/machines/alcyone-machines_AX-400_P-04`); the app shows its
+  manufacturer, model and serial number from the identification.
+- Timeseries persistence: subscribes to `machines/+/umati/#`, `machines/+/oem/#` and `sites/+/#`, keeps a value
+  with the unit it came with (new in `BaseUnit`: `wattHour`, `piece`, `kilogramPerSecond`), keeps a snapshot
+  such as `State/Status` field by field, and keeps no lists, no `null` and no manifest.
+- Events: the persistence takes `application/cloudevents+json` from `machines/+/events/jobs`, `…/workmasters`
+  and `…/notifications` with QoS 1 in a persistent session (`Config:MqttSource:SessionExpiry`), and the Events
+  API keeps the CloudEvents as they came in one collection `MachineEvent`, unique by `source` and `id`. It serves
+  `/machineEvents` with `/machineEvents/gaps`, `/alerts/active`, `/alerts/pairs` and `/alerts/statistics` (by
+  NE 107 severity), `/jobOrders` with `/jobOrders/{mId}/{jobOrderId}`, and `/programExecutions`, and the MCP
+  tools `events_machine_events_query`, `events_sequence_gaps_query`, `events_active_alerts_query`,
+  `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query` and
+  `events_program_executions_query`.
+- The machine card shows the work master instead of the program, the job order that runs, and alerts with their
+  NE 107 severity; a machine whose adapter is not `Running` has no data.
+
+### Removed
+
+- `NotificationEventDtoV1`, `JobEventDtoV1` and `WorkMasterEventDtoV1`, their collections, endpoints
+  (`/notificationEvents`, `/jobEvents`, `/workMasterEvents`) and MCP tools (`events_notification_*`,
+  `events_job_events_query`, `events_work_master_events_query`).
+- The libraries `Pleiades.Playground.Events.Generators` and `Pleiades.Playground.Timeseries.Generators`, which
+  nothing used any more.
 
 ### Added
-
-- Job events and work master events: job orders and program executions as events of the playground binding,
-  QoS 1, not retained, each carrying the whole state after it. `JobEventDtoV1` on
-  `machines/{SerialNumber}/events/jobs` (`jobeventdtov1`) carries what is ordered and, from the start, the
-  result of a job order, with the actions of the data model, `ResultChanged` among them; `WorkMasterEventDtoV1`
-  on `machines/{SerialNumber}/events/workmasters` (`workmastereventdtov1`) carries a program execution and at
-  its end its sums in joule. Every simulator publishes them from its virtual machine
-  (`Config:ProductionEvents:Enabled`, on by default), the Events persistence stores them, and the Events API
-  keeps them in the collections `JobEvent` and `WorkMasterEvent` and serves `/jobEvents`, `/jobOrders` and
-  `/jobOrders/{mId}/{jobOrderId}` (the last known state with the result, the history and the program
-  executions), `/workMasterEvents` and `/workMasterEvents/correlationPairs`, with the MCP tools
-  `events_job_events_query`, `events_job_orders_query`, `events_work_master_events_query` and
-  `events_program_executions_query`. They replace a draft `ProductionEventDtoV1` that was never released.
-  `NotificationEventDtoV1` is unchanged.
 
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.

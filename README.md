@@ -119,9 +119,10 @@ Every tool and how to check it: [development setup](docs/development-setup.md).
 
 ## Units
 
-Every numeric value is in its coherent SI unit. Energy is in joule, ratios and percentages are fractions with the
-unit `one` (1.0 = 100 %). Displays convert, the wire does not. See
-[ADR-0002](docs/adr/0002-si-units-joule-and-one.md).
+A value of a machine below `machines/` carries the unit of the umati data model, energy in watt hours for
+example, and is stored and served in it. A value of a place below `sites/` is in its coherent SI unit: energy in
+joule, ratios and percentages as fractions with the unit `one` (1.0 = 100 %). Displays convert; the wire, the
+stores and the APIs do not. See [ADR-0002](docs/adr/0002-si-units-joule-and-one.md).
 
 ## Contributing, security, licence
 

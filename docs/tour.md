@@ -62,9 +62,11 @@ Each publishes after the umati data model, below `machines/<manufacturer>_<model
 and alerts as CloudEvents. It is described in
 [`contracts/mqtt`](../contracts/mqtt/README.md#machines-the-binding-of-the-data-model).
 
-> **For now:** the simulators publish only this tree, while persistence, APIs, genui-mcp and the app still read
-> the earlier binding of `machines/`. Until they move, the app shows no machine data, and the screenshots of the
-> stops below show the earlier state.
+The persistence services store the values as they come, in the units of the model, and the CloudEvents as they
+came; the APIs put job orders, program executions and alerts together from them when they are read.
+
+> **For now:** the screenshots of the stops below show the state before the machine id and the work master; they
+> are retaken once the stack runs with this tree.
 
 ## 2. Home
 
@@ -87,8 +89,10 @@ in one file, [`packages/cards/src/machine/state.ts`](../packages/cards/src/machi
 
 ## 3. The page of one machine
 
-A click on a machine opens its page, here <http://localhost:5600/machines/P-04>. It shows the machine card:
-what the machine does now, and what it did over the last eight hours. It needs no language model.
+A click on a machine opens its page, here <http://localhost:5600/machines/alcyone-machines_AX-400_P-04>; the
+address carries the machine id, the page is titled with model and serial number, AX-400 P-04. It shows the
+machine card: what the machine does now, with which work master and job order, the alerts that stand, and what
+it did over the last eight hours. It needs no language model.
 
 ![The page Machines / P-04 with the machine card. The card says Stopped, no alarm and no reason recorded,
 since 20:36, program SHAFT_4711.MPF. Below is a band of the last 8 hours, the total duration of each state,
@@ -229,8 +233,9 @@ values.](images/tour/swagger-ui.png)
 
 The picture shows the Swagger UI of the Timeseries API at <http://localhost:5500/>, in its light mode; the
 lamp at the top right switches it. The Events API has the same page at <http://localhost:5510/>, with the
-notification events, the job events with the job orders put together from them (`/jobOrders`), and the work
-master events with the program executions (`/workMasterEvents/correlationPairs`). Open an
+CloudEvents of the machines as they came (`/machineEvents`, and the gaps in their `sequence`), and the views put
+together from them: the alerts (`/alerts/active`, `/alerts/pairs`, `/alerts/statistics`), the job orders
+(`/jobOrders`) and the program executions (`/programExecutions`). Open an
 endpoint and choose "Try it out" to send a request to the running stack.
 
 | API | REST | MCP | Contract |
