@@ -13,7 +13,7 @@ see [Spec binding (draft)](#spec-binding-draft); no service reads them yet.
 ```text
 machines/{SerialNumber}/umati/<path>     values named by the data model
 machines/{SerialNumber}/vendor/<path>    manufacturer-specific values
-machines/{SerialNumber}/events/<kind>    events, see "Notifications"
+machines/{SerialNumber}/events/<kind>    events, see "Notifications" and "Production events"
 sites/{SiteId}/{Source}/<path>           values about a place, in the names of one source
 simulators/{SerialNumber}/...            the simulator of a machine after the data model, see "Spec binding"
 ```
@@ -92,13 +92,53 @@ The payload is the notification event of the Events API (see [`../openapi`](../o
 - The Events persistence logs and drops a message without a content type or with an unknown one. A client that
   speaks MQTT 3.1.1 cannot set the content type, so notifications need an MQTT 5 client.
 
+## Production events
+
+Job orders and program executions are events too. Every change of state of a job order or a program execution,
+and every other change of a job order, is one event; all events of one job order, or of one program
+execution, share the same `CorrelationId`, and the Events API keeps them and puts the current state together
+from them.
+
+```text
+machines/{SerialNumber}/events/production
+```
+
+The payload is the production event of the Events API, `ProductionEventDtoV1` (see
+[`../openapi`](../openapi/README.md)):
+
+```json
+{ "Timestamp": "2026-11-17T09:21:40.000Z", "Id": "P-04:2026-11-17T06:58:12.000Z:1842", "MId": "P-04",
+  "Subject": "ProgramExecution", "Action": "Ended", "CorrelationId": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001",
+  "JobOrderId": "4711/01", "ExecutionId": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001", "WorkMaster": "WELLE_4711.MPF",
+  "State": "Ended", "StartTime": "2026-11-17T08:31:00.000Z",
+  "Duration": 3040.0, "PartsProduced": 1, "EnergyElectricity": 6661800, "Seq": 1842 }
+```
+
+- The MQTT 5 content type is mandatory and names the payload: `productioneventdtov1`. As with notifications,
+  the Events persistence logs and drops a message without a content type or with an unknown one.
+- QoS 1, not retained: an event happened once; the state is what its events add up to.
+- `Subject` is `JobOrder` or `ProgramExecution`. `Action` names what happened after the state reached: `Added`,
+  `Released`, `Revoked`, `Started`, `Interrupted`, `Resumed`, `Ended`, `Aborted`, `Cancelled`, `Changed`,
+  `Removed` for a job order; `Started`, `Interrupted`, `Resumed`, `Ended`, `Aborted` for a program execution.
+- `CorrelationId` is the `JobOrderId` of a job order and the `ExecutionId` of a program execution. A program
+  execution names its job order in `JobOrderId`.
+- Every event carries the whole state after it: `State`, `StartTime`, `EndTime`, `ProducedQuantity` and
+  `GoodQuantity` for a job order; `State`, `StartTime`, `WorkMaster` for a program execution, and at its end
+  (`Ended`, `Aborted`) the sums `Duration`, `PartsProduced`, `EnergyElectricity` and `EnergyCompressedAir`.
+- Units after this binding: `Duration` in seconds, energy in joule, quantities as counts. The data model sends
+  energy in watt hours; the source converts once.
+- `Id` is unique per event. The simulator builds it from the machine, the start of its run and `Seq`, so a
+  delivery that QoS 1 repeats carries the same `Id`, and the Events API refuses the second copy.
+- `Seq` is optional: it counts the production events of a machine without a gap and may start again from 1 when
+  the source restarts, so a gap shows.
+
 ## Deviations from the data model
 
 | Topic | Data model | This binding | Why |
 |---|---|---|---|
 | Energy | `wattHour` | `joule` | One coherent SI unit per quantity. |
 | `State.Status` | One snapshot struct with two members | Two topics, `State/MachineryItemState` and `State/MachineryOperationMode` | The persistence stores numbers, strings and booleans. |
-| Lists (`Notification.ActiveAlerts`, `Production.JobOrders`) | One list value | Not published; alarms travel as notification events | As above. |
+| Lists (`Notification.ActiveAlerts`, `Production.JobOrders`) | One list value | Not published; alarms travel as notification events, job orders and program executions as production events | As above. |
 | Alarm severity | Categories after NAMUR NE 107 | Levels of the Events API | Mapping is future work. |
 | Manufacturer-specific values | `x-<domain>` prefix | `vendor/` topic level | Simple wildcard subscription. |
 
@@ -119,6 +159,7 @@ The payload is the notification event of the Events API (see [`../openapi`](../o
 | `umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `joule` |
 | `vendor/Spindle/1/BearingTemperature` | number | `degreeCelsius` |
 | `events/notifications` | notification event | – |
+| `events/production` | production event | – |
 
 ## Example topics of a source
 
