@@ -1,6 +1,7 @@
 import type { State } from "@pleiades/cards/machine/contract.ts"
 import { stateLabel } from "@pleiades/cards/machine/state.ts"
 import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
+import { Badge } from "@pleiades/ui/components/badge"
 import { Button } from "@pleiades/ui/components/button"
 import { Item, ItemContent, ItemFooter, ItemHeader, ItemMedia, ItemTitle } from "@pleiades/ui/components/item"
 import { Meter } from "@pleiades/ui/components/meter"
@@ -17,7 +18,7 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
-import { MAP_HEIGHT, MAP_WIDTH, TILE_HEIGHT, TILE_WIDTH, edges, juiceLabel, parts, stations } from "./data.ts"
+import { MAP_HEIGHT, MAP_WIDTH, TILE_HEIGHT, TILE_WIDTH, edges, juiceLabel, partAt, parts, stations } from "./data.ts"
 import type { Instant, Part, Station, StepKind } from "./data.ts"
 
 export const stepIcon: Record<StepKind, LucideIcon> = {
@@ -43,10 +44,6 @@ export type Lens = "load" | "queue"
 
 export function stateWord(station: Station, state: State) {
   return (station.juice && juiceLabel[state]) || stateLabel[state]
-}
-
-export function partAt(part: Part, instant: Instant) {
-  return part.route[part.pos[instant]] ?? part.route[0]!
 }
 
 /**
@@ -88,6 +85,7 @@ export function FloorMap({
         className="relative m-2 bg-[radial-gradient(var(--border)_1px,transparent_1px)] bg-size-[16px_16px]"
         style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
       >
+        {/* The lines of the flow: no component draws a line between two places, so these are our own. */}
         {lines.map(({ key, segments, look }) =>
           // A horizontal segment runs from `a` to `b` at height `c`; a vertical one stands at `a`
           // and runs from `b` to `c`.
@@ -164,22 +162,18 @@ function StationTile({
     : lens === "load"
       ? `${queue} parts waiting`
       : `${load} % utilisation`
-  // One tracked part as a marker, everything else at the station as "+N".
+  // One tracked part as a marker, the chosen one if it is here; the rest of the queue as "+N".
+  // The queue already counts the tracked parts.
   const atStation = station.juice ? [] : parts.filter((one) => partAt(one, instant) === station.id)
-  const tracked = atStation.slice(0, 1)
-  const more = queue + atStation.length - tracked.length
+  const tracked = (atStation.find((one) => one.id === chosenPart?.id) ?? atStation[0])
+  const more = Math.max(0, queue - (tracked ? 1 : 0))
 
   return (
     <div className="absolute flex flex-col gap-1.5" style={{ left: station.x, top: station.y, width: TILE_WIDTH }}>
       {here && (
-        <span
-          className={cn(
-            "absolute -top-2.5 right-2 z-10 rounded-full px-2 text-xs leading-5 font-medium",
-            blocked ? "bg-destructive text-white" : "bg-primary text-primary-foreground",
-          )}
-        >
+        <Badge variant={blocked ? "destructive" : "default"} className="absolute -top-2.5 right-2 z-10">
           {blocked ? "Part waits here" : "Part is here"}
-        </span>
+        </Badge>
       )}
       <Item
         variant="outline"
@@ -217,30 +211,28 @@ function StationTile({
           <Meter value={load} aria-label={station.juice ? "Fill level" : "Utilisation"} />
           <span className="flex items-center justify-between gap-1">
             <span className="truncate text-xs text-muted-foreground">{small}</span>
-            {/* Room for the maker's logo. */}
-            <span className="shrink-0 rounded-sm border border-dashed px-1 text-[0.625rem] text-muted-foreground">Logo</span>
+            <MakerLogo />
           </span>
         </ItemFooter>
       </Item>
       {!station.juice && (
         <div className="flex gap-1">
-          {tracked.map((one) => (
+          {tracked && (
             <Button
-              key={one.id}
-              variant={chosenPart?.id === one.id ? "default" : "outline"}
+              variant={chosenPart?.id === tracked.id ? "default" : "outline"}
               size="xs"
               className={cn(
                 "w-16 rounded-full",
-                state === "alarm" && chosenPart?.id !== one.id && "border-destructive/50 text-destructive",
-                chosenPart && chosenPart.id !== one.id && "opacity-45",
+                state === "alarm" && chosenPart?.id !== tracked.id && "border-destructive/50 text-destructive",
+                chosenPart && chosenPart.id !== tracked.id && "opacity-45",
               )}
-              title={`${one.id} · ${one.name}`}
-              aria-label={`Open part ${one.id}`}
-              onClick={() => onPart(one.id)}
+              title={`${tracked.id} · ${tracked.name}`}
+              aria-label={`Open part ${tracked.id}`}
+              onClick={() => onPart(tracked.id)}
             >
-              {one.id.slice(3)}
+              {tracked.id.slice(3)}
             </Button>
-          ))}
+          )}
           {more > 0 && (
             <Button
               variant="secondary"
@@ -256,5 +248,14 @@ function StationTile({
         </div>
       )}
     </div>
+  )
+}
+
+/** Room for the logo of the machine's maker, until there is one: a placeholder, not a component. */
+export function MakerLogo({ className }: { className?: string }) {
+  return (
+    <Badge variant="outline" className={cn("border-dashed text-[0.625rem] font-normal text-muted-foreground", className)}>
+      Logo
+    </Badge>
   )
 }

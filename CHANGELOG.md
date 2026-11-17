@@ -9,7 +9,8 @@ All notable changes are documented here. The format follows
 
 - Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
   shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
-  from programming to packing, as three perspectives of one picture. It reads nothing from the stack.
+  from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
+  entry in the sidebar.
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
