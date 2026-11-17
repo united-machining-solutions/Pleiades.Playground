@@ -149,6 +149,9 @@ All notable changes are documented here. The format follows
   the line of a call is a `TraceCollapsible` once its result is there, with the result as text in a
   `CodeBlock` (JSON indented). `code-block` is new in `packages/ui`; it brings `shiki`, which only its
   highlighting hook loads, and the app does not use that hook.
+- The brand TRUMPF (`packages/ui/brands/trumpf`): the colours, square corners and Open Sans of the TRUMPF
+  UX UI Community design system. Its `DESIGN.md` names what the design system asks for that a brand
+  cannot do.
 
 ### Changed
 
