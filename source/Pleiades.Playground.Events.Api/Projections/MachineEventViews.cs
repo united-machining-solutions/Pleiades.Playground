@@ -24,6 +24,15 @@ internal static class MachineEventViews
     public const string JobOrderRemoved = "JobMonitoring.JobOrderRemoved";
     public const string ProgramExecutionPrefix = "WorkMasterMonitoring.ProgramExecution";
 
+    /// <summary>What cleared an alert: its AlertCleared.</summary>
+    public const string ByEvent = "Event";
+
+    /// <summary>
+    /// What ended an alert or a program execution that was open when the adapter started anew and that the new run
+    /// did not name again: the start of the next run.
+    /// </summary>
+    public const string AdapterRestart = "AdapterRestart";
+
     /// <summary>The severities of NAMUR NE 107, in the order of their weight.</summary>
     public static readonly IReadOnlyList<string> Severities = ["Failure", "CheckFunction", "OffSpec", "MaintenanceRequired"];
 
@@ -37,7 +46,13 @@ internal static class MachineEventViews
     /// <param name="events">Events of the group Notification in any order, since before the range.</param>
     /// <param name="from">Start of the range; null for no start.</param>
     /// <param name="to">End of the range; null for no end.</param>
-    public static List<AlertPairDtoV1> AlertPairs(IEnumerable<MachineEventDtoV1> events, DateTime? from = null, DateTime? to = null)
+    /// <param name="runs">
+    /// The runs of the adapters and the gaps in them: an alert that stands in an earlier run than the newest of its
+    /// machine is cleared by <see cref="AdapterRestart"/> at the start of the next run, one with a gap after its
+    /// last event is <see cref="AlertDtoV1.Stale"/>. Null to read the events alone.
+    /// </param>
+    public static List<AlertPairDtoV1> AlertPairs(
+        IEnumerable<MachineEventDtoV1> events, DateTime? from = null, DateTime? to = null, RunContext? runs = null)
     {
         ArgumentNullException.ThrowIfNull(events);
         return [.. events
@@ -51,6 +66,14 @@ internal static class MachineEventViews
                 var cleared = ordered.LastOrDefault(e => e.Type == AlertCleared);
                 var raisedAt = Time(last.Data, "Time") ?? raised?.Time ?? ordered[0].Time;
                 DateTime? clearedAt = cleared?.Time;
+                var clearedBy = cleared is null ? null : ByEvent;
+                var stale = false;
+                if (cleared is null && runs?.After(last) is { } after)
+                {
+                    (clearedAt, clearedBy, stale) = after.NextRunStart is { } next
+                        ? (Later(next, last.Time), AdapterRestart, false)
+                        : ((DateTime?)null, (string?)null, after.Gap);
+                }
                 return new AlertPairDtoV1
                 {
                     MId = group.Key.MId,
@@ -63,7 +86,9 @@ internal static class MachineEventViews
                     CorrelationId = Text(last.Data, "correlationId") ?? last.CorrelationId,
                     RaisedAt = raisedAt,
                     LastChange = last.Time,
+                    Stale = stale,
                     ClearedAt = clearedAt,
+                    ClearedBy = clearedBy,
                     DurationSeconds = clearedAt is { } end ? Math.Round((end - raisedAt).TotalSeconds, 3) : null,
                 };
             })
@@ -71,13 +96,16 @@ internal static class MachineEventViews
             .OrderBy(p => p.RaisedAt)];
     }
 
-    /// <summary>The alerts that stand now: raised and not cleared.</summary>
-    public static List<AlertDtoV1> ActiveAlerts(IEnumerable<MachineEventDtoV1> events)
+    /// <summary>The alerts that stand now: raised, not cleared, and not cleared by a restart of the adapter.</summary>
+    public static List<AlertDtoV1> ActiveAlerts(IEnumerable<MachineEventDtoV1> events, RunContext? runs = null)
     {
-        return [.. AlertPairs(events).Where(p => p.ClearedAt is null).Select(p => (AlertDtoV1)p with { })];
+        return [.. AlertPairs(events, runs: runs).Where(p => p.ClearedAt is null).Select(p => (AlertDtoV1)p with { })];
     }
 
-    /// <summary>The alerts that stood in the range, by severity, in the order of NE 107.</summary>
+    /// <summary>
+    /// The alerts that stood in the range, by severity, in the order of NE 107. An alert cleared by a restart of the
+    /// adapter counts until the start of the next run, at most as long as it stood.
+    /// </summary>
     public static List<AlertStatisticDtoV1> AlertStatistics(IEnumerable<AlertPairDtoV1> pairs)
     {
         ArgumentNullException.ThrowIfNull(pairs);
@@ -101,7 +129,12 @@ internal static class MachineEventViews
     /// with its sums, how often it was interrupted, and its state after its last event.
     /// </summary>
     /// <param name="events">Events of the group WorkMasterMonitoring in any order.</param>
-    public static List<ProgramExecutionDtoV1> ProgramExecutions(IEnumerable<MachineEventDtoV1> events)
+    /// <param name="runs">
+    /// The runs of the adapters and the gaps in them: an execution without an end in an earlier run than the newest
+    /// of its machine ends with <see cref="AdapterRestart"/> at the start of the next run, without sums; one with a
+    /// gap after its last event is <see cref="ProgramExecutionDtoV1.Stale"/>. Null to read the events alone.
+    /// </param>
+    public static List<ProgramExecutionDtoV1> ProgramExecutions(IEnumerable<MachineEventDtoV1> events, RunContext? runs = null)
     {
         ArgumentNullException.ThrowIfNull(events);
         return [.. events
@@ -112,6 +145,15 @@ internal static class MachineEventViews
                 var ordered = group.OrderBy(e => e.Time).ThenBy(e => e.Sequence, StringComparer.Ordinal).ToList();
                 var last = ordered[^1];
                 var end = ordered.LastOrDefault(e => e.Type is ProgramExecutionPrefix + "Ended" or ProgramExecutionPrefix + "Aborted");
+                DateTime? endTime = end?.Time;
+                var endType = end?.Type[ProgramExecutionPrefix.Length..];
+                var stale = false;
+                if (end is null && runs?.After(last) is { } after)
+                {
+                    (endTime, endType, stale) = after.NextRunStart is { } next
+                        ? (Later(next, last.Time), AdapterRestart, false)
+                        : ((DateTime?)null, (string?)null, after.Gap);
+                }
                 return new ProgramExecutionDtoV1
                 {
                     MId = group.Key.MId,
@@ -120,8 +162,9 @@ internal static class MachineEventViews
                     WorkMasterId = ordered.Select(e => Text(e.Data, "ActiveWorkMaster")).LastOrDefault(w => w is not null),
                     State = Text(last.Data, "State") ?? string.Empty,
                     StartTime = Time(last.Data, "StartTime") ?? ordered[0].Time,
-                    EndTime = end?.Time,
-                    EndType = end?.Type[ProgramExecutionPrefix.Length..],
+                    EndTime = endTime,
+                    EndType = endType,
+                    Stale = stale,
                     Interruptions = ordered.Count(e => e.Type == ProgramExecutionPrefix + "Interrupted"),
                     Duration = end is null ? null : Number(end.Data, "Duration"),
                     PartsProduced = end is null ? null : Number(end.Data, "PartsProduced"),
@@ -140,11 +183,17 @@ internal static class MachineEventViews
     /// </summary>
     /// <param name="jobEvents">Events of the group JobMonitoring in any order.</param>
     /// <param name="workMasterEvents">Events of the group WorkMasterMonitoring; those of a job order count for it.</param>
-    public static List<JobOrderDtoV1> JobOrders(IEnumerable<MachineEventDtoV1> jobEvents, IEnumerable<MachineEventDtoV1> workMasterEvents)
+    /// <param name="runs">
+    /// The runs of the adapters and the gaps in them: a job order that has not ended is
+    /// <see cref="JobOrderDtoV1.Stale"/> when the adapter started anew since its last event, or a gap follows it. It
+    /// is not closed: a job order outlives its adapter. Null to read the events alone.
+    /// </param>
+    public static List<JobOrderDtoV1> JobOrders(
+        IEnumerable<MachineEventDtoV1> jobEvents, IEnumerable<MachineEventDtoV1> workMasterEvents, RunContext? runs = null)
     {
         ArgumentNullException.ThrowIfNull(jobEvents);
         ArgumentNullException.ThrowIfNull(workMasterEvents);
-        var executions = ProgramExecutions(workMasterEvents)
+        var executions = ProgramExecutions(workMasterEvents, runs)
             .Where(p => p.JobOrderId is not null)
             .ToLookup(p => (p.MId, JobOrderId: p.JobOrderId!));
 
@@ -160,15 +209,19 @@ internal static class MachineEventViews
                 var started = ordered.LastOrDefault(e => e.Type == JobOrderStarted);
                 var ofJob = executions[group.Key].ToList();
                 var outcome = ResultOf(result, started);
+                var state = order is { } o ? Text(o, "State") ?? string.Empty : string.Empty;
+                var removed = last.Type == JobOrderRemoved;
+                var ended = removed || state is "Ended" or "Aborted";
                 return new JobOrderDtoV1
                 {
                     MId = group.Key.MId,
                     JobOrderId = group.Key.JobOrderId,
-                    State = order is { } o ? Text(o, "State") ?? string.Empty : string.Empty,
+                    State = state,
                     LastType = last.Type,
                     LastChange = last.Time,
                     FirstSeen = ordered[0].Time,
-                    Removed = last.Type == JobOrderRemoved,
+                    Removed = removed,
+                    Stale = !ended && runs?.After(last) is { } after && (after.NextRunStart is not null || after.Gap),
                     JobName = order is { } n ? Text(n, "JobName") : null,
                     WorkMasterId = order is { } w ? Text(w, "WorkMasterID") : null,
                     OrderNumbers = order is { } d && d.TryGetProperty("OrderNumbers", out var numbers) && numbers.ValueKind == JsonValueKind.Array
@@ -213,7 +266,8 @@ internal static class MachineEventViews
 
     /// <summary>One job order with its events and its program executions, oldest first; null if no event names it.</summary>
     public static JobOrderHistoryDtoV1? History(
-        IEnumerable<MachineEventDtoV1> jobEvents, IEnumerable<MachineEventDtoV1> workMasterEvents, string mId, string jobOrderId)
+        IEnumerable<MachineEventDtoV1> jobEvents, IEnumerable<MachineEventDtoV1> workMasterEvents, string mId, string jobOrderId,
+        RunContext? runs = null)
     {
         ArgumentNullException.ThrowIfNull(jobEvents);
         ArgumentNullException.ThrowIfNull(workMasterEvents);
@@ -222,14 +276,14 @@ internal static class MachineEventViews
             .OrderBy(e => e.Time).ThenBy(e => e.Sequence, StringComparer.Ordinal)
             .ToList();
         var ofJob = workMasterEvents.Where(e => e.MId == mId && Text(e.Data, "JobOrderID") == jobOrderId).ToList();
-        var jobOrder = JobOrders(history, ofJob).SingleOrDefault();
+        var jobOrder = JobOrders(history, ofJob, runs).SingleOrDefault();
         return jobOrder is null
             ? null
             : new JobOrderHistoryDtoV1
             {
                 JobOrder = jobOrder,
                 History = history,
-                ProgramExecutions = [.. ProgramExecutions(ofJob).OrderBy(p => p.StartTime)],
+                ProgramExecutions = [.. ProgramExecutions(ofJob, runs).OrderBy(p => p.StartTime)],
             };
     }
 
@@ -338,6 +392,19 @@ internal static class MachineEventViews
 
     // ─── reading data ──────────────────────────────────────────────────────────
 
+    /// <summary>The prefix and the count of a <c>sequence</c>; nulls when it has no count after a dot.</summary>
+    public static (string? Prefix, long? Count) SequenceOf(string? sequence)
+    {
+        var dot = sequence?.LastIndexOf('.') ?? -1;
+        return sequence is not null && dot > 0
+            && long.TryParse(sequence[(dot + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out var count)
+            ? (sequence[..dot], count)
+            : (null, null);
+    }
+
+    /// <summary>The later of two times: an end is never before the last event.</summary>
+    private static DateTime Later(DateTime a, DateTime b) => a > b ? a : b;
+
     private static string? Text(JsonElement data, string name)
     {
         return data.ValueKind == JsonValueKind.Object && data.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
@@ -381,3 +448,69 @@ internal sealed record SequenceRun(
     /// <summary>True when no count is missing between the first and the last (a count is stored once).</summary>
     public bool IsComplete => Count == LastCount - FirstCount + 1;
 }
+
+/// <summary>
+/// The runs of the adapters, per machine in the order they started, and the gaps in their numbers: what the views
+/// need to tell whether an alert, a program execution or a job order may have ended unseen.
+/// </summary>
+internal sealed class RunContext
+{
+    private readonly Dictionary<string, List<(string Prefix, DateTime Start)>> _runs;
+    private readonly ILookup<(string MId, string Group, string Prefix), SequenceGapDtoV1> _gaps;
+
+    private RunContext(Dictionary<string, List<(string Prefix, DateTime Start)>> runs, ILookup<(string, string, string), SequenceGapDtoV1> gaps)
+    {
+        _runs = runs;
+        _gaps = gaps;
+    }
+
+    /// <summary>
+    /// The runs of every group taken together per machine: one start of the adapter is one prefix in all groups. A
+    /// run starts at the time its prefix names, or, in another format, with its first event.
+    /// </summary>
+    /// <param name="runs">The runs of the machines, of all groups.</param>
+    /// <param name="gaps">The gaps inside the runs.</param>
+    public static RunContext From(IEnumerable<SequenceRun> runs, IEnumerable<SequenceGapDtoV1> gaps)
+    {
+        ArgumentNullException.ThrowIfNull(runs);
+        ArgumentNullException.ThrowIfNull(gaps);
+        var byMachine = runs
+            .GroupBy(r => r.MId, StringComparer.Ordinal)
+            .ToDictionary(
+                m => m.Key,
+                m => m.GroupBy(r => r.Prefix, StringComparer.Ordinal)
+                    .Select(p => (Prefix: p.Key, Start: MachineEventViews.RunStart(p.Key) ?? p.Min(r => r.FirstTime)))
+                    .OrderBy(p => p.Start).ThenBy(p => p.Prefix, StringComparer.Ordinal)
+                    .ToList(),
+                StringComparer.Ordinal);
+        return new RunContext(byMachine, gaps.ToLookup(g => (g.MId, g.Group, g.Prefix)));
+    }
+
+    /// <summary>
+    /// What came after an event in its run and machine: the start of the next run, if the adapter started anew since,
+    /// and whether a count of its group is missing after it in its own run. Null when the event has no
+    /// <c>sequence</c> of a known run.
+    /// </summary>
+    public RunAfter? After(MachineEventDtoV1 last)
+    {
+        ArgumentNullException.ThrowIfNull(last);
+        var (prefix, count) = MachineEventViews.SequenceOf(last.Sequence);
+        if (prefix is null || count is null || !_runs.TryGetValue(last.MId, out var runs))
+        {
+            return null;
+        }
+        var index = runs.FindIndex(r => r.Prefix == prefix);
+        if (index < 0)
+        {
+            return null;
+        }
+        DateTime? next = index + 1 < runs.Count ? runs[index + 1].Start : null;
+        var gap = _gaps[(last.MId, last.Group, prefix)].Any(g => g.LastMissing > count);
+        return new RunAfter(next, gap);
+    }
+}
+
+/// <summary>What came after the last event of an entry.</summary>
+/// <param name="NextRunStart">The start of the next run of the adapter; null when the event is in the newest run.</param>
+/// <param name="Gap">Whether a count of its group is missing after it in its own run.</param>
+internal sealed record RunAfter(DateTime? NextRunStart, bool Gap);

@@ -119,6 +119,12 @@ and the stack reads only it; the earlier text of this section is in the history 
   and holds up to 50 000 messages for a session (`max_queued_messages`): at the rate of the demo, about 520 events
   an hour, some four days in which the Events persistence may be away. Beyond that it drops what comes. A broker
   in production sizes this for its own sources.
+- The Events API does not read the retained lists. For "after a gap or a new prefix it reads the state again" it
+  reads the prefix instead: an alert or a program execution that was open in an earlier run and that no later run
+  names again ends with the start of the next run (`AdapterRestart`); a job order is only marked `stale`, and so
+  is an open entry after a gap. Known limit: an adapter that keeps an alert standing across its restart without
+  naming it again loses it there; comparing with the retained `Notification/ActiveAlerts` would settle it. See
+  [the REST contracts](../openapi/README.md).
 
 ### Example topics of a source
 

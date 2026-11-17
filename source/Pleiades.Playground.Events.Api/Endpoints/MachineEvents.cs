@@ -348,8 +348,9 @@ internal static class MachineEvents
         ArgumentNullException.ThrowIfNull(repository);
         var jobs = await repository.FindForViewAsync(new MachineEventFilter(mId, "JobMonitoring", JobOrderId: jobOrderId), cancellationToken).ConfigureAwait(false);
         var executions = await repository.FindForViewAsync(new MachineEventFilter(mId, "WorkMasterMonitoring", JobOrderId: jobOrderId), cancellationToken).ConfigureAwait(false);
+        var runs = await ReadRunContextAsync(repository, mId, cancellationToken).ConfigureAwait(false);
         MarkTruncated(response, jobs.Truncated || executions.Truncated);
-        var history = MachineEventViews.History(MachineEventMapper.ToDtos(jobs.Items), MachineEventMapper.ToDtos(executions.Items), mId, jobOrderId);
+        var history = MachineEventViews.History(MachineEventMapper.ToDtos(jobs.Items), MachineEventMapper.ToDtos(executions.Items), mId, jobOrderId, runs);
         return history is null ? TypedResults.NotFound() : TypedResults.Ok(history);
     }
 
@@ -384,12 +385,45 @@ internal static class MachineEvents
 
     // ─── reads shared with the MCP tools ───────────────────────────────────────
 
-    /// <summary>The alerts that stand now; only the events of alerts not cleared are read, so nothing is left out.</summary>
+    /// <summary>
+    /// The alerts that stand now; only the events of alerts not cleared are read, so nothing is left out. An alert of
+    /// an earlier run of the adapter than the newest of its machine does not stand any more.
+    /// </summary>
     internal static async Task<List<AlertDtoV1>> ReadActiveAlertsAsync(IMachineEventRepository repository, string? mId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(repository);
         var events = await repository.FindOpenAlertEventsAsync(mId, cancellationToken).ConfigureAwait(false);
-        return MachineEventViews.ActiveAlerts(MachineEventMapper.ToDtos(events));
+        if (events.Count == 0)
+        {
+            return [];
+        }
+        var runs = await ReadRunContextAsync(repository, mId, cancellationToken).ConfigureAwait(false);
+        return MachineEventViews.ActiveAlerts(MachineEventMapper.ToDtos(events), runs);
+    }
+
+    /// <summary>
+    /// The runs of the adapters of a machine, or of all, in every group, and the gaps inside them: what tells the views
+    /// that an entry may have ended unseen.
+    /// </summary>
+    internal static async Task<RunContext> ReadRunContextAsync(IMachineEventRepository repository, string? mId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(repository);
+        var filter = new MachineEventFilter(mId);
+        var runs = await repository.FindRunsAsync(filter, cancellationToken).ConfigureAwait(false);
+        var counts = await ReadCountsOfIncompleteRunsAsync(repository, filter, runs, cancellationToken).ConfigureAwait(false);
+        return RunContext.From(runs, MachineEventViews.Gaps(runs, run => counts[run], _ => false));
+    }
+
+    /// <summary>The counts of the runs with a count missing inside them; most runs are complete and need none.</summary>
+    private static async Task<Dictionary<SequenceRun, IReadOnlyCollection<long>>> ReadCountsOfIncompleteRunsAsync(
+        IMachineEventRepository repository, MachineEventFilter filter, List<SequenceRun> runs, CancellationToken cancellationToken)
+    {
+        var counts = new Dictionary<SequenceRun, IReadOnlyCollection<long>>();
+        foreach (var run in runs.Where(r => !r.IsComplete))
+        {
+            counts[run] = await repository.FindCountsAsync(filter with { MId = run.MId, Group = run.Group }, run.Prefix, cancellationToken).ConfigureAwait(false);
+        }
+        return counts;
     }
 
     /// <summary>The gaps in the numbers of the events; see <see cref="GetSequenceGaps"/>.</summary>
@@ -400,13 +434,7 @@ internal static class MachineEvents
         ArgumentNullException.ThrowIfNull(repository);
         var filter = new MachineEventFilter(mId, group, From: from, To: to);
         var runs = await repository.FindRunsAsync(filter, cancellationToken).ConfigureAwait(false);
-
-        // Only a run with a count missing inside it needs its counts; most runs are complete.
-        var counts = new Dictionary<SequenceRun, IReadOnlyCollection<long>>();
-        foreach (var run in runs.Where(r => !r.IsComplete))
-        {
-            counts[run] = await repository.FindCountsAsync(filter with { MId = run.MId, Group = run.Group }, run.Prefix, cancellationToken).ConfigureAwait(false);
-        }
+        var counts = await ReadCountsOfIncompleteRunsAsync(repository, filter, runs, cancellationToken).ConfigureAwait(false);
         return MachineEventViews.Gaps(runs, run => counts[run], run => MachineEventViews.StartVisible(run, now, retention, from));
     }
 
@@ -416,7 +444,8 @@ internal static class MachineEvents
         ArgumentNullException.ThrowIfNull(repository);
         // An alert raised before the range may stand in it: read every alert event up to its end.
         var events = await repository.FindForViewAsync(new MachineEventFilter(mId, "Notification", To: to), cancellationToken).ConfigureAwait(false);
-        return ([.. MachineEventViews.AlertPairs(MachineEventMapper.ToDtos(events.Items), from, to)
+        var runs = await ReadRunContextAsync(repository, mId, cancellationToken).ConfigureAwait(false);
+        return ([.. MachineEventViews.AlertPairs(MachineEventMapper.ToDtos(events.Items), from, to, runs)
             .Where(p => string.IsNullOrEmpty(severity) || string.Equals(p.Severity, severity, StringComparison.OrdinalIgnoreCase))], events.Truncated);
     }
 
@@ -427,7 +456,8 @@ internal static class MachineEvents
         // The state of a job order needs all its events, not only those in the range: read them all, then filter.
         var jobs = await repository.FindForViewAsync(new MachineEventFilter(mId, "JobMonitoring"), cancellationToken).ConfigureAwait(false);
         var executions = await repository.FindForViewAsync(new MachineEventFilter(mId, "WorkMasterMonitoring"), cancellationToken).ConfigureAwait(false);
-        return ([.. MachineEventViews.JobOrders(MachineEventMapper.ToDtos(jobs.Items), MachineEventMapper.ToDtos(executions.Items))
+        var runs = await ReadRunContextAsync(repository, mId, cancellationToken).ConfigureAwait(false);
+        return ([.. MachineEventViews.JobOrders(MachineEventMapper.ToDtos(jobs.Items), MachineEventMapper.ToDtos(executions.Items), runs)
             .Where(j => string.IsNullOrEmpty(state) || string.Equals(j.State, state, StringComparison.OrdinalIgnoreCase))
             .Where(j => from is null || j.LastChange >= from)
             .Where(j => to is null || j.LastChange <= to)], jobs.Truncated || executions.Truncated);
@@ -440,7 +470,8 @@ internal static class MachineEvents
         ArgumentNullException.ThrowIfNull(repository);
         var events = await repository.FindForViewAsync(
             new MachineEventFilter(mId, "WorkMasterMonitoring", JobOrderId: jobOrderId, From: from, To: to), cancellationToken).ConfigureAwait(false);
-        return ([.. MachineEventViews.ProgramExecutions(MachineEventMapper.ToDtos(events.Items))
+        var runs = await ReadRunContextAsync(repository, mId, cancellationToken).ConfigureAwait(false);
+        return ([.. MachineEventViews.ProgramExecutions(MachineEventMapper.ToDtos(events.Items), runs)
             .Where(p => string.IsNullOrEmpty(workMasterId) || p.WorkMasterId == workMasterId)], events.Truncated);
     }
 

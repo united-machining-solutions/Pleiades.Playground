@@ -28,6 +28,21 @@ The Events API keeps the CloudEvents of the machines as they came, each with the
 - `/programExecutions`: `ProgramExecutionStarted` paired with its `ProgramExecutionEnded` or
   `ProgramExecutionAborted`, with the sums of the end.
 
+A new start of the adapter begins a new prefix of `sequence` (the runs of a machine are ordered by the start
+their prefix names, or by their first event). The views read it so:
+
+- An alert that stands, or a program execution without an end, whose last event lies in an earlier run than the
+  newest of its machine, and that no later run names again, is closed: `clearedBy` / `endType` `AdapterRestart`,
+  `clearedAt` / `endTime` the start of the next run. The duration of such an alert is at most; such a program
+  execution has no sums. An alert cleared by its event has `clearedBy` `Event`.
+- A job order is never closed so; when it has not ended (`Ended`, `Aborted`, removed), it is `stale` until its next
+  event.
+- An open alert, program execution or job order after whose last event a count of its group is missing in its run
+  is `stale`: its end may have been lost.
+- Known limit: an adapter that keeps an alert standing across its restart without naming it again loses it in the
+  views. Comparing with the retained `Notification/ActiveAlerts` (and `JobOrders`, `ProgramExecution`) would
+  settle it; the Events API does not read them yet.
+
 `/alerts/active` and `/machineEvents/gaps` read only what they need and leave nothing out. The other views read
 at most the newest 100 000 events of what they ask for; when that leaves older events out, the answer carries the
 header `Pleiades-Truncated: true`, and a narrower machine or time range gives the whole answer.

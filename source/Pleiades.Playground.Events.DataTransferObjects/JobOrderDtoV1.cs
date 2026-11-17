@@ -29,6 +29,13 @@ public sealed record JobOrderDtoV1
     /// <summary>Whether it left the job order list of the machine.</summary>
     public bool Removed { get; init; }
 
+    /// <summary>
+    /// True when it has not ended and its state may have changed unseen: the adapter started anew since its last
+    /// event, or events of its group are missing after it. A job order outlives its adapter, so it is not closed; its
+    /// next event makes it current again.
+    /// </summary>
+    public bool Stale { get; init; }
+
     /// <summary>Name of the job order.</summary>
     public string? JobName { get; init; }
 
@@ -118,11 +125,20 @@ public sealed record ProgramExecutionDtoV1
     /// <summary>When it started.</summary>
     public DateTime StartTime { get; init; }
 
-    /// <summary>When it ended or was aborted; null while it runs.</summary>
+    /// <summary>
+    /// When it ended or was aborted; null while it runs. For <see cref="EndType"/> <c>AdapterRestart</c> the start of
+    /// the next run of the adapter.
+    /// </summary>
     public DateTime? EndTime { get; init; }
 
-    /// <summary>Ended or Aborted; null while it runs.</summary>
+    /// <summary>
+    /// Ended or Aborted; <c>AdapterRestart</c> when the adapter started anew while it ran and did not name it again
+    /// (then without its sums); null while it runs.
+    /// </summary>
     public string? EndType { get; init; }
+
+    /// <summary>True while it runs and events of its group are missing after its last one: its end may have been among them.</summary>
+    public bool Stale { get; init; }
 
     /// <summary>How often it was interrupted.</summary>
     public int Interruptions { get; init; }

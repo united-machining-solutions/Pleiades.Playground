@@ -73,7 +73,9 @@ internal sealed class MachineEventTools(IMachineEventRepository repository, IOpt
      Description(
          "List the alerts of industrial machines that stand now (raised, not cleared): error code, message, " +
          "severity after NAMUR NE 107 (Failure, CheckFunction, OffSpec, MaintenanceRequired), severity value, the " +
-         "component, when it came up and the program execution it came up in. Returns paged results.")]
+         "component, when it came up and the program execution it came up in. An alert of an earlier run of the " +
+         "adapter that the new run did not name again does not stand any more; stale=true means events of its group " +
+         "are missing after it, so its clear may have been lost. Returns paged results.")]
     public async Task<PagedResponse<AlertDtoV1>> QueryActiveAlerts(
         [Description(MachineDescription)] string? mId = null,
         [Description("Number of records to skip (default: 0)")] int skip = 0,
@@ -90,8 +92,10 @@ internal sealed class MachineEventTools(IMachineEventRepository repository, IOpt
      Description(
          "List the alerts of industrial machines that stood in a time range, AlertRaised paired with AlertCleared by " +
          "the alert id: when it came up, when it was cleared (null while it stands) and how long it stood in seconds, " +
-         "with error code, message and NE 107 severity. Answers 'which failures did the machine have today and how " +
-         "long did they last?'. Returns paged results.")]
+         "with error code, message and NE 107 severity. clearedBy says what cleared it: Event (its AlertCleared) or " +
+         "AdapterRestart (the adapter started anew and did not name it again; clearedAt is then the start of the new " +
+         "run and the duration at most). Answers 'which failures did the machine have today and how long did they " +
+         "last?'. Returns paged results.")]
     public async Task<PagedResponse<AlertPairDtoV1>> QueryAlertPairs(
         [Description(MachineDescription)] string? mId = null,
         [Description("Severity filter: Failure, CheckFunction, OffSpec or MaintenanceRequired")] string? severity = null,
@@ -112,7 +116,8 @@ internal sealed class MachineEventTools(IMachineEventRepository repository, IOpt
     [McpServerTool(Name = "events_alert_statistics_query", ReadOnly = true),
      Description(
          "Count the alerts of industrial machines by NE 107 severity in a time range: how many stood, how many still " +
-         "stand, and how long the cleared ones stood together in seconds. Useful for a quick health check.")]
+         "stand, and how long the cleared ones stood together in seconds (one cleared by a restart of the adapter " +
+         "counts until the restart, at most). Useful for a quick health check.")]
     public async Task<List<AlertStatisticDtoV1>> QueryAlertStatistics(
         [Description(MachineDescription)] string? mId = null,
         [Description("Start of time range (ISO 8601)")] DateTime? fromDate = null,
@@ -128,9 +133,10 @@ internal sealed class MachineEventTools(IMachineEventRepository repository, IOpt
          "List job orders of industrial machines with their last known state, put together from their events: state " +
          "(NotAllowedToStart, AllowedToStart, Running, Interrupted, Ended, Aborted), what is ordered (job name, work " +
          "master, runs planned), the result (start and end time, produced and good quantity, runs completed, " +
-         "jobResult), how many program executions they had and their electric energy in watt hours. Answers 'which " +
-         "job orders did the machine end today, with how many parts and how much energy?'. The time range filters on " +
-         "the last change. Returns paged results.")]
+         "jobResult), how many program executions they had and their electric energy in watt hours. stale=true: it " +
+         "has not ended, and the adapter started anew since its last event or events are missing after it, so its " +
+         "state may have changed unseen. Answers 'which job orders did the machine end today, with how many parts " +
+         "and how much energy?'. The time range filters on the last change. Returns paged results.")]
     public async Task<PagedResponse<JobOrderDtoV1>> QueryJobOrders(
         [Description(MachineDescription)] string? mId = null,
         [Description("State filter, e.g. Running, Ended or Aborted")] string? state = null,
@@ -153,7 +159,9 @@ internal sealed class MachineEventTools(IMachineEventRepository repository, IOpt
          "List program executions of industrial machines from start to end: the Started event paired with Ended or " +
          "Aborted by the ExecutionId, with the work master, the job order, how often it was interrupted, and at its " +
          "end the duration in seconds (interruptions included), the parts produced and the electric energy in watt " +
-         "hours. One without an end still runs. Useful for cycle times, energy per part and aborts. Returns paged results.")]
+         "hours. One without an end still runs; endType AdapterRestart means the adapter started anew while it ran " +
+         "and did not name it again (no sums), stale=true that events are missing after it. Useful for cycle times, " +
+         "energy per part and aborts. Returns paged results.")]
     public async Task<PagedResponse<ProgramExecutionDtoV1>> QueryProgramExecutions(
         [Description(MachineDescription)] string? mId = null,
         [Description("Job order the program executions belong to (e.g. '4711/01')")] string? jobOrderId = null,

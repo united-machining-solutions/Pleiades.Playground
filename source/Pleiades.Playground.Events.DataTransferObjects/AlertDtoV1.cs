@@ -36,15 +36,30 @@ public record AlertDtoV1
 
     /// <summary>When its last event happened.</summary>
     public DateTime LastChange { get; init; }
+
+    /// <summary>
+    /// True while it stands and events of its group are missing after its last one (a gap in <c>sequence</c>): its
+    /// clear may have been among them.
+    /// </summary>
+    public bool Stale { get; init; }
 }
 
 /// <summary>An alert from its raise to its clear; <see cref="ClearedAt"/> is null while it stands.</summary>
 public sealed record AlertPairDtoV1 : AlertDtoV1
 {
-    /// <summary>When the alert was cleared; null while it stands.</summary>
+    /// <summary>
+    /// When the alert was cleared; null while it stands. For <see cref="ClearedBy"/> <c>AdapterRestart</c> the start
+    /// of the next run of the adapter: the alert stood at most until then.
+    /// </summary>
     public DateTime? ClearedAt { get; init; }
 
-    /// <summary>How long it stood, in seconds; null while it stands.</summary>
+    /// <summary>
+    /// What cleared it: <c>Event</c> (its AlertCleared), or <c>AdapterRestart</c> (the adapter started anew and did not
+    /// name it again); null while it stands.
+    /// </summary>
+    public string? ClearedBy { get; init; }
+
+    /// <summary>How long it stood, in seconds; null while it stands. After an <c>AdapterRestart</c>, at most.</summary>
     public double? DurationSeconds { get; init; }
 }
 

@@ -569,7 +569,13 @@ All notable changes are documented here. The format follows
   of the adapter (per machine, group and prefix of `sequence`), so neither is limited. A gap before the first
   stored event of a run is named only when the run started within the retention and the range. The other views
   read at most the newest 100 000 events, without the CloudEvent as it came, and answer with the header
-  `Pleiades-Truncated: true` when that left older events out.
+  `Pleiades-Truncated: true` when that left older events out. A new start of the adapter (a new prefix of
+  `sequence`) closes an alert or a program execution of an earlier run that the new run does not name again:
+  `clearedBy` / `endType` `AdapterRestart` at the start of the new run, the duration of the alert at most, the
+  execution without sums. A job order is never closed so, only `stale`; so is an open entry with a gap after its
+  last event. Known limit: an adapter that keeps an alert standing across its restart without naming it again
+  loses it in the views; comparing with the retained `Notification/ActiveAlerts` would settle it and is not done
+  yet.
 - The machine card shows the work master instead of the program, the job order that runs, and alerts with their
   NE 107 severity; a machine whose adapter is not `Running` has no data, since the adapter said so.
 - The measurement card and the Ultimaker telemetry follow this tree: the card takes a machine by its machine id,
