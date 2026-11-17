@@ -7,6 +7,16 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Production events: job orders and program executions as events of the playground binding.
+  `ProductionEventDtoV1` on `machines/{SerialNumber}/events/production` (content type
+  `productioneventdtov1`, QoS 1, not retained, energy in joule) carries the whole state after each event.
+  Every simulator publishes them from its virtual machine (`Config:ProductionEvents:Enabled`, on by default),
+  the Events persistence stores them, and the Events API keeps them in the collection `ProductionEvent` and
+  serves `/productionEvents`, `/productionEvents/correlationPairs` (program executions from start to end),
+  `/jobOrders` and `/jobOrders/{mId}/{jobOrderId}` (the last known state of each job order and its history),
+  with the MCP tools `events_production_query`, `events_job_orders_query` and
+  `events_program_executions_query`. `NotificationEventDtoV1` is unchanged.
+
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
 - Simulator for values, states and notifications of several machines.

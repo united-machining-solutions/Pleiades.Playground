@@ -57,6 +57,8 @@ timeseries-persistence   Up 3 minutes (healthy)
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
 port and setting. The three simulated machines, P-04, P-07 and M-02, are the three `simulator-*` services.
+Besides values and notifications each publishes its job orders and program executions as production events on
+`machines/<serial number>/events/production`; the Events API keeps them.
 Each also publishes a second tree, below `simulators/<serial number>/`, that follows the umati data model exactly;
 no service reads it yet. It is described in [`contracts/mqtt`](../contracts/mqtt/README.md#spec-binding-draft).
 
@@ -222,7 +224,8 @@ group Timeseries: GET and POST for base unit values, string values and boolean
 values.](images/tour/swagger-ui.png)
 
 The picture shows the Swagger UI of the Timeseries API at <http://localhost:5500/>, in its light mode; the
-lamp at the top right switches it. The Events API has the same page at <http://localhost:5510/>. Open an
+lamp at the top right switches it. The Events API has the same page at <http://localhost:5510/>, with the
+notification events, the production events and the job orders put together from them (`/jobOrders`). Open an
 endpoint and choose "Try it out" to send a request to the running stack.
 
 | API | REST | MCP | Contract |
