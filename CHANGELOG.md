@@ -211,11 +211,14 @@ All notable changes are documented here. The format follows
   server function, `getCharts`, reads the values over one connection, the spans of the last 30 minutes only.
   The charts are the chart of shadcn/ui; `recharts` is new in the app.
 - OPC UA adapter `opcua-adapter` in the demo stack on port 5530, a proof of concept, with the TRUMPF OPC UA
-  simulator as a machine to try it with (`ghcr.io/umati/trumpf/edge/opc-simulator`). It runs every registered OPC UA machine from its registration in the
-  volume `/data` and publishes its values and alarms by the MQTT binding, also after a restart. It hosts the
-  read-only tools of the OPC UA MCP library of the OPC Foundation. In the chat of the example app, `/discover`
-  scans a server and proposes its registration, which a person adds with a button; `/opcua`, `/mapping`,
-  `/rescan` and `/help` list servers, show mismatched and unclear mappings and scan again.
+  simulator as a machine to try it with (`ghcr.io/umati/trumpf/edge/opc-simulator`). It runs every registered
+  OPC UA machine from its registration in the volume `/data` and publishes its values and alarms by the MQTT
+  binding, also after a restart. It hosts the read-only tools of the OPC UA MCP library of the OPC Foundation.
+  In the chat of the example app, `/discover` scans a server and proposes its registration, which a person
+  adds with a button; `/opcua`, `/mapping`, `/rescan` and `/help` list servers, show mismatched and unclear
+  mappings and scan again. Machines behind an OPC UA aggregation server (a gateway) are listed by
+  `opcua_machine_list`, each with the serial number read on the server, get one registration each, and share
+  one session per endpoint. The simulator of the stack runs definition `K09`, machine `A1121O0001`.
 
 ### Changed
 
