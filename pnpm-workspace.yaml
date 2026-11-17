@@ -7,6 +7,7 @@ packages:
 catalog:
   "@base-ui/react": 1.9.0
   "@fontsource-variable/roboto": 5.3.0
+  '@huggingface/transformers': 4.3.2
   "@modelcontextprotocol/ext-apps": 2.0.4
   "@shadcn/react": 0.3.1
   "@tailwindcss/vite": 4.3.5
@@ -53,6 +54,12 @@ catalog:
 # hand is not: that stays a thing to see in a review.
 catalogMode: strict
 savePrefix: ""
+
+# The speech recognition of the assistant page runs in the browser. These two packages come with it
+# and would download native files for Node.js when installed, which nothing here uses.
+allowBuilds:
+  onnxruntime-node: false
+  protobufjs: false
 
 # rollup-plugin-license lists the packages a bundler put into a file. It names Rollup as a peer.
 # The card files are built by Vite on Rolldown, which calls the same hooks, so Rollup stays out.

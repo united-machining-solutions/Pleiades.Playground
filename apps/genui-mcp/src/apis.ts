@@ -217,3 +217,52 @@ export async function readRaised(
     goneAt: pair.timestampGone === null ? null : new Date(pair.timestampGone).toISOString(),
   }))
 }
+
+const messageStatsAnswer = z.array(
+  z.object({
+    notificationId: z.string(),
+    title: z.string().nullish(),
+    level: z.string(),
+    occurrenceCount: z.number(),
+    totalDuration: z.string().describe("A .NET time span, for example 00:39:26.6320000 or 1.02:03:04."),
+  }),
+)
+
+/** How often each kind of notification was raised between the two instants, and how long it stood in total. */
+export type MessageStat = { notificationId: string; title: string; level: string; count: number; seconds: number }
+
+/** "1.02:03:04.5" is a day, two hours, three minutes and 4.5 seconds. */
+export function secondsOfTimeSpan(span: string): number {
+  const match = /^(?:(\d+)\.)?(\d+):(\d+):(\d+(?:\.\d+)?)$/.exec(span)
+  if (!match) return 0
+  const [, days = "0", h = "0", m = "0", s = "0"] = match
+  return Number(days) * 86_400 + Number(h) * 3_600 + Number(m) * 60 + Number(s)
+}
+
+/** The notifications by kind, for one machine or for all, between the two instants. */
+export async function readMessageStats(apis: Apis, from: Date, to: Date, machine?: string): Promise<Array<MessageStat>> {
+  const url = between(new URL("/notificationEvents/statistics/messages", apis.eventsUrl), ["from", "to"], from, to)
+  if (machine !== undefined) url.searchParams.set("mId", machine)
+  const items = await getJson("Events API", url, messageStatsAnswer)
+  return items.map((one) => ({
+    notificationId: one.notificationId,
+    title: one.title ?? one.notificationId,
+    level: one.level,
+    count: one.occurrenceCount,
+    seconds: secondsOfTimeSpan(one.totalDuration),
+  }))
+}
+
+/** The oldest and the newest number of a topic between the two instants, or null if it has none. */
+export async function readFirstAndLast(apis: Apis, topic: string, from: Date, to: Date): Promise<{ first: number; last: number } | null> {
+  const one = async (sorting: "Ascending" | "Descending") => {
+    const url = between(new URL(`/timeseries/baseUnitValues/topics/${inPath(topic)}`, apis.timeseriesUrl), ["startTime", "stopTime"], from, to)
+    url.searchParams.set("limit", "1")
+    url.searchParams.set("sorting", sorting)
+    const { series } = await getJson("Timeseries API", url, numberSeriesAnswer)
+    const value = series[0]?.values.find((each) => each !== null)
+    return value === undefined || value === null ? null : Number(value)
+  }
+  const [first, last] = await Promise.all([one("Ascending"), one("Descending")])
+  return first === null || last === null ? null : { first, last }
+}

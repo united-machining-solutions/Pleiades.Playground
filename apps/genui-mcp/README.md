@@ -18,6 +18,8 @@ durations are computed here, never by a language model.
 |---|---|
 | `genui_machine_list` | Every machine with what it does now: connection, heartbeat, state and operation mode with the time since when, the active program, and the warnings and errors of the last 24 hours that have not gone. |
 | `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and how long each state lasted in total over the last hours (`hours`, 8 if omitted). Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_shopfloor_show` | Every machine of the hall: its state, whether it runs, and for one that does not, why (the open error, a warning, setup or no data) with the topic of the reason, and how many do not run. Its output is the contract of the shop floor card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_view_show` | A view a language model lays out itself: a `title` and one to six `blocks` (`kpi`, `ranking`, `causes`, `hall`, `note`, `gaps`). The model chooses what to show; every value is read and computed here, with its source. Its output is the contract of the view card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_span_list` | The states of one machine between two instants (`from`, `to`) as spans without a gap: the band of the machine card. A card calls it after `genui_machine_show`. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. A question about a machine needs neither: a result answers it. |
 
@@ -25,6 +27,8 @@ durations are computed here, never by a language model.
 |---|---|
 | `genui://skill` | The skill guide, as markdown. |
 | `ui://genui/machine` | The machine card as a file for other hosts, see below. |
+| `ui://genui/shopfloor` | The shop floor card as a file for other hosts, built like the machine card. |
+| `ui://genui/view` | The view card as a file for other hosts, built like the machine card. |
 
 Every instant of a result is ISO 8601 in UTC. The two machine tools also take a `timeZone`, an IANA name such
 as `Europe/Zurich`: then every instant is a local time there with its offset, `2026-11-11T09:00:41.000+01:00`.

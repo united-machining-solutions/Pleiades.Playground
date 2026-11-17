@@ -11,6 +11,8 @@ generative UI backend. Its contract and its component lie next to each other, so
 | Card | Tool | Contract | Component |
 |---|---|---|---|
 | Machine: what one machine does now, since when, with which program, and the states of the last hours | `genui_machine_show` | `machineShow` in `src/machine/contract.ts` | `MachineCard` in `src/machine/machine-card.tsx` |
+| Shop floor: the plan of the hall with every machine at its place, the running ones greyed out, and over each one that does not run, why | `genui_shopfloor_show` | `shopfloorShow` in `src/shopfloor/contract.ts` | `ShopfloorCard` in `src/shopfloor/shopfloor-card.tsx` |
+| View: an answer a language model lays out itself from blocks (figures, rankings, frequent faults, the hall, notes, what is missing); every value is computed by the backend | `genui_view_show` | `viewShow` in `src/view/contract.ts` | `ViewCard` in `src/view/view-card.tsx` |
 
 The list of machines, the result of `genui_machine_list`, has a contract here too (`machineList`), but no
 card: an application draws it with rows of its own and checks what it gets against the contract.

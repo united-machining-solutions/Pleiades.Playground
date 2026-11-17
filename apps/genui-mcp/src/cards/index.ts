@@ -1,4 +1,6 @@
 import { machineCard } from "./machine.ts"
+import { shopfloorCard } from "./shopfloor.ts"
+import { viewCard } from "./view.ts"
 
 /**
  * The cards of this server: one module each, and one line each here, in the order of the alphabet.
@@ -7,4 +9,6 @@ import { machineCard } from "./machine.ts"
  */
 export const cards = [
   machineCard,
+  shopfloorCard,
+  viewCard,
 ] as const

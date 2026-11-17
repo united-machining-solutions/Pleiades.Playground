@@ -50,6 +50,9 @@ import {
 } from "@pleiades/ui/components/sidebar"
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@pleiades/ui/components/trace"
 
+import { useShareCards } from "@/voice/shown.ts"
+import { useFollowUps, useSpokenAnswers } from "@/voice/voice.ts"
+
 import { Answer } from "./answer.tsx"
 import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
 import { blocksOf, questionOf } from "./blocks.ts"
@@ -190,6 +193,10 @@ function Conversation({ threadId }: { threadId: string }) {
     // times the person's clock shows.
     forwardedProps: { timeZone },
   })
+  // On the assistant page an answer is read aloud, and a question asked by voice goes on in this chat.
+  useSpokenAnswers(messages, isLoading)
+  useFollowUps((question) => void sendMessage(question))
+  useShareCards(messages, isLoading)
   const [model, setModel] = useState(() => pickedModel(chatStatus.models))
   const [switchError, setSwitchError] = useState<string>()
   const switchTo = (name: string) =>
