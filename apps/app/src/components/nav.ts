@@ -11,6 +11,13 @@ export type NavEntry = {
   icon: LucideIcon
   /** Lower comes first; 100 if omitted. Pages of the same order stand by their title. */
   order?: number
+  /**
+   * False for a page that is no row of the top level of the sidebar, because the sidebar lists what
+   * is under it in a group of its own ("Pages", see app-sidebar.tsx). The page still has its entry:
+   * the pages under it stand behind it in the breadcrumb, and a person on one of them is under it
+   * and not under Home. True if omitted.
+   */
+  sidebar?: boolean
 }
 
 /**
@@ -49,10 +56,16 @@ export function navPages(routes: ReadonlyArray<RouteLike>, pinned: ReadonlyArray
     .sort((a, b) => (a.order ?? 100) - (b.order ?? 100) || a.title.localeCompare(b.title))
 }
 
+/** The entries that are a row of the top level of the sidebar: all but those that say `sidebar: false`. */
+export function sidebarPages(pages: ReadonlyArray<NavPage>): Array<NavPage> {
+  return pages.filter((page) => page.sidebar !== false)
+}
+
 /**
  * The entry a person is under: the page itself, or the nearest page above it that has an entry.
  * The page of a machine has none, so it stands under Home. A pinned page is its own entry; one that
- * is not pinned stands under "Pages".
+ * is not pinned stands under "Pages", which is no row of the sidebar, so no row of the top level is
+ * marked for it (its row is in the group, pages/listed.ts).
  */
 export function activePage(pages: ReadonlyArray<NavPage>, pathname: string): NavPage | undefined {
   const above = (path: string) => path === "/" || pathname === path || pathname.startsWith(`${path}/`)

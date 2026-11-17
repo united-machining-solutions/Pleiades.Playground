@@ -16,9 +16,10 @@ const savedFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "s
  * page. The pages are read from the browser, so the list needs no backend and follows every change.
  */
 export const Route = createFileRoute("/pages/")({
-  // The entry of this page in the sidebar. It stands last, after the pinned pages, because it
-  // lists them all.
-  staticData: { nav: { title: "Pages", icon: ListIcon, order: 1000 } },
+  // The entry that the pages kept in this browser stand under, in the breadcrumb and in the mark
+  // of the sidebar. It is no row of the sidebar: the pages themselves are listed there, in the group
+  // "Pages" (app-sidebar.tsx), and this list is reached through the breadcrumb.
+  staticData: { nav: { title: "Pages", icon: ListIcon, sidebar: false } },
   component: Pages,
 })
 

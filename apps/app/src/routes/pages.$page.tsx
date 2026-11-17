@@ -43,8 +43,8 @@ import { Input } from "@pleiades/ui/components/input"
  */
 export const Route = createFileRoute("/pages/$page")({
   // No entry of its own in the sidebar: a pinned page has one, read from this browser
-  // (app-sidebar.tsx), and one that is not pinned stands under "Pages". In the breadcrumb the
-  // page is called by its title.
+  // (app-sidebar.tsx), and one that is not pinned is a row of the group "Pages" (page-group.tsx).
+  // In the breadcrumb the page stands behind "Pages" and is called by its title.
   staticData: { crumb: (params) => getPage(params.page ?? "")?.recipe.title ?? "" },
   // The recipe is in the browser, and so is this loader (the app renders in the browser).
   loader: async ({ params }) => {
