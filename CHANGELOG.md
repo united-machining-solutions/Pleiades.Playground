@@ -246,7 +246,7 @@ All notable changes are documented here. The format follows
   from the moment it is asked. A button "All chats" at the left of the head leads back to the list. The list
   is the start view, now headed "Chats"; its field begins a new chat. "New chat" is gone from the head of a
   chat, since it led to the same view the way back leads to. Without a language model the head still says
-  "Chat".
+  "Chat". After "All chats" or a chat of the list the focus is on the heading of the view it leads to.
 
 ### Fixed
 

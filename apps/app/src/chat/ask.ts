@@ -37,6 +37,20 @@ export function pickedModel(models: ReadonlyArray<string>): string | undefined {
   return lastModel !== undefined && models.includes(lastModel) ? lastModel : models[0]
 }
 
+/** Whether a press in the panel changed its view: then the heading of the new view takes the focus. */
+let pressed = false
+
+export function markPress() {
+  pressed = true
+}
+
+/** Whether a press in the panel changed its view, once: the next head to ask gets `false`. */
+export function takePress(): boolean {
+  const was = pressed
+  pressed = false
+  return was
+}
+
 export function useChatPanel() {
   const navigate = useNavigate()
   // The page stays where it is: you chat about what you see.
@@ -46,7 +60,10 @@ export function useChatPanel() {
     open: () => show(lastThread ?? NEW_CHAT),
     close: () => show(undefined),
     /** The list of the panel: the chats so far, and the field that begins a new one. */
-    showList: () => show(NEW_CHAT),
+    showList: () => {
+      markPress()
+      show(NEW_CHAT)
+    },
     /** A new chat that begins with this question. */
     ask: (question: string) => {
       const threadId = crypto.randomUUID()

@@ -66,11 +66,13 @@ import { keepOfAnswer } from "@/pages/from-answer.ts"
 import { Answer } from "./answer.tsx"
 import {
   NEW_CHAT,
+  markPress,
   peekFirstQuestion,
   pickModel,
   pickedModel,
   rememberThread,
   takeFirstQuestion,
+  takePress,
   useChatPanel,
 } from "./ask.ts"
 import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
@@ -121,9 +123,17 @@ export function ChatSidebar({ chat }: { chat: string }) {
  * The head of the panel. In a chat (`back`) a button leads back to the list, then comes the name of
  * the chat; elsewhere there is only the title of the view. The name takes the room that is left and
  * is cut where it is too long: the buttons never give way.
+ *
+ * "All chats" and the link of a chat go away with the view they stand in. After such a press the
+ * heading of the new view takes the focus, so it does not fall to the page and a screen reader says
+ * where it is. On a page load the focus stays where it was.
  */
 function PanelHead({ title, back = false }: { title: string; back?: boolean }) {
   const panel = useChatPanel()
+  const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (takePress()) heading.current?.focus()
+  }, [])
   return (
     <SidebarHeader className="h-14 flex-row items-center gap-1 border-b">
       {back && (
@@ -131,7 +141,9 @@ function PanelHead({ title, back = false }: { title: string; back?: boolean }) {
           <ChevronLeftIcon />
         </Button>
       )}
-      <h2 className="min-w-0 flex-1 truncate px-2 font-medium">{title}</h2>
+      <h2 ref={heading} tabIndex={-1} className="min-w-0 flex-1 truncate px-2 font-medium outline-none">
+        {title}
+      </h2>
       <Button variant="ghost" size="icon-sm" aria-label="Close the chat" onClick={panel.close}>
         <XIcon />
       </Button>
@@ -186,7 +198,7 @@ function Start() {
               <SidebarMenu>
                 {chats.map((entry) => (
                   <SidebarMenuItem key={entry.threadId}>
-                    <SidebarMenuButton render={<Link to="." search={{ chat: entry.threadId }} />}>
+                    <SidebarMenuButton render={<Link to="." search={{ chat: entry.threadId }} onClick={markPress} />}>
                       <span>{entry.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
