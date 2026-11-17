@@ -9,6 +9,8 @@ All notable changes are documented here. The format follows
 
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
+- Energy card: `genui_energy_show` says how much energy machines imported over the last 1 to 24 hours, from
+  their meters, with mean and peak power; the card draws their power as a graph (`genui_energy_series`).
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,

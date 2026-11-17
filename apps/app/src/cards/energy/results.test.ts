@@ -1,0 +1,29 @@
+import assert from "node:assert/strict"
+import { test } from "node:test"
+
+import { energyShowOf } from "./results.ts"
+
+const machine = {
+  machine: "P-04",
+  energy: {
+    joule: 7_200_000,
+    start: { joule: 1_000_000, at: "2026-11-17T08:00:00.000Z" },
+    end: { joule: 8_200_000, at: "2026-11-17T15:59:58.000Z" },
+    meterWentBack: false,
+    topic: "machines/P-04/umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp",
+  },
+  power: { meanWatt: 900, peakWatt: 2400, values: 14400, topic: "machines/P-04/umati/Consumption/Electricity/Main/AcActivePowerTotal" },
+}
+
+test("the JSON of genui_energy_show becomes the energy of every machine", () => {
+  const shown = energyShowOf(
+    JSON.stringify({ from: "2026-11-17T08:00:00.000Z", to: "2026-11-17T16:00:00.000Z", hours: 8, machines: [machine] }),
+  )
+  assert.equal(shown?.machines[0]?.energy.joule, 7_200_000)
+})
+
+test("what does not keep the contract of the card is not drawn as one", () => {
+  assert.equal(energyShowOf('{"from":"2026-11-17T08:00:00.000Z","to":"2026-11-17T16:00:00.000Z","hours":8,"machines":[{"machine":"P-04"}]}'), null)
+  assert.equal(energyShowOf("no energy"), null)
+  assert.equal(energyShowOf(undefined), null)
+})

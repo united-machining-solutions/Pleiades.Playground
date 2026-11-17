@@ -16,6 +16,8 @@ durations are computed here, never by a language model.
 
 | Tool | What it returns |
 |---|---|
+| `genui_energy_show` | Every machine that published active power or its energy meter, or those in `machines`, over the last hours (`hours`, 8 if omitted, at most 24): the energy it imported, the difference of its meter in joule, and the mean and peak of its active power in watt, from the statistics of the Timeseries API. The one that imported the most first. Its output is the contract of the energy card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_energy_series` | The active power of machines between two instants (`from`, `to`, at most 24 hours), a line for each machine on the same instants (`slots`, 240 if omitted): the graph of the energy card. Each value is the mean of its slot, over the values the Timeseries API keeps when it thins a line to twice the slots. A card calls it after `genui_energy_show`. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_machine_list` | Every machine with what it does now: connection, heartbeat, state and operation mode with the time since when, the active program, and the warnings and errors of the last 24 hours that have not gone. |
 | `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and how long each state lasted in total over the last hours (`hours`, 8 if omitted). Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_span_list` | The states of one machine between two instants (`from`, `to`) as spans without a gap: the band of the machine card. A card calls it after `genui_machine_show`. A host that shows MCP Apps does not offer it to its language model. |
@@ -26,6 +28,7 @@ durations are computed here, never by a language model.
 | Resource | What it is |
 |---|---|
 | `genui://skill` | The skill guide, as markdown. |
+| `ui://genui/energy` | The energy card as a file for other hosts: the energy of each machine, and the graph of their power, which it asks `genui_energy_series` for. |
 | `ui://genui/machine` | The machine card as a file for other hosts, see below. |
 | `ui://genui/measurement` | The measurement card as a file for other hosts: the cards, and below them the graphs of the last minutes, which it asks `genui_measurement_series` for, as the machine card asks for its band. |
 
