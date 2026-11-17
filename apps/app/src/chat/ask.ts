@@ -39,8 +39,9 @@ export function pickSwitchedOff(names: ReadonlyArray<string>) {
   lastOff = [...names]
 }
 
-export function pickedSwitchedOff(): Array<string> {
-  return [...lastOff]
+/** The servers switched off last that the settings still name. */
+export function pickedSwitchedOff(servers: ReadonlyArray<string>): Array<string> {
+  return lastOff.filter((name) => servers.includes(name))
 }
 
 /** The servers that are off after one of them was switched. */

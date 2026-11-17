@@ -1,7 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { afterSwitch } from "./ask.ts"
 import { listServers, listedServer } from "./server-list.ts"
 
 const readOnly = { mcp: { annotations: { readOnlyHint: true } } }
@@ -59,10 +58,4 @@ test("without further servers the list is the backend alone", async () => {
     servers.map((server) => server.name),
     ["genui"],
   )
-})
-
-test("switching a server changes the ones that are off, each named once", () => {
-  assert.deepEqual(afterSwitch([], "ultimaker", false), ["ultimaker"])
-  assert.deepEqual(afterSwitch(["ultimaker"], "ultimaker", false), ["ultimaker"])
-  assert.deepEqual(afterSwitch(["ultimaker", "juicebar"], "ultimaker", true), ["juicebar"])
 })

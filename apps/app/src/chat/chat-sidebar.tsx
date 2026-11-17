@@ -77,7 +77,7 @@ import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
 import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { DictateButton } from "./dictate.tsx"
-import { chooseChatModel, fetchChatModel, fetchSwitchedOff, switchChatServer } from "./status.ts"
+import { chooseChatModel, fetchChatSettings, switchChatServer } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
 import { toolLabel } from "./tool-results.ts"
 import { ToolsMenu } from "./tools-menu.tsx"
@@ -160,7 +160,7 @@ function Start() {
     setModel(name)
   }
   // And without the tools of the servers switched off here.
-  const [off, setOff] = useState(pickedSwitchedOff)
+  const [off, setOff] = useState(() => pickedSwitchedOff(chatStatus.servers))
   const switchServer = (name: string, on: boolean) => {
     const next = afterSwitch(off, name, on)
     pickSwitchedOff(next)
@@ -235,18 +235,30 @@ function Conversation({ threadId }: { threadId: string }) {
   }
   // The further servers this chat has switched off. The harness keeps them with the chat, as it keeps
   // the model, and the server of the app gives the model no tool of a server that is off.
-  const [off, setOff] = useState(pickedSwitchedOff)
+  // A switch shows what the harness holds: it moves once the harness has taken it, and stays where it
+  // was when the harness did not.
+  const [off, setOff] = useState(() => pickedSwitchedOff(chatStatus.servers))
+  const offNow = useRef(off)
+  const hold = (next: Array<string>) => {
+    offNow.current = next
+    setOff(next)
+  }
   const [serverError, setServerError] = useState<string>()
+  /** Tells the harness, and says whether it took the switch. */
   const tell = (name: string, on: boolean) =>
     switchChatServer(threadId, name, on).then(
-      () => setServerError(undefined),
-      (problem: unknown) => setServerError(problem instanceof Error ? problem.message : String(problem)),
+      () => true,
+      (problem: unknown) => {
+        setServerError(problem instanceof Error ? problem.message : String(problem))
+        return false
+      },
     )
-  const switchServer = (name: string, on: boolean) => {
-    const next = afterSwitch(off, name, on)
-    pickSwitchedOff(next)
-    setOff(next)
-    void tell(name, on)
+  const switchServer = async (name: string, on: boolean) => {
+    if (!(await tell(name, on))) return
+    setServerError(undefined)
+    hold(afterSwitch(offNow.current, name, on))
+    // The next chat begins as this one was left.
+    pickSwitchedOff(offNow.current)
   }
   // Stop ends the answer twice: `stop` of the chat stops reading it, and the harness cancels the turn
   // on the server. Without that the model goes on writing, the server keeps the whole answer, and the
@@ -279,14 +291,23 @@ function Conversation({ threadId }: { threadId: string }) {
         // A question asked anywhere in the app opens this chat and is its first message. The chat
         // begins with the model picked last; the first model answers without being picked.
         if (model !== undefined && model !== chatStatus.models[0]) await switchTo(model)
-        // And without the servers switched off last: the question waits until the chat knows.
-        for (const name of off) await tell(name, false)
-        void sendMessage(first)
+        // And without the servers switched off last. The question goes out only once the harness has
+        // taken every one of them: a model must not get the tools of a server the person switched off.
+        // A switch the harness did not take shows on again, which is what the chat has.
+        let taken = true
+        for (const name of offNow.current) {
+          if (await tell(name, false)) continue
+          taken = false
+          hold(afterSwitch(offNow.current, name, true))
+        }
+        if (taken) void sendMessage(first)
+        else setServerError((reason) => `${reason ?? "A server could not be switched off."} The question was not sent: ask it again.`)
       } else {
         // A chat from before keeps the model it picked.
-        setModel((await fetchChatModel(threadId)) ?? chatStatus.models[0])
         // And the servers it switched off.
-        setOff(await fetchSwitchedOff(threadId))
+        const picked = await fetchChatSettings(threadId)
+        setModel(picked.model ?? chatStatus.models[0])
+        hold(picked.off)
       }
     })()
     return () => {
@@ -426,7 +447,7 @@ function Conversation({ threadId }: { threadId: string }) {
         model={model}
         onModel={choose}
         off={off}
-        onSwitch={switchServer}
+        onSwitch={(name, on) => void switchServer(name, on)}
         dictation={chatStatus.dictation}
       />
     </>

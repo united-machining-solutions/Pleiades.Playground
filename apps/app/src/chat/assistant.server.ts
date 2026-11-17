@@ -12,7 +12,7 @@ import type { ChatSettings } from "./gateway.ts"
 import { withTimeZone } from "./local-times.ts"
 import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
-import { furtherInstructions, isOnBy, leftOut, mcpServers, serverSwitches, switchedOn } from "./mcp-servers.ts"
+import { leftOut, mcpServers, serverSwitch } from "./mcp-servers.ts"
 import { forModel } from "./tool-results.ts"
 
 // The agent harness of the app. It runs on the server only: the keys of the language models stay
@@ -31,18 +31,11 @@ const tools = mcp({ servers: mcpServers() })
 // A chat switches a further server off and on (the panel "Tools" of the chat). The setting is the chat's,
 // kept by the harness, and it holds here, on the server: before every turn the tools of a server that is
 // off are taken out of what the model gets, and the model is told only about the servers that are on.
-// The further servers have no card in the app, so the model is told to say their values.
-const switches = serverSwitches()
-const serverSwitch = definePlugin({
+// Which servers there are is read once, here, as it is for the connections above.
+const switches = serverSwitch()
+const switchPlugin = definePlugin({
   name: "pleiades/server-switch",
-  setup: (ctx) => {
-    const isOn = isOnBy((key) => ctx.config.get(key))
-    return {
-      config: switches,
-      prepareTools: ({ tools: listed }) => switchedOn(listed, isOn),
-      prompts: furtherInstructions() === undefined ? [] : [() => furtherInstructions(process.env, isOn) ?? ""],
-    }
-  },
+  setup: (ctx) => switches.forChat((key) => ctx.config.get(key)),
 })
 
 // A typing mistake in the setting shows here, once, when the server starts.
@@ -108,10 +101,10 @@ function build(settings: ModelSettings | undefined): Handler | null {
       models,
       // Of a chat's settings the browser may change the model and switch a further server off and
       // on, and nothing else.
-      expose: { settings: ["model"], config: Object.keys(switches) },
+      expose: { settings: ["model"], config: switches.exposed },
       middleware: [localTimes],
       systemPrompts: [instructions],
-      plugins: () => [tools, serverSwitch, modelTools],
+      plugins: () => [tools, switchPlugin, modelTools],
     }),
     // The demo has no sign-in: every request runs without a user.
     openAccess: true,

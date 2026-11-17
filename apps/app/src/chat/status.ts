@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start"
 
 import { chatSettings } from "./gateway.ts"
-import { serverOfKey, switchKey } from "./mcp-servers.ts"
+import { furtherServers, switchKey, switchedOffOf } from "./mcp-servers.ts"
 import { modelNames } from "./models.ts"
 import { serverList } from "./server-list.ts"
 import type { ListedServer } from "./server-list.ts"
@@ -14,6 +14,8 @@ export type ChatStatus = {
   gaps: Array<string>
   /** Whether a model writes down what is said into the chat field. */
   dictation: boolean
+  /** The further servers a chat can switch off and on, by name. */
+  servers: Array<string>
 }
 
 /** Which language models are configured: the same snapshot the harness is built from. Keys never leave the server. */
@@ -25,6 +27,7 @@ export const getChatStatus = createServerFn({ method: "GET" }).handler(async ():
     models,
     gaps: chat.gaps,
     dictation: chat.dictation !== undefined,
+    servers: Object.keys(furtherServers()),
   }
 })
 
@@ -33,17 +36,6 @@ export const getChatStatus = createServerFn({ method: "GET" }).handler(async ():
  * panel "Tools" opens, not with every page. Addresses never leave the server.
  */
 export const getChatServers = createServerFn({ method: "GET" }).handler((): Promise<Array<ListedServer>> => serverList())
-
-/** The further servers a chat has switched off, by name. A chat that does not exist yet has none. */
-export async function fetchSwitchedOff(threadId: string): Promise<Array<string>> {
-  const response = await fetch(`/api/harness/describe?threadId=${encodeURIComponent(threadId)}`)
-  if (!response.ok) return []
-  const description = (await response.json()) as { config?: Array<{ key: string; value: unknown }> }
-  return (description.config ?? []).flatMap(({ key, value }) => {
-    const name = serverOfKey(key)
-    return name !== undefined && value === false ? [name] : []
-  })
-}
 
 /**
  * From its next turn on, the chat has the tools of this server, or has them no longer. The harness keeps
@@ -65,7 +57,7 @@ export async function switchChatServer(threadId: string, name: string, on: boole
   }
 }
 
-export type ChatEntry ={ threadId: string; title: string; titled: boolean }
+export type ChatEntry = { threadId: string; title: string; titled: boolean }
 
 /** The chats the harness knows, newest first. Without a language model there are none. */
 export async function fetchChats(): Promise<Array<ChatEntry>> {
@@ -79,12 +71,12 @@ export async function fetchChats(): Promise<Array<ChatEntry>> {
   }))
 }
 
-/** The model a chat has picked, or undefined while the first one answers. */
-export async function fetchChatModel(threadId: string): Promise<string | undefined> {
+/** What a chat has picked: its model, undefined while the first one answers, and the servers it switched off. */
+export async function fetchChatSettings(threadId: string): Promise<{ model: string | undefined; off: Array<string> }> {
   const response = await fetch(`/api/harness/describe?threadId=${encodeURIComponent(threadId)}`)
-  if (!response.ok) return undefined
+  if (!response.ok) return { model: undefined, off: [] }
   const description = (await response.json()) as { settings?: { model?: string } }
-  return description.settings?.model
+  return { model: description.settings?.model, off: switchedOffOf(description) }
 }
 
 /** From its next turn on, the chat answers with this model. The harness keeps the choice with the chat. */

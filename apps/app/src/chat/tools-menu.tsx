@@ -35,7 +35,7 @@ function toolsLine(server: ListedServer, tools: ReadonlyArray<unknown>): string 
 /**
  * Where the chat says which servers give it tools, and switches the further ones off and on: a button in
  * the message field, next to the model, that opens the list. The list is asked for when it opens, so it
- * says what answers now. A switch is the chat's and holds from its next question; the server of the app
+ * says what answers the app now. A switch is the chat's and holds from its next question; the server of the app
  * holds the chat to it (assistant.server.ts).
  */
 export function ToolsMenu({
@@ -57,12 +57,14 @@ export function ToolsMenu({
       <PopoverTrigger render={<InputGroupButton variant="ghost" aria-label="Tools of this chat" />}>
         <WrenchIcon data-icon="inline-start" />
         Tools
+        {/* What is off shows without opening the list. */}
+        {off.length > 0 && <Badge variant="secondary">{off.length} off</Badge>}
       </PopoverTrigger>
       <PopoverContent side="top" align="start" className="max-h-[70svh] w-96 max-w-[calc(100vw-2rem)] overflow-y-auto">
         <PopoverHeader>
           <PopoverTitle>Tools</PopoverTitle>
           <PopoverDescription>
-            What this chat can read and do besides answering. A switch holds from the next question, in this chat.
+            What this chat can read and do besides answering. A switch holds from the next question.
           </PopoverDescription>
         </PopoverHeader>
         {servers === undefined ? (

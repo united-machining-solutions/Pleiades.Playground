@@ -1,9 +1,11 @@
-import { backendServer, mcpServers } from "./mcp-servers.ts"
+import { backend, mcpServers } from "./mcp-servers.ts"
 
 // What the panel "Tools" of the chat shows: the servers whose tools the chat hands to its language model,
 // whether each one answers, and its tools by name. The app asks every server itself, the way it asks the
 // gateway for its models: the harness knows the state of a server only inside a chat that has run, and
-// never the names of its tools. The address of a server stays here; the browser gets its name.
+// never the names of its tools. So the list says what answers the app now. A chat has its own connections
+// to the servers: one that has just come back can be listed here a moment before the chat has its tools.
+// The address of a server stays here; the browser gets its name.
 
 export type ServerTool = {
   name: string
@@ -36,7 +38,7 @@ export type AskServer = (url: string) => Promise<Listed>
 export function listedServer(name: string, listed: Listed | undefined): ListedServer {
   return {
     name,
-    builtIn: name === backendServer,
+    builtIn: name === backend,
     reachable: listed !== undefined,
     tools: (listed ?? []).map((tool) => ({
       name: tool.name,

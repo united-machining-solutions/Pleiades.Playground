@@ -10,7 +10,8 @@ type Server = { type: "http"; url: string; toolName: (tool: { name: string }) =>
 // Every server names its tools with a prefix of its own, so the chat keeps the names as they are.
 const server = (url: string): Server => ({ type: "http", url, toolName: (tool) => tool.name })
 
-const backend = "genui"
+/** The name of the generative UI backend among the servers. Its tools draw the cards, so no chat switches it off. */
+export const backend = "genui"
 
 /**
  * The further servers of APP_MCP_SERVERS: `name=url`, separated by commas, for example
@@ -53,9 +54,6 @@ export function mcpServers(settings: Settings = process.env): Record<string, Ser
 
 const switchPrefix = "server."
 
-/** The name of the generative UI backend among the servers. Its tools draw the cards, so no chat switches it off. */
-export const backendServer = backend
-
 /**
  * The setting of a chat that says whether it has the tools of a further server. The harness keeps it with
  * the chat, and the chat panel sets it (status.ts).
@@ -92,17 +90,48 @@ function serverOf(tool: { metadata?: Record<string, unknown> }): string | undefi
 
 /**
  * The tools of a turn without those of the further servers the chat switched off. A tool of the backend,
- * and a tool that names no server, stays: only a server of APP_MCP_SERVERS can be off.
+ * and a tool that names no server, stays: only a further server, one of `names`, can be off.
  */
 export function switchedOn<TTool extends { metadata?: Record<string, unknown> }>(
   listed: ReadonlyArray<TTool>,
   isOn: IsOn,
-  settings: Settings = process.env,
+  names: ReadonlyArray<string>,
 ): Array<TTool> {
-  const further = furtherServers(settings)
   return listed.filter((tool) => {
     const name = serverOf(tool)
-    return name === undefined || !(name in further) || isOn(name)
+    return name === undefined || !names.includes(name) || isOn(name)
+  })
+}
+
+/**
+ * The switches as the harness takes them, read from the settings once: which settings of a chat the
+ * browser may set, and what the plugin gives a chat. `get` is how a plugin reads a setting of its chat.
+ */
+export function serverSwitch(settings: Settings = process.env) {
+  const names = Object.keys(furtherServers(settings))
+  const config = serverSwitches(settings)
+  return {
+    exposed: Object.keys(config),
+    forChat(get: (key: string) => unknown) {
+      const isOn = isOnBy(get)
+      return {
+        config,
+        prepareTools: <TTool extends { metadata?: Record<string, unknown> }>(turn: { tools: ReadonlyArray<TTool> }) =>
+          switchedOn(turn.tools, isOn, names),
+        // The further servers have no card in the app, so the model is told to say their values.
+        prompts: names.length === 0 ? [] : [() => instructionsFor(names, isOn)],
+      }
+    },
+  }
+}
+
+/** The further servers a chat has switched off, from what the harness says about the chat (`describe`). */
+export function switchedOffOf(description: unknown): Array<string> {
+  const config = (description as { config?: unknown } | null)?.config
+  if (!Array.isArray(config)) return []
+  return (config as Array<{ key?: unknown; value?: unknown } | null>).flatMap((entry) => {
+    const name = typeof entry?.key === "string" ? serverOfKey(entry.key) : undefined
+    return name !== undefined && entry?.value === false ? [name] : []
   })
 }
 
@@ -113,10 +142,13 @@ export function switchedOn<TTool extends { metadata?: Record<string, unknown> }>
  */
 export function furtherInstructions(settings: Settings = process.env, isOn: IsOn = () => true): string | undefined {
   const all = Object.keys(furtherServers(settings))
-  if (all.length === 0) return undefined
+  return all.length === 0 ? undefined : instructionsFor(all, isOn)
+}
+
+function instructionsFor(all: ReadonlyArray<string>, isOn: IsOn): string {
   const names = all.filter(isOn)
   if (names.length === 0) {
-    return `Other devices than the machines are switched off in this chat, so you have no tools for them. If the person asks for one, say that it is switched on under "Tools", below the message field.`
+    return `Other devices than the machines are switched off in this chat, so you have no tools for them. If the person asks for one, say that it is switched on under "Tools", in the message field.`
   }
   return `Besides the machines you reach other devices, each with tools that begin with its name: ${names.join(", ")}.
 The app draws nothing for these tools, so say their values in your answer.
