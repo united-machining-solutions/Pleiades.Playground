@@ -73,7 +73,8 @@ A version tag releases the app. bart takes the version from `--version`, so the 
    the workflow [`margo-push.yml`](../.github/workflows/margo-push.yml), which:
    - pins the images of this repository in `compose/compose.yaml` from `:main` to `:1.2.3`, in that run only,
      so that the app is exactly that build;
-   - runs `bart validate` and `bart push --version 1.2.3` from the image `cr.flecs.tech/flecs/bart`.
+   - runs `bart validate` and `bart push --version 1.2.3` from the image `cr.flecs.tech/flecs/bart:latest`,
+     as the other FLECS app repositories do.
 
    `push` copies every image to `<registry>/staging-<app id>/<service>:1.2.3` on the staging registry
    (`apps.flecs.tech`), so the staged app no longer depends on ghcr.io. The images on ghcr.io are public and need
@@ -81,14 +82,17 @@ A version tag releases the app. bart takes the version from `--version`, so the 
 4. `bart release` promotes the staged version to production and `bart sign` signs it; both are for whoever runs
    the registry.
 
-The workflow needs the repository secrets `BART_REGISTRY_USER` and `BART_REGISTRY_TOKEN`, the credentials of the
-staging registry. "Margo push" can also be started by hand, under Actions, for a version whose images are already
-on ghcr.io; its input `bart-version` picks another tag of the bart image than `latest`.
+The job runs in the GitHub environment `margo-staging`. It holds the secrets `BART_REGISTRY_USER` and
+`BART_REGISTRY_TOKEN`, the credentials of the staging registry, and its protection rules decide who may release:
+set required reviewers and limit it to `main` and the tags `v*`. "Margo push" can also be started by hand, under Actions, with
+a version tag (`v1.2.3`) whose images are already on ghcr.io; it checks out that tag, whatever branch it was started
+from. Its input `bart-version` picks another tag of the bart image than `latest`.
 
 By hand, the same as the workflow does:
 
 ```bash
-sed -Ei 's|(pleiades\.playground\.[a-z.]+):main$|\1:1.2.3|' margo/compose/compose.yaml
+git checkout v1.2.3
+sed -Ei 's|^(\s*image:\s*ghcr\.io/[^/]+/pleiades\.playground\.[a-z.]+):main$|\1:1.2.3|' margo/compose/compose.yaml
 BART_REGISTRY_USER=... BART_REGISTRY_TOKEN=... bart push --dir margo --version 1.2.3
 git checkout margo/compose/compose.yaml
 ```
