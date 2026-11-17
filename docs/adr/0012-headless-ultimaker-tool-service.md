@@ -28,8 +28,8 @@ exclusions. State that this is not whole-head collision simulation or proof of p
 
 ## Consequences
 
-The demo's ordinary start needs no physical printer. A maintainer issue is needed before merging this
-new service/contract; its README contains a draft. Existing telemetry and UI remain independent.
+The demo's ordinary start needs no physical printer. The discussion is
+[issue #117](https://github.com/united-machining-solutions/Pleiades.Playground/issues/117). Existing telemetry and UI remain independent.
 CuraEngine and data have their own licences and notices, retained in the image. Runtime libraries for
 the pinned engine are private to its subprocess. An administrator manages artifact retention.
 

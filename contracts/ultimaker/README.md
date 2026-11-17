@@ -1,7 +1,7 @@
-# Ultimaker service contract (proposal)
+# Ultimaker service contract (draft)
 
 The optional Ultimaker service slices STL files for an Ultimaker 3 and uses its local HTTP API.
-Maintainer review is tracked in [issue #117](https://github.com/united-machining-solutions/Pleiades.Playground/issues/117).
+The decision is [ADR-0012](../../docs/adr/0012-headless-ultimaker-tool-service.md); the discussion is [issue #117](https://github.com/united-machining-solutions/Pleiades.Playground/issues/117).
 
 REST OpenAPI is served at `/openapi/v1.json`, Streamable HTTP MCP at `/mcp`.
 Both use the same services. Public values use metre, second, kelvin, cubic metre and fractions (`one`).

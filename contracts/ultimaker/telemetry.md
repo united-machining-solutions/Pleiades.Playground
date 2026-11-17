@@ -1,4 +1,4 @@
-# Ultimaker telemetry adapter (proposal)
+# Ultimaker telemetry adapter (draft)
 
 This contract proposes a source under the existing MQTT binding, without changing contracts/mqtt.
 The requesting user's printer supplies observations through GET /api/v1/printer and GET /api/v1/print_job.
@@ -44,4 +44,4 @@ to artificial zeroes. Heartbeats restart from zero when the adapter process rest
 The adapter is opt-in under the ultimaker Compose profile and waits for broker and timeseries
 persistence health. It uses the existing wildcard subscriptions and the existing machine card;
 no MQTT binding, persistence implementation or UI code is changed.
-This proposal and the new adapter need maintainer agreement before merge. Review is tracked in [issue #117](https://github.com/united-machining-solutions/Pleiades.Playground/issues/117).
+The discussion is [issue #117](https://github.com/united-machining-solutions/Pleiades.Playground/issues/117).

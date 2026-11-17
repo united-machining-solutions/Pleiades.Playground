@@ -2,7 +2,7 @@
 
 An optional .NET 10 service with CuraEngine in one Linux container. It uses the existing Pleiades MCP,
 JSON, authorization and health-check libraries. The [contract](../../contracts/ultimaker/README.md)
-is a proposal. This is a tool service, not an MQTT telemetry adapter or a new application page.
+is a draft. This is a tool service, not an MQTT telemetry adapter or a new application page.
 
 ## Start
 
@@ -185,14 +185,7 @@ Copyright/licence notices are retained under `/opt/cura/licenses`.
 - [Upstream CuraEngine](https://github.com/Ultimaker/CuraEngine)
 - Local printer contract: the device's `/docs/api/api_documentation.json` (firmware 5.3.0).
 
-## Maintainer review
+## Decision
 
-Title: Add an optional Ultimaker 3 slicing and printer tool service
-
-Add a .NET REST/MCP service with CuraEngine, persistent STL/G-code artifacts, static toolpath
-validation and explicit local printer pairing/start. The manufacturer is UltiMaker; the connected
-device belongs to the requesting user. The public contract is under `contracts/ultimaker` and uses
-SI settings/results. The separate telemetry adapter follows the existing MQTT binding. Add an opt-in Compose profile,
-port 5530 and a data volume; print-start remains disabled by default. Review the fixed PLA profile,
-static collision-check limits and independent Cura/CuraEngine licences before merging. Container
-publication uses the repository's Images workflow. Review is tracked in [issue #117](https://github.com/united-machining-solutions/Pleiades.Playground/issues/117).
+[ADR-0012](../../docs/adr/0012-headless-ultimaker-tool-service.md) records the decision; the discussion is
+[issue #117](https://github.com/united-machining-solutions/Pleiades.Playground/issues/117).
