@@ -55,6 +55,7 @@ public sealed class MachineEventApiServiceTest
         using var handler = new Handler(HttpStatusCode.Conflict, "\"The event is already stored.\"");
         using var http = new HttpClient(handler) { BaseAddress = new Uri("http://events-api/") };
 
-        await Assert.ThrowsExactlyAsync<PleiadesEventPersistenceException>(() => new MachineEventApiService(http).PostEvent(Input()));
+        var error = await Assert.ThrowsExactlyAsync<PleiadesEventPersistenceException>(() => new MachineEventApiService(http).PostEvent(Input()));
+        Assert.AreEqual(HttpStatusCode.Conflict, error.StatusCode, "the caller can tell a duplicate from a failure");
     }
 }

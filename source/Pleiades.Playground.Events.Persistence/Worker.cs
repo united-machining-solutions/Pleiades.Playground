@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using MQTTnet;
@@ -33,6 +34,7 @@ public class Worker : BackgroundService
     private static readonly Action<ILogger, Exception?> LogStopping = LoggerMessage.Define(LogLevel.Information, 1, "Worker is stopping.");
     private static readonly Action<ILogger, string, string, Exception?> LogPostSuccessful = LoggerMessage.Define<string, string>(LogLevel.Debug, 3, "Event {Id} of {MachineId} stored");
     private static readonly Action<ILogger, string, Exception?> LogPostFailed = LoggerMessage.Define<string>(LogLevel.Warning, 4, "Event on {Topic} not stored");
+    private static readonly Action<ILogger, string, Exception?> LogAlreadyStored = LoggerMessage.Define<string>(LogLevel.Debug, 7, "Event on {Topic} already stored");
     private static readonly Action<ILogger, string, string, Exception?> LogDropped = LoggerMessage.Define<string, string>(LogLevel.Error, 6, "Message on {Topic} dropped: {Reason}");
 
     /// <summary>What the log names as the content type of a message that carries none.</summary>
@@ -142,11 +144,17 @@ public class Worker : BackgroundService
         }
 
         // Durability is provided by the client's standard resilience handler (retry, circuit breaker,
-        // timeouts). On exhaustion, or for an event stored before, the event is logged and not stored again.
+        // timeouts). On exhaustion the event is logged and not stored. An event stored before, by source and id,
+        // is answered with 409: the broker delivered it again (QoS 1) or a retry followed a write that timed out.
+        // It is stored, so that is a success.
         try
         {
             var stored = await _machineEventService.PostEvent(new MachineEventInputDtoV1 { MId = machineId, CloudEvent = cloudEvent }).ConfigureAwait(false);
             LogPostSuccessful(_logger, stored.Id, machineId, null);
+        }
+        catch (PleiadesEventPersistenceException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            LogAlreadyStored(_logger, topic, null);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or PleiadesEventPersistenceException)
         {

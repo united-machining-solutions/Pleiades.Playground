@@ -1,5 +1,7 @@
+using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -7,6 +9,7 @@ using MQTTnet;
 using MQTTnet.Packets;
 using MQTTnet.Protocol;
 using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Events.Api.Client.Exceptions;
 using Pleiades.Playground.Events.Api.Client.MachineEvents;
 using Pleiades.Playground.Events.DataTransferObjects;
 using Pleiades.Playground.HealthChecks.Mqtt;
@@ -114,6 +117,36 @@ public sealed class WorkerTest : IDisposable
         await Deliver($"machines/{MachineId}/events/notifications", contentType, payload);
 
         Assert.IsEmpty(_posted);
+    }
+
+    [TestMethod]
+    [DataRow(HttpStatusCode.Conflict, LogLevel.Debug)]
+    [DataRow(HttpStatusCode.InternalServerError, LogLevel.Warning)]
+    public async Task AnEventStoredBefore_IsASuccess_AFailureIsAWarning(HttpStatusCode status, LogLevel expected)
+    {
+        var logger = new Mock<ILogger<Worker>>();
+        logger.Setup(l => l.IsEnabled(It.IsAny<LogLevel>())).Returns(true);
+        var service = new Mock<IMachineEventService>();
+        service.Setup(s => s.PostEvent(It.IsAny<MachineEventInputDtoV1>()))
+            .ThrowsAsync(new PleiadesEventPersistenceException($"{status} - writing to db failed") { StatusCode = status });
+        var config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: false).Build().GetSection("Config").Get<Config>()!;
+        using var worker = new Worker(Options.Create(config), logger.Object, _mqttClient.Object, service.Object, new MqttSubscriptionReadiness());
+        await worker.StartAsync(TestContext.CancellationToken);
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!_mqttClient.Invocations.Any(i => i.Method.Name == "add_ApplicationMessageReceivedAsync"))
+        {
+            Assert.IsLessThan(deadline, DateTime.UtcNow, "the worker never attached its message handler");
+            await Task.Delay(10, TestContext.CancellationToken);
+        }
+
+        await Deliver($"machines/{MachineId}/events/notifications", "application/cloudevents+json", CloudEvent);
+
+        var levels = logger.Invocations.Where(i => i.Method.Name == nameof(ILogger.Log)).Select(i => (LogLevel)i.Arguments[0]).ToList();
+        CollectionAssert.Contains(levels, expected);
+        if (expected == LogLevel.Debug)
+        {
+            CollectionAssert.DoesNotContain(levels, LogLevel.Warning, "a duplicate is not reported as not stored");
+        }
     }
 
     [TestMethod]
