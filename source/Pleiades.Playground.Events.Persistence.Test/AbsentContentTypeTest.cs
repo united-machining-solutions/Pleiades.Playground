@@ -48,7 +48,7 @@ public sealed class AbsentContentTypeTest
             .WithPayload("""{"anything":"at all"}""")
             .Build();
         await client.RaiseAsync(c => c.ApplicationMessageReceivedAsync += null,
-            new MqttApplicationMessageReceivedEventArgs("", message, new MQTTnet.Packets.MqttPublishPacket(), null));
+            new MqttApplicationMessageReceivedEventArgs("", message, new MQTTnet.Packets.MqttPublishPacket(), (_, _) => Task.CompletedTask));
 
         logger.Verify(l => l.Log(
                 LogLevel.Error,

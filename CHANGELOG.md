@@ -552,7 +552,11 @@ All notable changes are documented here. The format follows
   such as `State/Status` field by field, and keeps no lists, no `null` and no manifest.
 - Events: the persistence takes `application/cloudevents+json` from `machines/+/events/jobs`, `…/workmasters`
   and `…/notifications` with QoS 1 in a persistent session (`Config:MqttSource:SessionExpiry`); an event stored
-  before (409, delivered again or retried) counts as stored and is logged on Debug. The Events
+  before (409, delivered again or retried) counts as stored and is logged on Debug. It acknowledges a message only
+  once its event is stored, stored before or refused for good (another 4xx); while the Events API is away it
+  waits and tries again every `Config:RetryDelay` (5 s), and a stop meanwhile leaves the message to the broker.
+  The broker of the demo keeps its sessions across a restart (volume `broker_data`) and queues up to 50 000
+  messages for a session. The Events
   API keeps the CloudEvents as they came in one collection `MachineEvent`, unique by `source` and `id`. It serves
   `/machineEvents` (by machine, group, type, correlation id, job order and time) with `/machineEvents/gaps`, `/alerts/active`, `/alerts/pairs` and `/alerts/statistics` (by
   NE 107 severity), `/jobOrders` with `/jobOrders/{mId}/{jobOrderId}`, and `/programExecutions`, and the MCP

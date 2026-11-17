@@ -85,8 +85,14 @@ public sealed class WorkerTest : IDisposable
             builder = builder.WithContentType(contentType);
         }
         await _mqttClient.RaiseAsync(s => s.ApplicationMessageReceivedAsync += null,
-            new MqttApplicationMessageReceivedEventArgs("", builder.Build(), new MqttPublishPacket(), null));
+            new MqttApplicationMessageReceivedEventArgs("", builder.Build(), new MqttPublishPacket(), (_, _) =>
+            {
+                Interlocked.Increment(ref _acknowledged);
+                return Task.CompletedTask;
+            }));
     }
+
+    private int _acknowledged;
 
     [TestMethod]
     [DataRow("application/cloudevents+json; charset=utf-8")]
@@ -99,6 +105,7 @@ public sealed class WorkerTest : IDisposable
         await Deliver($"machines/{MachineId}/events/notifications", contentType, CloudEvent);
 
         var posted = _posted.Single();
+        Assert.AreEqual(1, _acknowledged, "stored, then acknowledged");
         Assert.AreEqual(MachineId, posted.MId);
         Assert.AreEqual("Notification.AlertRaised", posted.CloudEvent.GetProperty("type").GetString());
         Assert.AreEqual("OffSpec", posted.CloudEvent.GetProperty("data").GetProperty("Severity").GetString(), "the data unchanged");
@@ -117,35 +124,128 @@ public sealed class WorkerTest : IDisposable
         await Deliver($"machines/{MachineId}/events/notifications", contentType, payload);
 
         Assert.IsEmpty(_posted);
+        Assert.AreEqual(1, _acknowledged, "what no repetition makes a CloudEvent leaves the session");
     }
 
     [TestMethod]
-    [DataRow(HttpStatusCode.Conflict, LogLevel.Debug)]
-    [DataRow(HttpStatusCode.InternalServerError, LogLevel.Warning)]
-    public async Task AnEventStoredBefore_IsASuccess_AFailureIsAWarning(HttpStatusCode status, LogLevel expected)
+    [DataRow(HttpStatusCode.Conflict, LogLevel.Debug, DisplayName = "stored before: a success")]
+    [DataRow(HttpStatusCode.BadRequest, LogLevel.Error, DisplayName = "no CloudEvent: refused for good")]
+    [DataRow(HttpStatusCode.UnprocessableEntity, LogLevel.Error, DisplayName = "another 4xx: refused for good")]
+    public async Task AnAnswerNoRepetitionChanges_IsAcknowledged_AfterOneAttempt(HttpStatusCode status, LogLevel expected)
+    {
+        var (worker, service, logger) = WorkerAnswering(_ => throw new PleiadesEventPersistenceException($"{status}") { StatusCode = status });
+        using (worker)
+        {
+            await StartWorkerAsync(worker);
+
+            await Deliver($"machines/{MachineId}/events/notifications", "application/cloudevents+json", CloudEvent);
+
+            service.Verify(s => s.PostEvent(It.IsAny<MachineEventInputDtoV1>()), Times.Once);
+            Assert.AreEqual(1, _acknowledged);
+            var levels = logger.Invocations.Where(i => i.Method.Name == nameof(ILogger.Log)).Select(i => i.Arguments[0] is LogLevel level ? level : LogLevel.None).ToList();
+            CollectionAssert.Contains(levels, expected);
+            CollectionAssert.DoesNotContain(levels, LogLevel.Warning, "nothing waits");
+        }
+    }
+
+    [TestMethod]
+    [DataRow(HttpStatusCode.ServiceUnavailable)]
+    [DataRow(HttpStatusCode.InternalServerError)]
+    [DataRow(HttpStatusCode.TooManyRequests)]
+    [DataRow(HttpStatusCode.RequestTimeout)]
+    [DataRow(null, DisplayName = "no answer")]
+    public async Task WhileTheEventsApiIsAway_TheHandlerWaits_AndAcknowledgesOnceStored(HttpStatusCode? status)
+    {
+        var (worker, service, logger) = WorkerAnswering(attempt => attempt switch
+        {
+            < 3 when status is { } s => throw new PleiadesEventPersistenceException($"{s}") { StatusCode = s },
+            < 3 => throw new HttpRequestException("connection refused"),
+            _ => Stored(),
+        });
+        using (worker)
+        {
+            await StartWorkerAsync(worker);
+
+            await Deliver($"machines/{MachineId}/events/notifications", "application/cloudevents+json", CloudEvent);
+
+            service.Verify(s => s.PostEvent(It.IsAny<MachineEventInputDtoV1>()), Times.Exactly(3));
+            Assert.AreEqual(1, _acknowledged, "acknowledged once it is stored");
+            var levels = logger.Invocations.Where(i => i.Method.Name == nameof(ILogger.Log)).Select(i => i.Arguments[0] is LogLevel level ? level : LogLevel.None).ToList();
+            Assert.AreEqual(1, levels.Count(l => l == LogLevel.Warning), "one warning when it begins to wait, not one per attempt");
+            CollectionAssert.Contains(levels, LogLevel.Information, "and one line when it is stored");
+        }
+    }
+
+    [TestMethod]
+    public async Task AStopWhileTheHandlerWaits_LeavesTheMessageUnacknowledged()
+    {
+        var (worker, service, _) = WorkerAnswering(_ => throw new HttpRequestException("connection refused"));
+        using (worker)
+        {
+            await StartWorkerAsync(worker);
+            var delivery = Deliver($"machines/{MachineId}/events/notifications", "application/cloudevents+json", CloudEvent);
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (service.Invocations.Count < 2)
+            {
+                Assert.IsLessThan(deadline, DateTime.UtcNow, "the handler never tried again");
+                await Task.Delay(10, TestContext.CancellationToken);
+            }
+
+            await worker.StopAsync(TestContext.CancellationToken);
+            await delivery.WaitAsync(TimeSpan.FromSeconds(5), TestContext.CancellationToken);
+
+            Assert.AreEqual(0, _acknowledged, "the broker delivers it again after the next connect");
+        }
+    }
+
+    [TestMethod]
+    [DataRow(HttpStatusCode.BadRequest, true)]
+    [DataRow(HttpStatusCode.NotFound, true)]
+    [DataRow(HttpStatusCode.Conflict, false)]
+    [DataRow(HttpStatusCode.RequestTimeout, false)]
+    [DataRow(HttpStatusCode.TooManyRequests, false)]
+    [DataRow(HttpStatusCode.InternalServerError, false)]
+    [DataRow(HttpStatusCode.ServiceUnavailable, false)]
+    public void IsRefusal_OnlyForA4xxNoRepetitionChanges(HttpStatusCode status, bool refusal)
+    {
+        Assert.AreEqual(refusal, Worker.IsRefusal(status));
+    }
+
+    /// <summary>A worker whose Events API answers the n-th attempt (from 1) with <paramref name="answer"/>.</summary>
+    private (Worker Worker, Mock<IMachineEventService> Service, Mock<ILogger<Worker>> Logger) WorkerAnswering(
+        Func<int, MachineEventDtoV1> answer)
     {
         var logger = new Mock<ILogger<Worker>>();
         logger.Setup(l => l.IsEnabled(It.IsAny<LogLevel>())).Returns(true);
         var service = new Mock<IMachineEventService>();
+        var attempts = 0;
         service.Setup(s => s.PostEvent(It.IsAny<MachineEventInputDtoV1>()))
-            .ThrowsAsync(new PleiadesEventPersistenceException($"{status} - writing to db failed") { StatusCode = status });
-        var config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: false).Build().GetSection("Config").Get<Config>()!;
-        using var worker = new Worker(Options.Create(config), logger.Object, _mqttClient.Object, service.Object, new MqttSubscriptionReadiness());
+            .ReturnsAsync((MachineEventInputDtoV1 _) => answer(Interlocked.Increment(ref attempts)));
+        var config = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json", optional: false)
+            .AddJsonFile("appsettings.test.json", optional: true)
+            .Build().GetSection("Config").Get<Config>()!;
+        config.RetryDelay = TimeSpan.FromMilliseconds(10);
+        return (new Worker(Options.Create(config), logger.Object, _mqttClient.Object, service.Object, new MqttSubscriptionReadiness()), service, logger);
+    }
+
+    private static MachineEventDtoV1 Stored() => new()
+    {
+        MId = MachineId,
+        Group = "Notification",
+        Type = "Notification.AlertRaised",
+        Id = "0f4c4a51-8e2b-5d6a-9c1f-4b7e2d913a60",
+        Source = "https://www.alcyone-machines.example/AX-400/P-04",
+    };
+
+    private async Task StartWorkerAsync(Worker worker)
+    {
         await worker.StartAsync(TestContext.CancellationToken);
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (!_mqttClient.Invocations.Any(i => i.Method.Name == "add_ApplicationMessageReceivedAsync"))
         {
             Assert.IsLessThan(deadline, DateTime.UtcNow, "the worker never attached its message handler");
             await Task.Delay(10, TestContext.CancellationToken);
-        }
-
-        await Deliver($"machines/{MachineId}/events/notifications", "application/cloudevents+json", CloudEvent);
-
-        var levels = logger.Invocations.Where(i => i.Method.Name == nameof(ILogger.Log)).Select(i => (LogLevel)i.Arguments[0]).ToList();
-        CollectionAssert.Contains(levels, expected);
-        if (expected == LogLevel.Debug)
-        {
-            CollectionAssert.DoesNotContain(levels, LogLevel.Warning, "a duplicate is not reported as not stored");
         }
     }
 

@@ -122,6 +122,7 @@ services:
       - "${MQTT_WS_PORT:-9001}:9001"
     volumes:
       - ./stacks/broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - broker_data:/mosquitto/data
     healthcheck:
       test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/version", "-C", "1", "-W", "3"]
       start_period: 5s
@@ -650,6 +651,7 @@ services:
       - opc_simulator_pki:/data/pki
 
 volumes:
+  broker_data:
   ultimaker_data:
   mongodb_data:
   cutting-laser-2d-exchange:
