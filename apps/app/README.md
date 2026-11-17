@@ -21,7 +21,8 @@ harness.
   presses it. A page is a recipe: a title
   and its parts in their order, each part a tool of `genui-mcp` with its arguments. No value is kept and no
   sentence of a language model: opening a page calls the tools again and draws each answer with the card
-  the chat draws for that tool, so it shows what holds now and needs no language model. A part whose tool
+  the chat draws for that tool, so it shows what holds now and needs no language model. It is read once, and
+  its head says as of when; only while a part waits for the backend is it read again. A part whose tool
   the app has no card for stays where it is and says so; the rest of the page is whole. A page can be
   renamed, pinned and deleted from its head. A pinned page stands in the sidebar on the top level, beside
   Home; under it a group "Pages", which folds, lists the pages that are not pinned, the newest first, and

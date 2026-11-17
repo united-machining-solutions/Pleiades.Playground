@@ -5,9 +5,9 @@ import { Link, createFileRoute, notFound, useNavigate } from "@tanstack/react-ro
 import { EllipsisIcon, PencilIcon, PinIcon, SearchXIcon, Trash2Icon } from "lucide-react"
 import { useEffect, useId, useRef, useState } from "react"
 
-import { useLive } from "@/hooks/use-live.ts"
+import { useRetry } from "@/hooks/use-live.ts"
 import { Column, PartsLoading } from "@/pages/column.tsx"
-import { DrawnPart, answerParts } from "@/pages/drawn-part.tsx"
+import { DrawnPart, answerParts, waitsForBackend } from "@/pages/drawn-part.tsx"
 import { MAX_TITLE_LENGTH } from "@/pages/recipe.ts"
 import type { StoredPage } from "@/pages/recipe.ts"
 import { SharePage } from "@/pages/share-page.tsx"
@@ -38,8 +38,9 @@ import { Input } from "@pleiades/ui/components/input"
  * A page kept from the chat. One route draws every page: it reads the recipe from this browser,
  * calls the tool of each part again and draws each result with the card the chat draws for that
  * tool, in one column, in the order of the recipe. No language model, no chat, no key: the values
- * are those of now. A part without an answer stays where it is and says what is missing; the rest
- * of the page is whole.
+ * are those of when the page was opened, read once (ADR-0014). A part without an answer stays where
+ * it is and says what is missing; the rest of the page is whole. Only while a part waits for the
+ * backend is the page read again (`useRetry`).
  */
 export const Route = createFileRoute("/pages/$page")({
   // No entry of its own in the sidebar: a pinned page has one, read from this browser
@@ -61,11 +62,11 @@ function KeptPage() {
   const { page: id } = Route.useParams()
   const page = usePage(id)
   const { parts, readAt } = Route.useLoaderData()
-  useLive()
+  useRetry(parts.some(waitsForBackend))
   // Deleted in another tab while it was open.
   if (!page) return <NoPage />
   return (
-    <Column head={<Head page={page} line={`live · now ${clock(readAt)}`} />}>
+    <Column head={<Head page={page} line={`as of ${clock(readAt)}`} />}>
       {parts.map((part, index) => (
         // The parts of a page keep their order, so the place is the key.
         <DrawnPart key={index} part={part} />

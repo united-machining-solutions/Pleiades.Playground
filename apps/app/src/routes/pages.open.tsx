@@ -6,17 +6,17 @@ import { Link, createFileRoute, retainSearchParams, useNavigate } from "@tanstac
 import { LinkIcon, SearchXIcon } from "lucide-react"
 import { useState } from "react"
 
-import { useLive } from "@/hooks/use-live.ts"
+import { useRetry } from "@/hooks/use-live.ts"
 import { Column, PartsLoading } from "@/pages/column.tsx"
-import { DrawnPart, answerParts } from "@/pages/drawn-part.tsx"
+import { DrawnPart, answerParts, waitsForBackend } from "@/pages/drawn-part.tsx"
 import { RECIPE_PARAM, decodeRecipe } from "@/pages/link.ts"
 import type { Recipe } from "@/pages/recipe.ts"
 import { savePage } from "@/pages/store.ts"
 
 /**
  * A page opened from a link: the recipe is in the address (`pages/link.ts`), not in this browser. It
- * is drawn exactly as a kept page is, in the same column and with the same parts, read again while
- * it is open, with no language model and no chat: the values are those of now, whoever made the
+ * is drawn exactly as a kept page is, in the same column and with the same parts, read once when it
+ * is opened, with no language model and no chat: the values are those of then, whoever made the
  * link. Above it a notice says that this browser does not keep it yet, and "Save to my pages" keeps
  * it. There is no rename, pin or delete here: those come once the page is kept.
  *
@@ -51,12 +51,12 @@ export const Route = createFileRoute("/pages/open")({
 
 function OpenedPage() {
   const { opened } = Route.useLoaderData()
-  useLive()
+  useRetry(opened?.parts.some(waitsForBackend) ?? false)
   if (!opened) return <NoRecipe />
   return (
     <Column>
       <Notice recipe={opened.recipe} />
-      <Head title={opened.recipe.title} line={`live · now ${clock(opened.readAt)} · from a link`} />
+      <Head title={opened.recipe.title} line={`as of ${clock(opened.readAt)} · from a link`} />
       {opened.parts.map((part, index) => (
         // The parts of a page keep their order, so the place is the key.
         <DrawnPart key={index} part={part} />

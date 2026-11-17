@@ -37,6 +37,14 @@ export function answerParts(parts: ReadonlyArray<RecipePart>): Promise<Array<Ans
 }
 
 /**
+ * Whether a part waits for the backend: it has a card, the tool did not refuse, and no answer came.
+ * The part says that the page keeps trying (`DrawnPart`), and the page asks again until it has one.
+ */
+export function waitsForBackend({ tool, answer }: AnsweredPart): boolean {
+  return answer.values === null && !answer.refused && drawingTool(tool, chatTools) !== undefined
+}
+
+/**
  * One part: the card the chat draws for its tool, or what is missing. The tool of a part is the one
  * the recipe names, as in the chat the tool that was called: the values do not choose the card.
  */

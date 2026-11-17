@@ -49,7 +49,11 @@ does.
 ## Consequences
 
 - A page shows what holds when it is opened. A part that asked for "the last eight hours" shows the eight
-  hours before it was opened, and a card drawn from it is as live as the page of a machine.
+  hours before it was opened.
+- A page is read once, and its head says as of when. It is not live as the page of a machine is: that page
+  hears the broker ([ADR-0013](0013-live-values-from-the-broker.md)), by a rule for each kind of value of
+  what a message does to it, and a page of any tools has no such rule yet. Only while a part waits for the
+  backend is the page read again, as the other pages are.
 - A new card in the list of the chat can be a part of a page without another line of code.
 - A page lives in one browser. Another browser, a private window or cleared site data has other pages, or
   none. A page is shared by its link, and the receiver keeps it in their browser.

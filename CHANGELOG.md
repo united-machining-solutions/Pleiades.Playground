@@ -176,7 +176,8 @@ All notable changes are documented here. The format follows
 - Pages in the example application: a page is a recipe, a title and its parts, each part a tool of
   `genui-mcp` with its arguments, kept in the `localStorage` of the browser. Opening a page calls the tools
   again on the server of the app, only those the chat draws, and draws each answer with the card of the
-  chat: the values of now, no language model. A part whose tool the app has no card for stays and says so.
+  chat: the values of now, no language model. A page is read once, and its head says as of when; only while
+  a part waits for the backend is it read again. A part whose tool the app has no card for stays and says so.
   `/pages` lists the pages of the browser, and is reached through the breadcrumb; a page is renamed, pinned
   and deleted from its head. A pinned page stands in the sidebar on the top level, beside Home, and the
   others stand under it in a group "Pages" that folds, a plain row each, the newest first; with no page to
