@@ -5,6 +5,17 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- One tree for machines: `machines/{MachineId}/` follows the data model, in the structure of the former spec
+  tree (`umati/Manifest`, `umati/<path>`, `oem/<path>`, CloudEvents on `events/jobmonitoring`,
+  `events/workmastermonitoring` and `events/notifications`), in the units of the model (energy in `wattHour`).
+  The root `simulators/` is gone. The simulator publishes only this tree, from its virtual machine, which always
+  runs; the value generators, the notification generator, the job and work master events of the playground
+  binding, `Config:SpecOutput:Enabled`, `Config:ProductionEvents` and the second MQTT client are gone from it.
+  ADR-0012 and ADR-0002 say so. Persistence, APIs, MCP tools, genui-mcp and the app still read the earlier
+  binding and show no data of the simulators until a second step moves them.
+
 ### Added
 
 - Job events and work master events: job orders and program executions as events of the playground binding,

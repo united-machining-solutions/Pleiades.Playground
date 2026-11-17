@@ -57,12 +57,14 @@ timeseries-persistence   Up 3 minutes (healthy)
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
 port and setting. The three simulated machines, P-04, P-07 and M-02, are the three `simulator-*` services.
-Besides values and notifications each publishes its job orders as job events on
-`machines/<serial number>/events/jobs` and its program executions as work master events on
-`machines/<serial number>/events/workmasters`; the Events API keeps them.
-Each also publishes a second tree, below `simulators/<manufacturer>_<model>_<serial number>/` (for P-04
-`simulators/alcyone-machines_AX-400_P-04/`), that follows the umati data model exactly, its stack light included;
-no service reads it yet. It is described in [`contracts/mqtt`](../contracts/mqtt/README.md#spec-binding-draft).
+Each publishes after the umati data model, below `machines/<manufacturer>_<model>_<serial number>/` (for P-04
+`machines/alcyone-machines_AX-400_P-04/`): manifest, values, its stack light, and job orders, program executions
+and alerts as CloudEvents. It is described in
+[`contracts/mqtt`](../contracts/mqtt/README.md#machines-the-binding-of-the-data-model).
+
+> **For now:** the simulators publish only this tree, while persistence, APIs, genui-mcp and the app still read
+> the earlier binding of `machines/`. Until they move, the app shows no machine data, and the screenshots of the
+> stops below show the earlier state.
 
 ## 2. Home
 

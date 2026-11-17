@@ -1,10 +1,13 @@
 ---
-title: "A second tree on the broker follows the data model exactly"
+title: "The tree of machines on the broker follows the data model exactly"
 status: proposed
 date: 2026-11-15
 ---
 
-# ADR-0012: The spec binding beside the binding of the playground
+# ADR-0012: The binding of machines follows the data model
+
+First proposed as a second tree beside the binding of the playground (`simulators/`); since 2026-11-17 the second
+tree replaces the first, below `machines/`.
 
 ## Context
 
@@ -17,53 +20,49 @@ exactly after the model, to find a compromise for the differences.
 
 ## Decision
 
-- The simulator can publish a second tree, below `simulators/{MachineId}/`, that follows the model exactly: its paths,
-  types and units (energy in `wattHour`), its snapshots, lists, events and manifest. Its topics are described in
-  [`contracts/mqtt`, "Spec binding"](../../contracts/mqtt/README.md#spec-binding-draft).
-- ADR-0002 and ADR-0003 keep applying to `machines/` and `sites/`. They do not apply to `simulators/`.
+- `machines/{MachineId}/` follows the model exactly: its paths, types and units (energy in `wattHour`), its
+  snapshots, lists, CloudEvents and manifest. The earlier binding of the playground below `machines/` (values in
+  joule below `umati/` and `vendor/`, events as DTOs of the Events API) is replaced. Its topics are described in
+  [`contracts/mqtt`](../../contracts/mqtt/README.md#machines-the-binding-of-the-data-model).
+- [ADR-0002](0002-si-units-joule-and-one.md) keeps applying to `sites/` and to the stores of the services; it does
+  not apply to `machines/`, which carries the units of the model.
 - Events are meant to be stored, and a store of events must miss none. The model makes each event a CloudEvent
-  with a UUID `id` and a `sequence` per group; the binding adds what MQTT needs: events lie in a subtree of their
-  own, one topic per group (`simulators/{MachineId}/events/jobmonitoring`, `…/events/workmastermonitoring`,
-  `…/events/notifications`, the last named as in the binding of the playground), so that MQTT keeps the order of a group, go out with QoS 1 and the
-  content type `application/cloudevents+json; charset=utf-8`, and wait in a bounded outbox while the broker is
-  away, with the same `id` when they go out later. The schemas of the model check an event as it is.
+  with a UUID `id` and a `sequence` per group; the binding adds what MQTT needs: one topic per group
+  (`events/jobmonitoring`, `events/workmastermonitoring`, `events/notifications`), so that MQTT keeps the order of
+  a group, QoS 1, the content type `application/cloudevents+json; charset=utf-8`, and a bounded outbox while the
+  broker is away, with the same `id` when they go out later.
 - `Connection.State` is the state of the adapter (`Initializing`, `Running`, `CommunicationFault`, `Shutdown`).
-  The model needs no last will; the binding keeps one as a quicker sign, with `CommunicationFault`, and names
-  the choice as open.
-- The second tree lies below a root of its own, `simulators/{MachineId}/`, so that nothing mixes with the
-  persistence and the app. The machine id is `<manufacturer>_<model>_<serial number>`, formed from the domain of
-  `ManufacturerUri` (without `www.` and its top-level domain), `Model` and `SerialNumber`, for example
-  `alcyone-machines_AX-400_P-04` by a rule of normalisation, so that it is unique across
-  manufacturers and holds nothing a broker reads otherwise; the manifest names it as `machineId`, and carries the
-  globally unique `ProductInstanceUri` of the model. `machines/` keeps the serial number for now.
-- Below the serial number comes a namespace level, as the namespaces of OPC UA: `umati` for the elements of the
-  model, `oem` for the signals the machine manufacturer defines, `events` for the events. Below every
-  namespace the tree is built the same way, so a signal of a manufacturer lies at the same place as the elements
-  of the model, only in another namespace. In the manifest it has the prefix segment `x-<domain>` the model asks
-  for, with type and unit; the binding maps `x-<domain>.<path>` to `oem/<path>`, so the domain stands only in the
-  manifest. `umati`, `oem` and `events` are the reserved names. Consumers ignore what they do not know.
-- The second tree is an option of the simulator (`Config:SpecOutput:Enabled`), not a service of its own. One
-  container stays one machine; the image, the health check and the logging are those of the simulator.
-- A virtual machine, a state machine driven by a scenario, produces the second tree. The topics below
-  `machines/` keep coming from the generators, unchanged.
-- Every simulator of the demo stack publishes the second tree, each from a virtual machine with a scenario of its
-  own kind of machine, with its own MQTT client and last will, and with a manufacturer of its own: made-up names
-  after the Pleiades (Alcyone Machine Works, Taygeta Precision, Merope Microtec) on domains below `.example`.
+  The model needs no last will; the binding keeps one as a quicker sign, with `CommunicationFault`, and names the
+  choice as open.
+- The machine id is `<manufacturer>_<model>_<serial number>`, formed from the domain of `ManufacturerUri` (without
+  `www.` and its top-level domain), `Model` and `SerialNumber`, for example `alcyone-machines_AX-400_P-04`, by a
+  rule of normalisation, so that it is unique across manufacturers and holds nothing a broker reads otherwise; the
+  manifest names it as `machineId`, and carries the globally unique `ProductInstanceUri` of the model.
+- Below the machine id comes a namespace level, as the namespaces of OPC UA: `umati` for the elements of the
+  model, `oem` for the signals the machine manufacturer defines, `events` for the events. A signal of a
+  manufacturer lies at the same place as the elements of the model, only in another namespace; in the manifest it
+  has the prefix segment `x-<domain>` the model asks for, and the binding maps `x-<domain>.<path>` to
+  `oem/<path>`. `umati`, `oem` and `events` are the reserved names. Consumers ignore what they do not know.
+- A virtual machine, a state machine driven by a scenario, produces the tree in the simulator. The value
+  generators of the earlier binding are gone from the simulator. Every simulator of the demo stack has a
+  scenario of its own kind of machine and a made-up manufacturer of its own, named after the Pleiades.
+- The services move in two steps: first the simulators publish only the new tree; then persistence, APIs, MCP
+  tools, genui-mcp and the app read it. Until then they still read the earlier binding and see no data of the
+  simulators.
 
 ## Consequences
 
-- The broker carries energy in two units, in two trees. A consumer reads one tree or the other, never both.
-- No consumer changes. Persistence, APIs, app and chat do not read `simulators/` until the hackathon decides how.
-- A consumer that keeps events, such as a persistence of the playground, can find every gap and every
-  duplicate: by the count in `sequence` and by `id`, whether the gap comes from a full outbox or from a broker
-  that lost its session. A new prefix of `sequence` shows a restart of the adapter.
-- A machine with both outputs tells two stories: the values below `machines/` are not consistent with those
-  below `simulators/`. Once the consumers read the second tree, the generators can go, or follow the virtual machine.
-- The decision ends with the hackathon: either the binding of the playground moves to the model, or the model
-  takes over what the playground does differently.
+- One tree, one set of units for machines; a consumer reads the data model and nothing else.
+- Between the two steps the stack shows no machine data: the services read topics and content types nobody
+  publishes any more. The DTOs of the Events API stay for the second step.
+- A consumer that keeps events can find every gap and every duplicate: by the count in `sequence` and by `id`. A
+  new prefix of `sequence` shows a restart of the adapter.
+- The decision ends with the hackathon: the binding of the model is settled there, and this tree follows it.
 
 ## Alternatives considered
 
+- **Two trees side by side** (`simulators/` after the model, `machines/` for the playground), as first
+  proposed here: a machine told two stories, in two units, and every consumer had to pick one.
 - **Document the deviations and publish the model in joule**: the simulator would not be a reference adapter.
 - **Move the binding of the playground to a prefix of its own and give `machines/{SerialNumber}/umati/` to the
   model**: every consumer would have to change now, before the hackathon.
