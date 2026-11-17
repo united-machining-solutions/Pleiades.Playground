@@ -46,8 +46,14 @@ export const recipePartSchema = z.object({
   args: argsSchema,
 })
 
+/** Characters that turn the direction of the text after them: a title from a link could show other words than it holds. */
+const DIRECTION_MARKS = /[\u202A-\u202E\u2066-\u2069]/g
+
 /** The title of a page: what the sidebar, the breadcrumb and the list of pages call it. */
-export const titleSchema = z.string().trim().min(1).max(MAX_TITLE_LENGTH)
+export const titleSchema = z
+  .string()
+  .transform((title) => title.replace(DIRECTION_MARKS, ""))
+  .pipe(z.string().trim().min(1).max(MAX_TITLE_LENGTH))
 
 /** A recipe: the title of a page and its parts, in the order the page draws them. */
 export const recipeSchema = z.object({

@@ -15,6 +15,11 @@ test("a tool the app does not know is still a part: the page says that it has no
   assert.deepEqual(recipeOf(other), other)
 })
 
+test("a title keeps no mark that turns the direction of the text", () => {
+  const turned = recipeOf({ title: "Mixed parts\u202Eevil", parts: [{ tool: "genui_machine_list", args: {} }] })
+  assert.equal(turned?.title, "Mixed partsevil")
+})
+
 test("the title is trimmed, and an empty or too long one is refused", () => {
   assert.equal(recipeOf({ ...recipe, title: "  Morning round \n" })?.title, "Morning round")
   assert.equal(recipeOf({ ...recipe, title: "   " }), null)
