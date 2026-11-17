@@ -35,7 +35,7 @@ catalog:
   playwright: 1.65.0
   react: 19.3.1
   react-dom: 19.3.1
-  recharts: 3.8.0
+  recharts: 3.10.1
   rollup-plugin-license: 3.7.2
   shadcn: 4.23.0
   shiki: 4.6.0
