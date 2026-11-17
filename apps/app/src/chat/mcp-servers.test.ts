@@ -43,3 +43,11 @@ test("what was left out is named, without its address, so a typing mistake shows
   ])
   assert.deepEqual(leftOut({}), [])
 })
+
+test("the optional docs server keeps its tools and adds evidence instructions", () => {
+  const settings = { APP_MCP_SERVERS: "docs=http://127.0.0.1:3202/mcp" }
+  assert.equal(mcpServers(settings).docs?.toolName({ name: "docs_search" }), "docs_search")
+  assert.match(furtherInstructions(settings) ?? "", /docs_read_page/)
+  assert.match(furtherInstructions(settings) ?? "", /filename and page/)
+  assert.doesNotMatch(furtherInstructions({ APP_MCP_SERVERS: "other=http://other/mcp" }) ?? "", /docs_search/)
+})

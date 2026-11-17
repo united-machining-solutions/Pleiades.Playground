@@ -158,3 +158,25 @@ the backend of the running demo stack answers.
 - `src/styles.css`: Tailwind and the font. The theme of the preset, light only, comes from `@pleiades/ui`
   and the brands with it, the chart and state colours from `@pleiades/cards`, so a card looks the same
   wherever it is drawn.
+
+## Machine documentation in chat
+
+Run the external documentation API and MCP service, then append an entry to `APP_MCP_SERVERS`:
+
+```dotenv
+# Playground running locally:
+APP_MCP_SERVERS=docs=http://127.0.0.1:3202/mcp
+# Playground in Docker, documentation service on the host:
+# APP_MCP_SERVERS=docs=http://host.docker.internal:3202/mcp
+```
+
+Keep any existing entries, separated by commas. Restart the local app, or recreate the Docker app with
+`docker compose up -d --no-deps app` so it receives the new environment. The external MCP service must
+listen on an address reachable by that runtime and accept its Host header; loopback-only services cannot
+be assumed reachable from another container. The standard demo has no documentation dependency.
+
+Ask about a manual, for example “Welche vier technologischen Bearbeitungen unterscheidet CYCLE832?”.
+The chat uses `docs_search` and `docs_read_page`, cites the document and page, and shows clickable sources.
+Selecting a source reads its MCP page resource through the Playground backend and displays plain extracted
+text. Missing, changed or unavailable sources show an error. This does not display a PDF or its diagrams.
+The Playground never calls the documentation REST API or accesses its database.

@@ -42,3 +42,17 @@ Rules for tools in this repository:
 - Names are `<area>_<subject>_<action>` in lower case with underscores.
 - Numbers come from the server, never from the model. Every value carries its source.
 - Cards (MCP Apps) are `ui://` resources referenced by `_meta.ui.resourceUri`; they live with the app under `apps/`.
+
+## External machine documentation
+
+Configure the external documentation service as `docs=<MCP endpoint>` in `APP_MCP_SERVERS`.
+The tools `docs_search`, `docs_read_page`, and `docs_get_guide` are read-only. Search returns
+`{hits: [{text, score, source, citation, resourceUri}]}` and page reading returns
+`{text, source, citation, resourceUri}`. `source` includes document ID, SHA-256 revision, package,
+relative path, physical page, page label, and extraction method. Scores are ranking scores, not probabilities.
+
+The app displays citations from tool results and reads a selected page through MCP `resources/read`.
+Only `docs://documents/<64 lowercase hex ID>/<64 lowercase hex revision>/pages/<positive page>`
+resources are accepted. The browser chooses no server URL: the app connects only to the configured `docs`
+endpoint. Changed or unavailable revisions show an error and require another search. Source text is
+rendered as plain text, never as HTML. Original PDF viewing is outside this integration.
