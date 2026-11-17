@@ -103,6 +103,8 @@ public sealed class PlacementsEndpointTests : ApiTestBase
     [TestMethod]
     [DataRow("M+05")]
     [DataRow("M%2305")]
+    [DataRow("M%2F05")]
+    [DataRow("%20M-05")]
     public async Task PutPlacement_WithASerialNumberThatIsNoLevelOfATopic_ReturnsBadRequest(string escapedSerialNumber)
     {
         await GivenSiteAsync("north-plant");

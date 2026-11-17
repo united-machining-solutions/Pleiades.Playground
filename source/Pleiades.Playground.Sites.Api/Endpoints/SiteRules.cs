@@ -15,8 +15,15 @@ internal static class SiteRules
 
     /// <summary>
     /// A site id or serial number names one level of an MQTT topic: it is not blank and holds no <c>/</c>,
-    /// <c>+</c> or <c>#</c>.
+    /// <c>+</c> or <c>#</c>. It also holds no <c>%</c> and no blank at either end, see the remarks.
     /// </summary>
+    /// <remarks>
+    /// ASP.NET Core decodes a route value except for <c>%2F</c>, so <c>PUT /sites/a%2Fb</c> would store the id
+    /// <c>a%2Fb</c>. Refusing <c>%</c> keeps the id in the path and the id stored the same; decoding a second
+    /// time would turn a <c>%25</c> the client meant into something else. A blank at either end is refused
+    /// rather than trimmed: the caller sees the mismatch with <c>sites/{SiteId}</c> instead of a key it did not
+    /// send.
+    /// </remarks>
     internal static string? CheckTopicLevel(string? value, string name)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -24,8 +31,18 @@ internal static class SiteRules
             return $"The {name} is required.";
         }
 
-        return value.IndexOfAny(TopicReserved) >= 0
-            ? $"The {name} '{value}' contains '/', '+' or '#', which a level of an MQTT topic cannot hold."
+        if (value.IndexOfAny(TopicReserved) >= 0)
+        {
+            return $"The {name} '{value}' contains '/', '+' or '#', which a level of an MQTT topic cannot hold.";
+        }
+
+        if (value.Contains('%', StringComparison.Ordinal))
+        {
+            return $"The {name} '{value}' contains '%': send it unencoded, without '/', '+', '#' or '%'.";
+        }
+
+        return char.IsWhiteSpace(value[0]) || char.IsWhiteSpace(value[^1])
+            ? $"The {name} '{value}' begins or ends with a blank."
             : null;
     }
 

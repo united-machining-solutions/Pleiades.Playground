@@ -30,7 +30,7 @@ public sealed class McpServerConformanceTests
     [DataRow("Production")]
     public async Task McpServer_FollowsTheFleetConventions_AndAnswersLikeRest(string environment)
     {
-        var store = await SeededStoreAsync();
+        using var store = await SeededStoreAsync();
         await using var factory = SitesApiFactory.Create(store, new FixedTimeProvider(ApiTestBase.Start), environment);
         using var http = factory.CreateClient();
         var options = new McpConformanceOptions { RequireRestApi = true };
@@ -45,7 +45,8 @@ public sealed class McpServerConformanceTests
     [TestMethod]
     public async Task ToolsList_OffersOnlyReadingTools()
     {
-        await using var factory = SitesApiFactory.Create(new InMemorySitesStore(), new FixedTimeProvider(ApiTestBase.Start), Environments.Development);
+        using var store = new InMemorySitesStore();
+        await using var factory = SitesApiFactory.Create(store, new FixedTimeProvider(ApiTestBase.Start), Environments.Development);
         using var http = factory.CreateClient();
         await using var connection = await McpTestClient.ConnectAsync(http, cancellationToken: Ct);
 
@@ -62,7 +63,8 @@ public sealed class McpServerConformanceTests
     [DataRow("Production")]
     public async Task StartupCheck_ReportsNoDeviation(string environment)
     {
-        await using var factory = SitesApiFactory.Create(new InMemorySitesStore(), new FixedTimeProvider(ApiTestBase.Start), environment);
+        using var store = new InMemorySitesStore();
+        await using var factory = SitesApiFactory.Create(store, new FixedTimeProvider(ApiTestBase.Start), environment);
         using var http = factory.CreateClient(); // starts the host, which runs the check
 
         var deviations = factory.Services.GetRequiredService<McpServerConventionReport>().Deviations;

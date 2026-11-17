@@ -53,6 +53,9 @@ public sealed class SitesEndpointTests : ApiTestBase
     [TestMethod]
     [DataRow("north+plant")]
     [DataRow("north%23plant")]
+    [DataRow("north%2Fplant")]
+    [DataRow("%20north-plant")]
+    [DataRow("north-plant%20")]
     public async Task PutSite_WithAnIdThatIsNoLevelOfATopic_ReturnsBadRequest(string escapedSiteId)
     {
         using var response = await PutSiteAsync(escapedSiteId, new SiteRequestV1("Demo Manufacturing", "North plant", []));

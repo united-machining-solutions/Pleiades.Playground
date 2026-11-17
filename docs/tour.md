@@ -24,8 +24,8 @@ docker compose up -d --build --wait
 ```
 
 The command returns when the stack is ready, that is when every container reports healthy: the broker, the
-database, the two APIs with their persistence workers, the generative UI backend, the app and one simulator
-per machine. To see the demo without building it, start it from the published images, see
+database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app and
+one simulator per machine. To see the demo without building it, start it from the published images, see
 [Start](../README.md#start).
 
 ```bash
@@ -43,6 +43,7 @@ mongodb                  Up 3 minutes (healthy)
 simulator-m-02           Up 3 minutes (healthy)
 simulator-p-04           Up 3 minutes (healthy)
 simulator-p-07           Up 3 minutes (healthy)
+sites-api                Up 3 minutes (healthy)
 timeseries-api           Up 3 minutes (healthy)
 timeseries-persistence   Up 3 minutes (healthy)
 ```
@@ -53,6 +54,7 @@ timeseries-persistence   Up 3 minutes (healthy)
 | <http://localhost:5520/mcp> | The generative UI backend, an MCP server. The app reads every value from it. |
 | <http://localhost:5500/> | The Timeseries API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. |
+| <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
 | `localhost:1883` | The MQTT broker the simulators publish to. |
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
@@ -232,8 +234,9 @@ Each part has a section "What is where" that maps its files:
 | A card, its contract, the wording or the colours of a state | [`packages/cards`: What is where](../packages/cards/README.md#what-is-where), and [A new card](../packages/cards/README.md#a-new-card) |
 | What a machine publishes and how it is stored | [`contracts/`](../contracts/README.md) first, then the .NET services under [`source/`](../source) |
 
-Below the app are the two APIs. Each one offers the same queries twice: over REST for applications, with a
-Swagger UI to try them, and over MCP for agents.
+Below the app are the two APIs, and next to them the Sites API, which keeps where the machines stand. Each one
+offers the same queries twice: over REST for applications, with a Swagger UI to try them, and over MCP for
+agents.
 
 ![The Swagger UI of the Timeseries API at localhost:5500, version 0.0.1.0, with the first endpoints of the
 group Timeseries: GET and POST for base unit values, string values and boolean
@@ -247,9 +250,10 @@ endpoint and choose "Try it out" to send a request to the running stack.
 |---|---|---|---|
 | Timeseries | <http://localhost:5500/>, OpenAPI at `/openapi/v1.json` | `http://localhost:5500/mcp` | [`contracts/openapi`](../contracts/openapi/README.md), [`contracts/mcp`](../contracts/mcp/README.md) |
 | Events | <http://localhost:5510/>, OpenAPI at `/openapi/v1.json` | `http://localhost:5510/mcp` | the same |
+| Sites | <http://localhost:5540/>, OpenAPI at `/openapi/v1.json` | `http://localhost:5540/mcp` | the same |
 | Generative UI | none: it is an MCP server only | `http://localhost:5520/mcp` | [`contracts/mcp`](../contracts/mcp/README.md), [`packages/cards`](../packages/cards/README.md) |
 
-To use the tools from your own agent, add the three MCP addresses to any MCP client; the entry to copy is in
+To use the tools from your own agent, add the MCP addresses to any MCP client; the entry to copy is in
 [`contracts/mcp`](../contracts/mcp/README.md).
 
 ---

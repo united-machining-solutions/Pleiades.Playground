@@ -30,7 +30,7 @@ internal sealed class SitesTools(ISitesStore store)
          "most. A machine that sends values but is not listed here stands on no site.")]
     public async Task<IReadOnlyList<PlacementDtoV1>> ListPlacements(CancellationToken cancellationToken = default)
     {
-        var placements = await store.ListPlacementsAsync(siteId: null, cancellationToken).ConfigureAwait(false);
+        var placements = await store.ListPlacementsAsync(cancellationToken).ConfigureAwait(false);
         return SitesMapper.ToDtos(placements);
     }
 }

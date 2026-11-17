@@ -199,7 +199,8 @@ services:
       <<: *build
       dockerfile: Pleiades.Playground.Sites.Api/Dockerfile
     ports:
-      - "${SITES_API_PORT:-5540}:8080"
+      # Writing needs no sign-in in the demo: this computer only, unless SITES_BIND opens it.
+      - "${SITES_BIND:-127.0.0.1}:${SITES_API_PORT:-5540}:8080"
     depends_on:
       mongodb:
         condition: service_healthy

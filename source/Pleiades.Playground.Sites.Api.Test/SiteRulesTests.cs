@@ -15,6 +15,11 @@ public sealed class SiteRulesTests
     [DataRow("")]
     [DataRow("   ")]
     [DataRow(null)]
+    [DataRow("north%2Fplant")]
+    [DataRow("100%")]
+    [DataRow(" north-plant")]
+    [DataRow("north-plant ")]
+    [DataRow("north-plant\t")]
     public void CheckTopicLevel_RefusesWhatALevelOfAnMqttTopicCannotHold(string? value) =>
         Assert.IsNotNull(SiteRules.CheckTopicLevel(value, "site id"));
 

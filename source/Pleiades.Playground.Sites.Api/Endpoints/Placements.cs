@@ -39,7 +39,7 @@ internal static class Placements
     /// <returns>Every placement.</returns>
     internal static async Task<Ok<IReadOnlyList<PlacementDtoV1>>> GetPlacements(ISitesStore store, CancellationToken cancellationToken)
     {
-        var placements = await store.ListPlacementsAsync(siteId: null, cancellationToken).ConfigureAwait(false);
+        var placements = await store.ListPlacementsAsync(cancellationToken).ConfigureAwait(false);
         return TypedResults.Ok(SitesMapper.ToDtos(placements));
     }
 
@@ -47,7 +47,7 @@ internal static class Placements
     /// Puts a machine on a site, or moves it to another site or hall. Its values and notifications are not
     /// touched. The time it was placed changes only when the site does.
     /// </summary>
-    /// <param name="serialNumber">The serial number: no '/', '+' or '#'. Example: M-05</param>
+    /// <param name="serialNumber">The serial number: no '/', '+', '#' or '%', no blank at either end. Example: M-05</param>
     /// <param name="request">Site, hall and display name.</param>
     /// <param name="store">The store of sites and placements.</param>
     /// <param name="timeProvider">The clock of the time a machine is placed.</param>
@@ -65,30 +65,38 @@ internal static class Placements
             return TypedResults.BadRequest(error);
         }
 
-        var site = await store.FindSiteAsync(request.SiteId!, cancellationToken).ConfigureAwait(false);
-        if (SiteRules.CheckPlacementOnSite(request, site) is { } siteError)
-        {
-            return TypedResults.BadRequest(siteError);
-        }
+        return await store.InTransactionAsync(
+            async Task<Results<Created<PlacementDtoV1>, Ok<PlacementDtoV1>, BadRequest<string>>> (tx, token) =>
+            {
+                var site = await tx.FindSiteAsync(request.SiteId!, token).ConfigureAwait(false);
+                if (SiteRules.CheckPlacementOnSite(request, site) is { } siteError)
+                {
+                    return TypedResults.BadRequest(siteError);
+                }
 
-        var existing = await store.FindPlacementAsync(serialNumber, cancellationToken).ConfigureAwait(false);
-        var placement = new PlacementDao
-        {
-            SerialNumber = serialNumber,
-            SiteId = request.SiteId!,
-            Hall = request.Hall,
-            DisplayName = request.DisplayName,
-            PlacedAt = existing is not null && existing.SiteId == request.SiteId
-                ? existing.PlacedAt
-                : Now(timeProvider),
-        };
+                // A concurrent transaction that removes the site or drops the hall now conflicts with this one.
+                await tx.ClaimSiteAsync(request.SiteId!, token).ConfigureAwait(false);
 
-        await store.SavePlacementAsync(placement, cancellationToken).ConfigureAwait(false);
+                var existing = await tx.FindPlacementAsync(serialNumber, token).ConfigureAwait(false);
+                var placement = new PlacementDao
+                {
+                    SerialNumber = serialNumber,
+                    SiteId = request.SiteId!,
+                    Hall = request.Hall,
+                    DisplayName = request.DisplayName,
+                    PlacedAt = existing is not null && existing.SiteId == request.SiteId
+                        ? existing.PlacedAt
+                        : Now(timeProvider),
+                };
 
-        var dto = SitesMapper.ToDto(placement);
-        return existing is null
-            ? TypedResults.Created(new Uri($"/placements/{Uri.EscapeDataString(serialNumber)}", UriKind.Relative), dto)
-            : TypedResults.Ok(dto);
+                await tx.SavePlacementAsync(placement, token).ConfigureAwait(false);
+
+                var dto = SitesMapper.ToDto(placement);
+                return existing is null
+                    ? TypedResults.Created(new Uri($"/placements/{Uri.EscapeDataString(serialNumber)}", UriKind.Relative), dto)
+                    : TypedResults.Ok(dto);
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

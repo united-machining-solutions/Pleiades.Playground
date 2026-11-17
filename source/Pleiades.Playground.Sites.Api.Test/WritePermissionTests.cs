@@ -14,7 +14,7 @@ namespace Pleiades.Playground.Sites.Api.Test;
 /// internal API key, as for the other APIs.
 /// </summary>
 [TestClass]
-public sealed class WritePermissionTests
+public sealed class WritePermissionTests : IDisposable
 {
     private static readonly SiteRequestV1 NorthPlant = new("Demo Manufacturing", "North plant", ["Hall 1"]);
 
@@ -34,11 +34,11 @@ public sealed class WritePermissionTests
         _http = _factory.CreateClient();
     }
 
-    [TestCleanup]
-    public async Task StopHost()
+    public void Dispose()
     {
         _http.Dispose();
-        await _factory.DisposeAsync();
+        _factory.Dispose();
+        _store.Dispose();
     }
 
     [TestMethod]

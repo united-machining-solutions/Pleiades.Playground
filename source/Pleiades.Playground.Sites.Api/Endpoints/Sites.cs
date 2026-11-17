@@ -46,7 +46,7 @@ internal static class Sites
     /// <summary>
     /// Creates a site, or changes the one with this id. A hall that still has machines cannot be left out.
     /// </summary>
-    /// <param name="siteId">The site id: no '/', '+' or '#'. Example: north-plant</param>
+    /// <param name="siteId">The site id: no '/', '+', '#' or '%', no blank at either end. Example: north-plant</param>
     /// <param name="request">Company, name and halls of the site.</param>
     /// <param name="store">The store of sites and placements.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -70,29 +70,35 @@ internal static class Sites
             Halls = [.. request.Halls ?? []],
         };
 
-        var existing = await store.FindSiteAsync(siteId, cancellationToken).ConfigureAwait(false);
-        if (existing is not null)
-        {
-            var leftOut = existing.Halls.Except(site.Halls, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
-            if (leftOut.Count > 0)
+        return await store.InTransactionAsync(
+            async Task<Results<Created<SiteDtoV1>, Ok<SiteDtoV1>, BadRequest<string>, Conflict<string>>> (tx, token) =>
             {
-                var placements = await store.ListPlacementsAsync(siteId, cancellationToken).ConfigureAwait(false);
-                var inLeftOut = placements.Where(p => p.Hall is not null && leftOut.Contains(p.Hall)).ToList();
-                if (inLeftOut.Count > 0)
+                var existing = await tx.FindSiteAsync(siteId, token).ConfigureAwait(false);
+                if (existing is not null)
                 {
-                    return TypedResults.Conflict(
-                        $"The hall '{inLeftOut[0].Hall}' of the site '{siteId}' still has machines: " +
-                        $"{string.Join(", ", inLeftOut.Select(p => p.SerialNumber))}. Move or remove them first.");
+                    var leftOut = existing.Halls.Except(site.Halls, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
+                    if (leftOut.Count > 0)
+                    {
+                        var placements = await tx.ListPlacementsOfSiteAsync(siteId, token).ConfigureAwait(false);
+                        var inLeftOut = placements.Where(p => p.Hall is not null && leftOut.Contains(p.Hall)).ToList();
+                        if (inLeftOut.Count > 0)
+                        {
+                            return TypedResults.Conflict(
+                                $"The hall '{inLeftOut[0].Hall}' of the site '{siteId}' still has machines: " +
+                                $"{string.Join(", ", inLeftOut.Select(p => p.SerialNumber))}. Move or remove them first.");
+                        }
+                    }
                 }
-            }
-        }
 
-        await store.SaveSiteAsync(site, cancellationToken).ConfigureAwait(false);
+                // Saving writes the site, so a concurrent transaction that put a machine on it conflicts.
+                await tx.SaveSiteAsync(site, token).ConfigureAwait(false);
 
-        var dto = SitesMapper.ToDto(site);
-        return existing is null
-            ? TypedResults.Created(new Uri($"/sites/{Uri.EscapeDataString(siteId)}", UriKind.Relative), dto)
-            : TypedResults.Ok(dto);
+                var dto = SitesMapper.ToDto(site);
+                return existing is null
+                    ? TypedResults.Created(new Uri($"/sites/{Uri.EscapeDataString(siteId)}", UriKind.Relative), dto)
+                    : TypedResults.Ok(dto);
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -112,16 +118,22 @@ internal static class Sites
             return TypedResults.BadRequest(error);
         }
 
-        var placements = await store.ListPlacementsAsync(siteId, cancellationToken).ConfigureAwait(false);
-        if (placements.Count > 0)
-        {
-            return TypedResults.Conflict(
-                $"The site '{siteId}' still has machines: {string.Join(", ", placements.Select(p => p.SerialNumber))}. " +
-                "Move or remove them first.");
-        }
+        return await store.InTransactionAsync(
+            async Task<Results<NoContent, NotFound, BadRequest<string>, Conflict<string>>> (tx, token) =>
+            {
+                var placements = await tx.ListPlacementsOfSiteAsync(siteId, token).ConfigureAwait(false);
+                if (placements.Count > 0)
+                {
+                    return TypedResults.Conflict(
+                        $"The site '{siteId}' still has machines: {string.Join(", ", placements.Select(p => p.SerialNumber))}. " +
+                        "Move or remove them first.");
+                }
 
-        return await store.DeleteSiteAsync(siteId, cancellationToken).ConfigureAwait(false)
-            ? TypedResults.NoContent()
-            : TypedResults.NotFound();
+                // Deleting writes the site, so a concurrent transaction that put a machine on it conflicts.
+                return await tx.DeleteSiteAsync(siteId, token).ConfigureAwait(false)
+                    ? TypedResults.NoContent()
+                    : TypedResults.NotFound();
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 }

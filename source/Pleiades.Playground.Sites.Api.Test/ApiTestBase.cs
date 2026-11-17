@@ -38,6 +38,7 @@ public abstract class ApiTestBase
     {
         Http.Dispose();
         await _factory.DisposeAsync();
+        Store.Dispose();
     }
 
     internal CancellationToken Ct => TestContext.CancellationToken;
