@@ -17,22 +17,24 @@ exactly after the model, to find a compromise for the differences.
 
 ## Decision
 
-- The simulator can publish a second tree, below `simulators/{SerialNumber}/`, that follows the model exactly: its paths,
+- The simulator can publish a second tree, below `simulators/{MachineId}/`, that follows the model exactly: its paths,
   types and units (energy in `wattHour`), its snapshots, lists, events and manifest. Its topics are described in
   [`contracts/mqtt`, "Spec binding"](../../contracts/mqtt/README.md#spec-binding-draft).
 - ADR-0002 and ADR-0003 keep applying to `machines/` and `sites/`. They do not apply to `simulators/`.
 - Events are meant to be stored, and a store of events must miss none. The model makes each event a CloudEvent
   with a UUID `id` and a `sequence` per group; the binding adds what MQTT needs: events lie in a subtree of their
-  own, one topic per group (`simulators/{SerialNumber}/events/jobmonitoring`, `…/events/workmastermonitoring`,
+  own, one topic per group (`simulators/{MachineId}/events/jobmonitoring`, `…/events/workmastermonitoring`,
   `…/events/notifications`, the last named as in the binding of the playground), so that MQTT keeps the order of a group, go out with QoS 1 and the
   content type `application/cloudevents+json; charset=utf-8`, and wait in a bounded outbox while the broker is
   away, with the same `id` when they go out later. The schemas of the model check an event as it is.
 - `Connection.State` is the state of the adapter (`Initializing`, `Running`, `CommunicationFault`, `Shutdown`).
   The model needs no last will; the binding keeps one as a quicker sign, with `CommunicationFault`, and names
   the choice as open.
-- The second tree lies below a root of its own, `simulators/{SerialNumber}/`, with the same serial number as below `machines/`, so that
-  nothing mixes with the persistence and the app. The machine is identified by that serial number and by the
-  manifest, which carries the globally unique `ProductInstanceUri` of the model.
+- The second tree lies below a root of its own, `simulators/{MachineId}/`, so that nothing mixes with the
+  persistence and the app. The machine id is `<manufacturer>_<model>_<serial number>`, formed from the domain of
+  `ManufacturerUri`, `Model` and `SerialNumber` by a rule of normalisation, so that it is unique across
+  manufacturers and holds nothing a broker reads otherwise; the manifest names it as `machineId`, and carries the
+  globally unique `ProductInstanceUri` of the model. `machines/` keeps the serial number for now.
 - Below the serial number comes a namespace level, as the namespaces of OPC UA: `umati` for the elements of the
   model, `oem` for the signals the machine manufacturer defines, `events` for the events. Below every
   namespace the tree is built the same way, so a signal of a manufacturer lies at the same place as the elements

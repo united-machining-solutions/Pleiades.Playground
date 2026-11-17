@@ -12,7 +12,7 @@ namespace Pleiades.Playground.Simulator.Spec;
     Justification = "Bound by the configuration binder, never constructed in code")]
 internal sealed class SpecOutputConfig
 {
-    /// <summary>Whether this simulator also publishes below <c>simulators/{SerialNumber}/</c>.</summary>
+    /// <summary>Whether this simulator also publishes below <c>simulators/{MachineId}/</c>.</summary>
     public bool Enabled { get; init; }
 
     /// <summary>Name of the manufacturer, the value of <c>Identification.Manufacturer</c>.</summary>

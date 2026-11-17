@@ -7,10 +7,11 @@ Each API serves its own description; that document is the contract.
 | Timeseries API | `http://localhost:5500/openapi/v1.json` | `http://localhost:5500/` |
 | Events API | `http://localhost:5510/openapi/v1.json` | `http://localhost:5510/` |
 
-The Events API serves notification events (`/notificationEvents`) and production events: `/productionEvents`
-with `/productionEvents/correlationPairs` (program executions from start to end), and `/jobOrders` with
-`/jobOrders/{mId}/{jobOrderId}` (the last known state of each job order and its history, put together from its
-production events; a job order id may contain `/`).
+The Events API serves notification events (`/notificationEvents`), job events (`/jobEvents`) with the job
+orders put together from them (`/jobOrders`, and `/jobOrders/{mId}/{jobOrderId}` with the last known state, its
+result included, the history and the program executions of one job order; a job order id may contain `/`), and
+work master events (`/workMasterEvents`) with `/workMasterEvents/correlationPairs` (program executions from start
+to end). Each type of event takes `POST` and `POST …/bulk`.
 
 Snapshots of both documents will be committed here once the first release is tagged, so that a change to an API
 shows up as a diff in review.

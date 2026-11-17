@@ -218,8 +218,8 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
 
-  # One simulator per machine. The serial number is the machine id in every topic.
-  # Every simulator also publishes after the data model, below simulators/{SerialNumber}/ (contracts/mqtt,
+  # One simulator per machine. The serial number is the machine id in every topic below machines/.
+  # Every simulator also publishes after the data model, below simulators/{MachineId}/ (contracts/mqtt,
   # "Spec binding"), from a virtual machine of its own with a scenario of its own kind of machine, as client
   # <ClientId>-spec. The topics below machines/{SerialNumber}/ stay as they are.
   # All three run the same image. Only the first one builds it, or pulls it, so that happens once and not

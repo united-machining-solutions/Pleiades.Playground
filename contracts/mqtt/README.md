@@ -13,9 +13,9 @@ see [Spec binding (draft)](#spec-binding-draft); no service reads them yet.
 ```text
 machines/{SerialNumber}/umati/<path>     values named by the data model
 machines/{SerialNumber}/vendor/<path>    manufacturer-specific values
-machines/{SerialNumber}/events/<kind>    events, see "Notifications" and "Production events"
+machines/{SerialNumber}/events/<kind>    events, see "Notifications", "Job events" and "Work master events"
 sites/{SiteId}/{Source}/<path>           values about a place, in the names of one source
-simulators/{SerialNumber}/...            the simulator of a machine after the data model, see "Spec binding"
+simulators/{MachineId}/...               the simulator of a machine after the data model, see "Spec binding"
 ```
 
 The first two levels of a topic say what a value is about, the third says whose names follow.
@@ -92,45 +92,72 @@ The payload is the notification event of the Events API (see [`../openapi`](../o
 - The Events persistence logs and drops a message without a content type or with an unknown one. A client that
   speaks MQTT 3.1.1 cannot set the content type, so notifications need an MQTT 5 client.
 
-## Production events
+## Job events
 
-Job orders and program executions are events too. Every change of state of a job order or a program execution,
-and every other change of a job order, is one event; all events of one job order, or of one program
-execution, share the same `CorrelationId`, and the Events API keeps them and puts the current state together
-from them.
+Job orders are events too. Every change of state of a job order, every other change of it and every change of its
+result is one event; all events of one job order share the same `CorrelationId`, its `JobOrderId`, and the
+Events API keeps them and puts the current state together from them.
 
 ```text
-machines/{SerialNumber}/events/production
+machines/{SerialNumber}/events/jobs
 ```
 
-The payload is the production event of the Events API, `ProductionEventDtoV1` (see
-[`../openapi`](../openapi/README.md)):
+The payload is the job event of the Events API, `JobEventDtoV1` (see [`../openapi`](../openapi/README.md)):
 
 ```json
 { "Timestamp": "2026-11-17T09:21:40.000Z", "Id": "0f4c4a51-8e2b-5d6a-9c1f-4b7e2d913a60", "MId": "P-04",
-  "Subject": "ProgramExecution", "Action": "Ended", "CorrelationId": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001",
-  "JobOrderId": "4711/01", "ExecutionId": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001", "WorkMaster": "WM-SHAFT-4711",
-  "State": "Ended", "StartTime": "2026-11-17T08:31:00.000Z",
-  "Duration": 3040.0, "PartsProduced": 1, "EnergyElectricity": 6661800, "Seq": 1842 }
+  "Action": "ResultChanged", "CorrelationId": "4711/01", "JobOrderId": "4711/01", "State": "Running",
+  "JobName": "Shaft 4711", "WorkMasterId": "WM-SHAFT-4711", "OrderNumbers": ["SO-4711"], "RunsPlanned": 12,
+  "JobExecutionMode": "ProductionMode", "PlannedStartTime": null, "PlannedEndTime": null,
+  "StartTime": "2026-11-17T08:31:00.000Z", "EndTime": null, "ProducedQuantity": 3, "GoodQuantity": 3,
+  "RunsCompleted": 3, "ActualProductionTime": 180.0, "JobResult": "Unknown", "Seq": 42 }
 ```
 
-- The MQTT 5 content type is mandatory and names the payload: `productioneventdtov1`. As with notifications,
-  the Events persistence logs and drops a message without a content type or with an unknown one.
+- The MQTT 5 content type is mandatory and names the payload: `jobeventdtov1`. As with notifications, the Events
+  persistence logs and drops a message without a content type or with an unknown one.
 - QoS 1, not retained: an event happened once; the state is what its events add up to.
-- `Subject` is `JobOrder` or `ProgramExecution`. `Action` names what happened after the state reached: `Added`,
-  `Released`, `Revoked`, `Started`, `Interrupted`, `Resumed`, `Ended`, `Aborted`, `Cancelled`, `Changed`,
-  `Removed` for a job order; `Started`, `Interrupted`, `Resumed`, `Ended`, `Aborted` for a program execution.
-- `CorrelationId` is the `JobOrderId` of a job order and the `ExecutionId` of a program execution. A program
-  execution names its job order in `JobOrderId`.
-- Every event carries the whole state after it: `State`, `StartTime`, `EndTime`, `ProducedQuantity` and
-  `GoodQuantity` for a job order; `State`, `StartTime`, `WorkMaster` for a program execution, and at its end
-  (`Ended`, `Aborted`) the sums `Duration`, `PartsProduced`, `EnergyElectricity` and `EnergyCompressedAir`.
-- Units after this binding: `Duration` in seconds, energy in joule, quantities as counts. The data model sends
-  energy in watt hours; the source converts once.
+- `Action` names what happened: after the state reached (ISA-95) `Added`, `Released`, `Revoked`, `Started`,
+  `Interrupted`, `Resumed`, `Ended`, `Aborted`, `Cancelled` (aborted before it started), `Removed`; or `Changed`
+  (what is ordered changed) and `ResultChanged` (a quantity or the end changed).
+- Every event carries the whole job order after it, as the data model has it in two lists: what is ordered
+  (`JobName`, `WorkMasterId`, `OrderNumbers`, `RunsPlanned`, `JobExecutionMode`, `PlannedStartTime`,
+  `PlannedEndTime`) and, from its start on, what came of it (`StartTime`, `EndTime`, `ProducedQuantity`,
+  `GoodQuantity`, `RunsCompleted`, `ActualProductionTime`, `JobResult`). Before the start the fields of the
+  result are `null`; `EndTime` is `null` and `JobResult` `Unknown` until the end.
+- `ActualProductionTime` in seconds, quantities as counts.
+
+## Work master events
+
+Program executions, the machine carrying out a work master, are events of their own. All events of one program
+execution share the same `CorrelationId`, its `ExecutionId`.
+
+```text
+machines/{SerialNumber}/events/workmasters
+```
+
+The payload is the work master event of the Events API, `WorkMasterEventDtoV1`:
+
+```json
+{ "Timestamp": "2026-11-17T09:21:40.000Z", "Id": "7b1d0c52-3f0e-5a41-8d2c-91e4f0a6b733", "MId": "P-04",
+  "Action": "Ended", "CorrelationId": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001",
+  "ExecutionId": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001", "WorkMasterId": "WM-SHAFT-4711", "JobOrderId": "4711/01",
+  "State": "Ended", "StartTime": "2026-11-17T08:31:00.000Z",
+  "Duration": 3040.0, "PartsProduced": 1, "EnergyElectricity": 6661800, "EnergyCompressedAir": null, "Seq": 1842 }
+```
+
+- The MQTT 5 content type is mandatory: `workmastereventdtov1`. QoS 1, not retained.
+- `Action` is `Started`, `Interrupted`, `Resumed`, `Ended` or `Aborted`. `JobOrderId` names the job order the
+  program execution belongs to, if any; `StartTime` stays after an interruption.
+- `Ended` and `Aborted` carry the sums over the program execution, its interruptions included: `Duration` in
+  seconds, `PartsProduced`, `EnergyElectricity` and `EnergyCompressedAir` in joule. The data model sends energy in
+  watt hours; the source converts once.
+
+For both types:
+
 - `Id` is unique per event. The simulator takes the `id` of the same event in the spec binding (a UUID made
   from the machine, the start of its run and the number of the event), so a delivery that QoS 1 repeats carries
   the same `Id`, and the Events API refuses the second copy.
-- `Seq` is optional: it counts the production events of a machine without a gap and may start again from 1 when
+- `Seq` is optional: it counts the events of one type of a machine without a gap and may start again from 1 when
   the source restarts, so a gap shows.
 
 ## Deviations from the data model
@@ -139,7 +166,7 @@ The payload is the production event of the Events API, `ProductionEventDtoV1` (s
 |---|---|---|---|
 | Energy | `wattHour` | `joule` | One coherent SI unit per quantity. |
 | `State.Status` | One snapshot struct with two members | Two topics, `State/MachineryItemState` and `State/MachineryOperationMode` | The persistence stores numbers, strings and booleans. |
-| Lists (`Notification.ActiveAlerts`, `Production.JobOrders`) | One list value | Not published; alarms travel as notification events, job orders and program executions as production events | As above. |
+| Lists (`Notification.ActiveAlerts`, `JobMonitoring.JobOrders`, `JobMonitoring.JobOrderResults`) | One list value | Not published; alarms travel as notification events, job orders with their results as job events, program executions as work master events | As above. |
 | Alarm severity | Categories after NAMUR NE 107 | Levels of the Events API | Mapping is future work. |
 | Manufacturer-specific values | `x-<domain>` prefix | `vendor/` topic level | Simple wildcard subscription. |
 
@@ -160,7 +187,8 @@ The payload is the production event of the Events API, `ProductionEventDtoV1` (s
 | `umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `joule` |
 | `vendor/Spindle/1/BearingTemperature` | number | `degreeCelsius` |
 | `events/notifications` | notification event | – |
-| `events/production` | production event | – |
+| `events/jobs` | job event | – |
+| `events/workmasters` | work master event | – |
 
 ## Example topics of a source
 
@@ -197,10 +225,10 @@ namespaces of OPC UA: one namespace for the model, one for the signals the machi
 below each the tree is built the same way.
 
 ```text
-simulators/{SerialNumber}/umati/Manifest                       retained      the manifest
-simulators/{SerialNumber}/umati/<path, every "." a level>      retained      an element of the model: value, snapshot or list
-simulators/{SerialNumber}/oem/<path, every "." a level>        retained      a signal the machine manufacturer defines
-simulators/{SerialNumber}/events/<topic of the group>          not retained  event
+simulators/{MachineId}/umati/Manifest                       retained      the manifest
+simulators/{MachineId}/umati/<path, every "." a level>      retained      an element of the model: value, snapshot or list
+simulators/{MachineId}/oem/<path, every "." a level>        retained      a signal the machine manufacturer defines
+simulators/{MachineId}/events/<topic of the group>          not retained  event
 ```
 
 - The namespace level is the third level. `umati` holds the elements of the model and the manifest; `oem`, the
@@ -211,9 +239,9 @@ simulators/{SerialNumber}/events/<topic of the group>          not retained  eve
 - `simulators/` is the root: the output stands for the simulator of a machine. It lies beside `machines/`, so
   nothing mixes with the persistence and the app, which subscribe to `machines/+/umati/#`, `machines/+/vendor/#`
   and `machines/+/events/#`. The tree below `machines/` stays as it is.
-- `{SerialNumber}` is the same serial number as below `machines/` (`Config:SerialNumber`). It contains no `/`,
-  `+` or `#`. The machine is identified by the serial number in the topic and by its manifest:
-  `machine.ProductInstanceUri`, the globally unique id the model asks for, and the values below
+- `{MachineId}` is `<manufacturer>_<model>_<serial number>`, for example `example-com_GX-400_P-04` (see "Machine
+  id" below). The manifest names it as `machineId`. The machine is identified by it in the topic and by its
+  manifest: `machine.ProductInstanceUri`, the globally unique id the model asks for, and the values below
   `umati/Identification/` (`Manufacturer`, `SerialNumber`, `ProductInstanceUri`, `Model`, `ManufacturerUri`,
   `ProductCode`, `YearOfConstruction`). `ProductInstanceUri` contains
   `/` and `:` and cannot be a topic level.
@@ -229,15 +257,15 @@ simulators/{SerialNumber}/events/<topic of the group>          not retained  eve
   `application/cloudevents+json; charset=utf-8`.
 
 ```text
-simulators/P-04/umati/Manifest
-simulators/P-04/umati/State/Status
-simulators/P-04/umati/Spindle/1/IsRotating
-simulators/P-04/umati/JobMonitoring/JobOrders
-simulators/P-04/umati/JobMonitoring/JobOrderResults
-simulators/P-04/oem/Spindle/1/BearingTemperature
-simulators/P-04/events/jobmonitoring
-simulators/P-04/events/workmastermonitoring
-simulators/P-04/events/notifications
+simulators/example-com_GX-400_P-04/umati/Manifest
+simulators/example-com_GX-400_P-04/umati/State/Status
+simulators/example-com_GX-400_P-04/umati/Spindle/1/IsRotating
+simulators/example-com_GX-400_P-04/umati/JobMonitoring/JobOrders
+simulators/example-com_GX-400_P-04/umati/JobMonitoring/JobOrderResults
+simulators/example-com_GX-400_P-04/oem/Spindle/1/BearingTemperature
+simulators/example-com_GX-400_P-04/events/jobmonitoring
+simulators/example-com_GX-400_P-04/events/workmastermonitoring
+simulators/example-com_GX-400_P-04/events/notifications
 ```
 
 Because the tree below every namespace is built the same way, wildcards cut across it either way:
@@ -246,9 +274,41 @@ Because the tree below every namespace is built the same way, wildcards cut acro
 |---|---|
 | `simulators/+/umati/#` | only the elements of the model, of every simulator |
 | `simulators/+/oem/#` | only the signals the machine manufacturers define |
-| `simulators/P-04/+/Spindle/1/#` | everything about spindle 1 of P-04, whatever the namespace |
+| `simulators/example-com_GX-400_P-04/+/Spindle/1/#` | everything about spindle 1 of P-04, whatever the namespace |
+| `simulators/example-com_GX-400_P-04/#` | everything of P-04 |
 | `simulators/+/+/Spindle/+/BearingTemperature` | the bearing temperature of every spindle, whatever the namespace |
 | `simulators/+/events/+` | every event |
+
+### Machine id
+
+The level below `simulators/` names the machine: `<manufacturer>_<model>_<serial number>`. The adapter forms it
+once from values it publishes anyway:
+
+| Part | From | Example |
+|---|---|---|
+| manufacturer | the domain of `Identification.ManufacturerUri`, without a leading `www.`, every dot a `-` | `https://www.example.com` → `example-com` |
+| model | `Identification.Model` | `GX-400` |
+| serial number | `Identification.SerialNumber` | `P-04` |
+
+Each part is normalised: `ä`, `ö`, `ü`, `ß` become `ae`, `oe`, `ue`, `ss` (`Ä`, `Ö`, `Ü` become `Ae`, `Oe`,
+`Ue`), other accents are dropped, every other character than `A-Z`, `a-z`, `0-9` and `-` becomes `-`, several `-`
+become one, none stands at the start or the end, and a part has at most 64 characters. An empty part is
+`unknown`. `_` separates the parts and never occurs in one; so the id holds no `/`, `+`, `#`, `.` or space, and
+nothing that MQTT, NATS or a file system would read otherwise.
+
+| ManufacturerUri, Model, SerialNumber | Machine id |
+|---|---|
+| `https://example.com`, `GX-400`, `P-04` | `example-com_GX-400_P-04` |
+| `https://example.com`, `MC-800`, `P-07` | `example-com_MC-800_P-07` |
+| `https://müller-maschinen.de`, `Schleifer 5/2`, `SN 0815#a` | `mueller-maschinen-de_Schleifer-5-2_SN-0815-a` |
+
+The domain stays when the company is renamed; the display name of the manufacturer is not used. The id is a
+proposal of this binding, not an element of the model: globally unique stays `ProductInstanceUri`, also as the
+`source` of every event.
+
+A wildcard takes a whole level, so it selects every machine (`simulators/+/umati/#`) or one
+(`simulators/example-com_GX-400_P-04/#`); MQTT has no wildcard for a part of a level. Who wants the machines of
+one manufacturer or model filters on the id after `_`, or reads the manifests.
 
 ### Value envelope
 
@@ -284,13 +344,13 @@ The rules for events, so that a consumer can keep nothing but the events and sti
 
 | Rule | What | Why |
 |---|---|---|
-| Topic per group | An event is published on `simulators/{SerialNumber}/events/<topic>`, one topic per group of events, the group being the first segment of its path. The binding names the topic of each group, in lower case (table below): every event of a job order and its result on `events/jobmonitoring`, every event of a program execution on `events/workmastermonitoring`, every alert event on `events/notifications`. A group without a name in the table is not published. The attribute `type`, the full path of the model such as `JobMonitoring.JobOrderStarted`, tells the events of a topic apart. | MQTT keeps the order of messages only within one topic. On one topic `JobOrderStarted` and the `JobOrderResultChanged` that follows arrive in the order they came up; between two groups, such as a job order and its program execution, only `time` orders them. One subscription per group is enough; `simulators/+/events/+` gets them all. The binding of the playground does the same with one topic for all notifications, `machines/{SerialNumber}/events/notifications`, and the spec binding keeps its name. |
+| Topic per group | An event is published on `simulators/{MachineId}/events/<topic>`, one topic per group of events, the group being the first segment of its path. The binding names the topic of each group, in lower case (table below): every event of a job order and its result on `events/jobmonitoring`, every event of a program execution on `events/workmastermonitoring`, every alert event on `events/notifications`. A group without a name in the table is not published. The attribute `type`, the full path of the model such as `JobMonitoring.JobOrderStarted`, tells the events of a topic apart. | MQTT keeps the order of messages only within one topic. On one topic `JobOrderStarted` and the `JobOrderResultChanged` that follows arrive in the order they came up; between two groups, such as a job order and its program execution, only `time` orders them. One subscription per group is enough; `simulators/+/events/+` gets them all. The binding of the playground does the same with one topic for all notifications, `machines/{SerialNumber}/events/notifications`, and the spec binding keeps its name. |
 | CloudEvent | `specversion` `1.0`; `id` a UUID, the same when the event goes out again; `source` the `ProductInstanceUri` of the machine, as a valid URI reference; `type` the path of the event; `time` its source time; `sequence` the start of the adapter (`yyyyMMddTHHmmssZ`), a dot and a count of twelve digits that counts the events of the machine within their group (`JobMonitoring`, `WorkMasterMonitoring`, `Notification`), from 1 and without a gap: one count per topic of events; `correlationid` the `ExecutionId` on the events of a program execution, and on an alert or notification that came up in one; `dataschema` the event schema of the model version; `data` the flat struct of the event. A new start of the adapter begins a new prefix and counts from 1 again. | A consumer finds a duplicate by `source` and `id`, and a gap by the count in `sequence`, in any technology; a comparison of strings orders the events of a group. After a gap or a new prefix it reads the state again: `JobMonitoring.JobOrders` and `JobMonitoring.JobOrderResults` after a gap in `JobMonitoring`, `WorkMasterMonitoring.ProgramExecution` after a gap in `WorkMasterMonitoring`, `Notification.ActiveAlerts` after a gap in `Notification`. |
 | Delivery | QoS 1, not retained. | QoS 1 delivers at least once; a duplicate is caught by `id`. A retained event would be a state, and a state is a value. |
 | Outbox | While the broker is away the adapter keeps the events in the order they came up and sends them after the next connect, with their source time and their `id`. The outbox is bounded; when it is full the oldest event is dropped and logged, and its count stays a gap in `sequence`: nothing is numbered again. Values need no outbox, every connect publishes them whole. | Without an outbox the events of a broker outage are lost unnoticed. |
 | Consumer | A consumer that keeps events subscribes with a persistent session: Clean Start false, a session expiry of for example 24 hours, QoS 1. Several instances of one consumer share the events with a shared subscription, `$share/<group>/simulators/+/events/+`. | The broker holds the events while the consumer restarts. |
 
-| Group of events (first segment of `type`) | Topic below `simulators/{SerialNumber}/events/` |
+| Group of events (first segment of `type`) | Topic below `simulators/{MachineId}/events/` |
 |---|---|
 | `JobMonitoring` | `jobmonitoring` |
 | `WorkMasterMonitoring` | `workmastermonitoring` |
@@ -359,8 +419,8 @@ The signals the machine manufacturer defines lie in the same tree as the element
   (`code` and `name`) and a `description`.
 - The binding maps `x-<domain>.<path>` to `oem/<path>`: the prefix segment is left out, the rest of the path
   becomes topic levels. `x-example-com.Spindle.1.BearingTemperature` lies on
-  `simulators/P-04/oem/Spindle/1/BearingTemperature`, at the same place of the tree as
-  `simulators/P-04/umati/Spindle/1/IsRotating`, only in another namespace. The domain of the manufacturer stands
+  `simulators/example-com_GX-400_P-04/oem/Spindle/1/BearingTemperature`, at the same place of the tree as
+  `simulators/example-com_GX-400_P-04/umati/Spindle/1/IsRotating`, only in another namespace. The domain of the manufacturer stands
   only in the manifest; back from the topic, the manifest gives the full path. An element of the model never lies
   outside `umati`, a signal of the manufacturer never in `umati`.
 - It has the same envelope as an element of the model, `{timestamp, value, unit}`, retained, QoS 1. The `unit` is
@@ -372,25 +432,24 @@ The signals the machine manufacturer defines lie in the same tree as the element
 ### What the simulators publish
 
 Every simulator of the demo stack publishes this tree, as client `<ClientId>-spec` with its own last will on
-`simulators/{SerialNumber}/umati/Connection/State`. A virtual machine of its own, a state machine driven by a scenario in the
+`simulators/{MachineId}/umati/Connection/State`. A virtual machine of its own, a state machine driven by a scenario in the
 configuration (`Config:SpecOutput`), produces every value and event, so they agree with each other.
 `Config:SpecOutput:ScenarioName` picks the scenario from `Config:SpecOutput:Scenarios`; without a name the
 simulator runs `Config:SpecOutput:Scenario`.
 
 | Simulator | Topics below | Scenario | Jobs | Profiles | Signals of the manufacturer |
 |---|---|---|---|---|---|
-| P-04 | `simulators/P-04/` | default | shafts, flanges, bushings; cycles of 45 s to 90 s, up to 15 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
-| P-07 | `simulators/P-07/` | `housings` | housings, cover plates, gearbox housings; cycles of 2.5 min to 7 min, up to 21 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
-| M-02 | `simulators/M-02/` | `small-parts` | pins, spacers, nozzles in large quantities; cycles of 20 s to 50 s, up to 7 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
+| P-04 | `simulators/example-com_GX-400_P-04/` | default | shafts, flanges, bushings; cycles of 45 s to 90 s, up to 15 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
+| P-07 | `simulators/example-com_MC-800_P-07/` | `housings` | housings, cover plates, gearbox housings; cycles of 2.5 min to 7 min, up to 21 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
+| M-02 | `simulators/example-com_SL-120_M-02/` | `small-parts` | pins, spacers, nozzles in large quantities; cycles of 20 s to 50 s, up to 7 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
 
 All three are machine tools with one channel and one spindle and declare the same profiles: `Core`,
-`IdentificationExtended`, `Components`, `MonitoringExtended`, `ChannelMonitoring`, `Spindle`,
+`IdentificationExtended`, `Components`, `MonitoringExtended`, `ChannelMonitoring`, `Spindle`, `Stacklight`,
 `EnergyElectricity`, `JobMonitoring`, `WorkMasterMonitoring` and `AlertsEvents`. A declared profile is delivered
 whole: every element and event of it is in the manifest, and what the machine lacks says `"available": false`.
 Of `IdentificationExtended` the virtual machine delivers `MonthOfConstruction`, `InitialOperationDate` and
 `DeviceClass`; `HardwareRevision`, `AssetId`, `ComponentName` and `Location` are `"available": false`.
-`EnergyCompressedAir` and `Stacklight` are not declared: the virtual machine has neither compressed air nor a
-stack light. Each scenario has its own alerts, job order numbers and
+`EnergyCompressedAir` is not declared: the virtual machine has no compressed air. Each scenario has its own alerts, job order numbers and
 counters. The signals of the manufacturer are those the simulator delivers below
 `machines/{SerialNumber}/vendor/` today, here derived from the virtual machine and published in the namespace
 `oem`.
@@ -439,6 +498,33 @@ Each virtual machine works like this:
   model has no software revision of the whole machine: `Components.Software` lists the revision of each
   component (`Manufacturer`, `ComponentName`, `SoftwareRevision`; `Manufacturer` and `ComponentName` name an
   entry): a control, an operator interface and a third component of each scenario (`Scenario:Software`).
+- The stack light is `Segmented`. P-04 and P-07 have four lamps, M-02 three (`Scenario:StacklightLamps`):
+
+  | `NumberInList` | `SignalColor` | P-04 | P-07 | M-02 |
+  |---|---|---|---|---|
+  | 0 | `Red` | yes | yes | yes |
+  | 1 | `Yellow` | yes | yes | yes |
+  | 2 | `Green` | yes | yes | yes |
+  | 3 | `Blue` | yes | yes | no |
+
+  The lamps follow the state of the virtual machine; several may shine at once. This mapping is an assumption of
+  the emulator; the model prescribes none:
+
+  | State of the machine | Lamp | `SignalMode` |
+  |---|---|---|
+  | an alert `Failure` stands | Red | `Continuous` |
+  | an alert `OffSpec` or `CheckFunction` stands | Yellow | `Blinking` |
+  | an alert `MaintenanceRequired` stands | Blue (M-02: Yellow) | `Continuous` (M-02: `Flashing`) |
+  | the program is interrupted | Green | `Blinking` |
+  | a program runs (`Executing`) | Green | `Continuous` |
+  | the machine is set up (`Setup`) | Yellow | `Continuous` |
+  | it waits for the operator: a job order ended or none is released | Blue (M-02: Yellow) | `Blinking` |
+  | the machine is off (`NotAvailable`) | none | every `SignalOn` `false` |
+
+  A lamp takes the first row that applies to it, so an alert comes before the state. A lamp that is off keeps its
+  colour and says `Continuous`. The whole list goes out, retained, whenever a lamp changes; the stack light has no
+  events. Only the mode `Blinking` is reported, not each on and off. The virtual machine is never off; that row
+  is there for an adapter that sees one.
 - Channel 1 has the feed override of the machine, `ChannelMode` `Automatic`, and `JogManual` while it is set up,
   a rapid override of 1 and the name `CHAN1`; spindle 1 is not used as an axis and is named `S1`.
 - `OperationCounters.OperationDuration` grows while a program runs. A scenario may let the machine warm up after
@@ -461,7 +547,7 @@ Each virtual machine works like this:
   The prefix of `sequence` is the start of the simulator; the `id` of an event is a UUID made from the
   `ProductInstanceUri`, the group and the `sequence`, so it stays the same when the event goes out again.
 
-| Path below `simulators/{SerialNumber}/` | Kind | Unit |
+| Path below `simulators/{MachineId}/` | Kind | Unit |
 |---|---|---|
 | `umati/Manifest` | manifest | – |
 | `umati/Identification/Manufacturer`, `umati/Identification/SerialNumber`, `umati/Identification/ProductInstanceUri`, `umati/Identification/Model`, `umati/Identification/ManufacturerUri`, `umati/Identification/ProductCode`, `umati/Identification/DeviceClass` | string | – |
@@ -488,6 +574,8 @@ Each virtual machine works like this:
 | `umati/Spindle/1/IsRotating`, `umati/Spindle/1/IsUsedAsAxis` | boolean | – |
 | `umati/Spindle/1/Override` | number | `one` |
 | `umati/Spindle/1/Name` | string | – |
+| `umati/Stacklight/StacklightMode` | enum: `Segmented` | – |
+| `umati/Stacklight/StackElement` | list: `NumberInList`, `SignalOn`, `SignalColor`, `SignalMode` | – |
 | `umati/Consumption/Electricity/Main/AcActivePowerTotal` | number | `watt` |
 | `umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `wattHour` |
 | `oem/Spindle/1/BearingTemperature` | number, signal of the manufacturer (`x-example-com.Spindle.1.BearingTemperature` in the manifest) | `degreeCelsius` |
@@ -502,10 +590,15 @@ next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; withou
 ### Open for the hackathon
 
 - A version level in the topic: proposed no, the version is in the manifest.
-- A globally unique id of the machine in the topic. Here the topic carries the serial number only, which is
-  unique on the broker of the playground but not across manufacturers; the manufacturer and the globally unique
-  `ProductInstanceUri` are in the manifest and below `umati/Identification/`. Whether a binding needs more in
-  the topic is open.
+- The machine id in the topic. This binding proposes `<manufacturer>_<model>_<serial number>` (see "Machine
+  id"), unique across manufacturers as long as a manufacturer gives a serial number once per model; globally
+  unique stays `ProductInstanceUri` (open question 4 of the model). The manifest names it as `machineId`, a field
+  the schema of the manifest of the model does not know: it passes the schema only once `machineId` is taken off,
+  as `unit` from a value. `machines/{SerialNumber}/` keeps the serial number for now: persistence, app and
+  genui-mcp read it.
+- The order of the lamps. The model takes `NumberInList` from OPC 10000-200, which counts from the base of the
+  stack light; here 0 is red, the lamp at the top of a usual machine tool. Either the list or the counting has to
+  change once the group decides.
 - The namespace level, the mapping of the prefix `x-<domain>` to `oem`, and the reserved names `umati`, `oem`
   and `events` are proposals of this binding. With one namespace `oem`, two manufacturers below one machine would
   share it; their paths must then differ.
@@ -525,10 +618,11 @@ next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; withou
 - The planned times of a job order. The model asks for `PlannedStartTime` and `PlannedEndTime` and allows `null`;
   the virtual machine knows no plan and sends `null`. `OrderNumbers` is made up (`SO-` and the number of the job
   order).
-- The stack light. `Stacklight` with the now mandatory `SignalColor` and `SignalMode` is not declared: the
-  virtual machine has no stack light.
-- The production events below `machines/` stay as they were: a job order event there carries the job order and
-  its result in one, and a `JobOrderResultChanged` of the model is a `Changed` of the job order there.
+- The mapping of states to lamps. It is an assumption of the emulator, as in the table above; whether the group
+  wants a recommendation, as NE 107 for alerts, is open.
+- The events below `machines/` follow the profiles too: job events (`events/jobs`) carry the job order and its
+  result in one, as `JobOrderResultChanged` with the action `ResultChanged`; work master events
+  (`events/workmasters`) carry the program executions.
 - During a `CommunicationFault` the virtual machine runs on and its events are lost; the gap shows in `sequence`.
   A real adapter that does not see the machine numbers no events it does not see, so it has no gap; it only has
   `CommunicationFault` and `Running` to tell its consumers to read the state again.

@@ -7,15 +7,19 @@ All notable changes are documented here. The format follows
 
 ### Added
 
-- Production events: job orders and program executions as events of the playground binding.
-  `ProductionEventDtoV1` on `machines/{SerialNumber}/events/production` (content type
-  `productioneventdtov1`, QoS 1, not retained, energy in joule) carries the whole state after each event.
-  Every simulator publishes them from its virtual machine (`Config:ProductionEvents:Enabled`, on by default),
-  the Events persistence stores them, and the Events API keeps them in the collection `ProductionEvent` and
-  serves `/productionEvents`, `/productionEvents/correlationPairs` (program executions from start to end),
-  `/jobOrders` and `/jobOrders/{mId}/{jobOrderId}` (the last known state of each job order and its history),
-  with the MCP tools `events_production_query`, `events_job_orders_query` and
-  `events_program_executions_query`. `NotificationEventDtoV1` is unchanged.
+- Job events and work master events: job orders and program executions as events of the playground binding,
+  QoS 1, not retained, each carrying the whole state after it. `JobEventDtoV1` on
+  `machines/{SerialNumber}/events/jobs` (`jobeventdtov1`) carries what is ordered and, from the start, the
+  result of a job order, with the actions of the data model, `ResultChanged` among them; `WorkMasterEventDtoV1`
+  on `machines/{SerialNumber}/events/workmasters` (`workmastereventdtov1`) carries a program execution and at
+  its end its sums in joule. Every simulator publishes them from its virtual machine
+  (`Config:ProductionEvents:Enabled`, on by default), the Events persistence stores them, and the Events API
+  keeps them in the collections `JobEvent` and `WorkMasterEvent` and serves `/jobEvents`, `/jobOrders` and
+  `/jobOrders/{mId}/{jobOrderId}` (the last known state with the result, the history and the program
+  executions), `/workMasterEvents` and `/workMasterEvents/correlationPairs`, with the MCP tools
+  `events_job_events_query`, `events_job_orders_query`, `events_work_master_events_query` and
+  `events_program_executions_query`. They replace a draft `ProductionEventDtoV1` that was never released.
+  `NotificationEventDtoV1` is unchanged.
 
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
@@ -216,6 +220,11 @@ All notable changes are documented here. The format follows
   `oem/WorkMasterMonitoring/ActiveProgram`. The production events below `machines/` keep their form: a job order
   event carries the job order and its result, a changed result is a `Changed`, and `Seq` counts them apart from
   the groups of the model.
+  The spec tree lies below `simulators/<manufacturer>_<model>_<serial number>/`, for example
+  `simulators/example-com_GX-400_P-04/`: the domain of `ManufacturerUri`, `Model` and `SerialNumber`, each part
+  normalised (only `A-Z`, `a-z`, `0-9` and `-`, umlauts written out, at most 64 characters), named in the
+  manifest as `machineId`; the last will too. The spec output shows a stack light (`Stacklight`, `Segmented`):
+  red, yellow, green and blue, M-02 without blue, following the state of the virtual machine and its alerts.
 
 ### Changed
 
