@@ -12,7 +12,7 @@ import type { ChatSettings } from "./gateway.ts"
 import { withTimeZone } from "./local-times.ts"
 import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
-import { furtherInstructions, leftOut, mcpServers } from "./mcp-servers.ts"
+import { leftOut, mcpServers, serverSwitch } from "./mcp-servers.ts"
 import { forModel } from "./tool-results.ts"
 
 // The agent harness of the app. It runs on the server only: the keys of the language models stay
@@ -28,8 +28,15 @@ The tools write every time as the clock of the person you answer shows it. Say a
 // Created once, shared by all chats.
 const tools = mcp({ servers: mcpServers() })
 
-// The further servers have no card in the app, so the model is told to say their values.
-const further = furtherInstructions()
+// A chat switches a further server off and on (the panel "Tools" of the chat). The setting is the chat's,
+// kept by the harness, and it holds here, on the server: before every turn the tools of a server that is
+// off are taken out of what the model gets, and the model is told only about the servers that are on.
+// Which servers there are is read once, here, as it is for the connections above.
+const switches = serverSwitch()
+const switchPlugin = definePlugin({
+  name: "pleiades/server-switch",
+  setup: (ctx) => switches.forChat((key) => ctx.config.get(key)),
+})
 
 // A typing mistake in the setting shows here, once, when the server starts.
 for (const name of leftOut()) {
@@ -92,11 +99,12 @@ function build(settings: ModelSettings | undefined): Handler | null {
       // name. The harness keeps that choice with the chat.
       adapter: models[first],
       models,
-      // Of a chat's settings the browser may change the model, and nothing else.
-      expose: { settings: ["model"] },
+      // Of a chat's settings the browser may change the model and switch a further server off and
+      // on, and nothing else.
+      expose: { settings: ["model"], config: switches.exposed },
       middleware: [localTimes],
-      systemPrompts: further ? [instructions, further] : [instructions],
-      plugins: () => [tools, modelTools],
+      systemPrompts: [instructions],
+      plugins: () => [tools, switchPlugin, modelTools],
     }),
     // The demo has no sign-in: every request runs without a user.
     openAccess: true,

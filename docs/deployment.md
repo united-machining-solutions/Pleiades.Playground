@@ -10,7 +10,7 @@ The deployment is optional and off by default. Whoever only wants to see the dem
 ## How it goes
 
 1. A pull request is merged into `main`.
-2. "Images" builds the service images, including the optional Ultimaker services, and tags them
+2. "Images" builds the service images, including the optional Ultimaker and juice bar services, and tags them
    `main` and `sha-<commit>`.
 3. "Deploy" runs after it on a runner of your own, on the computer that runs the stack. It checks out the
    commit, pulls the images tagged `sha-<commit>` and runs `docker compose up -d --no-build --wait`.
@@ -106,3 +106,34 @@ The named `ultimaker_data` volume preserves models, slices, pairing credentials 
 records across deployments of the same Compose project. A new server has a new volume and must
 be paired through its API with approval on the printer display. Starting the stack never pairs,
 enables printing or starts a print automatically.
+
+## Enable the juice bar service
+
+`juicebar-api` (REST, MCP and the state of the machine on MQTT) is defined in the root Compose file under
+the optional `juicebar` profile. The Images workflow publishes it with the same commit tags as the other
+services. It needs a machine that runs MixerControl and that the deployment computer reaches.
+
+Set these values in the private `.env` of the deployment computer in DEPLOY_DIR:
+
+```dotenv
+COMPOSE_PROFILES=juicebar
+JUICEBAR_URL=http://juicebar.local:3000/
+JUICEBAR_MACHINE_ID=JUICEBAR-01
+JUICEBAR_ENABLE_ORDERING=true
+APP_MCP_SERVERS=juicebar=http://juicebar-api:8080/mcp
+```
+
+Replace the example address with the one of the machine. Profiles combine with a comma, and so do the
+entries of `APP_MCP_SERVERS`: `COMPOSE_PROFILES=ultimaker,juicebar`. Leave both without the juice bar on a
+computer that does not reach one: the service starts and stays healthy without the machine, but the chat
+would offer tools that only answer with an error.
+
+`JUICEBAR_ENABLE_ORDERING=true` lets the service place orders at the real machine; it never starts the
+production, a person presses the start button. `false` makes it read-only. `APP_MCP_SERVERS` gives the chat
+of the example app the tools of the service, the one for ordering among them, and the chat has no sign-in:
+everyone who reaches the app can then order. Leave the entry out to keep the chat away from the machine.
+
+The service listens on host loopback port 5550 by default. Before `JUICEBAR_BIND` opens it to a network,
+switch sign-in on with `JUICEBAR_AUTH_ENABLED=true` and the three `JUICEBAR_AUTH_*` values; the chat of the
+example app sends no token and does not reach the service then. See the
+[service guide](../source/Pleiades.Playground.JuiceBar.Api/README.md).

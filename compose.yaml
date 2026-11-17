@@ -235,6 +235,40 @@ services:
       timeout: 5s
       retries: 12
 
+  # A juice bar as a tool: its card and state over REST and MCP, an order on request, its state on the
+  # broker. It starts only with the profile: docker compose --profile juicebar up -d. It needs a machine
+  # that runs MixerControl at JUICEBAR_URL. It places orders and never starts the production: a person
+  # presses the start button on the machine. JUICEBAR_ENABLE_ORDERING=false makes it read-only.
+  juicebar-api:
+    <<: *service
+    profiles: [juicebar]
+    image: ghcr.io/united-machining-solutions/pleiades.playground.juicebar.api:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.JuiceBar.Api/Dockerfile
+    ports:
+      # No sign-in, and it orders at a real machine: it answers on this computer only, unless
+      # JUICEBAR_BIND opens it to the network. The containers of this stack reach it either way.
+      - "${JUICEBAR_BIND:-127.0.0.1}:${JUICEBAR_API_PORT:-5550}:8080"
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-persistence:
+        condition: service_healthy
+    environment:
+      # Sign-in is off for the demo. On: reading needs the permission juicebar:read, an order juicebar:write.
+      Config__Auth__Enabled: ${JUICEBAR_AUTH_ENABLED:-false}
+      Config__Auth__MetadataAddress: ${JUICEBAR_AUTH_METADATA_ADDRESS:-}
+      Config__Auth__ValidIssuer: ${JUICEBAR_AUTH_VALID_ISSUER:-}
+      Config__Auth__Audience: ${JUICEBAR_AUTH_AUDIENCE:-}
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: juicebar-api-${JUICEBAR_MACHINE_ID:-JUICEBAR-01}
+      JuiceBar__BaseUrl: ${JUICEBAR_URL:-http://juicebar.local:3000/}
+      JuiceBar__EnableOrdering: ${JUICEBAR_ENABLE_ORDERING:-true}
+      JuiceBar__MaximumQueueLength: ${JUICEBAR_MAX_QUEUE_LENGTH:-3}
+      JuiceBar__SerialNumber: ${JUICEBAR_MACHINE_ID:-JUICEBAR-01}
+      JuiceBar__Language: ${JUICEBAR_LANGUAGE:-en}
+
   # The example application.
   app:
     <<: *service
