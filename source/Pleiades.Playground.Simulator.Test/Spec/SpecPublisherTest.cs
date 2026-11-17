@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -89,6 +90,9 @@ public sealed class SpecPublisherTest
         Assert.AreEqual($"machines/{SerialNumber}/umati/Manifest", topics[1]);
         Assert.AreEqual($"machines/{SerialNumber}/umati/Connection/State", topics[3]);
         Assert.AreEqual("Running", Payload(client.Published[3])["value"]!.GetValue<string>());
+        Assert.IsGreaterThan(DateTimeOffset.Parse(Payload(client.Published[0])["timestamp"]!.GetValue<string>(), CultureInfo.InvariantCulture),
+            DateTimeOffset.Parse(Payload(client.Published[3])["timestamp"]!.GetValue<string>(), CultureInfo.InvariantCulture),
+            "Running after Initializing, so the newest value is the state at the end");
 
         var events = client.Published.Skip(4).ToList();
         CollectionAssert.AreEqual(new long[] { 1, 2, 3 }, events.Select(Seq).ToList(), "in their order, after Running");

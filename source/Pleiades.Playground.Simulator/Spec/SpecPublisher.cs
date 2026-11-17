@@ -118,7 +118,9 @@ internal sealed partial class SpecPublisher : IDisposable
     /// After a connect, and when the machine can be reached again: the manifest, every value, then
     /// <c>Connection/State</c>, and then the events that waited in the outbox. The first time the adapter says
     /// <c>Initializing</c> before all of it. The state at the end is <c>Running</c>, or <c>CommunicationFault</c> when
-    /// the machine cannot be reached; so <c>Running</c> never stands over values of an earlier connection.
+    /// the machine cannot be reached; so <c>Running</c> never stands over values of an earlier connection. It comes a
+    /// millisecond after <c>Initializing</c>, the precision of a timestamp of the model: with the same instant, a store
+    /// that reads the newest value could not tell which of the two came last.
     /// </summary>
     public async Task PublishStateAsync(IReadOnlyCollection<SpecValue> values, DateTimeOffset now, bool reachable = true)
     {
@@ -127,16 +129,18 @@ internal sealed partial class SpecPublisher : IDisposable
         try
         {
             var waiting = Buffered;
+            var ready = now;
             if (!_initialized)
             {
                 await _client.EnqueueAsync(ValueMessage(ConnectionState(Initializing, now))).ConfigureAwait(false);
+                ready = now.AddMilliseconds(1);
             }
             await _client.EnqueueAsync(Message(SpecWire.ManifestTopic(_machineId), _manifest, retain: true)).ConfigureAwait(false);
             foreach (var value in values)
             {
                 await _client.EnqueueAsync(ValueMessage(value)).ConfigureAwait(false);
             }
-            await _client.EnqueueAsync(ValueMessage(ConnectionState(reachable ? Running : CommunicationFault, now))).ConfigureAwait(false);
+            await _client.EnqueueAsync(ValueMessage(ConnectionState(reachable ? Running : CommunicationFault, ready))).ConfigureAwait(false);
             _initialized = true;
             await DrainAsync().ConfigureAwait(false);
             LogConnected(values.Count, waiting);
