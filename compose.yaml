@@ -256,7 +256,11 @@ services:
       timeseries-persistence:
         condition: service_healthy
     environment:
-      Config__Auth__Enabled: "false"
+      # Sign-in is off for the demo. On: reading needs the permission juicebar:read, an order juicebar:write.
+      Config__Auth__Enabled: ${JUICEBAR_AUTH_ENABLED:-false}
+      Config__Auth__MetadataAddress: ${JUICEBAR_AUTH_METADATA_ADDRESS:-}
+      Config__Auth__ValidIssuer: ${JUICEBAR_AUTH_VALID_ISSUER:-}
+      Config__Auth__Audience: ${JUICEBAR_AUTH_AUDIENCE:-}
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: juicebar-api-${JUICEBAR_MACHINE_ID:-JUICEBAR-01}
       JuiceBar__BaseUrl: ${JUICEBAR_URL:-http://juicebar.local:3000/}

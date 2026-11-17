@@ -6,6 +6,11 @@ behind REST and MCP, and publishes its state to the broker like any other machin
 
 It is optional. It starts only with the Compose profile `juicebar`, and it needs a real machine.
 
+The machine has to run the branch
+[`001-reactivate-local-marketplace`](https://github.com/IUNO-TDM/MixerControl/tree/001-reactivate-local-marketplace)
+of MixerControl, where an order goes into the queue directly. On the default branch an order starts the flow
+of the marketplace and reaches the queue only after a payment, which this service never makes.
+
 ```bash
 docker compose --profile juicebar up -d --build
 ```
@@ -26,15 +31,18 @@ An order is refused, and nothing is sent to the machine,
 
 - while `JUICEBAR_ENABLE_ORDERING` is `false`,
 - while the machine does not answer or is not ready (service mode, paused, pump control not connected),
-- while `JUICEBAR_MAX_QUEUE_LENGTH` orders wait (default 3),
+- while `JUICEBAR_MAX_QUEUE_LENGTH` orders wait (default 3). The machine lists an order a moment after it
+  answered it, so an order placed here counts from its answer on, and orders are placed one at a time,
 - for a drink that is not on the card.
 
 A request to the machine that places an order is sent once and never repeated.
 
 The service has no sign-in in the demo stack, like the rest of it. So its port answers on this computer only
 (`JUICEBAR_BIND=127.0.0.1`); the containers of the stack reach it as `http://juicebar-api:8080`. Open it to a
-network only where everyone on that network may order. `Config__Auth__Enabled=true` puts the write behind the
-permission `juicebar:write`, as in the other APIs.
+network only where everyone on that network may order, or switch sign-in on first: `JUICEBAR_AUTH_ENABLED=true`
+with the three `JUICEBAR_AUTH_*` values of `.env.example` puts reading behind the permission `juicebar:read` and
+an order behind `juicebar:write`, as in the other APIs. The chat of the example app sends no token, so it
+reaches the service only while sign-in is off.
 
 ## REST
 
@@ -42,13 +50,14 @@ permission `juicebar:write`, as in the other APIs.
 |---|---|
 | `GET /drinks` | The drinks the machine can mix now. |
 | `GET /drinks/{id}` | One drink. |
-| `GET /status` | Connection, production state, progress, queue, pumps and warnings. |
+| `GET /status` | Connection, production state, progress, queue, pumps and warnings. For a machine that is switched off: not connected, and no pumps. |
 | `GET /orders/{orderNumber}` | One order with its state and its place in the queue. |
 | `POST /orders` | Body `{ "drinkId": "..." }`. Answers 201 with the order, 409 with the reason of a refusal. |
 | `GET /health`, `GET /healthcheck` | Liveness, and whether the machine answers (`Degraded` if not). |
 | `GET /openapi/v1.json` | The description of the routes above. |
 
-Errors: 404 for an unknown drink or order, 409 for a refused order, 502 when the machine does not answer.
+Errors: 404 for an unknown drink or order, 409 for a refused order, 502 when the machine does not answer a
+request for its card or an order.
 
 ## MCP
 
@@ -106,6 +115,7 @@ While the machine does not answer, only the heartbeat and `Connection/State` = `
 | `JUICEBAR_API_PORT` | `5550` | |
 | `JUICEBAR_MACHINE_ID` | `JUICEBAR-01` | The machine id in the topics. |
 | `JUICEBAR_LANGUAGE` | `en` | `en` or `de`, for the names of drinks and ingredients. |
+| `JUICEBAR_AUTH_ENABLED` | `false` | `true` switches sign-in on; it needs `JUICEBAR_AUTH_METADATA_ADDRESS`, `JUICEBAR_AUTH_VALID_ISSUER` and `JUICEBAR_AUTH_AUDIENCE`. |
 
 ## How it talks to the machine
 
