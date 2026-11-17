@@ -60,6 +60,13 @@ and the two discovery tools `juicebar_describe_server` and `juicebar_get_skill_g
 { "servers": { "pleiades-juicebar": { "type": "http", "url": "http://localhost:5540/mcp" } } }
 ```
 
+## In the chat of the example app
+
+Add `juicebar=http://juicebar-api:8080/mcp` to `APP_MCP_SERVERS` in `.env`, and the chat of the
+[example app](../../apps/app/README.md) gets the tools above: it answers what the bar can mix and how busy it
+is, and orders a drink when a person asks for one. The chat has no sign-in, so everyone who reaches the app
+can order then.
+
 ## Values
 
 SI units, as everywhere in the stack.
