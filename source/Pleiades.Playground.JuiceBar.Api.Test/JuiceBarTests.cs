@@ -46,13 +46,32 @@ public sealed class JuiceBarTests
     }
 
     [TestMethod]
+    public void TheMachineIdIsManufacturerModelAndSerialNumberAndTheIdentificationNamesWhatIsKnown()
+    {
+        var options = new JuiceBarOptions();
+        Assert.AreEqual("unknown_JuiceBar_JUICEBAR-01", options.MachineId);
+        // No manufacturer is named by default, so none is published.
+        CollectionAssert.AreEqual(
+            new[] { ("Model", "JuiceBar"), ("SerialNumber", "JUICEBAR-01") },
+            TelemetryMapper.Identification(options).ToArray());
+
+        var named = new JuiceBarOptions { Manufacturer = "example-mixers", ManufacturerName = "Example Mixers", Model = "JB-8", SerialNumber = "0042" };
+        Assert.AreEqual("example-mixers_JB-8_0042", named.MachineId);
+        CollectionAssert.AreEqual(
+            new[] { ("Manufacturer", "Example Mixers"), ("Model", "JB-8"), ("SerialNumber", "0042") },
+            TelemetryMapper.Identification(named).ToArray());
+    }
+
+    [TestMethod]
     public void TelemetryUsesBindingUnitsAndSaysNothingAboutAMachineThatDoesNotAnswer()
     {
         var live = new LiveState(TimeProvider.System);
         var now = DateTime.UtcNow;
         var silent = TelemetryMapper.Map(live.Snapshot(), now);
         Assert.HasCount(1, silent);
-        Assert.AreEqual("Disconnected", ((StringValueDto)silent[0].Message).Value);
+        // The adapter runs and does not reach the machine: the state of the data model for that.
+        Assert.AreEqual("umati/Connection/State", silent[0].Suffix);
+        Assert.AreEqual("CommunicationFault", ((StringValueDto)silent[0].Message).Value);
 
         live.Connected();
         Apply(live, """42/production,["state","processingOrder"]""");
@@ -62,14 +81,18 @@ public sealed class JuiceBarTests
         Apply(live, """42/production,["amountWarning",{"pumpNr":"1","warningCleared":true}]""");
         Apply(live, """42/production,["unknown",{"x":1}]""");
         var values = TelemetryMapper.Map(live.Snapshot(), now).ToDictionary(s => s.Suffix, s => s.Message);
-        var progress = (BaseUnitValueDto)values["vendor/JuiceBar/Production/Progress"];
+        Assert.AreEqual("Running", ((StringValueDto)values["umati/Connection/State"]).Value);
+        // What the data model does not know lies in the namespace oem, and nothing in the earlier vendor.
+        Assert.IsFalse(values.Keys.Any(suffix => suffix.StartsWith("vendor/", StringComparison.Ordinal)));
+        var progress = (BaseUnitValueDto)values["oem/JuiceBar/Production/Progress"];
         Assert.AreEqual(.4, progress.Value);
         Assert.AreEqual(BaseUnit.One, progress.Unit);
         Assert.AreEqual(now, progress.Timestamp);
-        Assert.AreEqual(1, ((BaseUnitValueDto)values["vendor/JuiceBar/Production/QueueLength"]).Value);
-        Assert.AreEqual("Executing", ((StringValueDto)values["umati/State/MachineryItemState"]).Value);
-        Assert.IsTrue(((BooleanValueDto)values["vendor/JuiceBar/Pump/2/AmountWarning"]).Value);
-        Assert.IsFalse(((BooleanValueDto)values["vendor/JuiceBar/Pump/1/AmountWarning"]).Value);
+        Assert.AreEqual(1, ((BaseUnitValueDto)values["oem/JuiceBar/Production/QueueLength"]).Value);
+        // The state is a field of the snapshot State/Status, on the topic the store keeps it on.
+        Assert.AreEqual("Executing", ((StringValueDto)values["umati/State/Status/MachineryItemState"]).Value);
+        Assert.IsTrue(((BooleanValueDto)values["oem/JuiceBar/Pump/2/AmountWarning"]).Value);
+        Assert.IsFalse(((BooleanValueDto)values["oem/JuiceBar/Pump/1/AmountWarning"]).Value);
 
         // Progress belongs to the drink that is being mixed, and to nothing after it.
         Apply(live, """42/production,["state","waitingOrder"]""");

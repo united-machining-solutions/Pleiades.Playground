@@ -34,8 +34,8 @@ All notable changes are documented here. The format follows
   deployment with COMPOSE_PROFILES=ultimaker.
 - Optional juice bar service `juicebar-api` (Compose profile `juicebar`, port 5550): the card and the state of
   a machine that runs MixerControl over REST and MCP, an order on request, and its state on the broker below
-  `machines/{SerialNumber}/`. It never starts the production; `JUICEBAR_ENABLE_ORDERING=false` makes it
-  read-only.
+  `machines/{MachineId}/`, `unknown_JuiceBar_JUICEBAR-01` by default, with its own values below `oem/JuiceBar/`.
+  It never starts the production; `JUICEBAR_ENABLE_ORDERING=false` makes it read-only.
 
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.

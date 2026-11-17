@@ -118,7 +118,7 @@ Set these values in the private `.env` of the deployment computer in DEPLOY_DIR:
 ```dotenv
 COMPOSE_PROFILES=juicebar
 JUICEBAR_URL=http://juicebar.local:3000/
-JUICEBAR_MACHINE_ID=JUICEBAR-01
+JUICEBAR_SERIAL_NUMBER=JUICEBAR-01
 JUICEBAR_ENABLE_ORDERING=true
 APP_MCP_SERVERS=juicebar=http://juicebar-api:8080/mcp
 ```

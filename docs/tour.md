@@ -342,8 +342,9 @@ It exposes MCP at <http://localhost:5550/mcp> and an OpenAPI document at
 <http://localhost:5550/openapi/v1.json>: the card, the state of the machine, and an order. An order joins
 the queue of the real machine; a person then presses its start button. What the service does and never does
 is in the [juice bar service guide](../source/Pleiades.Playground.JuiceBar.Api/README.md).
-The service publishes the state of the machine to the broker. Its machine ID defaults to `JUICEBAR-01`,
-which then appears in the machine list of Home next to the simulated machines. With
+The service publishes the state of the machine to the broker. Its machine id defaults to
+`unknown_JuiceBar_JUICEBAR-01`, which then appears in the machine list of Home as "JuiceBar JUICEBAR-01", next
+to the simulated machines. With
 `juicebar=http://juicebar-api:8080/mcp` in `APP_MCP_SERVERS`, the chat answers what the bar can mix and
 orders a drink when asked. No tour screenshot was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).
