@@ -166,6 +166,11 @@ All notable changes are documented here. The format follows
   chat: the values of now, no language model. A part whose tool the app has no card for stays and says so.
   `/pages` lists the pages of the browser; a page is renamed, pinned and deleted from its head, and a
   pinned page stands in the sidebar on the top level, beside Home. Why: ADR-0012.
+- "Save as page" under an answer of the chat: it keeps all the cards of the answer, in their order, as a page
+  titled with the question, and opens it beside the chat. It needs no language model, the app reads the tool
+  calls from the answer it already has, and it stands only under an answer that has ended and for which the
+  chat drew a card. The row then says "Saved as page" and links to it. An answer with more than 12 cards keeps
+  the first 12 and says so.
 
 ### Changed
 

@@ -13,7 +13,12 @@ harness.
 - **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
   machine, and reads them again every ten seconds. A choice above the graphs shows one machine or all of
   them, and stays in the URL (`?machine=`).
-- **Pages** (`/pages`) are what a person keeps of the chat, in this browser. A page is a recipe: a title
+- **Pages** (`/pages`) are what a person keeps of the chat, in this browser. "Save as page" under an answer
+  of the chat makes one: all the cards of that answer, in their order, titled with the question. It stands
+  under an answer that has ended and for which the chat drew a card, and needs no language model: the app
+  reads the tool calls from the answer it already has. The page opens beside the chat, which stays open, and
+  the row under the answer then says "Saved as page" and links to it. Nothing is kept unless a person
+  presses it. A page is a recipe: a title
   and its parts in their order, each part a tool of `genui-mcp` with its arguments. No value is kept and no
   sentence of a language model: opening a page calls the tools again and draws each answer with the card
   the chat draws for that tool, so it shows what holds now and needs no language model. A part whose tool
@@ -139,7 +144,11 @@ the backend of the running demo stack answers.
   the tool of a part, only a tool the chat draws (`parts.ts`), with the time zone of the browser, and
   returns what the chat hands to `draw`. `drawn-part.tsx` asks the parts of a recipe for a loader
   (`answerParts`) and draws one (`DrawnPart`): the card of the chat, or what is missing. `pinned.ts`
-  makes the entries of the sidebar for the pinned pages.
+  makes the entries of the sidebar for the pinned pages. `from-answer.ts` reads the recipe from an answer
+  of the chat, pure and without a language model (`keepOfAnswer`, for the button of the chat): the tool
+  calls the chat drew a result for, in their order, without the time zone, the same call once, and the
+  question as its title. An answer is everything the model said after one question, in more than one
+  message; an answer with more calls than a page holds (12) keeps the first 12, and the row says so.
 - `src/routeTree.gen.ts`: written from the route files and not in the repository, so that two branches with
   a page each have nothing to merge in it. `pnpm install` and `pnpm typecheck` write it
   (`route-tree.mjs`), and so do the development server and the build. Never edit it. TanStack advises to
@@ -158,6 +167,7 @@ the backend of the running demo stack answers.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a
   tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat`, the choice of the model and stop,
   which also cancels the turn in the harness (`createHarnessClient(...).cancel()`),
+  `save-as-page.tsx` the row under an answer with "Save as page" (chrome of the app, never part of a card),
   `dictate.tsx` the microphone in its field and `dictation.server.ts` the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for
   which tool, and its server which tools a language model does not get. `tool-results.ts` says what a card

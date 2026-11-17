@@ -130,6 +130,13 @@ the tool's and the wording is the model's: the card says 6 minutes of running, t
 minutes". The stack had just started, so most of the 8 hours have no data. The card on the left is one minute
 newer than the one in the chat: the page reads again, an answer shows what was true when it was given.
 
+Under an answer that has ended and for which the chat drew a card, the chat offers "Save as page". It keeps all
+the cards of that answer, in their order, as a page titled with your question, and opens the page beside the
+chat, which stays open. No language model is asked: the app reads the tool calls from the answer it already
+has. The page keeps no number and no sentence of the model, so opening it calls the tools again and its cards
+show what holds now. The row under the answer then says "Saved as page" and links to it, and "Pages" in the
+sidebar lists every page of this browser. An answer without a card, such as one in words only, has no button.
+
 The chat needs a language model, and the demo starts without one. Then the panel says "No language model
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
 copy `.env.example` to `.env`, set the address and the key of a LiteLLM gateway, at the hackathon the one of the
@@ -166,7 +173,8 @@ writes it down, see [Dictation](../apps/app/README.md#dictation). The picture of
 at the right of the field.
 
 **In the code:** [`apps/app/src/chat/`](../apps/app/src/chat). `chat-sidebar.tsx` is the panel with the model
-picker, `dictate.tsx` the microphone, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
+picker, `save-as-page.tsx` the row under an answer with "Save as page" (the recipe of an answer is read in
+[`pages/from-answer.ts`](../apps/app/src/pages/from-answer.ts)), `dictate.tsx` the microphone, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
 reads which models the settings name, `cards.tsx` lists what the app draws for which tool, card by card, and
 `suggestions.ts` holds the three questions.
 
