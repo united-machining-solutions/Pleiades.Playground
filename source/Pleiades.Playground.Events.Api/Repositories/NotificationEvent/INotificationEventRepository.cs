@@ -20,6 +20,11 @@ internal interface INotificationEventRepository
     /// </summary>
     Task CreateManyAsync(IEnumerable<NotificationEventDao> events, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Deletes every notification event of one machine. Returns how many were deleted.
+    /// </summary>
+    Task<long> DeleteByMachineAsync(string mId, CancellationToken cancellationToken);
+
     Task<(List<NotificationEventDao> Items, long TotalCount)> QueryEventsWithPaginationAsync(
         string? mId,
         NotificationAction? action,

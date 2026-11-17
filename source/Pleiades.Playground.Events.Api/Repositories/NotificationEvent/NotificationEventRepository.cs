@@ -61,6 +61,16 @@ internal sealed class NotificationEventRepository(IEventsDbContext dbContext) : 
     }
 
     /// <inheritdoc />
+    public async Task<long> DeleteByMachineAsync(string mId, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(mId);
+        var result = await dbContext.NotificationEvents
+            .DeleteManyAsync(Builders<NotificationEventDao>.Filter.Eq(e => e.MId, mId), cancellationToken)
+            .ConfigureAwait(false);
+        return result.DeletedCount;
+    }
+
+    /// <inheritdoc />
     public async Task<(List<NotificationEventDao> Items, long TotalCount)> QueryEventsWithPaginationAsync(
         string? mId,
         NotificationAction? action,

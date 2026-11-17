@@ -158,6 +158,12 @@ All notable changes are documented here. The format follows
   the line of a call is a `TraceCollapsible` once its result is there, with the result as text in a
   `CodeBlock` (JSON indented). `code-block` is new in `packages/ui`; it brings `shiki`, which only its
   highlighting hook loads, and the app does not use that hook.
+- The data of a machine can be deleted. `DELETE /machines/{serialNumber}` of the Timeseries API deletes every
+  value below `machines/{serialNumber}/`, `DELETE /notificationEvents/machines/{mId}` of the Events API every
+  notification of the machine; each says how many, and refuses a serial number with `/`, `+` or `#`. The page
+  of a machine has a button "Delete data" that calls both after a confirmation, from the server of the app
+  (`TIMESERIES_API_URL`, `EVENTS_API_URL`), and then goes to Home. No MCP tool deletes: a language model
+  cannot. A machine that still reports comes back with its next value.
 
 ### Changed
 

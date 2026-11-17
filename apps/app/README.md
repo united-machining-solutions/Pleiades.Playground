@@ -31,7 +31,7 @@ everything else works.
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app` |
 | Version | At the bottom of the sidebar: `0.0.142 · 7a83c2f` for an image of the workflow "Images", linked to its commit; `dev` for a build of your own, with the commit of the checkout under `vite dev` |
-| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. The language models of the chat, see below. |
+| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `TIMESERIES_API_URL` and `EVENTS_API_URL`, the two APIs, for the button that deletes the data of a machine; unset, those on this computer (ports 5500 and 5510). The language models of the chat, see below. |
 
 ## Language models
 
@@ -132,8 +132,10 @@ the backend of the running demo stack answers.
   is the measurement card in the chat: the cards of `genui_measurement_list`, without graphs.
 - `src/machines/`: what the pages and the chat both take of a machine. `get-machines.ts` holds the server
   functions that call the backend as a typed MCP client, `card-tools.ts` the names of the tools only a card
-  calls, `machine-item.tsx` draws a machine as a row or a tile. A card folder imports from here, never the
-  other way.
+  calls, `machine-item.tsx` draws a machine as a row or a tile. `delete-machine-data.tsx` is the button
+  "Delete data" of the page of a machine; `delete-machine.ts` its server function, which calls the two APIs
+  themselves (`machine-data.ts`), not the backend: the backend only reads. A card folder imports from here,
+  never the other way.
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a

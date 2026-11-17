@@ -42,6 +42,11 @@ internal static class NotificationEvents
             .WithSummary("Creates multiple notification events in bulk")
             .RequireFeatureWrite(EventsFeature.Name);
 
+        group.MapDelete("/machines/{mId}", DeleteMachineNotificationEvents)
+            .WithName("DeleteMachineNotificationEvents")
+            .WithSummary("Deletes every notification event of one machine")
+            .RequireFeatureWrite(EventsFeature.Name);
+
         return group;
     }
 
@@ -160,5 +165,27 @@ internal static class NotificationEvents
         }
 
         return TypedResults.Created(new Uri("/bulk", UriKind.Relative));
+    }
+
+    /// <summary>
+    /// Deletes every notification event of one machine, raised and reset alike. A machine that still
+    /// reports has events again with its next notification.
+    /// </summary>
+    /// <param name="mId">The machine identifier, as in its topics. Example: P-04</param>
+    /// <param name="repository">Repository for notification event database access.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>How many events were deleted; zero if the machine had none.</returns>
+    internal static async Task<Results<Ok<NotificationEventsDeleteResultDtoV1>, BadRequest<string>>> DeleteMachineNotificationEvents(
+        string mId,
+        INotificationEventRepository repository,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(mId) || mId.IndexOfAny(['/', '+', '#']) >= 0)
+        {
+            return TypedResults.BadRequest($"{nameof(mId)} must be one level of a topic: not empty, without '/', '+' or '#'.");
+        }
+
+        var count = await repository.DeleteByMachineAsync(mId, cancellationToken).ConfigureAwait(false);
+        return TypedResults.Ok(new NotificationEventsDeleteResultDtoV1 { EventsCount = count });
     }
 }

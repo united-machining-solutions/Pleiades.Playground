@@ -6,6 +6,7 @@ using MongoDB.Bson;
 using Pleiades.Playground.Common.Exceptions;
 using Pleiades.Playground.Events.Api.DataAccessObjects;
 using Pleiades.Playground.Events.Api.Repositories.NotificationEvent;
+using Pleiades.Playground.Events.DataTransferObjects;
 using Pleiades.Playground.Notification.DataTransferObjects;
 
 namespace Pleiades.Playground.Events.Api.Test.IntegrationTests;
@@ -13,6 +14,9 @@ namespace Pleiades.Playground.Events.Api.Test.IntegrationTests;
 [TestClass]
 public class ApiNotificationEventTest : IntegrationTestBase
 {
+    // A machine of its own: against a running API, the delete must not take the events of the other tests.
+    private const string DeleteTestMachine = "delete-test-no-such-machine";
+
     public required TestContext TestContext { get; set; }
 
     private static (IDisposable?, HttpClient) GetAppFactory()
@@ -49,6 +53,9 @@ public class ApiNotificationEventTest : IntegrationTestBase
                                        dao.Id = ObjectId.GenerateNewId().ToString();
                                    }
                                });
+
+                    serviceMock.Setup(s => s.DeleteByMachineAsync(DeleteTestMachine, It.IsAny<CancellationToken>()))
+                               .ReturnsAsync(3);
 
                     services.AddSingleton(serviceMock.Object);
                 }).UseEnvironment("Test");
@@ -156,6 +163,38 @@ public class ApiNotificationEventTest : IntegrationTestBase
         var response = await httpClient.PostAsync(new Uri(BaseUrl, "/notificationEvents/bulk"), content, TestContext.CancellationToken);
 
         Assert.AreEqual(System.Net.HttpStatusCode.Conflict, response.StatusCode);
+
+        factory?.Dispose();
+        httpClient?.Dispose();
+    }
+
+    [TestMethod]
+    public async Task DeleteMachineNotificationEvents_ReturnsTheCount()
+    {
+        var (factory, httpClient) = GetAppFactory();
+
+        var response = await httpClient.DeleteAsync(new Uri(BaseUrl, $"/notificationEvents/machines/{DeleteTestMachine}"), TestContext.CancellationToken);
+
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<NotificationEventsDeleteResultDtoV1>(TestContext.CancellationToken);
+        Assert.IsNotNull(result);
+        Assert.AreEqual(Containerized ? 0 : 3, result.EventsCount);
+
+        factory?.Dispose();
+        httpClient?.Dispose();
+    }
+
+    [TestMethod]
+    [DataRow("a+b")]
+    [DataRow("a%23b")]
+    [DataRow("%20")]
+    public async Task DeleteMachineNotificationEvents_NotOneLevelOfATopic_ReturnsBadRequest(string mId)
+    {
+        var (factory, httpClient) = GetAppFactory();
+
+        var response = await httpClient.DeleteAsync(new Uri(BaseUrl, $"/notificationEvents/machines/{mId}"), TestContext.CancellationToken);
+
+        Assert.AreEqual(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
 
         factory?.Dispose();
         httpClient?.Dispose();

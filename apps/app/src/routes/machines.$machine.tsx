@@ -9,6 +9,7 @@ import { NoAnswer } from "@/components/no-answer.tsx"
 import { buttonVariants } from "@pleiades/ui/components/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { useLive } from "@/hooks/use-live.ts"
+import { DeleteMachineData } from "@/machines/delete-machine-data.tsx"
 import { getMachine, getMachines, getSpans } from "@/machines/get-machines.ts"
 
 /**
@@ -45,20 +46,37 @@ function Machine() {
   const { machine } = Route.useParams()
   useLive()
   return (
-    <Page machine={machine} line={answer.values ? `live · now ${clock(answer.values.asOf)}` : undefined}>
+    <Page
+      machine={machine}
+      line={answer.values ? `live · now ${clock(answer.values.asOf)}` : undefined}
+      action={answer.values ? <DeleteMachineData machine={machine} /> : undefined}
+    >
       {answer.values ? <MachineCard {...answer.values} spans={spans} /> : <NoAnswer error={answer.error} />}
     </Page>
   )
 }
 
 /** The page of a machine is titled with the machine; the way back is the breadcrumb in the header. */
-function Page({ machine, line, children }: { machine?: string; line?: string; children: ReactNode }) {
+function Page({
+  machine,
+  line,
+  action,
+  children,
+}: {
+  machine?: string
+  line?: string
+  action?: ReactNode
+  children: ReactNode
+}) {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       {machine && (
-        <div>
-          <h1 className="text-2xl font-semibold">{machine}</h1>
-          {line && <p className="text-sm text-muted-foreground">{line}</p>}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold">{machine}</h1>
+            {line && <p className="text-sm text-muted-foreground">{line}</p>}
+          </div>
+          {action}
         </div>
       )}
       {children}

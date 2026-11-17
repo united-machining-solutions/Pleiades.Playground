@@ -102,6 +102,10 @@ total of each state. The hatched part of this band is "No data": the stack of th
 for about two hours, and before that nobody published. At the bottom the card names the topics it read, so
 every value can be traced to the broker.
 
+The button "Delete data" beside the title deletes every stored value and notification of the machine, after a
+confirmation, and goes back to Home. It is for a machine that is gone for good: a simulator like P-04 still
+reports and is back with its next value, so there is nothing to try it on in the tour.
+
 **In the code:** [`apps/app/src/routes/machines.$machine.tsx`](../apps/app/src/routes/machines.%24machine.tsx)
 is the page. The card is
 [`packages/cards/src/machine/machine-card.tsx`](../packages/cards/src/machine/machine-card.tsx), its band
