@@ -62,9 +62,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
         var identity = new MachineIdentity(
             _spec.Manufacturer,
             _config.SerialNumber,
-            string.IsNullOrWhiteSpace(_spec.ProductInstanceUri)
-                ? $"https://{_spec.ManufacturerDomain}/{_config.SerialNumber}"
-                : _spec.ProductInstanceUri);
+            _spec.EffectiveProductInstanceUri(_config.SerialNumber));
         _manifest = SpecManifest.Build(identity, _spec);
         _machineId = SpecManifest.MachineId(identity, _spec);
         var counters = SpecCounterStore.Load(_spec.PersistenceFilePath, _spec.Scenario);

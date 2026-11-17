@@ -609,8 +609,8 @@ internal sealed class VirtualMachine
             ? _scenario.Software
             :
             [
-                new SoftwareTemplate { Manufacturer = "Example Controls", ComponentName = "NC kernel", SoftwareRevision = "6.3.2" },
-                new SoftwareTemplate { Manufacturer = _identity.Manufacturer, ComponentName = "Operator interface", SoftwareRevision = _scenario.SoftwareRevision },
+                new SoftwareTemplate { Manufacturer = _identity.Manufacturer, ComponentName = "NC kernel", SoftwareRevision = "6.3.2" },
+                new SoftwareTemplate { Manufacturer = _identity.Manufacturer, ComponentName = "HMI", SoftwareRevision = _scenario.SoftwareRevision },
             ];
         foreach (var entry in software)
         {

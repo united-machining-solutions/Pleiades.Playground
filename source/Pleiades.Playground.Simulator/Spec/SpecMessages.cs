@@ -44,19 +44,19 @@ internal static class SpecWire
 
     /// <summary>
     /// The machine id of the spec binding, <c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>, for example
-    /// <c>example-com_GX-400_P-04</c>. The manufacturer is the domain of its <c>ManufacturerUri</c> without a leading
-    /// <c>www.</c>, every dot a <c>-</c>: it stays when the company is renamed. Each part is normalised
+    /// <c>alcyone-machines_AX-400_P-04</c>. The manufacturer is the domain of its <c>ManufacturerUri</c> in lower case,
+    /// without a leading <c>www.</c> and without its top-level domain (the last label only, so <c>co.uk</c> leaves
+    /// <c>co</c>), every dot a <c>-</c>: it stays when the company is renamed. Each part is normalised
     /// (<see cref="MachineIdPart"/>); <c>_</c> separates the parts and never occurs in one.
     /// </summary>
     public static string MachineId(string manufacturerUri, string model, string serialNumber)
     {
         ArgumentNullException.ThrowIfNull(manufacturerUri);
-        var manufacturer = Uri.TryCreate(manufacturerUri, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(uri.Host)
-            ? uri.Host
-            : manufacturerUri;
-        if (manufacturer.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
+        var manufacturer = SpecOutputConfig.DomainOf(manufacturerUri);
+        var lastDot = manufacturer.LastIndexOf('.');
+        if (lastDot > 0)
         {
-            manufacturer = manufacturer[4..];
+            manufacturer = manufacturer[..lastDot];
         }
         return string.Join('_', MachineIdPart(manufacturer), MachineIdPart(model), MachineIdPart(serialNumber));
     }

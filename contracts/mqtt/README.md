@@ -239,7 +239,7 @@ simulators/{MachineId}/events/<topic of the group>          not retained  event
 - `simulators/` is the root: the output stands for the simulator of a machine. It lies beside `machines/`, so
   nothing mixes with the persistence and the app, which subscribe to `machines/+/umati/#`, `machines/+/vendor/#`
   and `machines/+/events/#`. The tree below `machines/` stays as it is.
-- `{MachineId}` is `<manufacturer>_<model>_<serial number>`, for example `example-com_GX-400_P-04` (see "Machine
+- `{MachineId}` is `<manufacturer>_<model>_<serial number>`, for example `alcyone-machines_AX-400_P-04` (see "Machine
   id" below). The manifest names it as `machineId`. The machine is identified by it in the topic and by its
   manifest: `machine.ProductInstanceUri`, the globally unique id the model asks for, and the values below
   `umati/Identification/` (`Manufacturer`, `SerialNumber`, `ProductInstanceUri`, `Model`, `ManufacturerUri`,
@@ -257,15 +257,15 @@ simulators/{MachineId}/events/<topic of the group>          not retained  event
   `application/cloudevents+json; charset=utf-8`.
 
 ```text
-simulators/example-com_GX-400_P-04/umati/Manifest
-simulators/example-com_GX-400_P-04/umati/State/Status
-simulators/example-com_GX-400_P-04/umati/Spindle/1/IsRotating
-simulators/example-com_GX-400_P-04/umati/JobMonitoring/JobOrders
-simulators/example-com_GX-400_P-04/umati/JobMonitoring/JobOrderResults
-simulators/example-com_GX-400_P-04/oem/Spindle/1/BearingTemperature
-simulators/example-com_GX-400_P-04/events/jobmonitoring
-simulators/example-com_GX-400_P-04/events/workmastermonitoring
-simulators/example-com_GX-400_P-04/events/notifications
+simulators/alcyone-machines_AX-400_P-04/umati/Manifest
+simulators/alcyone-machines_AX-400_P-04/umati/State/Status
+simulators/alcyone-machines_AX-400_P-04/umati/Spindle/1/IsRotating
+simulators/alcyone-machines_AX-400_P-04/umati/JobMonitoring/JobOrders
+simulators/alcyone-machines_AX-400_P-04/umati/JobMonitoring/JobOrderResults
+simulators/alcyone-machines_AX-400_P-04/oem/Spindle/1/BearingTemperature
+simulators/alcyone-machines_AX-400_P-04/events/jobmonitoring
+simulators/alcyone-machines_AX-400_P-04/events/workmastermonitoring
+simulators/alcyone-machines_AX-400_P-04/events/notifications
 ```
 
 Because the tree below every namespace is built the same way, wildcards cut across it either way:
@@ -274,8 +274,8 @@ Because the tree below every namespace is built the same way, wildcards cut acro
 |---|---|
 | `simulators/+/umati/#` | only the elements of the model, of every simulator |
 | `simulators/+/oem/#` | only the signals the machine manufacturers define |
-| `simulators/example-com_GX-400_P-04/+/Spindle/1/#` | everything about spindle 1 of P-04, whatever the namespace |
-| `simulators/example-com_GX-400_P-04/#` | everything of P-04 |
+| `simulators/alcyone-machines_AX-400_P-04/+/Spindle/1/#` | everything about spindle 1 of P-04, whatever the namespace |
+| `simulators/alcyone-machines_AX-400_P-04/#` | everything of P-04 |
 | `simulators/+/+/Spindle/+/BearingTemperature` | the bearing temperature of every spindle, whatever the namespace |
 | `simulators/+/events/+` | every event |
 
@@ -286,8 +286,8 @@ once from values it publishes anyway:
 
 | Part | From | Example |
 |---|---|---|
-| manufacturer | the domain of `Identification.ManufacturerUri`, without a leading `www.`, every dot a `-` | `https://www.example.com` → `example-com` |
-| model | `Identification.Model` | `GX-400` |
+| manufacturer | the domain of `Identification.ManufacturerUri` in lower case, without a leading `www.` and without its top-level domain, every dot a `-` | `https://www.alcyone-machines.example` → `alcyone-machines` |
+| model | `Identification.Model` | `AX-400` |
 | serial number | `Identification.SerialNumber` | `P-04` |
 
 Each part is normalised: `ä`, `ö`, `ü`, `ß` become `ae`, `oe`, `ue`, `ss` (`Ä`, `Ö`, `Ü` become `Ae`, `Oe`,
@@ -298,16 +298,22 @@ nothing that MQTT, NATS or a file system would read otherwise.
 
 | ManufacturerUri, Model, SerialNumber | Machine id |
 |---|---|
-| `https://example.com`, `GX-400`, `P-04` | `example-com_GX-400_P-04` |
-| `https://example.com`, `MC-800`, `P-07` | `example-com_MC-800_P-07` |
-| `https://müller-maschinen.de`, `Schleifer 5/2`, `SN 0815#a` | `mueller-maschinen-de_Schleifer-5-2_SN-0815-a` |
+| `https://www.alcyone-machines.example`, `AX-400`, `P-04` | `alcyone-machines_AX-400_P-04` |
+| `https://www.taygeta-precision.example`, `TP-800`, `P-07` | `taygeta-precision_TP-800_P-07` |
+| `https://www.merope-microtec.example`, `MM-120`, `M-02` | `merope-microtec_MM-120_M-02` |
+| `https://machines.example.co.uk`, `AX-400`, `P-04` | `machines-example-co_AX-400_P-04` |
+| `https://müller-maschinen.de`, `Schleifer 5/2`, `SN 0815#a` | `mueller-maschinen_Schleifer-5-2_SN-0815-a` |
+
+Only the last label of the domain goes, the top-level domain. With an ending of several labels, such as `co.uk`,
+the rest stays (`co`), as the row above shows: the rule needs no list of endings, and the id stays the same for a
+manufacturer as long as its domain does. A subdomain stays a part of the id.
 
 The domain stays when the company is renamed; the display name of the manufacturer is not used. The id is a
 proposal of this binding, not an element of the model: globally unique stays `ProductInstanceUri`, also as the
 `source` of every event.
 
 A wildcard takes a whole level, so it selects every machine (`simulators/+/umati/#`) or one
-(`simulators/example-com_GX-400_P-04/#`); MQTT has no wildcard for a part of a level. Who wants the machines of
+(`simulators/alcyone-machines_AX-400_P-04/#`); MQTT has no wildcard for a part of a level. Who wants the machines of
 one manufacturer or model filters on the id after `_`, or reads the manifests.
 
 ### Value envelope
@@ -331,7 +337,7 @@ one manufacturer or model filters on the id after `_`, or reads the manifests.
 An event is a CloudEvent 1.0 in the JSON format, structured mode, as the model asks:
 
 ```json
-{ "specversion": "1.0", "id": "0f4c4a51-8e2b-5d6a-9c1f-4b7e2d913a60", "source": "https://example.com/P-04",
+{ "specversion": "1.0", "id": "0f4c4a51-8e2b-5d6a-9c1f-4b7e2d913a60", "source": "https://www.alcyone-machines.example/AX-400/P-04",
   "type": "WorkMasterMonitoring.ProgramExecutionEnded", "time": "2026-11-17T09:21:40.000Z",
   "sequence": "20261117T065812Z.000000001842", "correlationid": "3f6c2a9e-1b7d-4c55-9e0a-7d2b8c41f001",
   "dataschema": "urn:umati2:datamodel:0.17.0:event.schema.json",
@@ -415,12 +421,12 @@ The signals the machine manufacturer defines lie in the same tree as the element
 
 - In the model a signal of the manufacturer begins with exactly one prefix segment `x-<domain>`, the internet
   domain of the manufacturer with `-` for every dot (rule for names of the model). The manifest lists it so,
-  for example `x-example-com.Spindle.1.BearingTemperature`, with its `type` and, for a number, its `unit`
+  for example `x-alcyone-machines-example.Spindle.1.BearingTemperature`, with its `type` and, for a number, its `unit`
   (`code` and `name`) and a `description`.
 - The binding maps `x-<domain>.<path>` to `oem/<path>`: the prefix segment is left out, the rest of the path
-  becomes topic levels. `x-example-com.Spindle.1.BearingTemperature` lies on
-  `simulators/example-com_GX-400_P-04/oem/Spindle/1/BearingTemperature`, at the same place of the tree as
-  `simulators/example-com_GX-400_P-04/umati/Spindle/1/IsRotating`, only in another namespace. The domain of the manufacturer stands
+  becomes topic levels. `x-alcyone-machines-example.Spindle.1.BearingTemperature` lies on
+  `simulators/alcyone-machines_AX-400_P-04/oem/Spindle/1/BearingTemperature`, at the same place of the tree as
+  `simulators/alcyone-machines_AX-400_P-04/umati/Spindle/1/IsRotating`, only in another namespace. The domain of the manufacturer stands
   only in the manifest; back from the topic, the manifest gives the full path. An element of the model never lies
   outside `umati`, a signal of the manufacturer never in `umati`.
 - It has the same envelope as an element of the model, `{timestamp, value, unit}`, retained, QoS 1. The `unit` is
@@ -439,9 +445,21 @@ simulator runs `Config:SpecOutput:Scenario`.
 
 | Simulator | Topics below | Scenario | Jobs | Profiles | Signals of the manufacturer |
 |---|---|---|---|---|---|
-| P-04 | `simulators/example-com_GX-400_P-04/` | default | shafts, flanges, bushings; cycles of 45 s to 90 s, up to 15 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
-| P-07 | `simulators/example-com_MC-800_P-07/` | `housings` | housings, cover plates, gearbox housings; cycles of 2.5 min to 7 min, up to 21 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
-| M-02 | `simulators/example-com_SL-120_M-02/` | `small-parts` | pins, spacers, nozzles in large quantities; cycles of 20 s to 50 s, up to 7 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
+| P-04 | `simulators/alcyone-machines_AX-400_P-04/` | default | shafts, flanges, bushings; cycles of 45 s to 90 s, up to 15 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
+| P-07 | `simulators/taygeta-precision_TP-800_P-07/` | `housings` | housings, cover plates, gearbox housings; cycles of 2.5 min to 7 min, up to 21 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
+| M-02 | `simulators/merope-microtec_MM-120_M-02/` | `small-parts` | pins, spacers, nozzles in large quantities; cycles of 20 s to 50 s, up to 7 kW | all of the list below | `oem/Spindle/1/BearingTemperature`, `oem/WorkMasterMonitoring/ActiveProgram` |
+
+The manufacturers are made up, named after the Pleiades; each simulator has its own:
+
+| Simulator | `Manufacturer` | `ManufacturerUri` | `Model` | Machine id | `ProductInstanceUri` |
+|---|---|---|---|---|---|
+| P-04 | Alcyone Machine Works | `https://www.alcyone-machines.example` | `AX-400` | `alcyone-machines_AX-400_P-04` | `https://www.alcyone-machines.example/AX-400/P-04` |
+| P-07 | Taygeta Precision | `https://www.taygeta-precision.example` | `TP-800` | `taygeta-precision_TP-800_P-07` | `https://www.taygeta-precision.example/TP-800/P-07` |
+| M-02 | Merope Microtec | `https://www.merope-microtec.example` | `MM-120` | `merope-microtec_MM-120_M-02` | `https://www.merope-microtec.example/MM-120/M-02` |
+
+The domains end in `.example`, reserved for examples (RFC 2606), so none belongs to anyone. Each manufacturer
+names its signals with its own prefix: `x-alcyone-machines-example`, `x-taygeta-precision-example`,
+`x-merope-microtec-example`. The tree below `machines/` publishes no manufacturer and stays as it is.
 
 All three are machine tools with one channel and one spindle and declare the same profiles: `Core`,
 `IdentificationExtended`, `Components`, `MonitoringExtended`, `ChannelMonitoring`, `Spindle`, `Stacklight`,
@@ -491,13 +509,15 @@ Each virtual machine works like this:
   `WorkMasterMonitoring.ActiveWorkMaster`, `ActiveWorkMaster` in the snapshot and the events of a program
   execution, and `WorkMasterID` of its job order. The NC program that carries it out (`Scenario:Jobs:Program`,
   such as `SHAFT_4711.MPF`) has no element in the model; the virtual machine publishes it as a signal of the
-  manufacturer, `x-example-com.WorkMasterMonitoring.ActiveProgram` on `oem/WorkMasterMonitoring/ActiveProgram`,
+  manufacturer, `x-alcyone-machines-example.WorkMasterMonitoring.ActiveProgram` on `oem/WorkMasterMonitoring/ActiveProgram`,
   and nowhere else.
 - Each scenario names its machine: `Model`, `ProductCode`, `YearOfConstruction`, `MonthOfConstruction`,
-  `InitialOperationDate`, `DeviceClass`; `ManufacturerUri` is `https://{ManufacturerDomain}` unless set. The
-  model has no software revision of the whole machine: `Components.Software` lists the revision of each
-  component (`Manufacturer`, `ComponentName`, `SoftwareRevision`; `Manufacturer` and `ComponentName` name an
-  entry): a control, an operator interface and a third component of each scenario (`Scenario:Software`).
+  `InitialOperationDate`, `DeviceClass`, and its manufacturer: `Manufacturer` and `ManufacturerUri`, whose domain
+  without `www.` forms the prefix of its signals. `ProductInstanceUri` is `{ManufacturerUri}/{Model}/{SerialNumber}`
+  unless set. The model has no software revision of the whole machine: `Components.Software` lists the revision
+  of each component (`Manufacturer`, `ComponentName`, `SoftwareRevision`; `Manufacturer` and `ComponentName` name
+  an entry), all of them of the manufacturer of the machine: NC kernel, PLC, HMI and a fourth component of each
+  scenario (`Scenario:Software`).
 - The stack light is `Segmented`. P-04 and P-07 have four lamps, M-02 three (`Scenario:StacklightLamps`):
 
   | `NumberInList` | `SignalColor` | P-04 | P-07 | M-02 |
@@ -578,8 +598,8 @@ Each virtual machine works like this:
 | `umati/Stacklight/StackElement` | list: `NumberInList`, `SignalOn`, `SignalColor`, `SignalMode` | – |
 | `umati/Consumption/Electricity/Main/AcActivePowerTotal` | number | `watt` |
 | `umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` | number | `wattHour` |
-| `oem/Spindle/1/BearingTemperature` | number, signal of the manufacturer (`x-example-com.Spindle.1.BearingTemperature` in the manifest) | `degreeCelsius` |
-| `oem/WorkMasterMonitoring/ActiveProgram` | string, signal of the manufacturer (`x-example-com.WorkMasterMonitoring.ActiveProgram`): the NC program of the active work master | – |
+| `oem/Spindle/1/BearingTemperature` | number, signal of the manufacturer (`x-alcyone-machines-example.Spindle.1.BearingTemperature` in the manifest) | `degreeCelsius` |
+| `oem/WorkMasterMonitoring/ActiveProgram` | string, signal of the manufacturer (`x-alcyone-machines-example.WorkMasterMonitoring.ActiveProgram`): the NC program of the active work master | – |
 | `events/jobmonitoring` | CloudEvents `JobMonitoring.JobOrder<Added, Released, Revoked, Started, Interrupted, Resumed, Ended, Aborted, Cancelled, Changed, ResultChanged, Removed>` | – |
 | `events/workmastermonitoring` | CloudEvents `WorkMasterMonitoring.ProgramExecution<Started, Interrupted, Resumed, Ended, Aborted>` | – |
 | `events/notifications` | CloudEvents `Notification.AlertRaised`, `Notification.AlertChanged`, `Notification.AlertCleared`, `Notification.NotificationEvent` | – |

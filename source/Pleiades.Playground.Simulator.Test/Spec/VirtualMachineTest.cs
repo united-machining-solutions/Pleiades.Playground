@@ -269,7 +269,7 @@ public sealed class VirtualMachineTest
     public void Values_CarryTheUnitOfTheirElementAndStayInTheManifest()
     {
         var run = MachineRun.For(SixHours, MachineRun.Config(TimeSpan.FromMinutes(10)));
-        var paths = SpecElements.ElementsFor("example.com").Select(e => e.Path).ToHashSet();
+        var paths = SpecElements.ElementsFor("alcyone-machines.example").Select(e => e.Path).ToHashSet();
         foreach (var value in run.Messages.OfType<SpecValue>())
         {
             Assert.IsTrue(paths.Contains(value.Path), value.Path);
@@ -658,7 +658,7 @@ public sealed class VirtualMachineTest
     public void WorkMaster_IsAnIdOfItsOwn_AndTheProgramASignalOfTheManufacturer()
     {
         var run = MachineRun.For(TimeSpan.FromHours(2));
-        var program = SpecElements.ExtensionPath("example.com", SpecElements.ActiveProgram);
+        var program = SpecElements.ExtensionPath("alcyone-machines.example", SpecElements.ActiveProgram);
         var started = run.EventsOf(SpecElements.ProgramExecutionStarted).First();
         var template = MachineRun.Config().Scenario.Jobs.Single(j => j.WorkMasterId == started.Value["ActiveWorkMaster"]!.GetValue<string>());
 
@@ -783,7 +783,7 @@ public sealed class VirtualMachineTest
         var values = run.Messages.OfType<SpecValue>().GroupBy(v => v.Path).ToDictionary(g => g.Key, g => g.Last().Value);
         var scenario = MachineRun.Config().Scenario;
         Assert.AreEqual(scenario.Model, values[SpecElements.Model]!.GetValue<string>());
-        Assert.AreEqual("https://example.com", values[SpecElements.ManufacturerUri]!.GetValue<string>());
+        Assert.AreEqual("https://alcyone-machines.example", values[SpecElements.ManufacturerUri]!.GetValue<string>());
         Assert.AreEqual(scenario.ProductCode, values[SpecElements.ProductCode]!.GetValue<string>());
         Assert.AreEqual((long)scenario.YearOfConstruction, values[SpecElements.YearOfConstruction]!.GetValue<long>());
         Assert.IsFalse(values.ContainsKey("Identification.SoftwareRevision"), "no revision of the whole machine since 0.17.0");
@@ -804,7 +804,7 @@ public sealed class VirtualMachineTest
             Assert.IsNull(published[0].Value, $"{path} null");
         }
 
-        var identity = new MachineIdentity("Example Machine Tools", "P-04", "https://example.com/P-04");
+        var identity = new MachineIdentity("Alcyone Machine Works", "P-04", "https://www.alcyone-machines.example/GM-500/P-04");
         var elements = SpecManifest.Build(identity, config)["elements"]!.AsArray().Select(e => e!.AsObject()).ToList();
         var unavailable = elements.Where(e => e["available"]?.GetValue<bool>() == false).Select(e => e["path"]!.GetValue<string>()).ToList();
         CollectionAssert.AreEquivalent(config.Scenario.Unavailable.Concat(SpecElements.NotDelivered).ToList(), unavailable,
@@ -856,16 +856,16 @@ public sealed class VirtualMachineTest
         CollectionAssert.IsSubsetOf(SpecElements.Events.Select(e => e.Path.Split('.')[0]).Distinct().ToList(), SpecWire.EventTopicNames.Keys.ToList(),
             "every event of the manifest has a topic");
 
-        var id = SpecWire.NameUuid("https://example.com/P-04 Notification 20261117T060000Z.000000000007");
+        var id = SpecWire.NameUuid("https://www.alcyone-machines.example/GM-500/P-04 Notification 20261117T060000Z.000000000007");
         var specEvent = new SpecEvent(SpecElements.AlertCleared, MachineRun.Start, 7, new JsonObject { ["Id"] = "a" }, id,
             SpecWire.Sequence("20261117T060000Z", 7), "exec-1");
-        var wire = SpecWire.Event(specEvent, "https://example.com/P 04");
+        var wire = SpecWire.Event(specEvent, "https://www.alcyone-machines.example/GM-500/P 04");
         CollectionAssert.AreEqual(new[] { "specversion", "id", "source", "type", "time", "sequence", "correlationid", "dataschema", "data" },
             wire.Select(p => p.Key).ToList());
         Assert.AreEqual("1.0", wire["specversion"]!.GetValue<string>());
         Assert.AreEqual(id, wire["id"]!.GetValue<string>());
         Assert.AreEqual(5, Guid.Parse(id).Version, "a UUID made from a name");
-        Assert.AreEqual("https://example.com/P%2004", wire["source"]!.GetValue<string>(), "a space is encoded");
+        Assert.AreEqual("https://www.alcyone-machines.example/GM-500/P%2004", wire["source"]!.GetValue<string>(), "a space is encoded");
         Assert.AreEqual(SpecElements.AlertCleared, wire["type"]!.GetValue<string>());
         Assert.AreEqual("2026-11-17T06:00:00.000Z", wire["time"]!.GetValue<string>());
         Assert.AreEqual("20261117T060000Z.000000000007", wire["sequence"]!.GetValue<string>());
@@ -873,17 +873,17 @@ public sealed class VirtualMachineTest
         Assert.AreEqual("urn:umati2:datamodel:0.17.0:event.schema.json", wire["dataschema"]!.GetValue<string>());
         Assert.AreEqual("a", wire["data"]!["Id"]!.GetValue<string>());
 
-        var withoutCorrelation = SpecWire.Event(specEvent with { CorrelationId = null }, "https://example.com/P-04");
+        var withoutCorrelation = SpecWire.Event(specEvent with { CorrelationId = null }, "https://www.alcyone-machines.example/GM-500/P-04");
         Assert.IsFalse(withoutCorrelation.ContainsKey("correlationid"), "only where the event belongs to a program execution");
     }
 
     [TestMethod]
     public void BearingTemperature_IsASignalOfTheManufacturerInTheSameTree()
     {
-        var path = SpecElements.ExtensionPath("example.com", SpecElements.BearingTemperature);
-        Assert.AreEqual("x-example-com.Spindle.1.BearingTemperature", path);
+        var path = SpecElements.ExtensionPath("alcyone-machines.example", SpecElements.BearingTemperature);
+        Assert.AreEqual("x-alcyone-machines-example.Spindle.1.BearingTemperature", path);
         Assert.AreEqual("simulators/P-04/oem/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", path), "the prefix maps to oem/");
-        Assert.AreEqual("x-example-com", SpecElements.ExtensionPrefix("Example.COM"), "lower case, like the machine id");
+        Assert.AreEqual("x-alcyone-machines-example", SpecElements.ExtensionPrefix("Alcyone-Machines.EXAMPLE"), "lower case, like the machine id");
 
         var run = MachineRun.For(TimeSpan.FromHours(1));
         var values = run.ValuesOf(path).ToList();
@@ -897,7 +897,7 @@ public sealed class VirtualMachineTest
     {
         // The same place in the tree, only another namespace: the model and the manufacturer side by side.
         var model = SpecWire.Topic("P-04", SpecElements.SpindleIsRotating);
-        var oem = SpecWire.Topic("P-04", "x-example-com.Spindle.1.BearingTemperature");
+        var oem = SpecWire.Topic("P-04", "x-alcyone-machines-example.Spindle.1.BearingTemperature");
         Assert.AreEqual("simulators/P-04/umati/Spindle/1/IsRotating", model);
         Assert.AreEqual("simulators/P-04/oem/Spindle/1/BearingTemperature", oem);
         Assert.AreEqual(string.Join('/', model.Split('/')[3..5]), string.Join('/', oem.Split('/')[3..5]));
@@ -926,7 +926,7 @@ public sealed class VirtualMachineTest
     [TestMethod]
     public void BearingTemperature_WarmsWhileTheSpindleTurnsAndCoolsWhileItStands()
     {
-        var path = SpecElements.ExtensionPath("example.com", SpecElements.BearingTemperature);
+        var path = SpecElements.ExtensionPath("alcyone-machines.example", SpecElements.BearingTemperature);
         var scenario = MachineRun.Config().Scenario;
         var previous = (double?)null;
         var changed = true;
@@ -967,13 +967,13 @@ public sealed class VirtualMachineTest
     [TestMethod]
     public void Manifest_NamesTypeUnitAndDescriptionOfTheSignalsOfTheManufacturer()
     {
-        var identity = new MachineIdentity("Example Machine Tools", "P-04", "https://example.com/P-04");
+        var identity = new MachineIdentity("Alcyone Machine Works", "P-04", "https://www.alcyone-machines.example/GM-500/P-04");
         var elements = SpecManifest.Build(identity, MachineRun.Config())["elements"]!.AsArray().Select(e => e!.AsObject()).ToList();
         var extensions = elements.Where(e => e["path"]!.GetValue<string>().StartsWith("x-", StringComparison.Ordinal)).ToList();
         Assert.HasCount(SpecElements.Extensions.Count, extensions);
         foreach (var extension in extensions)
         {
-            Assert.IsTrue(extension["path"]!.GetValue<string>().StartsWith("x-example-com.", StringComparison.Ordinal));
+            Assert.IsTrue(extension["path"]!.GetValue<string>().StartsWith("x-alcyone-machines-example.", StringComparison.Ordinal));
             Assert.IsNotNull(extension["type"]);
             Assert.AreEqual(extension["type"]!.GetValue<string>() == "number", extension["unit"]?["code"] is not null, "a number has a unit, a text none");
             Assert.IsNotNull(extension["description"]);
@@ -983,12 +983,17 @@ public sealed class VirtualMachineTest
     }
 
     [TestMethod]
-    [DataRow("https://example.com", "GX-400", "P-04", "example-com_GX-400_P-04")]
-    [DataRow("https://www.example.com/products", "GX-400", "P-04", "example-com_GX-400_P-04")]
-    [DataRow("https://müller-maschinen.de", "Schleifer 5/2", "SN 0815#a", "mueller-maschinen-de_Schleifer-5-2_SN-0815-a")]
-    [DataRow("https://example.com", "Größe Ä Ö Ü", "Café_01", "example-com_Groesse-Ae-Oe-Ue_Cafe-01")]
-    [DataRow("https://example.com", "--a  +  b--", "x//y", "example-com_a-b_x-y")]
-    [DataRow("example machine tools", "", "  ", "example-machine-tools_unknown_unknown")]
+    [DataRow("https://www.alcyone-machines.example", "AX-400", "P-04", "alcyone-machines_AX-400_P-04")]
+    [DataRow("https://www.taygeta-precision.example", "TP-800", "P-07", "taygeta-precision_TP-800_P-07")]
+    [DataRow("https://www.merope-microtec.example", "MM-120", "M-02", "merope-microtec_MM-120_M-02")]
+    [DataRow("https://alcyone-machines.example/products", "AX-400", "P-04", "alcyone-machines_AX-400_P-04")]
+    [DataRow("https://WWW.Alcyone-Machines.EXAMPLE", "AX-400", "P-04", "alcyone-machines_AX-400_P-04")]
+    [DataRow("https://machines.example.co.uk", "AX-400", "P-04", "machines-example-co_AX-400_P-04")]
+    [DataRow("https://localhost", "AX-400", "P-04", "localhost_AX-400_P-04")]
+    [DataRow("https://müller-maschinen.de", "Schleifer 5/2", "SN 0815#a", "mueller-maschinen_Schleifer-5-2_SN-0815-a")]
+    [DataRow("https://www.alcyone-machines.example", "Größe Ä Ö Ü", "Café_01", "alcyone-machines_Groesse-Ae-Oe-Ue_Cafe-01")]
+    [DataRow("https://www.alcyone-machines.example", "--a  +  b--", "x//y", "alcyone-machines_a-b_x-y")]
+    [DataRow("alcyone machine works", "", "  ", "alcyone-machine-works_unknown_unknown")]
     public void MachineId_IsManufacturerModelAndSerialNumber_EachPartNormalised(string manufacturerAddress, string model, string serialNumber, string expected)
     {
         Assert.AreEqual(expected, SpecWire.MachineId(manufacturerAddress, model, serialNumber));
@@ -1011,16 +1016,16 @@ public sealed class VirtualMachineTest
     [TestMethod]
     public void MachineId_OfEveryScenario_NamesTheManifestTheTopicsAndTheLastWill()
     {
-        var identity = new MachineIdentity("Example Machine Tools", "P-04", "https://example.com/P-04");
+        var identity = new MachineIdentity("Alcyone Machine Works", "P-04", "https://www.alcyone-machines.example/GM-500/P-04");
         var config = MachineRun.Config();
         var machineId = SpecManifest.MachineId(identity, config);
 
-        Assert.AreEqual($"example-com_{config.Scenario.Model}_P-04", machineId);
+        Assert.AreEqual($"alcyone-machines_{config.Scenario.Model}_P-04", machineId);
         Assert.AreEqual(machineId, SpecManifest.Build(identity, config)["machineId"]!.GetValue<string>());
         Assert.AreEqual($"simulators/{machineId}/umati/Connection/State", SpecPublisher.LastWill(machineId, MachineRun.Start).Topic);
         Assert.AreEqual($"simulators/{machineId}/events/jobmonitoring", SpecWire.EventTopic(machineId, SpecElements.JobOrderAdded));
         Assert.AreEqual($"simulators/{machineId}/oem/Spindle/1/BearingTemperature",
-            SpecWire.Topic(machineId, SpecElements.ExtensionPath("example.com", SpecElements.BearingTemperature)));
+            SpecWire.Topic(machineId, SpecElements.ExtensionPath("alcyone-machines.example", SpecElements.BearingTemperature)));
     }
 
     [TestMethod]
@@ -1029,14 +1034,14 @@ public sealed class VirtualMachineTest
         Assert.AreEqual("simulators/P-04/umati/Channel/1/ChannelState", SpecWire.Topic("P-04", "Channel.1.ChannelState"));
         Assert.AreEqual("simulators/P-04/umati/State/Status", SpecWire.Topic("P-04", SpecElements.Status));
         Assert.AreEqual("simulators/P-04/umati/Manifest", SpecWire.ManifestTopic("P-04"));
-        Assert.AreEqual("simulators/P-04/oem/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", "x-example-com.Spindle.1.BearingTemperature"));
+        Assert.AreEqual("simulators/P-04/oem/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", "x-alcyone-machines-example.Spindle.1.BearingTemperature"));
         Assert.AreEqual("simulators/P-04/umati/Connection/State", SpecPublisher.LastWill("P-04", MachineRun.Start).Topic, "the last will");
     }
 
     [TestMethod]
     public void Manifest_NamesTheRetentionTheMachineChose_WithoutALeastTime()
     {
-        var identity = new MachineIdentity("Example Machine Tools", "P-04", "https://example.com/P-04");
+        var identity = new MachineIdentity("Alcyone Machine Works", "P-04", "https://www.alcyone-machines.example/GM-500/P-04");
         Assert.AreEqual(86400.0, SpecManifest.Build(identity, MachineRun.Config())["jobOrderRetention"]!.GetValue<double>());
         Assert.AreEqual(3600.0, SpecManifest.Build(identity, MachineRun.Config(TimeSpan.FromHours(1)))["jobOrderRetention"]!.GetValue<double>());
         Assert.AreEqual(TimeSpan.FromHours(8), new ScenarioConfig().JobOrderRetention, "one shift by default");
@@ -1052,7 +1057,7 @@ public sealed class VirtualMachineTest
         return string.Join('\n', run.Messages.Select(m => m switch
         {
             SpecValue v => SpecWire.Envelope(v).ToJsonString(),
-            SpecEvent e => SpecWire.Event(e, "https://example.com/P-04").ToJsonString(),
+            SpecEvent e => SpecWire.Event(e, "https://www.alcyone-machines.example/GM-500/P-04").ToJsonString(),
             _ => string.Empty,
         }));
     }

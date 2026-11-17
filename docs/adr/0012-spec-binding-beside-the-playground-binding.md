@@ -32,7 +32,8 @@ exactly after the model, to find a compromise for the differences.
   the choice as open.
 - The second tree lies below a root of its own, `simulators/{MachineId}/`, so that nothing mixes with the
   persistence and the app. The machine id is `<manufacturer>_<model>_<serial number>`, formed from the domain of
-  `ManufacturerUri`, `Model` and `SerialNumber` by a rule of normalisation, so that it is unique across
+  `ManufacturerUri` (without `www.` and its top-level domain), `Model` and `SerialNumber`, for example
+  `alcyone-machines_AX-400_P-04` by a rule of normalisation, so that it is unique across
   manufacturers and holds nothing a broker reads otherwise; the manifest names it as `machineId`, and carries the
   globally unique `ProductInstanceUri` of the model. `machines/` keeps the serial number for now.
 - Below the serial number comes a namespace level, as the namespaces of OPC UA: `umati` for the elements of the
@@ -46,7 +47,8 @@ exactly after the model, to find a compromise for the differences.
 - A virtual machine, a state machine driven by a scenario, produces the second tree. The topics below
   `machines/` keep coming from the generators, unchanged.
 - Every simulator of the demo stack publishes the second tree, each from a virtual machine with a scenario of its
-  own kind of machine, with its own MQTT client and last will.
+  own kind of machine, with its own MQTT client and last will, and with a manufacturer of its own: made-up names
+  after the Pleiades (Alcyone Machine Works, Taygeta Precision, Merope Microtec) on domains below `.example`.
 
 ## Consequences
 

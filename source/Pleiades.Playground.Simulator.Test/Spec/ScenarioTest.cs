@@ -23,7 +23,7 @@ public sealed class ScenarioTest
         Assert.IsTrue(config.Scenario.Jobs.Count > 0, "a scenario of its own");
         Assert.IsTrue(config.Scenario.Alerts.Any(a => a.Severity == "Failure"));
 
-        var identity = new MachineIdentity(config.Manufacturer, "X-01", "https://example.com/X-01");
+        var identity = new MachineIdentity(config.Manufacturer, "X-01", "https://www.alcyone-machines.example/X/X-01");
         var machine = new VirtualMachine(identity, Seeded(config), new MachineCounters(1, 1, 1), MachineRun.Start);
         var messages = new List<SpecMessage>(machine.TakeInitialMessages());
         for (var now = MachineRun.Start.AddSeconds(1); now <= MachineRun.Start.AddHours(8); now = now.AddSeconds(1))
@@ -78,13 +78,36 @@ public sealed class ScenarioTest
     public void Stacklight_OfEachScenario_HasItsLamps_SmallPartsWithoutBlue(string name, int lamps)
     {
         var config = Settings(name).Resolve();
-        var machine = new VirtualMachine(new MachineIdentity(config.Manufacturer, "X-01", "https://example.com/X-01"), Seeded(config),
+        var machine = new VirtualMachine(new MachineIdentity(config.Manufacturer, "X-01", "https://www.alcyone-machines.example/X/X-01"), Seeded(config),
             new MachineCounters(1, 1, 1), MachineRun.Start);
 
         var elements = machine.TakeInitialMessages().OfType<SpecValue>().Last(v => v.Path == SpecElements.StackElement).Value!.AsArray();
 
         Assert.HasCount(lamps, elements);
         Assert.AreEqual(lamps == 4, elements.Any(e => e!["SignalColor"]!.GetValue<string>() == "Blue"));
+    }
+
+    [TestMethod]
+    [DataRow("", "P-04", "Alcyone Machine Works", "alcyone-machines_AX-400_P-04", "https://www.alcyone-machines.example/AX-400/P-04")]
+    [DataRow("housings", "P-07", "Taygeta Precision", "taygeta-precision_TP-800_P-07", "https://www.taygeta-precision.example/TP-800/P-07")]
+    [DataRow("small-parts", "M-02", "Merope Microtec", "merope-microtec_MM-120_M-02", "https://www.merope-microtec.example/MM-120/M-02")]
+    public void EverySimulator_HasAManufacturerOfItsOwn_ItsMachineIdAndItsSoftware(
+        string name, string serialNumber, string manufacturer, string machineId, string instanceAddress)
+    {
+        ArgumentNullException.ThrowIfNull(machineId);
+        var config = Settings(name).Resolve();
+        var identity = new MachineIdentity(config.Manufacturer, serialNumber, config.EffectiveProductInstanceUri(serialNumber));
+
+        Assert.AreEqual(manufacturer, config.Manufacturer);
+        Assert.AreEqual(instanceAddress, identity.ProductInstanceUri);
+        Assert.AreEqual(machineId, SpecManifest.MachineId(identity, config));
+        Assert.IsTrue(config.Scenario.Software.All(s => s.Manufacturer == manufacturer), "the software comes from the manufacturer of the machine");
+        CollectionAssert.IsSubsetOf(new[] { "NC kernel", "PLC", "HMI" }, config.Scenario.Software.Select(s => s.ComponentName).ToList());
+        var manifest = SpecManifest.Build(identity, config);
+        Assert.AreEqual(instanceAddress, manifest["machine"]!["ProductInstanceUri"]!.GetValue<string>());
+        var prefix = $"x-{machineId.Split('_')[0]}-example.";
+        Assert.IsTrue(manifest["elements"]!.AsArray().Select(e => e!["path"]!.GetValue<string>()).Where(p => p.StartsWith("x-", StringComparison.Ordinal))
+            .All(p => p.StartsWith(prefix, StringComparison.Ordinal)), $"the signals of the manufacturer below {prefix}");
     }
 
     [TestMethod]
@@ -95,7 +118,7 @@ public sealed class ScenarioTest
         foreach (var name in Names.Select(n => (string)n[0]))
         {
             var config = Settings(name).Resolve();
-            var manifest = SpecManifest.Build(new MachineIdentity(config.Manufacturer, "X-01", "https://example.com/X-01"), config);
+            var manifest = SpecManifest.Build(new MachineIdentity(config.Manufacturer, "X-01", "https://www.alcyone-machines.example/X/X-01"), config);
             CollectionAssert.AreEqual(SpecElements.Profiles.ToList(),
                 manifest["profiles"]!.AsArray().Select(p => p!.GetValue<string>()).ToList(), name);
         }
@@ -104,14 +127,14 @@ public sealed class ScenarioTest
     private static SpecOutputConfig Seeded(SpecOutputConfig config)
     {
         // The scenarios of the stack run without a seed; the test gives one, so that it runs the same each time.
-        var json = new ConfigurationBuilder().AddJsonFile(AppSettings()).Build();
-        var settings = json.GetSection("Config:SpecOutput").Get<SpecOutputConfig>()!;
         var scenario = config.Scenario;
         return new SpecOutputConfig
         {
             Enabled = true,
-            Manufacturer = settings.Manufacturer,
-            ManufacturerDomain = settings.ManufacturerDomain,
+            // The manufacturer of the scenario, as Resolve gave it.
+            Manufacturer = config.Manufacturer,
+            ManufacturerDomain = config.ManufacturerDomain,
+            ManufacturerUri = config.ManufacturerUri,
             Scenario = new ScenarioConfig
             {
                 Seed = 7,

@@ -180,7 +180,7 @@ All notable changes are documented here. The format follows
   stays after its end, and the scenario now also stops programs, revokes, cancels and takes back job orders.
   The signal of the manufacturer, the temperature of the spindle bearing, comes in the same tree below
   `oem/Spindle/1/BearingTemperature`, in the namespace `oem`, in `degreeCelsius`; it
-  follows the spindle and is named in the manifest as `x-example-com.Spindle.1.BearingTemperature` with type and
+  follows the spindle and is named in the manifest as `x-alcyone-machines-example.Spindle.1.BearingTemperature` with type and
   unit, and the binding maps `x-<domain>.<path>` to `oem/<path>`. `umati`, `oem` and `events` are reserved.
   `machines/{SerialNumber}/` stays as it is.
   With 0.15.0: `Production.ActiveProgram` is `Production.ActiveWorkMaster`; the program execution snapshot
@@ -221,10 +221,16 @@ All notable changes are documented here. The format follows
   event carries the job order and its result, a changed result is a `Changed`, and `Seq` counts them apart from
   the groups of the model.
   The spec tree lies below `simulators/<manufacturer>_<model>_<serial number>/`, for example
-  `simulators/example-com_GX-400_P-04/`: the domain of `ManufacturerUri`, `Model` and `SerialNumber`, each part
+  `simulators/alcyone-machines_AX-400_P-04/`: the domain of `ManufacturerUri` without `www.` and without its
+  top-level domain, `Model` and `SerialNumber`, each part
   normalised (only `A-Z`, `a-z`, `0-9` and `-`, umlauts written out, at most 64 characters), named in the
   manifest as `machineId`; the last will too. The spec output shows a stack light (`Stacklight`, `Segmented`):
   red, yellow, green and blue, M-02 without blue, following the state of the virtual machine and its alerts.
+  Every simulator has a made-up manufacturer of its own, named after the Pleiades: P-04 Alcyone Machine Works
+  (`AX-400`, `alcyone-machines_AX-400_P-04`), P-07 Taygeta Precision (`TP-800`, `taygeta-precision_TP-800_P-07`),
+  M-02 Merope Microtec (`MM-120`, `merope-microtec_MM-120_M-02`), each on a domain below `.example` with its
+  `ProductInstanceUri` `{ManufacturerUri}/{Model}/{SerialNumber}`, its own prefix of its signals and all its
+  software (NC kernel, PLC, HMI and one more) of its own (`Scenario:Manufacturer`, `Scenario:ManufacturerUri`).
 
 ### Changed
 

@@ -15,18 +15,24 @@ internal sealed class SpecOutputConfig
     /// <summary>Whether this simulator also publishes below <c>simulators/{MachineId}/</c>.</summary>
     public bool Enabled { get; init; }
 
-    /// <summary>Name of the manufacturer, the value of <c>Identification.Manufacturer</c>.</summary>
-    public string Manufacturer { get; init; } = "Example Machine Tools";
+    /// <summary>
+    /// Name of the manufacturer, the value of <c>Identification.Manufacturer</c>, unless the scenario names its own.
+    /// The manufacturers of the demo stack are made up, named after the Pleiades.
+    /// </summary>
+    public string Manufacturer { get; init; } = "Alcyone Machine Works";
 
     /// <summary>
-    /// Internet domain of the manufacturer, for example <c>example.com</c>. It forms the prefix of the signals of the
-    /// manufacturer in the manifest, <c>x-example-com</c>, and the default <see cref="ProductInstanceUri"/>.
+    /// Internet domain of the manufacturer, for example <c>alcyone-machines.example</c>. It forms the prefix of the
+    /// signals of the manufacturer in the manifest, <c>x-alcyone-machines-example</c>, and the default
+    /// <see cref="ManufacturerUri"/>. A scenario with a <see cref="ScenarioConfig.ManufacturerUri"/> of its own takes the
+    /// domain from it, without <c>www.</c>.
     /// </summary>
     [RegularExpression(@"^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$")]
-    public string ManufacturerDomain { get; init; } = "example.com";
+    public string ManufacturerDomain { get; init; } = "alcyone-machines.example";
 
     /// <summary>
-    /// Globally unique id of the machine. Empty: <c>https://{ManufacturerDomain}/{SerialNumber}</c>.
+    /// Globally unique id of the machine. Empty: <c>{ManufacturerUri}/{Model}/{SerialNumber}</c>, for example
+    /// <c>https://www.alcyone-machines.example/AX-400/P-04</c>.
     /// </summary>
     public string? ProductInstanceUri { get; init; }
 
@@ -35,6 +41,14 @@ internal sealed class SpecOutputConfig
 
     /// <summary>The value of <c>Identification.ManufacturerUri</c>: <see cref="ManufacturerUri"/>, or the one of the domain.</summary>
     public string EffectiveManufacturerUri => string.IsNullOrWhiteSpace(ManufacturerUri) ? $"https://{ManufacturerDomain}" : ManufacturerUri;
+
+    /// <summary>The value of <c>Identification.ProductInstanceUri</c> of the machine with this serial number.</summary>
+    public string EffectiveProductInstanceUri(string serialNumber)
+    {
+        return string.IsNullOrWhiteSpace(ProductInstanceUri)
+            ? $"{EffectiveManufacturerUri.TrimEnd('/')}/{Uri.EscapeDataString(Scenario.Model)}/{Uri.EscapeDataString(serialNumber)}"
+            : ProductInstanceUri;
+    }
 
     /// <summary>Interval of <c>Connection.Heartbeat</c>; the manifest names it.</summary>
     public TimeSpan HeartbeatInterval { get; init; } = TimeSpan.FromSeconds(10);
@@ -72,26 +86,27 @@ internal sealed class SpecOutputConfig
     [SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "Configuration binding")]
     public Dictionary<string, ScenarioConfig> Scenarios { get; set; } = [];
 
-    /// <summary>This configuration with the scenario <see cref="ScenarioName"/> names as <see cref="Scenario"/>.</summary>
+    /// <summary>
+    /// This configuration with the scenario <see cref="ScenarioName"/> names as <see cref="Scenario"/>, and with the
+    /// manufacturer of the scenario, if it names one.
+    /// </summary>
     /// <exception cref="InvalidOperationException">No scenario has that name.</exception>
     public SpecOutputConfig Resolve()
     {
-        if (string.IsNullOrWhiteSpace(ScenarioName))
-        {
-            return this;
-        }
-        if (!Scenarios.TryGetValue(ScenarioName, out var scenario))
+        var scenario = Scenario;
+        if (!string.IsNullOrWhiteSpace(ScenarioName) && !Scenarios.TryGetValue(ScenarioName, out scenario))
         {
             throw new InvalidOperationException(
                 $"Config:SpecOutput:ScenarioName '{ScenarioName}' names no scenario in Config:SpecOutput:Scenarios.");
         }
+        var manufacturerUri = string.IsNullOrWhiteSpace(scenario!.ManufacturerUri) ? ManufacturerUri : scenario.ManufacturerUri;
         return new SpecOutputConfig
         {
             Enabled = Enabled,
-            Manufacturer = Manufacturer,
-            ManufacturerDomain = ManufacturerDomain,
+            Manufacturer = string.IsNullOrWhiteSpace(scenario.Manufacturer) ? Manufacturer : scenario.Manufacturer,
+            ManufacturerDomain = string.IsNullOrWhiteSpace(scenario.ManufacturerUri) ? ManufacturerDomain : DomainOf(scenario.ManufacturerUri),
             ProductInstanceUri = ProductInstanceUri,
-            ManufacturerUri = ManufacturerUri,
+            ManufacturerUri = manufacturerUri,
             HeartbeatInterval = HeartbeatInterval,
             MeasurementInterval = MeasurementInterval,
             TickInterval = TickInterval,
@@ -101,6 +116,17 @@ internal sealed class SpecOutputConfig
             ScenarioName = ScenarioName,
             Scenarios = Scenarios,
         };
+    }
+
+    /// <summary>The domain of a web address, without a leading <c>www.</c>, in lower case.</summary>
+    public static string DomainOf(string uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+        var host = Uri.TryCreate(uri, UriKind.Absolute, out var parsed) && !string.IsNullOrEmpty(parsed.Host) ? parsed.Host : uri.Trim();
+#pragma warning disable CA1308 // A domain is lower case by convention.
+        host = host.ToLowerInvariant();
+#pragma warning restore CA1308
+        return host.StartsWith("www.", StringComparison.Ordinal) ? host[4..] : host;
     }
 }
 
@@ -121,6 +147,15 @@ internal sealed class ScenarioConfig
     /// <c>jobOrderRetention</c>.
     /// </summary>
     public TimeSpan JobOrderRetention { get; init; } = TimeSpan.FromHours(8);
+
+    /// <summary>Name of the manufacturer of this machine, <c>Identification.Manufacturer</c>; empty for the one of the output.</summary>
+    public string? Manufacturer { get; init; }
+
+    /// <summary>
+    /// Web address of the manufacturer of this machine, <c>Identification.ManufacturerUri</c>; empty for the one of the
+    /// output. Its domain names the manufacturer in the machine id and in the prefix of its signals.
+    /// </summary>
+    public string? ManufacturerUri { get; init; }
 
     /// <summary>Model of the machine, <c>Identification.Model</c>.</summary>
     public string Model { get; init; } = "GM-500";
@@ -149,8 +184,8 @@ internal sealed class ScenarioConfig
     public string DeviceClass { get; init; } = "Machine tool";
 
     /// <summary>
-    /// The software components of the machine, <c>Components.Software</c>. Empty: a control and an operator
-    /// interface of the manufacturer.
+    /// The software components of the machine, <c>Components.Software</c>, all of its manufacturer. Empty: an NC
+    /// kernel and an operator interface of the manufacturer.
     /// </summary>
     [SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "Configuration binding")]
     public List<SoftwareTemplate> Software { get; set; } = [];

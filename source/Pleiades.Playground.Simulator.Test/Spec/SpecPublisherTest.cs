@@ -15,7 +15,7 @@ public sealed class SpecPublisherTest
 {
     private const string SerialNumber = "P-04";
     private const string Prefix = "20261117T060000Z";
-    private const string Source = "https://example.com/P-04";
+    private const string Source = "https://www.alcyone-machines.example/GM-500/P-04";
 
     [TestMethod]
     public async Task Events_GoBelowEventsWithQos1AndNotRetained()

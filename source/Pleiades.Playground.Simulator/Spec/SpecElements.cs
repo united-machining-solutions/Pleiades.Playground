@@ -194,7 +194,7 @@ internal static class SpecElements
 
     /// <summary>
     /// The prefix of the signals of a manufacturer: exactly one segment <c>x-&lt;domain&gt;</c>, every dot of the domain a
-    /// <c>-</c>, for example <c>x-example-com</c>.
+    /// <c>-</c>, for example <c>x-alcyone-machines-example</c>.
     /// </summary>
     public static string ExtensionPrefix(string manufacturerDomain)
     {

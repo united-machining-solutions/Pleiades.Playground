@@ -33,7 +33,7 @@ internal sealed class MachineRun
     public static MachineRun For(TimeSpan duration, SpecOutputConfig? config = null, Action<VirtualMachine, IReadOnlyList<SpecMessage>>? afterStep = null)
     {
         config ??= Config();
-        var identity = new MachineIdentity("Example Machine Tools", "P-04", "https://example.com/P-04");
+        var identity = new MachineIdentity("Alcyone Machine Works", "P-04", "https://www.alcyone-machines.example/GM-500/P-04");
         var machine = new VirtualMachine(identity, config, new MachineCounters(1000, 5000, 100), Start);
         var messages = new List<SpecMessage>(machine.TakeInitialMessages());
         for (var now = Start + TimeSpan.FromSeconds(1); now <= Start + duration; now += TimeSpan.FromSeconds(1))

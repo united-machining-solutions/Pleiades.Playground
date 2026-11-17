@@ -61,7 +61,7 @@ Besides values and notifications each publishes its job orders as job events on
 `machines/<serial number>/events/jobs` and its program executions as work master events on
 `machines/<serial number>/events/workmasters`; the Events API keeps them.
 Each also publishes a second tree, below `simulators/<manufacturer>_<model>_<serial number>/` (for P-04
-`simulators/example-com_GX-400_P-04/`), that follows the umati data model exactly, its stack light included;
+`simulators/alcyone-machines_AX-400_P-04/`), that follows the umati data model exactly, its stack light included;
 no service reads it yet. It is described in [`contracts/mqtt`](../contracts/mqtt/README.md#spec-binding-draft).
 
 ## 2. Home

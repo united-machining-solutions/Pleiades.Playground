@@ -59,11 +59,11 @@ public sealed partial class SchemaConformanceTest
         AssertValid(Schema("manifest.schema.json"), manifest.ToJsonString(), "manifest");
 
         // The schema takes a signal of the manufacturer with type, unit and description.
-        var extension = manifest["elements"]!.AsArray().Single(e => e!["path"]!.GetValue<string>() == "x-example-com.Spindle.1.BearingTemperature")!;
+        var extension = manifest["elements"]!.AsArray().Single(e => e!["path"]!.GetValue<string>() == "x-alcyone-machines-example.Spindle.1.BearingTemperature")!;
         Assert.AreEqual("number", extension["type"]!.GetValue<string>());
         Assert.AreEqual("CEL", extension["unit"]!["code"]!.GetValue<string>());
         Assert.AreEqual("degreeCelsius", extension["unit"]!["name"]!.GetValue<string>());
-        var program = manifest["elements"]!.AsArray().Single(e => e!["path"]!.GetValue<string>() == "x-example-com.WorkMasterMonitoring.ActiveProgram")!;
+        var program = manifest["elements"]!.AsArray().Single(e => e!["path"]!.GetValue<string>() == "x-alcyone-machines-example.WorkMasterMonitoring.ActiveProgram")!;
         Assert.AreEqual("string", program["type"]!.GetValue<string>());
         Assert.IsNull(program["unit"], "a text has no unit");
     }
@@ -202,14 +202,14 @@ public sealed partial class SchemaConformanceTest
     private static JsonObject ModelManifest()
     {
         var manifest = SpecManifest.Build(Identity(), MachineRun.Config());
-        Assert.AreEqual("example-com_GM-500_P-04", manifest["machineId"]!.GetValue<string>(), "the binding names the machine id");
+        Assert.AreEqual("alcyone-machines_GM-500_P-04", manifest["machineId"]!.GetValue<string>(), "the binding names the machine id");
         manifest.Remove("machineId");
         return manifest;
     }
 
     private static MachineIdentity Identity()
     {
-        return new MachineIdentity("Example Machine Tools", "P-04", "https://example.com/P-04");
+        return new MachineIdentity("Alcyone Machine Works", "P-04", "https://www.alcyone-machines.example/GM-500/P-04");
     }
 
     private static JsonSchema Schema(string name)
