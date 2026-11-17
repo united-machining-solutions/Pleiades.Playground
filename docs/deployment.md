@@ -27,7 +27,7 @@ The stack keeps its data: the project name is fixed, so its volumes stay from on
 
   | File | What it holds |
   |---|---|
-  | `.env` | The settings of [`.env.example`](../.env.example): ports, `APP_BIND`, the address and the key of the LiteLLM gateway. `COMPOSE_PROFILES=opcua` adds the [OPC UA adapter](../source/Pleiades.Playground.OpcUa.Adapter/README.md) and its simulated machine. It is never part of a commit. |
+  | `.env` | The settings of [`.env.example`](../.env.example): ports, `APP_BIND`, the address and the key of the LiteLLM gateway. It is never part of a commit. |
   | `compose.override.yaml` | Optional. What only this computer needs, for example the network of a reverse proxy. |
 
 The live pages of the example app hear the broker from the browser, MQTT over WebSocket. On a demo that people

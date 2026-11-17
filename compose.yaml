@@ -327,7 +327,8 @@ services:
       # address of MQTT_WS_URL for a broker behind a proxy.
       MQTT_WS_PORT: ${MQTT_WS_PORT:-9001}
       MQTT_WS_URL: ${MQTT_WS_URL:-}
-      # The OPC UA adapter (profile opcua). Without it running the chat leaves its tools and commands out.
+      # The OPC UA adapter. While it does not answer, the chat leaves its tools and commands out; empty,
+      # the chat has no OPC UA.
       OPCUA_MCP_URL: ${OPCUA_MCP_URL-http://opcua-adapter:8080/mcp}
       OPCUA_ADAPTER_URL: ${OPCUA_ADAPTER_URL-http://opcua-adapter:8080}
       # The chat needs a language model; everything else works without one. The models come from a LiteLLM
@@ -375,8 +376,7 @@ services:
       # Small parts, machine id merope-microtec_MM-120_M-02.
       Config__SpecOutput__ScenarioName: small-parts
 
-  # OPC UA, optional: started only with the profile `opcua`
-  # (docker compose --profile opcua up -d --build --wait, or COMPOSE_PROFILES=opcua in .env).
+  # OPC UA: machines that speak OPC UA, added in the chat.
   #
   #   opc-simulator ──OPC UA──▶ opcua-adapter ──MQTT──▶ broker
   #
@@ -384,7 +384,6 @@ services:
   # See source/Pleiades.Playground.OpcUa.Adapter/README.md.
   opcua-adapter:
     <<: *service
-    profiles: [opcua]
     image: ghcr.io/united-machining-solutions/pleiades.playground.opcua.adapter:${PLEIADES_VERSION:-dev}
     build:
       <<: *build
@@ -409,10 +408,10 @@ services:
       - opcua_adapter_data:/data
 
   # A machine to try the adapter with: the TRUMPF OPC UA simulator with a TruLaser, as umati publishes
-  # it. OPC_SIMULATOR_IMAGE names another image of it, for example one built on this computer.
+  # it. It is not registered with the adapter: a person adds it in the chat, /discover A0280O0001.
+  # OPC_SIMULATOR_IMAGE names another image of it, for example one built on this computer.
   opc-simulator:
-    profiles: [opcua]
-    image: ${OPC_SIMULATOR_IMAGE:-ghcr.io/umati/trumpf/edge/opc-simulator:1.3.0}
+    image: ${OPC_SIMULATOR_IMAGE:-ghcr.io/umati/trumpf/edge/opc-simulator:1.3.1}
     restart: unless-stopped
     # The name the server announces in its endpoints and carries in its certificate.
     hostname: A0280O0001

@@ -32,7 +32,8 @@ A machine with an OPC UA server becomes a machine of the platform like the simul
 | Who adds and removes a machine | A person, with a button on a card in the chat. No tool of the MCP server adds or removes one |
 | How a machine is added and removed | The management API of the adapter; the registrations live in its volume |
 | Lists of Core (`Notification.ActiveAlerts`, `Production.JobOrders`) | By the MQTT binding: alarms as notification events, job orders not published |
-| Test server | The TRUMPF OPC UA simulator, definition `L26`, machine `A0280O0001`, in the stack under the compose profile `opcua` |
+| Test server | The TRUMPF OPC UA simulator, definition `L26`, machine `A0280O0001` |
+| Optional or not | Part of the stack, locally, in CI and in the deployment: no compose profile |
 
 ## The idea: discover once, run from the registration
 
@@ -63,16 +64,18 @@ renamed `opcua_ua_*`; the model's guide to a scan is the tool `opcua_get_skill_g
 
 ## Start
 
-The adapter and a simulated machine are optional parts of the demo stack, behind the profile `opcua`:
+The adapter and a simulated machine are part of the demo stack. They start with the others:
 
 ```bash
-docker compose --profile opcua up -d --build --wait
+docker compose up -d --build --wait
 ```
 
-Or write `COMPOSE_PROFILES=opcua` into `.env`. The simulated machine is the TRUMPF OPC UA simulator with its
-definition `L26`, a TruLaser, from the image that umati publishes,
-[`ghcr.io/umati/trumpf/edge/opc-simulator:1.3.0`](https://github.com/orgs/umati/packages/container/package/trumpf%2Fedge%2Fopc-simulator)
-(amd64 only). `OPC_SIMULATOR_IMAGE` in `.env` names another one, for example a build of your own.
+The simulated machine is the TRUMPF OPC UA simulator with its definition `L26`, a TruLaser, from the image
+that umati publishes for amd64 and arm64,
+[`ghcr.io/umati/trumpf/edge/opc-simulator:1.3.1`](https://github.com/orgs/umati/packages/container/package/trumpf%2Fedge%2Fopc-simulator).
+`OPC_SIMULATOR_IMAGE` in `.env` names another one, for example a build of your own. The simulator is not
+registered at the start: the stack shows it once a person adds it in the chat, `/discover A0280O0001`, or with
+the request below.
 
 | | |
 |---|---|
@@ -107,7 +110,7 @@ Its nodes, units and derivations are not a template to copy: every server is sca
 decides from what that server offers. The guide of the model says so, and the adapter refuses a registration
 whose nodes the server does not have.
 
-The image of umati, `1.3.0`, reports `A0280O0001`. An image of the simulator built before its machine numbers
+The images of umati, `1.3.0` and later, report `A0280O0001`. An image of the simulator built before its machine numbers
 were replaced reports `A0280E0062` instead: the example registration is then refused or publishes under the wrong
 number.
 
@@ -284,16 +287,13 @@ Not verified: a discovery through the chat from the first question to the click,
 - Sessions to a server are anonymous only; a user name or a user certificate is not supported yet.
 - One registration is one session: the adapter knows no server that serves several machines.
 - `PartsProducedInLifetime` is not offered by the simulator; `Production.JobOrders` is not published.
-- The job of CI that starts the stack runs without the profile `opcua`: the adapter is built and tested, but
-  not started there.
 
 ## Deployment
 
-The workflow "Images" builds the image of the adapter with the others, and "Deploy" starts the stack from them
-([deployment](../../docs/deployment.md)). The adapter runs there only if the `.env` of the deployment has
-`COMPOSE_PROFILES=opcua`; without it the deployment is the stack without OPC UA, as before. The image of the
-simulator is pulled from umati; it is built for amd64 only, so the computer of the deployment needs that
-architecture for it.
+The workflow "Images" builds the image of the adapter with the others, for amd64 and arm64, and "Deploy" starts
+the stack from them ([deployment](../../docs/deployment.md)), the adapter and the simulator with it. The image
+of the simulator is pulled from umati. Registrations live in the volume of the deployment: a machine added there
+stays across deployments.
 
 ## Next steps
 
@@ -322,6 +322,5 @@ architecture for it.
   automated end-to-end test.
 - A server that is not TRUMPF's, before the proof of concept counts as done.
 - The issue for the new service ([#105](https://github.com/united-machining-solutions/Pleiades.Playground/issues/105)),
-  a contract under `contracts/` for the management API and the MCP tools, a stop in the
-  [tour](../../docs/tour.md), and a CI job that starts the stack with the profile `opcua`.
+  and a contract under `contracts/` for the management API and the MCP tools.
 - Sessions with a user name or a user certificate.
