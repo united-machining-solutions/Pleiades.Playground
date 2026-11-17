@@ -17,7 +17,9 @@ import { getCharts } from "@/machines/get-machines.ts"
 export const Route = createFileRoute("/charts")({
   // The entry in the sidebar; the breadcrumb calls the page by its title.
   staticData: { nav: { title: "Charts", icon: ChartColumnIcon } },
-  // One call of the server for the whole page, which asks the backend over one connection.
+  // One call of the server for the whole page, which asks the backend over one connection. The page is
+  // not live: it reads once when it is opened, and again only when it is opened again, or while it has
+  // no values yet.
   loader: () => getCharts({ data: HISTORY_MS }).catch((error: unknown) => ({ values: null, error: String(error) })),
   component: Charts,
   pendingComponent: Loading,
@@ -25,12 +27,11 @@ export const Route = createFileRoute("/charts")({
 
 function Charts() {
   const answer = Route.useLoaderData()
-  useLive()
 
   if (answer.values === null) {
     return (
       <Page>
-        <NoAnswer error={answer.error} />
+        <Retrying error={answer.error} />
       </Page>
     )
   }
@@ -53,7 +54,7 @@ function Charts() {
   }
 
   return (
-    <Page line={`${machines.length} ${machines.length === 1 ? "machine" : "machines"} · live · now ${clock(asOf)}`}>
+    <Page line={`${machines.length} ${machines.length === 1 ? "machine" : "machines"} · as of ${clock(asOf)}`}>
       <StateTotalsTile shows={machines.map((one) => one.show)} />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(20rem,1fr))] gap-4">
         {machines.map(({ show, from, spans }) => (
@@ -68,6 +69,12 @@ function Charts() {
       </div>
     </Page>
   )
+}
+
+/** Without values the page tries again every ten seconds, as NoAnswer says, and stops once it has them. */
+function Retrying({ error }: { error: string }) {
+  useLive()
+  return <NoAnswer error={error} />
 }
 
 function Page({ line, children }: { line?: string; children: ReactNode }) {
