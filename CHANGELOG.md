@@ -9,6 +9,9 @@ All notable changes are documented here. The format follows
 
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
+- Example app: the button "Tools" in the message field of the chat lists the servers that give the chat
+  tools, says whether each one answers, and names its tools. A chat switches a further server off and on
+  there; the server of the app gives the model no tool of a server that is off.
 - Example app: where no tool answers a question, the chat says that its tools do not show it, not that it
   does not exist, and where a place fits the question names where to ask, such as the maker of the machine
   or the maintenance records.
@@ -20,6 +23,10 @@ All notable changes are documented here. The format follows
   current jobs and history with durable slice associations, and a separate MQTT telemetry adapter.
   Both containers are part of the root Compose stack and image-publication workflow, enabled for
   deployment with COMPOSE_PROFILES=ultimaker.
+- Optional juice bar service `juicebar-api` (Compose profile `juicebar`, port 5550): the card and the state of
+  a machine that runs MixerControl over REST and MCP, an order on request, and its state on the broker below
+  `machines/{SerialNumber}/`. It never starts the production; `JUICEBAR_ENABLE_ORDERING=false` makes it
+  read-only.
 
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
@@ -29,6 +36,9 @@ All notable changes are documented here. The format follows
   `DEPLOY_ENABLED` is `true`.
 - Shared libraries for logging, JSON, authorization, health checks, MQTT and the MCP server standard.
 - Demo stack (`compose.yaml`), contracts and CI.
+- Margo app (`margo/`): the demo stack as a Margo application, from the published images, validated,
+  packaged and pushed with `bart`. A version tag pushes it to the staging registry with the images of that
+  version (workflow "Margo push", called by "Images"); CI validates it when `margo/` changes.
 - TypeScript workspace for `apps/` and `packages/`: pinned Node.js and pnpm, one version catalog, a shared
   TypeScript configuration and a CI job.
 - Generative UI backend `genui-mcp` in the demo stack on port 5520: an MCP server with the tool
@@ -163,6 +173,10 @@ All notable changes are documented here. The format follows
   the line of a call is a `TraceCollapsible` once its result is there, with the result as text in a
   `CodeBlock` (JSON indented). `code-block` is new in `packages/ui`; it brings `shiki`, which only its
   highlighting hook loads, and the app does not use that hook.
+- The page "Charts" (`/charts`) in the example application: how long each machine was in each state over
+  the last hours, as stacked bars, and its state over the last 30 minutes, as a step line per machine. One
+  server function, `getCharts`, reads the values over one connection, the spans of the last 30 minutes only.
+  The charts are the chart of shadcn/ui; `recharts` is new in the app.
 
 ### Changed
 

@@ -1,0 +1,86 @@
+name: Margo push
+
+# Pushes the Margo app (margo/) with bart to the staging registry of FLECS, as the version of a tag.
+# The workflow "Images" calls it for a version tag (v1.2.3), after it has published the images as 1.2.3; by hand
+# it pushes a tag whose images are already on ghcr.io. See margo/README.md, "Release".
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Version tag to push, v1.2.3; the images of this repository must exist as 1.2.3
+        required: true
+        type: string
+    # Taken from the environment margo-staging when it holds them; an environment secret wins over a passed one.
+    secrets:
+      BART_REGISTRY_USER:
+        required: false
+      BART_REGISTRY_TOKEN:
+        required: false
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version tag to push, v1.2.3; the images of this repository must exist as 1.2.3
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  margo-push:
+    name: Push the Margo app
+    runs-on: ubuntu-latest
+    # Holds the credentials of the staging registry; its protection rules decide who may release.
+    environment: margo-staging
+    # One push per version at a time. A group per version, so that no tag replaces the pending push of another.
+    concurrency:
+      group: margo-push-${{ inputs.version }}
+      cancel-in-progress: false
+    env:
+      INPUT_VERSION: ${{ inputs.version }}
+      # Pinned by digest: this image gets the credentials of the registry. The same as in ci.yml, job margo.
+      BART_IMAGE: cr.flecs.tech/flecs/bart:0.5.0-rc@sha256:e238950dd3884febe770cd70cb179107c0171b7e86c54f75e3606b9219b500b4
+    # Each step takes the version from INPUT_VERSION itself, without the v ("Images" tags the images 1.2.3).
+    # It never goes through $GITHUB_ENV, so a version cannot set variables of later steps; bart checks it is SemVer.
+    steps:
+      # The tagged commit, also when started by hand from another branch: margo/ must match the images of the tag.
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.version }}
+
+      # compose/compose.yaml names the images of this repository with the tag `main`. The app of a release takes
+      # the images "Images" published for this tag: under this owner, as the version. Only in this run.
+      - name: Pin the images of this repository to the version
+        run: |
+          set -eu
+          VERSION="${INPUT_VERSION#v}"
+          COMPOSE=margo/compose/compose.yaml
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          sed -Ei "s|^(\s*image:\s*)ghcr\.io/[^/]+/(pleiades\.playground\.[a-z.]+):main$|\1ghcr.io/${OWNER}/\2:${VERSION}|" "$COMPOSE"
+          if grep -Eq 'pleiades\.playground\.[a-z.]+:main$' "$COMPOSE"; then
+            echo "::error file=$COMPOSE::an image of this repository is still on :main"
+            exit 1
+          fi
+          grep -E '^\s*image:' "$COMPOSE"
+
+      - name: bart validate
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/workspace" -w /workspace \
+            "${BART_IMAGE}" validate --dir margo
+
+      # Copies every image to <registry>/staging-<app id>/<service>:<version>, so the staged app no longer depends
+      # on ghcr.io. The images there are public and need no --pull-auth.
+      - name: bart push
+        env:
+          BART_REGISTRY_USER: ${{ secrets.BART_REGISTRY_USER }}
+          BART_REGISTRY_TOKEN: ${{ secrets.BART_REGISTRY_TOKEN }}
+        run: |
+          set -eu
+          VERSION="${INPUT_VERSION#v}"
+          if [[ -z "$BART_REGISTRY_USER" || -z "$BART_REGISTRY_TOKEN" ]]; then
+            echo "::error::BART_REGISTRY_USER and BART_REGISTRY_TOKEN are missing; set them in the environment margo-staging"
+            exit 1
+          fi
+          docker run --rm -v "${GITHUB_WORKSPACE}:/workspace" -w /workspace \
+            -e BART_REGISTRY_USER -e BART_REGISTRY_TOKEN \
+            "${BART_IMAGE}" push --dir margo --version "${VERSION}"
