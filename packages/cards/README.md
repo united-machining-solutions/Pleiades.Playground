@@ -10,7 +10,7 @@ generative UI backend. Its contract and its component lie next to each other, so
 
 | Card | Tool | Contract | Component |
 |---|---|---|---|
-| Machine: what one machine does now, since when, with which program, and the states of the last hours | `genui_machine_show` | `machineShow` in `src/machine/contract.ts` | `MachineCard` in `src/machine/machine-card.tsx` |
+| Machine: what one machine does now, since when, with which work master and job order, and the states of the last hours | `genui_machine_show` | `machineShow` in `src/machine/contract.ts` | `MachineCard` in `src/machine/machine-card.tsx` |
 
 The list of machines, the result of `genui_machine_list`, has a contract here too (`machineList`), but no
 card: an application draws it with rows of its own and checks what it gets against the contract.

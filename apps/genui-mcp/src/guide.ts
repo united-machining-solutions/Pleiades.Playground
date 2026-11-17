@@ -24,8 +24,8 @@ export const skillGuide = `# genui: skill guide
 ## A result is an answer
 
 - The text of a result says in words what a display shows: what a machine does, since when, with
-  which program, and for one machine how long each state lasted over the last hours. The values
-  next to the text are for a display.
+  which work master and job order, and for one machine how long each state lasted over the last
+  hours. The values next to the text are for a display.
 - A host that shows MCP Apps draws the result of \`genui_machine_show\` as the machine card. The
   person then sees every value. Say what matters in a sentence or two. Do not list the values again,
   and do not draw them again.

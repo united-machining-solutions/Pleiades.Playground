@@ -53,7 +53,7 @@ export function tell(machine: Machine, state: State, time: (instant: string) => 
       }
     case "running":
       return {
-        message: program.value ?? "No program",
+        message: program.value ?? "No work master",
         detail: warning ? `Warning: ${warning.title}` : "",
         since: itemState.since,
         atLeast: itemState.sinceIsLowerBound,

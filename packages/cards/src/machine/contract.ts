@@ -19,11 +19,12 @@ export const SILENT_AFTER_SECONDS = 30
 export const instant = z.iso.datetime({ offset: true })
 
 /**
- * The serial number of a machine: the level after `machines/` in every topic. The MQTT binding
- * forbids what would break a topic, `/`, `+` and `#`, and nothing else. Whoever takes or lists a
- * serial number uses this rule, so a machine that is listed can also be asked for.
+ * The machine id: the level after `machines/` in every topic, `<manufacturer>_<model>_<serial
+ * number>`, for example `alcyone-machines_AX-400_P-04`. The MQTT binding forms it so that it holds
+ * nothing that would break a topic; this rule forbids `/`, `+` and `#` and nothing else. Whoever
+ * takes or lists a machine id uses this rule, so a machine that is listed can also be asked for.
  */
-export const serialNumber = z.string().regex(/^[^/+#]+$/)
+export const machineId = z.string().regex(/^[^/+#]+$/)
 
 export const reading = z.object({
   value: z.string().nullable().describe("The newest value, or null if the topic had none."),
@@ -36,28 +37,56 @@ export const reading = z.object({
 })
 export type Reading = z.infer<typeof reading>
 
+/** The categories of an alert after NAMUR NE 107, from the most urgent. */
+export const severity = z.enum(["Failure", "CheckFunction", "OffSpec", "MaintenanceRequired"])
+export type Severity = z.infer<typeof severity>
+
+/**
+ * An alert of the machine that stands: raised and not cleared. `level` is what a display that knows
+ * errors and warnings shows: a `Failure` is an error, every other category a warning.
+ */
 export const notification = z.object({
-  correlationId: z.string(),
-  notificationId: z.string(),
+  correlationId: z.string().describe("The id of the alert, the same in its raise and its clear."),
+  notificationId: z.string().describe("The error code of the manufacturer."),
+  severity: severity.nullable().describe("The category after NAMUR NE 107."),
   level: z.enum(["Warning", "Error"]),
-  title: z.string(),
+  title: z.string().describe("The message of the alert."),
   raisedAt: instant,
-  topic: z.string().describe("The MQTT topic the notification comes from."),
+  topic: z.string().describe("The MQTT topic the alert comes from."),
 })
 export type Notification = z.infer<typeof notification>
 
+/** Who the machine is, from its identification values; null where it reported none. */
+export const identity = z.object({
+  manufacturer: z.string().nullable(),
+  model: z.string().nullable(),
+  serialNumber: z.string().nullable(),
+})
+export type Identity = z.infer<typeof identity>
+
+/** The job order the machine works on, with what came of it so far. */
+export const jobOrder = z.object({
+  jobOrderId: z.string(),
+  state: z.string().describe("Running or Interrupted."),
+  producedQuantity: z.number().nullable(),
+  runsPlanned: z.number().nullable(),
+})
+export type JobOrder = z.infer<typeof jobOrder>
+
 /** What a machine does now. */
 export const machine = z.object({
-  machine: serialNumber.describe("The serial number, which identifies the machine in every topic."),
-  connection: reading,
+  machine: machineId.describe("The machine id, which identifies the machine in every topic."),
+  identity,
+  connection: reading.describe("The state of the adapter: Initializing, Running, CommunicationFault or Shutdown."),
   heartbeat: reading.describe("The sign of life of the machine. Its value counts up and says nothing else."),
   itemState: reading,
   operationMode: reading,
-  program: reading,
+  program: reading.describe("The work master the machine carries out."),
+  jobOrder: jobOrder.nullable().describe("The job order that runs or is interrupted, or null."),
   lastValueAt: instant.nullable().describe("The newest value of any of the readings: the last sign of life."),
   notifications: z
     .array(notification)
-    .describe("Warnings and errors that were raised in the last 24 hours and have not gone."),
+    .describe("Alerts that were raised in the last 24 hours and have not been cleared."),
 })
 export type Machine = z.infer<typeof machine>
 
@@ -110,7 +139,7 @@ export type MachineShow = z.infer<typeof machineShow>
  * model reads.
  */
 export const spanList = z.object({
-  machine: serialNumber.describe("The serial number of the machine."),
+  machine: machineId.describe("The machine id."),
   from: instant,
   to: instant,
   spans: z.array(span).describe("The states between `from` and `to`, oldest first and without a gap."),

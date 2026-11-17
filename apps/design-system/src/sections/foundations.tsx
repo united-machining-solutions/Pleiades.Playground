@@ -155,7 +155,7 @@ const type = [
   {
     classes: "font-mono text-xs",
     use: "A value in the tooltip of a chart, a topic, code",
-    specimen: "machines/P-04/umati/State/MachineryItemState",
+    specimen: "machines/alcyone-machines_AX-400_P-04/umati/State/Status/MachineryItemState",
   },
 ]
 

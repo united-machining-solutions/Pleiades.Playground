@@ -1,4 +1,5 @@
 import { clock } from "@pleiades/cards/machine/format.ts"
+import { titleOf } from "@pleiades/cards/machine/in-words.ts"
 import { MachineCard } from "@pleiades/cards/machine/machine-card.tsx"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { Link, createFileRoute, notFound } from "@tanstack/react-router"
@@ -45,7 +46,12 @@ function Machine() {
   const { machine } = Route.useParams()
   useLive()
   return (
-    <Page machine={machine} line={answer.values ? `live · now ${clock(answer.values.asOf)}` : undefined}>
+    // The title is the machine by its model and serial number, once the backend named them; the
+    // address keeps its id.
+    <Page
+      machine={answer.values ? titleOf(answer.values.machine) : machine}
+      line={answer.values ? `live · now ${clock(answer.values.asOf)}` : undefined}
+    >
       {answer.values ? <MachineCard {...answer.values} spans={spans} /> : <NoAnswer error={answer.error} />}
     </Page>
   )

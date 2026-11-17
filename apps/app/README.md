@@ -6,7 +6,7 @@ harness.
 
 - **Home** asks "what needs you?": it lists the machines of the demo stack, first those in alarm, stopped or
   without data, then those in setup, then the running ones, and reads them again every ten seconds.
-- **A page per machine** (`/machines/P-04`) shows the machine card of the
+- **A page per machine** (`/machines/alcyone-machines_AX-400_P-04`, by the machine id) shows the machine card of the
   [card catalogue](../../packages/cards/README.md): what the machine does now and what it did over the last
   hours. It needs no language model. Home leads to it. For a machine the backend does not know, the page
   says so and does not ask again.

@@ -16,8 +16,8 @@ durations are computed here, never by a language model.
 
 | Tool | What it returns |
 |---|---|
-| `genui_machine_list` | Every machine with what it does now: connection, heartbeat, state and operation mode with the time since when, the active program, and the warnings and errors of the last 24 hours that have not gone. |
-| `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and how long each state lasted in total over the last hours (`hours`, 8 if omitted). Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_machine_list` | Every machine with what it does now: manufacturer, model and serial number, connection, heartbeat, state and operation mode with the time since when, the active work master and job order, and the alerts of the last 24 hours that have not been cleared. |
+| `genui_machine_show` | One machine (`machine`, the machine id): the same readings, and how long each state lasted in total over the last hours (`hours`, 8 if omitted). Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_span_list` | The states of one machine between two instants (`from`, `to`) as spans without a gap: the band of the machine card. A card calls it after `genui_machine_show`. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. A question about a machine needs neither: a result answers it. |
 
@@ -35,7 +35,7 @@ So whoever reads the result, a language model included, has nothing to convert.
 A result has two parts, for two readers:
 
 - **Its text is for a language model**, and for a host that shows nothing else. It says in words what a
-  display shows: what a machine does, since when, with which program, and for one machine how long each
+  display shows: what a machine does, since when, with which work master, and for one machine how long each
   state lasted over the last hours. A few lines, in the words of the card.
 - **Its values (`structuredContent`) are for a display.** The example application and the card file draw
   them.
