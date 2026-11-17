@@ -9,9 +9,28 @@ an environment variable chooses which:
 | `Tube` | Tube laser with tube loader | Loads a tube, starts a tube allocation, cuts, ends it, unloads |
 | `Punch` | Punching machine with sheet handler | Loads a sheet, punches, unloads the parts one by one |
 
-The web page shows the machine and lets you drive it: switch it on and off, start and stop the plan, raise and
-acknowledge alarms, edit the production plan, fill or empty a stack, send any notification by hand, and watch
-every telegram in and out.
+The web page shows the machine, with its serial number, and lets you drive it: switch it on and off, start and stop
+the plan, raise and acknowledge alarms, edit the production plan, fill or empty a stack, send any notification by
+hand, and watch every telegram in and out.
+
+The serial number (`Config__SerialNumber`) is the machine id in Pleiades: the adapter publishes below
+`machines/{SerialNumber}/`. The telegrams do not carry it, so simulator and adapter are each told it; in
+`compose.yaml` one YAML anchor gives both the same value.
+
+## Endless mode
+
+For a machine that produces all day without anyone at it, switch on *Endless mode* on the Overview page (or set
+`Config__EndlessMode`). Switched on, it starts the plan, and:
+
+- whenever the plan holds no free order, the machine writes a new one into it: the demo orders of its type in turn,
+  named `L-E00001`, `T-E00002`, `P-E00003` …, with a quantity from 1 to 5 and three orders to a job (`JOB-E0001`).
+  The host sees each one as any other change of the plan (`ProdPlanGeaendert`, `PRD_SHOW`);
+- when it waits for an empty supply or a full stack, it reports it as always (`MaschinenMeldung` 2 or 1) and fills
+  or empties the stack itself after `EndlessRestockAfter`, then sends `PalletSituation`, as after `LOCAVAIL`;
+- of the orders it wrote, only the last ten done ones stay in the plan. Orders of a person or the host stay.
+
+A stop ends the run as without it. With `AutoRun` on the plan starts again by itself, also after a restart; the
+setting survives one.
 
 The other side, the host, is a separate program. In this repository it is the
 [cutting adapter](../Pleiades.Playground.Cutting.Adapter/README.md), which brings the data into Pleiades; the
@@ -93,7 +112,9 @@ not have gets `-10`, "function not possible at the moment".
 Each program run:
 `StartNCP`, `MaschineLaeuft` … `EndeNCP` (or `ResetNCP` after an abort), `MaschineSteht` 2,
 `ProdPlanGeaendert`. An alarm sends `MaschineSteht` 1 and `AktuelleAlarme`. Acknowledging it sends
-`MaschineLaeuft` again.
+`MaschineLaeuft` when a program was running, which then runs on (at a real machine, NC start as well), and
+`MaschineSteht` 2 when none was. The protocol has no notification for an alarm that goes; a host learns it from this
+state.
 
 What each type adds:
 
@@ -115,11 +136,14 @@ them to SI units when it publishes to the broker.
 | `MachineType` | `Laser2D` | `Laser2D`, `Tube` or `Punch` |
 | `MachineNumber` | `1` | Field 1 of every request, at most ten letters or digits |
 | `MachineName` | type and number | The name on the web page |
+| `SerialNumber` | empty | The machine id in Pleiades, shown on the web page; no `/`, `+` or `#` |
 | `ExchangeDirectory` | `/exchange` | The folder of the telegram files |
 | `MachineFileName`, `HostFileName` | `m1_to_s1.dat`, `s1_to_m1.dat` | The two telegram files |
 | `PollInterval` | `00:00:00.250` | How often the machine looks for a telegram of the host |
 | `LockTimeout` | `00:00:10` | How long it waits for the host to release a file |
 | `AutoRun` | `true` | Start the plan by itself when it holds a free order |
+| `EndlessMode` | `false` | See [Endless mode](#endless-mode); the web page switches it |
+| `EndlessRestockAfter` | `00:00:30` | How long the endless mode waits before it fills or empties a stack, in simulated time |
 | `TimeScale` | `1` | Real time per simulated time; `0.1` runs ten times faster. Runtimes in telegrams stay simulated |
 | `MinProgramDuration`, `MaxProgramDuration` | `00:00:20`, `00:01:00` | The runtime of one program run, in simulated time |
 | `StateBeforeProgram` | `false` | `MaschineLaeuft` before `StartNCP` and `MaschineSteht` before `EndeNCP`, as real machines often send them; the specification sets no order |

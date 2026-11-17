@@ -12,6 +12,19 @@
     <section class="card">
         <h2>Connection</h2>
         <dl class="facts">
+            <dt>Serial number</dt>
+            <dd>
+                @if (State.SerialNumber.Length > 0)
+                {
+                    <span class="mono" title="The machine id in Pleiades: the adapter publishes below machines/@State.SerialNumber/">@State.SerialNumber</span>
+                }
+                else
+                {
+                    <span class="muted">Not set (Config__SerialNumber)</span>
+                }
+            </dd>
+            <dt>Machine number</dt>
+            <dd class="mono">@State.MachineNumber</dd>
             <dt>Machine</dt>
             <dd>
                 <span class="dot @(State.Online ? "ok" : "neutral")"></span>
@@ -23,7 +36,7 @@
                 @(State.HostConnected ? "Connected with SRC9CONN" : "Not connected: notifications are held")
             </dd>
             <dt>Production plan</dt>
-            <dd>@(State.ProductionActive ? "Runs" : "Stopped")@StopText</dd>
+            <dd>@(State.ProductionActive ? "Runs" : "Stopped")@StopText@(State.EndlessMode ? ", endless mode" : "")</dd>
         </dl>
         <div class="actions">
             @if (State.Online)
@@ -55,7 +68,7 @@
         }
         else if (State.WaitingFor.Length > 0)
         {
-            <p class="callout warn">@State.WaitingFor Make the place available on the <a href="stock">Stock</a> page, or let the host send LOCAVAIL.</p>
+            <p class="callout warn">@State.WaitingFor Make the place available on the <a href="stock">Stock</a> page, or let the host send LOCAVAIL@(State.EndlessMode ? "; in endless mode the machine does it itself after a while" : "").</p>
         }
         else
         {
@@ -94,7 +107,8 @@
         </div>
         <div class="actions">
             <button class="btn danger" disabled="@(!State.Online)" @onclick="RaiseAlarm">Raise alarm</button>
-            <button class="btn" disabled="@(State.Alarms.Count == 0)" @onclick="() => Do(Actions.AcknowledgeAlarmsAsync)">Acknowledge</button>
+            <button class="btn" disabled="@(State.Alarms.Count == 0)" @onclick="() => Do(Actions.AcknowledgeAlarmsAsync)"
+                    title="Clears the alarms. A program that was halted runs on, as after NC start.">@(string.IsNullOrEmpty(State.CurrentProgram) ? "Acknowledge" : "Acknowledge and continue")</button>
         </div>
     </section>
 
@@ -104,6 +118,12 @@
             <label class="check">
                 <input type="checkbox" checked="@State.AutoRun" @onchange="e => Machine.SetAutoRun(e.Value is true)" />
                 Start the plan by itself when it holds a free order
+            </label>
+        </div>
+        <div class="form-row">
+            <label class="check" title="Switched on, it starts the plan. Done orders of its own beyond the last ten are cleared away.">
+                <input type="checkbox" checked="@State.EndlessMode" @onchange="e => Machine.SetEndlessMode(e.Value is true)" />
+                Endless mode: write a new order whenever the plan runs out, and fill or empty a stack by itself
             </label>
         </div>
         <div class="form-row">

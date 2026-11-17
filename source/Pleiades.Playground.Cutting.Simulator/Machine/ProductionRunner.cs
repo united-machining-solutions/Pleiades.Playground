@@ -20,6 +20,7 @@ namespace Pleiades.Playground.Cutting.Simulator.Machine;
 internal sealed partial class ProductionRunner(
     CuttingMachine machine,
     CuttingLink link,
+    MachineActions actions,
     IOptions<Config> config,
     ILogger<ProductionRunner> logger) : BackgroundService
 {
@@ -115,7 +116,10 @@ internal sealed partial class ProductionRunner(
     {
         var context = new SheetContext(machine, link, order, program, sheet);
 
-        // Load. When the supply is empty or a stack full, wait until a person or the host makes it available.
+        // Load. When the supply is empty or a stack full, wait until a person or the host makes it available; in
+        // endless mode the machine does it itself after a while.
+        var waited = TimeSpan.Zero;
+        var clock = Stopwatch.StartNew();
         while (await Variant.PrepareSheetAsync(context).ConfigureAwait(false) is { } waitingFor)
         {
             machine.SetWaiting(waitingFor);
@@ -124,6 +128,14 @@ internal sealed partial class ProductionRunner(
             {
                 machine.SetWaiting(string.Empty);
                 return SheetOutcome.Stopped;
+            }
+
+            waited += clock.Elapsed / machine.TimeScale;
+            clock.Restart();
+            if (machine.EndlessMode && !machine.HasAlarms && waited >= config.Value.EndlessRestockAfter)
+            {
+                await RestockAsync().ConfigureAwait(false);
+                waited = TimeSpan.Zero;
             }
         }
 
@@ -224,6 +236,19 @@ internal sealed partial class ProductionRunner(
         return (false, total, halted);
     }
 
+    /// <summary>
+    /// Fills every empty supply and empties every full stack the machine reported, as an operator would at the web
+    /// page; the host learns it from <c>PalletSituation</c>, as after <c>LOCAVAIL</c>.
+    /// </summary>
+    private async Task RestockAsync()
+    {
+        foreach (var location in machine.Locations().Where(l => l.Locked))
+        {
+            LogRestocked(location.Label);
+            await actions.MakeAvailableAsync(location.Key).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>A program notification and the state that goes with it, in the order the settings ask for.</summary>
     private List<CuttingMessage> InOrder(CuttingNotification program, CuttingNotification state)
     {
@@ -239,4 +264,7 @@ internal sealed partial class ProductionRunner(
 
     [LoggerMessage(Level = LogLevel.Error, Message = "A program run failed; the runner goes on.")]
     private partial void LogRunFailed(Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Endless mode: {Location} is made available again.")]
+    private partial void LogRestocked(string location);
 }

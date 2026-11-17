@@ -6,7 +6,7 @@
             <span class="brand-mark" aria-hidden="true">CUT</span>
             <div>
                 <div class="brand-title">@Name</div>
-                <div class="brand-sub">Cutting simulator · @Type.DisplayName() · machine number @Number</div>
+                <div class="brand-sub">Cutting simulator · @Type.DisplayName()@(Serial.Length > 0 ? $" · serial number {Serial}" : "") · machine number @Number</div>
             </div>
         </div>
         <nav class="tabs" aria-label="Pages">
@@ -27,6 +27,8 @@
     internal CuttingMachine Machine { get; set; } = default!;
 
     private string Name => Machine.Snapshot().DisplayName;
+
+    private string Serial => Machine.Snapshot().SerialNumber;
 
     private CuttingMachineType Type => Machine.Type;
 

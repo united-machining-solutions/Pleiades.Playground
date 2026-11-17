@@ -49,6 +49,9 @@ internal sealed record ProductionOrder
     /// <summary>The bounding circle diameter in millimetre (tube only).</summary>
     public double TubeDiameter { get; init; } = 40;
 
+    /// <summary>Whether the endless mode wrote it; only such orders are cleared away when they are done.</summary>
+    public bool Generated { get; init; }
+
     /// <summary>The name of the tube allocation (tube only).</summary>
     public string AllocationName => $"{Name}-B";
 
@@ -153,6 +156,8 @@ internal sealed record MachineSnapshot
 
     public required string DisplayName { get; init; }
 
+    public string SerialNumber { get; init; } = string.Empty;
+
     public bool Online { get; init; }
 
     public bool HostConnected { get; init; }
@@ -164,6 +169,8 @@ internal sealed record MachineSnapshot
     public StopMode StopMode { get; init; }
 
     public bool AutoRun { get; init; }
+
+    public bool EndlessMode { get; init; }
 
     public double TimeScale { get; init; }
 
@@ -201,11 +208,16 @@ internal sealed record PersistedState
 
     public bool AutoRun { get; init; }
 
+    /// <summary>Null in a file written before the endless mode existed: then the configuration applies.</summary>
+    public bool? EndlessMode { get; init; }
+
     public double TimeScale { get; init; }
 
     public int Feedrate { get; init; } = 100;
 
     public int NextSequence { get; init; } = 1;
+
+    public int NextGeneratedNumber { get; init; } = 1;
 
     public int PalletChangerPosition { get; init; } = 4;
 

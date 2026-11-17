@@ -29,6 +29,13 @@ internal sealed class Config : IValidatableObject
     /// <summary>The name the web page shows.</summary>
     public string MachineName { get; init; } = string.Empty;
 
+    /// <summary>
+    /// The serial number the web page shows: the machine id the adapter publishes under, for example
+    /// <c>L-01</c>. The telegrams do not carry it. It contains no <c>/</c>, <c>+</c> or <c>#</c>; empty when unknown.
+    /// </summary>
+    [RegularExpression("^[^/+#]*$")]
+    public string SerialNumber { get; init; } = string.Empty;
+
     /// <summary>The folder with the telegram files, shared with the host.</summary>
     [Required]
     public string ExchangeDirectory { get; init; } = "/exchange";
@@ -51,6 +58,17 @@ internal sealed class Config : IValidatableObject
 
     /// <summary>Start the production plan by itself whenever it holds a free order.</summary>
     public bool AutoRun { get; init; } = true;
+
+    /// <summary>
+    /// Endless mode: while the plan runs and holds no free order, the machine writes a new one into it; and when it
+    /// waits for material or for a full stack, it fills or empties the stack after <see cref="EndlessRestockAfter"/>,
+    /// as an operator would. The web page switches it, and the setting survives a restart.
+    /// </summary>
+    public bool EndlessMode { get; init; }
+
+    /// <summary>How long the machine waits in endless mode before it fills or empties a stack, in simulated time.</summary>
+    [Range(typeof(TimeSpan), "00:00:00", "01:00:00")]
+    public TimeSpan EndlessRestockAfter { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// Real time per simulated time: 1 runs in real time, 0.1 ten times faster. The runtimes in the

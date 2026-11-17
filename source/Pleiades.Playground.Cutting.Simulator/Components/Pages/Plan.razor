@@ -6,6 +6,10 @@
 <div class="page-head">
     <h1>Production plan</h1>
     <span class="muted">@State.Orders.Count orders · the host reads it with PRD_SHOW</span>
+    @if (State.EndlessMode)
+    {
+        <span class="badge info" title="The machine writes a new order whenever the plan runs out. Switch it on the Overview page.">Endless mode</span>
+    }
 </div>
 
 <section class="card">
@@ -36,7 +40,7 @@
                         var running = order.Sequence == State.CurrentOrder;
                         <tr class="@(running ? "current" : "")">
                             <td class="num">@order.Sequence</td>
-                            <td>@order.Name</td>
+                            <td>@order.Name@if (order.Generated) {<span class="muted small" title="Written by the endless mode"> · generated</span>}</td>
                             <td class="mono">@order.NcProgram</td>
                             <td>@order.JobName</td>
                             <td class="num">@order.Actual / @order.Target</td>
