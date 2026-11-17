@@ -222,7 +222,10 @@ All notable changes are documented here. The format follows
   mappings: for a namespace whose meaning is fixed the adapter sets an element itself, so far
   `Identification.Model` of a TRUMPF MachineTool instance. A server that wants a user: a person enters user
   name and password in a card of the chat, the adapter tries them and keeps them in its data volume, and every
-  session of that server logs in with them; the password never enters the chat.
+  session of that server logs in with them; the password never enters the chat. Alarms have a subscription of
+  their own, apart from the values: a server built on open62541 refuses ConditionRefresh on a subscription
+  that also holds values (`BadFilterNotAllowed`), so such a machine ran no values at all. A refresh that still
+  fails is logged, and the machine runs without the catch-up of alarms that already stand.
 
 ### Changed
 

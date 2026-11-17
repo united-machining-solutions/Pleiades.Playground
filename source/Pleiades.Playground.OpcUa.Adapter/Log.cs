@@ -56,4 +56,7 @@ internal static partial class Log
 
     [LoggerMessage(19, LogLevel.Information, "The user of {Url} is removed.")]
     public static partial void UserRemoved(this ILogger logger, string url);
+
+    [LoggerMessage(20, LogLevel.Warning, "Machine {SerialNumber}: ConditionRefresh failed: {Reason}. New alarms are monitored; alarms that already stand are not caught up.")]
+    public static partial void AlertsNotRefreshed(this ILogger logger, string serialNumber, string reason);
 }

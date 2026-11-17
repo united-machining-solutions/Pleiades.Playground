@@ -58,6 +58,7 @@ internal sealed class MachineConnection : ISessionTenant
     private string? _lastError;
     private DateTime? _connectedSince;
     private Subscription? _subscription;
+    private Subscription? _alertSubscription;
 
     /// <summary>Creates the connection. Nothing happens before <see cref="RunAsync"/> and a session.</summary>
     public MachineConnection(
@@ -161,6 +162,7 @@ internal sealed class MachineConnection : ISessionTenant
         try
         {
             _subscription = await SubscribeAsync(session.Session, cancellationToken).ConfigureAwait(false);
+            await SubscribeAlertsAsync(session.Session, cancellationToken).ConfigureAwait(false);
             await WaitForFirstValuesAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -186,8 +188,9 @@ internal sealed class MachineConnection : ISessionTenant
     /// <inheritdoc />
     public async Task SessionDownAsync(string? reason)
     {
-        // The subscription goes with the session; a session that is gone is not asked to delete it.
+        // The subscriptions go with the session; a session that is gone is not asked to delete them.
         _subscription = null;
+        _alertSubscription = null;
         bool wasConnected;
         lock (_gate)
         {
@@ -222,7 +225,13 @@ internal sealed class MachineConnection : ISessionTenant
 
     private async Task RemoveSubscriptionAsync(IEndpointSession session)
     {
-        if (Interlocked.Exchange(ref _subscription, null) is not { } subscription)
+        await RemoveAsync(session.Session, Interlocked.Exchange(ref _subscription, null)).ConfigureAwait(false);
+        await RemoveAsync(session.Session, Interlocked.Exchange(ref _alertSubscription, null)).ConfigureAwait(false);
+    }
+
+    private async Task RemoveAsync(ISession session, Subscription? subscription)
+    {
+        if (subscription is null)
         {
             return;
         }
@@ -230,7 +239,7 @@ internal sealed class MachineConnection : ISessionTenant
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await session.Session.RemoveSubscriptionAsync(subscription, timeout.Token).ConfigureAwait(false);
+            await session.RemoveSubscriptionAsync(subscription, timeout.Token).ConfigureAwait(false);
         }
 #pragma warning disable CA1031 // A subscription that cannot be deleted ends with the session; nothing else depends on it.
         catch (Exception exception)
@@ -278,7 +287,6 @@ internal sealed class MachineConnection : ISessionTenant
             runtime.Set(Pending);
         }
 
-        var alertItem = AlertItem(session, subscription);
         await subscription.ApplyChangesAsync(cancellationToken).ConfigureAwait(false);
 
         foreach (var (runtime, item) in items)
@@ -290,24 +298,72 @@ internal sealed class MachineConnection : ISessionTenant
             }
         }
 
-        if (alertItem is not null)
+        return subscription;
+    }
+
+    /// <summary>
+    /// Subscribes to the alarms of the registration, in a subscription of their own: ConditionRefresh
+    /// works on a whole subscription, and a server may refuse it for one that also holds data items
+    /// (open62541 answers BadFilterNotAllowed). Alarms are an addition to the values: if they cannot
+    /// be monitored, the machine runs without them, and the reason is logged.
+    /// </summary>
+    private async Task SubscribeAlertsAsync(ISession session, CancellationToken cancellationToken)
+    {
+        if (Registration.Alerts is null)
         {
-            if (ServiceResult.IsGood(alertItem.Status.Error))
-            {
-                // The server lists the conditions that stand, so alarms raised or gone while nobody listened are caught up.
-                await session.CallAsync(
-                    ObjectTypeIds.ConditionType,
-                    MethodIds.ConditionType_ConditionRefresh,
-                    cancellationToken,
-                    Variant.From(subscription.Id)).ConfigureAwait(false);
-            }
-            else
-            {
-                _logger.AlertsNotMonitored(Registration.SerialNumber, alertItem.Status.Error?.ToString() ?? "Bad");
-            }
+            return;
         }
 
-        return subscription;
+#pragma warning disable CA2000, CS0618 // The session owns its subscriptions and disposes them; see SubscribeAsync.
+        var subscription = new Subscription(session.DefaultSubscription)
+        {
+            PublishingInterval = (int)_samplingInterval.TotalMilliseconds,
+            PublishingEnabled = true,
+        };
+#pragma warning restore CA2000, CS0618
+        if (AlertItem(session, subscription) is not { } item)
+        {
+            subscription.Dispose();
+            return;
+        }
+
+        // Set before it exists on the server, so that a failure on the way removes it with the others.
+        _alertSubscription = subscription;
+        try
+        {
+            session.AddSubscription(subscription);
+            await subscription.CreateAsync(cancellationToken).ConfigureAwait(false);
+            subscription.AddItem(item);
+            await subscription.ApplyChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (ServiceResultException exception)
+        {
+            _logger.AlertsNotMonitored(Registration.SerialNumber, exception.Message);
+            await RemoveAsync(session, Interlocked.Exchange(ref _alertSubscription, null)).ConfigureAwait(false);
+            return;
+        }
+
+        if (!ServiceResult.IsGood(item.Status.Error))
+        {
+            _logger.AlertsNotMonitored(Registration.SerialNumber, item.Status.Error?.ToString() ?? "Bad");
+            await RemoveAsync(session, Interlocked.Exchange(ref _alertSubscription, null)).ConfigureAwait(false);
+            return;
+        }
+
+        try
+        {
+            // The server lists the conditions that stand, so alarms raised or gone while nobody listened are caught up.
+            await session.CallAsync(
+                ObjectTypeIds.ConditionType,
+                MethodIds.ConditionType_ConditionRefresh,
+                cancellationToken,
+                Variant.From(subscription.Id)).ConfigureAwait(false);
+        }
+        catch (ServiceResultException exception)
+        {
+            // New alarms still arrive on the subscription; only the catch-up is missing.
+            _logger.AlertsNotRefreshed(Registration.SerialNumber, exception.Message);
+        }
     }
 
     private MonitoredItem? AlertItem(ISession session, Subscription subscription)
@@ -372,7 +428,6 @@ internal sealed class MachineConnection : ISessionTenant
                 OnEvent(list, eventType, session.NamespaceUris);
             }
         };
-        subscription.AddItem(item);
         return item;
     }
 
