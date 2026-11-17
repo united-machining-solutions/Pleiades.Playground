@@ -1,3 +1,4 @@
+using Pleiades.Playground.Events.Api.Client.MachineEvents;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
@@ -10,9 +11,6 @@ using Pleiades.Playground.HealthChecks.AspNetCore;
 using Pleiades.Playground.HealthChecks.Mqtt;
 using Pleiades.Playground.Common.RestApi;
 using Pleiades.Playground.Events.Api.Client;
-using Pleiades.Playground.Events.Api.Client.NotificationEvents;
-using Pleiades.Playground.Events.Api.Client.JobEvents;
-using Pleiades.Playground.Events.Api.Client.WorkMasterEvents;
 using Pleiades.Playground.Events.Persistence;
 using Pleiades.Playground.Mqtt.Extensions;
 
@@ -50,13 +48,7 @@ var apiConfig = builder.Configuration.GetSection("Config:EventsApi") ?? throw ne
 
 builder.Services.AddMqttClientHost().AddClient(builder.Configuration.GetSection("Config:MqttSource"));
 
-builder.Services.AddEventsApiService<INotificationEventService, NotificationEventApiService>(apiConfig)
-    .AddStandardResilienceHandler(ConfigureEventClientResilience);
-
-builder.Services.AddEventsApiService<IJobEventService, JobEventApiService>(apiConfig)
-    .AddStandardResilienceHandler(ConfigureEventClientResilience);
-
-builder.Services.AddEventsApiService<IWorkMasterEventService, WorkMasterEventApiService>(apiConfig)
+builder.Services.AddEventsApiService<IMachineEventService, MachineEventApiService>(apiConfig)
     .AddStandardResilienceHandler(ConfigureEventClientResilience);
 
 builder.Services.AddPleiadesDefaultJsonOptions();

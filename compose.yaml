@@ -145,7 +145,12 @@ services:
       Config__MqttSource__User: ""
       Config__MqttSource__Password: ""
       Config__MqttSource__ClientId: events-persistence
-      Config__Topics__0: machines/+/events/#
+      # A persistent session: the broker keeps the CloudEvents (QoS 1) while the service restarts.
+      Config__MqttSource__CleanSession: "false"
+      Config__MqttSource__SessionExpiry: "1.00:00:00"
+      Config__Topics__0: machines/+/events/jobs
+      Config__Topics__1: machines/+/events/workmasters
+      Config__Topics__2: machines/+/events/notifications
       Config__EventsApi__Uri: http://events-api:8080
 
   # The generative UI backend: an MCP server that reads both APIs. The TypeScript images are built

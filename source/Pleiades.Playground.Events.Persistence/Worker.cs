@@ -1,59 +1,56 @@
-using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using MQTTnet;
+using MQTTnet.Protocol;
 using Pleiades.Playground.Mqtt.Extensions;
-using Pleiades.Playground.Common.Json;
 using Pleiades.Playground.Events.Api.Client.Exceptions;
-using Pleiades.Playground.Events.Api.Client.NotificationEvents;
-using Pleiades.Playground.Events.Api.Client.JobEvents;
-using Pleiades.Playground.Events.Api.Client.WorkMasterEvents;
+using Pleiades.Playground.Events.Api.Client.MachineEvents;
 using Pleiades.Playground.Events.DataTransferObjects;
-using Pleiades.Playground.Common.DataTransferObjects;
 using Pleiades.Playground.HealthChecks.Mqtt;
-using Pleiades.Playground.Notification.DataTransferObjects;
 
 namespace Pleiades.Playground.Events.Persistence;
 
+/// <summary>
+/// Hands every CloudEvent of a machine to the Events API as it came. The events come on
+/// <c>machines/{MachineId}/events/jobs|workmasters|notifications</c> with the MQTT 5 content type
+/// <c>application/cloudevents+json</c>; the machine id is the second level of the topic. The subscriptions are
+/// QoS 1, and the session of the client is persistent (Clean Start false, a session expiry), so the broker keeps
+/// the events while this service restarts. A message without that content type, or one that is no JSON object, is
+/// logged and dropped; whether it is a valid CloudEvent the Events API decides.
+/// </summary>
 public class Worker : BackgroundService
 {
-    private readonly INotificationEventService _notificationEventService;
-    private readonly IJobEventService _jobEventService;
-    private readonly IWorkMasterEventService _workMasterEventService;
+    /// <summary>The MQTT 5 content type of a CloudEvent in structured mode, without its parameters.</summary>
+    public const string CloudEventContentType = "application/cloudevents+json";
+
+    private readonly IMachineEventService _machineEventService;
     private readonly IManagedMqttClient _mqttClient;
     private readonly Config _config;
     private readonly ILogger<Worker> _logger;
     private readonly MqttSubscriptionReadiness _readiness;
 
-    private readonly JsonSerializerOptions _jsonSerializerOptions = JsonSerializerOptionsExtension.PleiadesDefaultJsonOptions;
-
     private static readonly Action<ILogger, Exception?> LogStarting = LoggerMessage.Define(LogLevel.Information, 0, "Worker is starting.");
     private static readonly Action<ILogger, Exception?> LogStopping = LoggerMessage.Define(LogLevel.Information, 1, "Worker is stopping.");
-    private static readonly Action<ILogger, string, string, Exception?> LogPostSuccessful = LoggerMessage.Define<string, string>(LogLevel.Information, 3, "Event sucessfully posted with id {ID} of type {ContentType}");
-    private static readonly Action<ILogger, string, Exception?> LogPostFailed = LoggerMessage.Define<string>(LogLevel.Warning, 4, "Event not posted {ContentType}");
+    private static readonly Action<ILogger, string, string, Exception?> LogPostSuccessful = LoggerMessage.Define<string, string>(LogLevel.Debug, 3, "Event {Id} of {MachineId} stored");
+    private static readonly Action<ILogger, string, Exception?> LogPostFailed = LoggerMessage.Define<string>(LogLevel.Warning, 4, "Event on {Topic} not stored");
+    private static readonly Action<ILogger, string, string, Exception?> LogDropped = LoggerMessage.Define<string, string>(LogLevel.Error, 6, "Message on {Topic} dropped: {Reason}");
+
     /// <summary>What the log names as the content type of a message that carries none.</summary>
     private const string NoContentType = "(none)";
-
-    private static readonly Action<ILogger, string, Exception?> LogErrorByHandlingMessage = LoggerMessage.Define<string>(LogLevel.Error, 6, "Error by handling mqtt message with content type {ContenType}.");
 
     public Worker(
         IOptions<Config> config,
         ILogger<Worker> logger,
         IManagedMqttClient mqttClient,
-        INotificationEventService notificationEventService,
-        IJobEventService jobEventService,
-        IWorkMasterEventService workMasterEventService,
+        IMachineEventService machineEventService,
         MqttSubscriptionReadiness readiness)
     {
         ArgumentNullException.ThrowIfNull(config);
         _config = config.Value ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _readiness = readiness ?? throw new ArgumentNullException(nameof(readiness));
-
         _mqttClient = mqttClient ?? throw new ArgumentNullException(nameof(mqttClient));
-        _notificationEventService = notificationEventService ?? throw new ArgumentNullException(nameof(notificationEventService));
-        _jobEventService = jobEventService ?? throw new ArgumentNullException(nameof(jobEventService));
-        _workMasterEventService = workMasterEventService ?? throw new ArgumentNullException(nameof(workMasterEventService));
+        _machineEventService = machineEventService ?? throw new ArgumentNullException(nameof(machineEventService));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -74,7 +71,8 @@ public class Worker : BackgroundService
 
             foreach (var topic in _config.Topics)
             {
-                await _mqttClient.SubscribeAsync(topic).ConfigureAwait(false);
+                // QoS 1: an event is delivered at least once; a repeated one the Events API refuses by its id.
+                await _mqttClient.SubscribeAsync(topic, MqttQualityOfServiceLevel.AtLeastOnce).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -99,60 +97,60 @@ public class Worker : BackgroundService
         }
     }
 
+    /// <summary>The machine id of a topic <c>machines/{MachineId}/events/…</c>, or null for another topic.</summary>
+    public static string? MachineIdOf(string topic)
+    {
+        ArgumentNullException.ThrowIfNull(topic);
+        var levels = topic.Split('/');
+        return levels.Length >= 4 && levels[0] == "machines" && levels[2] == "events" && levels[1].Length > 0 ? levels[1] : null;
+    }
+
     private async Task HandleMqttData(MqttApplicationMessageReceivedEventArgs args)
     {
         var message = args.ApplicationMessage.Parse<string>();
-        var payload = message.Payload;
+        var topic = message.Topic;
         var contentType = message.ContentType;
 
-        ArgumentNullException.ThrowIfNull(payload);
-
-        // ContentType is an MQTT 5 property, so every 3.1.1 publisher sends a message without one. That is
-        // the same case as an unknown type: logged on the default branch's path and dropped, decided here
-        // rather than left to MQTTnet catching an exception that leaves this handler.
-        if (contentType is null)
+        // ContentType is an MQTT 5 property; a CloudEvent in structured mode names itself with it. Its parameters
+        // (such as charset=utf-8) do not change what it is.
+        if (contentType is null || !contentType.Split(';')[0].Trim().Equals(CloudEventContentType, StringComparison.OrdinalIgnoreCase))
         {
-            LogErrorByHandlingMessage(_logger, NoContentType, null);
+            LogDropped(_logger, topic, $"content type {contentType ?? NoContentType}", null);
+            return;
+        }
+        if (MachineIdOf(topic) is not { } machineId)
+        {
+            LogDropped(_logger, topic, "no machine id in the topic", null);
             return;
         }
 
-        switch (contentType)
-        {
-            case var s when s.Equals(nameof(NotificationEventDtoV1).ToLowerInvariant(), StringComparison.Ordinal):
-                await ProcessEventDto<NotificationEventDtoV1>(payload, _notificationEventService.PostEvent).ConfigureAwait(false);
-                break;
-
-            case var s when s.Equals(nameof(JobEventDtoV1).ToLowerInvariant(), StringComparison.Ordinal):
-                await ProcessEventDto<JobEventDtoV1>(payload, _jobEventService.PostEvent).ConfigureAwait(false);
-                break;
-
-            case var s when s.Equals(nameof(WorkMasterEventDtoV1).ToLowerInvariant(), StringComparison.Ordinal):
-                await ProcessEventDto<WorkMasterEventDtoV1>(payload, _workMasterEventService.PostEvent).ConfigureAwait(false);
-                break;
-
-            default:
-                LogErrorByHandlingMessage(_logger, contentType, null);
-                break;
-        }
-    }
-
-
-    private async Task ProcessEventDto<T>(string payload, Func<T, Task<T>> postEventService)
-        where T : IMachineEvent
-    {
-        var eventDto = JsonSerializer.Deserialize<T>(payload, _jsonSerializerOptions) ?? throw new InvalidOperationException("Deserialization returned null.");
-
-        // Durability is provided by the client's standard resilience handler (retry, circuit breaker,
-        // timeouts). A single attempt through the resilient client is all that is needed here; on
-        // exhaustion the event is dropped and logged.
+        JsonElement cloudEvent;
         try
         {
-            await postEventService(eventDto).ConfigureAwait(false);
-            LogPostSuccessful(_logger, eventDto.Id.ToString(CultureInfo.InvariantCulture), eventDto.GetType().Name.ToLower(CultureInfo.CurrentCulture), null);
+            using var document = JsonDocument.Parse(message.Payload ?? string.Empty);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                LogDropped(_logger, topic, "not a JSON object", null);
+                return;
+            }
+            cloudEvent = document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            LogDropped(_logger, topic, "not JSON", null);
+            return;
+        }
+
+        // Durability is provided by the client's standard resilience handler (retry, circuit breaker,
+        // timeouts). On exhaustion, or for an event stored before, the event is logged and not stored again.
+        try
+        {
+            var stored = await _machineEventService.PostEvent(new MachineEventInputDtoV1 { MId = machineId, CloudEvent = cloudEvent }).ConfigureAwait(false);
+            LogPostSuccessful(_logger, stored.Id, machineId, null);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or PleiadesEventPersistenceException)
         {
-            LogPostFailed(_logger, eventDto.Id.ToString(CultureInfo.InvariantCulture), ex);
+            LogPostFailed(_logger, topic, ex);
         }
     }
 

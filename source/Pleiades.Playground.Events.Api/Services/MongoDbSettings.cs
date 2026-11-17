@@ -20,19 +20,9 @@ internal sealed class MongoDbSettings
     public required string DatabaseName { get; init; } = "Events";
 
     /// <summary>
-    /// Notification event collection name
+    /// Collection of the CloudEvents of machines
     /// </summary>
-    public string NotificationEventCollection { get; init; } = "NotificationEvent";
-
-    /// <summary>
-    /// Job event collection name
-    /// </summary>
-    public string JobEventCollection { get; init; } = "JobEvent";
-
-    /// <summary>
-    /// Work master event collection name
-    /// </summary>
-    public string WorkMasterEventCollection { get; init; } = "WorkMasterEvent";
+    public string MachineEventCollection { get; init; } = "MachineEvent";
 
     /// <summary>
     /// Whether to ensure MongoDB indexes exist on startup

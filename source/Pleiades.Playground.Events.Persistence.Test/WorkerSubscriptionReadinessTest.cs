@@ -1,3 +1,4 @@
+using Pleiades.Playground.Events.Api.Client.MachineEvents;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -7,9 +8,6 @@ using Moq;
 using MQTTnet;
 using Pleiades.Playground.Mqtt.Extensions;
 using MQTTnet.Packets;
-using Pleiades.Playground.Events.Api.Client.NotificationEvents;
-using Pleiades.Playground.Events.Api.Client.JobEvents;
-using Pleiades.Playground.Events.Api.Client.WorkMasterEvents;
 using Pleiades.Playground.HealthChecks.Mqtt;
 
 namespace Pleiades.Playground.Events.Persistence.Test;
@@ -97,9 +95,7 @@ public sealed class WorkerSubscriptionReadinessTest
             Options.Create(config),
             NullLogger<Worker>.Instance,
             client.Object,
-            Mock.Of<INotificationEventService>(),
-            Mock.Of<IJobEventService>(),
-            Mock.Of<IWorkMasterEventService>(),
+            Mock.Of<IMachineEventService>(),
             services.GetRequiredService<MqttSubscriptionReadiness>());
         _ = worker.StartAsync(TestContext.CancellationToken);
         return worker;

@@ -15,7 +15,6 @@ using Pleiades.Playground.HealthChecks.AspNetCore;
 using Pleiades.Playground.HealthChecks.MongoDb;
 using Pleiades.Playground.Mcp.Server;
 using Pleiades.Playground.Events.DataTransferObjects;
-using Pleiades.Playground.Notification.DataTransferObjects;
 
 var assembly = typeof(Program).Assembly;
 
@@ -48,9 +47,8 @@ builder.Services
         mcp.Prefix = "events";
         mcp.Name = "Pleiades-Events";
         mcp.Title = "Events API MCP server for industrial machine event analysis.";
-        mcp.Domains.Add("Notification events");
-        mcp.Domains.Add("Job events: job orders and their results");
-        mcp.Domains.Add("Work master events: program executions");
+        mcp.Domains.Add("CloudEvents of machines after the umati data model, stored as they came");
+        mcp.Domains.Add("Alerts (NE 107), job orders with their results, program executions, gaps in the event numbers");
         mcp.DiscoveryFlow.Add("Use the events_* query tools for filtered event retrieval and analysis.");
         mcp.WritePolicy = FeaturePolicy.Write(EventsFeature.Name);
     })
@@ -95,30 +93,6 @@ builder.Services.AddOpenApi(options =>
         return Task.CompletedTask;
     });
 
-    options.AddSchemaTransformer((schema, context, _) =>
-    {
-        if (context.JsonTypeInfo.Type == typeof(NotificationAction))
-        {
-            schema.Type = JsonSchemaType.String;
-            schema.Enum =
-            [
-                JsonValue.Create("None"),
-                JsonValue.Create("Raised"),
-                JsonValue.Create("Reset")
-            ];
-        }
-        else if (context.JsonTypeInfo.Type == typeof(JobAction))
-        {
-            schema.Type = JsonSchemaType.String;
-            schema.Enum = [.. Enum.GetNames<JobAction>().Select(n => (JsonNode)JsonValue.Create(n))];
-        }
-        else if (context.JsonTypeInfo.Type == typeof(WorkMasterAction))
-        {
-            schema.Type = JsonSchemaType.String;
-            schema.Enum = [.. Enum.GetNames<WorkMasterAction>().Select(n => (JsonNode)JsonValue.Create(n))];
-        }
-        return Task.CompletedTask;
-    });
 });
 
 var app = builder.Build();
@@ -168,13 +142,10 @@ app.MapPleiadesHealthChecks();
 app.MapOpenApi();
 app.UsePleiadesSwaggerUI($"{serviceInfo.Name} - V {serviceInfo.Version}");
 
-var notificationEvents = app.MapGroup("notificationEvents").WithTags("Notification Events");
-notificationEvents.MapNotificationEvents();
-notificationEvents.MapNotificationEventStatistics();
-
-app.MapGroup("jobEvents").WithTags("Job Events").MapJobEvents();
+app.MapGroup("machineEvents").WithTags("Machine Events").MapMachineEvents();
+app.MapGroup("alerts").WithTags("Alerts").MapAlerts();
 app.MapGroup("jobOrders").WithTags("Job Orders").MapJobOrders();
-app.MapGroup("workMasterEvents").WithTags("Work Master Events").MapWorkMasterEvents();
+app.MapGroup("programExecutions").WithTags("Program Executions").MapProgramExecutions();
 
 // MCP tool discovery/queries are reads; the internal API key satisfies the read policy.
 // Non-prod (auth disabled) stays anonymous. The group covers /mcp and GET /skill.
