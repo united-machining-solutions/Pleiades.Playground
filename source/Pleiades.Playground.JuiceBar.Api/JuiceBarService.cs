@@ -4,15 +4,21 @@ namespace Pleiades.Playground.JuiceBar.Api;
 
 /// <summary>What REST and MCP both offer: the card, the status, and an order with its guards.</summary>
 internal sealed class JuiceBarService(MixerClient mixer, LiveState live, IOptions<JuiceBarOptions> options, TimeProvider time)
+    : IDisposable
 {
     internal const string StartButtonHint =
         "The order waits in the queue. A person puts a glass under the outlet and presses the start button on the machine; this service never starts the production.";
 
     // The states of the production in which the machine takes an order and can soon make it.
+    // One order at a time: the check of the queue and the order it allows belong together.
+    private readonly SemaphoreSlim _ordering = new(1, 1);
+
     private static readonly HashSet<string> Ready = new(StringComparer.Ordinal)
     {
         "waitingOrder", "waitingStart", "startProcessing", "processingOrder", "finished",
     };
+
+    public void Dispose() => _ordering.Dispose();
 
     internal Task<IReadOnlyList<Drink>> DrinksAsync(CancellationToken cancellationToken) => mixer.DrinksAsync(cancellationToken);
 
@@ -23,7 +29,17 @@ internal sealed class JuiceBarService(MixerClient mixer, LiveState live, IOption
     internal async Task<JuiceBarStatus> StatusAsync(CancellationToken cancellationToken)
     {
         var snapshot = live.Snapshot();
-        var pumps = await mixer.PumpsAsync(snapshot.AmountWarnings, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<Pump> pumps;
+        try
+        {
+            pumps = await mixer.PumpsAsync(snapshot.AmountWarnings, cancellationToken).ConfigureAwait(false);
+        }
+        catch (JuiceBarUnavailableException) when (!snapshot.Connected)
+        {
+            // A machine that is switched off has a status too: not connected, and nothing known about its pumps.
+            pumps = [];
+        }
+
         return new(snapshot.Connected, snapshot.ProductionState, snapshot.PumpControlMode, snapshot.PumpControlServiceState,
             snapshot.ProgressFraction, snapshot.Queue, pumps, options.Value.EnableOrdering, options.Value.MaximumQueueLength,
             time.GetUtcNow());
@@ -44,27 +60,38 @@ internal sealed class JuiceBarService(MixerClient mixer, LiveState live, IOption
             throw new InvalidOperationException("Ordering is switched off in this service (JUICEBAR_ENABLE_ORDERING).");
         }
 
-        var snapshot = live.Snapshot();
-        if (!snapshot.Connected)
+        await _ordering.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            throw new JuiceBarUnavailableException("The state of the juice bar is unknown, so no order is placed.");
-        }
+            var snapshot = live.Snapshot();
+            if (!snapshot.Connected)
+            {
+                throw new JuiceBarUnavailableException("The state of the juice bar is unknown, so no order is placed.");
+            }
 
-        if (snapshot.ProductionState is not { } state || !Ready.Contains(state))
+            if (snapshot.ProductionState is not { } state || !Ready.Contains(state))
+            {
+                throw new InvalidOperationException(
+                    $"The juice bar takes no order now (production state: {snapshot.ProductionState ?? "unknown"}).");
+            }
+
+            // The machine lists an order a moment after it answered it, so the orders placed here count too.
+            var waiting = snapshot.Queue.Count + live.PlacedNotQueued();
+            if (waiting >= options.Value.MaximumQueueLength)
+            {
+                throw new InvalidOperationException(
+                    $"{waiting} orders wait at the juice bar; the limit is {options.Value.MaximumQueueLength}. Try again when one is made.");
+            }
+
+            var drink = await DrinkAsync(drinkId, cancellationToken).ConfigureAwait(false);
+            var order = await mixer.CreateOrderAsync(drink.Id, cancellationToken).ConfigureAwait(false);
+            live.Placed(order.OrderNumber);
+            return WithLiveState(order) with { NextStep = StartButtonHint };
+        }
+        finally
         {
-            throw new InvalidOperationException(
-                $"The juice bar takes no order now (production state: {snapshot.ProductionState ?? "unknown"}).");
+            _ordering.Release();
         }
-
-        if (snapshot.Queue.Count >= options.Value.MaximumQueueLength)
-        {
-            throw new InvalidOperationException(
-                $"{snapshot.Queue.Count} orders wait at the juice bar; the limit is {options.Value.MaximumQueueLength}. Try again when one is made.");
-        }
-
-        var drink = await DrinkAsync(drinkId, cancellationToken).ConfigureAwait(false);
-        var order = await mixer.CreateOrderAsync(drink.Id, cancellationToken).ConfigureAwait(false);
-        return WithLiveState(order) with { NextStep = StartButtonHint };
     }
 
     private Order WithLiveState(Order order)

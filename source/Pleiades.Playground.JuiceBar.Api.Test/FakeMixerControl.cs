@@ -24,6 +24,7 @@ internal sealed class FakeMixerControl : IAsyncDisposable
     private readonly WebApplication _app;
     private readonly ConcurrentDictionary<WebSocket, SemaphoreSlim> _sockets = new();
     private readonly List<int> _queue = [];
+    private int _accepted;
     private readonly Lock _gate = new();
 
     private FakeMixerControl(WebApplication app) => _app = app;
@@ -31,6 +32,12 @@ internal sealed class FakeMixerControl : IAsyncDisposable
     internal ConcurrentQueue<string> Requests { get; } = new();
 
     internal string ProductionState { get; set; } = "waitingOrder";
+
+    /// <summary>
+    /// How long after its answer the machine lists an order: MixerControl answers first and puts the order into
+    /// the queue once it has loaded the program.
+    /// </summary>
+    internal TimeSpan EnqueueDelay { get; set; } = TimeSpan.FromMilliseconds(150);
 
     internal Uri BaseUrl { get; private set; } = null!;
 
@@ -67,9 +74,8 @@ internal sealed class FakeMixerControl : IAsyncDisposable
         {
             using var body = await JsonDocument.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted).ConfigureAwait(false);
             var drinkId = body.RootElement.GetProperty("drinkId").GetString();
-            var number = fake.Enqueue();
-            await fake.BroadcastAsync($$"""42/production,["queue",{{fake.QueueJson()}}]""").ConfigureAwait(false);
-            await fake.BroadcastAsync($$"""42/orders,["state",{"orderNumber":{{number}},"toState":"waitForProduction"}]""").ConfigureAwait(false);
+            var number = fake.Accept();
+            _ = fake.EnqueueLaterAsync(number);
             return Results.Json(new { orderNumber = number, orderName = "Tropical Mix", drinkId }, statusCode: StatusCodes.Status201Created);
         });
         app.Map("/socket.io/", fake.ServeSocketAsync);
@@ -100,18 +106,28 @@ internal sealed class FakeMixerControl : IAsyncDisposable
     {
         lock (_gate)
         {
-            return _queue.Contains(number);
+            return number >= 100 && number < 100 + _accepted;
         }
     }
 
-    private int Enqueue()
+    private int Accept()
     {
         lock (_gate)
         {
-            var number = 100 + _queue.Count;
-            _queue.Add(number);
-            return number;
+            return 100 + _accepted++;
         }
+    }
+
+    private async Task EnqueueLaterAsync(int number)
+    {
+        await Task.Delay(EnqueueDelay).ConfigureAwait(false);
+        lock (_gate)
+        {
+            _queue.Add(number);
+        }
+
+        await BroadcastAsync($$"""42/production,["queue",{{QueueJson()}}]""").ConfigureAwait(false);
+        await BroadcastAsync($$"""42/orders,["state",{"orderNumber":{{number}},"toState":"waitForProduction"}]""").ConfigureAwait(false);
     }
 
     private string QueueJson()

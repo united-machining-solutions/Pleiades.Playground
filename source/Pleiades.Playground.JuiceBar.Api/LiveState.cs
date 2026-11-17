@@ -17,6 +17,10 @@ internal sealed class LiveState(TimeProvider time)
     private readonly Lock _gate = new();
     private readonly Dictionary<int, bool> _warnings = [];
     private readonly Dictionary<int, LiveOrder> _orders = [];
+
+    // Orders this service placed that the machine does not list yet: it answers an order first and puts it into
+    // the queue a moment later, after it has loaded the program.
+    private readonly HashSet<int> _placed = [];
     private IReadOnlyList<QueuedOrder> _queue = [];
     private bool _connected;
     private string? _productionState;
@@ -42,6 +46,27 @@ internal sealed class LiveState(TimeProvider time)
         }
     }
 
+    /// <summary>Counts an order this service placed as waiting until the machine lists it.</summary>
+    internal void Placed(int orderNumber)
+    {
+        lock (_gate)
+        {
+            if (!_queue.Any(q => q.OrderNumber == orderNumber))
+            {
+                _placed.Add(orderNumber);
+            }
+        }
+    }
+
+    /// <summary>The orders this service placed that are not in the queue of the machine yet.</summary>
+    internal int PlacedNotQueued()
+    {
+        lock (_gate)
+        {
+            return _placed.Count;
+        }
+    }
+
     internal void Connected()
     {
         lock (_gate)
@@ -61,6 +86,7 @@ internal sealed class LiveState(TimeProvider time)
             _queue = [];
             _warnings.Clear();
             _orders.Clear();
+            _placed.Clear();
             _observedAt = time.GetUtcNow();
         }
     }
@@ -93,6 +119,7 @@ internal sealed class LiveState(TimeProvider time)
                     break;
                 case ("/production", "queue") when value.ValueKind == JsonValueKind.Array:
                     _queue = [.. value.EnumerateArray().Select(ToQueued).OfType<QueuedOrder>()];
+                    _placed.ExceptWith(_queue.Select(q => q.OrderNumber));
                     break;
                 case ("/production", "amountWarning" or "warning") when Number(value, "pumpNr") is { } pump:
                     // The machine marks a pump without a warning with warningCleared; anything else is a warning.
@@ -104,6 +131,12 @@ internal sealed class LiveState(TimeProvider time)
                     {
                         State = value.TryGetProperty("toState", out var state) ? Text(state) : null,
                     };
+                    if (_orders[number].State == "error")
+                    {
+                        // An order that failed before it reached the queue never will.
+                        _placed.Remove(number);
+                    }
+
                     break;
                 case ("/orders", "progress") when Number(value, "orderNumber") is { } number:
                     _orders[number] = (_orders.GetValueOrDefault(number) ?? new(null, null)) with
