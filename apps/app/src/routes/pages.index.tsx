@@ -33,7 +33,9 @@ function Pages() {
               <FilesIcon />
             </EmptyMedia>
             <EmptyTitle>No pages yet</EmptyTitle>
-            <EmptyDescription>A page is kept from an answer in the chat, and this browser keeps it.</EmptyDescription>
+            <EmptyDescription>
+              Ask the chat something, and press "Save as page" under its answer. This browser keeps the page.
+            </EmptyDescription>
           </EmptyHeader>
         </Empty>
       </Page>

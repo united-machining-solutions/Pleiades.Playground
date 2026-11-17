@@ -61,12 +61,15 @@ import {
   TraceTitle,
 } from "@pleiades/ui/components/trace"
 
+import { keepOfAnswer } from "@/pages/from-answer.ts"
+
 import { Answer } from "./answer.tsx"
 import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
 import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
 import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { DictateButton } from "./dictate.tsx"
+import { SaveAsPage } from "./save-as-page.tsx"
 import { chooseChatModel, fetchChatModel } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
 import { toolLabel } from "./tool-results.ts"
@@ -282,7 +285,7 @@ function Conversation({ threadId }: { threadId: string }) {
           <MessageScroller>
             <MessageScrollerViewport>
               <MessageScrollerContent aria-busy={isLoading} className="gap-6 p-4">
-                {messages.map((message) => {
+                {messages.map((message, position) => {
                   if (message.role === "user") {
                     return (
                       <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor>
@@ -296,9 +299,14 @@ function Conversation({ threadId }: { threadId: string }) {
                       </MessageScrollerItem>
                     )
                   }
-                  const blocks = blocksOf(message.parts, isLoading && message === messages.at(-1), chatTools)
+                  const live = isLoading && message === messages.at(-1)
+                  const blocks = blocksOf(message.parts, live, chatTools)
                   // An answer that has nothing to show yet takes no room.
                   if (blocks.length === 0) return null
+                  // An answer that has ended, and for which the chat drew a card, can be saved as a
+                  // page: its cards, titled with the question it answers (pages/from-answer.ts). The
+                  // answer is more than this message: the button stands under its last one.
+                  const keep = keepOfAnswer(messages, position, chatTools, isLoading)
                   return (
                     // An item paints nothing outside its box, and a card draws its edge as a ring
                     // around itself: one pixel of room keeps that edge.
@@ -314,6 +322,7 @@ function Conversation({ threadId }: { threadId: string }) {
                               }
                             />
                           ))}
+                          {keep && <SaveAsPage answer={`${threadId}/${message.id}`} recipe={keep.recipe} left={keep.left} />}
                         </MessageContent>
                       </Message>
                     </MessageScrollerItem>
