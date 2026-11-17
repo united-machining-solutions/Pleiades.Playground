@@ -28,8 +28,22 @@ function setStatus(next: Partial<BrokerStatus>) {
   for (const listener of statusListeners) listener()
 }
 
+/** How far the clock of the server is ahead of the clock of this browser, in milliseconds. */
+let offset = 0
+
+/**
+ * Now, by the clock of the server. Whether a machine is silent is read against it, as the backend
+ * reads it: the clock of a laptop in a workshop may be minutes off.
+ */
+export function serverNow(): string {
+  return new Date(Date.now() + offset).toISOString()
+}
+
 async function addressOf(): Promise<string> {
-  const { url, port } = await getBrokerAddress()
+  const asked = Date.now()
+  const { url, port, now } = await getBrokerAddress()
+  // The server read its clock about halfway between the question and the answer.
+  offset = Date.parse(now) - (asked + Date.now()) / 2
   if (url) return url
   const scheme = window.location.protocol === "https:" ? "wss" : "ws"
   return `${scheme}://${window.location.hostname}:${port}`

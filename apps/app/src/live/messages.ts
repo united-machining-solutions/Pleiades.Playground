@@ -27,12 +27,24 @@ function jsonOf(payload: string): Record<string, unknown> | null {
   }
 }
 
+/**
+ * How far ahead of the clock a value may be stamped. One stamped further ahead comes from a wrong
+ * clock: the backend reads stored values only up to now, so it would not show it yet either.
+ */
+export const AHEAD_MS = 30_000
+
+/** Whether an instant lies further ahead of `now`, in milliseconds since 1970, than a clock may be wrong. */
+function ahead(at: string, now: number): boolean {
+  return Date.parse(at) > now + AHEAD_MS
+}
+
 /** The value envelope of the binding: `{ "timestamp": …, "value": …, "unit": … }`. */
-export function valueOf(payload: string): Value | null {
+export function valueOf(payload: string, now = Date.now()): Value | null {
   const json = jsonOf(payload)
   const at = instantOf(json?.timestamp)
   const value = json?.value
-  if (at === null || (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")) return null
+  if (at === null || ahead(at, now)) return null
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") return null
   return { at, value, unit: typeof json?.unit === "string" ? json.unit : null }
 }
 
@@ -47,11 +59,11 @@ export type NotificationEvent = {
   correlationId: string
 }
 
-export function notificationOf(payload: string): NotificationEvent | null {
+export function notificationOf(payload: string, now = Date.now()): NotificationEvent | null {
   const json = jsonOf(payload)
   const at = instantOf(json?.timestamp)
   const { action, level, title, notificationId, correlationId } = json ?? {}
-  if (at === null || (action !== "Raised" && action !== "Reset")) return null
+  if (at === null || ahead(at, now) || (action !== "Raised" && action !== "Reset")) return null
   if (typeof correlationId !== "string" || correlationId === "") return null
   return {
     at,

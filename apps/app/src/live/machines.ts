@@ -1,5 +1,5 @@
 import { NOTIFICATIONS_PATH, READING_PATHS, SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
-import type { Machine, MachineList, MachineShow, Notification, Reading, ReadingName, Span } from "@pleiades/cards/machine/contract.ts"
+import type { Machine, MachineList, MachineShow, Notification, Reading, ReadingName, Span, State } from "@pleiades/cards/machine/contract.ts"
 import { stateOf, stateOrder } from "@pleiades/cards/machine/state.ts"
 
 import { filterOf, machineOf, notificationOf, valueOf } from "./messages.ts"
@@ -88,31 +88,33 @@ export function withNotification(machine: Machine, event: NotificationEvent): Ma
   return { ...machine, notifications }
 }
 
-/** What a message of the broker does to a machine. A topic the page does not show leaves it as it is. */
-export function machineWith(machine: Machine, topic: string, payload: string): Machine {
+/**
+ * What a message of the broker does to a machine. A topic the page does not show leaves it as it is.
+ * `now`, in milliseconds since 1970, is the clock of the server: a value stamped far ahead of it is left out.
+ */
+export function machineWith(machine: Machine, topic: string, payload: string, now = Date.now()): Machine {
   if (topic === filterOf(NOTIFICATIONS_PATH, machine.machine)) {
-    const event = notificationOf(payload)
+    const event = notificationOf(payload, now)
     return event ? withNotification(machine, event) : machine
   }
   const name = names.find((one) => machine[one].topic === topic)
-  const value = name && valueOf(payload)
+  const value = name && valueOf(payload, now)
   return name && value ? withValue(machine, name, value) : machine
 }
 
-/** What a message does to the list of machines. A machine the list does not know yet joins it. */
-export function listWith(list: MachineList, topic: string, payload: string): MachineList {
+/** What a message does to the list of machines. A machine the list does not know yet joins it with its first value. */
+export function listWith(list: MachineList, topic: string, payload: string, now = Date.now()): MachineList {
   const serial = machineOf(topic)
   if (serial === undefined) return list
-  const known = list.machines.some((one) => one.machine === serial)
-  const machines = known ? list.machines : [...list.machines, unknownMachine(serial)].sort((a, b) => a.machine.localeCompare(b.machine))
-  let changed = !known
-  const next = machines.map((one) => {
-    if (one.machine !== serial) return one
-    const updated = machineWith(one, topic, payload)
-    changed ||= updated !== one
-    return updated
-  })
-  return changed ? { ...list, machines: next } : list
+  const known = list.machines.find((one) => one.machine === serial)
+  const machine = known ?? unknownMachine(serial)
+  const updated = machineWith(machine, topic, payload, now)
+  // A message that is not a value of the binding changes nothing, and names no machine either.
+  if (updated === machine) return list
+  const machines = known
+    ? list.machines.map((one) => (one === known ? updated : one))
+    : [...list.machines, updated].sort((a, b) => a.machine.localeCompare(b.machine))
+  return { ...list, machines }
 }
 
 /** The list at a later instant: whether a machine is silent is read against the clock. */
@@ -123,15 +125,16 @@ export function listAt(list: MachineList, now: string): MachineList {
 /** The page of one machine: the values of its card and the spans of its band. */
 export type MachinePage = { show: MachineShow; spans: ReadonlyArray<Span> | null }
 
-export function pageWith(page: MachinePage, topic: string, payload: string): MachinePage {
-  const machine = machineWith(page.show.machine, topic, payload)
+export function pageWith(page: MachinePage, topic: string, payload: string, now = Date.now()): MachinePage {
+  const machine = machineWith(page.show.machine, topic, payload, now)
   return machine === page.show.machine ? page : { ...page, show: { ...page.show, machine } }
 }
 
 /**
- * The page at a later instant. The history goes on to `now`: the time since its end is added to
- * the state the machine is in now, in the sums and at the end of the band. Where the history
- * begins stays, so a page that stays open shows more than the hours it was read with.
+ * The page at a later instant. The history keeps the length it was read with and rolls on to `now`:
+ * the time since its end is added to the state the machine is in now, in the sums and at the end of
+ * the band, and as much is cut from its beginning, by the band. A card without its band does not
+ * know what it loses at the beginning, so its history grows instead.
  */
 export function pageAt(page: MachinePage, now: string): MachinePage {
   const { show, spans } = page
@@ -139,19 +142,36 @@ export function pageAt(page: MachinePage, now: string): MachinePage {
   if (now <= history.to) return page
   const state = stateOf(show.machine, now)
   const seconds = (Date.parse(now) - Date.parse(history.to)) / 1000
+  const from = spans === null ? history.from : new Date(Date.parse(history.from) + seconds * 1000).toISOString()
+  const begins = Date.parse(from)
+
+  // What falls off at the beginning, by the band.
+  const lost = new Map<State, number>()
+  for (const span of spans ?? []) {
+    const end = Math.min(Date.parse(span.to), begins)
+    if (Date.parse(span.from) < end) lost.set(span.state, (lost.get(span.state) ?? 0) + (end - Date.parse(span.from)) / 1000)
+  }
   const totals = stateOrder.flatMap((one) => {
-    const total = (history.totals.find((entry) => entry.state === one)?.seconds ?? 0) + (one === state ? seconds : 0)
+    const before = history.totals.find((entry) => entry.state === one)?.seconds ?? 0
+    // The band is thinner than the sums: what it cuts may be a little more than a sum still holds.
+    const total = Math.max(0, before + (one === state ? seconds : 0) - (lost.get(one) ?? 0))
     return total > 0 ? [{ state: one, seconds: total }] : []
   })
+
   const last = spans?.at(-1)
-  const nextSpans =
+  const grown =
     spans === null
       ? null
       : last !== undefined && last.state === state && last.to === history.to
         ? [...spans.slice(0, -1), { ...last, to: now }]
         : [...spans, { state, from: history.to, to: now }]
+  const nextSpans =
+    grown &&
+    grown.flatMap((span) =>
+      Date.parse(span.to) <= begins ? [] : [Date.parse(span.from) < begins ? { ...span, from } : span],
+    )
   return {
-    show: { ...show, asOf: now > show.asOf ? now : show.asOf, history: { ...history, to: now, totals } },
+    show: { ...show, asOf: now > show.asOf ? now : show.asOf, history: { ...history, from, to: now, totals } },
     spans: nextSpans,
   }
 }

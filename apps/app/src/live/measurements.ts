@@ -110,10 +110,13 @@ function seriesWithLine(series: MeasurementSeries, machine: string, quantity: Qu
   }
 }
 
-/** What a message of the broker does to the page. */
-export function liveWith(page: LivePage, topic: string, payload: string): LivePage {
+/**
+ * What a message of the broker does to the page. `now`, in milliseconds since 1970, is the clock of
+ * the server: a value stamped far ahead of it is left out.
+ */
+export function liveWith(page: LivePage, topic: string, payload: string, now = Date.now()): LivePage {
   const machine = machineOf(topic)
-  const value = machine && valueOf(payload)
+  const value = machine && valueOf(payload, now)
   if (!machine || !value) return page
   // Every value is a sign of life, whatever it says.
   const lastSign = { ...page.lastSign, [machine]: later(page.lastSign[machine], value.at) ?? value.at }

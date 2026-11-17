@@ -52,7 +52,7 @@ function Machine() {
   const live = useMemo(
     (): Live<MachinePage | null> => ({
       filters: machineFilters(machine),
-      message: (page, topic, payload) => page && pageWith(page, topic, payload),
+      message: (page, topic, payload, now) => page && pageWith(page, topic, payload, now),
       at: (page, now) => page && pageAt(page, now),
     }),
     [machine],

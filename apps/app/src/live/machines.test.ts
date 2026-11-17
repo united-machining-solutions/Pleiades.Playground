@@ -73,6 +73,17 @@ test("a machine the list does not know yet joins it, in the order of the serial 
   assert.equal(m02?.connection.sinceIsLowerBound, true)
 })
 
+test("a message that is not a value of the binding names no machine", () => {
+  assert.equal(listWith(list, "machines/X-1/umati/State/MachineryItemState", "not json"), list)
+  assert.equal(listWith(list, "machines/X-1/umati/State/MachineryItemState", '{"timestamp":"2026-11-16T09:30:01Z","value":{"a":1}}'), list)
+})
+
+test("a value stamped far ahead of the clock of the server is left out", () => {
+  const now = Date.parse("2026-11-16T09:30:00Z")
+  const ahead = listWith(list, "machines/P-04/umati/State/MachineryItemState", value("2026-11-16T10:30:00Z", "Aborted"), now)
+  assert.equal(ahead, list)
+})
+
 test("a warning that is raised stands until it is reset; a message of another level is not shown", () => {
   const topic = "machines/P-04/events/notifications"
   const raised = listWith(list, topic, event("2026-11-16T09:30:02Z", "Raised", "Warning", "c1"))
@@ -114,17 +125,26 @@ const spans = [
   { state: "running" as const, from: "2026-11-16T09:00:00.000Z", to: "2026-11-16T09:30:00.000Z" },
 ]
 
-test("the history goes on with the state of now: the last span grows, and its sum", () => {
+test("the history rolls on with the state of now: the last span grows, and as much falls off at the beginning", () => {
   const later = pageAt({ show, spans }, "2026-11-16T09:30:10.000Z")
   assert.equal(later.show.asOf, "2026-11-16T09:30:10.000Z")
   assert.equal(later.show.history.to, "2026-11-16T09:30:10.000Z")
-  assert.equal(later.show.history.from, show.history.from)
+  assert.equal(later.show.history.from, "2026-11-16T01:30:10.000Z")
   assert.deepEqual(later.show.history.totals, [
     { state: "running", seconds: 1810 },
-    { state: "stopped", seconds: 27000 },
+    { state: "stopped", seconds: 26990 },
   ])
-  assert.deepEqual(later.spans?.at(-1), { state: "running", from: "2026-11-16T09:00:00.000Z", to: "2026-11-16T09:30:10.000Z" })
-  assert.equal(later.spans?.length, 2)
+  assert.deepEqual(later.spans, [
+    { state: "stopped", from: "2026-11-16T01:30:10.000Z", to: "2026-11-16T09:00:00.000Z" },
+    { state: "running", from: "2026-11-16T09:00:00.000Z", to: "2026-11-16T09:30:10.000Z" },
+  ])
+})
+
+test("an open page keeps the length of its history: after eight hours, only what came after it", () => {
+  const later = pageAt({ show, spans }, "2026-11-16T17:30:00.000Z")
+  assert.equal(later.show.history.from, "2026-11-16T09:30:00.000Z")
+  assert.deepEqual(later.spans, [{ state: "no-data", from: "2026-11-16T09:30:00.000Z", to: "2026-11-16T17:30:00.000Z" }])
+  assert.deepEqual(later.show.history.totals, [{ state: "no-data", seconds: 28800 }])
 })
 
 test("a machine that falls silent begins a span without data", () => {
@@ -137,8 +157,11 @@ test("a machine that falls silent begins a span without data", () => {
   )
 })
 
-test("a card without its band goes on without one", () => {
-  assert.equal(pageAt({ show, spans: null }, "2026-11-16T09:30:10.000Z").spans, null)
+test("a card without its band does not know what falls off at the beginning: its history grows", () => {
+  const later = pageAt({ show, spans: null }, "2026-11-16T09:30:10.000Z")
+  assert.equal(later.spans, null)
+  assert.equal(later.show.history.from, show.history.from)
+  assert.equal(later.show.history.totals.find((one) => one.state === "running")?.seconds, 1810)
 })
 
 test("a value of the machine reaches its card", () => {

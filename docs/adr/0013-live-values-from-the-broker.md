@@ -22,10 +22,13 @@ Every value already passes the broker before it is stored, and the broker publis
 Live values are not pulled. A page reads once, through its loader, what the backend knows: what held when
 it was opened, and the history before it. From then on the browser subscribes at the broker, MQTT over
 WebSocket, to the topics the page shows, and lays every value onto what it read, by the rules the backend
-reads the stored values with. The clock of the page moves on locally: a machine without a sign of life
-for `SILENT_AFTER_SECONDS` has no data, and a history goes on to now.
+reads the stored values with. The clock of the page moves on locally, by the clock of the server, which
+the page reads once: a machine without a sign of life for `SILENT_AFTER_SECONDS` has no data, and a history
+keeps its length and rolls on to now. A value stamped further ahead of that clock than `AHEAD_MS` is left
+out, as the backend, which reads stored values up to now, would not show it yet either.
 
-- The browser only subscribes; it never publishes.
+- The code of the app only subscribes; it never publishes. The broker does not hold a client to that: its
+  WebSocket listener takes anonymous publishes, as it did before this decision.
 - The topics come from the contracts: `READING_PATHS` and `NOTIFICATIONS_PATH` of the machine card,
   `QUANTITY_PATHS` of the measurement card. The backend reads the same paths.
 - A page reads from the backend again in two cases only: after the connection to the broker was lost, for
@@ -37,8 +40,11 @@ for `SILENT_AFTER_SECONDS` has no data, and a history goes on to now.
 
 A value shows the moment it is published, and an open page costs no reads. The browser now talks to a
 second service besides the server of the app: whoever reaches the app must also reach the WebSocket of the
-broker, which the demo stack publishes without sign-in (see `stacks/broker/mosquitto.conf`). A deployment
-behind TLS needs the broker behind the same proxy, `wss://`, named in `MQTT_WS_URL`.
+broker, which the demo stack publishes without sign-in (see `stacks/broker/mosquitto.conf`). A WebSocket is
+not held back by the same-origin rule, so any other page open in the same browser can reach the broker too,
+and publish to it. A listener that only lets the WebSocket read (an ACL of `topic read machines/#` on port
+9001, while 1883 stays as it is) closes that; it is a change of the stack of its own. A deployment behind
+TLS needs the broker behind the same proxy, `wss://`, named in `MQTT_WS_URL`.
 
 Each live page states a part of the rules of the backend a second time, in `apps/app/src/live/`: how a run of
 a value goes on, when a machine is silent, how a line of a graph holds its value. Its tests name the rules,

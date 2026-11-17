@@ -50,6 +50,12 @@ test("a new value stands next to the title at once", () => {
   })
 })
 
+test("an older value of a quantity does not replace a newer one", () => {
+  const page = liveWith(livePageOf(series, current), power, value("2026-11-16T09:29:50Z", 1000, "watt"))
+  assert.equal(page.current?.machines[0]?.measurements[0]?.value, 3010)
+  assert.equal(page.current?.machines[0]?.measurements[0]?.at, "2026-11-16T09:29:58.000Z")
+})
+
 test("the graphs move on by whole slots, each holding the newest value before its end", () => {
   let page = livePageOf(series, current)
   page = liveWith(page, power, value("2026-11-16T09:30:01Z", 3100, "watt"))

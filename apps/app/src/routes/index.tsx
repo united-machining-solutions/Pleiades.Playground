@@ -21,7 +21,7 @@ import { MachineRow, MachineTile } from "@/machines/machine-item.tsx"
 /** The list is read once, from the backend; then every value of every machine comes from the broker. */
 const live: Live<MachineList | null> = {
   filters: machineFilters(),
-  message: (list, topic, payload) => list && listWith(list, topic, payload),
+  message: (list, topic, payload, now) => list && listWith(list, topic, payload, now),
   at: (list, now) => list && listAt(list, now),
 }
 

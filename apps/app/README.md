@@ -29,8 +29,10 @@ which settings are missing; everything else works.
 machine and Live values read once, in their loader, what `genui-mcp` knows: what held when the page was opened,
 and the history before it. From then on the browser subscribes at the broker, MQTT over WebSocket, to the
 topics the page shows, and every value appears the moment a machine publishes it: a state, a program, a warning
-that is raised or reset, a point of a graph. The clock of the page moves on by itself, so a machine that falls
-silent shows "No data" after 30 seconds, and the history of a machine grows to now. The line under the title
+that is raised or reset, a point of a graph. The clock of the page moves on by itself, by the clock of the
+server, so a machine that falls silent shows "No data" after 30 seconds, and the history of a machine keeps its
+length and rolls on to now. A value stamped more than 30 seconds ahead of that clock is left out, as the backend
+would not show it yet either. The line under the title
 says "live" while the browser hears the broker, and "not live" while it does not; the page then reads again
 once the broker is back, for what it missed. A page reads on a clock only while the backend has not answered.
 

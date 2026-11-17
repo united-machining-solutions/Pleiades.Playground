@@ -2,15 +2,18 @@ import { clock } from "@pleiades/cards/machine/format.ts"
 import { useRouter } from "@tanstack/react-router"
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 
-import { brokerStatus, onBrokerStatus, subscribe } from "@/live/broker.ts"
+import { brokerStatus, onBrokerStatus, serverNow, subscribe } from "@/live/broker.ts"
 
 /** How a page is kept live: which topics it hears, and what a message and the clock do to its values. */
 export type Live<TValues> = {
   /** The topic filters of the values the page shows. */
   filters: ReadonlyArray<string>
-  /** What a message of the broker does to the values. */
-  message: (values: TValues, topic: string, payload: string) => TValues
-  /** What the passing of time does to them: a machine falls silent, a history goes on. */
+  /**
+   * What a message of the broker does to the values. `now` is the clock of the server, in
+   * milliseconds since 1970: a value stamped far ahead of it is left out.
+   */
+  message: (values: TValues, topic: string, payload: string, now: number) => TValues
+  /** What the passing of time does to them, by the clock of the server: a machine falls silent, a history goes on. */
   at: (values: TValues, now: string) => TValues
 }
 
@@ -40,14 +43,19 @@ export function useLive<TValues>(loaded: TValues, live: Live<TValues>): { values
 
   const filters = live.filters.join("\n")
   useEffect(
-    () => subscribe(filters.split("\n"), (topic, payload) => setValues((before) => current.current.message(before, topic, payload))),
+    () =>
+      subscribe(filters.split("\n"), (topic, payload) => {
+        const now = Date.parse(serverNow())
+        setValues((before) => current.current.message(before, topic, payload, now))
+      }),
     [filters],
   )
 
   const status = useSyncExternalStore(onBrokerStatus, brokerStatus, brokerStatus)
   useEffect(() => {
+    // The clock runs only while the page hears the broker: by then the clock of the server is known.
     if (!status.connected) return
-    const tick = () => setValues((before) => current.current.at(before, new Date().toISOString()))
+    const tick = () => setValues((before) => current.current.at(before, serverNow()))
     tick()
     const timer = setInterval(tick, TICK_MS)
     return () => clearInterval(timer)

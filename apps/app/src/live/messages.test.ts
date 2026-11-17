@@ -41,6 +41,13 @@ test("a notification event is read as the Events API writes it", () => {
   assert.equal(notificationOf('{"timestamp":"2026-11-17T19:32:06Z","action":"Reset"}'), null)
 })
 
+test("a value stamped further ahead than the clock is left out", () => {
+  const now = Date.parse("2026-11-17T19:31:00Z")
+  assert.equal(valueOf('{"timestamp":"2026-11-17T19:31:20Z","value":1}', now)?.value, 1)
+  assert.equal(valueOf('{"timestamp":"2026-11-17T20:31:00Z","value":1}', now), null)
+  assert.equal(notificationOf('{"timestamp":"2026-11-17T20:31:00Z","action":"Raised","correlationId":"c1"}', now), null)
+})
+
 test("a topic names its machine, and a filter matches as MQTT matches it", () => {
   assert.equal(machineOf("machines/P-04/umati/Connection/State"), "P-04")
   assert.equal(machineOf("sites/plant/weather/Temperature"), undefined)
