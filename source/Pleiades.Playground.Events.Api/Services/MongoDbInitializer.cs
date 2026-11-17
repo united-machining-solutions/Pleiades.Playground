@@ -73,6 +73,7 @@ internal sealed class MongoDbInitializer(
             var database = client.GetDatabase(_settings.DatabaseName);
 
             await InitializeNotificationEventCollectionAsync(database, linkedCts.Token).ConfigureAwait(false);
+            await InitializeProductionEventCollectionAsync(database, linkedCts.Token).ConfigureAwait(false);
 
             // The TTL index is reconciled against retention (applied to an existing collection too),
             // so a changed/removed DataRetentionPeriod is honored every boot — without a rebuild.
@@ -126,6 +127,36 @@ internal sealed class MongoDbInitializer(
         LogIndexesEnsured(logger, indexes.Count, collectionName, null);
     }
 
+    private async Task InitializeProductionEventCollectionAsync(
+        IMongoDatabase database, CancellationToken cancellationToken)
+    {
+        var collectionName = _settings.ProductionEventCollection;
+        var collection = database.GetCollection<ProductionEventDao>(collectionName);
+
+        var indexes = new List<CreateIndexModel<ProductionEventDao>>
+        {
+            new(Builders<ProductionEventDao>.IndexKeys
+                    .Ascending(e => e.MId)
+                    .Descending(e => e.Timestamp),
+                new CreateIndexOptions { Name = "idx_mid_timestamp" }),
+
+            new(Builders<ProductionEventDao>.IndexKeys
+                    .Ascending(e => e.CorrelationId),
+                new CreateIndexOptions { Name = "idx_correlationid" }),
+
+            new(Builders<ProductionEventDao>.IndexKeys
+                    .Ascending(e => e.JobOrderId),
+                new CreateIndexOptions { Name = "idx_joborderid" }),
+
+            new(Builders<ProductionEventDao>.IndexKeys
+                    .Ascending(e => e.ExecutionId),
+                new CreateIndexOptions { Name = "idx_executionid" }),
+        };
+
+        await EnsureIndexesAsync(collection, indexes, cancellationToken).ConfigureAwait(false);
+        LogIndexesEnsured(logger, indexes.Count, collectionName, null);
+    }
+
     // ── Structural indexes: create only what is missing, never drop ──────────────────
 
     /// <summary>
@@ -160,7 +191,7 @@ internal sealed class MongoDbInitializer(
     // ── TTL indexes: reconcile by retention, never drop-and-rebuild ──────────────────
 
     /// <summary>
-    /// Reconciles the retention TTL index on the event collection, regardless of collection
+    /// Reconciles the retention TTL index on the event collections, regardless of collection
     /// existence, so a changed/removed <see cref="MongoDbSettings.DataRetentionPeriod"/> is honored.
     /// </summary>
     private async Task EnsureTtlIndexesAsync(IMongoDatabase database, CancellationToken cancellationToken)
@@ -171,6 +202,11 @@ internal sealed class MongoDbInitializer(
             database.GetCollection<NotificationEventDao>(_settings.NotificationEventCollection),
             Builders<NotificationEventDao>.IndexKeys.Ascending(e => e.Timestamp),
             _settings.NotificationEventCollection, retention, cancellationToken).ConfigureAwait(false);
+
+        await ApplyTtlAsync(
+            database.GetCollection<ProductionEventDao>(_settings.ProductionEventCollection),
+            Builders<ProductionEventDao>.IndexKeys.Ascending(e => e.Timestamp),
+            _settings.ProductionEventCollection, retention, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

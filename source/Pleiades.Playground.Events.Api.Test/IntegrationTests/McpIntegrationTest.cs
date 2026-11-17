@@ -1,3 +1,4 @@
+using Pleiades.Playground.Events.Api.Repositories.ProductionEvent;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
@@ -42,7 +43,10 @@ public class McpIntegrationTest : IntegrationTestBase
         "events_notification_pairs",
         "events_notification_level_distribution",
         "events_notification_time_buckets",
-        "events_notification_message_stats"
+        "events_notification_message_stats",
+        "events_production_query",
+        "events_job_orders_query",
+        "events_program_executions_query"
     ];
 
     [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "The created disposables are transferred to McpClient and McpClientScope for the test lifetime.")]
@@ -177,6 +181,43 @@ public class McpIntegrationTest : IntegrationTestBase
         using var doc = JsonDocument.Parse(json);
         Assert.IsTrue(doc.RootElement.TryGetProperty("items", out _), "Response missing 'items' property");
         Assert.IsTrue(doc.RootElement.TryGetProperty("totalCount", out _), "Response missing 'totalCount' property");
+    }
+
+    [TestMethod]
+    [DataRow("events_production_query")]
+    [DataRow("events_job_orders_query")]
+    [DataRow("events_program_executions_query")]
+    public async Task CallTool_Production_ReturnsPagedResult(string tool)
+    {
+        await using var scope = await CreateMcpClientAsync(TestContext.CancellationToken);
+
+        var result = await scope.Client.CallToolAsync(
+            tool,
+            new Dictionary<string, object?> { ["mId"] = "9000-0000", ["take"] = 10 },
+            cancellationToken: TestContext.CancellationToken);
+
+        Assert.AreNotEqual(true, result.IsError, $"Tool returned error: {GetTextContent(result)}");
+        using var doc = JsonDocument.Parse(GetTextContent(result) ?? string.Empty);
+        Assert.IsTrue(doc.RootElement.TryGetProperty("items", out var items), "Response missing 'items' property");
+        Assert.IsTrue(doc.RootElement.TryGetProperty("totalCount", out _), "Response missing 'totalCount' property");
+        if (!Containerized)
+        {
+            Assert.IsGreaterThan(0, items.GetArrayLength(), $"{tool} answers from the events");
+        }
+    }
+
+    [TestMethod]
+    public async Task CallTool_ProductionQuery_WithAnUnknownSubject_IsRefused()
+    {
+        await using var scope = await CreateMcpClientAsync(TestContext.CancellationToken);
+
+        var result = await scope.Client.CallToolAsync(
+            "events_production_query",
+            new Dictionary<string, object?> { ["subject"] = "Machine" },
+            cancellationToken: TestContext.CancellationToken);
+
+        Assert.IsTrue(result.IsError);
+        Assert.Contains("JobOrder", GetTextContent(result) ?? string.Empty, StringComparison.Ordinal);
     }
 
     [TestMethod]
@@ -368,6 +409,16 @@ public class McpIntegrationTest : IntegrationTestBase
                 It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
         ReplaceService(services, notificationMock.Object);
+
+        // Mock ProductionEventRepository: one job order with one ended program execution
+        var events = Pleiades.Playground.Events.Api.Test.ProductionEventSamples.OneJobOrderWithOneExecution("9000-0000");
+        var productionMock = new Mock<IProductionEventRepository>();
+        productionMock.Setup(r => r.QueryEventsWithPaginationAsync(
+                It.IsAny<ProductionEventFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((events, events.Count));
+        productionMock.Setup(r => r.FindForViewAsync(It.IsAny<ProductionEventFilter>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(events);
+        ReplaceService(services, productionMock.Object);
     }
 
     private static void ReplaceService<T>(IServiceCollection services, T implementation) where T : class

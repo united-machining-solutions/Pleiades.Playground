@@ -14,6 +14,7 @@ using Pleiades.Playground.Events.Api.Extensions;
 using Pleiades.Playground.HealthChecks.AspNetCore;
 using Pleiades.Playground.HealthChecks.MongoDb;
 using Pleiades.Playground.Mcp.Server;
+using Pleiades.Playground.Events.DataTransferObjects;
 using Pleiades.Playground.Notification.DataTransferObjects;
 
 var assembly = typeof(Program).Assembly;
@@ -48,6 +49,7 @@ builder.Services
         mcp.Name = "Pleiades-Events";
         mcp.Title = "Events API MCP server for industrial machine event analysis.";
         mcp.Domains.Add("Notification events");
+        mcp.Domains.Add("Production events: job orders and program executions");
         mcp.DiscoveryFlow.Add("Use the events_* query tools for filtered event retrieval and analysis.");
         mcp.WritePolicy = FeaturePolicy.Write(EventsFeature.Name);
     })
@@ -104,6 +106,16 @@ builder.Services.AddOpenApi(options =>
                 JsonValue.Create("Reset")
             ];
         }
+        else if (context.JsonTypeInfo.Type == typeof(ProductionSubject))
+        {
+            schema.Type = JsonSchemaType.String;
+            schema.Enum = [.. Enum.GetNames<ProductionSubject>().Select(n => (JsonNode)JsonValue.Create(n))];
+        }
+        else if (context.JsonTypeInfo.Type == typeof(ProductionAction))
+        {
+            schema.Type = JsonSchemaType.String;
+            schema.Enum = [.. Enum.GetNames<ProductionAction>().Select(n => (JsonNode)JsonValue.Create(n))];
+        }
         return Task.CompletedTask;
     });
 });
@@ -158,6 +170,9 @@ app.UsePleiadesSwaggerUI($"{serviceInfo.Name} - V {serviceInfo.Version}");
 var notificationEvents = app.MapGroup("notificationEvents").WithTags("Notification Events");
 notificationEvents.MapNotificationEvents();
 notificationEvents.MapNotificationEventStatistics();
+
+app.MapGroup("productionEvents").WithTags("Production Events").MapProductionEvents();
+app.MapGroup("jobOrders").WithTags("Job Orders").MapJobOrders();
 
 // MCP tool discovery/queries are reads; the internal API key satisfies the read policy.
 // Non-prod (auth disabled) stays anonymous. The group covers /mcp and GET /skill.

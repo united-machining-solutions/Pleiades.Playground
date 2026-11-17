@@ -92,6 +92,7 @@ public sealed class McpServerConformanceTests
         {
             "events_notification_query", "events_notification_pairs",
             "events_notification_level_distribution", "events_notification_time_buckets", "events_notification_message_stats",
+            "events_production_query", "events_job_orders_query", "events_program_executions_query",
         })
         {
             Assert.Contains("- " + tool + "\n", text, StringComparison.Ordinal);
