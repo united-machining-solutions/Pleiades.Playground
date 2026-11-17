@@ -39,7 +39,8 @@ function read(settings: Settings): { servers: Record<string, string>; leftOut: A
     const url = at < 0 ? "" : entry.slice(at + 1).trim()
     const named = /^[a-z][a-z0-9]*$/.test(name) && name !== backend && !(name in servers)
     if (named && /^https?:\/\/\S+$/.test(url) && URL.canParse(url)) servers[name] = url
-    else leftOut.push(name)
+    // What stands there may be an address, or part of one, and an address stays out of the log.
+    else leftOut.push(/^[\w-]+$/.test(name) ? name : "(entry without a name)")
   }
   return { servers, leftOut }
 }

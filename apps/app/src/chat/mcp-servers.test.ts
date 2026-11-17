@@ -37,5 +37,9 @@ test("what was left out is named, without its address, so a typing mistake shows
   const settings = { APP_MCP_SERVERS: "Juicebar=http://some-host:8080/mcp, ultimaker ,ok=http://ok/mcp," }
   assert.deepEqual(leftOut(settings), ["Juicebar", "ultimaker"])
   assert.deepEqual(furtherServers(settings), { ok: "http://ok/mcp" })
+  assert.deepEqual(leftOut({ APP_MCP_SERVERS: "http://some-host:8080/mcp,http://some-host/mcp?a=b" }), [
+    "(entry without a name)",
+    "(entry without a name)",
+  ])
   assert.deepEqual(leftOut({}), [])
 })
