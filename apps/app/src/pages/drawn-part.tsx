@@ -2,10 +2,10 @@ import { SearchXIcon, ServerOffIcon } from "lucide-react"
 import type { ReactNode } from "react"
 
 import { chatTools } from "@/chat/cards.tsx"
-import type { Answer } from "@/machines/get-machines.ts"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 
 import { callPart } from "./call-part.ts"
+import type { PartAnswer } from "./call-part.ts"
 import { drawingTool, noCardFor } from "./parts.ts"
 import type { RecipePart } from "./recipe.ts"
 
@@ -16,7 +16,7 @@ import type { RecipePart } from "./recipe.ts"
 const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
 
 /** A part with its answer: what the tool gave now, or why it gave nothing. */
-export type AnsweredPart = RecipePart & { answer: Answer<string> }
+export type AnsweredPart = RecipePart & { answer: PartAnswer }
 
 /**
  * Asks every part of a recipe at the same time, for a loader. Each part answers for itself: one
@@ -29,7 +29,7 @@ export function answerParts(parts: ReadonlyArray<RecipePart>): Promise<Array<Ans
       if (!drawingTool(part.tool, chatTools)) return { ...part, answer: { values: null, error: noCardFor(part.tool) } }
       // If the server of the app itself is away for a moment, the part says so and the page keeps trying.
       const answer = await callPart({ data: { tool: part.tool, args: part.args, timeZone } }).catch(
-        (error: unknown): Answer<string> => ({ values: null, error: String(error) }),
+        (error: unknown): PartAnswer => ({ values: null, error: String(error) }),
       )
       return { ...part, answer }
     }),
@@ -43,6 +43,10 @@ export function answerParts(parts: ReadonlyArray<RecipePart>): Promise<Array<Ans
 export function DrawnPart({ part: { tool, answer } }: { part: AnsweredPart }) {
   const drawing = drawingTool(tool, chatTools)
   if (!drawing) return <NoPartAnswer icon={<SearchXIcon />} title="This part has no answer here" reason={noCardFor(tool)} />
+  // The tool answered and said no, for these arguments or this machine: asking again does not change it.
+  if (answer.values === null && answer.refused) {
+    return <NoPartAnswer icon={<SearchXIcon />} title="This part has no answer here" reason={answer.error} />
+  }
   if (answer.values === null) {
     // The words of NoAnswer (components/no-answer.tsx), which the other pages show in their place.
     return (

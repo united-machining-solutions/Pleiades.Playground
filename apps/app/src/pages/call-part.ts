@@ -20,6 +20,9 @@ export type PartCall = { tool: string; args: Record<string, unknown>; timeZone?:
 
 const partCallSchema = recipePartSchema.extend({ timeZone: z.string().max(64).optional() })
 
+/** What a part got. `refused`: the tool answered and said no, which asking again does not change. */
+export type PartAnswer = Answer<string> & { refused?: true }
+
 /**
  * Calls the tool of one part and returns what the chat hands to `draw` of that tool for the same
  * call: the values a tool with an output schema gives as `structuredContent`, written as JSON, or
@@ -32,7 +35,7 @@ export const callPart = createServerFn({ method: "GET" })
     if (!call.success) throw new Error("A part is the name of a tool and its arguments, a plain JSON object without a time zone.")
     return call.data
   })
-  .handler(async ({ data: { tool, args, timeZone } }): Promise<Answer<string>> => {
+  .handler(async ({ data: { tool, args, timeZone } }): Promise<PartAnswer> => {
     if (!drawingTool(tool, chatTools)) return { values: null, error: noCardFor(tool) }
     try {
       const backend = await createMCPClient({
@@ -43,7 +46,7 @@ export const callPart = createServerFn({ method: "GET" })
         const listed = (await backend.tools()).find((one) => one.name === tool)
         const result = await backend.callTool(tool, withTimeZone(args, listed?.inputSchema, { timeZone }) ?? args)
         const text = textOf(result)
-        if (result.isError) return { values: null, error: text ?? `${tool} returned no values.` }
+        if (result.isError) return { values: null, error: text ?? `${tool} returned no values.`, refused: true }
         if (result.structuredContent !== undefined) return { values: JSON.stringify(result.structuredContent), error: null }
         return text === undefined ? { values: null, error: `${tool} returned no values.` } : { values: text, error: null }
       } finally {
