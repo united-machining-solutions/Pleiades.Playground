@@ -93,7 +93,11 @@ tour.
    Home does, with `useLive(loaded, live)` of `src/hooks/use-live.ts`. `live` names the topic filters of
    the values the page shows and what a message and the clock do to them; the functions for machines and
    for measurements are in `src/live/`, and the topics come from the contracts of `@pleiades/cards`
-   (`READING_PATHS`, `QUANTITY_PATHS`). A page whose values are not among those needs functions of its own
+   (`READING_PATHS`, `QUANTITY_PATHS`). They name a value as the store keeps it. The broker carries most of
+   them the same way; a snapshot such as `umati/State/Status` is one message there and a value per field in
+   the store, a list such as the job orders is one message with the whole list, and an alert is a CloudEvent:
+   `valuesOf`, `brokerPathsOf`, `listOf` and `alertOf` of `src/live/messages.ts` read them. A page whose
+   values are not among those needs functions of its own
    there, with tests, by the rules the tool of the backend reads the stored values with. If the read in the
    loader failed, `useRetry()` asks again. See ADR-0013.
 6. Give the page its entry in the sidebar, in the route itself:

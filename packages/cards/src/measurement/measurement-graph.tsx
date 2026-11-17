@@ -103,7 +103,7 @@ export function MeasurementGraph({
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
-                // As wide as the longest number: a meter in joule has eight digits.
+                // As wide as the longest number: an energy meter has many digits.
                 width="auto"
                 domain={yesOrNo ? [0, 1] : ["auto", "auto"]}
                 ticks={yesOrNo ? [0, 1] : undefined}

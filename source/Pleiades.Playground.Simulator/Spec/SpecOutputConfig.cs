@@ -5,8 +5,8 @@ using System.Diagnostics.CodeAnalysis;
 namespace Pleiades.Playground.Simulator.Spec;
 
 /// <summary>
-/// The output after the data model (contracts/mqtt, "Spec binding"). It runs in addition to the output of the
-/// generators and is off unless <see cref="Enabled"/> is set.
+/// The output after the data model (contracts/mqtt, "Machines: the binding of the data model"): the only output
+/// of the simulator.
 /// </summary>
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",
     Justification = "Bound by the configuration binder, never constructed in code")]

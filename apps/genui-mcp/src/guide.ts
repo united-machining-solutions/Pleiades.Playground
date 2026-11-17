@@ -47,6 +47,8 @@ export const skillGuide = `# genui: skill guide
   for more than 30 seconds, it is not, and its values are the last known ones, not the present. Such
   a silence also ends a run, because what the value was in between is not known: \`since\` is then
   the first value after the silence.
-- Units are SI on the wire; a display converts them.
+- A value of a machine is in the unit of the umati data model, as the machine published it: power in
+  watt, energy in watt hours, a temperature in degrees Celsius. Nothing is converted on the way; a
+  display writes the unit out.
 
 ${cards.map((card) => card.guide).join("\n")}`

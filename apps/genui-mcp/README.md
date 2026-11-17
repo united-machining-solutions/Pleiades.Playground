@@ -126,8 +126,8 @@ The [MQTT binding](../../contracts/mqtt/README.md) has no quality field: whether
 by `Connection/State` and `Connection/Heartbeat`. This server reads it so:
 
 - **A value holds until the next one of its topic**, however long that takes. A machine may publish its state
-  only when the state changes, and one that runs for days says once that it is connected; a simulator repeats
-  it every few seconds. Both read the same.
+  only when the state changes, and one that runs for days says once that its adapter is `Running`; another
+  repeats it every few seconds. Both read the same.
 - **Every value is a sign of life**, and the heartbeat is one that is nothing else. A machine that gave no sign
   for more than 30 seconds is silent: it has no data, whatever its last values say.
 - **A silence ends a run.** What a value was while the machine was silent is not known, so "since" is the
@@ -137,10 +137,10 @@ by `Connection/State` and `Connection/Heartbeat`. This server reads it so:
 
 A warning or an error that has stood for more than 24 hours is not in a result: not in the list, not on a
 card and not in the history of a machine. All three look back 24 hours, from now or from where a history
-ends, so the state of a machine and the end of its history say the same. The Events API returns
-the notifications that were raised between two instants; it cannot be asked for the ones that are open. Reading
-every notification of the retention time on each call would be the only way around it here. A filter for open
-notifications in the Events API would solve it.
+ends, so the state of a machine and the end of its history say the same. This server reads the alerts that
+were raised in those 24 hours (`/alerts/pairs` of the Events API). The Events API also names the alerts that stand
+now, however old (`/alerts/active`); it has no such view for an earlier instant, where a history ends. Reading
+the active alerts for the list, and every alert of the retention time for a history, would lift the limit.
 
 ## When an API fails
 

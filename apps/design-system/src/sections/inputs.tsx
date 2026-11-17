@@ -401,7 +401,7 @@ export function Inputs() {
             rows={["select"] as const}
             states={fieldStates}
             render={(_, state) => (
-              <Select items={machines} defaultValue="P-04" disabled={state === "disabled"}>
+              <Select items={machines} defaultValue="alcyone-machines_AX-400_P-04" disabled={state === "disabled"}>
                 <SelectTrigger
                   aria-label="Machine"
                   className="w-36"
@@ -876,7 +876,7 @@ export function Inputs() {
             <FieldGroup dir="rtl" className="grid gap-6 md:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="rtl-machine">Machine</FieldLabel>
-                <Select items={machines} defaultValue="P-04">
+                <Select items={machines} defaultValue="alcyone-machines_AX-400_P-04">
                   <SelectTrigger id="rtl-machine" className="w-full">
                     <SelectValue />
                   </SelectTrigger>

@@ -8,6 +8,6 @@ public interface IMachineEvent : IMessage
     /// <summary>Id of the event.</summary>
     public string Id { get; set; }
 
-    /// <summary>Machine id, the serial number of the machine.</summary>
+    /// <summary>Machine id, the level after <c>machines/</c> in the topics of the machine.</summary>
     public string MId { get; set; }
 }

@@ -1,7 +1,7 @@
 # Pleiades Playground
 
 An open playground for machine data: adapters publish to an MQTT broker, services persist time series and
-notification events, and every service offers the same data over REST and over the Model Context Protocol (MCP),
+the events of machines, and every service offers the same data over REST and over the Model Context Protocol (MCP),
 so applications and AI agents use one set of tools.
 
 The repository is a monorepo so that the whole demo case starts with one command. What proves itself here moves

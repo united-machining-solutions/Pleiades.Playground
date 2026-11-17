@@ -28,7 +28,7 @@ claude mcp add --transport http pleiades-events http://localhost:5510/mcp
 claude mcp add --transport http pleiades-genui http://localhost:5520/mcp
 ```
 
-The agent can then answer questions from the data, for example "which notifications did machine P-04 raise in
+The agent can then answer questions from the data, for example "which alerts did the machine AX-400 P-04 raise in
 the last hour, and what did the spindle do at that time?". The tools are listed in
 [`contracts/mcp`](../contracts/mcp/README.md).
 
@@ -87,7 +87,7 @@ workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your
 | A tour of the demo | "Give me a tour." The agent walks you through the [tour](tour.md) stop by stop, in your running stack. It offers the tour itself when a session begins without a task. |
 | Something of your own in the demo | `/build-your-own`, or "I would like to see which machine stood still the longest." The agent finds out whether that is a page, a card or a source, and builds it. |
 | To see the demo | "Start the stack and show me what the simulator publishes for one machine." |
-| A new value | "Add the topic `…` to the simulator and to the MQTT binding, with its SI unit." |
+| A new value | "Add the topic `…` to the simulator and to the MQTT binding, with its unit." |
 | To share what you built | "Open a pull request." |
 | To know why a check is red | "Why is pull request 12 red?" The agent reads `gh pr checks` and `gh run view --log-failed`. |
 | A review before you ask a person | "Review the diff of this branch against `main` for correctness." |

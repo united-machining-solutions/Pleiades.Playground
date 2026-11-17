@@ -26,10 +26,11 @@ The Events API keeps the CloudEvents of the machines as they came, each with the
 
 Values and sums keep the units in which the machine delivered them, energy in watt hours for example.
 
-Snapshots of both documents will be committed here once the first release is tagged, so that a change to an API
+Snapshots of the documents will be committed here once the first release is tagged, so that a change to an API
 shows up as a diff in review.
 
 ```bash
 curl -s http://localhost:5500/openapi/v1.json -o timeseries.openapi.json
 curl -s http://localhost:5510/openapi/v1.json -o events.openapi.json
+curl -s http://localhost:5540/openapi/v1.json -o sites.openapi.json
 ```

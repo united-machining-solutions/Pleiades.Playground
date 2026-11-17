@@ -130,7 +130,7 @@ keeps its length and moves on with the clock.
 23:34, program SHAFT_4711.MPF. Below is a band of the last 8 hours, the total duration of each state, and the
 MQTT topics the values were read from.](images/tour/machine-page.png)
 
-The card has three parts. On top is the state with its reason, since when it holds, and the active program.
+The card has three parts. On top is the state with its reason, since when it holds, the work master and the job order that runs.
 In the middle is the band: one stripe from the chosen number of hours ago until now, coloured by state, and
 below it the total of each state. The hatched part of this band is "No data": the stack of the picture had been
 running for about three hours, and before that nobody published. At the bottom the card names the topics it
