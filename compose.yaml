@@ -191,6 +191,24 @@ services:
       Config__Topics__0: machines/+/events/#
       Config__EventsApi__Uri: http://events-api:8080
 
+  # Sites and the machines placed on them, as people enter them.
+  sites-api:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.sites.api:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Sites.Api/Dockerfile
+    ports:
+      - "${SITES_API_PORT:-5540}:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      <<: *logging-env
+      Config__MongoDb__ConnectionString: mongodb://mongodb:27017/?replicaSet=rs0
+      Config__MongoDb__DatabaseName: Sites
+      Config__Auth__Enabled: "false"
+
   # The generative UI backend: an MCP server that reads both APIs. The TypeScript images are built
   # from the repository root.
   genui-mcp:

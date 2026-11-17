@@ -7,6 +7,8 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
+  REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15

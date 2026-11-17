@@ -113,8 +113,10 @@ jobs:
         run: |
           curl -fsS http://localhost:5500/health
           curl -fsS http://localhost:5510/health
+          curl -fsS http://localhost:5540/health
           curl -fsS http://localhost:5500/openapi/v1.json -o /dev/null
           curl -fsS http://localhost:5510/openapi/v1.json -o /dev/null
+          curl -fsS http://localhost:5540/openapi/v1.json -o /dev/null
       - name: The generative UI backend answers
         run: |
           curl -fsS http://localhost:5520/health
