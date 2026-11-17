@@ -255,6 +255,8 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       GENUI_MCP_URL: http://genui-mcp:8080/mcp
+      # The MCP servers of optional services whose tools the chat has too, see .env.example.
+      APP_MCP_SERVERS: ${APP_MCP_SERVERS:-}
       # The chat needs a language model; everything else works without one. The models come from a LiteLLM
       # gateway: the app offers those it marks for chat, and dictation takes the first it marks for speech
       # to text.

@@ -21,6 +21,10 @@ draws the result with it. What a language model reads of a result is short; a se
 a machine over the last hours, is fetched by the card itself with a tool that only a card calls
 (`genui_span_list`).
 
+The chat of the example app has the tools of the generative UI server. The setting `APP_MCP_SERVERS` gives it
+the tools of further servers of this table, for example `ultimaker=http://ultimaker-api:8080/mcp`: all of
+them, under their own names. A server that does not answer has no tools until it does.
+
 Example entry for an MCP client:
 
 ```json

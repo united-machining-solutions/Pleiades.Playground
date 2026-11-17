@@ -31,7 +31,7 @@ everything else works.
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app` |
 | Version | At the bottom of the sidebar: `0.0.142 · 7a83c2f` for an image of the workflow "Images", linked to its commit; `dev` for a build of your own, with the commit of the checkout under `vite dev` |
-| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. The language models of the chat, see below. |
+| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); the app draws nothing for their results, the answer says them. The language models of the chat, see below. |
 
 ## Language models
 
