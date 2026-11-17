@@ -103,7 +103,9 @@ git checkout margo/compose/compose.yaml
 
 Every pull request that changes `margo/`, `compose.yaml` or the broker configuration runs the job "Margo app
 validates" in the workflow "CI": `bart validate`, the comparison with `compose.yaml`, and the stack itself,
-started from the images of `main` until every container is healthy, with one request to the app through Traefik.
+started until every container is healthy, with one request to the app through Traefik. The job first builds the
+images of the pull request from `compose.yaml` with `PLEIADES_VERSION=main`, the tag this file names, so the
+stack runs the code of the pull request, and a new service works before "Images" has published it.
 
 The three simulators share one image. bart rewrites them all to the copy of one of them; that is the same image
 and changes nothing.

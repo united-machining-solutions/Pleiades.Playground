@@ -223,8 +223,25 @@ jobs:
             echo "::error file=margo/compose/broker/mosquitto.conf::differs from stacks/broker/mosquitto.conf below its two lines of header"
             exit 1
           fi
-      # The twelve containers come up healthy from the images of main, with the configs: entries and the template
-      # of Traefik, which bart validate does not run.
+      # The images of this pull request, not those of main: built from compose.yaml and tagged :main, the tag the
+      # Margo file names, so that up finds them locally. A new service works in the same pull request, before
+      # "Images" publishes it.
+      - name: Build the images of the pull request
+        run: PLEIADES_VERSION=main docker compose -f compose.yaml build
+      # Each image of this repository in the Margo file must be one just built; a name compose.yaml does not
+      # build would otherwise be pulled from ghcr.io and test main.
+      - name: The Margo app runs the images just built
+        run: |
+          missing=0
+          for image in $(docker compose config --images | grep -E '/pleiades\.playground\.[a-z.]+:main$' | sort -u); do
+            if ! docker image inspect "$image" > /dev/null 2>&1; then
+              echo "::error file=margo/compose/compose.yaml::$image is not built by compose.yaml"
+              missing=1
+            fi
+          done
+          exit "$missing"
+      # The twelve containers come up healthy from the images of this pull request, with the configs: entries and
+      # the template of Traefik, which bart validate does not run.
       - name: Start the Margo stack
         run: docker compose up -d --wait --wait-timeout 300
       - name: Traefik serves the app under the host name of the device
