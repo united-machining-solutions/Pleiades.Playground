@@ -13,6 +13,14 @@ harness.
 - **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
   machine, and reads them again every ten seconds. A choice above the graphs shows one machine or all of
   them, and stays in the URL (`?machine=`).
+- **Pages** (`/pages`) are what a person keeps of the chat, in this browser. A page is a recipe: a title
+  and its parts in their order, each part a tool of `genui-mcp` with its arguments. No value is kept and no
+  sentence of a language model: opening a page calls the tools again and draws each answer with the card
+  the chat draws for that tool, so it shows what holds now and needs no language model. A part whose tool
+  the app has no card for stays where it is and says so; the rest of the page is whole. A page can be
+  renamed, pinned and deleted from its head. A pinned page stands in the sidebar on the top level, beside
+  Home; "Pages" lists them all. Another browser, or a private window, has pages of its own. Why:
+  [ADR-0012](../../docs/adr/0012-a-page-from-the-chat-is-a-recipe-kept-in-the-browser.md).
 - **Chat** is the panel on the right, with "New chat" and the chats so far. It opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
@@ -115,12 +123,23 @@ the backend of the running demo stack answers.
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
-  `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `health.ts`, `api/harness/$.ts` and
+  `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `pages.index.tsx` the list of the pages
+  kept in this browser and `pages.$page.tsx` one of them; `health.ts`, `api/harness/$.ts` and
   `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
   (`nav`: a title, an icon, an order). `src/components/app-sidebar.tsx` reads the entries from the routes
-  and names no page, and `nav.ts` next to it puts them in order and finds the one a person is under. The
+  and names no page, adds the pinned pages of this browser beside them, and `nav.ts` next to it puts them
+  in order (order, then title) and finds the one a person is under. The
   breadcrumb of the header, `page-breadcrumb.tsx`, reads the same: a page is called by the title of its
   entry, or by `crumb` in its `staticData`, and a page without an entry stands behind the one it is under.
+- `src/pages/`: the pages kept from the chat. `recipe.ts` is the recipe and its schema (zod): its shape
+  and its size, which is all that is checked, also of a recipe from outside. `store.ts` keeps the pages in
+  the `localStorage` of the browser under one key, `pleiades-playground.pages.v1`, and is the only way to
+  them: `listPages`, `getPage`, `savePage`, `renamePage`, `pinPage`, `unpinPage`, `deletePage`, and
+  `usePages` for a component that follows every change. `call-part.ts` is the server function that calls
+  the tool of a part, only a tool the chat draws (`parts.ts`), with the time zone of the browser, and
+  returns what the chat hands to `draw`. `drawn-part.tsx` asks the parts of a recipe for a loader
+  (`answerParts`) and draws one (`DrawnPart`): the card of the chat, or what is missing. `pinned.ts`
+  makes the entries of the sidebar for the pinned pages.
 - `src/routeTree.gen.ts`: written from the route files and not in the repository, so that two branches with
   a page each have nothing to merge in it. `pnpm install` and `pnpm typecheck` write it
   (`route-tree.mjs`), and so do the development server and the build. Never edit it. TanStack advises to

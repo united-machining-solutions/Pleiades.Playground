@@ -160,6 +160,12 @@ All notable changes are documented here. The format follows
   the line of a call is a `TraceCollapsible` once its result is there, with the result as text in a
   `CodeBlock` (JSON indented). `code-block` is new in `packages/ui`; it brings `shiki`, which only its
   highlighting hook loads, and the app does not use that hook.
+- Pages in the example application: a page is a recipe, a title and its parts, each part a tool of
+  `genui-mcp` with its arguments, kept in the `localStorage` of the browser. Opening a page calls the tools
+  again on the server of the app, only those the chat draws, and draws each answer with the card of the
+  chat: the values of now, no language model. A part whose tool the app has no card for stays and says so.
+  `/pages` lists the pages of the browser; a page is renamed, pinned and deleted from its head, and a
+  pinned page stands in the sidebar on the top level, beside Home. Why: ADR-0012.
 
 ### Changed
 
