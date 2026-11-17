@@ -12,6 +12,7 @@ the server is the source of truth for tool names and parameters.
 | Events | `http://localhost:5510/mcp` | `events_notification_query`, `events_notification_pairs`, `events_notification_message_stats`, `events_notification_level_distribution`, `events_notification_time_buckets` |
 | Generative UI | `http://localhost:5520/mcp` | `genui_machine_list`, `genui_machine_show`, `genui_measurement_list`, and for cards `genui_span_list` and `genui_measurement_series` |
 | Ultimaker (optional) | `http://localhost:5530/mcp` | Profile selection, STL storage, slicing, validation, artifacts and explicit printer pairing/start; see [contract](../ultimaker/README.md) |
+| Juice bar (optional) | `http://localhost:5550/mcp` | `juicebar_drinks_list`, `juicebar_drink_get`, `juicebar_status`, `juicebar_order_get`, `juicebar_order_create`; see the [service guide](../../source/Pleiades.Playground.JuiceBar.Api/README.md) |
 
 The generative UI server is not an API of its own: it reads the two servers above over REST and returns what
 a display needs, each value with the topic or notification it comes from. Its results are answers, not raw

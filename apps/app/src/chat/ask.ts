@@ -32,6 +32,24 @@ export function pickedModel(models: ReadonlyArray<string>): string | undefined {
   return lastModel !== undefined && models.includes(lastModel) ? lastModel : models[0]
 }
 
+/** The further servers switched off last, so that the next chat begins without their tools. */
+let lastOff: ReadonlyArray<string> = []
+
+export function pickSwitchedOff(names: ReadonlyArray<string>) {
+  lastOff = [...names]
+}
+
+/** The servers switched off last that the settings still name. */
+export function pickedSwitchedOff(servers: ReadonlyArray<string>): Array<string> {
+  return lastOff.filter((name) => servers.includes(name))
+}
+
+/** The servers that are off after one of them was switched. */
+export function afterSwitch(off: ReadonlyArray<string>, name: string, on: boolean): Array<string> {
+  const others = off.filter((other) => other !== name)
+  return on ? others : [...others, name]
+}
+
 export function useChatPanel() {
   const navigate = useNavigate()
   // The page stays where it is: you chat about what you see.

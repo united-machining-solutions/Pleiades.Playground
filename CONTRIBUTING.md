@@ -84,6 +84,9 @@ Agents are welcome. You stay responsible for the change: you sign off the commit
 you ask a person. See [Working with Claude](docs/working-with-claude.md); the rules for agents are in
 [AGENTS.md](AGENTS.md).
 
+Let the agent open the pull request: it knows what it did and what it checked, and fills in the template from
+that. GitHub's own page knows only the commits. If you open it there, paste the text the agent gives you.
+
 ## Adding a service
 
 A service is a folder with a `Dockerfile` and a short README. It reads and writes data only through a contract

@@ -50,6 +50,9 @@ jobs:
             file: source/Pleiades.Playground.Ultimaker.Telemetry/Dockerfile
             # The printer services run on the deployment computer only, which is amd64.
             platforms: linux/amd64
+          - image: pleiades.playground.juicebar.api
+            context: source
+            file: source/Pleiades.Playground.JuiceBar.Api/Dockerfile
           - image: pleiades.playground.genui.mcp
             context: .
             file: apps/genui-mcp/Dockerfile
