@@ -5,8 +5,6 @@ import { useEffect, useRef, useState } from "react"
 import { pickModel, useChatPanel } from "@/chat/ask.ts"
 import {
   askFollowUp,
-  remembering,
-  setSentenceVoice,
   canListen,
   listen,
   setVoiceEnabled,
@@ -22,9 +20,7 @@ import { useShownCards } from "@/voice/shown.ts"
 import { loadRecognition } from "@/voice/transcribe.ts"
 import { useWakeWord } from "@/voice/wake.ts"
 import { greetingFor } from "@/voice/greeting.ts"
-import { tom, tomAvailable } from "@/voice/tom.ts"
 import { usePresence } from "@/titan/faces/presence.ts"
-import { listPeople } from "@/titan/faces/store.ts"
 import { Cloud } from "@/voice/cloud.tsx"
 
 // Titan: a black screen with a cloud of points that greets, listens and speaks, and nothing else.
@@ -100,27 +96,9 @@ function Assistant() {
     return () => setVoiceEnabled(false)
   }, [])
 
-  // Titan speaks with the voice of Tom when its service runs (apps/titan-voice), else as before. It
-  // takes a few seconds a sentence, so what Titan says often is made at once and kept.
-  useEffect(() => {
-    let open = true
-    void tomAvailable().then((available) => {
-      if (!open || !available) return
-      const voice = remembering(tom)
-      setSentenceVoice(voice)
-      // The greetings of the people whose faces Titan knows too, one after the other.
-      void listPeople()
-        .catch(() => [])
-        .then((people) => [AWAKE, READY, greetingFor(undefined, []), ...people.map((one) => greetingFor(one.name, []))])
-        .then(async (sentences) => {
-          for (const sentence of sentences) if (open) await voice.predict(sentence).catch(() => undefined)
-        })
-    })
-    return () => {
-      open = false
-      setSentenceVoice(undefined)
-    }
-  }, [])
+  // Titan speaks with the voice of the system, which sounds at once. The voice of Tom (tom.ts,
+  // apps/titan-voice) is ready in the code, but on a computer without a graphics card it takes as long
+  // to make a sentence as to say it, which is too slow to talk with.
 
   // The cloud keeps an eye on the hall. A new fault turns it red at once, and the assistant speaks
   // first: it is told what happened and says it in its own words, with the shop floor. Without a
@@ -154,6 +132,13 @@ function Assistant() {
       setPerson(name)
       if (latest.current.state !== "idle") return
       setHeard(undefined)
+      void speak(greetingFor(name, latest.current.alarmed))
+    },
+    // The name is checked again every few seconds. Someone else who is known stepped in without a
+    // pause: Titan greets them too. Someone who is no longer recognised just loses the name.
+    onRename: ({ name }) => {
+      setPerson(name)
+      if (!name || latest.current.state !== "idle") return
       void speak(greetingFor(name, latest.current.alarmed))
     },
   })

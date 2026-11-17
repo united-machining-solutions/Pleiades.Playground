@@ -171,10 +171,12 @@ Titan answers first, then adds at most one hint nobody asked for and one suggest
 the data cannot answer. Its chats begin with the fastest model the settings name (Haiku at the hub).
 
 With a camera, Titan greets whoever steps in front of it: by name when the face is known, and straight away
-with the machines that stand still with an error. Faces are enrolled at <http://localhost:5600/titan/gesichter>
-("Gesichter"); what describes a face stays in that browser, and no photo is kept. With the voice service of
-[`apps/titan-voice`](../apps/titan-voice/README.md) running, Titan speaks with the voice of Tom, who agreed to
-it; without it, the voice of the system speaks. What Titan knows stands on one screen at
+with the machines that stand still with an error. It checks every few seconds who stands there, and greets
+someone known who steps in. Faces are enrolled at <http://localhost:5600/titan/gesichter> ("Gesichter");
+what describes a face stays in that browser, and no photo is kept. Titan speaks with the voice of the
+system, which sounds at once, and falls silent when the page is closed. A voice of Tom, who agreed to it, is
+ready in [`apps/titan-voice`](../apps/titan-voice/README.md), but the page does not use it yet: without a
+graphics card it takes as long to make a sentence as to say it. What Titan knows stands on one screen at
 <http://localhost:5600/lagebild> ("Lagebild"): the hall plan and every machine.
 
 The cloud shows what the assistant does: it breathes while it waits, draws together while it listens,

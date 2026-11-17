@@ -141,6 +141,12 @@ export function stopSpeaking() {
   setState(thinking ? "thinking" : "idle")
 }
 
+// The voice of the system lives outside the page: without this it could go on reading after the tab
+// or the browser was closed. Leaving or closing the page silences it, and so does reloading it.
+if (typeof window !== "undefined") {
+  for (const event of ["pagehide", "beforeunload"] as const) window.addEventListener(event, stopSound)
+}
+
 function make(voice: SentenceVoice, sentence: string): Promise<Blob | undefined> {
   return voice.predict(sentence).catch(() => undefined)
 }
