@@ -24,7 +24,11 @@ harness.
   the chat draws for that tool, so it shows what holds now and needs no language model. A part whose tool
   the app has no card for stays where it is and says so; the rest of the page is whole. A page can be
   renamed, pinned and deleted from its head. A pinned page stands in the sidebar on the top level, beside
-  Home; "Pages" lists them all. Another browser, or a private window, has pages of its own. Why:
+  Home; "Pages" lists them all. Another browser, or a private window, has pages of its own. "Share" in the
+  head gives a link that carries the recipe and no value, which answers for which machines and hours: whoever
+  opens it, at `/pages/open`, sees the values of now, with no language model and no chat, and keeps the page
+  with "Save to my pages". A link that holds no page says so, and a part whose tool the app has no card for
+  says so too, the rest of the page is whole. Why:
   [ADR-0012](../../docs/adr/0012-a-page-from-the-chat-is-a-recipe-kept-in-the-browser.md).
 - **Chat** is the panel on the right, with "New chat" and the chats so far. It opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
@@ -129,7 +133,7 @@ the backend of the running demo stack answers.
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
   `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `pages.index.tsx` the list of the pages
-  kept in this browser and `pages.$page.tsx` one of them; `health.ts`, `api/harness/$.ts` and
+  kept in this browser, `pages.$page.tsx` one of them and `pages.open.tsx` one opened from a link; `health.ts`, `api/harness/$.ts` and
   `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
   (`nav`: a title, an icon, an order). `src/components/app-sidebar.tsx` reads the entries from the routes
   and names no page, adds the pinned pages of this browser beside them, and `nav.ts` next to it puts them
@@ -140,11 +144,18 @@ the backend of the running demo stack answers.
   and its size, which is all that is checked, also of a recipe from outside. `store.ts` keeps the pages in
   the `localStorage` of the browser under one key, `pleiades-playground.pages.v1`, and is the only way to
   them: `listPages`, `getPage`, `savePage`, `renamePage`, `pinPage`, `unpinPage`, `deletePage`, and
-  `usePages` for a component that follows every change. `call-part.ts` is the server function that calls
+  `usePages` for a component that follows every change. `link.ts` writes a recipe into one search
+  parameter, `r`, and reads it back (`encodeRecipe`, `decodeRecipe`, `linkOf`): JSON as UTF-8 in base64url,
+  at most `MAX_PARAM_LENGTH` (8,000) characters, and what is not exactly a recipe (`recipeOf`) is null.
+  `share-page.tsx` is "Share" in the head of a kept page, `column.tsx` the column that a kept page and a page
+  opened from a link share. `call-part.ts` is the server function that calls
   the tool of a part, only a tool the chat draws (`parts.ts`), with the time zone of the browser, and
   returns what the chat hands to `draw`. `drawn-part.tsx` asks the parts of a recipe for a loader
   (`answerParts`) and draws one (`DrawnPart`): the card of the chat, or what is missing. `pinned.ts`
-  makes the entries of the sidebar for the pinned pages. `from-answer.ts` reads the recipe from an answer
+  makes the entries of the sidebar for the pinned pages. A route that opens a link is input from outside at its
+  door: `pages.open.tsx` lets in nothing but `decodeRecipe`, keeps its parameter while the chat panel opens
+  and closes (`retainSearchParams`), and the router has `search.strict`, so a link to any other page does not
+  carry the recipe along (`router.tsx`). `from-answer.ts` reads the recipe from an answer
   of the chat, pure and without a language model (`keepOfAnswer`, for the button of the chat): the tool
   calls the chat drew a result for, in their order, without the time zone, the same call once, and the
   question as its title. An answer is everything the model said after one question, in more than one

@@ -137,6 +137,12 @@ has. The page keeps no number and no sentence of the model, so opening it calls 
 show what holds now. The row under the answer then says "Saved as page" and links to it, and "Pages" in the
 sidebar lists every page of this browser. An answer without a card, such as one in words only, has no button.
 
+A page is private to the browser that keeps it, and the stack has no sign-in, so "Share" in its head gives a
+link that carries the recipe: which answers, for which machines and hours, and no value. Open it in a private
+window to see what a colleague sees: the page with the values of now, no chat and no language model needed,
+and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for says so,
+and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
+
 The chat needs a language model, and the demo starts without one. Then the panel says "No language model
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
 copy `.env.example` to `.env`, set the address and the key of a LiteLLM gateway, at the hackathon the one of the

@@ -171,6 +171,12 @@ All notable changes are documented here. The format follows
   calls from the answer it already has, and it stands only under an answer that has ended and for which the
   chat drew a card. The row then says "Saved as page" and links to it. An answer with more than 12 cards keeps
   the first 12 and says so.
+- "Share" in the head of a page: a link that carries the recipe, which answers for which machines and hours,
+  and no value, in one search parameter of `/pages/open` (at most 8,000 characters). Whoever opens it sees the
+  values of now, with no language model and no chat, and keeps the page with "Save to my pages". A link that
+  holds no page says so, and a part without a card in that app says so while the rest of the page is whole.
+  The links of the app now carry only the search that the page they lead to validates (`search.strict`), so
+  the recipe does not follow a person from the page that was opened from a link.
 
 ### Changed
 

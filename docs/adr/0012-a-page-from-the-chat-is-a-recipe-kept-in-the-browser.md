@@ -34,6 +34,11 @@ does.
   a part, and the arguments a plain JSON object. The same check holds for a recipe that comes from outside.
 - The pages are kept in the `localStorage` of the browser, under one key with a version in its name. No
   service of the stack keeps them.
+- A page is shared by a link, because the stack has no sign-in and keeps no page. The link carries the
+  recipe in one search parameter of `/pages/open`, its JSON as UTF-8 in base64url, at most 8,000 characters:
+  tools, machines and hours, never a value. Whoever opens it sees the values of that moment, with no
+  language model and no chat, and keeps the page in their own browser. A recipe from a link is input from
+  outside: only what `recipeOf` accepts is a page, and nothing in the link says where the app goes next.
 - A pinned page is an entry of the sidebar on the top level, beside Home. The entry "Pages" lists every page
   of the browser, pinned or not. A page is one column, and the order of its parts is its only arrangement.
 
@@ -43,7 +48,11 @@ does.
   hours before it was opened, and a card drawn from it is as live as the page of a machine.
 - A new card in the list of the chat can be a part of a page without another line of code.
 - A page lives in one browser. Another browser, a private window or cleared site data has other pages, or
-  none. Sharing a page needs a link that carries its recipe, and the receiver keeps it in their browser.
+  none. A page is shared by its link, and the receiver keeps it in their browser.
+- A link cannot be taken back, and it is a copy of the recipe at the moment it was made: a page that is
+  renamed afterwards is a new link, and the page of the receiver goes its own way. A page whose link would be
+  longer than 8,000 characters has none. The limit is the one of the server of the app, a Node server that
+  answers a request line and headers beyond 16 KiB with 431, with room for the cookies the browser sends.
 - A recipe from a link is input from outside, which the check of its shape and the list of tools on the
   server are for. It can still name any argument a tool takes.
 - The arguments are kept as the language model chose them. A tool that changes its arguments can leave a
