@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start"
 
+import { UNNAMED_CHAT } from "./chat-name.ts"
 import { chatSettings } from "./gateway.ts"
 import { modelNames } from "./models.ts"
 
@@ -34,7 +35,7 @@ export async function fetchChats(): Promise<Array<ChatEntry>> {
   const page = (await response.json()) as { entries?: Array<{ threadId: string; title?: string }> }
   return (page.entries ?? []).map((entry) => ({
     threadId: entry.threadId,
-    title: entry.title || "New chat",
+    title: entry.title || UNNAMED_CHAT,
     titled: Boolean(entry.title),
   }))
 }

@@ -14,6 +14,11 @@ export function rememberThread(threadId: string) {
   lastThread = threadId
 }
 
+/** The first question that waits for the panel of this chat, without taking it. */
+export function peekFirstQuestion(threadId: string): string | undefined {
+  return firstQuestions.get(threadId)
+}
+
 export function takeFirstQuestion(threadId: string): string | undefined {
   const question = firstQuestions.get(threadId)
   firstQuestions.delete(threadId)
@@ -40,8 +45,8 @@ export function useChatPanel() {
     /** Open the panel where it was left. */
     open: () => show(lastThread ?? NEW_CHAT),
     close: () => show(undefined),
-    /** The start of the panel: suggestions and the chats so far. */
-    startNew: () => show(NEW_CHAT),
+    /** The list of the panel: the chats so far, and the field that begins a new one. */
+    showList: () => show(NEW_CHAT),
     /** A new chat that begins with this question. */
     ask: (question: string) => {
       const threadId = crypto.randomUUID()
