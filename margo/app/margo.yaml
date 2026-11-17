@@ -33,7 +33,7 @@ deploymentProfiles:
         architectures:
           - amd64
           - arm64
-      # Estimates for twelve containers and 30 days of retained data, not measured.
+      # Estimates for thirteen containers and 30 days of retained data, not measured.
       memory: 4Gi
       storage: 20Gi
 
@@ -88,6 +88,16 @@ parameters:
     value: 5510
     targets:
       - pointer: EVENTS_API_PORT
+        components: ["default"]
+  sitesBind:
+    value: "127.0.0.1"
+    targets:
+      - pointer: SITES_BIND
+        components: ["default"]
+  sitesApiPort:
+    value: 5540
+    targets:
+      - pointer: SITES_API_PORT
         components: ["default"]
   genuiMcpPort:
     value: 5520
@@ -163,6 +173,15 @@ configuration:
           schema: port
         - parameter: eventsApiPort
           name: Port of the events API
+          schema: port
+        - parameter: sitesBind
+          name: Address of the sites API
+          description: >-
+            The address the sites API answers on. 127.0.0.1 keeps it on the device; 0.0.0.0 opens it to the
+            network. Writing a site or a placement needs no sign-in, so open it only to a network you control.
+          schema: bindAddress
+        - parameter: sitesApiPort
+          name: Port of the sites API
           schema: port
         - parameter: genuiMcpPort
           name: Port of the generative UI MCP server
