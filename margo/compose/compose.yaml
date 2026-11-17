@@ -180,7 +180,7 @@ services:
 
   # The reverse proxy in front of the example app, found by its host name. Not in compose.yaml at the root.
   traefik:
-    image: traefik:v3
+    image: traefik:v3.7.19
     restart: unless-stopped
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
@@ -193,7 +193,9 @@ services:
       # /ping on the internal entry point "traefik" (:8080), which is not published.
       - --ping=true
     ports:
-      - "${HTTP_PORT:-80}:8000"
+      # The same reason as for the app: Traefik answers on the device only, unless HTTP_BIND opens it to the
+      # network. Its Host() rule is no guard, a client sets the Host header it likes.
+      - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-80}:8000"
     configs:
       - source: traefik
         target: /etc/traefik/dynamic.yaml

@@ -9,8 +9,10 @@ chat.
 
 ## After the installation
 
-- The example app answers on port 5600 of the device. By default it answers on the device only; set
-  *Address of the example app* to `0.0.0.0` to open it to the network.
+- The example app answers on port 5600 of the device, and through Traefik on port 80 under the host names you
+  set. By default both answer on the device only: set *Address of Traefik* to `0.0.0.0` to open the app to the
+  network under its host names, or *Address of the example app* to open port 5600. The chat has no sign-in and
+  spends the key of its language model, so open it only to a network you control.
 - The chat needs a language model: set the URL and the key of a LiteLLM gateway, which can reach Anthropic,
   OpenAI and models of one's own. Everything else works without one.
 - The MQTT broker (1883, WebSockets 9001) accepts anonymous clients.

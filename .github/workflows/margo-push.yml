@@ -10,11 +10,6 @@ on:
         description: Version tag to push, v1.2.3; the images of this repository must exist as 1.2.3
         required: true
         type: string
-      bart-version:
-        description: Tag of the bart image to run
-        required: false
-        default: latest
-        type: string
     # Taken from the environment margo-staging when it holds them; an environment secret wins over a passed one.
     secrets:
       BART_REGISTRY_USER:
@@ -26,11 +21,6 @@ on:
       version:
         description: Version tag to push, v1.2.3; the images of this repository must exist as 1.2.3
         required: true
-        type: string
-      bart-version:
-        description: Tag of the bart image to run
-        required: false
-        default: latest
         type: string
 
 permissions:
@@ -48,7 +38,8 @@ jobs:
       cancel-in-progress: false
     env:
       INPUT_VERSION: ${{ inputs.version }}
-      BART_IMAGE: cr.flecs.tech/flecs/bart:${{ inputs.bart-version }}
+      # Pinned by digest: this image gets the credentials of the registry. The same as in ci.yml, job margo.
+      BART_IMAGE: cr.flecs.tech/flecs/bart:0.5.0-rc@sha256:e238950dd3884febe770cd70cb179107c0171b7e86c54f75e3606b9219b500b4
     # Each step takes the version from INPUT_VERSION itself, without the v ("Images" tags the images 1.2.3).
     # It never goes through $GITHUB_ENV, so a version cannot set variables of later steps; bart checks it is SemVer.
     steps:

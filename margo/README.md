@@ -40,8 +40,8 @@ that bart accepts it, and one more, Traefik:
   ```
 
 - **Traefik in front of the example app.** It serves the app on the HTTP port (setting *HTTP port of Traefik*,
-  80) under two host names: *Host name of the app*, a CNAME of the device, and *Host name of the device*, its
-  A record. Their defaults, `pleiades.example.internal` and `device.example.internal`, are placeholders: set both
+  80), on `127.0.0.1` unless the setting *Address of Traefik* opens it to the network, under two host names:
+  *Host name of the app*, a CNAME of the device, and *Host name of the device*, its A record. Their defaults, `pleiades.example.internal` and `device.example.internal`, are placeholders: set both
   to the names of your device when you install the app. Traefik reads its route from
   `compose/traefik/dynamic.yaml`, a `configs:` entry, and not from Docker labels: those need the Docker socket,
   a bind mount out of `compose/`. The file is a Go template that takes the host names from the environment.
@@ -51,7 +51,9 @@ that bart accepts it, and one more, Traefik:
   retention and the language models. The default after `:-` in the compose file is the same as the value of the
   parameter.
 
-A change to the stack in `compose.yaml` belongs here as well, in the same pull request.
+A change to the stack in `compose.yaml` belongs here as well, in the same pull request. CI checks that both files
+name the same services (leaving out the ones behind a profile, and Traefik) and that the broker configuration is
+the same; the rest, the variables and the settings, it does not see.
 
 ## Check
 
@@ -74,8 +76,9 @@ A version tag releases the app. bart takes the version from `--version`, so the 
    the workflow [`margo-push.yml`](../.github/workflows/margo-push.yml), which:
    - pins the images of this repository in `compose/compose.yaml` from `:main` to `:1.2.3`, in that run only,
      so that the app is exactly that build;
-   - runs `bart validate` and `bart push --version 1.2.3` from the image `cr.flecs.tech/flecs/bart:latest`,
-     as the other FLECS app repositories do.
+   - runs `bart validate` and `bart push --version 1.2.3` from the image of bart 0.5.0-rc, pinned by its digest in
+     the workflow, the same as in CI. The job hands that image the credentials of the registry; a new version of
+     bart is a change to both workflows, in a pull request.
 
    `push` copies every image to `<registry>/staging-<app id>/<service>:1.2.3` on the staging registry
    (`apps.flecs.tech`), so the staged app no longer depends on ghcr.io. The images on ghcr.io are public and need
@@ -87,7 +90,7 @@ The job runs in the GitHub environment `margo-staging`. It holds the secrets `BA
 `BART_REGISTRY_TOKEN`, the credentials of the staging registry, and its protection rules decide who may release:
 set required reviewers and limit it to `main` and the tags `v*`. "Margo push" can also be started by hand, under Actions, with
 a version tag (`v1.2.3`) whose images are already on ghcr.io; it checks out that tag, whatever branch it was started
-from. Its input `bart-version` picks another tag of the bart image than `latest`.
+from.
 
 By hand, the same as the workflow does:
 
@@ -98,7 +101,9 @@ BART_REGISTRY_USER=... BART_REGISTRY_TOKEN=... bart push --dir margo --version 1
 git checkout margo/compose/compose.yaml
 ```
 
-Every pull request that changes `margo/` runs `bart validate` in the workflow "CI".
+Every pull request that changes `margo/`, `compose.yaml` or the broker configuration runs the job "Margo app
+validates" in the workflow "CI": `bart validate`, the comparison with `compose.yaml`, and the stack itself,
+started from the images of `main` until every container is healthy, with one request to the app through Traefik.
 
 The three simulators share one image. bart rewrites them all to the copy of one of them; that is the same image
 and changes nothing.
@@ -106,6 +111,7 @@ and changes nothing.
 ## Security
 
 The app keeps the demo's settings: the MQTT broker accepts anonymous clients, the APIs have authorization
-switched off, and the chat has no sign-in. Its own port answers on `127.0.0.1` of the device unless the setting
-*Address of the example app* opens it, but Traefik serves the app to the whole network on the HTTP port, without
-sign-in, and with a key set the chat spends that key. Install it only on a device in a network you control.
+switched off, and the chat has no sign-in; with a key set the chat spends that key. The app's own port and
+Traefik answer on `127.0.0.1` of the device unless the settings *Address of the example app* and *Address of
+Traefik* open them. Traefik's host names are no guard: a client sends the Host header it likes. Open them, and
+the broker and the APIs, only in a network you control.

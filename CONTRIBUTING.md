@@ -87,4 +87,6 @@ you ask a person. See [Working with Claude](docs/working-with-claude.md); the ru
 ## Adding a service
 
 A service is a folder with a `Dockerfile` and a short README. It reads and writes data only through a contract
-under `contracts/`, exposes a liveness endpoint and is added to `compose.yaml`. The language is up to you.
+under `contracts/`, exposes a liveness endpoint and is added to `compose.yaml` and to
+`margo/compose/compose.yaml`, the Margo app (see [margo/README.md](margo/README.md)); CI fails while the two name
+different services. The language is up to you.

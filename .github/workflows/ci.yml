@@ -57,6 +57,9 @@ jobs:
               - '.github/workflows/ci.yml'
             margo:
               - 'margo/**'
+              # The Margo app follows the stack: a change there must show here.
+              - 'compose.yaml'
+              - 'stacks/broker/mosquitto.conf'
               - '.github/workflows/ci.yml'
 
   dotnet:
@@ -187,18 +190,55 @@ jobs:
         if: always()
         run: docker compose down --volumes
 
-  # The Margo app as bart sees it, so that a broken app shows in the pull request and not only at the release.
+  # The Margo app as bart sees it, in step with compose.yaml, and running: so that a broken app shows in the pull
+  # request and not only at the release or on a device.
   margo:
     name: Margo app validates
     needs: changes
     if: needs.changes.outputs.margo == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    env:
+      COMPOSE_FILE: margo/compose/compose.yaml
+      COMPOSE_PROJECT_NAME: pleiades-margo
     steps:
       - uses: actions/checkout@v7
+      # Pinned by digest, the same as in margo-push.yml, so that CI checks with the bart the release runs.
       - name: bart validate
         run: |
           docker run --rm -v "${GITHUB_WORKSPACE}:/workspace" -w /workspace \
-            cr.flecs.tech/flecs/bart:latest validate --dir margo
+            cr.flecs.tech/flecs/bart:0.5.0-rc@sha256:e238950dd3884febe770cd70cb179107c0171b7e86c54f75e3606b9219b500b4 \
+            validate --dir margo
+      # Both files must run the same stack. Services behind a profile (the LiteLLM gateway) are not in the Margo
+      # app, and Traefik is only there. The variables and the settings it does not compare.
+      - name: The Margo app has the services of compose.yaml
+        run: |
+          services() { docker compose -f "$1" config --format json | jq -r '.services | to_entries[] | select(.value.profiles == null) | .key' | grep -vx traefik | sort; }
+          if ! diff -u <(services compose.yaml) <(services margo/compose/compose.yaml); then
+            echo "::error file=margo/compose/compose.yaml::the services differ from compose.yaml (- compose.yaml, + Margo app); see margo/README.md"
+            exit 1
+          fi
+      - name: The Margo app has the broker configuration of the stack
+        run: |
+          if ! diff -u stacks/broker/mosquitto.conf <(tail -n +3 margo/compose/broker/mosquitto.conf); then
+            echo "::error file=margo/compose/broker/mosquitto.conf::differs from stacks/broker/mosquitto.conf below its two lines of header"
+            exit 1
+          fi
+      # The twelve containers come up healthy from the images of main, with the configs: entries and the template
+      # of Traefik, which bart validate does not run.
+      - name: Start the Margo stack
+        run: docker compose up -d --wait --wait-timeout 300
+      - name: Traefik serves the app under the host name of the device
+        run: |
+          curl -fsS -o /dev/null -w '%{http_code}\n' -H 'Host: device.example.internal' http://127.0.0.1/
+          curl -fsS -o /dev/null -w '%{http_code}\n' -H 'Host: pleiades.example.internal' http://127.0.0.1/
+          # Any other name gets no app.
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: other.example' http://127.0.0.1/)" = 404
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail 200
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes
 
   # Runs on every change: a link breaks when its target moves, not when the page that holds it changes.
   links:
