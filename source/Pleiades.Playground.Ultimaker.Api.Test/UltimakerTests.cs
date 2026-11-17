@@ -273,11 +273,20 @@ public sealed partial class UltimakerTests
         internal string? HeaderBody;
         internal string? HistoryQuery;
         internal Func<Task>? BeforeUpload;
+        internal string PairingState = "authorized";
+        internal HttpStatusCode PairingCheckStatus = HttpStatusCode.OK;
+        internal int PairingRequestCount;
+        internal Dictionary<string, string> ResponseOverrides = new(StringComparer.Ordinal);
         public HttpClient Create(PrinterCredentials? credentials = null)
             => new(this, false) { BaseAddress = new Uri("http://printer/api/v1/") };
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath;
+            if (path == "/api/v1/auth/request") PairingRequestCount++;
+            if (ResponseOverrides.TryGetValue(path, out var replacement))
+                return new(HttpStatusCode.OK) { Content = new StringContent(replacement, Encoding.UTF8, "application/json") };
+            if (path.StartsWith("/api/v1/auth/check/", StringComparison.Ordinal) && PairingCheckStatus != HttpStatusCode.OK)
+                return new(PairingCheckStatus);
             if ((path == "/api/v1/print_job" && Scenario == "current-missing")
                 || (path.StartsWith("/api/v1/history/print_jobs/", StringComparison.Ordinal) && Scenario == "history-missing"))
                 return new(HttpStatusCode.NotFound);
@@ -287,8 +296,8 @@ public sealed partial class UltimakerTests
                 datetime_started = "2026-11-17T08:00:00Z", datetime_finished = "", datetime_cleaned = "" });
             var body = path switch
             {
-                "/api/v1/auth/request" => "{\"id\":\"pair-id\",\"key\":\"private-key\"}",
-                "/api/v1/auth/check/pair-id" => "{\"message\":\"authorized\"}",
+                "/api/v1/auth/request" => JsonSerializer.Serialize(new { id = PairingRequestCount == 1 ? "pair-id" : "pair-id-" + PairingRequestCount, key = "private-key" }),
+                _ when path.StartsWith("/api/v1/auth/check/", StringComparison.Ordinal) => JsonSerializer.Serialize(new { message = PairingState }),
                 "/api/v1/auth/verify" => "{}",
                 "/api/v1/system" => JsonSerializer.Serialize(new { guid = Scenario == "other-printer" ? "0fd0ea9f-2fc1-4f30-b367-5b71b839c18c" : "6964c917-730a-4c9a-bef5-55de2de5fc47", variant = Scenario == "wrong-model" ? "Ultimaker S5" : "Ultimaker 3", name = "Test", firmware = "5.3.0" }),
                 "/api/v1/printer" => JsonSerializer.Serialize(new { status = Scenario == "printing" ? "printing" : "idle", heads = new[] { new { extruders = new[] { new { hotend = new { id = Scenario == "wrong-core" ? "BB 0.4" : "AA 0.4", temperature = new { current = 20 } }, active_material = new { guid = Scenario == "wrong-material" ? "other" : Material } } } } } }),

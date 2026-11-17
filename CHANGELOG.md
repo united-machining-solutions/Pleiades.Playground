@@ -219,6 +219,9 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Ultimaker pairing can be repeated after rejection or a forgotten request without removing files;
+  existing credentials survive failed replacements. Invalid printer status responses return HTTP 502
+  and MCP tool errors instead of unhandled server errors.
 - `app`: a question asked outside the chat ("Ask why", the field in the header) is answered under
   `vite dev` too. React ran the effect that sends it twice there (StrictMode); `useChat` detached after the
   first run and cut off its stream, and the second run found the question taken: it stood in the chat and

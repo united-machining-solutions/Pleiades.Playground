@@ -41,16 +41,27 @@ internal sealed partial class PrinterClient(IPrinterHttpClientFactory clients, A
         using var client = clients.Create();
         using var system = await ReadJsonAsync(client, "system", token).ConfigureAwait(false);
         using var printer = await ReadJsonAsync(client, "printer", token).ConfigureAwait(false);
-        var cores = printer.RootElement.GetProperty("heads")[0].GetProperty("extruders")
-            .EnumerateArray().Select((extruder, index) => new CoreStatus(index,
-                extruder.GetProperty("hotend").GetProperty("id").GetString() ?? "",
-                extruder.GetProperty("active_material").GetProperty("guid").GetString(),
-                extruder.GetProperty("hotend").GetProperty("temperature").GetProperty("current").GetDouble() + 273.15))
-            .ToArray();
-        return new(system.RootElement.GetProperty("variant").GetString() ?? "",
-            system.RootElement.GetProperty("name").GetString() ?? "",
-            system.RootElement.GetProperty("firmware").GetString() ?? "",
-            printer.RootElement.GetProperty("status").GetString() ?? "unknown", cores, PrinterIdFrom(system.RootElement));
+        try
+        {
+            var cores = printer.RootElement.GetProperty("heads")[0].GetProperty("extruders")
+                .EnumerateArray().Select((extruder, index) => new CoreStatus(index,
+                    RequiredPrinterText(extruder.GetProperty("hotend"), "id"),
+                    extruder.GetProperty("active_material").GetProperty("guid").GetString(),
+                    extruder.GetProperty("hotend").GetProperty("temperature").GetProperty("current").GetDouble() + 273.15))
+                .ToArray();
+            if (cores.Length == 0 || cores.Any(core => !double.IsFinite(core.TemperatureKelvin) || core.TemperatureKelvin < 0))
+                throw new HttpRequestException("Printer returned invalid print cores or temperatures.");
+            return new(RequiredPrinterText(system.RootElement, "variant"),
+                RequiredPrinterText(system.RootElement, "name"),
+                RequiredPrinterText(system.RootElement, "firmware"),
+                RequiredPrinterText(printer.RootElement, "status"), cores, PrinterIdFrom(system.RootElement));
+        }
+        catch (Exception error) when (error is KeyNotFoundException or IndexOutOfRangeException
+            or InvalidOperationException or FormatException or InvalidDataException)
+        {
+            // Do not expose the upstream payload, which can contain private printer data.
+            throw new HttpRequestException("Printer returned an invalid system or printer status response.");
+        }
     }
 
     public async Task<PairStatus> PairAsync(PairRequest request, CancellationToken token)
@@ -60,24 +71,35 @@ internal sealed partial class PrinterClient(IPrinterHttpClientFactory clients, A
         await _writeGate.WaitAsync(token).ConfigureAwait(false);
         try
         {
-            if (File.Exists(CredentialsPath))
-                throw new InvalidOperationException("Pairing already exists. Poll its status; remove the credential file administratively to pair again.");
+            var existing = await LoadCredentialsAsync(token).ConfigureAwait(false);
+            if (existing is not null)
+            {
+                var state = await CheckPairingAsync(existing, token).ConfigureAwait(false);
+                if (state is not ("unauthorized" or "expired"))
+                    throw new InvalidOperationException(state == "authorized"
+                        ? "Pairing is already authorized. Existing credentials were preserved."
+                        : "Pairing is still awaiting display approval. Approve or reject it on the printer before requesting another pairing.");
+            }
             using var client = clients.Create();
             using var form = new FormUrlEncodedContent(new Dictionary<string, string>
                 { ["application"] = "Pleiades Ultimaker", ["user"] = request.User });
             using var response = await client.PostAsync("auth/request", form, token).ConfigureAwait(false);
             EnsureSuccess(response);
-            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
-            var credentials = new PrinterCredentials(json.RootElement.GetProperty("id").GetString()!,
-                json.RootElement.GetProperty("key").GetString()!);
-            if (string.IsNullOrWhiteSpace(credentials.Id) || string.IsNullOrWhiteSpace(credentials.Key))
-                throw new InvalidDataException("Printer returned incomplete pairing credentials.");
+            using var json = await ReadResponseJsonAsync(response, token).ConfigureAwait(false);
+            var credentials = new PrinterCredentials(RequiredPrinterText(json.RootElement, "id"),
+                RequiredPrinterText(json.RootElement, "key"));
             Directory.CreateDirectory(options.Value.DataDirectory);
-            // CreateNew avoids overwriting credentials; set permissions before any secret is written.
+            // Write privately, then replace atomically. A failed request/write preserves the old credentials.
+            var temporaryPath = CredentialsPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
             var fileOptions = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write };
             if (!OperatingSystem.IsWindows()) fileOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-            using var file = new FileStream(CredentialsPath, fileOptions);
-            await JsonSerializer.SerializeAsync(file, credentials, cancellationToken: token).ConfigureAwait(false);
+            try
+            {
+                await using (var file = new FileStream(temporaryPath, fileOptions))
+                    await JsonSerializer.SerializeAsync(file, credentials, cancellationToken: token).ConfigureAwait(false);
+                File.Move(temporaryPath, CredentialsPath, overwrite: existing is not null);
+            }
+            finally { if (File.Exists(temporaryPath)) File.Delete(temporaryPath); }
             return new("pending-display-approval");
         }
         finally { _writeGate.Release(); }
@@ -90,9 +112,7 @@ internal sealed partial class PrinterClient(IPrinterHttpClientFactory clients, A
         {
             var credentials = await LoadCredentialsAsync(token).ConfigureAwait(false);
             if (credentials is null) return new("unpaired");
-            using var client = clients.Create();
-            using var check = await ReadJsonAsync(client, $"auth/check/{Uri.EscapeDataString(credentials.Id)}", token).ConfigureAwait(false);
-            var state = check.RootElement.GetProperty("message").GetString() ?? "unknown";
+            var state = await CheckPairingAsync(credentials, token).ConfigureAwait(false);
             if (state == "authorized")
             {
                 using var authenticated = clients.Create(credentials);
@@ -144,7 +164,7 @@ internal sealed partial class PrinterClient(IPrinterHttpClientFactory clients, A
                 // This upload STARTS a print. No retry handler is installed, even for transport failures.
                 using var response = await client.PostAsync("print_job", form, token).ConfigureAwait(false);
                 EnsureSuccess(response);
-                using var result = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
+                using var result = await ReadResponseJsonAsync(response, token).ConfigureAwait(false);
                 if (!result.RootElement.TryGetProperty("uuid", out var uuid) || !Guid.TryParse(uuid.GetString(), out var jobId))
                     throw new InvalidDataException("Printer accepted the upload without a valid job UUID. Do not retry automatically.");
                 submission = submission with { State = "accepted", PrinterJobId = jobId.ToString("D"), UpdatedAt = DateTimeOffset.UtcNow };
@@ -188,7 +208,32 @@ internal sealed partial class PrinterClient(IPrinterHttpClientFactory clients, A
     {
         using var response = await client.GetAsync(path, token).ConfigureAwait(false);
         EnsureSuccess(response);
-        return JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
+        return await ReadResponseJsonAsync(response, token).ConfigureAwait(false);
+    }
+    private async Task<string> CheckPairingAsync(PrinterCredentials credentials, CancellationToken token)
+    {
+        using var client = clients.Create();
+        using var response = await client.GetAsync($"auth/check/{Uri.EscapeDataString(credentials.Id)}", token).ConfigureAwait(false);
+        // A forgotten request can no longer be approved on the display.
+        if (response.StatusCode == HttpStatusCode.NotFound) return "expired";
+        EnsureSuccess(response);
+        using var check = await ReadResponseJsonAsync(response, token).ConfigureAwait(false);
+        var state = RequiredPrinterText(check.RootElement, "message");
+        if (state is not ("authorized" or "unauthorized" or "unknown"))
+            throw new HttpRequestException("Printer returned an invalid pairing status response.");
+        return state;
+    }
+    private static string RequiredPrinterText(JsonElement element, string name)
+    {
+        if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(name, out var value)
+            || value.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(value.GetString()))
+            throw new HttpRequestException("Printer returned a missing or invalid required response field.");
+        return value.GetString()!;
+    }
+    private static async Task<JsonDocument> ReadResponseJsonAsync(HttpResponseMessage response, CancellationToken token)
+    {
+        try { return JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false)); }
+        catch (JsonException) { throw new HttpRequestException("Printer returned invalid JSON."); }
     }
     private static void EnsureSuccess(HttpResponseMessage response)
     {

@@ -111,7 +111,12 @@ The service never pairs on startup. Call `ultimaker_printer_pair` with the user 
 printer display (REST `POST /printer/pair`, body `{ "user": "Your name" }`). Approve on the printer,
 then poll `ultimaker_pairing_status` / `GET /printer/pair`. The returned printer key is saved with
 mode 0600 in the Linux data volume; no key is returned to the client. Back up/protect this volume.
-An administrator can remove `/data/printer-credentials.json` to re-pair after rejection/revocation.
+Repeat the same pairing call after rejection (`unauthorized`) or a forgotten request (`expired`,
+HTTP 404 from the printer). Authorized and pending (`unknown`) pairings return HTTP 409 and keep
+their credentials. Reject a pending request on the display before trying again. Network errors,
+unknown status values and malformed replacement credentials preserve the existing file; successful
+replacement is atomic. Malformed printer status responses return HTTP 502 over REST and a tool error
+over MCP without echoing the printer payload.
 
 Printing defaults to disabled. Set `ULTIMAKER_ENABLE_PRINTING=true` and recreate the service when
 you intend to use it. Then call `ultimaker_print_start` or `POST /printer/print` with:

@@ -69,3 +69,10 @@ Interrupted/failed uploads remain state=uploading or unknown with a potentially 
 These are visible through the slice's submissions. Do not retry automatically or invent a match.
 Inspect printer state and reconcile manually. A persistence failure after API acceptance is also
 ambiguous. Submission records contain no pairing secrets. One replica owns the printer/data volume.
+
+Pairing can be explicitly repeated after the printer reports unauthorized, or HTTP 404 for a forgotten
+request (exposed as expired). Authorized credentials and requests still awaiting display approval
+(unknown) are preserved; repeating those requests returns HTTP 409. A failed status check or replacement
+request never removes existing credentials. New credentials are persisted privately by atomic replacement.
+Malformed printer status payloads or JSON return HTTP 502 with a message that excludes the payload;
+MCP reports a tool error. Client input and artifact validation errors retain their existing status codes.

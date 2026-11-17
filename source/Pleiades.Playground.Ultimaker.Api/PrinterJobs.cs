@@ -32,7 +32,7 @@ internal sealed partial class PrinterClient
         // Different endpoint from print_job: this validates only and never starts a print.
         using var response = await client.PostAsync(new Uri("printer/validate_header", UriKind.Relative), form, token).ConfigureAwait(false);
         EnsureSuccess(response);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
+        using var json = await ReadResponseJsonAsync(response, token).ConfigureAwait(false);
         if (json.RootElement.ValueKind != JsonValueKind.Array)
             throw new InvalidDataException("Printer returned an invalid header-validation report.");
         var issues = json.RootElement.EnumerateArray().Select(item => new PrinterHeaderIssue(
@@ -48,7 +48,7 @@ internal sealed partial class PrinterClient
         using var response = await client.GetAsync(new Uri("print_job", UriKind.Relative), token).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.NotFound) return new(printerId, null);
         EnsureSuccess(response);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
+        using var json = await ReadResponseJsonAsync(response, token).ConfigureAwait(false);
         if (Text(json.RootElement, "state") == "none") return new(printerId, null);
         var submissions = await store.ReadSubmissionsAsync(token).ConfigureAwait(false);
         return new(printerId, MapJob(json.RootElement, printerId, submissions));
@@ -76,7 +76,7 @@ internal sealed partial class PrinterClient
         using var response = await client.GetAsync(new Uri("history/print_jobs/" + id.ToString("D"), UriKind.Relative), token).ConfigureAwait(false);
         if (response.StatusCode == HttpStatusCode.NotFound) throw new FileNotFoundException("Printer history job does not exist.");
         EnsureSuccess(response);
-        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
+        using var json = await ReadResponseJsonAsync(response, token).ConfigureAwait(false);
         var result = MapJob(json.RootElement, printerId, await store.ReadSubmissionsAsync(token).ConfigureAwait(false));
         if (result.PrinterJobId != id.ToString("D")) throw new InvalidDataException("Printer returned a different history job UUID.");
         return result;
