@@ -102,6 +102,38 @@ public sealed class SpecPublisherTest
     }
 
     [TestMethod]
+    public async Task TheStepThatEndsAFault_SendsTheStateFirst_ThenItsEvents()
+    {
+        using var client = new FakeClient { IsConnected = true };
+        using var publisher = Publisher(client, 10);
+        await publisher.PublishStateAsync([], MachineRun.Start);
+        client.Published.Clear();
+
+        await VirtualMachineService.PublishStepAsync(publisher, changed: true, faulted: false, [Value(2), Event(7), Event(8)],
+            [new SpecValue(SpecElements.FeedOverride, JsonValue.Create(1.0), "one", MachineRun.Start, null)], MachineRun.Start.AddMinutes(1));
+
+        var topics = client.Published.Select(m => m.Topic).ToList();
+        var running = topics.IndexOf($"machines/{SerialNumber}/umati/Connection/State");
+        Assert.IsGreaterThanOrEqualTo(0, running, "the adapter says Running");
+        Assert.AreEqual("Running", Payload(client.Published[running])["value"]!.GetValue<string>());
+        var events = client.Published.Select((m, i) => (m, i)).Where(p => p.m.Topic.Contains("/events/", StringComparison.Ordinal)).ToList();
+        CollectionAssert.AreEqual(new long[] { 7, 8 }, events.Select(p => Seq(p.m)).ToList(), "the events of that step are not lost");
+        Assert.IsTrue(events.All(p => p.i > running), "after Running");
+    }
+
+    [TestMethod]
+    public async Task TheStepThatEndsAFault_WithoutBroker_KeepsItsEventsInTheOutbox()
+    {
+        using var client = new FakeClient { IsConnected = false };
+        using var publisher = Publisher(client, 10);
+
+        await VirtualMachineService.PublishStepAsync(publisher, changed: true, faulted: false, [Value(2), Event(7)], [], MachineRun.Start);
+
+        Assert.IsEmpty(client.Published);
+        Assert.AreEqual(1, publisher.Buffered);
+    }
+
+    [TestMethod]
     public async Task FullOutbox_DropsTheOldestAndKeepsTheGapInSeq()
     {
         using var client = new FakeClient { IsConnected = false };

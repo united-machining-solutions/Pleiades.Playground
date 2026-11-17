@@ -172,7 +172,8 @@ All notable changes are documented here. The format follows
 - Simulator: a virtual machine publishes this tree: snapshots and lists retained; job orders and their results,
   program executions and alerts with their NE 107 severity as CloudEvents, not retained, waiting in a bounded
   outbox while the broker is away; a stack light; `Connection/State` `Initializing`, `Running`,
-  `CommunicationFault` and `Shutdown`. Each simulator of the stack has a scenario of its own
+  `CommunicationFault` and `Shutdown`. The events of the step that ends a `CommunicationFault` go out after
+  `Running`; only those of the steps meanwhile are lost. Each simulator of the stack has a scenario of its own
   (`Config:SpecOutput:ScenarioName`: P-04 the default, P-07 `housings`, M-02 `small-parts`) and a made-up
   manufacturer on a domain below `.example`: Alcyone Machine Works (`alcyone-machines_AX-400_P-04`), Taygeta
   Precision (`taygeta-precision_TP-800_P-07`) and Merope Microtec (`merope-microtec_MM-120_M-02`). Its tests

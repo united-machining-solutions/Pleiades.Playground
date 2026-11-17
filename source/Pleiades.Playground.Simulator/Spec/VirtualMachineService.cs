@@ -126,11 +126,31 @@ internal sealed partial class VirtualMachineService : BackgroundService
             }
         }
 
+        if (changed && faulted)
+        {
+            LogCommunicationFault();
+        }
+        else if (changed)
+        {
+            LogCommunicationRestored();
+        }
+        await PublishStepAsync(publisher, changed, faulted, messages, values, now).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// What one step sends. In the step that ends a fault the state goes out first (every value, then
+    /// <c>Running</c>), then the events of that step, which came up once the machine was reached again; without a
+    /// connection to the broker they wait in the outbox.
+    /// </summary>
+    internal static async Task PublishStepAsync(
+        SpecPublisher publisher, bool changed, bool faulted, IReadOnlyList<SpecMessage> messages, IReadOnlyCollection<SpecValue> values, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(publisher);
+        ArgumentNullException.ThrowIfNull(messages);
         if (faulted)
         {
             if (changed)
             {
-                LogCommunicationFault();
                 await publisher.PublishConnectionStateAsync(SpecPublisher.CommunicationFault, now).ConfigureAwait(false);
             }
             await publisher.PublishAsync([.. messages.Where(m => m is SpecValue { Path: SpecElements.Heartbeat })]).ConfigureAwait(false);
@@ -138,11 +158,11 @@ internal sealed partial class VirtualMachineService : BackgroundService
         }
         if (changed)
         {
-            LogCommunicationRestored();
             if (publisher.IsConnected)
             {
                 await publisher.PublishStateAsync(values, now).ConfigureAwait(false);
             }
+            await publisher.PublishAsync([.. messages.OfType<SpecEvent>()]).ConfigureAwait(false);
             return;
         }
         await publisher.PublishAsync(messages).ConfigureAwait(false);
