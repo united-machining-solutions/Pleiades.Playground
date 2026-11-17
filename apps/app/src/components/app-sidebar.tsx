@@ -3,6 +3,8 @@ import { Link, useLocation, useRouter } from "@tanstack/react-router"
 import { versionOf } from "@/components/app-version.ts"
 import { BrandSwitcher } from "@/components/brand-switcher.tsx"
 import { activePage, navPages } from "@/components/nav.ts"
+import { pinnedEntries } from "@/pages/pinned.ts"
+import { usePages } from "@/pages/store.ts"
 import { Badge } from "@pleiades/ui/components/badge"
 import {
   Sidebar,
@@ -26,12 +28,13 @@ const version = versionOf({
  * this side stays the same with or without a chat.
  *
  * No page is named here. A page that stands in the sidebar says so in its route file
- * (`staticData.nav`), and this list is read from the routes.
+ * (`staticData.nav`), and this list is read from the routes. Beside them stand the pages a person
+ * kept from the chat and pinned, read from this browser: a pin or a new title shows at once.
  */
 export function AppSidebar() {
   const router = useRouter()
   const pathname = useLocation({ select: (location) => location.pathname })
-  const pages = navPages(Object.values(router.routesById))
+  const pages = navPages(Object.values(router.routesById), pinnedEntries(usePages()))
   const active = activePage(pages, pathname)
   return (
     <Sidebar>
@@ -41,7 +44,8 @@ export function AppSidebar() {
           {pages.map((page) => (
             <SidebarMenuItem key={page.path}>
               {/* A page of the sidebar has no parameter in its path, which the type of a path read
-                  from the routes cannot say. The chat stays open while the page changes. */}
+                  from the routes cannot say; a pinned page has its id in it. The chat stays open
+                  while the page changes. */}
               <SidebarMenuButton
                 isActive={page === active}
                 render={<Link to={page.path as "/"} search={(before) => before} />}

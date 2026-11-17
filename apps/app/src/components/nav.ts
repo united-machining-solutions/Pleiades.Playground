@@ -33,19 +33,25 @@ function pathOf(fullPath: string): string {
   return fullPath.length > 1 && fullPath.endsWith("/") ? fullPath.slice(0, -1) : fullPath
 }
 
-/** The pages that name an entry, in the order of the sidebar. */
-export function navPages(routes: ReadonlyArray<RouteLike>): Array<NavPage> {
+/**
+ * The pages that name an entry, in the order of the sidebar. `pinned` are the entries of the pages
+ * a person kept from the chat and pinned (pages/pinned.ts): they stand on the top level beside the
+ * pages of the routes, by the same rule, and none is under another entry.
+ */
+export function navPages(routes: ReadonlyArray<RouteLike>, pinned: ReadonlyArray<NavPage> = []): Array<NavPage> {
   return routes
-    .flatMap((route) => {
+    .flatMap((route): Array<NavPage> => {
       const { nav, crumb } = route.options.staticData ?? {}
       return nav ? [{ ...nav, path: pathOf(route.fullPath), crumb }] : []
     })
+    .concat(pinned)
     .sort((a, b) => (a.order ?? 100) - (b.order ?? 100) || a.title.localeCompare(b.title))
 }
 
 /**
  * The entry a person is under: the page itself, or the nearest page above it that has an entry.
- * The page of a machine has none, so it stands under Home.
+ * The page of a machine has none, so it stands under Home. A pinned page is its own entry; one that
+ * is not pinned stands under "Pages".
  */
 export function activePage(pages: ReadonlyArray<NavPage>, pathname: string): NavPage | undefined {
   const above = (path: string) => path === "/" || pathname === path || pathname.startsWith(`${path}/`)
@@ -70,6 +76,9 @@ type ShownPage = {
  * then the page itself. A page is called by its `crumb`, or by the title of its entry. So a new
  * page with an entry has its breadcrumb without a word about it. The index route of an entry is its
  * page: it is called like the entry, unless it says otherwise, and never links to itself.
+ *
+ * `pages` are the entries of the routes alone, without the pinned pages: a page kept from the chat
+ * stands behind "Pages" in the breadcrumb, pinned or not.
  */
 export function crumbsOf(pages: ReadonlyArray<NavPage>, page: ShownPage): Array<CrumbStep> {
   const text = (crumb: Crumb | undefined, params: Record<string, string>) =>

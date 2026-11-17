@@ -145,3 +145,64 @@ test("a page that says nothing about itself shows only where it stands", () => {
   )
   assert.deepEqual(crumbsOf([], { fullPath: "/about", pathname: "/about", params: {} }), [])
 })
+
+// Pages kept from the chat: "Pages" lists them all and stands last; a pinned page stands on the
+// top level beside the pages of the routes, by the same rule.
+const withPages = [
+  ...withCrumbs,
+  route("/pages/", { title: "Pages", order: 1000 }),
+  { fullPath: "/pages/$page", options: { staticData: { crumb: (params: Record<string, string>) => `Title of ${params.page}` } } },
+]
+const pinned = [
+  { title: "Overnight", icon, path: "/pages/b2" },
+  { title: "Morning round", icon, path: "/pages/a1" },
+]
+
+test("a pinned page stands on the top level, by its title among the pages of the routes, and Pages last", () => {
+  assert.deepEqual(
+    navPages(withPages, pinned).map((page) => [page.title, page.path]),
+    [
+      ["Home", "/"],
+      ["Morning round", "/pages/a1"],
+      ["Overnight", "/pages/b2"],
+      ["Warnings", "/warnings"],
+      ["Pages", "/pages"],
+    ],
+  )
+})
+
+test("a pinned page is marked while it is open; one that is not pinned stands under Pages", () => {
+  const pages = navPages(withPages, pinned)
+  assert.equal(activePage(pages, "/pages/a1")?.title, "Morning round")
+  assert.equal(activePage(pages, "/pages/c3")?.title, "Pages")
+  assert.equal(activePage(pages, "/pages")?.title, "Pages")
+  assert.equal(activePage(pages, "/")?.title, "Home")
+})
+
+test("a page kept from the chat stands behind Pages in the breadcrumb, pinned or not", () => {
+  for (const page of ["a1", "c3"]) {
+    assert.deepEqual(
+      crumbsOf(navPages(withPages), {
+        fullPath: "/pages/$page",
+        pathname: `/pages/${page}`,
+        params: { page },
+        staticData: { crumb: (params) => `Title of ${params.page}` },
+      }),
+      [{ title: "Pages", path: "/pages" }, { title: `Title of ${page}` }],
+    )
+  }
+})
+
+test("a page this browser does not keep has no title: the breadcrumb says Pages alone", () => {
+  assert.deepEqual(
+    crumbsOf(navPages(withPages), { fullPath: "/pages/$page", pathname: "/pages/zz", params: { page: "zz" }, staticData: { crumb: () => "" } }),
+    [{ title: "Pages", path: "/pages" }],
+  )
+})
+
+test("the list of all pages is called Pages and links nowhere", () => {
+  assert.deepEqual(
+    crumbsOf(navPages(withPages), { fullPath: "/pages/", pathname: "/pages", params: {}, staticData: { nav: { title: "Pages", icon, order: 1000 } } }),
+    [{ title: "Pages" }],
+  )
+})
