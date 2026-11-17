@@ -31,18 +31,12 @@ Displays convert to what people are used to (millimetre, 1/min, bar, percent, kW
 ## Amendment (2026-11-17)
 
 Machines below `machines/` follow the data model exactly, its units included: energy in `wattHour`, and the
-unit named by the catalogue ([ADR-0013](0013-spec-binding-beside-the-playground-binding.md)). This decision keeps
-applying to values about a place below `sites/`, and to what the services store and serve; a service that reads
-the tree of the machines converts once, where it stores.
-
-## Amendment (2026-11-17, storage)
-
-The services do not convert machine data either. The Timeseries and Events stores keep a value of a machine
-with the unit it came with (`wattHour`, `degreeCelsius` …), and the APIs serve it so; converting is the matter of
-the display. Two machines that deliver one quantity in two units would need a conversion in whoever compares
-them; the catalogue of the data model gives one unit per quantity, so they do not. For machine data this replaces
-the sentence above that a service converts where it stores, and the rule that services never convert now holds
-without exception. Places below `sites/` keep the coherent SI units of this decision.
+unit named by the catalogue ([ADR-0013](0013-spec-binding-beside-the-playground-binding.md)). The services do
+not convert machine data either: the Timeseries and Events stores keep a value of a machine with the unit it came
+with (`wattHour`, `degreeCelsius` …), and the APIs serve it so; converting is the matter of the display. Two
+machines that deliver one quantity in two units would need a conversion in whoever compares them; the catalogue
+of the data model gives one unit per quantity, so they do not. This decision applies only to values about a
+place below `sites/`, which keep their coherent SI units; that services never convert holds without exception.
 
 ## Alternatives considered
 

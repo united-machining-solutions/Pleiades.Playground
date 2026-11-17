@@ -6,12 +6,15 @@ date: 2026-11-15
 
 # ADR-0013: The binding of machines follows the data model
 
-First proposed as a second tree beside the binding of the playground (`simulators/`); since 2026-11-17 the second
-tree replaces the first, below `machines/`.
+First proposed as a second tree beside the binding of the playground (`simulators/`); since 2026-11-17 it is
+the only tree below `machines/`, and the whole stack reads it.
+
+The status stays `proposed` on purpose: the binding of the model is settled at the umati hackathon
+(16 to 20 November 2026), and this decision is accepted or changed with it.
 
 ## Context
 
-The data model referenced in [`contracts/datamodel`](../../contracts/datamodel/README.md) (0.17.0) asks for things
+The data model referenced in [`contracts/datamodel`](../../contracts/datamodel/README.md) (0.17.1) asks for things
 the binding of the playground does not do: energy in watt hours, snapshots and lists as one value, events,
 a manifest and retained values. [ADR-0002](0002-si-units-joule-and-one.md) puts energy in joule, and
 [ADR-0003](0003-naming.md) puts every topic below `machines/{SerialNumber}/`. The services, the example app and
@@ -24,8 +27,8 @@ exactly after the model, to find a compromise for the differences.
   snapshots, lists, CloudEvents and manifest. The earlier binding of the playground below `machines/` (values in
   joule below `umati/` and `vendor/`, events as DTOs of the Events API) is replaced. Its topics are described in
   [`contracts/mqtt`](../../contracts/mqtt/README.md#machines-the-binding-of-the-data-model).
-- [ADR-0002](0002-si-units-joule-and-one.md) keeps applying to `sites/` and to the stores of the services; it does
-  not apply to `machines/`, which carries the units of the model.
+- [ADR-0002](0002-si-units-joule-and-one.md) applies only to `sites/`. `machines/` carries the units of the
+  model, and the stores and APIs keep them as delivered; only a display converts.
 - Events are meant to be stored, and a store of events must miss none. The model makes each event a CloudEvent
   with a UUID `id` and a `sequence` per group; the binding adds what MQTT needs: one topic per group
   (`events/jobs`, `events/workmasters`, `events/notifications`), so that MQTT keeps the order of
@@ -46,15 +49,16 @@ exactly after the model, to find a compromise for the differences.
 - A virtual machine, a state machine driven by a scenario, produces the tree in the simulator. The value
   generators of the earlier binding are gone from the simulator. Every simulator of the demo stack has a
   scenario of its own kind of machine and a made-up manufacturer of its own, named after the Pleiades.
-- The services move in two steps: first the simulators publish only the new tree; then persistence, APIs, MCP
-  tools, genui-mcp and the app read it. Until then they still read the earlier binding and see no data of the
-  simulators.
+- Persistence, APIs, MCP tools, genui-mcp and the app read only this tree. The Timeseries store keeps values,
+  and snapshots field by field; the Events store keeps the CloudEvents as they came, unique by `source` and
+  `id`, and puts alerts, job orders and program executions together when they are read. The DTOs of events of
+  the earlier binding are gone.
 
 ## Consequences
 
 - One tree, one set of units for machines; a consumer reads the data model and nothing else.
-- Between the two steps the stack shows no machine data: the services read topics and content types nobody
-  publishes any more. The DTOs of the Events API stay for the second step.
+- A consumer outside the stack that read the earlier binding (topics below `machines/{SerialNumber}/`, values in
+  joule, the event DTOs of the Events API) has to move to this tree.
 - A consumer that keeps events can find every gap and every duplicate: by the count in `sequence` and by `id`. A
   new prefix of `sequence` shows a restart of the adapter.
 - The decision ends with the hackathon: the binding of the model is settled there, and this tree follows it.
