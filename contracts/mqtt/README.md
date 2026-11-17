@@ -124,7 +124,7 @@ sites/demo/weather/AirTemperature         { "timestamp": "2026-11-16T09:10:00Z",
 A proposal for the MQTT binding of the data model, version 0.17.1 (see [`../datamodel`](../datamodel/README.md)),
 to be settled at the umati hackathon. Here everything is as the model says: paths, types, units, snapshots,
 lists, events, manifest and connection. It is the binding of `machines/`; why: see
-[ADR-0012](../../docs/adr/0012-spec-binding-beside-the-playground-binding.md).
+[ADR-0013](../../docs/adr/0013-spec-binding-beside-the-playground-binding.md).
 
 In the demo stack every simulator (P-04, P-07, M-02) publishes this tree. The services of the playground move to
 it in a second step.

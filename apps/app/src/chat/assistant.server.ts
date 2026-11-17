@@ -12,6 +12,7 @@ import type { ChatSettings } from "./gateway.ts"
 import { withTimeZone } from "./local-times.ts"
 import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
+import { furtherInstructions, leftOut, mcpServers } from "./mcp-servers.ts"
 import { forModel } from "./tool-results.ts"
 
 // The agent harness of the app. It runs on the server only: the keys of the language models stay
@@ -22,16 +23,18 @@ Read values with the tools and never invent one. If the tools do not give a reas
 Answer in a few plain sentences. The app shows the values of a tool call next to your answer, so do not repeat them as a list or a table.
 The tools write every time as the clock of the person you answer shows it. Say a time the way a clock does, for example 09:30: take the hours and minutes as they stand in the result, do not convert them, and name no time zone and no offset.`
 
-// The tools of the generative UI backend, under their own names. Created once, shared by all chats.
-const tools = mcp({
-  servers: {
-    genui: {
-      type: "http",
-      url: process.env.GENUI_MCP_URL ?? "http://localhost:5520/mcp",
-      toolName: (tool) => tool.name,
-    },
-  },
-})
+// The tools of the generative UI backend, and of the further servers the settings name, under their own
+// names (mcp-servers.ts). A server that does not answer has no tools until it does; the others work.
+// Created once, shared by all chats.
+const tools = mcp({ servers: mcpServers() })
+
+// The further servers have no card in the app, so the model is told to say their values.
+const further = furtherInstructions()
+
+// A typing mistake in the setting shows here, once, when the server starts.
+for (const name of leftOut()) {
+  console.warn(`APP_MCP_SERVERS: the entry "${name}" is left out. An entry is name=address, the name in lower case.`)
+}
 
 // A tool that only a card calls is not for the model. The plugin above has no setting for that,
 // so this one takes those tools out of every turn, after the servers listed theirs. Which tools
@@ -92,7 +95,7 @@ function build(settings: ModelSettings | undefined): Handler | null {
       // Of a chat's settings the browser may change the model, and nothing else.
       expose: { settings: ["model"] },
       middleware: [localTimes],
-      systemPrompts: [instructions],
+      systemPrompts: further ? [instructions, further] : [instructions],
       plugins: () => [tools, modelTools],
     }),
     // The demo has no sign-in: every request runs without a user.

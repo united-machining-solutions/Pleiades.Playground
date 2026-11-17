@@ -31,7 +31,7 @@ Displays convert to what people are used to (millimetre, 1/min, bar, percent, kW
 ## Amendment (2026-11-17)
 
 Machines below `machines/` follow the data model exactly, its units included: energy in `wattHour`, and the
-unit named by the catalogue ([ADR-0012](0012-spec-binding-beside-the-playground-binding.md)). This decision keeps
+unit named by the catalogue ([ADR-0013](0013-spec-binding-beside-the-playground-binding.md)). This decision keeps
 applying to values about a place below `sites/`, and to what the services store and serve; a service that reads
 the tree of the machines converts once, where it stores.
 

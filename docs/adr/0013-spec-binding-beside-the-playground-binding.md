@@ -4,7 +4,7 @@ status: proposed
 date: 2026-11-15
 ---
 
-# ADR-0012: The binding of machines follows the data model
+# ADR-0013: The binding of machines follows the data model
 
 First proposed as a second tree beside the binding of the playground (`simulators/`); since 2026-11-17 the second
 tree replaces the first, below `machines/`.

@@ -46,6 +46,13 @@ In PowerShell, set the variable first: `$env:PLEIADES_VERSION = "main"`. Or writ
 | Example app | <http://localhost:5600/> | What every machine does now, and a chat about it. It answers on this computer only (`APP_BIND`); see [`apps/app`](apps/app/README.md) |
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
+An optional [Ultimaker 3 service](source/Pleiades.Playground.Ultimaker.Api/README.md) adds CuraEngine,
+REST and MCP slicing, static toolpath validation and explicit printer pairing/start. It is started only
+with the `ultimaker` Compose profile and leaves printing disabled by default.
+The separate [Ultimaker telemetry adapter](source/Pleiades.Playground.Ultimaker.Telemetry/README.md)
+publishes read-only printer observations to the existing broker and time-series persistence.
+For deployment from published images, enable `COMPOSE_PROFILES=ultimaker` and configure the printer
+URL in the server's private .env; see [deployment](docs/deployment.md#enable-the-ultimaker-services).
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo; only
 the chat of the example app needs a language model, through a LiteLLM gateway:
 

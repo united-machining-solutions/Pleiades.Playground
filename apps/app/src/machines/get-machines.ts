@@ -1,9 +1,10 @@
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
+import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
-import { SPAN_LIST_TOOL } from "./card-tools.ts"
+import { MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL } from "./card-tools.ts"
 
 // The values come from the generative UI backend. These functions run on the server of the app:
 // the browser never talks to the backend itself.
@@ -88,6 +89,35 @@ export const getMachine = createServerFn({ method: "GET" })
         return result.structuredContent
       }),
   )
+
+/** The newest physical values of every machine: the values of the measurement cards. */
+export const getMeasurements = createServerFn({ method: "GET" }).handler(
+  (): Promise<Answer<MeasurementList>> =>
+    ask(async (backend) => {
+      const result = await backend.callTool("genui_measurement_list", {})
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? "genui_measurement_list returned no values.")
+      }
+      return result.structuredContent
+    }),
+)
+
+/**
+ * The values of every quantity over the last minutes, a line for each machine: what the graphs of
+ * the measurements draw. They are not among the values of the list, because a language model reads
+ * those.
+ */
+export const getMeasurementSeries = createServerFn({ method: "GET" }).handler(
+  (): Promise<Answer<MeasurementSeries>> =>
+    ask(async (backend) => {
+      // The name is checked against the tools of the backend: if it changes there, this fails to compile.
+      const result = await backend.callTool(MEASUREMENT_SERIES_TOOL, {})
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? `${MEASUREMENT_SERIES_TOOL} returned no values.`)
+      }
+      return result.structuredContent
+    }),
+)
 
 /**
  * The spans of a card's band, for the hours its values are about. They are not among the values,

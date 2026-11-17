@@ -13,7 +13,7 @@ All notable changes are documented here. The format follows
   The root `simulators/` is gone. The simulator publishes only this tree, from its virtual machine, which always
   runs; the value generators, the notification generator, the job and work master events of the playground
   binding, `Config:SpecOutput:Enabled`, `Config:ProductionEvents` and the second MQTT client are gone from it.
-  ADR-0012 and ADR-0002 say so.
+  ADR-0013 and ADR-0002 say so.
 - The stack reads this tree. A machine is named by its machine id everywhere: in the stores, the APIs, the MCP
   tools, genui-mcp and the address of its page (`/machines/alcyone-machines_AX-400_P-04`); the app shows its
   manufacturer, model and serial number from the identification.
@@ -43,6 +43,17 @@ All notable changes are documented here. The format follows
   nothing used any more.
 
 ### Added
+
+- Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
+  optional Ultimaker service, as `name=address` separated by commas.
+- Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
+  minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
+  `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
+  and `genui_measurement_series`, the lines of the graphs, which the card file draws below the cards.
+- Optional Ultimaker 3 services: CuraEngine slicing over REST/MCP, printer-side header validation,
+  current jobs and history with durable slice associations, and a separate MQTT telemetry adapter.
+  Both containers are part of the root Compose stack and image-publication workflow, enabled for
+  deployment with COMPOSE_PROFILES=ultimaker.
 
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
@@ -193,7 +204,7 @@ All notable changes are documented here. The format follows
   scenario of its own (`Config:SpecOutput:ScenarioName`: P-04 the default, P-07 `housings`, M-02
   `small-parts`), in addition to its topics below `machines/{SerialNumber}/`, which stay as they are. Its tests check the consistency of the machine and,
   with a clone of the model next to the repository, every message against the schemas of the model
-  (`contracts/mqtt`, ADR-0012). Its events lie below `simulators/{SerialNumber}/events/`, one topic per group
+  (`contracts/mqtt`, ADR-0013). Its events lie below `simulators/{SerialNumber}/events/`, one topic per group
   (`events/production`, `events/notifications`) so that a group arrives in order, carry `seq` and `seqEpoch`,
   so that a gap or a duplicate shows, and wait in a bounded outbox (`EventBufferSize`, 10 000) while the broker
   is away; the oldest is dropped when it is full. The first job orders come with their `JobOrderAdded`, and
@@ -319,6 +330,9 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Ultimaker pairing can be repeated after rejection or a forgotten request without removing files;
+  existing credentials survive failed replacements. Invalid printer status responses return HTTP 502
+  and MCP tool errors instead of unhandled server errors.
 - `app`: a question asked outside the chat ("Ask why", the field in the header) is answered under
   `vite dev` too. React ran the effect that sends it twice there (StrictMode); `useChat` detached after the
   first run and cut off its stream, and the second run found the question taken: it stood in the chat and
