@@ -25,6 +25,7 @@ jobs:
       dotnet: ${{ steps.filter.outputs.dotnet }}
       typescript: ${{ steps.filter.outputs.typescript }}
       stack: ${{ steps.filter.outputs.stack }}
+      margo: ${{ steps.filter.outputs.margo }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -53,6 +54,9 @@ jobs:
               - 'stacks/**'
               - 'compose.yaml'
               - '.env.example'
+              - '.github/workflows/ci.yml'
+            margo:
+              - 'margo/**'
               - '.github/workflows/ci.yml'
 
   dotnet:
@@ -183,6 +187,19 @@ jobs:
         if: always()
         run: docker compose down --volumes
 
+  # The Margo app as bart sees it, so that a broken app shows in the pull request and not only at the release.
+  margo:
+    name: Margo app validates
+    needs: changes
+    if: needs.changes.outputs.margo == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: bart validate
+        run: |
+          docker run --rm -v "${GITHUB_WORKSPACE}:/workspace" -w /workspace \
+            cr.flecs.tech/flecs/bart:latest validate --dir margo
+
   # Runs on every change: a link breaks when its target moves, not when the page that holds it changes.
   links:
     name: Links between files resolve
@@ -199,7 +216,7 @@ jobs:
   ci:
     name: CI result
     if: always()
-    needs: [dotnet, typescript, stack, links]
+    needs: [dotnet, typescript, stack, margo, links]
     runs-on: ubuntu-latest
     steps:
       - name: Fail if a job failed

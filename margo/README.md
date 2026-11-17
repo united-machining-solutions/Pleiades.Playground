@@ -65,23 +65,35 @@ credentials. `dist/` is ignored by git.
 
 ## Release
 
-bart takes the version from a SemVer tag on `HEAD` (`v1.2.3`) or from `--version`, and needs a clean working tree
-for the tag.
+A version tag releases the app. bart takes the version from `--version`, so the working tree need not be clean.
 
-1. Tag the commit `v1.2.3` and push the tag. The workflow "Images" publishes the images as `1.2.3`.
-2. Optionally pin the images of this repository in `compose/compose.yaml` from `:main` to `:1.2.3`, so that the
-   app is that exact build. Otherwise `bart push` takes whatever `main` is when it runs.
-3. Add the release to `app/release-notes.md`.
-4. Push to the staging registry (default `apps.flecs.tech`) with its credentials in the environment:
+1. Add the release to `app/release-notes.md`, on `main`.
+2. Tag the commit `v1.2.3` and push the tag.
+3. The workflow "Images" publishes the images of this repository as `1.2.3`. When all of them are there, it calls
+   the workflow [`margo-push.yml`](../.github/workflows/margo-push.yml), which:
+   - pins the images of this repository in `compose/compose.yaml` from `:main` to `:1.2.3`, in that run only,
+     so that the app is exactly that build;
+   - runs `bart validate` and `bart push --version 1.2.3` from the image `cr.flecs.tech/flecs/bart`.
 
-   ```bash
-   BART_REGISTRY_USER=... BART_REGISTRY_TOKEN=... bart push --dir margo --version 1.2.3
-   ```
-
-   `push` copies every image to `<registry>/staging-<app id>/<service>:1.2.3`, so the staged app no longer depends
-   on `main`. The images on ghcr.io are public and need no `--pull-auth`.
-5. `bart release` promotes the staged version to production and `bart sign` signs it; both are for whoever runs
+   `push` copies every image to `<registry>/staging-<app id>/<service>:1.2.3` on the staging registry
+   (`apps.flecs.tech`), so the staged app no longer depends on ghcr.io. The images on ghcr.io are public and need
+   no `--pull-auth`.
+4. `bart release` promotes the staged version to production and `bart sign` signs it; both are for whoever runs
    the registry.
+
+The workflow needs the repository secrets `BART_REGISTRY_USER` and `BART_REGISTRY_TOKEN`, the credentials of the
+staging registry. "Margo push" can also be started by hand, under Actions, for a version whose images are already
+on ghcr.io; its input `bart-version` picks another tag of the bart image than `latest`.
+
+By hand, the same as the workflow does:
+
+```bash
+sed -Ei 's|(pleiades\.playground\.[a-z.]+):main$|\1:1.2.3|' margo/compose/compose.yaml
+BART_REGISTRY_USER=... BART_REGISTRY_TOKEN=... bart push --dir margo --version 1.2.3
+git checkout margo/compose/compose.yaml
+```
+
+Every pull request that changes `margo/` runs `bart validate` in the workflow "CI".
 
 The three simulators share one image. bart rewrites them all to the copy of one of them; that is the same image
 and changes nothing.
