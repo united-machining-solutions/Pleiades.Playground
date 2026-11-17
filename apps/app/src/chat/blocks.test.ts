@@ -152,12 +152,20 @@ test("the line stands in the answer once its last step has ended or its last car
   assert.equal(lineFor([call("a", "genui_machine_show"), result("a", shown)]), "in-answer")
   // A text, then a step that has ended.
   assert.equal(lineFor([text("Let me look."), call("a", "genui_span_list"), result("a", "{}")]), "in-answer")
+  // Two steps of one stretch, both ended and both drawn.
+  const both = [call("a", "genui_machine_show"), call("b", "genui_machine_show"), result("a", shown)]
+  assert.equal(lineFor([...both, result("b", shown)]), "in-answer")
 })
 
 test("no line while a step runs or a text grows, or when no answer comes", () => {
   assert.equal(lineFor([call("a", "genui_machine_list")]), undefined)
   // One step of the stretch has ended, the other still runs.
   assert.equal(lineFor([call("a", "genui_span_list"), result("a", "{}"), call("b", "genui_machine_list")]), undefined)
+  // Two steps of one stretch: the card of the first is drawn, the second still runs above it.
+  assert.equal(
+    lineFor([call("a", "genui_machine_show"), call("b", "genui_machine_show"), result("a", shown)]),
+    undefined,
+  )
   assert.equal(lineFor([text("Here is …")]), undefined)
   assert.equal(lineFor([call("a", "genui_machine_show"), result("a", shown), text("Here is P-04.")]), undefined)
   assert.equal(thinkingLine([question], false, tools), undefined)

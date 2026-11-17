@@ -85,9 +85,11 @@ export function blocksOf(
  * Where the chat shows a running line "Thinking", so that one sees something happen, or `undefined`
  * where it shows none. The line stands while an answer is coming and nothing in it moves: before the
  * answer shows anything ("apart": on its own under the question, after the shadcn chatbot template),
- * and once its last step has ended or its last card is drawn, while the model reads that and the
- * next step or text has not come ("in-answer": under that step or card). A running step and a text
- * that grows show by themselves that something happens. `live` says whether an answer is coming.
+ * and once its steps have ended or its last card is drawn, while the model reads that and the next
+ * step or text has not come ("in-answer": under that step or card). A running step and a text that
+ * grows show by themselves that something happens; the step can stand above the last block, when the
+ * card of one call is drawn while another call of the same stretch still runs. `live` says whether
+ * an answer is coming.
  */
 export function thinkingLine(
   messages: ReadonlyArray<UIMessage>,
@@ -97,10 +99,12 @@ export function thinkingLine(
   const last = messages.at(-1)
   if (!live || last === undefined) return undefined
   if (last.role === "user") return "apart"
-  const shown = blocksOf(last.parts, true, tools).at(-1)
+  const blocks = blocksOf(last.parts, true, tools)
+  const shown = blocks.at(-1)
   if (shown === undefined) return "apart"
   if (shown.kind === "text") return undefined
-  if (shown.kind === "steps" && shown.calls.some((call) => call.state === "running")) return undefined
+  const running = (block: Block) => block.kind === "steps" && block.calls.some((call) => call.state === "running")
+  if (blocks.some(running)) return undefined
   return "in-answer"
 }
 

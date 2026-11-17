@@ -310,9 +310,10 @@ function Conversation({ threadId }: { threadId: string }) {
                   )
                 })}
                 {/* Until the answer shows anything, the running line stands on its own where the
-                    answer will be. */}
+                    answer will be: with the pixel of room an answer has, so the first step takes
+                    its place without a shift. */}
                 {thinking === "apart" && (
-                  <MessageScrollerItem messageId="thinking">
+                  <MessageScrollerItem messageId="thinking" className="p-px">
                     <Message>
                       <MessageContent>
                         <Trace>
