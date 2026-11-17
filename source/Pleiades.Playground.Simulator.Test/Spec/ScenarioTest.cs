@@ -130,7 +130,6 @@ public sealed class ScenarioTest
         var scenario = config.Scenario;
         return new SpecOutputConfig
         {
-            Enabled = true,
             // The manufacturer of the scenario, as Resolve gave it.
             Manufacturer = config.Manufacturer,
             ManufacturerDomain = config.ManufacturerDomain,

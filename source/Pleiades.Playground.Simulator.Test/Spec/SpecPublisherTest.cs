@@ -27,7 +27,7 @@ public sealed class SpecPublisherTest
 
         var events = client.Published.Where(m => m.Topic.Contains("/events/", StringComparison.Ordinal)).ToList();
         Assert.HasCount(2, events);
-        Assert.IsTrue(events.All(m => m.Topic == $"simulators/{SerialNumber}/events/jobmonitoring"));
+        Assert.IsTrue(events.All(m => m.Topic == $"machines/{SerialNumber}/events/jobmonitoring"));
         Assert.IsTrue(events.All(m => !m.Retain && m.QualityOfServiceLevel == MqttQualityOfServiceLevel.AtLeastOnce));
         Assert.IsTrue(events.All(m => m.ContentType == "application/cloudevents+json; charset=utf-8"));
         CollectionAssert.AreEqual(new long[] { 1, 2 }, events.Select(Seq).ToList());
@@ -49,11 +49,11 @@ public sealed class SpecPublisherTest
 
         var topics = client.Published.Select(m => m.Topic).Distinct().ToList();
         CollectionAssert.AreEquivalent(
-            new[] { $"simulators/{SerialNumber}/events/jobmonitoring", $"simulators/{SerialNumber}/events/workmastermonitoring", $"simulators/{SerialNumber}/events/notifications" },
+            new[] { $"machines/{SerialNumber}/events/jobmonitoring", $"machines/{SerialNumber}/events/workmastermonitoring", $"machines/{SerialNumber}/events/notifications" },
             topics, "one topic per group, none per event");
         foreach (var (group, name) in new[] { ("JobMonitoring", "jobmonitoring"), ("WorkMasterMonitoring", "workmastermonitoring"), ("Notification", "notifications") })
         {
-            var onTopic = client.Published.Where(m => m.Topic == $"simulators/{SerialNumber}/events/{name}").Select(Payload).ToList();
+            var onTopic = client.Published.Where(m => m.Topic == $"machines/{SerialNumber}/events/{name}").Select(Payload).ToList();
             var expected = events.Where(e => e.Path.StartsWith(group + ".", StringComparison.Ordinal)).ToList();
             CollectionAssert.AreEqual(expected.Select(e => e.Path).ToList(), onTopic.Select(p => p["type"]!.GetValue<string>()).ToList(),
                 $"the events of {group} in the order they came up");
@@ -84,10 +84,10 @@ public sealed class SpecPublisherTest
         await publisher.PublishStateAsync([new SpecValue(SpecElements.FeedOverride, JsonValue.Create(1.0), "one", MachineRun.Start, null)], MachineRun.Start);
 
         var topics = client.Published.Select(m => m.Topic).ToList();
-        Assert.AreEqual($"simulators/{SerialNumber}/umati/Connection/State", topics[0]);
+        Assert.AreEqual($"machines/{SerialNumber}/umati/Connection/State", topics[0]);
         Assert.AreEqual("Initializing", Payload(client.Published[0])["value"]!.GetValue<string>());
-        Assert.AreEqual($"simulators/{SerialNumber}/umati/Manifest", topics[1]);
-        Assert.AreEqual($"simulators/{SerialNumber}/umati/Connection/State", topics[3]);
+        Assert.AreEqual($"machines/{SerialNumber}/umati/Manifest", topics[1]);
+        Assert.AreEqual($"machines/{SerialNumber}/umati/Connection/State", topics[3]);
         Assert.AreEqual("Running", Payload(client.Published[3])["value"]!.GetValue<string>());
 
         var events = client.Published.Skip(4).ToList();
@@ -165,7 +165,7 @@ public sealed class SpecPublisherTest
         var (topic, payload) = SpecPublisher.LastWill(SerialNumber, MachineRun.Start);
         var will = JsonNode.Parse(Encoding.UTF8.GetString(payload))!.AsObject();
 
-        Assert.AreEqual($"simulators/{SerialNumber}/umati/Connection/State", topic);
+        Assert.AreEqual($"machines/{SerialNumber}/umati/Connection/State", topic);
         Assert.AreEqual("CommunicationFault", will["value"]!.GetValue<string>());
         Assert.AreEqual(SpecWire.Timestamp(MachineRun.Start), will["timestamp"]!.GetValue<string>());
     }

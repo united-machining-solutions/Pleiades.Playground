@@ -741,7 +741,7 @@ public sealed class VirtualMachineTest
             Assert.IsFalse(string.IsNullOrWhiteSpace((string?)entry["ComponentName"]));
         }
         Assert.AreEqual(software.Count, software.Select(s => $"{s["Manufacturer"]}/{s["ComponentName"]}").Distinct().Count(), "Manufacturer and ComponentName name an entry");
-        Assert.AreEqual("simulators/P-04/umati/Components/Software", SpecWire.Topic("P-04", SpecElements.Software));
+        Assert.AreEqual("machines/P-04/umati/Components/Software", SpecWire.Topic("P-04", SpecElements.Software));
     }
 
     [TestMethod]
@@ -847,11 +847,11 @@ public sealed class VirtualMachineTest
     [TestMethod]
     public void Event_GoesBelowTheEventsLevelAsACloudEvent()
     {
-        Assert.AreEqual("simulators/P-04/events/jobmonitoring", SpecWire.EventTopic("P-04", SpecElements.JobOrderChanged));
-        Assert.AreEqual("simulators/P-04/events/jobmonitoring", SpecWire.EventTopic("P-04", SpecElements.JobOrderResultChanged));
-        Assert.AreEqual("simulators/P-04/events/workmastermonitoring", SpecWire.EventTopic("P-04", SpecElements.ProgramExecutionStarted));
+        Assert.AreEqual("machines/P-04/events/jobmonitoring", SpecWire.EventTopic("P-04", SpecElements.JobOrderChanged));
+        Assert.AreEqual("machines/P-04/events/jobmonitoring", SpecWire.EventTopic("P-04", SpecElements.JobOrderResultChanged));
+        Assert.AreEqual("machines/P-04/events/workmastermonitoring", SpecWire.EventTopic("P-04", SpecElements.ProgramExecutionStarted));
         Assert.ThrowsExactly<ArgumentException>(() => SpecWire.EventTopic("P-04", "Production.JobOrderChanged"), "no group Production since 0.17.0");
-        Assert.AreEqual("simulators/P-04/events/notifications", SpecWire.EventTopic("P-04", SpecElements.AlertRaised));
+        Assert.AreEqual("machines/P-04/events/notifications", SpecWire.EventTopic("P-04", SpecElements.AlertRaised));
         Assert.ThrowsExactly<ArgumentException>(() => SpecWire.EventTopic("P-04", "Maintenance.TaskDue"), "a group without a name");
         CollectionAssert.IsSubsetOf(SpecElements.Events.Select(e => e.Path.Split('.')[0]).Distinct().ToList(), SpecWire.EventTopicNames.Keys.ToList(),
             "every event of the manifest has a topic");
@@ -882,7 +882,7 @@ public sealed class VirtualMachineTest
     {
         var path = SpecElements.ExtensionPath("alcyone-machines.example", SpecElements.BearingTemperature);
         Assert.AreEqual("x-alcyone-machines-example.Spindle.1.BearingTemperature", path);
-        Assert.AreEqual("simulators/P-04/oem/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", path), "the prefix maps to oem/");
+        Assert.AreEqual("machines/P-04/oem/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", path), "the prefix maps to oem/");
         Assert.AreEqual("x-alcyone-machines-example", SpecElements.ExtensionPrefix("Alcyone-Machines.EXAMPLE"), "lower case, like the machine id");
 
         var run = MachineRun.For(TimeSpan.FromHours(1));
@@ -898,12 +898,12 @@ public sealed class VirtualMachineTest
         // The same place in the tree, only another namespace: the model and the manufacturer side by side.
         var model = SpecWire.Topic("P-04", SpecElements.SpindleIsRotating);
         var oem = SpecWire.Topic("P-04", "x-alcyone-machines-example.Spindle.1.BearingTemperature");
-        Assert.AreEqual("simulators/P-04/umati/Spindle/1/IsRotating", model);
-        Assert.AreEqual("simulators/P-04/oem/Spindle/1/BearingTemperature", oem);
+        Assert.AreEqual("machines/P-04/umati/Spindle/1/IsRotating", model);
+        Assert.AreEqual("machines/P-04/oem/Spindle/1/BearingTemperature", oem);
         Assert.AreEqual(string.Join('/', model.Split('/')[3..5]), string.Join('/', oem.Split('/')[3..5]));
 
         // Every domain goes to oem/; the domain stays in the manifest only.
-        Assert.AreEqual("simulators/P-04/oem/Process/DressingCount", SpecWire.Topic("P-04", "x-machines-example-org.Process.DressingCount"));
+        Assert.AreEqual("machines/P-04/oem/Process/DressingCount", SpecWire.Topic("P-04", "x-machines-example-org.Process.DressingCount"));
         Assert.IsFalse(oem.Contains("example", StringComparison.Ordinal), "no domain in the topic");
         Assert.ThrowsExactly<ArgumentException>(() => SpecWire.Topic("P-04", "x-.Spindle.1.BearingTemperature"));
         Assert.ThrowsExactly<ArgumentException>(() => SpecWire.Topic("P-04", "x-Example.Spindle.1.BearingTemperature"));
@@ -1022,20 +1022,20 @@ public sealed class VirtualMachineTest
 
         Assert.AreEqual($"alcyone-machines_{config.Scenario.Model}_P-04", machineId);
         Assert.AreEqual(machineId, SpecManifest.Build(identity, config)["machineId"]!.GetValue<string>());
-        Assert.AreEqual($"simulators/{machineId}/umati/Connection/State", SpecPublisher.LastWill(machineId, MachineRun.Start).Topic);
-        Assert.AreEqual($"simulators/{machineId}/events/jobmonitoring", SpecWire.EventTopic(machineId, SpecElements.JobOrderAdded));
-        Assert.AreEqual($"simulators/{machineId}/oem/Spindle/1/BearingTemperature",
+        Assert.AreEqual($"machines/{machineId}/umati/Connection/State", SpecPublisher.LastWill(machineId, MachineRun.Start).Topic);
+        Assert.AreEqual($"machines/{machineId}/events/jobmonitoring", SpecWire.EventTopic(machineId, SpecElements.JobOrderAdded));
+        Assert.AreEqual($"machines/{machineId}/oem/Spindle/1/BearingTemperature",
             SpecWire.Topic(machineId, SpecElements.ExtensionPath("alcyone-machines.example", SpecElements.BearingTemperature)));
     }
 
     [TestMethod]
     public void Topics_LieBelowTheMachineIdOfTheSimulator_SplitLikeThePlaygroundTree()
     {
-        Assert.AreEqual("simulators/P-04/umati/Channel/1/ChannelState", SpecWire.Topic("P-04", "Channel.1.ChannelState"));
-        Assert.AreEqual("simulators/P-04/umati/State/Status", SpecWire.Topic("P-04", SpecElements.Status));
-        Assert.AreEqual("simulators/P-04/umati/Manifest", SpecWire.ManifestTopic("P-04"));
-        Assert.AreEqual("simulators/P-04/oem/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", "x-alcyone-machines-example.Spindle.1.BearingTemperature"));
-        Assert.AreEqual("simulators/P-04/umati/Connection/State", SpecPublisher.LastWill("P-04", MachineRun.Start).Topic, "the last will");
+        Assert.AreEqual("machines/P-04/umati/Channel/1/ChannelState", SpecWire.Topic("P-04", "Channel.1.ChannelState"));
+        Assert.AreEqual("machines/P-04/umati/State/Status", SpecWire.Topic("P-04", SpecElements.Status));
+        Assert.AreEqual("machines/P-04/umati/Manifest", SpecWire.ManifestTopic("P-04"));
+        Assert.AreEqual("machines/P-04/oem/Spindle/1/BearingTemperature", SpecWire.Topic("P-04", "x-alcyone-machines-example.Spindle.1.BearingTemperature"));
+        Assert.AreEqual("machines/P-04/umati/Connection/State", SpecPublisher.LastWill("P-04", MachineRun.Start).Topic, "the last will");
     }
 
     [TestMethod]

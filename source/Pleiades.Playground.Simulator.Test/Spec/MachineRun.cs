@@ -50,7 +50,6 @@ internal sealed class MachineRun
     {
         return new SpecOutputConfig
         {
-            Enabled = true,
             Scenario = new ScenarioConfig
             {
                 Seed = seed,

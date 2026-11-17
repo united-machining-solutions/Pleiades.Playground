@@ -7,22 +7,16 @@ using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Protocol;
 using Pleiades.Playground.Mqtt.Extensions;
-using Pleiades.Playground.Simulator.Production;
 
 namespace Pleiades.Playground.Simulator.Spec;
 
 /// <summary>
-/// Runs the virtual machine and hands what it says in each step to its outputs, each of them switched on its own:
-/// <list type="bullet">
-/// <item>the spec output (<c>Config:SpecOutput:Enabled</c>): the manifest, every value retained and the events not
-/// retained, below <c>simulators/{MachineId}/</c> (<c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>), on an MQTT connection of its own with the last will
+/// Runs the virtual machine and publishes what it says in each step after the data model, below
+/// <c>machines/{MachineId}/</c> (<c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>): the manifest, every value
+/// retained and the events as CloudEvents, not retained, on the MQTT connection of the simulator with the last will
 /// <c>Connection/State = CommunicationFault</c>. A scenario may let the adapter lose the machine now and then
-/// (<see cref="ScenarioConfig.CommunicationFaultInterval"/>): meanwhile only the heartbeat goes out;</item>
-/// <item>the production events (<c>Config:ProductionEvents:Enabled</c>): the job order and program execution events
-/// in the binding of the playground, on <c>machines/{SerialNumber}/events/jobs</c> and <c>…/events/workmasters</c>, over the connection of the
-/// generators.</item>
-/// </list>
-/// The scenario of the virtual machine is the one of <c>Config:SpecOutput</c> in both cases.
+/// (<see cref="ScenarioConfig.CommunicationFaultInterval"/>): meanwhile only the heartbeat goes out. The scenario is
+/// the one of <c>Config:SpecOutput</c>.
 /// </summary>
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Instantiated by DI")]
 internal sealed partial class VirtualMachineService : BackgroundService
@@ -30,8 +24,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
     private readonly Config _config;
     private readonly SpecOutputConfig _spec;
     private readonly ILogger<VirtualMachineService> _logger;
-    private readonly IManagedMqttClient _playgroundClient;
-    private readonly ILoggerFactory _loggerFactory;
+    private readonly IManagedMqttClient _client;
     private readonly TimeProvider _timeProvider;
     private readonly Lock _lock = new();
 
@@ -43,16 +36,14 @@ internal sealed partial class VirtualMachineService : BackgroundService
     public VirtualMachineService(
         IOptions<Config> config,
         ILogger<VirtualMachineService> logger,
-        ILoggerFactory loggerFactory,
         TimeProvider timeProvider,
-        IManagedMqttClient playgroundClient)
+        IManagedMqttClient client)
     {
         ArgumentNullException.ThrowIfNull(config);
         _config = config.Value;
-        _playgroundClient = playgroundClient;
+        _client = client;
         _spec = _config.SpecOutput.Resolve();
         _logger = logger;
-        _loggerFactory = loggerFactory;
         _timeProvider = timeProvider;
     }
 
@@ -69,35 +60,21 @@ internal sealed partial class VirtualMachineService : BackgroundService
         _machine = new VirtualMachine(identity, _spec, counters, start);
         _machine.TakeInitialMessages();
 
-        var production = _config.ProductionEvents.Enabled
-            ? new ProductionEventOutput(_playgroundClient, _config.SerialNumber)
-            : null;
         var faults = new CommunicationFaults(_spec.Scenario.CommunicationFaultInterval, _spec.Scenario.CommunicationFaultDuration, start);
-        if (production is not null)
-        {
-            LogProductionEvents(_config.SerialNumber);
-        }
 
-        // The spec output has a connection of its own; client and publisher are disposed once the loop has ended
-        // and the client is stopped, in the finally block below.
-        IManagedMqttClient? client = null;
-        SpecPublisher? publisher = null;
+        // The client is the one of the simulator (the health check watches it); the publisher is disposed once the
+        // loop has ended and the client is stopped, in the finally block below.
+        using var publisher = new SpecPublisher(_client, _machineId, _manifest, identity.ProductInstanceUri, _spec.EventBufferSize, _logger);
         var lastSaved = start;
         using var timer = new PeriodicTimer(_spec.TickInterval, _timeProvider);
         try
         {
-            if (_spec.Enabled)
-            {
-                LogStarting(SpecWire.Root, _machineId);
-                client = new MqttClientFactory().CreateManagedMqttClientWithLogger(_loggerFactory);
-                publisher = new SpecPublisher(client, _machineId, _manifest, identity.ProductInstanceUri, _spec.EventBufferSize, _logger);
-                var connected = publisher;
-                // The handler only runs while the client is started; the client is stopped before either is disposed.
+            LogStarting(SpecWire.Root, _machineId);
+            // The handler only runs while the client is started; the client is stopped before the publisher is disposed.
 #pragma warning disable CA2025
-                client.ConnectedAsync += _ => OnConnectedAsync(connected);
+            _client.ConnectedAsync += _ => OnConnectedAsync(publisher);
 #pragma warning restore CA2025
-                await client.StartAsync(CreateOptions(start)).ConfigureAwait(false);
-            }
+            await _client.StartAsync(CreateOptions(start)).ConfigureAwait(false);
 
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
             {
@@ -110,14 +87,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
                     current = _machine.Counters;
                 }
 
-                if (publisher is not null)
-                {
-                    await PublishSpecAsync(publisher, faults.IsFaulted(now), messages, now).ConfigureAwait(false);
-                }
-                if (production is not null)
-                {
-                    await production.PublishAsync(messages).ConfigureAwait(false);
-                }
+                await PublishSpecAsync(publisher, faults.IsFaulted(now), messages, now).ConfigureAwait(false);
 
                 if (now - lastSaved >= TimeSpan.FromSeconds(30))
                 {
@@ -133,18 +103,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
         finally
         {
             SaveCounters(_machine.Counters);
-            try
-            {
-                if (client is not null && publisher is not null)
-                {
-                    await DisconnectAsync(client, publisher).ConfigureAwait(false);
-                }
-            }
-            finally
-            {
-                publisher?.Dispose();
-                client?.Dispose();
-            }
+            await DisconnectAsync(_client, publisher).ConfigureAwait(false);
         }
     }
 
@@ -228,7 +187,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
             UseTls = destination.UseTls,
             UseSecureWebSocket = destination.UseSecureWebSocket,
             ProtocolVersion = destination.ProtocolVersion,
-            ClientId = string.IsNullOrWhiteSpace(destination.ClientId) ? null : $"{destination.ClientId}-spec",
+            ClientId = string.IsNullOrWhiteSpace(destination.ClientId) ? null : destination.ClientId,
         };
 
         // The broker publishes the last will when the connection breaks off. Its timestamp is the time of the
@@ -263,11 +222,8 @@ internal sealed partial class VirtualMachineService : BackgroundService
         }
     }
 
-    [LoggerMessage(EventId = 100, Level = LogLevel.Information, Message = "Spec output publishes the virtual machine below {Root}/{MachineId}/")]
+    [LoggerMessage(EventId = 100, Level = LogLevel.Information, Message = "Simulator publishes the virtual machine below {Root}/{MachineId}/")]
     private partial void LogStarting(string root, string machineId);
-
-    [LoggerMessage(EventId = 101, Level = LogLevel.Information, Message = "Job and work master events of the virtual machine go to machines/{SerialNumber}/events/jobs and /workmasters")]
-    private partial void LogProductionEvents(string serialNumber);
 
     [LoggerMessage(EventId = 102, Level = LogLevel.Information, Message = "Virtual machine is stopping")]
     private partial void LogStopping();

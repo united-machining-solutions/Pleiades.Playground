@@ -1,13 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using Pleiades.Playground.Common.Logging.Loki.Configuration;
-using Pleiades.Playground.Events.Generators.NotificationEvent;
 using Pleiades.Playground.Mqtt.Extensions;
-using Pleiades.Playground.Simulator.Production;
 using Pleiades.Playground.Simulator.Spec;
-using Pleiades.Playground.Timeseries.Generators.BaseUnitValue;
-using Pleiades.Playground.Timeseries.Generators.BooleanValue;
-using Pleiades.Playground.Timeseries.Generators.StringValue;
 
 namespace Pleiades.Playground.Simulator;
 
@@ -19,8 +14,8 @@ namespace Pleiades.Playground.Simulator;
 internal sealed class Config
 {
     /// <summary>
-    /// Serial number of the simulated machine. It is the machine id in every topic:
-    /// <c>machines/{SerialNumber}/...</c>. Must not contain '/', '+' or '#'.
+    /// Serial number of the simulated machine, <c>Identification.SerialNumber</c> and the last part of the machine id
+    /// in every topic, <c>machines/{MachineId}/...</c>. Must not contain '/', '+' or '#'.
     /// </summary>
     [Required]
     [RegularExpression(@"^[^/+#\s]+$")]
@@ -33,41 +28,10 @@ internal sealed class Config
     public required MqttConfig MqttDestination { get; set; }
 
     /// <summary>
-    /// Numeric values, each in its SI unit.
-    /// </summary>
-    [Required]
-    public required BaseUnitValueGeneratorConfig BaseUnitValueGeneratorConfig { get; init; }
-
-    /// <summary>
-    /// Text values such as machine states.
-    /// </summary>
-    [Required]
-    public required StringValueGeneratorConfig StringValueGeneratorConfig { get; init; }
-
-    /// <summary>
-    /// Boolean values.
-    /// </summary>
-    [Required]
-    public required BooleanValueGeneratorConfig BooleanValueGeneratorConfig { get; init; }
-
-    /// <summary>
-    /// Notifications (alarms and messages) that are raised and reset.
-    /// </summary>
-    [Required]
-    public required NotificationEventGeneratorConfig NotificationEventGeneratorConfig { get; init; }
-
-    /// <summary>
-    /// The output after the data model, below <c>simulators/{MachineId}/</c>, in addition to the output of the
-    /// generators. Off unless enabled.
+    /// The virtual machine and what it publishes after the data model, below <c>machines/{MachineId}/</c>: its
+    /// manufacturer and its scenario.
     /// </summary>
     public SpecOutputConfig SpecOutput { get; init; } = new();
-
-    /// <summary>
-    /// The production events of the virtual machine, job orders and program executions, on
-    /// <c>machines/{SerialNumber}/events/jobs</c> and <c>…/events/workmasters</c>. On by default; the virtual machine runs with the scenario
-    /// of <see cref="SpecOutput"/> whether the spec output is on or not.
-    /// </summary>
-    public ProductionEventsConfig ProductionEvents { get; init; } = new();
 
     /// <summary>
     /// Loki logging configuration.

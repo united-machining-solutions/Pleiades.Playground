@@ -12,8 +12,6 @@ namespace Pleiades.Playground.Simulator.Spec;
     Justification = "Bound by the configuration binder, never constructed in code")]
 internal sealed class SpecOutputConfig
 {
-    /// <summary>Whether this simulator also publishes below <c>simulators/{MachineId}/</c>.</summary>
-    public bool Enabled { get; init; }
 
     /// <summary>
     /// Name of the manufacturer, the value of <c>Identification.Manufacturer</c>, unless the scenario names its own.
@@ -102,7 +100,6 @@ internal sealed class SpecOutputConfig
         var manufacturerUri = string.IsNullOrWhiteSpace(scenario!.ManufacturerUri) ? ManufacturerUri : scenario.ManufacturerUri;
         return new SpecOutputConfig
         {
-            Enabled = Enabled,
             Manufacturer = string.IsNullOrWhiteSpace(scenario.Manufacturer) ? Manufacturer : scenario.Manufacturer,
             ManufacturerDomain = string.IsNullOrWhiteSpace(scenario.ManufacturerUri) ? ManufacturerDomain : DomainOf(scenario.ManufacturerUri),
             ProductInstanceUri = ProductInstanceUri,

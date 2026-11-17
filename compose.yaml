@@ -4,7 +4,7 @@
 #                          └─────▶ events-persistence ─────REST──▶ events-api ──────▶ mongodb
 #
 # Start:  docker compose up -d --build
-# Every numeric value on the broker is in its coherent SI unit (contracts/mqtt).
+# The simulators publish after the data model, in its units (contracts/mqtt).
 name: pleiades-playground
 
 x-service: &service
@@ -218,10 +218,9 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
 
-  # One simulator per machine. The serial number is the machine id in every topic below machines/.
-  # Every simulator also publishes after the data model, below simulators/{MachineId}/ (contracts/mqtt,
-  # "Spec binding"), from a virtual machine of its own with a scenario of its own kind of machine, as client
-  # <ClientId>-spec. The topics below machines/{SerialNumber}/ stay as they are.
+  # One simulator per machine. Each publishes after the data model, below machines/{MachineId}/
+  # (<manufacturer>_<model>_<serial number>, contracts/mqtt), from a virtual machine of its own with a scenario of
+  # its own kind of machine and a made-up manufacturer of its own.
   # All three run the same image. Only the first one builds it, or pulls it, so that happens once and not
   # three times; the other two take the image that is then on this computer (pull_policy: never).
   simulator-p-04:
@@ -234,8 +233,7 @@ services:
       Config__SerialNumber: P-04
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-p-04
-      # Shafts, flanges and bushings: the default scenario.
-      Config__SpecOutput__Enabled: "true"
+      # Shafts, flanges and bushings: the default scenario, machine id alcyone-machines_AX-400_P-04.
 
   simulator-p-07:
     <<: *simulator
@@ -245,7 +243,7 @@ services:
       Config__SerialNumber: P-07
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-p-07
-      Config__SpecOutput__Enabled: "true"
+      # Housings, machine id taygeta-precision_TP-800_P-07.
       Config__SpecOutput__ScenarioName: housings
 
   simulator-m-02:
@@ -256,7 +254,7 @@ services:
       Config__SerialNumber: M-02
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-m-02
-      Config__SpecOutput__Enabled: "true"
+      # Small parts, machine id merope-microtec_MM-120_M-02.
       Config__SpecOutput__ScenarioName: small-parts
 
 volumes:

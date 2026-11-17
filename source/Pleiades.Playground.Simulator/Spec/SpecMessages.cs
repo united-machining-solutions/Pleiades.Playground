@@ -32,12 +32,11 @@ internal sealed record SpecEvent(
 internal static class SpecWire
 {
     /// <summary>
-    /// The root of every topic of the spec binding. The output stands for the simulator of a machine; it lies below
-    /// <c>simulators/{MachineId}/</c>, beside <c>machines/{SerialNumber}/</c> of the binding of the playground.
-    /// Below the machine id comes a namespace level, as namespaces in OPC UA: <c>umati</c> for the elements of
-    /// the model, <c>oem</c> for the signals the machine manufacturer defines, and <c>events</c> for the events.
+    /// The root of every topic of the binding: <c>machines/{MachineId}/</c>. Below the machine id comes a namespace
+    /// level, as namespaces in OPC UA: <c>umati</c> for the elements of the model, <c>oem</c> for the signals the
+    /// machine manufacturer defines, and <c>events</c> for the events.
     /// </summary>
-    public const string Root = "simulators";
+    public const string Root = "machines";
 
     /// <summary>The most characters of one part of a machine id.</summary>
     public const int MachineIdPartLength = 64;
