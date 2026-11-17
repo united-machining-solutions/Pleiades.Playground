@@ -45,7 +45,7 @@ async function ask<TValues>(
  * Why a request got no answer. The client and `fetch` each wrap what the network said, for example
  * ECONNREFUSED, in an error of their own: the innermost cause is the reason.
  */
-function reasonOf(error: unknown): string {
+export function reasonOf(error: unknown): string {
   let innermost = error
   while (innermost instanceof Error && innermost.cause !== undefined) innermost = innermost.cause
   const { code, message } = (innermost ?? {}) as { code?: unknown; message?: unknown }
@@ -53,7 +53,7 @@ function reasonOf(error: unknown): string {
 }
 
 /** What a tool wrote as text, which is where it says why it failed. */
-function textOf(result: unknown): string | undefined {
+export function textOf(result: unknown): string | undefined {
   const { content } = result as { content?: unknown }
   if (!Array.isArray(content)) return undefined
   const texts = content.flatMap((part: { type?: unknown; text?: unknown }) =>
