@@ -14,6 +14,8 @@ internal sealed class MongoDbInitializer(
     IOptions<MongoDbSettings> options,
     ILogger<MongoDbInitializer> logger) : IHostedLifecycleService
 {
+    // The name keeps the word of the first version of this API, in which the machine id was called the serial
+    // number: MongoDB refuses the same index under a second name, so a database that has it keeps starting.
     private const string PlacementSiteIndexName = "idx_siteid_serialnumber";
 
     private static readonly Action<ILogger, string, Exception?> LogIndexCreated =
@@ -55,7 +57,7 @@ internal sealed class MongoDbInitializer(
 
             await placements.Indexes.CreateOneAsync(
                 new CreateIndexModel<PlacementDao>(
-                    Builders<PlacementDao>.IndexKeys.Ascending(p => p.SiteId).Ascending(p => p.SerialNumber),
+                    Builders<PlacementDao>.IndexKeys.Ascending(p => p.SiteId).Ascending(p => p.MachineId),
                     new CreateIndexOptions { Name = PlacementSiteIndexName }),
                 cancellationToken: linkedCts.Token).ConfigureAwait(false);
             LogIndexCreated(logger, _settings.PlacementCollection, null);

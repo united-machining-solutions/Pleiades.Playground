@@ -6,8 +6,10 @@ these; no machine sends them. The values and notifications of a machine stay in 
 - A **site** is a place with a company, a plant (`name`) and its halls. Its `siteId` follows the rules of
   `sites/{SiteId}` in the [MQTT binding](../../contracts/mqtt/README.md): not blank, no `/`, `+` or `#`. It also
   holds no `%` (an encoded `/` in a path stays encoded in ASP.NET Core) and no blank at either end.
-- A **placement** puts a machine on a site: serial number, site, hall (one of the halls of the site, or none) and
-  a display name (or none). The serial number follows the rules of `machines/{SerialNumber}`. A machine stands on
+- A **placement** puts a machine on a site: machine id, site, hall (one of the halls of the site, or none) and
+  a display name (or none). The machine id is the `{MachineId}` of `machines/{MachineId}` in the
+  [MQTT binding](../../contracts/mqtt/README.md#machine-id), `<manufacturer>_<model>_<serial number>`, the same id
+  the other APIs, the MCP tools and the example app name a machine by. A machine stands on
   one site at most; putting it on another site moves it.
 
 ## Start
@@ -24,9 +26,9 @@ answers on this computer only unless `SITES_BIND` opens it, because writing need
 | `GET /sites` | Every site with its halls, by site id |
 | `PUT /sites/{siteId}` | 201 new, 200 changed; 400 invalid; 409 when a hall left out still has machines |
 | `DELETE /sites/{siteId}` | 204; 404 unknown; 409 while machines stand on it |
-| `GET /placements` | Every machine on a site, by serial number |
-| `PUT /placements/{serialNumber}` | 201 placed, 200 moved or changed; 400 invalid, unknown site or hall |
-| `DELETE /placements/{serialNumber}` | 204; 404 when the machine stood on no site |
+| `GET /placements` | Every machine on a site, by machine id |
+| `PUT /placements/{machineId}` | 201 placed, 200 moved or changed; 400 invalid, unknown site or hall |
+| `DELETE /placements/{machineId}` | 204; 404 when the machine stood on no site |
 
 `placedAt` is the time the machine was put on its current site; moving it within the site keeps it.
 
@@ -37,7 +39,7 @@ or dropping the hall at the same moment conflicts, runs again and is refused.
 ```bash
 curl -X PUT http://localhost:5540/sites/north-plant -H 'Content-Type: application/json' \
   -d '{"company":"Demo Manufacturing","name":"North plant","halls":["Hall 1","Hall 2"]}'
-curl -X PUT http://localhost:5540/placements/M-02 -H 'Content-Type: application/json' \
+curl -X PUT http://localhost:5540/placements/merope-microtec_MM-120_M-02 -H 'Content-Type: application/json' \
   -d '{"siteId":"north-plant","hall":"Hall 2","displayName":"M-02"}'
 curl http://localhost:5540/placements
 ```

@@ -20,18 +20,18 @@ internal sealed record SiteRequestV1(string? Company, string? Name, IReadOnlyLis
 /// <summary>
 /// A machine on a site.
 /// </summary>
-/// <param name="SerialNumber">The serial number, the <c>{SerialNumber}</c> of <c>machines/{SerialNumber}</c> in the MQTT binding. Example: M-05</param>
+/// <param name="MachineId">The machine id, the <c>{MachineId}</c> of <c>machines/{MachineId}</c> in the MQTT binding, as every API and tool of the stack names a machine. Example: merope-microtec_MM-120_M-02</param>
 /// <param name="SiteId">The site the machine stands on. Example: north-plant</param>
 /// <param name="Hall">The hall of the site, or null when not given. Example: Hall 2</param>
-/// <param name="DisplayName">The name people know the machine by, or null when not given. Example: M-05</param>
+/// <param name="DisplayName">The name people know the machine by, or null when not given. Example: M-02</param>
 /// <param name="PlacedAt">When the machine was put on this site (UTC). Example: 2026-11-18T08:12:00Z</param>
-internal sealed record PlacementDtoV1(string SerialNumber, string SiteId, string? Hall, string? DisplayName, DateTime PlacedAt);
+internal sealed record PlacementDtoV1(string MachineId, string SiteId, string? Hall, string? DisplayName, DateTime PlacedAt);
 
 /// <summary>
-/// The body of <c>PUT /placements/{serialNumber}</c>: where a machine stands, without its serial number, which
+/// The body of <c>PUT /placements/{machineId}</c>: where a machine stands, without its machine id, which
 /// the path carries.
 /// </summary>
 /// <param name="SiteId">The site; required, and the site must exist. Example: north-plant</param>
 /// <param name="Hall">One of the halls of the site, or left out. Example: Hall 2</param>
-/// <param name="DisplayName">The name people know the machine by, or left out. Example: M-05</param>
+/// <param name="DisplayName">The name people know the machine by, or left out. Example: M-02</param>
 internal sealed record PlacementRequestV1(string? SiteId, string? Hall, string? DisplayName);

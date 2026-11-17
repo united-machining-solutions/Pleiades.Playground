@@ -4,17 +4,17 @@ using Pleiades.Playground.Sites.Api.DataTransferObjects;
 namespace Pleiades.Playground.Sites.Api.Endpoints;
 
 /// <summary>
-/// What a site id, a serial number and the bodies of the write endpoints must satisfy. Every check returns the
+/// What a site id, a machine id and the bodies of the write endpoints must satisfy. Every check returns the
 /// sentence the caller reads in a 400, or <see langword="null"/> when the value is fine.
 /// </summary>
 internal static class SiteRules
 {
-    // The MQTT binding forbids these three in {SiteId} and {SerialNumber}: '/' separates topic levels,
+    // The MQTT binding forbids these three in {SiteId} and {MachineId}: '/' separates topic levels,
     // '+' and '#' are the wildcards of a subscription.
     private static readonly char[] TopicReserved = ['/', '+', '#'];
 
     /// <summary>
-    /// A site id or serial number names one level of an MQTT topic: it is not blank and holds no <c>/</c>,
+    /// A site id or machine id names one level of an MQTT topic: it is not blank and holds no <c>/</c>,
     /// <c>+</c> or <c>#</c>. It also holds no <c>%</c> and no blank at either end, see the remarks.
     /// </summary>
     /// <remarks>

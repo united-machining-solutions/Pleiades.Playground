@@ -18,12 +18,12 @@ internal static class Placements
             .WithSummary("Lists every machine on a site")
             .RequireFeatureRead(SitesFeature.Name);
 
-        group.MapPut("/{serialNumber}", PutPlacement)
+        group.MapPut("/{machineId}", PutPlacement)
             .WithName("PutPlacement")
             .WithSummary("Puts a machine on a site, or moves it")
             .RequireFeatureWrite(SitesFeature.Name);
 
-        group.MapDelete("/{serialNumber}", DeletePlacement)
+        group.MapDelete("/{machineId}", DeletePlacement)
             .WithName("DeletePlacement")
             .WithSummary("Takes a machine off its site")
             .RequireFeatureWrite(SitesFeature.Name);
@@ -32,7 +32,7 @@ internal static class Placements
     }
 
     /// <summary>
-    /// Lists every machine on a site, ordered by serial number.
+    /// Lists every machine on a site, ordered by machine id.
     /// </summary>
     /// <param name="store">The store of sites and placements.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -47,20 +47,20 @@ internal static class Placements
     /// Puts a machine on a site, or moves it to another site or hall. Its values and notifications are not
     /// touched. The time it was placed changes only when the site does.
     /// </summary>
-    /// <param name="serialNumber">The serial number: no '/', '+', '#' or '%', no blank at either end. Example: M-05</param>
+    /// <param name="machineId">The machine id: no '/', '+', '#' or '%', no blank at either end. Example: merope-microtec_MM-120_M-02</param>
     /// <param name="request">Site, hall and display name.</param>
     /// <param name="store">The store of sites and placements.</param>
     /// <param name="timeProvider">The clock of the time a machine is placed.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>201 for a machine not placed before, 200 for one moved or changed, 400 for an invalid placement or an unknown site or hall.</returns>
     internal static async Task<Results<Created<PlacementDtoV1>, Ok<PlacementDtoV1>, BadRequest<string>>> PutPlacement(
-        string serialNumber,
+        string machineId,
         PlacementRequestV1 request,
         ISitesStore store,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        if ((SiteRules.CheckTopicLevel(serialNumber, "serial number") ?? SiteRules.CheckPlacement(request)) is { } error)
+        if ((SiteRules.CheckTopicLevel(machineId, "machine id") ?? SiteRules.CheckPlacement(request)) is { } error)
         {
             return TypedResults.BadRequest(error);
         }
@@ -77,10 +77,10 @@ internal static class Placements
                 // A concurrent transaction that removes the site or drops the hall now conflicts with this one.
                 await tx.ClaimSiteAsync(request.SiteId!, token).ConfigureAwait(false);
 
-                var existing = await tx.FindPlacementAsync(serialNumber, token).ConfigureAwait(false);
+                var existing = await tx.FindPlacementAsync(machineId, token).ConfigureAwait(false);
                 var placement = new PlacementDao
                 {
-                    SerialNumber = serialNumber,
+                    MachineId = machineId,
                     SiteId = request.SiteId!,
                     Hall = request.Hall,
                     DisplayName = request.DisplayName,
@@ -93,7 +93,7 @@ internal static class Placements
 
                 var dto = SitesMapper.ToDto(placement);
                 return existing is null
-                    ? TypedResults.Created(new Uri($"/placements/{Uri.EscapeDataString(serialNumber)}", UriKind.Relative), dto)
+                    ? TypedResults.Created(new Uri($"/placements/{Uri.EscapeDataString(machineId)}", UriKind.Relative), dto)
                     : TypedResults.Ok(dto);
             },
             cancellationToken).ConfigureAwait(false);
@@ -103,21 +103,21 @@ internal static class Placements
     /// Takes a machine off its site. Its values and notifications stay; a machine that keeps sending shows up
     /// again as not placed.
     /// </summary>
-    /// <param name="serialNumber">The serial number. Example: M-05</param>
+    /// <param name="machineId">The machine id. Example: merope-microtec_MM-120_M-02</param>
     /// <param name="store">The store of sites and placements.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>204 when removed, 404 when the machine stood on no site.</returns>
     internal static async Task<Results<NoContent, NotFound, BadRequest<string>>> DeletePlacement(
-        string serialNumber,
+        string machineId,
         ISitesStore store,
         CancellationToken cancellationToken)
     {
-        if (SiteRules.CheckTopicLevel(serialNumber, "serial number") is { } error)
+        if (SiteRules.CheckTopicLevel(machineId, "machine id") is { } error)
         {
             return TypedResults.BadRequest(error);
         }
 
-        return await store.DeletePlacementAsync(serialNumber, cancellationToken).ConfigureAwait(false)
+        return await store.DeletePlacementAsync(machineId, cancellationToken).ConfigureAwait(false)
             ? TypedResults.NoContent()
             : TypedResults.NotFound();
     }

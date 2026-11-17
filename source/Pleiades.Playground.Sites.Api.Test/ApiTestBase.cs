@@ -46,8 +46,8 @@ public abstract class ApiTestBase
     internal Task<HttpResponseMessage> PutSiteAsync(string siteId, SiteRequestV1 site) =>
         Http.PutAsJsonAsync(new Uri($"/sites/{siteId}", UriKind.Relative), site, Json, Ct);
 
-    internal Task<HttpResponseMessage> PutPlacementAsync(string serialNumber, PlacementRequestV1 placement) =>
-        Http.PutAsJsonAsync(new Uri($"/placements/{serialNumber}", UriKind.Relative), placement, Json, Ct);
+    internal Task<HttpResponseMessage> PutPlacementAsync(string machineId, PlacementRequestV1 placement) =>
+        Http.PutAsJsonAsync(new Uri($"/placements/{machineId}", UriKind.Relative), placement, Json, Ct);
 
     internal async Task<List<SiteDtoV1>> GetSitesAsync() =>
         (await Http.GetFromJsonAsync<List<SiteDtoV1>>(new Uri("/sites", UriKind.Relative), Json, Ct))!;
@@ -61,9 +61,9 @@ public abstract class ApiTestBase
         response.EnsureSuccessStatusCode();
     }
 
-    internal async Task GivenPlacementAsync(string serialNumber, string siteId, string? hall = null)
+    internal async Task GivenPlacementAsync(string machineId, string siteId, string? hall = null)
     {
-        using var response = await PutPlacementAsync(serialNumber, new PlacementRequestV1(siteId, hall, null));
+        using var response = await PutPlacementAsync(machineId, new PlacementRequestV1(siteId, hall, null));
         response.EnsureSuccessStatusCode();
     }
 }

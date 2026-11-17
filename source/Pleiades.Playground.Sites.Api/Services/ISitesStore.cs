@@ -12,11 +12,11 @@ internal interface ISitesStore
     /// <summary>Every site, ordered by site id.</summary>
     Task<IReadOnlyList<SiteDao>> ListSitesAsync(CancellationToken cancellationToken);
 
-    /// <summary>Every placement, ordered by serial number.</summary>
+    /// <summary>Every placement, ordered by machine id.</summary>
     Task<IReadOnlyList<PlacementDao>> ListPlacementsAsync(CancellationToken cancellationToken);
 
     /// <summary>Removes the placement; <see langword="false"/> when there was none. Needs no check.</summary>
-    Task<bool> DeletePlacementAsync(string serialNumber, CancellationToken cancellationToken);
+    Task<bool> DeletePlacementAsync(string machineId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Runs <paramref name="work"/> as one transaction: it sees one state of the store, and either all of its
@@ -47,11 +47,11 @@ internal interface ISitesTransaction
     /// </summary>
     Task ClaimSiteAsync(string siteId, CancellationToken cancellationToken);
 
-    /// <summary>The placements of one site, ordered by serial number.</summary>
+    /// <summary>The placements of one site, ordered by machine id.</summary>
     Task<IReadOnlyList<PlacementDao>> ListPlacementsOfSiteAsync(string siteId, CancellationToken cancellationToken);
 
     /// <summary>The placement of this machine, or <see langword="null"/>.</summary>
-    Task<PlacementDao?> FindPlacementAsync(string serialNumber, CancellationToken cancellationToken);
+    Task<PlacementDao?> FindPlacementAsync(string machineId, CancellationToken cancellationToken);
 
     /// <summary>Creates the placement or replaces the one of the same machine.</summary>
     Task SavePlacementAsync(PlacementDao placement, CancellationToken cancellationToken);

@@ -131,8 +131,8 @@ public sealed class MongoSitesStoreRaceTests : IDisposable
 
         public Task<IReadOnlyList<PlacementDao>> ListPlacementsAsync(CancellationToken cancellationToken) => inner.ListPlacementsAsync(cancellationToken);
 
-        public Task<bool> DeletePlacementAsync(string serialNumber, CancellationToken cancellationToken) =>
-            inner.DeletePlacementAsync(serialNumber, cancellationToken);
+        public Task<bool> DeletePlacementAsync(string machineId, CancellationToken cancellationToken) =>
+            inner.DeletePlacementAsync(machineId, cancellationToken);
 
         public Task<T> InTransactionAsync<T>(Func<ISitesTransaction, CancellationToken, Task<T>> work, CancellationToken cancellationToken) =>
             inner.InTransactionAsync((tx, token) => work(new PausingTransaction(tx, this), token), cancellationToken);
@@ -163,8 +163,8 @@ public sealed class MongoSitesStoreRaceTests : IDisposable
             public Task<IReadOnlyList<PlacementDao>> ListPlacementsOfSiteAsync(string siteId, CancellationToken cancellationToken) =>
                 store.PauseAfter(nameof(ListPlacementsOfSiteAsync), tx.ListPlacementsOfSiteAsync(siteId, cancellationToken));
 
-            public Task<PlacementDao?> FindPlacementAsync(string serialNumber, CancellationToken cancellationToken) =>
-                tx.FindPlacementAsync(serialNumber, cancellationToken);
+            public Task<PlacementDao?> FindPlacementAsync(string machineId, CancellationToken cancellationToken) =>
+                tx.FindPlacementAsync(machineId, cancellationToken);
 
             public Task SavePlacementAsync(PlacementDao placement, CancellationToken cancellationToken) =>
                 tx.SavePlacementAsync(placement, cancellationToken);
