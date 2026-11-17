@@ -325,7 +325,8 @@ internal sealed class VirtualMachine
             ["StartTime"] = SpecWire.Timestamp(execution.Start),
         };
         addSums?.Invoke(snapshot);
-        Set(SpecElements.ProgramExecution, snapshot, execution.Id);
+        // The snapshot names its ExecutionId inside; it carries no correlationId.
+        Set(SpecElements.ProgramExecution, snapshot);
         Emit(eventPath, (JsonObject)snapshot.DeepClone());
     }
 

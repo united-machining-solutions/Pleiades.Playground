@@ -138,8 +138,7 @@ sites/demo/weather/AirTemperature         { "timestamp": "2026-11-16T09:10:00Z",
 
 ## Spec binding (draft)
 
-A proposal for the MQTT binding of the data model, following the draft of version 0.15.0 (the reference in
-[`../datamodel`](../datamodel/README.md) still names 0.13.1 until 0.15.0 is published),
+A proposal for the MQTT binding of the data model, version 0.15.0 (see [`../datamodel`](../datamodel/README.md)),
 to be settled at the umati hackathon. Here everything is as the model says: paths, types, units, snapshots,
 lists, events, manifest and connection. The binding of the playground above stays as it is; the two trees live
 side by side on the same broker. Why this tree may use other units than the playground: see
@@ -259,8 +258,8 @@ The rules for events, so that a consumer can keep nothing but the events and sti
   carries its value at the moment of the change. A job order taken back before it started leaves with
   `JobOrderRemoved`, without a change of state.
 - Whoever needs the current state reads the value, not the events.
-- `seq` and `seqEpoch` are in the envelope of the model from 0.15.0 on; the schemas of 0.13.1 and 0.14.0 reject
-  them, and an event passes those once they are taken off, as `unit` with the values.
+- `seq` and `seqEpoch` are mandatory in the envelope of the model: every event carries them, `seq` from 1 per
+  machine and group.
 - The fields of an alert, in `Notification.ActiveAlerts` and in every alert event, are `Id`, `ErrorCode`,
   `Message`, `Severity` (the category after NAMUR NE 107), `SeverityValue` (a number from 1 to 1000), `Time`
   (since when it stands) and `SourceName`, and `correlationId` where it came up in a program execution.
@@ -333,8 +332,8 @@ Each virtual machine works like this:
   cancels it (`JobOrderCancelled`: aborted without having run, so with `EndTime` but without `StartTime` and
   `ProducedQuantity`) or takes it back (`JobOrderRemoved`).
 - `Executing` in `State/Status`, `Active` in `Channel/1/ChannelState`, a turning spindle and a program execution
-  always come together. Channel, active program and program execution carry the `ExecutionId` as
-  `correlationId`.
+  always come together. Channel and active work master carry the `ExecutionId` as `correlationId`; the
+  program execution snapshot names it inside, as `ExecutionId`, and carries no `correlationId`.
 - The power is high while a program runs and lower while the machine waits or is set up. The energy counter is
   the integral of the published power, and `EnergyElectricity` of `ProgramExecutionEnded` is the same integral
   over the program execution.
@@ -374,7 +373,7 @@ Each virtual machine works like this:
 | `umati/State/FeedOverride` | number | `one` |
 | `umati/Channel/1/ChannelState` | enum, `correlationId` | – |
 | `umati/Production/ActiveWorkMaster` | string, `correlationId` | – |
-| `umati/Production/ProgramExecution` | snapshot with `State` and `StartTime`, `correlationId` | – |
+| `umati/Production/ProgramExecution` | snapshot with `State`, `StartTime` and, after the end, the sums | – |
 | `umati/Production/JobOrders` | list | – |
 | `umati/OperationCounters/PartsProducedInLifetime` | integer | `piece` |
 | `umati/OperationCounters/PowerOnDuration` | number | `second` |

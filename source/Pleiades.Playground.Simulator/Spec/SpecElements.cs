@@ -95,7 +95,7 @@ internal static class SpecElements
         new(ChannelState, null, "source", true),
         new(JobOrders, null, "source", false),
         new(ActiveWorkMaster, null, "source", true),
-        new(ProgramExecution, null, "source", true),
+        new(ProgramExecution, null, "source", false),
         new(PartsProducedInLifetime, UnitPiece, "source", false),
         new(ActiveAlerts, null, "source", true),
         new(PowerOnDuration, UnitSecond, "source", false),

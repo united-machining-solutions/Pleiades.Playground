@@ -36,7 +36,7 @@ public sealed class VirtualMachineTest
             Assert.AreEqual(channelState == "Active", rotating, $"Channel and spindle at {machine.Now:O}");
             Assert.AreEqual(expectedChannel, channelState, $"Channel and execution at {machine.Now:O}");
             Assert.AreEqual(channelState == "Reset" ? null : executionId, channel.CorrelationId, "The channel names the running execution");
-            Assert.AreEqual(executionId, execution.CorrelationId, "The execution names itself");
+            Assert.IsNull(execution.CorrelationId, "The snapshot names its ExecutionId inside, without a correlationId");
             if (executionState is "Running" or "Interrupted")
             {
                 Assert.AreEqual(MachineRun.Text(execution.Value, "ActiveWorkMaster"), values[SpecElements.ActiveWorkMaster].Value!.GetValue<string>());

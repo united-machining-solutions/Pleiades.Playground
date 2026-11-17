@@ -107,9 +107,7 @@ public sealed partial class SchemaConformanceTest
             Assert.AreEqual(specEvent.Seq, wire["seq"]!.GetValue<long>());
             Assert.AreEqual(run.Machine.SeqEpoch, wire["seqEpoch"]!.GetValue<string>());
 
-            // seq and seqEpoch belong to the binding, the schema of the model describes the event without them.
-            wire.Remove("seq");
-            wire.Remove("seqEpoch");
+            // seq and seqEpoch are in the envelope of the model: the event goes to the schema as it is.
             if (specEvent.Path == SpecElements.JobOrderCancelled)
             {
                 Assert.AreEqual(1, Cancelled(wire["value"]!.AsObject()), "JobOrderCancelled carries a job order that never ran");
