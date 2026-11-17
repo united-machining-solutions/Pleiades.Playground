@@ -52,12 +52,12 @@ Errors: 404 for an unknown drink or order, 409 for a refused order, 502 when the
 
 ## MCP
 
-`http://localhost:5540/mcp`, streamable HTTP. The tools are the routes above:
+`http://localhost:5550/mcp`, streamable HTTP. The tools are the routes above:
 `juicebar_drinks_list`, `juicebar_drink_get`, `juicebar_status`, `juicebar_order_get`, `juicebar_order_create`,
 and the two discovery tools `juicebar_describe_server` and `juicebar_get_skill_guide`.
 
 ```json
-{ "servers": { "pleiades-juicebar": { "type": "http", "url": "http://localhost:5540/mcp" } } }
+{ "servers": { "pleiades-juicebar": { "type": "http", "url": "http://localhost:5550/mcp" } } }
 ```
 
 ## In the chat of the example app
@@ -103,7 +103,7 @@ While the machine does not answer, only the heartbeat and `Connection/State` = `
 | `JUICEBAR_ENABLE_ORDERING` | `true` | `false` makes the service read-only. |
 | `JUICEBAR_MAX_QUEUE_LENGTH` | `3` | No order while this many wait. |
 | `JUICEBAR_BIND` | `127.0.0.1` | The address the port is published on. |
-| `JUICEBAR_API_PORT` | `5540` | |
+| `JUICEBAR_API_PORT` | `5550` | |
 | `JUICEBAR_MACHINE_ID` | `JUICEBAR-01` | The machine id in the topics. |
 | `JUICEBAR_LANGUAGE` | `en` | `en` or `de`, for the names of drinks and ingredients. |
 

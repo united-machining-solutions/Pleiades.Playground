@@ -17,7 +17,7 @@ All notable changes are documented here. The format follows
   current jobs and history with durable slice associations, and a separate MQTT telemetry adapter.
   Both containers are part of the root Compose stack and image-publication workflow, enabled for
   deployment with COMPOSE_PROFILES=ultimaker.
-- Optional juice bar service `juicebar-api` (Compose profile `juicebar`, port 5540): the card and the state of
+- Optional juice bar service `juicebar-api` (Compose profile `juicebar`, port 5550): the card and the state of
   a machine that runs MixerControl over REST and MCP, an order on request, and its state on the broker below
   `machines/{SerialNumber}/`. It never starts the production; `JUICEBAR_ENABLE_ORDERING=false` makes it
   read-only.

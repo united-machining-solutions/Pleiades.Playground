@@ -249,7 +249,7 @@ services:
     ports:
       # No sign-in, and it orders at a real machine: it answers on this computer only, unless
       # JUICEBAR_BIND opens it to the network. The containers of this stack reach it either way.
-      - "${JUICEBAR_BIND:-127.0.0.1}:${JUICEBAR_API_PORT:-5540}:8080"
+      - "${JUICEBAR_BIND:-127.0.0.1}:${JUICEBAR_API_PORT:-5550}:8080"
     depends_on:
       broker:
         condition: service_healthy
