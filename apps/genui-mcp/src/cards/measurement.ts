@@ -1,3 +1,4 @@
+import { serialNumber } from "@pleiades/cards/machine/contract.ts"
 import { SERIES_SLOTS, measurementList, measurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import { measurementListInWords } from "@pleiades/cards/measurement/in-words.ts"
 import { toolDefinition } from "@tanstack/ai"
@@ -20,13 +21,18 @@ const shownAsCard =
 const measurementListTool = toolDefinition({
   name: "genui_measurement_list",
   description:
-    "List what every machine measures now: active power, energy imported, spindle bearing temperature, whether the spindle rotates, feed and spindle override, and power-on duration. Each is the newest value of its topic, in the unit it was published in, and says whether it is current. The result says it in a line for each machine and carries the values of the measurement card.",
-  inputSchema: z.object({ timeZone }),
+    "List what every machine measures now, or one machine with `machine`: active power, energy imported, spindle bearing temperature, whether the spindle rotates, feed and spindle override, and power-on duration. Each is the newest value of its topic, in the unit it was published in, and says whether it is current. The result says it in a line for each machine and carries the values of the measurement card. For a question about one machine, name it.",
+  inputSchema: z.object({
+    machine: serialNumber
+      .optional()
+      .describe("The serial number of one machine, for example P-04. Every machine if omitted."),
+    timeZone,
+  }),
   outputSchema: measurementList,
   metadata: { title: "List measurements", annotations: readOnly, _meta: { ui: { resourceUri: MEASUREMENT_CARD_URI } } },
 }).server<Context>(async (input, ctx) => {
   const zone = knownTimeZone(input.timeZone)
-  const list = inTimeZoneOf(await listMeasurements(ctx.context.apis), zone)
+  const list = inTimeZoneOf(await listMeasurements(ctx.context.apis, new Date(), input.machine), zone)
   return inWords(list, `${measurementListInWords(list)}\n\n${shownAsCard}`)
 })
 
@@ -35,7 +41,7 @@ export const MEASUREMENT_SERIES_TOOL = "genui_measurement_series"
 const measurementSeriesTool = toolDefinition({
   name: MEASUREMENT_SERIES_TOOL,
   description:
-    "List the values of every physical quantity of every machine over the last minutes, a line for each machine: what the graphs of the measurements draw. A graph calls it. A language model does not need it to say what a machine measures now: that is genui_measurement_list.",
+    "List the values of every physical quantity of every machine over the last minutes, a line for each machine: what the graphs of the measurements draw. A page of an application calls it; no card asks for it yet. A language model does not need it to say what a machine measures now: that is genui_measurement_list.",
   inputSchema: z.object({
     minutes: z
       .number()
@@ -55,7 +61,8 @@ const measurementSeriesTool = toolDefinition({
       ),
   }),
   outputSchema: measurementSeries,
-  // Only a graph calls this tool: a host that shows MCP Apps does not offer it to its language model.
+  // Not for a language model: a host that shows MCP Apps does not offer it to one. Today the page
+  // "Live values" of the example app calls it; no card file asks for it yet.
   metadata: { title: "List measurement series", annotations: readOnly, _meta: { ui: { visibility: ["app"] } } },
 }).server<Context>(async (input, ctx) => {
   const series = await listMeasurementSeries(ctx.context.apis, input.minutes, input.slots)
@@ -81,18 +88,21 @@ newest value of each physical quantity. Pass the \`timeZone\` of the person you 
 - \`powerOnDuration\`: \`umati/OperationCounters/PowerOnDuration\`, in seconds.
 
 Every value keeps the unit it was published in (\`unit\`). Say it in that unit, and do not convert it.
-\`stale\` is true where the newest value is more than 30 seconds old, or where there is none: then it is
+For a question about one machine, pass \`machine\`. A value holds until the next one of its topic, as
+long as the machine gives signs of life. \`stale\` is true where the machine was silent since, more
+than 30 seconds without a sign of life, or where there is no value: then it is
 the last value known, not what the machine measures now.
 
 The values over the last minutes, a line for each machine, are what a graph draws. They grow with
-time, so they are not in that result: a graph asks \`genui_measurement_series\` for them.
+time, so they are not in that result: a page that draws graphs asks \`genui_measurement_series\` for
+them. You do not need it.
 `
 
 export const measurementCard = card({
   tools: [measurementListTool, measurementSeriesTool],
   describes: [
     "- genui_measurement_list: every machine with the newest value of each physical quantity.",
-    "- genui_measurement_series: the values of every quantity over the last minutes, for graphs. A graph calls it.",
+    "- genui_measurement_series: the values of every quantity over the last minutes, for the graphs of a page.",
   ],
   guide: measurementGuide,
   file: { name: "measurement", uri: MEASUREMENT_CARD_URI },

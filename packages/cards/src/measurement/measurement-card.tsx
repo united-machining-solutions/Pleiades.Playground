@@ -49,7 +49,7 @@ export function MeasurementCards({ asOf, machines }: MeasurementList) {
     return <p className="text-sm text-muted-foreground">No machine published a value in the last 24 hours.</p>
   }
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(20rem,1fr))] gap-3">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,20rem),1fr))] gap-3">
       {machines.map((machine) => (
         <MeasurementCard key={machine.machine} machine={machine} asOf={asOf} />
       ))}

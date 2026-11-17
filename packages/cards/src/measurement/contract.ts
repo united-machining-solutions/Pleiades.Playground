@@ -32,7 +32,7 @@ export const measurement = z.object({
   stale: z
     .boolean()
     .describe(
-      `True if the newest value is more than ${SILENT_AFTER_SECONDS} seconds older than \`asOf\`, or if there is none: then it is not what the machine measures now.`,
+      `True if the machine was silent since the newest value, more than ${SILENT_AFTER_SECONDS} seconds without a sign of life, or if there is none: then it is not what the machine measures now. A value holds until the next one, however old, as long as the machine is there.`,
     ),
   topic: z.string().describe("The MQTT topic the value comes from."),
 })
@@ -59,7 +59,9 @@ export const point = z.object({
   value: z
     .union([z.number(), z.boolean()])
     .nullable()
-    .describe("The value that held at `at`: the newest one measured before. Null if none was measured in the 30 seconds before."),
+    .describe(
+      `The value that held at \`at\`: the newest one measured before. Null if there is none, or if the machine was silent since, more than ${SILENT_AFTER_SECONDS} seconds without a sign of life.`,
+    ),
 })
 export type Point = z.infer<typeof point>
 
@@ -73,7 +75,7 @@ export type MeasurementLine = z.infer<typeof measurementLine>
 /**
  * The values of every machine over the last minutes: what the graphs of the measurements draw,
  * one graph for each quantity and a line for each machine in it. They grow with time, so they are
- * not part of what a language model reads: only a graph asks for them.
+ * not part of what a language model reads: a page that draws the graphs asks for them.
  */
 export const measurementSeries = z.object({
   from: instant,

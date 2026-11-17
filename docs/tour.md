@@ -77,6 +77,16 @@ tile. The values are the result of the tool `genui_machine_list`
 ([`apps/genui-mcp/src/machines.ts`](../apps/genui-mcp/src/machines.ts)). Which value is which state is decided
 in one file, [`packages/cards/src/machine/state.ts`](../packages/cards/src/machine/state.ts).
 
+The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
+physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
+a line for each machine. A choice above the graphs shows one machine or all of them. It has no picture in
+this tour.
+
+**In the code:** [`apps/app/src/routes/live.tsx`](../apps/app/src/routes/live.tsx) is the page,
+[`packages/cards/src/measurement/measurement-graph.tsx`](../packages/cards/src/measurement/measurement-graph.tsx)
+a graph. The lines are the result of the tool `genui_measurement_series`
+([`apps/genui-mcp/src/measurements.ts`](../apps/genui-mcp/src/measurements.ts)).
+
 ## 3. The page of one machine
 
 A click on a machine opens its page, here <http://localhost:5600/machines/P-04>. It shows the machine card:
