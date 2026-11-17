@@ -81,7 +81,7 @@ newest value of each physical quantity. Pass the \`timeZone\` of the person you 
 - \`activePower\`: \`umati/Consumption/Electricity/Main/AcActivePowerTotal\`, in watt.
 - \`energyImported\`: \`umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp\`, a meter in watt hours
   that counts up.
-- \`bearingTemperature\`: \`vendor/Spindle/1/BearingTemperature\`, a value of the manufacturer.
+- \`bearingTemperature\`: \`oem/Spindle/1/BearingTemperature\`, a value of the manufacturer.
 - \`spindleRotating\`: \`umati/Spindle/1/IsRotating\`, yes or no.
 - \`feedOverride\`, \`spindleOverride\`: \`umati/State/FeedOverride\`, \`umati/Spindle/1/Override\`, a
   fraction in \`one\`: 1 is 100 percent.

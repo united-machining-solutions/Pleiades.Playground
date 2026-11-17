@@ -43,7 +43,7 @@ Then stop asking.
 
 ## 3. Look for yourself
 
-One command shows what the stack has: the pages, the answers, the stored values, the notifications, and
+One command shows what the stack has: the pages, the answers, the stored values, the alerts, and
 whether the chat has a language model. It only reads, and it runs with any Node.js from version 18.
 
 ```bash
@@ -57,13 +57,13 @@ Without Node.js, read the same from the files: the routes under `apps/app/src/ro
 To read one answer as it is, call its tool:
 
 ```bash
-node .claude/skills/build-your-own/look.mjs call genui_machine_show machine=P-04
+node .claude/skills/build-your-own/look.mjs call genui_machine_show machine=alcyone-machines_AX-400_P-04
 ```
 
 To see the card of an answer, without a language model, as a host of MCP Apps shows it:
 
 ```bash
-node .claude/skills/build-your-own/show-card.mjs genui_machine_show machine=P-04
+node .claude/skills/build-your-own/show-card.mjs genui_machine_show machine=alcyone-machines_AX-400_P-04
 ```
 
 It serves a page until it is stopped, and prints its address.
@@ -74,7 +74,7 @@ Then take the first row that is true, from the top:
 |---|---|---|
 | A page shows it, or a tool returns it as it is | Nothing to build | none |
 | Tools return what is needed, and no place shows it together | A page | `create-page` |
-| The stored values or the notifications hold it, and no tool returns it | A card, with the tool that answers | `create-card` |
+| The stored values or the alerts hold it, and no tool returns it | A card, with the tool that answers | `create-card` |
 | The stack does not have the data | A source, then a card that shows it | `add-source` |
 
 Where the rows meet:

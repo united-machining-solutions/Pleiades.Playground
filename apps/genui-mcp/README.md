@@ -91,7 +91,7 @@ To see it, add `http://localhost:5520/mcp` to a host that shows MCP Apps and ask
 runs somewhere else needs an address it can reach.
 
 Without a host and without a language model, a script stands in for one:
-`node .claude/skills/build-your-own/show-card.mjs genui_machine_show machine=P-04` calls the tool, reads the
+`node .claude/skills/build-your-own/show-card.mjs genui_machine_show machine=alcyone-machines_AX-400_P-04` calls the tool, reads the
 card file it links and serves a page that hands the file the result, as a host does. A tool the card calls
 itself goes on to this server. It is what the recipe `create-card` looks at a new card with.
 

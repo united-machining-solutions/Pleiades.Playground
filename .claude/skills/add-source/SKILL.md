@@ -28,8 +28,8 @@ What the value is about decides its topic.
 
 | The value belongs to | Topic | Agreed |
 |---|---|---|
-| A machine, and the data model names it | `machines/{SerialNumber}/umati/<path>` | Yes, by the binding |
-| A machine, and it is specific to its maker | `machines/{SerialNumber}/vendor/<path>` | Yes, by the binding |
+| A machine, and the data model names it | `machines/{MachineId}/umati/<path>` | Yes, by the binding |
+| A machine, and it is specific to its maker | `machines/{MachineId}/oem/<path>` | Yes, by the binding |
 | A place, a line, anything that is not a machine | `sites/{SiteId}/{Source}/<path>` | Yes, by the binding |
 
 - Ask the person only what you cannot look up: where the values come from, whether that needs a key, and
