@@ -152,8 +152,19 @@ function Assistant() {
   }, [alert, alarmed])
 
   // "Hey Titan": listens while Titan is started and does nothing else, so it never hears itself.
+  const [wakeReady, setWakeReady] = useState(false)
+  /** The last piece Titan recognised that was no call, shown a moment so the person sees what it heard. */
+  const [overheard, setOverheard] = useState<string>()
+  useEffect(() => {
+    if (!overheard) return
+    const timer = setTimeout(() => setOverheard(undefined), 4_000)
+    return () => clearTimeout(timer)
+  }, [overheard])
   useWakeWord({
+    armed: started,
     enabled: started && state === "idle",
+    onReady: setWakeReady,
+    onHeard: (text) => setOverheard(text),
     onWake: () => {
       setProblem(undefined)
       setHeard(undefined)
@@ -264,8 +275,10 @@ function Assistant() {
       <p className="sr-only" aria-live="polite">
         {said[state]}
       </p>
-      {(problem ?? recognition) && (
-        <p className="absolute bottom-6 px-4 text-sm text-white/50">{problem ?? recognition}</p>
+      {(problem ?? recognition ?? (overheard && `Gehört: „${overheard}“`) ?? (wakeReady && "Ich höre auf „Hey Titan“.")) && (
+        <p className="absolute bottom-6 px-4 text-sm text-white/50">
+          {problem ?? recognition ?? (overheard && `Gehört: „${overheard}“`) ?? (wakeReady && "Ich höre auf „Hey Titan“.")}
+        </p>
       )}
     </div>
   )

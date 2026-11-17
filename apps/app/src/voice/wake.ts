@@ -77,6 +77,11 @@ export function wavOf(samples: Float32Array, rate = RATE): Blob {
 }
 
 export type WakeOptions = {
+  /**
+   * Open the microphone. Only after a click or a key on the page: a browser keeps the sound of a page
+   * that was not touched yet suspended, and the microphone would hear nothing.
+   */
+  armed: boolean
   /** Listen now. False while Titan speaks or the space bar records. */
   enabled: boolean
   /** "Hey Titan" alone: Titan is awake and waits for the question. */
@@ -85,15 +90,20 @@ export type WakeOptions = {
   onQuestion(question: string): void
   /** The microphone cannot be used, in words for the person. */
   onProblem?(problem: string): void
+  /** Ready to hear "Hey Titan", or not any more. */
+  onReady?(ready: boolean): void
+  /** What a piece of speech was recognised as, a call or not, so the person sees what Titan heard. */
+  onHeard?(text: string): void
 }
 
-/** Listens for "Hey Titan" while the page is open and `enabled` is true. */
+/** Listens for "Hey Titan" once `armed`, while the page is open and `enabled` is true. */
 export function useWakeWord(options: WakeOptions) {
   const latest = useRef(options)
   latest.current = options
+  const { armed } = options
 
   useEffect(() => {
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return
+    if (!armed || typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return
     let closed = false
     let context: AudioContext | undefined
     let stream: MediaStream | undefined
@@ -109,6 +119,7 @@ export function useWakeWord(options: WakeOptions) {
       try {
         const text = await transcribe(wavOf(samples))
         if (closed || !text) return
+        latest.current.onHeard?.(text)
         if (Date.now() < awakeUntil) {
           awakeUntil = 0
           const { woke, question } = wakeQuestion(text)
@@ -173,6 +184,8 @@ export function useWakeWord(options: WakeOptions) {
         source.connect(processor)
         // It runs only when it is connected to an output; it writes silence there.
         processor.connect(context.destination)
+        if (context.state === "suspended") await context.resume()
+        latest.current.onReady?.(context.state === "running")
       } catch {
         latest.current.onProblem?.("Für „Hey Titan“ braucht der Browser das Mikrofon. Erlaube es oben links in der Adresszeile.")
       }
@@ -182,6 +195,7 @@ export function useWakeWord(options: WakeOptions) {
       closed = true
       void context?.close()
       stream?.getTracks().forEach((track) => track.stop())
+      latest.current.onReady?.(false)
     }
-  }, [])
+  }, [armed])
 }
