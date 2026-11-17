@@ -62,16 +62,17 @@ export function useNewFaults(onFault: (fault: Fault) => void): ReadonlyArray<str
  * What the assistant is told when a fault arrives. It is no question of the person: it says so, and
  * asks for a short spoken message, the shop floor and a next step.
  */
-export function faultBriefing(fault: Fault, person: string): string {
+export function faultBriefing(fault: Fault, person: string | undefined): string {
   const at = new Date(fault.raisedAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+  const who = person ?? "der Person vor dem Bildschirm"
   return [
-    `[Meldung der Anlage, nicht von ${person}] Um ${at} hat die Maschine ${fault.machine} einen Fehler gemeldet: „${fault.title}“ (Fehler ${fault.notificationId}).`,
-    `Sprich ${person} direkt an und sag ihr in zwei kurzen Sätzen auf Deutsch, was los ist. Zeig dazu die Halle mit genui_shopfloor_show.`,
+    `[Meldung der Anlage, nicht von ${person ?? "der Person"}] Um ${at} hat die Maschine ${fault.machine} einen Fehler gemeldet: „${fault.title}“ (Fehler ${fault.notificationId}).`,
+    `Sprich ${person ?? "die Person"} direkt an${person ? "" : ", ohne Namen,"} und sag ${who} in zwei kurzen Sätzen auf Deutsch, was los ist. Zeig dazu die Halle mit genui_shopfloor_show.`,
     `Schlag einen sinnvollen nächsten Schritt vor und frag am Ende, ob du die Details der Maschine zeigen sollst. Erfinde keine Ursache, die die Daten nicht nennen.`,
   ].join(" ")
 }
 
 /** What the orb says when there is no language model to ask: the fault itself. */
-export function faultInWords(fault: Fault, person: string): string {
-  return `${person}, Achtung: Die Maschine ${fault.machine} hat gerade einen Fehler gemeldet. ${fault.title}.`
+export function faultInWords(fault: Fault, person: string | undefined): string {
+  return `${person ? `${person}, ` : ""}Achtung: Die Maschine ${fault.machine} hat gerade einen Fehler gemeldet. ${fault.title}.`
 }

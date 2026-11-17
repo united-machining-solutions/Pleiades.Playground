@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite dev --port 3000",
-    "build": "vite build",
+    "dev": "node face-models.mjs && vite dev --port 3000",
+    "build": "node face-models.mjs && vite build",
     "start": "node .output/server/index.mjs",
     "postinstall": "node route-tree.mjs",
     "typecheck": "node route-tree.mjs && tsc",
@@ -26,6 +26,7 @@
     "@tanstack/markdown": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
+    "@vladmandic/human": "catalog:",
     "cn": "catalog:",
     "lucide-react": "catalog:",
     "react": "catalog:",

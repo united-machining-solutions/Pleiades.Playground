@@ -19,6 +19,8 @@ import type { Fault } from "@/voice/faults.ts"
 import { useShownCards } from "@/voice/shown.ts"
 import { loadRecognition } from "@/voice/transcribe.ts"
 import { useWakeWord } from "@/voice/wake.ts"
+import { greetingFor } from "@/voice/greeting.ts"
+import { usePresence } from "@/titan/faces/presence.ts"
 import { Cloud } from "@/voice/cloud.tsx"
 
 // Titan: a black screen with a cloud of points that greets, listens and speaks, and nothing else.
@@ -32,9 +34,6 @@ import { Cloud } from "@/voice/cloud.tsx"
 //
 // The demo speaks German, so do the words of this page.
 
-/** Who the cloud greets. */
-const GREETED = "Kathrin"
-const GREETING = `Hallo ${GREETED}, was kann ich für dich tun?`
 /** What Titan says when it is called by its name alone. */
 const AWAKE = "Ja?"
 
@@ -66,8 +65,9 @@ function Assistant() {
   const [started, setStarted] = useState(false)
   const holding = useRef(false)
   // The handlers of the keys read the newest values without being bound again.
-  const latest = useRef({ state, panel })
-  latest.current = { state, panel }
+  const latest = useRef<{ state: VoiceState; panel: typeof panel; alarmed: ReadonlyArray<string>; person?: string }>({ state, panel, alarmed: [] })
+  latest.current.state = state
+  latest.current.panel = panel
 
   // The speech recognition gets ready as the screen opens. With the endpoint of the language model,
   // the hub, there is nothing to load. Without it, Whisper loads: from the cache of the browser, or
@@ -105,14 +105,34 @@ function Assistant() {
     if (fastest) pickModel(fastest)
   }, [chatStatus.models])
   const [alert, setAlert] = useState<Fault>()
+  /** Who stands in front of the camera, by name if the face is known. */
+  const [person, setPerson] = useState<string>()
   const alarmed = useNewFaults((fault) => {
     setAlert(fault)
     setHeard(undefined)
     setProblem(undefined)
-    if (!chatStatus.configured) return void speak(faultInWords(fault, GREETED))
-    const briefing = faultBriefing(fault, GREETED)
+    if (!chatStatus.configured) return void speak(faultInWords(fault, latest.current.person))
+    const briefing = faultBriefing(fault, latest.current.person)
     if (!askFollowUp(briefing)) latest.current.panel.ask(briefing)
   })
+  latest.current.alarmed = alarmed
+  latest.current.person = person
+
+  // Someone steps in front of the camera: Titan greets them, by name if it knows the face, and says
+  // straight away when machines stand still with an error. It does not talk over itself or a question.
+  const presence = usePresence({
+    enabled: started,
+    onArrive: ({ name }) => {
+      setPerson(name)
+      if (latest.current.state !== "idle") return
+      setHeard(undefined)
+      void speak(greetingFor(name, latest.current.alarmed))
+    },
+  })
+  // Without a camera, Titan greets once when it is started, without a name.
+  useEffect(() => {
+    if (started && presence.status === "error") void speak(greetingFor(undefined, latest.current.alarmed))
+  }, [started, presence.status])
   // The fault is over once its machine has no open error any more.
   useEffect(() => {
     if (alert && !alarmed.includes(alert.machine)) setAlert(undefined)
@@ -143,8 +163,9 @@ function Assistant() {
     const start = () => {
       if (greeted.current) return false
       greeted.current = true
+      // The camera greets whoever stands in front of it; until then a short sound says Titan is there.
       setStarted(true)
-      void speak(GREETING)
+      void speak("Titan ist bereit.")
       return true
     }
 
@@ -210,7 +231,7 @@ function Assistant() {
       </div>
       <div className="flex flex-col gap-4">
         {cards.length === 0 && !alert && (
-          <h1 className="text-3xl font-light tracking-wide text-balance text-white/90">{GREETING}</h1>
+          <h1 className="text-3xl font-light tracking-wide text-balance text-white/90">{greetingFor(person, alarmed)}</h1>
         )}
         {alert && (
           <p className="text-2xl font-light text-balance text-state-alarm" role="alert">

@@ -1,0 +1,18 @@
+// What Titan says when someone steps in front of the camera: by name if the face is known, and
+// straight to the point if a machine stands still with an error.
+
+/** "P-04", "P-04 und P-07", "M-02, P-04 und P-07". */
+export function machinesInWords(machines: ReadonlyArray<string>): string {
+  if (machines.length <= 1) return machines.join("")
+  return `${machines.slice(0, -1).join(", ")} und ${machines.at(-1)}`
+}
+
+/** The greeting for a person, by name if known, with the machines that have an open error now. */
+export function greetingFor(name: string | undefined, faulty: ReadonlyArray<string>): string {
+  const hello = name ? `Hallo ${name}` : "Hallo"
+  if (faulty.length > 0) {
+    const where = machinesInWords(faulty)
+    return name ? `${hello}, du hast ungeplante Ausfälle: ${where}.` : `${hello}, es gibt ungeplante Ausfälle: ${where}.`
+  }
+  return name ? `${hello}, wie kann ich dir helfen?` : `${hello}, wie kann ich helfen?`
+}
