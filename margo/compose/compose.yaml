@@ -1,0 +1,284 @@
+# Pleiades Playground demo stack as the component of the Margo app (see margo/README.md).
+#
+#   simulator ──MQTT──▶ broker ──▶ timeseries-persistence ──REST──▶ timeseries-api ──▶ mongodb
+#                          └─────▶ events-persistence ─────REST──▶ events-api ──────▶ mongodb
+#   browser ──HTTP──▶ traefik ──▶ app ──MCP──▶ genui-mcp ──▶ both APIs
+#
+# The same stack as compose.yaml at the root of the repository, in the form bart accepts:
+# - no `build:`: the images are the ones the workflow "Images" publishes to ghcr.io;
+# - every image is a literal reference: bart mirrors each one as it stands and does not interpolate it;
+# - no YAML anchors or merge keys: bart's compose parser does not resolve them, so each service says
+#   everything itself;
+# - no bind mount out of this folder: the configurations of the broker and of Traefik are config files
+#   next to this one, and Traefik reads its routes from a file rather than from the Docker socket.
+# Every ${VAR} is a parameter in app/margo.yaml; the default after `:-` is the same as the value there.
+# Every numeric value on the broker is in its coherent SI unit (contracts/mqtt).
+
+services:
+  broker:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "${MQTT_PORT:-1883}:1883"
+      - "${MQTT_WS_PORT:-9001}:9001"
+    configs:
+      - source: mosquitto
+        target: /mosquitto/config/mosquitto.conf
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/version", "-C", "1", "-W", "3"]
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mongodb:
+    image: mongo:8.0
+    restart: unless-stopped
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      # Time-series collections need a writable primary: initiate the single-node replica set on the
+      # first pass and report healthy once it is primary.
+      test: >-
+        HOME=/tmp mongosh --quiet --eval "try { if (!db.hello().isWritablePrimary) throw new Error('not primary') }
+        catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb:27017'}]}); throw e }"
+      start_period: 15s
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  timeseries-api:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.timeseries.api:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "${TIMESERIES_API_PORT:-5500}:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      # The services require a Loki sink in their configuration; the demo disables it.
+      Config__Loki__Sinks__0__Name: demo
+      Config__Loki__Sinks__0__Enabled: "false"
+      Config__Loki__Sinks__0__Uri: http://localhost:3100
+      Config__MongoTimeseries__ConnectionString: mongodb://mongodb:27017/?replicaSet=rs0
+      Config__MongoTimeseries__DatabaseName: Timeseries
+      Config__MongoTimeseries__DataRetentionPeriod: ${DATA_RETENTION:-30.00:00:00}
+      # Authorization is implemented and switched off for the demo.
+      Config__Auth__Enabled: "false"
+
+  timeseries-persistence:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.timeseries.persistence:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-api:
+        condition: service_healthy
+    environment:
+      Config__Loki__Sinks__0__Name: demo
+      Config__Loki__Sinks__0__Enabled: "false"
+      Config__Loki__Sinks__0__Uri: http://localhost:3100
+      Config__MqttSource__ConnectionString: mqtt://broker:1883
+      Config__MqttSource__User: ""
+      Config__MqttSource__Password: ""
+      Config__MqttSource__ClientId: timeseries-persistence
+      Config__Topics__0: machines/+/umati/#
+      Config__Topics__1: machines/+/vendor/#
+      # Values about a place, see contracts/mqtt. A first level the binding does not name is not stored.
+      Config__Topics__2: sites/+/#
+      Config__CachingTime: "00:00:05"
+      Config__TimeseriesApi__Uri: http://timeseries-api:8080
+
+  events-api:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.events.api:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "${EVENTS_API_PORT:-5510}:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      Config__Loki__Sinks__0__Name: demo
+      Config__Loki__Sinks__0__Enabled: "false"
+      Config__Loki__Sinks__0__Uri: http://localhost:3100
+      Config__MongoDb__ConnectionString: mongodb://mongodb:27017/?replicaSet=rs0
+      Config__MongoDb__DatabaseName: Events
+      Config__MongoDb__DataRetentionPeriod: ${DATA_RETENTION:-30.00:00:00}
+      Config__Auth__Enabled: "false"
+
+  events-persistence:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.events.persistence:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      broker:
+        condition: service_healthy
+      events-api:
+        condition: service_healthy
+    environment:
+      Config__Loki__Sinks__0__Name: demo
+      Config__Loki__Sinks__0__Enabled: "false"
+      Config__Loki__Sinks__0__Uri: http://localhost:3100
+      Config__MqttSource__ConnectionString: mqtt://broker:1883
+      Config__MqttSource__User: ""
+      Config__MqttSource__Password: ""
+      Config__MqttSource__ClientId: events-persistence
+      Config__Topics__0: machines/+/events/#
+      Config__EventsApi__Uri: http://events-api:8080
+
+  # The generative UI backend: an MCP server that reads both APIs.
+  genui-mcp:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.genui.mcp:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "${GENUI_MCP_PORT:-5520}:8080"
+    depends_on:
+      timeseries-api:
+        condition: service_healthy
+      events-api:
+        condition: service_healthy
+    environment:
+      TIMESERIES_API_URL: http://timeseries-api:8080
+      EVENTS_API_URL: http://events-api:8080
+      # The origins a card file may load the font of its host from; none unless set.
+      CARD_RESOURCE_DOMAINS: ${CARD_RESOURCE_DOMAINS:-}
+
+  # The example application.
+  app:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.app:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      # The chat has no sign-in, and with a key set it spends that key. So the app answers on the
+      # device only, unless APP_BIND opens it to the network.
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-5600}:8080"
+    depends_on:
+      genui-mcp:
+        condition: service_healthy
+    # A model server on the device is host.docker.internal. Docker Desktop knows the name; this line
+    # gives it to Docker Engine on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      GENUI_MCP_URL: http://genui-mcp:8080/mcp
+      # The chat needs a language model; everything else works without one. The models come from a LiteLLM
+      # gateway: the app offers those it marks for chat, and dictation takes the first it marks for speech
+      # to text.
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+
+  # The reverse proxy in front of the example app, found by its host name. Not in compose.yaml at the root.
+  traefik:
+    image: traefik:v3.7.19
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command:
+      - --global.checkNewVersion=false
+      - --global.sendAnonymousUsage=false
+      # Inside the container on an unprivileged port, so it needs no capability.
+      - --entryPoints.web.address=:8000
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
+      # /ping on the internal entry point "traefik" (:8080), which is not published.
+      - --ping=true
+    ports:
+      # The same reason as for the app: Traefik answers on the device only, unless HTTP_BIND opens it to the
+      # network. Its Host() rule is no guard, a client sets the Host header it likes.
+      - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-80}:8000"
+    configs:
+      - source: traefik
+        target: /etc/traefik/dynamic.yaml
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      # The name of the app (a CNAME) and the name of the device (its A record); both lead to the app.
+      APP_HOST: ${APP_HOST:-pleiades.example.internal}
+      SERVER_HOST: ${SERVER_HOST:-device.example.internal}
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # One simulator per machine. The serial number is the machine id in every topic.
+  simulator-p-04:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.simulator:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-persistence:
+        condition: service_started
+      events-persistence:
+        condition: service_started
+    environment:
+      Config__Loki__Sinks__0__Name: demo
+      Config__Loki__Sinks__0__Enabled: "false"
+      Config__Loki__Sinks__0__Uri: http://localhost:3100
+      Config__SerialNumber: P-04
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: simulator-p-04
+
+  simulator-p-07:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.simulator:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-persistence:
+        condition: service_started
+      events-persistence:
+        condition: service_started
+    environment:
+      Config__Loki__Sinks__0__Name: demo
+      Config__Loki__Sinks__0__Enabled: "false"
+      Config__Loki__Sinks__0__Uri: http://localhost:3100
+      Config__SerialNumber: P-07
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: simulator-p-07
+
+  simulator-m-02:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.simulator:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-persistence:
+        condition: service_started
+      events-persistence:
+        condition: service_started
+    environment:
+      Config__Loki__Sinks__0__Name: demo
+      Config__Loki__Sinks__0__Enabled: "false"
+      Config__Loki__Sinks__0__Uri: http://localhost:3100
+      Config__SerialNumber: M-02
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: simulator-m-02
+
+configs:
+  mosquitto:
+    file: ./broker/mosquitto.conf
+  traefik:
+    file: ./traefik/dynamic.yaml
+
+volumes:
+  mongodb_data:

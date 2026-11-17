@@ -87,6 +87,16 @@ this tour.
 a graph. The lines are the result of the tool `genui_measurement_series`
 ([`apps/genui-mcp/src/measurements.ts`](../apps/genui-mcp/src/measurements.ts)).
 
+The page "Charts" in the sidebar, <http://localhost:5600/charts>, shows the last hours of every machine as charts:
+one bar per machine with how long it was in each state, and a tile per machine with its state over the last 30
+minutes.
+
+**In the code:** [`apps/app/src/routes/charts.tsx`](../apps/app/src/routes/charts.tsx) is the page,
+[`apps/app/src/charts/state-tiles.tsx`](../apps/app/src/charts/state-tiles.tsx) draws the two charts with the
+chart of shadcn/ui. The values are those of the machine card, from `genui_machine_show` and `genui_span_list`,
+read by one server function, `getCharts` in
+[`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts).
+
 ## 3. The page of one machine
 
 A click on a machine opens its page, here <http://localhost:5600/machines/P-04>. It shows the machine card:
@@ -148,6 +158,13 @@ The chat has no sign-in, and whoever reaches the port chats at the cost of the o
 
 With more than one model, the input field offers a choice. The first model answers until a chat picks
 another one, and the choice stays with that chat.
+
+The button "Tools" in the input field lists the servers that give the chat its tools: the generative UI
+backend, and the further ones the setting `APP_MCP_SERVERS` names, such as the optional Ultimaker service.
+It says whether each one answers and names its tools, and marks a tool that can change something. A switch
+takes a further server out of the chat from its next question on: the model then gets none of its tools. The
+choice stays with the chat, as the model does. The two pictures of this stop were taken before the button
+was there.
 
 ![Home on the left and the chat panel on the right, before the first question. The model picker in the input
 field is open and lists seven models: spark/qwen3.8-27b, ticked, then three named openai/gpt and three named
