@@ -6,7 +6,9 @@ Each API serves its own description; that document is the contract.
 |---|---|---|
 | Timeseries API | `http://localhost:5500/openapi/v1.json` | `http://localhost:5500/` |
 | Events API | `http://localhost:5510/openapi/v1.json` | `http://localhost:5510/` |
+| Sites API | `http://localhost:5540/openapi/v1.json` | `http://localhost:5540/` |
 | Ultimaker API (optional) | `http://localhost:5530/openapi/v1.json` | No Swagger UI; see [service guide](../../source/Pleiades.Playground.Ultimaker.Api/README.md) |
+| Juice bar API (optional) | `http://localhost:5550/openapi/v1.json` | No Swagger UI; see the [service guide](../../source/Pleiades.Playground.JuiceBar.Api/README.md) |
 
 The Events API keeps the CloudEvents of the machines as they came, each with the machine id of its topic
 (`mId`), and puts its views together when they are read:

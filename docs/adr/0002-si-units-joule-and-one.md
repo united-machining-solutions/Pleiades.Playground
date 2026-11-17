@@ -31,7 +31,7 @@ Displays convert to what people are used to (millimetre, 1/min, bar, percent, kW
 ## Amendment (2026-11-17)
 
 Machines below `machines/` follow the data model exactly, its units included: energy in `wattHour`, and the
-unit named by the catalogue ([ADR-0013](0013-spec-binding-beside-the-playground-binding.md)). The services do
+unit named by the catalogue ([ADR-0015](0015-the-binding-of-machines-follows-the-data-model.md)). The services do
 not convert machine data either: the Timeseries and Events stores keep a value of a machine with the unit it came
 with (`wattHour`, `degreeCelsius` …), and the APIs serve it so; converting is the matter of the display. Two
 machines that deliver one quantity in two units would need a conversion in whoever compares them; the catalogue

@@ -26,6 +26,39 @@ export const instant = z.iso.datetime({ offset: true })
  */
 export const machineId = z.string().regex(/^[^/+#]+$/)
 
+/**
+ * Where each reading of a machine is kept, below `machines/{machineId}/`: the topics of the umati data
+ * model. The backend reads the stored values of these topics, and a page that is live hears them at
+ * the broker. The state and the operation mode are the two fields of the snapshot `State/Status`: see
+ * `SNAPSHOT_PATHS`.
+ */
+export const READING_PATHS = {
+  connection: "umati/Connection/State",
+  heartbeat: "umati/Connection/Heartbeat",
+  itemState: "umati/State/Status/MachineryItemState",
+  operationMode: "umati/State/Status/MachineryOperationMode",
+  program: "umati/WorkMasterMonitoring/ActiveWorkMaster",
+} as const
+export type ReadingName = keyof typeof READING_PATHS
+
+/**
+ * The snapshots among the readings. A snapshot is one topic at the broker, its value an object with
+ * a field for each reading; the Timeseries store keeps it field by field, each below the topic of the
+ * snapshot: `umati/State/Status` arrives as one message and is read as
+ * `umati/State/Status/MachineryItemState` and `umati/State/Status/MachineryOperationMode`.
+ */
+export const SNAPSHOT_PATHS = ["umati/State/Status"] as const
+
+/** Who a machine is: its identification values, published once and retained. */
+export const IDENTITY_PATHS = {
+  manufacturer: "umati/Identification/Manufacturer",
+  model: "umati/Identification/Model",
+  serialNumber: "umati/Identification/SerialNumber",
+} as const
+
+/** Where the alerts and notifications of a machine are published, as CloudEvents, below `machines/{machineId}/`. */
+export const NOTIFICATIONS_PATH = "events/notifications"
+
 export const reading = z.object({
   value: z.string().nullable().describe("The newest value, or null if the topic had none."),
   at: instant.nullable().describe("When the newest value was measured."),

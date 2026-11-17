@@ -1,5 +1,12 @@
-import { BAND_SLOTS, SILENT_AFTER_SECONDS, machineId } from "@pleiades/cards/machine/contract.ts"
-import type { Identity, Machine, MachineList, MachineShow, Reading, Span, SpanList } from "@pleiades/cards/machine/contract.ts"
+import {
+  BAND_SLOTS,
+  IDENTITY_PATHS,
+  NOTIFICATIONS_PATH,
+  READING_PATHS,
+  SILENT_AFTER_SECONDS,
+  machineId,
+} from "@pleiades/cards/machine/contract.ts"
+import type { Identity, Machine, MachineList, MachineShow, Reading, ReadingName, Span, SpanList } from "@pleiades/cards/machine/contract.ts"
 
 import { EVER, listTopics, readNumbers, readOpenNotifications, readRaised, readRunningJobOrders, readStrings } from "./apis.ts"
 import type { Apis, Sample, Series } from "./apis.ts"
@@ -24,23 +31,9 @@ export const HISTORY_HOURS = 8
 /** How many hours a history covers at most. */
 export const MOST_HOURS = 24
 
-// The topics of the umati data model below `machines/{machineId}/`. The snapshot `State/Status` is
-// stored field by field, so its two fields are topics of their own.
-const paths = {
-  connection: "umati/Connection/State",
-  heartbeat: "umati/Connection/Heartbeat",
-  itemState: "umati/State/Status/MachineryItemState",
-  operationMode: "umati/State/Status/MachineryOperationMode",
-  program: "umati/WorkMasterMonitoring/ActiveWorkMaster",
-} as const
-
-/** Who a machine is: its identification values, published once. */
-const identityPaths = {
-  manufacturer: "umati/Identification/Manufacturer",
-  model: "umati/Identification/Model",
-  serialNumber: "umati/Identification/SerialNumber",
-} as const
-type ReadingName = keyof typeof paths
+// The topics of the umati data model below `machines/{machineId}/`, as the contract of the machine
+// names them: the backend reads their stored values, a page that is live hears them at the broker.
+const paths = READING_PATHS
 const names = Object.keys(paths) as Array<ReadingName>
 
 /** The heartbeat counts, the other readings are text. */
@@ -59,7 +52,7 @@ export function machineOf(topic: string): string | undefined {
 /** The identification of a machine: the newest value of each, however old. */
 async function readIdentity(apis: Apis, machine: string, now: Date): Promise<Identity> {
   const [manufacturer, model, serialNumber] = await Promise.all(
-    Object.values(identityPaths).map(async (path) => {
+    Object.values(IDENTITY_PATHS).map(async (path) => {
       const [series] = await readStrings(apis, `machines/${machine}/${path}`, EVER, now, 1)
       return series?.samples.at(-1)?.value ?? null
     }),
@@ -154,7 +147,7 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
         read("program"),
         readIdentity(apis, id, now),
       ])
-      const topic = `machines/${id}/events/notifications`
+      const topic = `machines/${id}/${NOTIFICATIONS_PATH}`
       const job = jobOrders.find((one) => one.machine === id)
       return {
         machine: id,

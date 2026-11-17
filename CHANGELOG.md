@@ -7,8 +7,23 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
+  shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
+  from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
+  entry in the sidebar.
+- Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
+  REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
+- Example app: the button "Tools" in the message field of the chat lists the servers that give the chat
+  tools, says whether each one answers, and names its tools. A chat switches a further server off and on
+  there; the server of the app gives the model no tool of a server that is off.
+- Example app: where no tool answers a question, the chat says that its tools do not show it, not that it
+  does not exist, and where a place fits the question names where to ask, such as the maker of the machine
+  or the maintenance records.
+- Page of a machine: the title switches to another machine, with a search over the serial number and the
+  state, and the history of the card covers the last 1, 8 or 24 hours (`?hours=`). The page is wider, with
+  room for actions on the right.
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
@@ -17,6 +32,10 @@ All notable changes are documented here. The format follows
   current jobs and history with durable slice associations, and a separate MQTT telemetry adapter.
   Both containers are part of the root Compose stack and image-publication workflow, enabled for
   deployment with COMPOSE_PROFILES=ultimaker.
+- Optional juice bar service `juicebar-api` (Compose profile `juicebar`, port 5550): the card and the state of
+  a machine that runs MixerControl over REST and MCP, an order on request, and its state on the broker below
+  `machines/{SerialNumber}/`. It never starts the production; `JUICEBAR_ENABLE_ORDERING=false` makes it
+  read-only.
 
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
@@ -26,6 +45,9 @@ All notable changes are documented here. The format follows
   `DEPLOY_ENABLED` is `true`.
 - Shared libraries for logging, JSON, authorization, health checks, MQTT and the MCP server standard.
 - Demo stack (`compose.yaml`), contracts and CI.
+- Margo app (`margo/`): the demo stack as a Margo application, from the published images, validated,
+  packaged and pushed with `bart`. A version tag pushes it to the staging registry with the images of that
+  version (workflow "Margo push", called by "Images"); CI validates it when `margo/` changes.
 - TypeScript workspace for `apps/` and `packages/`: pinned Node.js and pnpm, one version catalog, a shared
   TypeScript configuration and a CI job.
 - Generative UI backend `genui-mcp` in the demo stack on port 5520: an MCP server with the tool
@@ -160,11 +182,35 @@ All notable changes are documented here. The format follows
   the line of a call is a `TraceCollapsible` once its result is there, with the result as text in a
   `CodeBlock` (JSON indented). `code-block` is new in `packages/ui`; it brings `shiki`, which only its
   highlighting hook loads, and the app does not use that hook.
+- Pages in the example application: a page is a recipe, a title and its parts, each part a tool of
+  `genui-mcp` with its arguments, kept in the `localStorage` of the browser. Opening a page calls the tools
+  again on the server of the app, only those the chat draws, and draws each answer with the card of the
+  chat: the values of now, no language model. A page is read once, and its head says as of when; only while
+  a part waits for the backend is it read again. A part whose tool the app has no card for stays and says so.
+  `/pages` lists the pages of the browser, and is reached through the breadcrumb; a page is renamed, pinned
+  and deleted from its head. A pinned page stands in the sidebar on the top level, beside Home, and the
+  others stand under it in a group "Pages" that folds, a plain row each, the newest first; with no page to
+  list there is no group. Why: ADR-0014.
+- "Save as page" under an answer of the chat: it keeps all the cards of the answer, in their order, as a page
+  titled with the question, and opens it beside the chat. It needs no language model, the app reads the tool
+  calls from the answer it already has, and it stands only under an answer that has ended and for which the
+  chat drew a card. The row then says "Saved as page" and links to it. An answer with more than 12 cards keeps
+  the first 12 and says so.
+- "Share" in the head of a page: a link that carries the recipe, which answers for which machines and hours,
+  and no value, in one search parameter of `/pages/open` (at most 8,000 characters). Whoever opens it sees the
+  values of now, with no language model and no chat, and keeps the page with "Save to my pages". A link that
+  holds no page says so, and a part without a card in that app says so while the rest of the page is whole.
+  The links of the app now carry only the search that the page they lead to validates (`search.strict`), so
+  the recipe does not follow a person from the page that was opened from a link.
+- The page "Charts" (`/charts`) in the example application: how long each machine was in each state over
+  the last hours, as stacked bars, and its state over the last 30 minutes, as a step line per machine. One
+  server function, `getCharts`, reads the values over one connection, the spans of the last 30 minutes only.
+  The charts are the chart of shadcn/ui; `recharts` is new in the app.
 
 ### Changed
 
 - `machines/{machineId}/` carries the umati data model 0.17.1 instead of the binding of the playground
-  ([`contracts/mqtt`](contracts/mqtt/README.md), ADR-0013; [`contracts/datamodel`](contracts/datamodel/README.md)
+  ([`contracts/mqtt`](contracts/mqtt/README.md), ADR-0015; [`contracts/datamodel`](contracts/datamodel/README.md)
   refers to commit `3a799d5`): `umati/Manifest`, `umati/<path>`, `oem/<path>` for the signals of the
   manufacturer, and CloudEvents on `events/jobs`, `events/workmasters` and `events/notifications`, each topic
   counting its own `sequence`. Values carry the units of the model, energy in `wattHour` (ADR-0002). The machine
@@ -201,6 +247,12 @@ All notable changes are documented here. The format follows
   `machines/ultimaker_UM3_UM3-01/` (`ULTIMAKER_SERIAL_NUMBER` instead of `ULTIMAKER_MACHINE_ID`), its signals
   below `oem/Ultimaker/`, `State/Status/MachineryItemState`, the adapter states `Running` and
   `CommunicationFault`, and its identification.
+- `app`: Home, the page of a machine, Live values and Charts are live from the broker (ADR-0013). They read what the
+  backend knows once, and then hear every value at the broker, MQTT over WebSocket, the moment it is
+  published, instead of reading everything again every ten seconds. The browser must reach the broker's
+  WebSocket: `MQTT_WS_PORT` at the host of the page, or `MQTT_WS_URL` behind a proxy. The topics of the
+  machine card and the measurement card are in their contracts in `@pleiades/cards` (`READING_PATHS`,
+  `NOTIFICATIONS_PATH`, `QUANTITY_PATHS`), and `genui-mcp` reads the same ones.
 - `app`, for those who run `main`: the chat takes its models from a LiteLLM gateway, with two settings,
   `LLM_BASE_URL` and `LLM_API_KEY`. The settings `ANTHROPIC_*`, `OPENAI_*`, `OPENAI_TRANSCRIPTION_MODEL`,
   `LLM_MODELS` and `LLM_TRANSCRIPTION_MODEL` and the package `@tanstack/ai-anthropic` are gone. A `.env` that
@@ -260,6 +312,12 @@ All notable changes are documented here. The format follows
   the `package.json` (`catalogMode: strict` and an empty `savePrefix` in `pnpm-workspace.yaml`). Before,
   `pnpm add` and `shadcn add` wrote a version with a `^` into the `package.json`, and moving it into the
   catalog was a step by hand.
+- The chat panel works like a chat app on a phone, a list and a chat with a way back. In a chat the head says
+  what the chat is called, on one line and cut where it is too long: its first question, which the head shows
+  from the moment it is asked. A button "All chats" at the left of the head leads back to the list. The list
+  is the start view, now headed "Chats"; its field begins a new chat. "New chat" is gone from the head of a
+  chat, since it led to the same view the way back leads to. Without a language model the head still says
+  "Chat". After "All chats" or a chat of the list the focus is on the heading of the view it leads to.
 
 ### Removed
 

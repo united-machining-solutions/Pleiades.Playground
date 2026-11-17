@@ -5,15 +5,41 @@ the app. The server delivers the document, the server routes and the server func
 harness.
 
 - **Home** asks "what needs you?": it lists the machines of the demo stack, first those in alarm, stopped or
-  without data, then those in setup, then the running ones, and reads them again every ten seconds.
+  without data, then those in setup, then the running ones. It is live: see below.
 - **A page per machine** (`/machines/alcyone-machines_AX-400_P-04`, by the machine id) shows the machine card of the
   [card catalogue](../../packages/cards/README.md): what the machine does now and what it did over the last
   hours. It needs no language model. Home leads to it. For a machine the backend does not know, the page
   says so and does not ask again.
 - **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
-  machine, and reads them again every ten seconds. A choice above the graphs shows one machine or all of
-  them, and stays in the URL (`?machine=`).
-- **Chat** is the panel on the right, with "New chat" and the chats so far. It opens from the button in the
+  machine, live. A choice above the graphs shows one machine or all of them, and stays in the URL
+  (`?machine=`).
+- **Pages** (`/pages`) are what a person keeps of the chat, in this browser. "Save as page" under an answer
+  of the chat makes one: all the cards of that answer, in their order, titled with the question. It stands
+  under an answer that has ended and for which the chat drew a card, and needs no language model: the app
+  reads the tool calls from the answer it already has. The page opens beside the chat, which stays open, and
+  the row under the answer then says "Saved as page" and links to it. Nothing is kept unless a person
+  presses it. A page is a recipe: a title
+  and its parts in their order, each part a tool of `genui-mcp` with its arguments. No value is kept and no
+  sentence of a language model: opening a page calls the tools again and draws each answer with the card
+  the chat draws for that tool, so it shows what holds now and needs no language model. It is read once, and
+  its head says as of when; only while a part waits for the backend is it read again. A part whose tool
+  the app has no card for stays where it is and says so; the rest of the page is whole. A page can be
+  renamed, pinned and deleted from its head. A pinned page stands in the sidebar on the top level, beside
+  Home; under it a group "Pages", which folds, lists the pages that are not pinned, the newest first, and
+  there is no group where there is nothing to list. `/pages` lists them all and is reached through the
+  breadcrumb. Another browser, or a private window, has pages of its own. "Share" in the
+  head gives a link that carries the recipe and no value, which answers for which machines and hours: whoever
+  opens it, at `/pages/open`, sees the values of now, with no language model and no chat, and keeps the page
+  with "Save to my pages". A link that holds no page says so, and a part whose tool the app has no card for
+  says so too, the rest of the page is whole. Why:
+  [ADR-0014](../../docs/adr/0014-a-page-from-the-chat-is-a-recipe-kept-in-the-browser.md).
+- **Chat** is the panel on the right. It works like a chat app on a phone: a list and a chat, with a way
+  back. The list, headed "Chats", shows the chats so far and, below them, the field that begins a new
+  chat, with questions to begin with. A chat says in its head what it is called, on one line and cut where it
+  is too long, and "All chats" at the left of the head leads back to the list; there is no "New chat" in a
+  chat, a new one begins in the field of the list. A chat is called by its first question, up to 80
+  characters, which the panel shows from the moment it is asked. Without a language model the head says
+  "Chat". The panel opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
   of a tool call itself: a card of the catalogue, or a list with the same rows as Home. An answer is drawn
@@ -22,8 +48,19 @@ harness.
   the URL (`?chat=`), and the page stays where it is: you chat about what you see. Everything about the chat
   is in that panel: the pages on the left stay the same without it.
 
-The values always come from `genui-mcp`. Without a language model the chat says which settings are missing;
-everything else works.
+The values come from `genui-mcp`, and what is live comes from the broker. Without a language model the chat says
+which settings are missing; everything else works.
+
+**Live, not read again** ([ADR-0013](../../docs/adr/0013-live-values-from-the-broker.md)). Home, the page of a
+machine, Live values and Charts read once, in their loader, what `genui-mcp` knows: what held when the page was opened,
+and the history before it. From then on the browser subscribes at the broker, MQTT over WebSocket, to the
+topics the page shows, and every value appears the moment a machine publishes it: a state, a program, a warning
+that is raised or reset, a point of a graph. The clock of the page moves on by itself, by the clock of the
+server, so a machine that falls silent shows "No data" after 30 seconds, and the history of a machine keeps its
+length and rolls on to now. A value stamped more than 30 seconds ahead of that clock is left out, as the backend
+would not show it yet either. The line under the title
+says "live" while the browser hears the broker, and "not live" while it does not; the page then reads again
+once the broker is back, for what it missed. A page reads on a clock only while the backend has not answered.
 
 | | |
 |---|---|
@@ -31,7 +68,7 @@ everything else works.
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app` |
 | Version | At the bottom of the sidebar: `0.0.142 · 7a83c2f` for an image of the workflow "Images", linked to its commit; `dev` for a build of your own, with the commit of the checkout under `vite dev` |
-| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); the app draws nothing for their results, the answer says them. The language models of the chat, see below. |
+| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `MQTT_WS_PORT`, the port the browser reaches the broker's WebSocket on, at the host of the page (9001 if unset); or `MQTT_WS_URL`, the whole address, for a broker behind a proxy (`wss://…`). `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); the app draws nothing for their results, the answer says them, and a chat switches each of them off and on under "Tools" in its message field. The language models of the chat, see below. |
 
 ## Language models
 
@@ -115,12 +152,41 @@ the backend of the running demo stack answers.
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
-  `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `health.ts`, `api/harness/$.ts` and
+  `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `charts.tsx` the last hours of every
+  machine as charts (drawn by `src/charts/state-tiles.tsx`), `pages.index.tsx` the list of the pages kept
+  in this browser, `pages.$page.tsx` one of them and `pages.open.tsx` one opened from a link; `health.ts`,
+  `api/harness/$.ts` and
   `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
-  (`nav`: a title, an icon, an order). `src/components/app-sidebar.tsx` reads the entries from the routes
-  and names no page, and `nav.ts` next to it puts them in order and finds the one a person is under. The
+  (`nav`: a title, an icon, an order; `sidebar: false` for an entry that is no row, `/pages`, which the
+  pages kept in this browser stand under). `src/components/app-sidebar.tsx` reads the entries from the
+  routes and names no page, adds the pinned pages of this browser beside them, and `nav.ts` next to it puts
+  them in order (order, then title), leaves out the entries that are no row (`sidebarPages`) and finds the
+  one a person is under. Under the rows stands `page-group.tsx`, the group "Pages" of the pages that are not
+  pinned: `Collapsible` around a `SidebarGroup`, as the docs of the sidebar have it, open when the app
+  starts and as a person leaves it until a reload. The
   breadcrumb of the header, `page-breadcrumb.tsx`, reads the same: a page is called by the title of its
   entry, or by `crumb` in its `staticData`, and a page without an entry stands behind the one it is under.
+- `src/pages/`: the pages kept from the chat. `recipe.ts` is the recipe and its schema (zod): its shape
+  and its size, which is all that is checked, also of a recipe from outside. `store.ts` keeps the pages in
+  the `localStorage` of the browser under one key, `pleiades-playground.pages.v1`, and is the only way to
+  them: `listPages`, `getPage`, `savePage`, `renamePage`, `pinPage`, `unpinPage`, `deletePage`, and
+  `usePages` for a component that follows every change. `link.ts` writes a recipe into one search
+  parameter, `r`, and reads it back (`encodeRecipe`, `decodeRecipe`, `linkOf`): JSON as UTF-8 in base64url,
+  at most `MAX_PARAM_LENGTH` (8,000) characters, and what is not exactly a recipe (`recipeOf`) is null.
+  `share-page.tsx` is "Share" in the head of a kept page, `column.tsx` the column that a kept page and a page
+  opened from a link share. `call-part.ts` is the server function that calls
+  the tool of a part, only a tool the chat draws (`parts.ts`), with the time zone of the browser, and
+  returns what the chat hands to `draw`. `drawn-part.tsx` asks the parts of a recipe for a loader
+  (`answerParts`) and draws one (`DrawnPart`): the card of the chat, or what is missing. `pinned.ts`
+  makes the entries of the sidebar for the pinned pages, `listed.ts` the rows of the group for the others
+  and the row that is marked: none for a pinned page, the list of the pages or a page opened from a link. A route that opens a link is input from outside at its
+  door: `pages.open.tsx` lets in nothing but `decodeRecipe`, keeps its parameter while the chat panel opens
+  and closes (`retainSearchParams`), and the router has `search.strict`, so a link to any other page does not
+  carry the recipe along (`router.tsx`). `from-answer.ts` reads the recipe from an answer
+  of the chat, pure and without a language model (`keepOfAnswer`, for the button of the chat): the tool
+  calls the chat drew a result for, in their order, without the time zone, the same call once, and the
+  question as its title. An answer is everything the model said after one question, in more than one
+  message; an answer with more calls than a page holds (12) keeps the first 12, and the row says so.
 - `src/routeTree.gen.ts`: written from the route files and not in the repository, so that two branches with
   a page each have nothing to merge in it. `pnpm install` and `pnpm typecheck` write it
   (`route-tree.mjs`), and so do the development server and the build. Never edit it. TanStack advises to
@@ -134,11 +200,23 @@ the backend of the running demo stack answers.
   functions that call the backend as a typed MCP client, `card-tools.ts` the names of the tools only a card
   calls, `machine-item.tsx` draws a machine as a row or a tile. A card folder imports from here, never the
   other way.
+- `src/live/`: what keeps a page live. `broker.ts` is the one connection of the browser to the broker, MQTT
+  over WebSocket, which only subscribes; `broker-address.ts` the server function that says where the broker
+  is. `messages.ts` reads what the binding publishes, `machines.ts` and `measurements.ts` lay a message, and
+  the passing of time, onto what the backend read, by the rules of `genui-mcp`; each has its tests.
+  `src/hooks/use-live.ts` puts it together for a route: `useLive(loaded, live)`.
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
+  `mcp-servers.ts` reads the servers whose tools the chat has and holds a chat to the ones it left on,
+  `server-list.ts` asks each of them for its tools, and `tools-menu.tsx` is the list "Tools" in the message
+  field, where a chat switches a further server off and on.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a
   tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat`, the choice of the model and stop,
-  which also cancels the turn in the harness (`createHarnessClient(...).cancel()`),
+  which also cancels the turn in the harness (`createHarnessClient(...).cancel()`), and holds its head:
+  the title of the view, or in a chat a way back and the name of the chat; `chat-name.ts` next to it says
+  what a chat is called (`chatName`, `nameOfQuestion`), `ask.ts` which chat the panel shows, in the URL
+  (`?chat=`: `new` is the list), and where the first question of a new chat waits,
+  `save-as-page.tsx` the row under an answer with "Save as page" (chrome of the app, never part of a card),
   `dictate.tsx` the microphone in its field and `dictation.server.ts` the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for
   which tool, and its server which tools a language model does not get. `tool-results.ts` says what a card

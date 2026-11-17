@@ -70,6 +70,9 @@ By [Adding a service](../../../CONTRIBUTING.md#adding-a-service):
   the broker, and the `Dockerfile` checks it.
 - One entry in `compose.yaml`, shaped like the one of `genui-mcp`. It waits for the broker and for
   `timeseries-persistence`, each with `condition: service_healthy`, so that a first value is not lost.
+- The same entry in `margo/compose/compose.yaml`, the Margo app, in the form `margo/README.md` describes: the
+  published image instead of `build:`, no anchors, each setting a parameter in `margo/app/margo.yaml`. CI
+  fails while the two files name different services.
 - Its settings come from the environment. The name of a key goes to `.env.example`, its value into the
   person's `.env`, never into a commit, a log or your answer. The person sets it.
 - The README names the source of the values, its terms, and the topic.
@@ -78,8 +81,8 @@ By [Adding a service](../../../CONTRIBUTING.md#adding-a-service):
 below `sites/`. A value under any other first level is not stored, and a new first level is a change to the
 binding: it needs the issue, not a topic filter on the branch.
 
-You touch the new folder, one entry in `compose.yaml`, names in `.env.example`, and a row in `apps/README.md`
-if the folder is there. For TypeScript, the catalog and the lockfile. Never the code or the settings of a
+You touch the new folder, one entry in `compose.yaml` and one in `margo/compose/compose.yaml`, names in
+`.env.example`, and a row in `apps/README.md` if the folder is there. For TypeScript, the catalog and the lockfile. Never the code or the settings of a
 service that is there, and nothing under `.github/`: say in your hand-over that the workflow that builds the
 images does not know the adapter yet.
 

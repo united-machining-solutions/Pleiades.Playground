@@ -1,0 +1,20 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Sites.Api.Test</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Sites.Api.Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="ModelContextProtocol" />
+    <PackageReference Include="SonarAnalyzer.CSharp">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <ProjectReference Include="..\Pleiades.Playground.Mcp.Testing\Pleiades.Playground.Mcp.Testing.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Sites.Api\Pleiades.Playground.Sites.Api.csproj" />
+  </ItemGroup>
+
+</Project>

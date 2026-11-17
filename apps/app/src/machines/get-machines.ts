@@ -45,7 +45,7 @@ async function ask<TValues>(
  * Why a request got no answer. The client and `fetch` each wrap what the network said, for example
  * ECONNREFUSED, in an error of their own: the innermost cause is the reason.
  */
-function reasonOf(error: unknown): string {
+export function reasonOf(error: unknown): string {
   let innermost = error
   while (innermost instanceof Error && innermost.cause !== undefined) innermost = innermost.cause
   const { code, message } = (innermost ?? {}) as { code?: unknown; message?: unknown }
@@ -53,7 +53,7 @@ function reasonOf(error: unknown): string {
 }
 
 /** What a tool wrote as text, which is where it says why it failed. */
-function textOf(result: unknown): string | undefined {
+export function textOf(result: unknown): string | undefined {
   const { content } = result as { content?: unknown }
   if (!Array.isArray(content)) return undefined
   const texts = content.flatMap((part: { type?: unknown; text?: unknown }) =>
@@ -76,13 +76,17 @@ export function listMachines(): Promise<Answer<MachineList>> {
 /** What every machine does now. */
 export const getMachines = createServerFn({ method: "GET" }).handler(() => listMachines())
 
-/** One machine, and how long each state lasted over the last hours: the values of the machine card. */
+/**
+ * One machine, and how long each state lasted over the last hours: the values of the machine card.
+ * Without `hours` the backend says how far back the history goes.
+ */
 export const getMachine = createServerFn({ method: "GET" })
-  .validator((machine: string) => machine)
+  .validator((request: { machine: string; hours?: number }) => request)
   .handler(
-    ({ data: machine }): Promise<Answer<MachineShow>> =>
+    ({ data: { machine, hours } }): Promise<Answer<MachineShow>> =>
       ask(async (backend) => {
-        const result = await backend.callTool("genui_machine_show", { machine })
+        const input = hours === undefined ? { machine } : { machine, hours }
+        const result = await backend.callTool("genui_machine_show", input)
         if (result.isError || !result.structuredContent) {
           throw new Refused(textOf(result) ?? "genui_machine_show returned no values.")
         }
@@ -118,6 +122,44 @@ export const getMeasurementSeries = createServerFn({ method: "GET" }).handler(
       return result.structuredContent
     }),
 )
+
+/** The values of the page Charts: each machine with the sums of its last hours, and its recent spans. */
+export type Charts = {
+  asOf: string
+  machines: Array<{ show: MachineShow; from: string; spans: Array<Span> | null }>
+}
+
+/**
+ * Everything the page Charts draws, over one connection: the list, then for each machine its values
+ * and its spans of the last `recent` milliseconds only, not of all its hours. A machine without
+ * values is left out; one without spans keeps its sums.
+ */
+export const getCharts = createServerFn({ method: "GET" })
+  .validator((recent: number) => recent)
+  .handler(
+    ({ data: recent }): Promise<Answer<Charts>> =>
+      ask(async (backend) => {
+        const list = await backend.callTool("genui_machine_list", {})
+        if (list.isError || !list.structuredContent) {
+          throw new Refused(textOf(list) ?? "genui_machine_list returned no values.")
+        }
+        const machines = await Promise.all(
+          list.structuredContent.machines.map(async ({ machine }) => {
+            const show = await backend.callTool("genui_machine_show", { machine })
+            if (show.isError || !show.structuredContent) return null
+            const { history } = show.structuredContent
+            const from = new Date(Math.max(Date.parse(history.from), Date.parse(history.to) - recent)).toISOString()
+            const spans = await backend.callTool(SPAN_LIST_TOOL, { machine, from, to: history.to })
+            return {
+              show: show.structuredContent,
+              from,
+              spans: spans.isError || !spans.structuredContent ? null : spans.structuredContent.spans,
+            }
+          }),
+        )
+        return { asOf: list.structuredContent.asOf, machines: machines.filter((one) => one !== null) }
+      }),
+  )
 
 /**
  * The spans of a card's band, for the hours its values are about. They are not among the values,
