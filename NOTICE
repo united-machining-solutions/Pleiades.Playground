@@ -22,12 +22,12 @@ the SIL Open Font License 1.1. The chart and state colours of the cards (package
 and the image of the generative UI backend (apps/genui-mcp) contain, are taken from the IBM Carbon Design
 System, licensed under the Apache License, Version 2.0.
 
-The user interface components under packages/ui/src/components/, the hook
-packages/ui/src/hooks/use-mobile.ts and the theme in packages/ui/src/styles/globals.css are copies from
-shadcn/ui (https://ui.shadcn.com), some of them changed. The files under .claude/skills/shadcn/ are a copy
-of the agent skill of shadcn/ui, unchanged; color-pair.tsx, state-matrix.tsx and preview-states.css under
-apps/design-system/src/ are copies of its helpers, two of them with their imports changed. shadcn/ui is
-licensed under the MIT License:
+The user interface components under packages/ui/src/components/, the hooks under packages/ui/src/hooks/
+(use-mobile.ts, use-highlighted-code.ts), packages/ui/src/lib/highlighter.tsx and the theme in
+packages/ui/src/styles/globals.css are copies from shadcn/ui (https://ui.shadcn.com), some of them changed.
+The files under .claude/skills/shadcn/ are a copy of the agent skill of shadcn/ui, unchanged; color-pair.tsx,
+state-matrix.tsx and preview-states.css under apps/design-system/src/ are copies of its helpers, two of them
+with their imports changed. shadcn/ui is licensed under the MIT License:
 
     MIT License
 

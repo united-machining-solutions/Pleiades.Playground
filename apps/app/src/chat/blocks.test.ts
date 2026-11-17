@@ -3,7 +3,7 @@ import { test } from "node:test"
 
 import type { UIMessage } from "@tanstack/ai-react"
 
-import { blocksOf, questionOf } from "./blocks.ts"
+import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
 import { jsonOf } from "./tool-results.ts"
 import type { ChatTool } from "./tool-results.ts"
 
@@ -48,10 +48,30 @@ test("the calls of one stretch are one trace, a text ends it", () => {
   assert.deepEqual(blocks[0], {
     kind: "steps",
     calls: [
-      { id: "a", name: "genui_get_skill_guide", state: "done" },
-      { id: "b", name: "genui_machine_list", state: "done" },
+      { id: "a", name: "genui_get_skill_guide", state: "done", output: "# The guide" },
+      { id: "b", name: "genui_machine_list", state: "done", output: JSON.stringify(JSON.parse(list), null, 2) },
     ],
   })
+})
+
+/** The output the line of the first call opens to. */
+const firstOutput = (parts: Parts, live: boolean) => {
+  const [first] = blocksOf(parts, live, tools)
+  return first?.kind === "steps" ? first.calls[0]?.output : "no steps"
+}
+
+test("a call opens to what its tool gave back: JSON indented, any other text as it is", () => {
+  assert.equal(firstOutput([call("a", "genui_machine_list"), result("a", '{"machines":[]}')], false), '{\n  "machines": []\n}')
+  assert.equal(firstOutput([call("a", "genui_get_skill_guide"), result("a", "# The guide")], false), "# The guide")
+})
+
+test("a failed call opens to why, and a call without a result does not open", () => {
+  const failed = { ...result("a", "{}", "error"), error: "No machine P-09 is known." } as Parts[number]
+  assert.equal(firstOutput([call("a", "genui_machine_show"), failed], false), "No machine P-09 is known.")
+  // An error without its own words keeps what the tool gave back.
+  assert.equal(firstOutput([call("a", "genui_machine_show"), result("a", "boom", "error")], false), "boom")
+  assert.equal(firstOutput([call("a", "genui_machine_list")], true), undefined)
+  assert.equal(firstOutput([call("a", "genui_machine_list")], false), undefined)
 })
 
 /** What the chat draws for the result of one call. */
@@ -108,6 +128,50 @@ test("a call without a result runs while the answer is live, and has failed afte
 
 test("a result with an error is a failed call", () => {
   assert.equal(firstState([call("a", "genui_machine_list"), result("a", "boom", "error")], true), "failed")
+})
+
+const message = (role: "user" | "assistant", parts: Parts) => ({ id: role, role, parts }) as UIMessage
+
+const question = message("user", [text("What needs me?")])
+/** Where the line "Thinking" stands while the answer with these parts is coming. */
+const lineFor = (parts: Parts) => thinkingLine([question, message("assistant", parts)], true, tools)
+
+test("the line stands apart while a question is out and its answer shows nothing yet", () => {
+  assert.equal(thinkingLine([question], true, tools), "apart")
+  // An answer that has begun, but with nothing to show: an empty text, or a thought.
+  assert.equal(lineFor([text("")]), "apart")
+  assert.equal(lineFor([{ type: "thinking", content: "…" } as Parts[number]]), "apart")
+})
+
+test("the line stands in the answer once its last step has ended or its last card is drawn", () => {
+  // A step done whose result draws nothing, such as the guide of the backend.
+  assert.equal(lineFor([call("a", "genui_span_list"), result("a", '{"spans":[]}')]), "in-answer")
+  // A step that failed.
+  assert.equal(lineFor([call("a", "genui_machine_list"), result("a", "boom", "error")]), "in-answer")
+  // A card drawn for the result of its step.
+  assert.equal(lineFor([call("a", "genui_machine_show"), result("a", shown)]), "in-answer")
+  // A text, then a step that has ended.
+  assert.equal(lineFor([text("Let me look."), call("a", "genui_span_list"), result("a", "{}")]), "in-answer")
+  // Two steps of one stretch, both ended and both drawn.
+  const both = [call("a", "genui_machine_show"), call("b", "genui_machine_show"), result("a", shown)]
+  assert.equal(lineFor([...both, result("b", shown)]), "in-answer")
+})
+
+test("no line while a step runs or a text grows, or when no answer comes", () => {
+  assert.equal(lineFor([call("a", "genui_machine_list")]), undefined)
+  // One step of the stretch has ended, the other still runs.
+  assert.equal(lineFor([call("a", "genui_span_list"), result("a", "{}"), call("b", "genui_machine_list")]), undefined)
+  // Two steps of one stretch: the card of the first is drawn, the second still runs above it.
+  assert.equal(
+    lineFor([call("a", "genui_machine_show"), call("b", "genui_machine_show"), result("a", shown)]),
+    undefined,
+  )
+  assert.equal(lineFor([text("Here is …")]), undefined)
+  assert.equal(lineFor([call("a", "genui_machine_show"), result("a", shown), text("Here is P-04.")]), undefined)
+  assert.equal(thinkingLine([question], false, tools), undefined)
+  const ended = message("assistant", [call("a", "genui_span_list"), result("a", "{}")])
+  assert.equal(thinkingLine([question, ended], false, tools), undefined)
+  assert.equal(thinkingLine([], true, tools), undefined)
 })
 
 test("an empty text is no block, a question is its text", () => {

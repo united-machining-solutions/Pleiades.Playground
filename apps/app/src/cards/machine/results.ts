@@ -1,7 +1,7 @@
 import { machineList, machineShow } from "@pleiades/cards/machine/contract.ts"
 import type { MachineList, MachineShow } from "@pleiades/cards/machine/contract.ts"
 
-import { jsonOf } from "../chat/tool-results.ts"
+import { jsonOf } from "../../chat/tool-results.ts"
 
 // The values of the machine card in the result of a tool call, as a chat has it. Each is checked
 // against its contract: what does not keep it is not drawn.

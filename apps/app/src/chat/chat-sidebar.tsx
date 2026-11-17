@@ -1,3 +1,4 @@
+import { createHarnessClient } from "@tanstack/ai-harness/client"
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react"
 import { Link, getRouteApi, useRouter } from "@tanstack/react-router"
 import {
@@ -9,6 +10,7 @@ import {
   LoaderCircleIcon,
   MessageCircleDashedIcon,
   PlusIcon,
+  SquareIcon,
   XIcon,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
@@ -17,6 +19,7 @@ import type { FormEvent, KeyboardEvent } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
 import { Bubble, BubbleContent } from "@pleiades/ui/components/bubble"
 import { Button } from "@pleiades/ui/components/button"
+import { CodeBlock, CodeBlockContent } from "@pleiades/ui/components/code-block"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,12 +51,20 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@pleiades/ui/components/sidebar"
-import { Trace, TraceIcon, TraceLine, TraceTitle } from "@pleiades/ui/components/trace"
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceIcon,
+  TraceLine,
+  TraceTitle,
+} from "@pleiades/ui/components/trace"
 
 import { Answer } from "./answer.tsx"
 import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
-import { blocksOf, questionOf } from "./blocks.ts"
-import type { Block, CallState } from "./blocks.ts"
+import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
+import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { DictateButton } from "./dictate.tsx"
 import { chooseChatModel, fetchChatModel } from "./status.ts"
@@ -119,10 +130,8 @@ function NoLanguageModel() {
         <EmptyDescription>
           {/* What is missing first, by the names of the settings. */}
           {chatStatus.gaps.map((gap) => `${gap}. `)}
-          Set one block in <code>.env</code> and start the app again with <code>docker compose up -d app</code>:{" "}
-          <code>ANTHROPIC_API_KEY</code> with <code>ANTHROPIC_MODELS</code>, <code>OPENAI_API_KEY</code> with{" "}
-          <code>OPENAI_MODELS</code>, or <code>LLM_BASE_URL</code> with <code>LLM_MODELS</code> for any
-          OpenAI-compatible endpoint. Home needs no language model.
+          Set <code>LLM_BASE_URL</code> and <code>LLM_API_KEY</code> of a LiteLLM gateway in <code>.env</code>{" "}
+          and start the app again with <code>docker compose up -d app</code>. Home needs no language model.
         </EmptyDescription>
       </EmptyHeader>
     </Empty>
@@ -184,7 +193,7 @@ function Conversation({ threadId }: { threadId: string }) {
   const router = useRouter()
   const { chats, chatStatus } = root.useLoaderData()
   const titled = chats.some((entry) => entry.threadId === threadId && entry.titled)
-  const { messages, sendMessage, isLoading, error } = useChat({
+  const { messages, sendMessage, isLoading, error, stop } = useChat({
     threadId,
     connection: fetchServerSentEvents("/api/harness/run"),
     persistence: true,
@@ -204,11 +213,33 @@ function Conversation({ threadId }: { threadId: string }) {
     setModel(name)
     void switchTo(name)
   }
+  // Stop ends the answer twice: `stop` of the chat stops reading it, and the harness cancels the turn
+  // on the server. Without that the model goes on writing, the server keeps the whole answer, and the
+  // next question waits until it is done. When the server refuses the cancel, the chat says so with its
+  // reason, which is true both when the turn goes on and when it had just ended; the next question
+  // takes the alert away.
+  const [stopError, setStopError] = useState<string>()
+  const halt = () => {
+    stop()
+    createHarnessClient({ url: "/api/harness", threadId })
+      .cancel()
+      .then(
+        (receipt) => setStopError(receipt.status === "rejected" ? receipt.reason : undefined),
+        (problem: unknown) => setStopError(problem instanceof Error ? problem.message : String(problem)),
+      )
+  }
 
   useEffect(() => {
     rememberThread(threadId)
-    const first = takeFirstQuestion(threadId)
+    let current = true
     void (async () => {
+      // In development React runs this effect twice and cleans up the first run at once
+      // (StrictMode). `useChat` detaches then and cuts off a stream the first run had started, so
+      // the question stood in the chat and no answer came. Waiting one tick lets only the run that
+      // stays take the question.
+      await Promise.resolve()
+      if (!current) return
+      const first = takeFirstQuestion(threadId)
       if (first) {
         // A question asked anywhere in the app opens this chat and is its first message. The chat
         // begins with the model picked last; the first model answers without being picked.
@@ -219,6 +250,9 @@ function Conversation({ threadId }: { threadId: string }) {
         setModel((await fetchChatModel(threadId)) ?? chatStatus.models[0])
       }
     })()
+    return () => {
+      current = false
+    }
     // Only when the chat opens, whatever the other values are on later renders.
   }, [threadId])
 
@@ -235,6 +269,9 @@ function Conversation({ threadId }: { threadId: string }) {
       body: JSON.stringify({ op: "rename", threadId, title: firstQuestion.slice(0, 80) }),
     }).then(() => router.invalidate())
   }, [isLoading, firstQuestion, titled, threadId, router])
+
+  // Where the running line "Thinking" stands while nothing in the answer moves, if anywhere.
+  const thinking = thinkingLine(messages, isLoading, chatTools)
 
   return (
     <>
@@ -269,13 +306,33 @@ function Conversation({ threadId }: { threadId: string }) {
                       <Message>
                         <MessageContent className="gap-3">
                           {blocks.map((block, index) => (
-                            <AnswerBlock key={index} block={block} />
+                            <AnswerBlock
+                              key={index}
+                              block={block}
+                              thinking={
+                                thinking === "in-answer" && message === messages.at(-1) && index === blocks.length - 1
+                              }
+                            />
                           ))}
                         </MessageContent>
                       </Message>
                     </MessageScrollerItem>
                   )
                 })}
+                {/* Until the answer shows anything, the running line stands on its own where the
+                    answer will be: with the pixel of room an answer has, so the first step takes
+                    its place without a shift. */}
+                {thinking === "apart" && (
+                  <MessageScrollerItem messageId="thinking" className="p-px">
+                    <Message>
+                      <MessageContent>
+                        <Trace>
+                          <ThinkingLine />
+                        </Trace>
+                      </MessageContent>
+                    </Message>
+                  </MessageScrollerItem>
+                )}
                 {error && (
                   <MessageScrollerItem messageId="error">
                     <Alert>
@@ -294,6 +351,15 @@ function Conversation({ threadId }: { threadId: string }) {
                     </Alert>
                   </MessageScrollerItem>
                 )}
+                {stopError && (
+                  <MessageScrollerItem messageId="stop-error">
+                    <Alert>
+                      <CircleAlertIcon />
+                      <AlertTitle>Stopping did not reach the server</AlertTitle>
+                      <AlertDescription>{stopError}</AlertDescription>
+                    </Alert>
+                  </MessageScrollerItem>
+                )}
               </MessageScrollerContent>
             </MessageScrollerViewport>
             <MessageScrollerButton />
@@ -303,7 +369,11 @@ function Conversation({ threadId }: { threadId: string }) {
       <Composer
         placeholder={messages.length === 0 ? "Ask about the machines" : "Ask a follow-up"}
         busy={isLoading}
-        onSend={(question) => void sendMessage(question)}
+        onSend={(question) => {
+          setStopError(undefined)
+          void sendMessage(question)
+        }}
+        onStop={halt}
         models={chatStatus.models}
         model={model}
         onModel={choose}
@@ -319,33 +389,84 @@ const callIcon: Record<CallState, typeof CircleCheckIcon> = {
   failed: CircleAlertIcon,
 }
 
-/** One block of an answer: the tool calls of a stretch, a text, or what a card draws for a result. */
-function AnswerBlock({ block }: { block: Block }) {
+/**
+ * One tool call, after the shadcn pattern Tool: a line while it runs, and a line that opens to what
+ * the tool gave back, or why it failed, once its result is there.
+ */
+function CallLine({ call }: { call: Call }) {
+  const Icon = callIcon[call.state]
+  const line = (
+    <TraceLine status={call.state === "running" ? "running" : call.state === "failed" ? "error" : undefined}>
+      <TraceIcon>
+        <Icon className={call.state === "running" ? "animate-spin" : undefined} />
+      </TraceIcon>
+      <TraceTitle>{toolLabel(call.name, chatTools)[call.state]}</TraceTitle>
+    </TraceLine>
+  )
+  if (call.output === undefined) return line
+  // The output is data of the stack, shown whole and unfiltered: the chat has no sign-in, so whoever
+  // reaches it may read what the tools read. `wrap` and `max-h-64` bound the box, not the text; a
+  // closed step costs nothing, because the panel of Base UI mounts its children only while open
+  // (`keepMounted` is off by default).
+  return (
+    <TraceCollapsible>
+      <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
+      <TraceCollapsibleContent>
+        <CodeBlock size="sm">
+          <CodeBlockContent wrap className="max-h-64">
+            {call.output}
+          </CodeBlockContent>
+        </CodeBlock>
+      </TraceCollapsibleContent>
+    </TraceCollapsible>
+  )
+}
+
+/**
+ * The running line "Thinking": an answer is coming and nothing in it moves (`thinkingLine` in
+ * blocks.ts). Its title shimmers, as every running line of a Trace does.
+ */
+function ThinkingLine() {
+  return (
+    <TraceLine status="running">
+      <TraceIcon>
+        <LoaderCircleIcon className="animate-spin" />
+      </TraceIcon>
+      <TraceTitle>Thinking</TraceTitle>
+    </TraceLine>
+  )
+}
+
+/**
+ * One block of an answer: the tool calls of a stretch, a text, or what a card draws for a result.
+ * `thinking` puts the running line "Thinking" under it: under the last step, in the same Trace, or
+ * in a Trace of its own under a card.
+ */
+function AnswerBlock({ block, thinking = false }: { block: Block; thinking?: boolean }) {
   switch (block.kind) {
     case "steps":
       return (
         <Trace>
-          {block.calls.map((call) => {
-            const Icon = callIcon[call.state]
-            return (
-              <TraceLine
-                key={call.id}
-                status={call.state === "running" ? "running" : call.state === "failed" ? "error" : undefined}
-              >
-                <TraceIcon>
-                  <Icon className={call.state === "running" ? "animate-spin" : undefined} />
-                </TraceIcon>
-                <TraceTitle>{toolLabel(call.name, chatTools)[call.state]}</TraceTitle>
-              </TraceLine>
-            )
-          })}
+          {block.calls.map((call) => (
+            <CallLine key={call.id} call={call} />
+          ))}
+          {thinking && <ThinkingLine />}
         </Trace>
       )
     case "text":
       return <Answer text={block.text} />
     // What the card of a tool draws for its result: a card, a list. The chat names no card.
     case "drawn":
-      return block.node
+      return thinking ? (
+        <>
+          {block.node}
+          <Trace>
+            <ThinkingLine />
+          </Trace>
+        </>
+      ) : (
+        block.node
+      )
   }
 }
 
@@ -354,12 +475,14 @@ function AnswerBlock({ block }: { block: Block }) {
  * answers and lets the chat pick another one, after the shadcn pattern "Model Selector". At the
  * start of the panel the questions to begin with stand above it, after the pattern "Suggestion".
  * With a model for speech in the settings, a question can also be spoken into it (dictate.tsx).
+ * While an answer comes, send is stop, after the pattern "Prompt Input": what came so far stays.
  */
 function Composer({
   placeholder,
   suggestions: questions = [],
   busy = false,
   onSend,
+  onStop,
   models,
   model,
   onModel,
@@ -369,6 +492,7 @@ function Composer({
   suggestions?: ReadonlyArray<string>
   busy?: boolean
   onSend: (question: string) => void
+  onStop?: () => void
   models: ReadonlyArray<string>
   model: string | undefined
   onModel: (name: string) => void
@@ -398,6 +522,9 @@ function Composer({
     }
   }
   const choice = models.length > 1 && model !== undefined
+  // One button that sends, and stops the answer while it comes: the same element, so that it keeps
+  // the focus when it turns from one into the other.
+  const stoppable = busy && onStop !== undefined
   return (
     <SidebarFooter className="border-t">
       {questions.length > 0 && (
@@ -445,14 +572,15 @@ function Composer({
             )}
             {dictation && <DictateButton className={choice ? "ml-auto" : undefined} onText={dictated} />}
             <InputGroupButton
-              type="submit"
+              type={stoppable ? "button" : "submit"}
               variant="default"
               size="icon-sm"
               className={choice && !dictation ? "ml-auto" : undefined}
-              aria-label="Send"
-              disabled={busy}
+              aria-label={stoppable ? "Stop" : "Send"}
+              disabled={busy && !stoppable}
+              onClick={stoppable ? onStop : undefined}
             >
-              <ArrowUpIcon />
+              {stoppable ? <SquareIcon /> : <ArrowUpIcon />}
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>

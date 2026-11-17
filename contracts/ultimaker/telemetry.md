@@ -44,5 +44,4 @@ to artificial zeroes. Heartbeats restart from zero when the adapter process rest
 The adapter is opt-in under the ultimaker Compose profile and waits for broker and timeseries
 persistence health. It uses the existing wildcard subscriptions and the existing machine card;
 no MQTT binding, persistence implementation or UI code is changed.
-This proposal and the new adapter need maintainer agreement before merge. The adapter README
-contains an issue draft; opening an issue or publishing images is not part of this change.
+This proposal and the new adapter need maintainer agreement before merge. Review is tracked in [issue #117](https://github.com/united-machining-solutions/Pleiades.Playground/issues/117).

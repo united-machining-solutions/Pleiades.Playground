@@ -63,7 +63,7 @@ The Images workflow publishes `ghcr.io/united-machining-solutions/pleiades.playg
 after a merge to main or release tag. Enable `COMPOSE_PROFILES=ultimaker` in the deployment computer's
 private .env; see [deployment](../../docs/deployment.md#enable-the-ultimaker-services).
 
-## Maintainer issue draft
+## Maintainer review
 
 Title: Add an optional Ultimaker MQTT telemetry adapter
 
@@ -74,4 +74,4 @@ MQTT binding's degreeCelsius exception, metre, second and one; UTC adapter obser
 Add a separate opt-in .NET container and Compose entry, with broker/persistence dependencies.
 No shared binding, existing persistence service or existing UI changes. The Images workflow publishes
 the adapter alongside the other service images. Maintainer
-agreement is needed before merge. This text is a draft; no issue is opened automatically.
+agreement is needed before merge. Review is tracked in [issue #117](https://github.com/united-machining-solutions/Pleiades.Playground/issues/117).

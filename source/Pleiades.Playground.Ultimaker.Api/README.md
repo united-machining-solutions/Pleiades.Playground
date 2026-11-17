@@ -185,15 +185,14 @@ Copyright/licence notices are retained under `/opt/cura/licenses`.
 - [Upstream CuraEngine](https://github.com/Ultimaker/CuraEngine)
 - Local printer contract: the device's `/docs/api/api_documentation.json` (firmware 5.3.0).
 
-## Maintainer issue draft
+## Maintainer review
 
 Title: Add an optional Ultimaker 3 slicing and printer tool service
 
 Add a .NET REST/MCP service with CuraEngine, persistent STL/G-code artifacts, static toolpath
 validation and explicit local printer pairing/start. The manufacturer is UltiMaker; the connected
 device belongs to the requesting user. The public contract is under `contracts/ultimaker` and uses
-SI settings/results. No MQTT binding or existing service changes. Add an opt-in Compose profile,
+SI settings/results. The separate telemetry adapter follows the existing MQTT binding. Add an opt-in Compose profile,
 port 5530 and a data volume; print-start remains disabled by default. Review the fixed PLA profile,
 static collision-check limits and independent Cura/CuraEngine licences before merging. Container
-publication uses the repository's Images workflow. This draft is for the maintainer to open; no issue or PR is
-created by this change.
+publication uses the repository's Images workflow. Review is tracked in [issue #117](https://github.com/united-machining-solutions/Pleiades.Playground/issues/117).

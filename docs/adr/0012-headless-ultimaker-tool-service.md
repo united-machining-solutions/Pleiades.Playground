@@ -4,7 +4,7 @@ status: proposed
 date: 2026-11-16
 ---
 
-# ADR-0010: Headless Ultimaker tool service
+# ADR-0012: Headless Ultimaker tool service
 
 ## Context
 

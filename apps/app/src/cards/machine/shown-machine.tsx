@@ -3,7 +3,7 @@ import { MachineCard } from "@pleiades/cards/machine/machine-card.tsx"
 import type { Spans } from "@pleiades/cards/machine/state-band.tsx"
 import { useEffect, useState } from "react"
 
-import { getSpans } from "./get-machines.ts"
+import { getSpans } from "@/machines/get-machines.ts"
 
 /**
  * The machine card for the values of a tool result, as a chat has them. The result holds no

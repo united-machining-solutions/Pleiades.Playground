@@ -27,36 +27,51 @@ everything else works.
 | In the demo stack | <http://localhost:5600/>, port from `APP_PORT`, on this computer only (`APP_BIND`) |
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app` |
+| Version | At the bottom of the sidebar: `0.0.142 · 7a83c2f` for an image of the workflow "Images", linked to its commit; `dev` for a build of your own, with the commit of the checkout under `vite dev` |
 | Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. The language models of the chat, see below. |
 
 ## Language models
 
-The chat offers every model the settings name, in up to three blocks. Each block is optional, and a block
-counts once it is complete. Several models are separated by commas. In the stack a key alone completes the
-block of Anthropic or of OpenAI: `compose.yaml` fills in the model names of `.env.example` where a line of
-names is missing or empty. Where a block was begun and is not complete, the chat panel says which setting is
-empty.
+The chat takes its models from a LiteLLM gateway, which reaches Anthropic, OpenAI and models of one's own behind
+one address and one key. At the hackathon that is the gateway of the hub, with the address and the key of its
+handbook.
 
-| Block | Settings | How the app talks to it |
-|---|---|---|
-| Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODELS` | Anthropic's Messages API |
-| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` | OpenAI's Responses API |
-| Any other endpoint | `LLM_BASE_URL`, `LLM_MODELS`, and `LLM_API_KEY` if it wants one | OpenAI's chat completions, which a local model server or a gateway speaks |
+| Setting | What it holds |
+|---|---|
+| `LLM_BASE_URL` | The address of the gateway up to `/v1`, as the app reaches it from its container |
+| `LLM_API_KEY` | The key the gateway gave you |
 
-The models are offered block by block in the order of the table, each block in the order of its setting.
-The first one answers until a chat picks another one in its input field: with a key of Anthropic and the
-names of `.env.example`, that is Claude Haiku. The agent harness keeps that choice with the chat. With one model the field shows no choice. The keys stay on the server.
+The chat offers the models `GET <LLM_BASE_URL>/models` lists, in the order of the list. LiteLLM says of each
+what it is for (`mode`): the chat takes those for `chat`, and those without a mode, which a model of one's own has
+until the admin of the gateway sets one. Every other mode, `embedding` or `audio_transcription`, is left out.
+Which models there are, and in which order, is set at the gateway, also per key. The first one answers until a
+chat picks another one in its input field. The agent harness keeps that choice with the chat. With one model
+the field shows no choice. The key stays on the server.
 
-A model on your own computer goes into the third block:
+The app asks the gateway when it is first needed. A list with a model for chat is kept until the app restarts;
+a new model of the gateway needs `docker compose up -d app`. Where the list does not come, the chat panel says
+why ("GET /models of the gateway at LLM_BASE_URL answered 401"), and the app asks again after half a minute.
+The chat panel, the harness and dictation read the same list.
+
+**Without the gateway of the hackathon**, with a key of Anthropic or of OpenAI, the stack starts a LiteLLM
+gateway of its own, with the profile `gateway`:
 
 ```bash
-LLM_BASE_URL=http://host.docker.internal:<port>/v1
-LLM_MODELS=<a model your server has>
+# in .env: LLM_BASE_URL=http://litellm:4000/v1, LLM_API_KEY=sk-<a key of your own choosing>,
+# and ANTHROPIC_API_KEY or OPENAI_API_KEY
+docker compose --profile gateway up -d
 ```
 
-Then start the app again: `docker compose up -d app`. The app runs in a container, and `localhost` there is
-the container; with Docker Desktop your own computer is `host.docker.internal`. The model must be able to
-call tools: one that cannot answers without data.
+Its models, their order and what each is for are in [`stacks/litellm/config.yaml`](../../stacks/litellm/config.yaml):
+delete the lines of a provider whose key you do not have, or the chat offers its models and they answer with an
+error. `LLM_API_KEY` becomes the master key of the gateway, which LiteLLM wants before it starts; a long random
+value after `sk-` will do. The gateway publishes no port; only the containers of the stack reach it.
+Without the profile it does not start, and its image is not downloaded.
+
+A gateway on your own computer is `http://host.docker.internal:<port>/v1`: the app runs in a container, and
+`localhost` there is the container. The name works with Docker Desktop and, through `extra_hosts` in
+`compose.yaml`, with Docker Engine on Linux; the gateway must then listen on more than `127.0.0.1`. A model must
+be able to call tools: one that cannot answers without data.
 
 **The chat has no sign-in.** The agent harness runs with open access: whoever reaches the port can chat with
 the configured model, at the cost of whoever owns its key, and can list and read every chat. So the demo
@@ -65,24 +80,19 @@ device, set `APP_BIND=0.0.0.0`, and only in a network you trust.
 
 ## Dictation
 
-With a speech-to-text model in the settings, the chat field has a microphone. Press it, speak, press it
+With a speech-to-text model at the gateway, the chat field has a microphone. Press it, speak, press it
 again: a spinner shows while the model writes down what was said, and the text goes into the field, after
 what is already there. It is sent like a typed question, when you send it. After two minutes the recording
 stops by itself and is written down the same way. The model hears the language itself. It also gets the
 names of the machines from the backend as its prompt, so that it writes "P-04" as the stack spells it.
 
-| Block | Setting | Default in the stack |
-|---|---|---|
-| OpenAI | `OPENAI_TRANSCRIPTION_MODEL`, with `OPENAI_API_KEY` | `gpt-transcribe`, so the key alone is enough |
-| Any other endpoint | `LLM_TRANSCRIPTION_MODEL`, with `LLM_BASE_URL` and `LLM_API_KEY` | none |
-
-The other endpoint must speak OpenAI's audio transcriptions (`POST /audio/transcriptions`), as a gateway or a
-local speech server does. With both blocks set, OpenAI's counts; an empty `OPENAI_TRANSCRIPTION_MODEL=` in
-`.env` turns it off, and the other endpoint's counts. Anthropic has no speech-to-text model.
-Without a model for it the field has no microphone, and the chat works as before.
+Dictation takes the first model the gateway marks for speech to text (`mode: audio_transcription`), at the hub
+of the hackathon `openai/gpt-transcribe`. The gateway passes it on as OpenAI's audio transcriptions
+(`POST /audio/transcriptions`). Where the gateway lists none, the field has no microphone, and the chat works
+as before.
 
 The browser records (`useAudioRecorder` of TanStack AI) and sends the recording to `/api/transcribe`, which
-calls the model with the key of its block (`generateTranscription`). The route reads at most 32 MiB, as the
+calls the model with the key of the gateway (`generateTranscription`). The route reads at most 32 MiB, as the
 agent harness does, and answers a larger request with 413. A browser lets a page use the
 microphone only over https or on `localhost`; elsewhere the microphone says so when pressed. The recording
 is not kept.
@@ -112,15 +122,19 @@ the backend of the running demo stack answers.
   a page each have nothing to merge in it. `pnpm install` and `pnpm typecheck` write it
   (`route-tree.mjs`), and so do the development server and the build. Never edit it. TanStack advises to
   commit this file; here everything that needs it writes it first.
-- `src/machines/`: `get-machines.ts` holds the server functions that call the backend as a typed MCP client,
-  `machine-item.tsx` draws a machine as a row or a tile. `chat.tsx` is the machine card in the chat: what a
-  call of each of its tools is called, what the chat draws for a result (`results.ts` checks it against the
-  contract), and which tool only a card calls. Which value of the binding is which state,
-  the signs and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
+- `src/cards/`: a folder for each card, named like the card. `machine/chat.tsx` is the machine card in the
+  chat: what a call of each of its tools is called, what the chat draws for a result (`results.ts` checks it
+  against the contract), and which tool only a card calls. Which value of the binding is which state, the
+  signs and the wording come from [`@pleiades/cards`](../../packages/cards/README.md).
+- `src/machines/`: what the pages and the chat both take of a machine. `get-machines.ts` holds the server
+  functions that call the backend as a typed MCP client, `card-tools.ts` the name of the tool only a card
+  calls, `machine-item.tsx` draws a machine as a row or a tile. A card folder imports from here, never the
+  other way.
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `models.ts` reads which models the settings name, `local-times.ts` adds the time zone of the browser to a
-  tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat` and the choice of the model,
+  tool call. `chat-sidebar.tsx` is the panel with the chat on `useChat`, the choice of the model and stop,
+  which also cancels the turn in the harness (`createHarnessClient(...).cancel()`),
   `dictate.tsx` the microphone in its field and `dictation.server.ts` the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for
   which tool, and its server which tools a language model does not get. `tool-results.ts` says what a card
@@ -133,5 +147,10 @@ the backend of the running demo stack answers.
 - `public/`: the sign of umati as the icon of the page, and the umati wordmark at the top of the sidebar.
   They are trademarks of VDW e.V. and not covered by the licences of this repository, see
   [NOTICE](../../NOTICE).
-- `src/styles.css`: Tailwind and the font. The theme of the preset, light only, comes from `@pleiades/ui`,
-  the chart and state colours from `@pleiades/cards`, so a card looks the same wherever it is drawn.
+- `src/components/brand-switcher.tsx`: the top of the sidebar, the wordmark and the choice of a brand. A
+  brand is a look for the whole app: a block of theme tokens in
+  [`packages/ui/brands`](../../packages/ui/brands/README.md), put on by one attribute, `data-brand` on
+  `<html>`. "Default" is the app without one. With no brand in that folder the wordmark stands alone.
+- `src/styles.css`: Tailwind and the font. The theme of the preset, light only, comes from `@pleiades/ui`
+  and the brands with it, the chart and state colours from `@pleiades/cards`, so a card looks the same
+  wherever it is drawn.

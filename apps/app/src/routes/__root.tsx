@@ -8,6 +8,7 @@ import { fetchChats, getChatStatus } from "@/chat/status.ts"
 import { AppSidebar } from "@/components/app-sidebar.tsx"
 import { AskAnything } from "@/components/ask-anything.tsx"
 import { PageBreadcrumb } from "@/components/page-breadcrumb.tsx"
+import { brandScript } from "@pleiades/ui/brands"
 import { Button } from "@pleiades/ui/components/button"
 import { Separator } from "@pleiades/ui/components/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@pleiades/ui/components/sidebar"
@@ -45,6 +46,8 @@ export const Route = createRootRoute({
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
+    // The brand of the last visit goes on before the first frame, not only once the bundle runs.
+    scripts: [{ children: brandScript }],
   }),
   shellComponent: Document,
   component: Layout,
@@ -53,7 +56,9 @@ export const Route = createRootRoute({
 
 function Document({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // The script in the head puts the brand of the last visit on this element before React takes the
+    // document over (packages/ui/brands), so the attribute is not in what the server sent.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

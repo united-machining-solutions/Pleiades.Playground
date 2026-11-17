@@ -69,7 +69,7 @@ Both import the theme from [`packages/ui`](../ui/README.md), so the card looks t
    [`contracts/mcp`](../../contracts/mcp/README.md).
 3. Write the component with the inferred type as its properties.
 4. In the application, say what the chat draws for a result of the tool: a module for the card, like
-   `src/machines/chat.tsx`, and one line in `src/chat/cards.tsx`.
+   `src/cards/machine/chat.tsx`, and one line in `src/chat/cards.tsx`.
 5. For other hosts, add a page for the card under `apps/genui-mcp/ui/` and link it from the tool. The build
    finds the page by itself.
 6. If the card shows a series, keep it out of the contract of the card: give it a contract and a tool of its
