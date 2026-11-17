@@ -1,0 +1,152 @@
+using Pleiades.Playground.OpcUa.Adapter.Mapping;
+
+namespace Pleiades.Playground.OpcUa.Adapter.Registrations;
+
+/// <summary>
+/// Checks a registration before it is stored: everything that can be said without a connection.
+/// </summary>
+internal static class RegistrationValidator
+{
+    /// <summary>The elements of the profile Core that are values in the MQTT binding and mandatory.</summary>
+    public static IReadOnlyList<string> CoreMandatory { get; } =
+    [
+        "Identification.Manufacturer",
+        "Identification.SerialNumber",
+        "Identification.ProductInstanceUri",
+        "State.MachineryItemState",
+        "State.MachineryOperationMode",
+        "OperationCounters.PowerOnDuration",
+    ];
+
+    /// <summary>The problems of a registration. Empty means it can be stored.</summary>
+    public static IReadOnlyList<string> Validate(MachineRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        var problems = new List<string>();
+
+        if (!Topics.IsSerialNumber(registration.SerialNumber))
+        {
+            problems.Add("serialNumber: must be one topic level, without '/', '+', '#' or white space.");
+        }
+
+        if (!Uri.TryCreate(registration.Endpoint.Url, UriKind.Absolute, out var url) || url.Scheme != "opc.tcp")
+        {
+            problems.Add("endpoint.url: must be an opc.tcp:// URL.");
+        }
+
+        if (string.IsNullOrWhiteSpace(registration.Endpoint.SecurityPolicy))
+        {
+            problems.Add("endpoint.securityPolicy: is required, for example Aes256_Sha256_RsaPss.");
+        }
+
+        if (registration.Elements.Count == 0)
+        {
+            problems.Add("elements: at least one element is required.");
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var element in registration.Elements)
+        {
+            Check(element, seen, problems);
+        }
+
+        if (registration.Profiles.Contains("Core", StringComparer.Ordinal))
+        {
+            var missing = CoreMandatory
+                .Where(path => !registration.Elements.Any(element => element.Area == "umati" && element.Path == path))
+                .ToList();
+            if (missing.Count > 0)
+            {
+                problems.Add($"profiles: Core is named, but its mandatory elements are missing: {string.Join(", ", missing)}.");
+            }
+        }
+
+        if (registration.Alerts is { } alerts)
+        {
+            if (!IsPortableNode(alerts.EventType))
+            {
+                problems.Add("alerts.eventType: must be a node with a namespace URI, 'nsu=<uri>;i=<number>', or a node of namespace 0.");
+            }
+
+            if (alerts.Notifier is { Length: > 0 } notifier && !IsPortableNode(notifier))
+            {
+                problems.Add("alerts.notifier: must be a node with a namespace URI, or a node of namespace 0.");
+            }
+        }
+
+        return problems;
+    }
+
+    /// <summary>
+    /// A node id that stays the same when the server restarts: namespace 0 (<c>i=2253</c>) or one
+    /// with the namespace as a URI (<c>nsu=...;</c>). <c>ns=2;...</c> is an index and may move.
+    /// </summary>
+    public static bool IsPortableNode(string? node)
+    {
+        if (string.IsNullOrWhiteSpace(node))
+        {
+            return false;
+        }
+
+        var identifier = node;
+        if (node.StartsWith("nsu=", StringComparison.Ordinal))
+        {
+            // The identifier follows the first ';': a namespace URI holds none.
+            var separator = node.IndexOf(';', StringComparison.Ordinal);
+            if (separator <= "nsu=".Length)
+            {
+                return false;
+            }
+
+            identifier = node[(separator + 1)..];
+        }
+
+        // "i=42", "s=name", "g=...", "b=...". An index form, "ns=2;i=42", fails here on its second character.
+        return identifier.Length > 2 && identifier[1] == '=' && "isgb".Contains(identifier[0], StringComparison.Ordinal);
+    }
+
+    private static void Check(ElementRegistration element, HashSet<string> seen, List<string> problems)
+    {
+        var name = $"elements[{element.Area}/{element.Path}]";
+        if (element.Area is not ("umati" or "vendor"))
+        {
+            problems.Add($"{name}: area must be 'umati' or 'vendor'.");
+        }
+
+        if (!Topics.IsPath(element.Path))
+        {
+            problems.Add($"{name}: path must be 'Group.Element', with instance keys in brackets.");
+        }
+        else if (element.Path is Topics.ConnectionState or Topics.ConnectionHeartbeat)
+        {
+            problems.Add($"{name}: the adapter publishes the connection itself; it is not an element of a registration.");
+        }
+
+        if (!seen.Add($"{element.Area}/{element.Path}"))
+        {
+            problems.Add($"{name}: is named twice.");
+        }
+
+        if (!IsPortableNode(element.Node))
+        {
+            problems.Add($"{name}: node must carry the namespace as a URI, 'nsu=<uri>;i=<number>' or 'nsu=<uri>;s=<text>', not an index.");
+        }
+
+        if (element.Kind == ValueKind.Number)
+        {
+            if (!ValueConverter.TryParseUnit(element.Unit, out _))
+            {
+                problems.Add($"{name}: a number needs a unit of the MQTT binding, for example 'one' or 'second'.");
+            }
+
+            if (element.Map is not null)
+            {
+                problems.Add($"{name}: a number has no map; use scale and offset.");
+            }
+        }
+        else if (element.Unit is not null || element.Scale is not null || element.Offset is not null)
+        {
+            problems.Add($"{name}: unit, scale and offset belong to a number only.");
+        }
+    }
+}

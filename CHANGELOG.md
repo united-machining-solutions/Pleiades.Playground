@@ -210,6 +210,12 @@ All notable changes are documented here. The format follows
   the last hours, as stacked bars, and its state over the last 30 minutes, as a step line per machine. One
   server function, `getCharts`, reads the values over one connection, the spans of the last 30 minutes only.
   The charts are the chart of shadcn/ui; `recharts` is new in the app.
+- OPC UA adapter `opcua-adapter`, a proof of concept behind the compose profile `opcua`, with the TRUMPF OPC UA
+  simulator as a machine to try it with. It runs every registered OPC UA machine from its registration in the
+  volume `/data` and publishes its values and alarms by the MQTT binding, also after a restart. It hosts the
+  read-only tools of the OPC UA MCP library of the OPC Foundation. In the chat of the example app, `/discover`
+  scans a server and proposes its registration, which a person adds with a button; `/opcua`, `/mapping`,
+  `/rescan` and `/help` list servers, show mismatched and unclear mappings and scan again.
 
 ### Changed
 
