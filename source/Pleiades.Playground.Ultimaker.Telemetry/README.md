@@ -18,9 +18,11 @@ runs under `pleiades-playground`, specify `-p pleiades-playground`; do not launc
 the same host ports. The service waits for broker and timeseries-persistence health. It does not
 depend on the slicer, require printer pairing or enable printing.
 
-Settings in .env.example: ULTIMAKER_MACHINE_ID (logical ID, default UM3-01), ULTIMAKER_PRINTER_URL,
+Settings in .env.example: ULTIMAKER_SERIAL_NUMBER (logical serial number, default UM3-01), ULTIMAKER_PRINTER_URL,
 ULTIMAKER_POLL_INTERVAL_SECOND (default 2), ULTIMAKER_MQTT_URL, ULTIMAKER_MQTT_USER and
-ULTIMAKER_MQTT_PASSWORD. The logical ID is not asserted to be a physical serial number.
+ULTIMAKER_MQTT_PASSWORD. The logical serial number is not asserted to be the physical one. The machine id
+is `<manufacturer>_<model>_<serial number>`, `ultimaker_UM3_UM3-01` by default (`Config:Manufacturer`,
+`Config:Model`, `Config:SerialNumber`).
 Secrets are configured by the operator, never logged or copied into code.
 
 ## Observations and units
@@ -29,18 +31,19 @@ The adapter polls GET /api/v1/printer and GET /api/v1/print_job. The temperature
 diagnostic history buffer; its opaque heater/flow/step signals are not assigned guessed units.
 We use the live snapshots for bed/nozzle current and target temperatures, XYZ position, fan
 fraction, known material length, printer/job states, progress and duration estimates.
-See the contract table for every topic under `machines/{SerialNumber}/`.
+See the contract table for every topic under `machines/{MachineId}/`.
 
 Temperatures use `degreeCelsius`, the explicit exception already documented in the MQTT binding.
 Positions and lengths are converted from manufacturer millimetres to metre; fan percentages to
 fractions. Unknown negative material lengths and missing job measurements are omitted, not zeroed.
 Job filenames and user names are not published. Unknown machine states are not fabricated into an
-umati state; the original vendor state remains available.
+umati state; the original state of the manufacturer remains available below `oem/`.
 
 UTC timestamps are the adapter's observation time of each live snapshot. No printer clock or
 diagnostics boot-relative timestamp is substituted. Messages are not retained.
 An independent ten-second heartbeat counter runs even while printer requests are blocked. The
-connection state reports Disconnected when polling fails or the last success becomes stale.
+connection state reports CommunicationFault when polling fails or the last success becomes stale,
+and Running otherwise.
 Abrupt process loss is detected by a missing heartbeat; the counter resets on process restart.
 The shared MQTT client reconnects and has a bounded outgoing queue. The adapter skips sensor
 publishing while disconnected from the broker. Consumers must still respect timestamps and age.
@@ -50,9 +53,9 @@ fresh. This distinguishes an alive adapter from an unreachable printer.
 
 ## Verify and view
 
-Subscribe to `machines/UM3-01/#` with an MQTT 5 client and compare bed/nozzle values with the printer.
+Subscribe to `machines/ultimaker_UM3_UM3-01/#` with an MQTT 5 client and compare bed/nozzle values with the printer.
 Then query the Timeseries API at <http://localhost:5500/> for those exact topics and observation
-times. The existing `genui_machine_list` discovers UM3-01 from stored connection/state topics, and
+times. The existing `genui_machine_list` discovers ultimaker_UM3_UM3-01 from stored connection/state topics, and
 `genui_machine_show` renders the existing machine card. No new UI component or card is needed.
 The existing card focuses on state; numeric temperatures are available through Timeseries.
 

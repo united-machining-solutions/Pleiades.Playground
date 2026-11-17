@@ -74,7 +74,7 @@ Set these values in the deployment computer's private `.env` in DEPLOY_DIR:
 ```dotenv
 COMPOSE_PROFILES=ultimaker
 ULTIMAKER_PRINTER_URL=http://ultimaker.local/
-ULTIMAKER_MACHINE_ID=UM3-01
+ULTIMAKER_SERIAL_NUMBER=UM3-01
 ULTIMAKER_ENABLE_PRINTING=false
 ```
 

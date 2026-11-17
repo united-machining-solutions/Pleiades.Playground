@@ -34,6 +34,12 @@ All notable changes are documented here. The format follows
 - The data model is pinned to 0.17.1 (`3a799d5`), which names the event topics `events/jobs` and
   `events/workmasters` as the simulator already publishes them; the manifest and `dataschema` carry 0.17.1.
 
+- The measurement card and the Ultimaker telemetry follow the tree of the data model: the card names a machine
+  by its machine id and reads the bearing temperature below `oem/` (energy shows in `Wh`); the telemetry
+  publishes below `machines/ultimaker_UM3_UM3-01/` (`ULTIMAKER_SERIAL_NUMBER` instead of
+  `ULTIMAKER_MACHINE_ID`), its signals below `oem/Ultimaker/`, `State/Status/MachineryItemState`, the adapter
+  states `Running` and `CommunicationFault`, and its identification.
+
 ### Removed
 
 - `NotificationEventDtoV1`, `JobEventDtoV1` and `WorkMasterEventDtoV1`, their collections, endpoints

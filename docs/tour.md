@@ -269,7 +269,7 @@ preview workflow and validation limits are in the
 [Ultimaker service guide](../source/Pleiades.Playground.Ultimaker.Api/README.md).
 No tour screenshot changes: this service adds no application screen.
 The optional `ultimaker-telemetry` service publishes live printer observations to the existing broker.
-Its logical machine ID defaults to `UM3-01`, which then appears in the existing machine list/card.
+Its machine id defaults to `ultimaker_UM3_UM3-01`, which then appears in the existing machine list/card.
 See the [adapter guide](../source/Pleiades.Playground.Ultimaker.Telemetry/README.md) for topic names,
 units, timestamps and how to verify persistence. The existing Home screenshot was not retaken;
 it therefore still shows only simulated machines.

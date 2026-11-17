@@ -49,11 +49,11 @@ services:
       timeseries-persistence:
         condition: service_healthy
     environment:
-      Config__SerialNumber: ${ULTIMAKER_MACHINE_ID:-UM3-01}
+      Config__SerialNumber: ${ULTIMAKER_SERIAL_NUMBER:-UM3-01}
       Config__PrinterBaseUrl: ${ULTIMAKER_PRINTER_URL:-http://ultimaker.local/}
       Config__PollIntervalSecond: ${ULTIMAKER_POLL_INTERVAL_SECOND:-2}
       Config__MqttDestination__ConnectionString: ${ULTIMAKER_MQTT_URL:-mqtt://broker:1883}
-      Config__MqttDestination__ClientId: ultimaker-telemetry-${ULTIMAKER_MACHINE_ID:-UM3-01}
+      Config__MqttDestination__ClientId: ultimaker-telemetry-${ULTIMAKER_SERIAL_NUMBER:-UM3-01}
       Config__MqttDestination__User: ${ULTIMAKER_MQTT_USER:-}
       Config__MqttDestination__Password: ${ULTIMAKER_MQTT_PASSWORD:-}
 

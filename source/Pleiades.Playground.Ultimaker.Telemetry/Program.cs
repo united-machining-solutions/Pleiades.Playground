@@ -6,8 +6,9 @@ using Pleiades.Playground.Ultimaker.Telemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOptions<TelemetryOptions>().BindConfiguration("Config")
-    .Validate(o => !string.IsNullOrWhiteSpace(o.SerialNumber) && !o.SerialNumber.Any(c => char.IsWhiteSpace(c) || "/+#".Contains(c)),
-        "SerialNumber must be one nonempty MQTT topic segment.")
+    .Validate(o => new[] { o.Manufacturer, o.Model, o.SerialNumber }.All(part => !string.IsNullOrWhiteSpace(part)
+            && !part.Any(c => char.IsWhiteSpace(c) || "/+#".Contains(c))),
+        "Manufacturer, Model and SerialNumber must each be nonempty and fit in one MQTT topic segment.")
     .Validate(o => o.PollIntervalSecond is >= 1 and <= 10, "Poll interval must be 1..10 seconds.")
     .Validate(o => Uri.TryCreate(o.PrinterBaseUrl, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"
         && string.IsNullOrEmpty(uri.UserInfo), "PrinterBaseUrl must be an HTTP(S) URL without credentials.")

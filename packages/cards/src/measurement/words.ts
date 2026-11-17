@@ -18,6 +18,7 @@ export const quantityLabel: Record<Quantity, string> = {
 const units: Record<string, { sign: string; decimals: number }> = {
   watt: { sign: "W", decimals: 0 },
   joule: { sign: "J", decimals: 0 },
+  wattHour: { sign: "Wh", decimals: 0 },
   degreeCelsius: { sign: "°C", decimals: 1 },
   one: { sign: "", decimals: 2 },
 }

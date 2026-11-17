@@ -28,7 +28,7 @@ public sealed class TelemetryTests
         using var job = JsonDocument.Parse("""{"state":"printing","uuid":"a-job","progress":0.25,"time_elapsed":10,"time_total":40}""");
         var now = DateTime.UtcNow;
         var values = TelemetryMapper.Map(printer.RootElement, job.RootElement, now);
-        var temperature = (BaseUnitValueDto)values.Single(s => s.Suffix == "vendor/Ultimaker/Bed/Temperature").Message;
+        var temperature = (BaseUnitValueDto)values.Single(s => s.Suffix == "oem/Ultimaker/Bed/Temperature").Message;
         Assert.AreEqual(60.5, temperature.Value);
         Assert.AreEqual(BaseUnit.DegreeCelsius, temperature.Unit);
         Assert.AreEqual(now, temperature.Timestamp);
@@ -36,7 +36,7 @@ public sealed class TelemetryTests
         Assert.AreEqual(.5, ((BaseUnitValueDto)values.Single(s => s.Suffix.EndsWith("FanFraction", StringComparison.Ordinal)).Message).Value);
         Assert.AreEqual(1, ((BaseUnitValueDto)values.Single(s => s.Suffix.EndsWith("0/MaterialRemainingLength", StringComparison.Ordinal)).Message).Value);
         Assert.IsFalse(values.Any(s => s.Suffix.EndsWith("1/MaterialRemainingLength", StringComparison.Ordinal)));
-        Assert.AreEqual("Executing", ((StringValueDto)values.Single(s => s.Suffix == "umati/State/MachineryItemState").Message).Value);
+        Assert.AreEqual("Executing", ((StringValueDto)values.Single(s => s.Suffix == "umati/State/Status/MachineryItemState").Message).Value);
     }
 
     [TestMethod]
@@ -45,12 +45,12 @@ public sealed class TelemetryTests
         using var printer = JsonDocument.Parse("""{"status":"future_status","bed":{"temperature":{"current":null}}}""");
         var values = TelemetryMapper.Map(printer.RootElement, null, DateTime.UtcNow);
         Assert.IsFalse(values.Any(s => s.Message is BaseUnitValueDto));
-        Assert.IsFalse(values.Any(s => s.Suffix == "umati/State/MachineryItemState"));
-        Assert.AreEqual("none", ((StringValueDto)values.Single(s => s.Suffix == "vendor/Ultimaker/Print/State").Message).Value);
+        Assert.IsFalse(values.Any(s => s.Suffix == "umati/State/Status/MachineryItemState"));
+        Assert.AreEqual("none", ((StringValueDto)values.Single(s => s.Suffix == "oem/Ultimaker/Print/State").Message).Value);
         using var job = JsonDocument.Parse("""{"state":"paused","progress":-1,"time_elapsed":null,"time_total":-1}""");
         values = TelemetryMapper.Map(printer.RootElement, job.RootElement, DateTime.UtcNow);
         Assert.IsFalse(values.Any(s => s.Message is BaseUnitValueDto));
-        Assert.AreEqual("NotExecuting", ((StringValueDto)values.Single(s => s.Suffix == "umati/State/MachineryItemState").Message).Value);
+        Assert.AreEqual("NotExecuting", ((StringValueDto)values.Single(s => s.Suffix == "umati/State/Status/MachineryItemState").Message).Value);
     }
 
     [TestMethod]
@@ -81,7 +81,11 @@ public sealed class TelemetryTests
         var state = messages.Single(m => m.Topic.EndsWith("/Connection/State", StringComparison.Ordinal));
         Assert.AreEqual("stringvaluedto", state.ContentType);
         using var status = JsonDocument.Parse(state.Payload);
-        Assert.AreEqual("Disconnected", status.RootElement.GetProperty("value").GetString());
+        Assert.AreEqual("CommunicationFault", status.RootElement.GetProperty("value").GetString());
+        Assert.IsTrue(state.Topic.StartsWith("machines/ultimaker_UM3_UM3-01/", StringComparison.Ordinal), state.Topic);
+        var model = messages.Single(m => m.Topic.EndsWith("/umati/Identification/Model", StringComparison.Ordinal));
+        using var modelValue = JsonDocument.Parse(model.Payload);
+        Assert.AreEqual("UM3", modelValue.RootElement.GetProperty("value").GetString());
         await worker.StopAsync(TestContext.CancellationToken).ConfigureAwait(false);
     }
 

@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { SILENT_AFTER_SECONDS, instant, serialNumber } from "../machine/contract.ts"
+import { SILENT_AFTER_SECONDS, instant, machineId } from "../machine/contract.ts"
 
 // The contract of the measurement card: what every machine measures now. Each value is the
 // newest one of its topic, in the unit it was published in, and names the topic it comes from.
@@ -39,7 +39,7 @@ export const measurement = z.object({
 export type Measurement = z.infer<typeof measurement>
 
 export const machineMeasurements = z.object({
-  machine: serialNumber.describe("The serial number, which identifies the machine in every topic."),
+  machine: machineId.describe("The machine id, which identifies the machine in every topic."),
   measurements: z.array(measurement).describe("One for each quantity, in the order of `QUANTITIES`."),
 })
 export type MachineMeasurements = z.infer<typeof machineMeasurements>
@@ -64,7 +64,7 @@ export const lineValue = z
 export type LineValue = z.infer<typeof lineValue>
 
 export const measurementLine = z.object({
-  machine: serialNumber,
+  machine: machineId,
   topic: z.string().describe("The MQTT topic the values come from."),
   values: z.array(lineValue).describe("One for each of `instants` of the result, in that order."),
 })

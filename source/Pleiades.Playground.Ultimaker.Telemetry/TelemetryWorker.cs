@@ -9,7 +9,14 @@ namespace Pleiades.Playground.Ultimaker.Telemetry;
 internal sealed class TelemetryOptions
 {
     public string PrinterBaseUrl { get; set; } = "http://ultimaker.local/";
+    /// <summary>The first part of the machine id, after the domain of the manufacturer.</summary>
+    public string Manufacturer { get; set; } = "ultimaker";
+    /// <summary>The name of the manufacturer, as <c>Identification/Manufacturer</c> says it.</summary>
+    public string ManufacturerName { get; set; } = "Ultimaker";
+    public string Model { get; set; } = "UM3";
     public string SerialNumber { get; set; } = "UM3-01";
+    /// <summary>The machine id of the MQTT binding, <c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>.</summary>
+    public string MachineId => Manufacturer + "_" + Model + "_" + SerialNumber;
     public int PollIntervalSecond { get; set; } = 2;
 }
 
@@ -30,7 +37,7 @@ internal sealed class TelemetryState
 internal sealed class TelemetryWorker(IHttpClientFactory clients, IManagedMqttClient mqtt,
     IOptions<TelemetryOptions> options, TelemetryState state, ILogger<TelemetryWorker> logger) : BackgroundService
 {
-    private string Prefix => "machines/" + options.Value.SerialNumber + "/";
+    private string Prefix => "machines/" + options.Value.MachineId + "/";
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -98,12 +105,28 @@ internal sealed class TelemetryWorker(IHttpClientFactory clients, IManagedMqttCl
             if (mqtt.IsConnected)
             {
                 var now = DateTime.UtcNow;
+                // The states of an adapter of the data model: Running while the printer answers, CommunicationFault
+                // while it does not.
                 await mqtt.Publish(Prefix + "umati/Connection/State",
-                    new StringValueDto { Timestamp = now, Value = state.IsFresh ? "Connected" : "Disconnected" }).ConfigureAwait(false);
+                    new StringValueDto { Timestamp = now, Value = state.IsFresh ? "Running" : "CommunicationFault" }).ConfigureAwait(false);
                 await mqtt.Publish(Prefix + "umati/Connection/Heartbeat",
                     new BaseUnitValueDto { Timestamp = now, Value = ++count, Unit = BaseUnit.One }).ConfigureAwait(false);
+                // Who the printer is, so a display can name it; again every five minutes, since nothing is retained.
+                if (count % 30 == 1)
+                {
+                    await PublishIdentificationAsync(now).ConfigureAwait(false);
+                }
             }
         } while (await timer.WaitForNextTickAsync(token).ConfigureAwait(false));
+    }
+
+    private async Task PublishIdentificationAsync(DateTime now)
+    {
+        var settings = options.Value;
+        foreach (var (name, value) in new[] { ("Manufacturer", settings.ManufacturerName), ("Model", settings.Model), ("SerialNumber", settings.SerialNumber) })
+        {
+            await mqtt.Publish(Prefix + "umati/Identification/" + name, new StringValueDto { Timestamp = now, Value = value }).ConfigureAwait(false);
+        }
     }
 
     private static async Task<JsonDocument> ReadAsync(HttpClient client, string path, CancellationToken token)

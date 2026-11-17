@@ -5,29 +5,34 @@ The requesting user's printer supplies observations through GET /api/v1/printer 
 No authentication or printer write is needed. A separate .NET adapter publishes the existing
 BaseUnitValueDto/StringValueDto envelopes and MQTT 5 content types to the configured broker.
 
-The configurable logical machine ID defaults to UM3-01. It is not claimed to be the hardware serial.
-All topics start with machines/{SerialNumber}/. UTC timestamps identify the adapter's observation
+The configurable logical serial number defaults to UM3-01. It is not claimed to be the hardware serial.
+All topics start with machines/{MachineId}/, the machine id `<manufacturer>_<model>_<serial number>` of the
+MQTT binding, `ultimaker_UM3_UM3-01` by default. Manufacturer signals lie below `oem/`, as in that binding.
+It follows the tree of that binding, not yet its payloads: values come as the value DTOs with their content
+types, which the Timeseries persistence still takes, and the adapter publishes no manifest, no snapshot
+`State/Status` (only its field `MachineryItemState` as a value of its own) and no CloudEvents. UTC timestamps identify the adapter's observation
 of the live snapshot; they are not reconstructed hardware sampling times.
 
 | Topic suffix | Kind | Unit / meaning |
 |---|---|---|
-| umati/Connection/State | string | Connected when the last poll succeeded and is fresh, otherwise Disconnected |
+| umati/Connection/State | string | Running when the last poll succeeded and is fresh, otherwise CommunicationFault |
 | umati/Connection/Heartbeat | number | one; independent monotonic process counter every 10 seconds |
-| umati/State/MachineryItemState | string | Executing for an actively printing job; NotExecuting for known idle/paused/wait states; omitted for unknown states |
-| vendor/Ultimaker/PrinterStatus | string | Unmodified manufacturer state |
-| vendor/Ultimaker/Bed/Temperature | number | degreeCelsius |
-| vendor/Ultimaker/Bed/TargetTemperature | number | degreeCelsius |
-| vendor/Ultimaker/Extruder/{index}/Temperature | number | degreeCelsius; manufacturer indices start at zero |
-| vendor/Ultimaker/Extruder/{index}/TargetTemperature | number | degreeCelsius |
-| vendor/Ultimaker/Extruder/{index}/MaterialRemainingLength | number | metre; unknown negative values omitted |
-| vendor/Ultimaker/Position/{X,Y,Z} | number | metre |
-| vendor/Ultimaker/FanFraction | number | one; 0..1 |
-| vendor/Ultimaker/Print/State | string | Manufacturer job state, or none when HTTP 404/no job |
-| vendor/Ultimaker/Print/JobId | string | Printer job UUID, if known |
-| vendor/Ultimaker/Print/Result | string | Manufacturer result, if present |
-| vendor/Ultimaker/Print/Progress | number | one; 0..1, omitted when unknown |
-| vendor/Ultimaker/Print/TimeElapsed | number | second |
-| vendor/Ultimaker/Print/TimeTotal | number | second; manufacturer's estimate |
+| umati/Identification/{Manufacturer,Model,SerialNumber} | string | who the printer is; with the first heartbeat and every five minutes |
+| umati/State/Status/MachineryItemState | string | Executing for an actively printing job; NotExecuting for known idle/paused/wait states; omitted for unknown states |
+| oem/Ultimaker/PrinterStatus | string | Unmodified manufacturer state |
+| oem/Ultimaker/Bed/Temperature | number | degreeCelsius |
+| oem/Ultimaker/Bed/TargetTemperature | number | degreeCelsius |
+| oem/Ultimaker/Extruder/{index}/Temperature | number | degreeCelsius; manufacturer indices start at zero |
+| oem/Ultimaker/Extruder/{index}/TargetTemperature | number | degreeCelsius |
+| oem/Ultimaker/Extruder/{index}/MaterialRemainingLength | number | metre; unknown negative values omitted |
+| oem/Ultimaker/Position/{X,Y,Z} | number | metre |
+| oem/Ultimaker/FanFraction | number | one; 0..1 |
+| oem/Ultimaker/Print/State | string | Manufacturer job state, or none when HTTP 404/no job |
+| oem/Ultimaker/Print/JobId | string | Printer job UUID, if known |
+| oem/Ultimaker/Print/Result | string | Manufacturer result, if present |
+| oem/Ultimaker/Print/Progress | number | one; 0..1, omitted when unknown |
+| oem/Ultimaker/Print/TimeElapsed | number | second |
+| oem/Ultimaker/Print/TimeTotal | number | second; manufacturer's estimate |
 
 The MQTT binding explicitly uses degreeCelsius rather than kelvin. This existing documented
 exception is followed here; the REST/MCP printer API continues to use kelvin.
@@ -36,7 +41,7 @@ The temperature.html diagnostics buffer is not scraped or replayed as live obser
 No filenames, user names, credentials or printer network configuration are published.
 
 Polls default to every 2 seconds. Missing/invalid/non-finite measurements are omitted, never replaced
-by zero. Failed polls publish no sensor observations; the independent heartbeat reports Disconnected.
+by zero. Failed polls publish no sensor observations; the independent heartbeat reports CommunicationFault.
 MQTT reconnects through the shared managed client, with a bounded queue. No messages are retained.
 Consumers must respect observation timestamps and heartbeat age; missing job metrics are not reset
 to artificial zeroes. Heartbeats restart from zero when the adapter process restarts.
