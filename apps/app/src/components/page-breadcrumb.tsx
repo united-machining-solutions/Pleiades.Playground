@@ -29,6 +29,7 @@ export function PageBreadcrumb() {
     fullPath: page.fullPath,
     pathname: page.pathname,
     params: page.params,
+    search: page.search,
     staticData: page.staticData,
   })
   if (steps.length === 0) return null

@@ -206,3 +206,21 @@ test("the list of all pages is called Pages and links nowhere", () => {
     [{ title: "Pages" }],
   )
 })
+
+test("a page opened from a link stands behind Pages, called by what the link says: the crumb reads the search", () => {
+  const pages = navPages([
+    ...withPages,
+    { fullPath: "/pages/open", options: { staticData: { crumb: (_params: Record<string, string>, search: Record<string, unknown>) => String(search.r ?? "") } } },
+  ])
+  assert.equal(activePage(pages, "/pages/open")?.title, "Pages")
+  assert.deepEqual(
+    crumbsOf(pages, {
+      fullPath: "/pages/open",
+      pathname: "/pages/open",
+      params: {},
+      search: { r: "Morning round" },
+      staticData: { crumb: (_params, search) => String(search.r ?? "") },
+    }),
+    [{ title: "Pages", path: "/pages" }, { title: "Morning round" }],
+  )
+})

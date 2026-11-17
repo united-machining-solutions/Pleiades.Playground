@@ -15,10 +15,11 @@ export type NavEntry = {
 
 /**
  * What a page is called in the breadcrumb of the header, where the title of its entry does not say
- * it: a text, or one made from the parameters of its route. Home is called "Machines" there, and
- * the page of a machine by its machine.
+ * it: a text, or one made from the parameters of its route, and from its search where the page is
+ * named there (a page opened from a link is called by the title in the link). Home is called
+ * "Machines" there, and the page of a machine by its machine.
  */
-export type Crumb = string | ((params: Record<string, string>) => string)
+export type Crumb = string | ((params: Record<string, string>, search: Record<string, unknown>) => string)
 
 /** An entry with the path of its page, and what the page is called in the breadcrumb. */
 export type NavPage = NavEntry & { path: string; crumb?: Crumb }
@@ -68,6 +69,8 @@ type ShownPage = {
   /** The path in the address: "/machines/P-04". */
   pathname: string
   params: Record<string, string>
+  /** What the address says after the question mark, as the route validated it. */
+  search?: Record<string, unknown>
   staticData?: { nav?: NavEntry; crumb?: Crumb }
 }
 
@@ -81,18 +84,19 @@ type ShownPage = {
  * stands behind "Pages" in the breadcrumb, pinned or not.
  */
 export function crumbsOf(pages: ReadonlyArray<NavPage>, page: ShownPage): Array<CrumbStep> {
-  const text = (crumb: Crumb | undefined, params: Record<string, string>) =>
-    typeof crumb === "function" ? crumb(params) : crumb
+  const search = page.search ?? {}
+  const text = (crumb: Crumb | undefined, params: Record<string, string>, searched: Record<string, unknown>) =>
+    typeof crumb === "function" ? crumb(params, searched) : crumb
   const steps: Array<CrumbStep> = []
   const under = activePage(pages, page.pathname)
   const isEntry = under !== undefined && under.path === pathOf(page.fullPath)
   if (under && !isEntry) {
-    steps.push({ title: text(under.crumb, {}) ?? under.title, path: under.path })
+    steps.push({ title: text(under.crumb, {}, {}) ?? under.title, path: under.path })
   }
   const own =
-    text(page.staticData?.crumb, page.params) ??
+    text(page.staticData?.crumb, page.params, search) ??
     page.staticData?.nav?.title ??
-    (isEntry ? (text(under.crumb, page.params) ?? under.title) : undefined)
+    (isEntry ? (text(under.crumb, page.params, search) ?? under.title) : undefined)
   if (own) steps.push({ title: own })
   return steps
 }

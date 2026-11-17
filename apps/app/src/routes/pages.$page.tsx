@@ -1,16 +1,16 @@
 import { clock } from "@pleiades/cards/machine/format.ts"
 import { Button, buttonVariants } from "@pleiades/ui/components/button"
-import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { Toggle } from "@pleiades/ui/components/toggle"
 import { Link, createFileRoute, notFound, useNavigate } from "@tanstack/react-router"
 import { EllipsisIcon, PencilIcon, PinIcon, SearchXIcon, Trash2Icon } from "lucide-react"
 import { useEffect, useId, useRef, useState } from "react"
-import type { ReactNode } from "react"
 
 import { useLive } from "@/hooks/use-live.ts"
+import { Column, PartsLoading } from "@/pages/column.tsx"
 import { DrawnPart, answerParts } from "@/pages/drawn-part.tsx"
 import { MAX_TITLE_LENGTH } from "@/pages/recipe.ts"
 import type { StoredPage } from "@/pages/recipe.ts"
+import { SharePage } from "@/pages/share-page.tsx"
 import { deletePage, getPage, pinPage, renamePage, unpinPage, usePage } from "@/pages/store.ts"
 import {
   AlertDialog,
@@ -74,19 +74,10 @@ function KeptPage() {
   )
 }
 
-/** One column, as wide as the page of a machine, with the head of the page on top. */
-function Column({ head, children }: { head?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-      {head}
-      {children}
-    </div>
-  )
-}
-
 /**
  * The head of a page, laid out like the heads of the other pages: the title, which can be renamed
- * in place, and the line under it; beside them the pin and a menu with what else there is to do.
+ * in place, and the line under it; beside them the pin, "Share" and a menu with what else there is
+ * to do.
  */
 function Head({ page, line }: { page: StoredPage; line: string }) {
   const navigate = useNavigate()
@@ -108,6 +99,8 @@ function Head({ page, line }: { page: StoredPage; line: string }) {
           <PinIcon />
           {page.pinned ? "Pinned" : "Pin"}
         </Toggle>
+        {/* A link that carries the recipe of this page: the stack keeps no page and nobody signs in. */}
+        <SharePage recipe={page.recipe} />
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="outline" size="icon" aria-label="More for this page" />}>
             <EllipsisIcon />
@@ -260,11 +253,5 @@ function NoPage() {
 function Loading() {
   const { page: id } = Route.useParams()
   const page = getPage(id)
-  return (
-    <Column head={page && <h1 className="text-2xl font-semibold wrap-break-word">{page.recipe.title}</h1>}>
-      {(page?.recipe.parts ?? [undefined]).map((_, index) => (
-        <Skeleton key={index} className="h-40 w-full" />
-      ))}
-    </Column>
-  )
+  return <PartsLoading title={page?.recipe.title} parts={page?.recipe.parts.length ?? 1} />
 }
