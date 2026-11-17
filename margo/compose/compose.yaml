@@ -252,10 +252,11 @@ services:
     depends_on:
       broker:
         condition: service_healthy
+      # Healthy means the broker has acknowledged the subscriptions: an event sent before is lost for good.
       timeseries-persistence:
-        condition: service_started
+        condition: service_healthy
       events-persistence:
-        condition: service_started
+        condition: service_healthy
     environment:
       Config__Loki__Sinks__0__Name: demo
       Config__Loki__Sinks__0__Enabled: "false"
@@ -273,10 +274,11 @@ services:
     depends_on:
       broker:
         condition: service_healthy
+      # Healthy means the broker has acknowledged the subscriptions: an event sent before is lost for good.
       timeseries-persistence:
-        condition: service_started
+        condition: service_healthy
       events-persistence:
-        condition: service_started
+        condition: service_healthy
     environment:
       Config__Loki__Sinks__0__Name: demo
       Config__Loki__Sinks__0__Enabled: "false"
@@ -295,10 +297,11 @@ services:
     depends_on:
       broker:
         condition: service_healthy
+      # Healthy means the broker has acknowledged the subscriptions: an event sent before is lost for good.
       timeseries-persistence:
-        condition: service_started
+        condition: service_healthy
       events-persistence:
-        condition: service_started
+        condition: service_healthy
     environment:
       Config__Loki__Sinks__0__Name: demo
       Config__Loki__Sinks__0__Enabled: "false"

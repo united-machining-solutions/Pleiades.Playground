@@ -29,10 +29,12 @@ x-simulator: &simulator
   depends_on:
     broker:
       condition: service_healthy
+    # A persistence service is healthy once the broker has acknowledged its subscriptions. Events are not
+    # retained, so one a simulator sends before that is lost for good and stays a gap in its sequence.
     timeseries-persistence:
-      condition: service_started
+      condition: service_healthy
     events-persistence:
-      condition: service_started
+      condition: service_healthy
 
 services:
   # Read-only printer observations, independent of the slicer and printer pairing.

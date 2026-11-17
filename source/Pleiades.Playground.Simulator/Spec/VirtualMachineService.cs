@@ -58,13 +58,16 @@ internal sealed partial class VirtualMachineService : BackgroundService
         _machineId = SpecManifest.MachineId(identity, _spec);
         var counters = SpecCounterStore.Load(_spec.PersistenceFilePath, _spec.Scenario);
         _machine = new VirtualMachine(identity, _spec, counters, start);
-        _machine.TakeInitialMessages();
+        // The values of the start go out whole with the first connect. Its events, the first entries of the list
+        // of job orders, wait in the outbox for it: so the count of a group begins at 1, without a gap.
+        var initialEvents = _machine.TakeInitialMessages().OfType<SpecEvent>().ToList();
 
         var faults = new CommunicationFaults(_spec.Scenario.CommunicationFaultInterval, _spec.Scenario.CommunicationFaultDuration, start);
 
         // The client is the one of the simulator (the health check watches it); the publisher is disposed once the
         // loop has ended and the client is stopped, in the finally block below.
         using var publisher = new SpecPublisher(_client, _machineId, _manifest, identity.ProductInstanceUri, _spec.EventBufferSize, _logger);
+        await publisher.PublishAsync(initialEvents).ConfigureAwait(false);
         var lastSaved = start;
         using var timer = new PeriodicTimer(_spec.TickInterval, _timeProvider);
         try
