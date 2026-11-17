@@ -135,7 +135,8 @@ function Page({
       {machine && (
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold">
+            {/* The button that opens the list gives the heading no name of its content: it is named here. */}
+            <h1 className="text-2xl font-semibold" aria-label={machine}>
               {choices && choices.length > 0 ? <MachineSwitcher machine={machine} choices={choices} /> : machine}
             </h1>
             {line && <p className="text-sm text-muted-foreground">{line}</p>}
