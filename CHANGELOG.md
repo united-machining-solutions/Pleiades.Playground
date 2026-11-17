@@ -167,7 +167,7 @@ All notable changes are documented here. The format follows
   `/pages` lists the pages of the browser, and is reached through the breadcrumb; a page is renamed, pinned
   and deleted from its head. A pinned page stands in the sidebar on the top level, beside Home, and the
   others stand under it in a group "Pages" that folds, a plain row each, the newest first; with no page to
-  list there is no group. Why: ADR-0012.
+  list there is no group. Why: ADR-0013.
 - "Save as page" under an answer of the chat: it keeps all the cards of the answer, in their order, as a page
   titled with the question, and opens it beside the chat. It needs no language model, the app reads the tool
   calls from the answer it already has, and it stands only under an answer that has ended and for which the

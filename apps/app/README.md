@@ -31,7 +31,7 @@ harness.
   opens it, at `/pages/open`, sees the values of now, with no language model and no chat, and keeps the page
   with "Save to my pages". A link that holds no page says so, and a part whose tool the app has no card for
   says so too, the rest of the page is whole. Why:
-  [ADR-0012](../../docs/adr/0012-a-page-from-the-chat-is-a-recipe-kept-in-the-browser.md).
+  [ADR-0013](../../docs/adr/0013-a-page-from-the-chat-is-a-recipe-kept-in-the-browser.md).
 - **Chat** is the panel on the right, with "New chat" and the chats so far. It opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
