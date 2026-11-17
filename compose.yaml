@@ -35,6 +35,49 @@ x-simulator: &simulator
       condition: service_started
 
 services:
+  # Read-only printer observations, independent of the slicer and printer pairing.
+  ultimaker-telemetry:
+    <<: *service
+    profiles: [ultimaker]
+    image: ghcr.io/united-machining-solutions/pleiades.playground.ultimaker.telemetry:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Ultimaker.Telemetry/Dockerfile
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-persistence:
+        condition: service_healthy
+    environment:
+      Config__SerialNumber: ${ULTIMAKER_MACHINE_ID:-UM3-01}
+      Config__PrinterBaseUrl: ${ULTIMAKER_PRINTER_URL:-http://ultimaker.local/}
+      Config__PollIntervalSecond: ${ULTIMAKER_POLL_INTERVAL_SECOND:-2}
+      Config__MqttDestination__ConnectionString: ${ULTIMAKER_MQTT_URL:-mqtt://broker:1883}
+      Config__MqttDestination__ClientId: ultimaker-telemetry-${ULTIMAKER_MACHINE_ID:-UM3-01}
+      Config__MqttDestination__User: ${ULTIMAKER_MQTT_USER:-}
+      Config__MqttDestination__Password: ${ULTIMAKER_MQTT_PASSWORD:-}
+
+  # Optional physical-printer service. Starting it never pairs or starts a print.
+  ultimaker-api:
+    <<: *service
+    profiles: [ultimaker]
+    image: ghcr.io/united-machining-solutions/pleiades.playground.ultimaker.api:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Ultimaker.Api/Dockerfile
+    ports:
+      - "${ULTIMAKER_BIND:-127.0.0.1}:${ULTIMAKER_API_PORT:-5530}:8080"
+    volumes:
+      - ultimaker_data:/data
+    environment:
+      Config__Auth__Enabled: ${ULTIMAKER_AUTH_ENABLED:-false}
+      Config__Auth__MetadataAddress: ${ULTIMAKER_AUTH_METADATA_ADDRESS:-}
+      Config__Auth__ValidIssuer: ${ULTIMAKER_AUTH_VALID_ISSUER:-}
+      Config__Auth__Audience: ${ULTIMAKER_AUTH_AUDIENCE:-}
+      Ultimaker__PrinterBaseUrl: ${ULTIMAKER_PRINTER_URL:-http://ultimaker.local/}
+      Ultimaker__EnablePrinting: ${ULTIMAKER_ENABLE_PRINTING:-false}
+      Ultimaker__SliceTimeoutSecond: ${ULTIMAKER_SLICE_TIMEOUT_SECOND:-180}
+
   broker:
     image: eclipse-mosquitto:${MOSQUITTO_VERSION:-2}
     restart: unless-stopped
@@ -251,4 +294,5 @@ services:
       Config__MqttDestination__ClientId: simulator-m-02
 
 volumes:
+  ultimaker_data:
   mongodb_data:

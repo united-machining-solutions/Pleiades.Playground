@@ -11,6 +11,10 @@ All notable changes are documented here. The format follows
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
   and `genui_measurement_series`, the lines of the graphs, which the card file draws below the cards.
+- Optional Ultimaker 3 services: CuraEngine slicing over REST/MCP, printer-side header validation,
+  current jobs and history with durable slice associations, and a separate MQTT telemetry adapter.
+  Both containers are part of the root Compose stack and image-publication workflow, enabled for
+  deployment with COMPOSE_PROFILES=ultimaker.
 
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
@@ -219,6 +223,9 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Ultimaker pairing can be repeated after rejection or a forgotten request without removing files;
+  existing credentials survive failed replacements. Invalid printer status responses return HTTP 502
+  and MCP tool errors instead of unhandled server errors.
 - `app`: a question asked outside the chat ("Ask why", the field in the header) is answered under
   `vite dev` too. React ran the effect that sends it twice there (StrictMode); `useChat` detached after the
   first run and cut off its stream, and the second run found the question taken: it stood in the chat and

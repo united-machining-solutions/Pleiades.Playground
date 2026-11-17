@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="../Pleiades.Playground.Common.DataTransferObjects/Pleiades.Playground.Common.DataTransferObjects.csproj" />
+    <ProjectReference Include="../Pleiades.Playground.Mqtt.Extensions/Pleiades.Playground.Mqtt.Extensions.csproj" />
+    <ProjectReference Include="../Pleiades.Playground.HealthChecks.AspNetCore/Pleiades.Playground.HealthChecks.AspNetCore.csproj" />
+    <ProjectReference Include="../Pleiades.Playground.HealthChecks.Mqtt/Pleiades.Playground.HealthChecks.Mqtt.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pleiades.Playground.Ultimaker.Telemetry.Test" />
+  </ItemGroup>
+</Project>

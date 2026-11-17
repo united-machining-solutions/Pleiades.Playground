@@ -244,6 +244,24 @@ To use the tools from your own agent, add the three MCP addresses to any MCP cli
 
 ---
 
+## Optional: a real printer
+
+The physical-printer integration is not part of the six stops. Start only its service with
+`docker compose --profile ultimaker up -d --build --wait ultimaker-api`.
+It exposes MCP at <http://localhost:5530/mcp> and an OpenAPI document at
+<http://localhost:5530/openapi/v1.json>. Printing is disabled by default. The configuration, Cura
+preview workflow and validation limits are in the
+[Ultimaker service guide](../source/Pleiades.Playground.Ultimaker.Api/README.md).
+No tour screenshot changes: this service adds no application screen.
+The optional `ultimaker-telemetry` service publishes live printer observations to the existing broker.
+Its logical machine ID defaults to `UM3-01`, which then appears in the existing machine list/card.
+See the [adapter guide](../source/Pleiades.Playground.Ultimaker.Telemetry/README.md) for topic names,
+units, timestamps and how to verify persistence. The existing Home screenshot was not retaken;
+it therefore still shows only simulated machines.
+For deployment from published images, enable `COMPOSE_PROFILES=ultimaker` in the server's private
+.env; both services use the same commit tag as the rest of the stack. See
+[deployment](deployment.md#enable-the-ultimaker-services).
+
 ## Retaking the screenshots
 
 One command takes the screenshots from the running stack and writes them under

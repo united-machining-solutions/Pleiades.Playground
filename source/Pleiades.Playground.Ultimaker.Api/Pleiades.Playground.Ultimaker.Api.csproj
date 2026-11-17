@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+    <ProjectReference Include="../Pleiades.Playground.Common.AspNetCore/Pleiades.Playground.Common.AspNetCore.csproj" />
+    <ProjectReference Include="../Pleiades.Playground.Common.Authorization/Pleiades.Playground.Common.Authorization.csproj" />
+    <ProjectReference Include="../Pleiades.Playground.HealthChecks.AspNetCore/Pleiades.Playground.HealthChecks.AspNetCore.csproj" />
+    <ProjectReference Include="../Pleiades.Playground.Mcp.Server/Pleiades.Playground.Mcp.Server.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Resources/skill.md" />
+    <InternalsVisibleTo Include="Pleiades.Playground.Ultimaker.Api.Test" />
+  </ItemGroup>
+</Project>
