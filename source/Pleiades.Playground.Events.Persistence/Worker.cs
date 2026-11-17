@@ -6,6 +6,8 @@ using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Common.Json;
 using Pleiades.Playground.Events.Api.Client.Exceptions;
 using Pleiades.Playground.Events.Api.Client.NotificationEvents;
+using Pleiades.Playground.Events.Api.Client.ProductionEvents;
+using Pleiades.Playground.Events.DataTransferObjects;
 using Pleiades.Playground.Common.DataTransferObjects;
 using Pleiades.Playground.HealthChecks.Mqtt;
 using Pleiades.Playground.Notification.DataTransferObjects;
@@ -15,6 +17,7 @@ namespace Pleiades.Playground.Events.Persistence;
 public class Worker : BackgroundService
 {
     private readonly INotificationEventService _notificationEventService;
+    private readonly IProductionEventService _productionEventService;
     private readonly IManagedMqttClient _mqttClient;
     private readonly Config _config;
     private readonly ILogger<Worker> _logger;
@@ -36,6 +39,7 @@ public class Worker : BackgroundService
         ILogger<Worker> logger,
         IManagedMqttClient mqttClient,
         INotificationEventService notificationEventService,
+        IProductionEventService productionEventService,
         MqttSubscriptionReadiness readiness)
     {
         ArgumentNullException.ThrowIfNull(config);
@@ -45,6 +49,7 @@ public class Worker : BackgroundService
 
         _mqttClient = mqttClient ?? throw new ArgumentNullException(nameof(mqttClient));
         _notificationEventService = notificationEventService ?? throw new ArgumentNullException(nameof(notificationEventService));
+        _productionEventService = productionEventService ?? throw new ArgumentNullException(nameof(productionEventService));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -113,6 +118,10 @@ public class Worker : BackgroundService
                 await ProcessEventDto<NotificationEventDtoV1>(payload, _notificationEventService.PostEvent).ConfigureAwait(false);
                 break;
 
+            case var s when s.Equals(nameof(ProductionEventDtoV1).ToLowerInvariant(), StringComparison.Ordinal):
+                await ProcessEventDto<ProductionEventDtoV1>(payload, _productionEventService.PostEvent).ConfigureAwait(false);
+                break;
+
             default:
                 LogErrorByHandlingMessage(_logger, contentType, null);
                 break;
@@ -121,7 +130,7 @@ public class Worker : BackgroundService
 
 
     private async Task ProcessEventDto<T>(string payload, Func<T, Task<T>> postEventService)
-        where T : IEvent
+        where T : IMachineEvent
     {
         var eventDto = JsonSerializer.Deserialize<T>(payload, _jsonSerializerOptions) ?? throw new InvalidOperationException("Deserialization returned null.");
 

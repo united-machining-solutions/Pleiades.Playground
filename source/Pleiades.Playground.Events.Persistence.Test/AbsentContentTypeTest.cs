@@ -5,6 +5,7 @@ using Moq;
 using MQTTnet;
 using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Events.Api.Client.NotificationEvents;
+using Pleiades.Playground.Events.Api.Client.ProductionEvents;
 using Pleiades.Playground.HealthChecks.Mqtt;
 
 namespace Pleiades.Playground.Events.Persistence.Test;
@@ -33,7 +34,7 @@ public sealed class AbsentContentTypeTest
         logger.Setup(l => l.IsEnabled(It.IsAny<LogLevel>())).Returns(true);
         var notifications = new Mock<INotificationEventService>();
         using var worker = new Worker(Config(), logger.Object, client.Object, notifications.Object,
-            new MqttSubscriptionReadiness());
+            new Mock<IProductionEventService>().Object, new MqttSubscriptionReadiness());
 
         await worker.StartAsync(TestContext.CancellationToken);
         var deadline = DateTime.UtcNow.AddSeconds(5);

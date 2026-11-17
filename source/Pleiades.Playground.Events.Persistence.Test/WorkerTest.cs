@@ -9,6 +9,8 @@ using MQTTnet;
 using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Common.Json;
 using Pleiades.Playground.Events.Api.Client.NotificationEvents;
+using Pleiades.Playground.Events.Api.Client.ProductionEvents;
+using Pleiades.Playground.Events.DataTransferObjects;
 using Pleiades.Playground.HealthChecks.Mqtt;
 using Pleiades.Playground.Notification.DataTransferObjects;
 
@@ -19,6 +21,7 @@ public class WorkerTest : IDisposable
 {
     private readonly Mock<IManagedMqttClient> _mqttClient;
     private readonly Mock<INotificationEventService> _notificationEventService;
+    private readonly Mock<IProductionEventService> _productionEventService;
 
     private Object _data;
 
@@ -32,6 +35,7 @@ public class WorkerTest : IDisposable
     {
         _mqttClient = new Mock<IManagedMqttClient>();
         _notificationEventService = new Mock<INotificationEventService>();
+        _productionEventService = new Mock<IProductionEventService>();
 
         _data = new();
 
@@ -47,6 +51,7 @@ public class WorkerTest : IDisposable
                              NullLogger<Worker>.Instance,
                              _mqttClient.Object,
                              _notificationEventService.Object,
+                             _productionEventService.Object,
                              new MqttSubscriptionReadiness());
     }
 
@@ -87,6 +92,64 @@ public class WorkerTest : IDisposable
 
         // Assert
         Assert.IsInstanceOfType<NotificationEventDtoV1>(_data);
+    }
+
+    [TestMethod]
+    public async Task ProductionEvent_GoesToTheProductionEventService()
+    {
+        var posted = new List<ProductionEventDtoV1>();
+        _productionEventService.Setup(s => s.PostEvent(It.IsAny<ProductionEventDtoV1>()))
+            .ReturnsAsync((ProductionEventDtoV1 model) =>
+            {
+                posted.Add(model);
+                return model;
+            });
+
+        var productionEvent = new ProductionEventDtoV1
+        {
+            Id = "P-04:2026-11-17T06:00:00.000Z:7",
+            MId = "P-04",
+            Timestamp = DateTime.UtcNow,
+            Subject = ProductionSubject.ProgramExecution,
+            Action = ProductionAction.Ended,
+            CorrelationId = "exec-1",
+            ExecutionId = "exec-1",
+            State = "Ended",
+            EnergyElectricity = 720_000,
+            Seq = 7,
+        };
+
+        await _worker.StartAsync(CancellationToken.None).ConfigureAwait(false);
+        await Task.Delay(500).ConfigureAwait(false);
+        await Deliver("productioneventdtov1", JsonSerializer.Serialize(productionEvent, _jsonSerializerOptions)).ConfigureAwait(false);
+        await Task.Delay(1000).ConfigureAwait(false);
+
+        Assert.HasCount(1, posted);
+        Assert.AreEqual(productionEvent, posted[0]);
+        _notificationEventService.Verify(s => s.PostEvent(It.IsAny<NotificationEventDtoV1>()), Times.Never);
+    }
+
+    [TestMethod]
+    public async Task UnknownContentType_GoesNowhere()
+    {
+        await _worker.StartAsync(CancellationToken.None).ConfigureAwait(false);
+        await Task.Delay(500).ConfigureAwait(false);
+        await Deliver("productioneventdtov2", "{}").ConfigureAwait(false);
+        await Task.Delay(500).ConfigureAwait(false);
+
+        _productionEventService.Verify(s => s.PostEvent(It.IsAny<ProductionEventDtoV1>()), Times.Never);
+        _notificationEventService.Verify(s => s.PostEvent(It.IsAny<NotificationEventDtoV1>()), Times.Never);
+    }
+
+    private async Task Deliver(string contentType, string payload)
+    {
+        var message = new MqttApplicationMessageBuilder()
+            .WithTopic("machines/P-04/events/production")
+            .WithContentType(contentType)
+            .WithPayload(payload).Build();
+
+        await _mqttClient.RaiseAsync(s => s.ApplicationMessageReceivedAsync += null,
+            (object)new MqttApplicationMessageReceivedEventArgs("", message, new MQTTnet.Packets.MqttPublishPacket(), null)).ConfigureAwait(false);
     }
 
     protected virtual void Dispose(bool disposing)
