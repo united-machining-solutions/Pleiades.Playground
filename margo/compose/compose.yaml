@@ -202,8 +202,8 @@ services:
         condition: service_healthy
     environment:
       # The name of the app (a CNAME) and the name of the device (its A record); both lead to the app.
-      APP_HOST: ${APP_HOST:-pleiades-margo.hub000.ums.internal}
-      SERVER_HOST: ${SERVER_HOST:-srv03.hub000.ums.internal}
+      APP_HOST: ${APP_HOST:-pleiades.example.internal}
+      SERVER_HOST: ${SERVER_HOST:-device.example.internal}
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       start_period: 5s

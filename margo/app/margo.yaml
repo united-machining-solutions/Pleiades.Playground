@@ -40,12 +40,12 @@ deploymentProfiles:
 # Each parameter sets the ${VAR} of the same name in compose/compose.yaml.
 parameters:
   appHost:
-    value: "pleiades-margo.hub000.ums.internal"
+    value: "pleiades.example.internal"
     targets:
       - pointer: APP_HOST
         components: ["default"]
   serverHost:
-    value: "srv03.hub000.ums.internal"
+    value: "device.example.internal"
     targets:
       - pointer: SERVER_HOST
         components: ["default"]
@@ -118,11 +118,13 @@ configuration:
           name: Host name of the app
           description: >-
             The name (a CNAME of the device) under which Traefik serves the example app on the HTTP port, to
-            everyone in the network.
+            everyone in the network. The default is a placeholder; set the name of your device.
           schema: hostName
         - parameter: serverHost
           name: Host name of the device
-          description: The name of the device itself (its A record); Traefik serves the example app under it as well.
+          description: >-
+            The name of the device itself (its A record); Traefik serves the example app under it as well. The
+            default is a placeholder; set the name of your device.
           schema: hostName
         - parameter: httpPort
           name: HTTP port of Traefik

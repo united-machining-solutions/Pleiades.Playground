@@ -40,8 +40,9 @@ that bart accepts it, and one more, Traefik:
   ```
 
 - **Traefik in front of the example app.** It serves the app on the HTTP port (setting *HTTP port of Traefik*,
-  80) under two host names: *Host name of the app*, `pleiades-margo.hub000.ums.internal`, a CNAME of the device,
-  and *Host name of the device*, `srv03.hub000.ums.internal`, its A record. Traefik reads its route from
+  80) under two host names: *Host name of the app*, a CNAME of the device, and *Host name of the device*, its
+  A record. Their defaults, `pleiades.example.internal` and `device.example.internal`, are placeholders: set both
+  to the names of your device when you install the app. Traefik reads its route from
   `compose/traefik/dynamic.yaml`, a `configs:` entry, and not from Docker labels: those need the Docker socket,
   a bind mount out of `compose/`. The file is a Go template that takes the host names from the environment.
   Plain HTTP only; there is no certificate.
