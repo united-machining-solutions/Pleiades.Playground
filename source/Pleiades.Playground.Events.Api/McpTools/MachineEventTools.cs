@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.ComponentModel;
+using Microsoft.Extensions.Options;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 using Pleiades.Playground.Common.Pagination;
@@ -7,12 +8,13 @@ using Pleiades.Playground.Events.Api.Endpoints;
 using Pleiades.Playground.Events.Api.Mapping;
 using Pleiades.Playground.Events.Api.Projections;
 using Pleiades.Playground.Events.Api.Repositories.MachineEvent;
+using Pleiades.Playground.Events.Api.Services;
 using Pleiades.Playground.Events.DataTransferObjects;
 
 namespace Pleiades.Playground.Events.Api.McpTools;
 
 [McpServerToolType]
-internal sealed class MachineEventTools(IMachineEventRepository repository)
+internal sealed class MachineEventTools(IMachineEventRepository repository, IOptions<MongoDbSettings> settings, TimeProvider timeProvider)
 {
     private const string MachineDescription =
         "Machine id, the second level of its MQTT topic: <manufacturer>_<model>_<serial number>, e.g. " +
@@ -51,7 +53,10 @@ internal sealed class MachineEventTools(IMachineEventRepository repository)
     [McpServerTool(Name = "events_sequence_gaps_query", ReadOnly = true),
      Description(
          "Find gaps in the event numbers of industrial machines: per machine, group and run of the adapter, the " +
-         "sequence counts that never arrived (lost events). An empty list means no event is missing.")]
+         "sequence counts that never arrived (lost events), within the time the events are kept. An empty list means " +
+         "no event is missing between the first and the last stored event of each run; events lost at the end of a " +
+         "run cannot be seen, and a gap before the first stored event is named only when the run started within the " +
+         "retention and the range.")]
     public async Task<List<SequenceGapDtoV1>> QuerySequenceGaps(
         [Description(MachineDescription)] string? mId = null,
         [Description("Group filter: JobMonitoring, WorkMasterMonitoring or Notification")] string? group = null,
@@ -59,9 +64,9 @@ internal sealed class MachineEventTools(IMachineEventRepository repository)
         [Description("End of time range (ISO 8601)")] DateTime? toDate = null,
         CancellationToken cancellationToken = default)
     {
-        var events = await repository.FindForViewAsync(
-            new MachineEventFilter(mId, ParseGroup(group), From: fromDate, To: toDate), cancellationToken).ConfigureAwait(false);
-        return MachineEventViews.Gaps(events, fromStart: fromDate is null);
+        return await MachineEvents.ReadGapsAsync(
+            repository, mId, ParseGroup(group), fromDate, toDate, timeProvider.GetUtcNow().UtcDateTime,
+            settings.Value.DataRetentionPeriod, cancellationToken).ConfigureAwait(false);
     }
 
     [McpServerTool(Name = "events_active_alerts_query", ReadOnly = true),
@@ -98,7 +103,7 @@ internal sealed class MachineEventTools(IMachineEventRepository repository)
         CancellationToken cancellationToken = default)
     {
         var page = EventToolArguments.Page(skip, take);
-        var pairs = await MachineEvents.ReadAlertPairsAsync(repository, mId, ParseSeverity(severity), fromDate, toDate, cancellationToken).ConfigureAwait(false);
+        var (pairs, _) = await MachineEvents.ReadAlertPairsAsync(repository, mId, ParseSeverity(severity), fromDate, toDate, cancellationToken).ConfigureAwait(false);
         var (items, totalCount) = MachineEventViews.Page(
             pairs, p => p.RaisedAt, new PagedRequest(page.Skip, page.Take, EventToolArguments.ParseSorting(sortDirection)));
         return new PagedResponse<AlertPairDtoV1>(items, totalCount, page.Skip, page.Take);
@@ -114,7 +119,7 @@ internal sealed class MachineEventTools(IMachineEventRepository repository)
         [Description("End of time range (ISO 8601)")] DateTime? toDate = null,
         CancellationToken cancellationToken = default)
     {
-        var pairs = await MachineEvents.ReadAlertPairsAsync(repository, mId, null, fromDate, toDate, cancellationToken).ConfigureAwait(false);
+        var (pairs, _) = await MachineEvents.ReadAlertPairsAsync(repository, mId, null, fromDate, toDate, cancellationToken).ConfigureAwait(false);
         return MachineEventViews.AlertStatistics(pairs);
     }
 
@@ -137,7 +142,7 @@ internal sealed class MachineEventTools(IMachineEventRepository repository)
         CancellationToken cancellationToken = default)
     {
         var page = EventToolArguments.Page(skip, take);
-        var jobOrders = await MachineEvents.ReadJobOrdersAsync(repository, mId, state, fromDate, toDate, cancellationToken).ConfigureAwait(false);
+        var (jobOrders, _) = await MachineEvents.ReadJobOrdersAsync(repository, mId, state, fromDate, toDate, cancellationToken).ConfigureAwait(false);
         var (items, totalCount) = MachineEventViews.Page(
             jobOrders, j => j.LastChange, new PagedRequest(page.Skip, page.Take, EventToolArguments.ParseSorting(sortDirection)));
         return new PagedResponse<JobOrderDtoV1>(items, totalCount, page.Skip, page.Take);
@@ -161,7 +166,7 @@ internal sealed class MachineEventTools(IMachineEventRepository repository)
         CancellationToken cancellationToken = default)
     {
         var page = EventToolArguments.Page(skip, take);
-        var executions = await MachineEvents.ReadProgramExecutionsAsync(repository, mId, jobOrderId, workMasterId, fromDate, toDate, cancellationToken).ConfigureAwait(false);
+        var (executions, _) = await MachineEvents.ReadProgramExecutionsAsync(repository, mId, jobOrderId, workMasterId, fromDate, toDate, cancellationToken).ConfigureAwait(false);
         var (items, totalCount) = MachineEventViews.Page(
             executions, p => p.StartTime, new PagedRequest(page.Skip, page.Take, EventToolArguments.ParseSorting(sortDirection)));
         return new PagedResponse<ProgramExecutionDtoV1>(items, totalCount, page.Skip, page.Take);

@@ -235,40 +235,94 @@ internal static class MachineEventViews
 
     // ─── gaps ──────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// The gaps in the numbers of the events: per machine, group and run of the adapter (the prefix of
-    /// <c>sequence</c>), every count that never arrived between two that did. With <paramref name="fromStart"/>, a
-    /// run whose first event seen is not number 1 also has a gap before it.
-    /// </summary>
-    public static List<SequenceGapDtoV1> Gaps(IEnumerable<MachineEventDao> events, bool fromStart)
+    /// <summary>The format of the prefix of <c>sequence</c>: the start of the adapter, in UTC to the second.</summary>
+    public const string RunStartFormat = "yyyyMMdd'T'HHmmss'Z'";
+
+    /// <summary>The start of a run of the adapter, read from the prefix of <c>sequence</c>; null for another format.</summary>
+    public static DateTime? RunStart(string prefix)
+    {
+        return DateTime.TryParseExact(prefix, RunStartFormat, CultureInfo.InvariantCulture,
+            DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var start)
+            ? start
+            : null;
+    }
+
+    /// <summary>The runs of stored events, as <see cref="Repositories.MachineEvent.IMachineEventRepository.FindRunsAsync"/> gives them.</summary>
+    public static List<SequenceRun> Runs(IEnumerable<MachineEventDao> events)
     {
         ArgumentNullException.ThrowIfNull(events);
-        var gaps = new List<SequenceGapDtoV1>();
-        foreach (var run in events
+        return [.. events
             .Where(e => e.SequencePrefix is not null && e.SequenceCount is not null)
             .GroupBy(e => (e.MId, e.Group, Prefix: e.SequencePrefix!))
-            .OrderBy(g => g.Key.MId, StringComparer.Ordinal).ThenBy(g => g.Key.Group, StringComparer.Ordinal).ThenBy(g => g.Key.Prefix, StringComparer.Ordinal))
+            .Select(g => new SequenceRun(g.Key.MId, g.Key.Group, g.Key.Prefix,
+                g.Min(e => e.SequenceCount!.Value), g.Max(e => e.SequenceCount!.Value), g.LongCount(),
+                g.Min(e => e.Time), g.Max(e => e.Time)))];
+    }
+
+    /// <summary>
+    /// The gaps in the numbers of the events: per machine, group and run of the adapter (the prefix of
+    /// <c>sequence</c>), every count that never arrived between two that did, and the counts before the first one
+    /// that arrived when <paramref name="startVisible"/> says the start of the run lies in what is stored and read.
+    /// </summary>
+    /// <param name="runs">The runs that were read.</param>
+    /// <param name="countsOf">The counts of a run that is not complete (<see cref="SequenceRun.IsComplete"/>).</param>
+    /// <param name="startVisible">Whether the counts from 1 of a run would be stored and read, had they arrived.</param>
+    public static List<SequenceGapDtoV1> Gaps(
+        IEnumerable<SequenceRun> runs, Func<SequenceRun, IReadOnlyCollection<long>> countsOf, Func<SequenceRun, bool> startVisible)
+    {
+        ArgumentNullException.ThrowIfNull(runs);
+        ArgumentNullException.ThrowIfNull(countsOf);
+        ArgumentNullException.ThrowIfNull(startVisible);
+        var gaps = new List<SequenceGapDtoV1>();
+        foreach (var run in runs
+            .OrderBy(r => r.MId, StringComparer.Ordinal).ThenBy(r => r.Group, StringComparer.Ordinal).ThenBy(r => r.Prefix, StringComparer.Ordinal))
         {
-            var counts = run.Select(e => e.SequenceCount!.Value).Distinct().Order().ToList();
-            var previous = fromStart ? 0 : counts[0];
-            foreach (var count in counts)
+            if (run.FirstCount > 1 && startVisible(run))
+            {
+                gaps.Add(Gap(run, 0, run.FirstCount));
+            }
+            if (run.IsComplete)
+            {
+                continue;
+            }
+            var previous = run.FirstCount;
+            foreach (var count in countsOf(run).Distinct().Order())
             {
                 if (count > previous + 1)
                 {
-                    gaps.Add(new SequenceGapDtoV1
-                    {
-                        MId = run.Key.MId,
-                        Group = run.Key.Group,
-                        Prefix = run.Key.Prefix,
-                        FirstMissing = previous + 1,
-                        LastMissing = count - 1,
-                        Missing = count - 1 - previous,
-                    });
+                    gaps.Add(Gap(run, previous, count));
                 }
                 previous = count;
             }
         }
         return gaps;
+    }
+
+    /// <summary>
+    /// Whether the counts from 1 of a run would be stored and read, had they arrived: its start is known from its
+    /// prefix, lies after the oldest time the retention keeps (events of a run are never older than its start), and
+    /// is not before <paramref name="from"/>. Otherwise a run that begins later than 1 may have lost its first events
+    /// to the retention or to the range, and nothing is said about them.
+    /// </summary>
+    public static bool StartVisible(SequenceRun run, DateTime now, TimeSpan? retention, DateTime? from)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        return RunStart(run.Prefix) is { } start
+            && (retention is not { } kept || start > now - kept)
+            && (from is null || from <= start);
+    }
+
+    private static SequenceGapDtoV1 Gap(SequenceRun run, long previous, long next)
+    {
+        return new SequenceGapDtoV1
+        {
+            MId = run.MId,
+            Group = run.Group,
+            Prefix = run.Prefix,
+            FirstMissing = previous + 1,
+            LastMissing = next - 1,
+            Missing = next - 1 - previous,
+        };
     }
 
     // ─── paging ────────────────────────────────────────────────────────────────
@@ -310,4 +364,20 @@ internal static class MachineEventViews
             ? time
             : null;
     }
+}
+
+/// <summary>One run of the adapter in one group of a machine: the counts of <c>sequence</c> stored for it.</summary>
+/// <param name="MId">Machine id.</param>
+/// <param name="Group">Group of events.</param>
+/// <param name="Prefix">The prefix of <c>sequence</c>, the start of the adapter.</param>
+/// <param name="FirstCount">The lowest count stored.</param>
+/// <param name="LastCount">The highest count stored.</param>
+/// <param name="Count">How many events are stored.</param>
+/// <param name="FirstTime">The time of the oldest event.</param>
+/// <param name="LastTime">The time of the newest event.</param>
+internal sealed record SequenceRun(
+    string MId, string Group, string Prefix, long FirstCount, long LastCount, long Count, DateTime FirstTime, DateTime LastTime)
+{
+    /// <summary>True when no count is missing between the first and the last (a count is stored once).</summary>
+    public bool IsComplete => Count == LastCount - FirstCount + 1;
 }

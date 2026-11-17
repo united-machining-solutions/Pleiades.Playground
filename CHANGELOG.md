@@ -559,6 +559,11 @@ All notable changes are documented here. The format follows
   tools `events_machine_events_query`, `events_sequence_gaps_query`, `events_active_alerts_query`,
   `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query` and
   `events_program_executions_query`.
+  The active alerts are found by an aggregation in MongoDB over the alerts not cleared, and the gaps from the runs
+  of the adapter (per machine, group and prefix of `sequence`), so neither is limited. A gap before the first
+  stored event of a run is named only when the run started within the retention and the range. The other views
+  read at most the newest 100 000 events, without the CloudEvent as it came, and answer with the header
+  `Pleiades-Truncated: true` when that left older events out.
 - The machine card shows the work master instead of the program, the job order that runs, and alerts with their
   NE 107 severity; a machine whose adapter is not `Running` has no data, since the adapter said so.
 - The measurement card and the Ultimaker telemetry follow this tree: the card takes a machine by its machine id,

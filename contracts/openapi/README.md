@@ -17,13 +17,20 @@ The Events API keeps the CloudEvents of the machines as they came, each with the
 - `/machineEvents`: the events themselves, filtered by machine, group (`JobMonitoring`, `WorkMasterMonitoring`,
   `Notification`), type, correlation id, job order and time; `POST /machineEvents` and `POST /machineEvents/bulk`
   take them (an event that is there already, by `source` and `id`, is answered with 409).
-  `/machineEvents/gaps` names the counts of `sequence` that never arrived, per machine and group.
+  `/machineEvents/gaps` names the counts of `sequence` that never arrived, per machine, group and run of the
+  adapter, within the time the events are kept. Counts missing before the first stored event of a run are named
+  only when the run started within the retention and the range (the prefix of `sequence` is its start); otherwise
+  the retention may have removed them, and nothing is said. Events lost at the end of a run cannot be seen.
 - `/alerts/active`, `/alerts/pairs` (each `AlertRaised` with its `AlertCleared`, by the `Id` of the alert) and
   `/alerts/statistics` (by severity after NAMUR NE 107).
 - `/jobOrders`: the last state of each job order with its last result; `/jobOrders/{mId}/{jobOrderId}` adds its
   history and its program executions (a job order id may contain `/`).
 - `/programExecutions`: `ProgramExecutionStarted` paired with its `ProgramExecutionEnded` or
   `ProgramExecutionAborted`, with the sums of the end.
+
+`/alerts/active` and `/machineEvents/gaps` read only what they need and leave nothing out. The other views read
+at most the newest 100 000 events of what they ask for; when that leaves older events out, the answer carries the
+header `Pleiades-Truncated: true`, and a narrower machine or time range gives the whole answer.
 
 Values and sums keep the units in which the machine delivered them, energy in watt hours for example.
 

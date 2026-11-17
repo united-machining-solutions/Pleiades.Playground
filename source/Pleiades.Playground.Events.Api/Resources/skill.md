@@ -42,7 +42,16 @@ Three groups of events:
 3. `events_machine_events_query` with `group=JobMonitoring` — every event of the job orders, in order
 
 ### Trust the Data
-`events_sequence_gaps_query` — an empty list means no event of the machine is missing.
+`events_sequence_gaps_query` — an empty list means no event is missing between the first and the last stored
+event of each run of the adapter, within the time the events are kept (30 days in the demo). Events lost at the
+end of a run cannot be seen, and a gap before the first stored event of a run is named only when the run started
+within that time and the range.
+
+### Large Ranges
+The alert pairs, statistics, job orders and program executions are put together from at most the newest 100 000
+events they ask for; older ones are then left out, and the result may miss old entries or show too small sums. Ask
+for one machine (`mId`) or a time range when a machine has run for weeks. The active alerts and the gaps are not
+limited.
 
 ## Pagination Tips
 
