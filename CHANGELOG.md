@@ -170,7 +170,7 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
-- `app`: Home, the page of a machine and Live values are live from the broker (ADR-0013). They read what the
+- `app`: Home, the page of a machine, Live values and Charts are live from the broker (ADR-0013). They read what the
   backend knows once, and then hear every value at the broker, MQTT over WebSocket, the moment it is
   published, instead of reading everything again every ten seconds. The browser must reach the broker's
   WebSocket: `MQTT_WS_PORT` at the host of the page, or `MQTT_WS_URL` behind a proxy. The topics of the

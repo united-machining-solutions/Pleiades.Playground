@@ -125,6 +125,44 @@ export function listAt(list: MachineList, now: string): MachineList {
 /** The page of one machine: the values of its card and the spans of its band. */
 export type MachinePage = { show: MachineShow; spans: ReadonlyArray<Span> | null }
 
+/**
+ * The page Charts: every machine with the values of its card and the spans of its last minutes,
+ * `from` being where the spans were read from.
+ */
+export type ChartsPage = {
+  asOf: string
+  machines: ReadonlyArray<{ show: MachineShow; from: string; spans: ReadonlyArray<Span> | null }>
+}
+
+/**
+ * What a message does to the page Charts. A machine the page does not know stays out: its history
+ * is not known, and the page shows it after the next read.
+ */
+export function chartsWith(page: ChartsPage, topic: string, payload: string, now = Date.now()): ChartsPage {
+  const serial = machineOf(topic)
+  let changed = false
+  const machines = page.machines.map((entry) => {
+    if (entry.show.machine.machine !== serial) return entry
+    const next = pageWith({ show: entry.show, spans: entry.spans }, topic, payload, now)
+    if (next.show === entry.show) return entry
+    changed = true
+    return { ...entry, show: next.show }
+  })
+  return changed ? { ...page, machines } : page
+}
+
+/** The page Charts at a later instant: each machine as the page of a machine goes on (`pageAt`). */
+export function chartsAt(page: ChartsPage, now: string): ChartsPage {
+  if (now <= page.asOf) return page
+  return {
+    asOf: now,
+    machines: page.machines.map((entry) => {
+      const next = pageAt({ show: entry.show, spans: entry.spans }, now)
+      return next.show === entry.show ? entry : { ...entry, show: next.show, spans: next.spans }
+    }),
+  }
+}
+
 export function pageWith(page: MachinePage, topic: string, payload: string, now = Date.now()): MachinePage {
   const machine = machineWith(page.show.machine, topic, payload, now)
   return machine === page.show.machine ? page : { ...page, show: { ...page.show, machine } }
@@ -133,8 +171,8 @@ export function pageWith(page: MachinePage, topic: string, payload: string, now 
 /**
  * The page at a later instant. The history keeps the length it was read with and rolls on to `now`:
  * the time since its end is added to the state the machine is in now, in the sums and at the end of
- * the band, and as much is cut from its beginning, by the band. A card without its band does not
- * know what it loses at the beginning, so its history grows instead.
+ * the band, and as much is cut from its beginning, by the band. A card without its band, or with a
+ * band of the last minutes only, does not know what it loses at the beginning: its history grows instead.
  */
 export function pageAt(page: MachinePage, now: string): MachinePage {
   const { show, spans } = page
@@ -142,7 +180,9 @@ export function pageAt(page: MachinePage, now: string): MachinePage {
   if (now <= history.to) return page
   const state = stateOf(show.machine, now)
   const seconds = (Date.parse(now) - Date.parse(history.to)) / 1000
-  const from = spans === null ? history.from : new Date(Date.parse(history.from) + seconds * 1000).toISOString()
+  const first = spans?.[0]
+  const knowsBeginning = first !== undefined && first.from <= history.from
+  const from = knowsBeginning ? new Date(Date.parse(history.from) + seconds * 1000).toISOString() : history.from
   const begins = Date.parse(from)
 
   // What falls off at the beginning, by the band.

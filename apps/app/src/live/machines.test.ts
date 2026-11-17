@@ -3,7 +3,7 @@ import { test } from "node:test"
 
 import type { Machine, MachineList, MachineShow } from "@pleiades/cards/machine/contract.ts"
 
-import { listAt, listWith, machineFilters, pageAt, pageWith, unknownMachine } from "./machines.ts"
+import { chartsAt, chartsWith, listAt, listWith, machineFilters, pageAt, pageWith, unknownMachine } from "./machines.ts"
 
 const value = (timestamp: string, written: string | number) => JSON.stringify({ timestamp, value: written })
 const event = (timestamp: string, action: string, level: string, correlationId: string) =>
@@ -162,6 +162,30 @@ test("a card without its band does not know what falls off at the beginning: its
   assert.equal(later.spans, null)
   assert.equal(later.show.history.from, show.history.from)
   assert.equal(later.show.history.totals.find((one) => one.state === "running")?.seconds, 1810)
+})
+
+test("a band of the last minutes only does not know what falls off at the beginning: the history grows", () => {
+  const recent = [{ state: "running" as const, from: "2026-11-16T09:00:00.000Z", to: "2026-11-16T09:30:00.000Z" }]
+  const later = pageAt({ show, spans: recent }, "2026-11-16T09:30:10.000Z")
+  assert.equal(later.show.history.from, show.history.from)
+  assert.deepEqual(later.show.history.totals, [
+    { state: "running", seconds: 1810 },
+    { state: "stopped", seconds: 27000 },
+  ])
+  assert.deepEqual(later.spans, [{ state: "running", from: "2026-11-16T09:00:00.000Z", to: "2026-11-16T09:30:10.000Z" }])
+})
+
+test("the page Charts takes the values and the clock of each machine it shows, and no machine it does not", () => {
+  const charts = { asOf: show.asOf, machines: [{ show, from: "2026-11-16T09:00:00.000Z", spans }] }
+  const program = chartsWith(charts, "machines/P-04/umati/Production/ActiveProgram", value("2026-11-16T09:30:01Z", "WP-17"))
+  assert.equal(program.machines[0]?.show.machine.program.value, "WP-17")
+  assert.equal(chartsWith(charts, "machines/M-02/umati/Production/ActiveProgram", value("2026-11-16T09:30:01Z", "WP-17")), charts)
+
+  const later = chartsAt(program, "2026-11-16T09:30:10.000Z")
+  assert.equal(later.asOf, "2026-11-16T09:30:10.000Z")
+  assert.equal(later.machines[0]?.show.history.to, "2026-11-16T09:30:10.000Z")
+  assert.equal(later.machines[0]?.spans?.at(-1)?.to, "2026-11-16T09:30:10.000Z")
+  assert.equal(chartsAt(later, "2026-11-16T09:30:05.000Z"), later)
 })
 
 test("a value of the machine reaches its card", () => {

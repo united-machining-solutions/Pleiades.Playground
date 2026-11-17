@@ -98,8 +98,9 @@ minutes.
 **In the code:** [`apps/app/src/routes/charts.tsx`](../apps/app/src/routes/charts.tsx) is the page,
 [`apps/app/src/charts/state-tiles.tsx`](../apps/app/src/charts/state-tiles.tsx) draws the two charts with the
 chart of shadcn/ui. The values are those of the machine card, from `genui_machine_show` and `genui_span_list`,
-read by one server function, `getCharts` in
-[`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts).
+read once by one server function, `getCharts` in
+[`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts); from then on the page is
+live from the broker, as Home is.
 
 ## 3. The page of one machine
 

@@ -8,7 +8,7 @@ date: 2026-11-17
 
 ## Context
 
-The pages of the example app that show what machines do now (Home, the page of a machine, Live values) read
+The pages of the example app that show what machines do now (Home, the page of a machine, Live values, Charts) read
 everything again every ten seconds: the server of the app asked `genui-mcp`, which asked the Timeseries and
 Events APIs, for the whole picture, the past hours included. A value was up to ten seconds old before a page
 showed it, and every open page cost a full read of the stored values every ten seconds. A selectable shorter

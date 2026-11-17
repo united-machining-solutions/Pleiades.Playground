@@ -26,7 +26,7 @@ The values come from `genui-mcp`, and what is live comes from the broker. Withou
 which settings are missing; everything else works.
 
 **Live, not read again** ([ADR-0013](../../docs/adr/0013-live-values-from-the-broker.md)). Home, the page of a
-machine and Live values read once, in their loader, what `genui-mcp` knows: what held when the page was opened,
+machine, Live values and Charts read once, in their loader, what `genui-mcp` knows: what held when the page was opened,
 and the history before it. From then on the browser subscribes at the broker, MQTT over WebSocket, to the
 topics the page shows, and every value appears the moment a machine publishes it: a state, a program, a warning
 that is raised or reset, a point of a graph. The clock of the page moves on by itself, by the clock of the
