@@ -62,14 +62,25 @@ import {
 } from "@pleiades/ui/components/trace"
 
 import { Answer } from "./answer.tsx"
-import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
+import {
+  NEW_CHAT,
+  afterSwitch,
+  pickModel,
+  pickSwitchedOff,
+  pickedModel,
+  pickedSwitchedOff,
+  rememberThread,
+  takeFirstQuestion,
+  useChatPanel,
+} from "./ask.ts"
 import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
 import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { DictateButton } from "./dictate.tsx"
-import { chooseChatModel, fetchChatModel } from "./status.ts"
+import { chooseChatModel, fetchChatModel, fetchSwitchedOff, switchChatServer } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
 import { toolLabel } from "./tool-results.ts"
+import { ToolsMenu } from "./tools-menu.tsx"
 
 const root = getRouteApi("__root__")
 const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
@@ -148,6 +159,13 @@ function Start() {
     pickModel(name)
     setModel(name)
   }
+  // And without the tools of the servers switched off here.
+  const [off, setOff] = useState(pickedSwitchedOff)
+  const switchServer = (name: string, on: boolean) => {
+    const next = afterSwitch(off, name, on)
+    pickSwitchedOff(next)
+    setOff(next)
+  }
   return (
     <>
       <SidebarContent>
@@ -183,6 +201,8 @@ function Start() {
         models={chatStatus.models}
         model={model}
         onModel={choose}
+        off={off}
+        onSwitch={switchServer}
         dictation={chatStatus.dictation}
       />
     </>
@@ -212,6 +232,21 @@ function Conversation({ threadId }: { threadId: string }) {
     pickModel(name)
     setModel(name)
     void switchTo(name)
+  }
+  // The further servers this chat has switched off. The harness keeps them with the chat, as it keeps
+  // the model, and the server of the app gives the model no tool of a server that is off.
+  const [off, setOff] = useState(pickedSwitchedOff)
+  const [serverError, setServerError] = useState<string>()
+  const tell = (name: string, on: boolean) =>
+    switchChatServer(threadId, name, on).then(
+      () => setServerError(undefined),
+      (problem: unknown) => setServerError(problem instanceof Error ? problem.message : String(problem)),
+    )
+  const switchServer = (name: string, on: boolean) => {
+    const next = afterSwitch(off, name, on)
+    pickSwitchedOff(next)
+    setOff(next)
+    void tell(name, on)
   }
   // Stop ends the answer twice: `stop` of the chat stops reading it, and the harness cancels the turn
   // on the server. Without that the model goes on writing, the server keeps the whole answer, and the
@@ -244,10 +279,14 @@ function Conversation({ threadId }: { threadId: string }) {
         // A question asked anywhere in the app opens this chat and is its first message. The chat
         // begins with the model picked last; the first model answers without being picked.
         if (model !== undefined && model !== chatStatus.models[0]) await switchTo(model)
+        // And without the servers switched off last: the question waits until the chat knows.
+        for (const name of off) await tell(name, false)
         void sendMessage(first)
       } else {
         // A chat from before keeps the model it picked.
         setModel((await fetchChatModel(threadId)) ?? chatStatus.models[0])
+        // And the servers it switched off.
+        setOff(await fetchSwitchedOff(threadId))
       }
     })()
     return () => {
@@ -351,6 +390,15 @@ function Conversation({ threadId }: { threadId: string }) {
                     </Alert>
                   </MessageScrollerItem>
                 )}
+                {serverError && (
+                  <MessageScrollerItem messageId="server-error">
+                    <Alert>
+                      <CircleAlertIcon />
+                      <AlertTitle>The tools were not changed</AlertTitle>
+                      <AlertDescription>{serverError}</AlertDescription>
+                    </Alert>
+                  </MessageScrollerItem>
+                )}
                 {stopError && (
                   <MessageScrollerItem messageId="stop-error">
                     <Alert>
@@ -377,6 +425,8 @@ function Conversation({ threadId }: { threadId: string }) {
         models={chatStatus.models}
         model={model}
         onModel={choose}
+        off={off}
+        onSwitch={switchServer}
         dictation={chatStatus.dictation}
       />
     </>
@@ -471,7 +521,8 @@ function AnswerBlock({ block, thinking = false }: { block: Block; thinking?: boo
 }
 
 /**
- * Where a question is written. With more than one model in the settings it also says which model
+ * Where a question is written. Below the text it says which servers give the chat tools and switches
+ * them (tools-menu.tsx). With more than one model in the settings it also says which model
  * answers and lets the chat pick another one, after the shadcn pattern "Model Selector". At the
  * start of the panel the questions to begin with stand above it, after the pattern "Suggestion".
  * With a model for speech in the settings, a question can also be spoken into it (dictate.tsx).
@@ -486,6 +537,8 @@ function Composer({
   models,
   model,
   onModel,
+  off,
+  onSwitch,
   dictation,
 }: {
   placeholder: string
@@ -496,6 +549,8 @@ function Composer({
   models: ReadonlyArray<string>
   model: string | undefined
   onModel: (name: string) => void
+  off: ReadonlyArray<string>
+  onSwitch: (name: string, on: boolean) => void
   dictation: boolean
 }) {
   const [text, setText] = useState("")
@@ -547,9 +602,10 @@ function Composer({
             onChange={(event) => setText(event.target.value)}
             onKeyDown={onKeyDown}
           />
-          {/* With a choice of models the field gets a second line: the model on the left, dictation
-              and send on the right. */}
-          <InputGroupAddon align={choice ? "block-end" : "inline-end"}>
+          {/* The second line of the field: the tools and, with a choice of models, the model on the
+              left, dictation and send on the right. */}
+          <InputGroupAddon align="block-end">
+            <ToolsMenu off={off} onSwitch={onSwitch} />
             {choice && (
               <DropdownMenu>
                 <DropdownMenuTrigger render={<InputGroupButton variant="ghost" aria-label={`Model: ${model}`} />}>
@@ -570,12 +626,12 @@ function Composer({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            {dictation && <DictateButton className={choice ? "ml-auto" : undefined} onText={dictated} />}
+            {dictation && <DictateButton className="ml-auto" onText={dictated} />}
             <InputGroupButton
               type={stoppable ? "button" : "submit"}
               variant="default"
               size="icon-sm"
-              className={choice && !dictation ? "ml-auto" : undefined}
+              className={dictation ? undefined : "ml-auto"}
               aria-label={stoppable ? "Stop" : "Send"}
               disabled={busy && !stoppable}
               onClick={stoppable ? onStop : undefined}

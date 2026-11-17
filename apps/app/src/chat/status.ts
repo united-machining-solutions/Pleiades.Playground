@@ -1,7 +1,10 @@
 import { createServerFn } from "@tanstack/react-start"
 
 import { chatSettings } from "./gateway.ts"
+import { serverOfKey, switchKey } from "./mcp-servers.ts"
 import { modelNames } from "./models.ts"
+import { serverList } from "./server-list.ts"
+import type { ListedServer } from "./server-list.ts"
 
 export type ChatStatus = {
   configured: boolean
@@ -25,7 +28,44 @@ export const getChatStatus = createServerFn({ method: "GET" }).handler(async ():
   }
 })
 
-export type ChatEntry = { threadId: string; title: string; titled: boolean }
+/**
+ * The servers whose tools the chat has, whether each one answers, and its tools by name. Asked when the
+ * panel "Tools" opens, not with every page. Addresses never leave the server.
+ */
+export const getChatServers = createServerFn({ method: "GET" }).handler((): Promise<Array<ListedServer>> => serverList())
+
+/** The further servers a chat has switched off, by name. A chat that does not exist yet has none. */
+export async function fetchSwitchedOff(threadId: string): Promise<Array<string>> {
+  const response = await fetch(`/api/harness/describe?threadId=${encodeURIComponent(threadId)}`)
+  if (!response.ok) return []
+  const description = (await response.json()) as { config?: Array<{ key: string; value: unknown }> }
+  return (description.config ?? []).flatMap(({ key, value }) => {
+    const name = serverOfKey(key)
+    return name !== undefined && value === false ? [name] : []
+  })
+}
+
+/**
+ * From its next turn on, the chat has the tools of this server, or has them no longer. The harness keeps
+ * the choice with the chat, and the server of the app holds the chat to it.
+ */
+export async function switchChatServer(threadId: string, name: string, on: boolean): Promise<void> {
+  const response = await fetch("/api/harness/control", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      threadId,
+      input: { op: "config", key: switchKey(name), value: on, inputId: crypto.randomUUID() },
+    }),
+  })
+  // The harness answers a request it refuses with 200 too, and says so in the receipt.
+  const receipt = response.ok ? ((await response.json()) as { status?: string; reason?: string }) : undefined
+  if (receipt?.status === "rejected" || !response.ok) {
+    throw new Error(`The chat could not switch ${name} ${on ? "on" : "off"} (${receipt?.reason ?? response.status}).`)
+  }
+}
+
+export type ChatEntry ={ threadId: string; title: string; titled: boolean }
 
 /** The chats the harness knows, newest first. Without a language model there are none. */
 export async function fetchChats(): Promise<Array<ChatEntry>> {

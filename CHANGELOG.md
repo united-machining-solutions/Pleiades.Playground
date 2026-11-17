@@ -9,6 +9,9 @@ All notable changes are documented here. The format follows
 
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
+- Example app: the button "Tools" in the message field of the chat lists the servers that give the chat
+  tools, says whether each one answers, and names its tools. A chat switches a further server off and on
+  there; the server of the app gives the model no tool of a server that is off.
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,

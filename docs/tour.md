@@ -149,6 +149,13 @@ The chat has no sign-in, and whoever reaches the port chats at the cost of the o
 With more than one model, the input field offers a choice. The first model answers until a chat picks
 another one, and the choice stays with that chat.
 
+The button "Tools" in the input field lists the servers that give the chat its tools: the generative UI
+backend, and the further ones the setting `APP_MCP_SERVERS` names, such as the optional Ultimaker service.
+It says whether each one answers and names its tools, and marks a tool that can change something. A switch
+takes a further server out of the chat from its next question on: the model then gets none of its tools. The
+choice stays with the chat, as the model does. The two pictures of this stop were taken before the button
+was there.
+
 ![Home on the left and the chat panel on the right, before the first question. The model picker in the input
 field is open and lists seven models: spark/qwen3.8-27b, ticked, then three named openai/gpt and three named
 anthropic/claude.](images/tour/chat-model-picker.png)
