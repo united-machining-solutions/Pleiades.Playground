@@ -28,7 +28,7 @@ catalog:
   "@vitejs/plugin-react": 6.3.0
   class-variance-authority: 0.7.1
   cn: 0.5.2
-  lucide-react: 1.70.0
+  lucide-react: 1.73.0
   # A release candidate: Nitro 3 has no stable release yet.
   nitro: 3.0.261103-rc
   # A tool for the documentation: its browser takes the screenshots of the tour.
