@@ -19,12 +19,15 @@ durations are computed here, never by a language model.
 | `genui_machine_list` | Every machine with what it does now: connection, heartbeat, state and operation mode with the time since when, the active program, and the warnings and errors of the last 24 hours that have not gone. |
 | `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and how long each state lasted in total over the last hours (`hours`, 8 if omitted). Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_span_list` | The states of one machine between two instants (`from`, `to`) as spans without a gap: the band of the machine card. A card calls it after `genui_machine_show`. A host that shows MCP Apps does not offer it to its language model. |
+| `genui_measurement_list` | Every machine, or one (`machine`), with the newest value of each physical quantity: active power, energy imported, spindle bearing temperature, whether the spindle rotates, feed and spindle override, power-on duration. Each in the unit it was published in, and whether it is current: a value holds until the next one, as long as the machine is there (see below). Its output is the contract of the measurement card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_measurement_series` | Every physical quantity over the last minutes (`minutes`, 15 if omitted), a line for each machine on the same instants (`slots`, 180 if omitted): what the graphs of the measurements draw. Each point is the value that held at its instant, also one published before the minutes began; none while the machine is silent, and none after a silence until the next value. The card file of the measurements calls it and draws the graphs below its cards; the page "Live values" of the example app calls it too. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. A question about a machine needs neither: a result answers it. |
 
 | Resource | What it is |
 |---|---|
 | `genui://skill` | The skill guide, as markdown. |
 | `ui://genui/machine` | The machine card as a file for other hosts, see below. |
+| `ui://genui/measurement` | The measurement card as a file for other hosts: the cards, and below them the graphs of the last minutes, which it asks `genui_measurement_series` for, as the machine card asks for its band. |
 
 Every instant of a result is ISO 8601 in UTC. The two machine tools also take a `timeZone`, an IANA name such
 as `Europe/Zurich`: then every instant is a local time there with its offset, `2026-11-11T09:00:41.000+01:00`.

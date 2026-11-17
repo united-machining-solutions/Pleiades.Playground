@@ -39,6 +39,16 @@ jobs:
           - image: pleiades.playground.simulator
             context: source
             file: source/Pleiades.Playground.Simulator/Dockerfile
+          - image: pleiades.playground.ultimaker.api
+            context: source
+            file: source/Pleiades.Playground.Ultimaker.Api/Dockerfile
+            # The printer services run on the deployment computer only, which is amd64.
+            platforms: linux/amd64
+          - image: pleiades.playground.ultimaker.telemetry
+            context: source
+            file: source/Pleiades.Playground.Ultimaker.Telemetry/Dockerfile
+            # The printer services run on the deployment computer only, which is amd64.
+            platforms: linux/amd64
           - image: pleiades.playground.genui.mcp
             context: .
             file: apps/genui-mcp/Dockerfile
@@ -75,7 +85,7 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platforms || 'linux/amd64,linux/arm64' }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

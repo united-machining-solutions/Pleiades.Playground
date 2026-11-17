@@ -4,7 +4,7 @@ status: proposed
 date: 2026-11-17
 ---
 
-# ADR-0012: A .NET service draws its own page with Blazor
+# ADR-0013: A .NET service draws its own page with Blazor
 
 ## Context
 

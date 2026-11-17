@@ -160,6 +160,24 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
   return { asOf: now.toISOString(), windowSeconds: WINDOW_SECONDS, machines }
 }
 
+/**
+ * The signs of life of every machine between two instants: when it published its connection, its
+ * heartbeat, its state, its operation mode or its program. Other values are signs of life too; a
+ * caller that reads them adds them.
+ */
+export async function readSignsOfLife(apis: Apis, from: Date, to: Date): Promise<Map<string, Array<string>>> {
+  const series = await Promise.all(names.map((name) => readValues(name)(apis, `machines/*/${paths[name]}`, from, to)))
+  const signs = new Map<string, Array<string>>()
+  names.forEach((name, index) => {
+    for (const one of series[index] ?? []) {
+      const machine = machineOf(one.topic)
+      if (machine === undefined || one.topic !== `machines/${machine}/${paths[name]}`) continue
+      signs.set(machine, [...(signs.get(machine) ?? []), ...one.samples.map((sample) => sample.at)])
+    }
+  })
+  return signs
+}
+
 /** The states of one machine between two instants, as spans without a gap. */
 async function readSpans(apis: Apis, serialNumber: string, from: Date, to: Date): Promise<Array<Span>> {
   // The signs of life just before say whether the machine was there where the history begins.

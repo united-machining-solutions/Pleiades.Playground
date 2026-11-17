@@ -1,4 +1,5 @@
 import { machineCard } from "./machine.ts"
+import { measurementCard } from "./measurement.ts"
 
 /**
  * The cards of this server: one module each, and one line each here, in the order of the alphabet.
@@ -7,4 +8,5 @@ import { machineCard } from "./machine.ts"
  */
 export const cards = [
   machineCard,
+  measurementCard,
 ] as const

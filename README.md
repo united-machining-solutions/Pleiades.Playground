@@ -47,6 +47,13 @@ In PowerShell, set the variable first: `$env:PLEIADES_VERSION = "main"`. Or writ
 | Cutting simulators | <http://localhost:5611/>, `:5612`, `:5613` | Only with `--profile cutting`: a 2D laser, a tube laser and a punching machine that take their jobs through telegram files; see [`Cutting.Simulator`](source/Pleiades.Playground.Cutting.Simulator/README.md). One [`Cutting.Adapter`](source/Pleiades.Playground.Cutting.Adapter/README.md) each publishes them to the broker as `L-01`, `T-01` and `PU-01` |
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
+An optional [Ultimaker 3 service](source/Pleiades.Playground.Ultimaker.Api/README.md) adds CuraEngine,
+REST and MCP slicing, static toolpath validation and explicit printer pairing/start. It is started only
+with the `ultimaker` Compose profile and leaves printing disabled by default.
+The separate [Ultimaker telemetry adapter](source/Pleiades.Playground.Ultimaker.Telemetry/README.md)
+publishes read-only printer observations to the existing broker and time-series persistence.
+For deployment from published images, enable `COMPOSE_PROFILES=ultimaker` and configure the printer
+URL in the server's private .env; see [deployment](docs/deployment.md#enable-the-ultimaker-services).
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo; only
 the chat of the example app needs a language model, through a LiteLLM gateway:
 
