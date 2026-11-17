@@ -83,6 +83,16 @@ app.MapGet("/printer/pair", (PrinterClient printer, CancellationToken ct) => pri
     .RequireFeatureRead("ultimaker");
 app.MapPost("/printer/print", (PrintRequest request, PrinterClient printer, CancellationToken ct) => printer.StartAsync(request, ct))
     .RequireFeatureWrite("ultimaker");
+app.MapPost("/slices/{id}/printer-validation", (string id, PrinterClient printer, CancellationToken ct) => printer.ValidateHeaderAsync(id, ct))
+    .RequireFeatureWrite("ultimaker");
+app.MapGet("/printer/print/current", (PrinterClient printer, CancellationToken ct) => printer.CurrentJobAsync(ct))
+    .RequireFeatureRead("ultimaker");
+app.MapGet("/printer/print/history", (PrinterClient printer, CancellationToken ct, int offset = 0, int count = 20) =>
+    printer.HistoryAsync(offset, count, ct)).RequireFeatureRead("ultimaker");
+app.MapGet("/printer/print/history/{jobId}", (string jobId, PrinterClient printer, CancellationToken ct) =>
+    printer.HistoryJobAsync(jobId, ct)).RequireFeatureRead("ultimaker");
+app.MapGet("/slices/{id}/prints", (string id, ArtifactStore store, CancellationToken ct, int offset = 0, int count = 20) =>
+    store.SlicePrintsAsync(id, offset, count, ct)).RequireFeatureRead("ultimaker");
 await app.RunAsync().ConfigureAwait(false);
 
 internal partial class Program;

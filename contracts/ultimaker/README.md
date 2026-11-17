@@ -21,6 +21,11 @@ converts units. The initial profile supports PLA, left AA 0.4, single extrusion 
 | `ultimaker_printer_pair` | `POST /printer/pair` | Request display approval, privately persist credentials |
 | `ultimaker_pairing_status` | `GET /printer/pair` | Poll approval and verify Digest credentials |
 | `ultimaker_print_start` | `POST /printer/print` | Validate hash, model, core, material and idle state, upload/start |
+| `ultimaker_slice_validate_header` | `POST /slices/{id}/printer-validation` | Ask the paired printer to validate the exact artifact header; never starts printing |
+| `ultimaker_print_current` | `GET /printer/print/current` | Current job, progress fraction, times and exact slice associations; job is null when none exists |
+| `ultimaker_print_history` | `GET /printer/print/history?offset=0&count=20` | Bounded page of historical jobs with slice associations |
+| `ultimaker_print_get` | `GET /printer/print/history/{jobId}` | One historical job by printer UUID |
+| `ultimaker_slice_prints` | `GET /slices/{id}/prints?offset=0&count=20` | Durable local submission attempts for this slice, including ambiguous uploads |
 
 Slicing accepts a model ID, profile ID, loaded PLA material UUID, layer height in metre (0.00006–0.0003),
 infill fraction (0–1) and support boolean. Result includes exact settings, SHA-256, time in second,
@@ -41,3 +46,27 @@ import is implied. The conservative model envelope is 0.17 × 0.19 × 0.195 metr
 explicit nozzle coordinates/segments only; it does not simulate the complete head, firmware-controlled
 motions or objects already on the plate. G-code can be opened in Cura for layer inspection, but is
 not an editable project. Validation reports name these limits alongside the checked SI bounds.
+
+## Header validation, job status and traceability
+
+Printer header validation requires pairing but not EnablePrinting. The result identifies the slice,
+exact SHA-256, printer UUID, check time and the manufacturer's fault code, level and message.
+Passed means no findings: warnings, errors and unknown levels all block print-start. This is a
+point-in-time header check, not collision simulation. Print-start repeats it immediately before upload.
+
+Current/history results expose nullable progress (fraction), durations in second and UTC timestamps.
+Empty vendor timestamps and absent values remain null. Unknown state/result strings are preserved.
+An absent current job returns HTTP 200 with job=null; a missing historical UUID returns HTTP 404.
+History and slice submission pages use offset>=0 and count=1..100, default 20. NextOffset is null
+when fewer than count items are returned; there is no claim of a known total count.
+
+Each print attempt is journalled under /data/print-submissions before the upload is sent, with
+submission ID, printer UUID, slice ID, SHA-256, job name and timestamps. Accepted responses add the
+printer job UUID. Current/history jobs are linked only by the exact printer UUID and job UUID,
+never by a filename, time or material guess. External jobs have no slice association.
+Mapping survives service restarts. Printer history retention remains controlled by the device.
+
+Interrupted/failed uploads remain state=uploading or unknown with a potentially missing job UUID.
+These are visible through the slice's submissions. Do not retry automatically or invent a match.
+Inspect printer state and reconcile manually. A persistence failure after API acceptance is also
+ambiguous. Submission records contain no pairing secrets. One replica owns the printer/data volume.

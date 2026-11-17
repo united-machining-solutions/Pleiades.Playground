@@ -10,7 +10,8 @@ The deployment is optional and off by default. Whoever only wants to see the dem
 ## How it goes
 
 1. A pull request is merged into `main`.
-2. "Images" builds the seven images and tags them `main` and `sha-<commit>`.
+2. "Images" builds the service images, including the optional Ultimaker services, and tags them
+   `main` and `sha-<commit>`.
 3. "Deploy" runs after it on a runner of your own, on the computer that runs the stack. It checks out the
    commit, pulls the images tagged `sha-<commit>` and runs `docker compose up -d --no-build --wait`.
 
@@ -60,3 +61,48 @@ PLEIADES_VERSION=main docker compose --env-file /path/to/.env up -d --no-build -
 ```
 
 "Deploy" can also be started by hand, under Actions, for the newest commit of `main`.
+
+## Enable the Ultimaker services
+
+Both `ultimaker-api` (CuraEngine, REST and MCP) and `ultimaker-telemetry` (printer to MQTT) are
+defined in the root Compose file under the optional `ultimaker` profile. The Images workflow
+publishes both to GHCR with the same commit tags as the other services. A feature-branch push
+does not publish deployment images; merge to main first, or build the branch locally.
+
+Set these values in the deployment computer's private `.env` in DEPLOY_DIR:
+
+```dotenv
+COMPOSE_PROFILES=ultimaker
+ULTIMAKER_PRINTER_URL=http://ultimaker.local/
+ULTIMAKER_MACHINE_ID=UM3-01
+ULTIMAKER_ENABLE_PRINTING=false
+```
+
+Replace the example printer URL with the actual reachable address. Compose reads COMPOSE_PROFILES
+from the same --env-file used by the deployment workflow, so no workflow edit or override file is
+needed to enable the services. Leave it empty on computers without this printer. Telemetry waits
+for the existing broker and time-series persistence; it does not need pairing or print permission.
+
+To deploy both from images after they have been published:
+
+```bash
+PLEIADES_VERSION=main docker compose --env-file /path/to/.env pull
+PLEIADES_VERSION=main docker compose --env-file /path/to/.env up -d --no-build --wait
+```
+
+To build the feature branch before it is merged:
+
+```bash
+docker compose --profile ultimaker up -d --build --wait ultimaker-api ultimaker-telemetry
+```
+
+The API listens on host loopback port 5530 by default. For remote MCP access, use the deployment's
+reverse proxy and configure the existing Ultimaker authentication settings; do not expose the
+anonymous local-development setting to an untrusted network. See the
+[API guide](../source/Pleiades.Playground.Ultimaker.Api/README.md) and
+[telemetry guide](../source/Pleiades.Playground.Ultimaker.Telemetry/README.md).
+
+The named `ultimaker_data` volume preserves models, slices, pairing credentials and submission
+records across deployments of the same Compose project. A new server has a new volume and must
+be paired through its API with approval on the printer display. Starting the stack never pairs,
+enables printing or starts a print automatically.

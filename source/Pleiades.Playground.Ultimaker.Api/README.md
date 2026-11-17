@@ -17,7 +17,7 @@ MCP: <http://localhost:5530/mcp>. REST schema: <http://localhost:5530/openapi/v1
 Liveness: `/health`. Diagnostics, including engine/definitions: `/healthcheck`.
 The service does not connect to the printer until a printer operation is called.
 
-The default host is `http://ultimaker.hub0000.ums.internal/`. Set `ULTIMAKER_PRINTER_URL` if needed;
+The default host is `http://ultimaker.local/`. Set `ULTIMAKER_PRINTER_URL` if needed;
 the Docker host/container must resolve and reach that internal name. The reference device identifies
 itself as Ultimaker 3, hardware type 9066, firmware 5.3.0. No printer address is discovered or changed.
 
@@ -127,6 +127,29 @@ before retrying. Status `accepted` proves API acceptance, not a completed print.
 
 ## Runtime and verification
 
+### Printer header checks and job traceability
+
+`POST /slices/{id}/printer-validation` and `ultimaker_slice_validate_header` send the exact hashed
+artifact to the paired printer's validation endpoint. This never starts a print and does not
+require printing enabled. Results identify slice, hash, printer, check time and structured findings.
+Print-start repeats the check and blocks on any warning, error or unknown finding level.
+
+`GET /printer/print/current` / `ultimaker_print_current` return the current job, or job=null when none
+exists. History is `GET /printer/print/history?offset=0&count=20` / `ultimaker_print_history`; a single
+job is `GET /printer/print/history/{jobId}` / `ultimaker_print_get`. Pages accept count=1..100.
+Unknown states/results are preserved; missing dates/numbers remain null. All durations use second,
+progress is a fraction and timestamps are UTC. A finished job is not a part-quality assessment.
+
+`GET /slices/{id}/prints` / `ultimaker_slice_prints` list the local submission journal. Each attempt
+is persisted before upload and bound to printer UUID, slice ID and SHA-256. Accepted responses add
+the printer job UUID. Current/history results join by those exact printer/job IDs, never by name.
+Externally started jobs therefore have no inferred association. The journal survives restarts.
+Remote job history remains subject to the printer's own retention.
+
+An upload failure/crash can leave state=unknown or uploading without a UUID. Do not retry
+automatically. Inspect the printer and the journal before deciding what happened. A persistence
+failure after API acceptance is ambiguous too. No printer pairing secrets appear in journal records.
+
 One slice runs at a time, with two OpenMP threads and a default 180-second timeout. Concurrent slices
 are rejected rather than queued. On cancellation/timeout the engine process tree is killed and
 incomplete artifacts are removed. Input is limited to 20 MiB. No automatic retention policy deletes
@@ -143,7 +166,10 @@ node .github/scripts/check-doc-links.mjs
 
 The optional container test exercises real slicing and MCP without calling any printer write.
 Fake-printer tests exercise pairing, print preflight and multipart upload without physical hardware.
-The image is currently built locally; the existing image-publication workflow does not publish it yet.
+The Images workflow publishes `ghcr.io/united-machining-solutions/pleiades.playground.ultimaker.api`
+after a merge to main or a release tag. To activate it in the deployed stack, set
+`COMPOSE_PROFILES=ultimaker` and the real printer URL in the deployment computer's private .env.
+See [deployment](../../docs/deployment.md#enable-the-ultimaker-services).
 No UI screenshot is required: this integration has no new application screen.
 
 ## Dependencies and licences
@@ -169,5 +195,5 @@ device belongs to the requesting user. The public contract is under `contracts/u
 SI settings/results. No MQTT binding or existing service changes. Add an opt-in Compose profile,
 port 5530 and a data volume; print-start remains disabled by default. Review the fixed PLA profile,
 static collision-check limits and independent Cura/CuraEngine licences before merging. Container
-publication can be added separately. This draft is for the maintainer to open; no issue or PR is
+publication uses the repository's Images workflow. This draft is for the maintainer to open; no issue or PR is
 created by this change.

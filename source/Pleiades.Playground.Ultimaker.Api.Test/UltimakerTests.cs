@@ -17,7 +17,7 @@ using Pleiades.Playground.Mcp.Testing;
 namespace Pleiades.Playground.Ultimaker.Api.Test;
 
 [TestClass]
-public sealed class UltimakerTests
+public sealed partial class UltimakerTests
 {
     private const string Material = "9c1959d0-f597-46ec-9131-34020c7a54fc";
     public TestContext TestContext { get; set; } = null!;
@@ -110,7 +110,7 @@ public sealed class UltimakerTests
             await fixture.Printer.StartAsync(new(slice.Id, slice.Sha256, "cube"), TestContext.CancellationToken);
             Assert.Fail("Expected preflight rejection.");
         }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException) { }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or InvalidDataException) { }
         Assert.AreEqual(0, fixture.Transport.UploadCount);
     }
 
@@ -240,6 +240,7 @@ public sealed class UltimakerTests
         internal readonly FakePrinter Transport = new();
         internal ArtifactStore Store { get; }
         internal PrinterClient Printer { get; }
+        internal string DataDirectory => _root;
         internal Fixture()
         {
             var options = Options.Create(new UltimakerOptions { DataDirectory = _root, EnablePrinting = true });
@@ -268,24 +269,47 @@ public sealed class UltimakerTests
         internal string Scenario = "";
         internal int UploadCount;
         internal string? UploadBody;
+        internal int HeaderValidationCount;
+        internal string? HeaderBody;
+        internal string? HistoryQuery;
+        internal Func<Task>? BeforeUpload;
         public HttpClient Create(PrinterCredentials? credentials = null)
             => new(this, false) { BaseAddress = new Uri("http://printer/api/v1/") };
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var path = request.RequestUri!.AbsolutePath;
+            if ((path == "/api/v1/print_job" && Scenario == "current-missing")
+                || (path.StartsWith("/api/v1/history/print_jobs/", StringComparison.Ordinal) && Scenario == "history-missing"))
+                return new(HttpStatusCode.NotFound);
+            var jobId = Scenario == "external-job" ? "fbb19509-a82c-461c-945c-8cc219d941e1" : "966066fe-ce93-4b44-a6ba-a5dd2f532636";
+            var job = JsonSerializer.Serialize(new { uuid = jobId, name = "cube", state = Scenario == "future-state" ? "future_state" : "printing",
+                result = "", source = "WEB_API", progress = .4, time_elapsed = 24, time_total = 60, time_estimated = 59,
+                datetime_started = "2026-11-17T08:00:00Z", datetime_finished = "", datetime_cleaned = "" });
             var body = path switch
             {
                 "/api/v1/auth/request" => "{\"id\":\"pair-id\",\"key\":\"private-key\"}",
                 "/api/v1/auth/check/pair-id" => "{\"message\":\"authorized\"}",
                 "/api/v1/auth/verify" => "{}",
-                "/api/v1/system" => JsonSerializer.Serialize(new { variant = Scenario == "wrong-model" ? "Ultimaker S5" : "Ultimaker 3", name = "Test", firmware = "5.3.0" }),
+                "/api/v1/system" => JsonSerializer.Serialize(new { guid = Scenario == "other-printer" ? "0fd0ea9f-2fc1-4f30-b367-5b71b839c18c" : "6964c917-730a-4c9a-bef5-55de2de5fc47", variant = Scenario == "wrong-model" ? "Ultimaker S5" : "Ultimaker 3", name = "Test", firmware = "5.3.0" }),
                 "/api/v1/printer" => JsonSerializer.Serialize(new { status = Scenario == "printing" ? "printing" : "idle", heads = new[] { new { extruders = new[] { new { hotend = new { id = Scenario == "wrong-core" ? "BB 0.4" : "AA 0.4", temperature = new { current = 20 } }, active_material = new { guid = Scenario == "wrong-material" ? "other" : Material } } } } } }),
                 _ when path.StartsWith("/api/v1/materials/", StringComparison.Ordinal) => $"<fdmmaterial><metadata><name><material>{(Scenario == "not-pla" ? "ABS" : "PLA")}</material></name></metadata></fdmmaterial>",
-                "/api/v1/print_job" => "{\"uuid\":\"accepted-job\"}",
+                "/api/v1/printer/validate_header" => Scenario.StartsWith("header-", StringComparison.Ordinal)
+                    ? JsonSerializer.Serialize(new[] { new { fault_code = "GUID_MISMATCH", fault_level = Scenario == "header-warning" ? "WARNING" : Scenario == "header-error" ? "ERROR" : "FUTURE_LEVEL", message = "Material mismatch" } }) : "[]",
+                "/api/v1/print_job" when request.Method == HttpMethod.Get => Scenario == "current-none" ? "{\"state\":\"none\"}" : job,
+                "/api/v1/print_job" => Scenario == "missing-uuid" ? "{}" : "{\"uuid\":\"966066fe-ce93-4b44-a6ba-a5dd2f532636\"}",
+                "/api/v1/history/print_jobs" => Scenario == "history-empty" ? "[]" : "[" + job + "]",
+                _ when path.StartsWith("/api/v1/history/print_jobs/", StringComparison.Ordinal) => job,
                 _ => throw new InvalidOperationException("Unexpected printer endpoint: " + path),
             };
-            if (path == "/api/v1/print_job")
+            if (path == "/api/v1/printer/validate_header")
             {
+                HeaderValidationCount++;
+                HeaderBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            }
+            if (path == "/api/v1/history/print_jobs") HistoryQuery = request.RequestUri.Query;
+            if (path == "/api/v1/print_job" && request.Method == HttpMethod.Post)
+            {
+                if (BeforeUpload is not null) await BeforeUpload();
                 UploadCount++;
                 UploadBody = await request.Content!.ReadAsStringAsync(cancellationToken);
                 if (Scenario == "upload-timeout") throw new HttpRequestException("Connection lost after upload.");

@@ -30,7 +30,7 @@ internal sealed class PrinterHttpClientFactory(IOptions<UltimakerOptions> option
     }
 }
 
-internal sealed class PrinterClient(IPrinterHttpClientFactory clients, ArtifactStore store,
+internal sealed partial class PrinterClient(IPrinterHttpClientFactory clients, ArtifactStore store,
     IOptions<UltimakerOptions> options) : IDisposable
 {
     private readonly SemaphoreSlim _writeGate = new(1, 1);
@@ -50,7 +50,7 @@ internal sealed class PrinterClient(IPrinterHttpClientFactory clients, ArtifactS
         return new(system.RootElement.GetProperty("variant").GetString() ?? "",
             system.RootElement.GetProperty("name").GetString() ?? "",
             system.RootElement.GetProperty("firmware").GetString() ?? "",
-            printer.RootElement.GetProperty("status").GetString() ?? "unknown", cores);
+            printer.RootElement.GetProperty("status").GetString() ?? "unknown", cores, PrinterIdFrom(system.RootElement));
     }
 
     public async Task<PairStatus> PairAsync(PairRequest request, CancellationToken token)
@@ -112,13 +112,9 @@ internal sealed class PrinterClient(IPrinterHttpClientFactory clients, ArtifactS
         await _writeGate.WaitAsync(token).ConfigureAwait(false);
         try
         {
-            var slice = await store.GetSliceAsync(request.SliceId, token).ConfigureAwait(false);
-            var bytes = await File.ReadAllBytesAsync(store.GcodePath(request.SliceId), token).ConfigureAwait(false);
-            if (!string.Equals(request.Sha256, slice.Sha256, StringComparison.OrdinalIgnoreCase)
-                || !string.Equals(ArtifactStore.Hash(bytes), slice.Sha256, StringComparison.Ordinal))
+            var (slice, bytes) = await store.ReadCheckedSliceAsync(request.SliceId, token).ConfigureAwait(false);
+            if (!string.Equals(request.Sha256, slice.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("G-code SHA-256 does not match the requested completed slice.");
-            GcodeHeader.Read(bytes);
-            GcodeValidation.CompleteAndValidate(bytes, slice.MaterialId);
             var credentials = await LoadCredentialsAsync(token).ConfigureAwait(false)
                 ?? throw new InvalidOperationException("Pair the printer and approve on its display before printing.");
             var status = await StatusAsync(token).ConfigureAwait(false);
@@ -130,17 +126,39 @@ internal sealed class PrinterClient(IPrinterHttpClientFactory clients, ArtifactS
                 throw new InvalidOperationException("Loaded left material does not match the sliced material UUID.");
             using var client = clients.Create(credentials);
             await RequirePlaAsync(client, slice.MaterialId, token).ConfigureAwait(false);
-            using var form = new MultipartFormDataContent();
-            using var jobName = new StringContent(request.JobName);
-            form.Add(jobName, "jobname");
-            using var file = new ByteArrayContent(bytes);
-            file.Headers.ContentType = new MediaTypeHeaderValue("text/x-gcode");
-            form.Add(file, "file", $"{slice.Id}.gcode");
-            // This upload STARTS a print. No retry handler is installed, even for transport failures.
-            using var response = await client.PostAsync("print_job", form, token).ConfigureAwait(false);
-            EnsureSuccess(response);
-            using var result = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
-            return new("accepted", result.RootElement.TryGetProperty("uuid", out var uuid) ? uuid.GetString() : null);
+            var validation = await ValidateHeaderCoreAsync(client, slice, bytes, status.PrinterId, token).ConfigureAwait(false);
+            if (!validation.Passed)
+                throw new InvalidOperationException("Printer header validation has findings. Inspect the slice's printer-validation report before printing.");
+            var submission = new PrintSubmission(Guid.NewGuid().ToString("N"), slice.Id, slice.Sha256,
+                status.PrinterId, request.JobName, "uploading", null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+            // Persist before any physical upload. A crash leaves an inspectable, ambiguous attempt.
+            await store.SaveSubmissionAsync(submission, token).ConfigureAwait(false);
+            try
+            {
+                using var form = new MultipartFormDataContent();
+                using var jobName = new StringContent(request.JobName);
+                form.Add(jobName, "jobname");
+                using var file = new ByteArrayContent(bytes);
+                file.Headers.ContentType = new MediaTypeHeaderValue("text/x-gcode");
+                form.Add(file, "file", $"{slice.Id}.gcode");
+                // This upload STARTS a print. No retry handler is installed, even for transport failures.
+                using var response = await client.PostAsync("print_job", form, token).ConfigureAwait(false);
+                EnsureSuccess(response);
+                using var result = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
+                if (!result.RootElement.TryGetProperty("uuid", out var uuid) || !Guid.TryParse(uuid.GetString(), out var jobId))
+                    throw new InvalidDataException("Printer accepted the upload without a valid job UUID. Do not retry automatically.");
+                submission = submission with { State = "accepted", PrinterJobId = jobId.ToString("D"), UpdatedAt = DateTimeOffset.UtcNow };
+                await store.SaveSubmissionAsync(submission, CancellationToken.None).ConfigureAwait(false);
+                return new("accepted", submission.PrinterJobId, submission.Id);
+            }
+            catch
+            {
+                // Cancellation must not discard an upload that may already have started a print.
+                // If the UUID was received, preserve it even when persistence of acceptance failed.
+                await store.SaveSubmissionAsync(submission with { State = "unknown", UpdatedAt = DateTimeOffset.UtcNow },
+                    CancellationToken.None).ConfigureAwait(false);
+                throw;
+            }
         }
         finally { _writeGate.Release(); }
     }

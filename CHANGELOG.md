@@ -7,6 +7,11 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Optional Ultimaker 3 services: CuraEngine slicing over REST/MCP, printer-side header validation,
+  current jobs and history with durable slice associations, and a separate MQTT telemetry adapter.
+  Both containers are part of the root Compose stack and image-publication workflow, enabled for
+  deployment with COMPOSE_PROFILES=ultimaker.
+
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
 - Simulator for values, states and notifications of several machines.

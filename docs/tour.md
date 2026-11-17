@@ -23,6 +23,14 @@ It exposes MCP at <http://localhost:5530/mcp> and an OpenAPI document at
 preview workflow and validation limits are in the
 [Ultimaker service guide](../source/Pleiades.Playground.Ultimaker.Api/README.md).
 No tour screenshot changes: this service adds no application screen.
+The optional `ultimaker-telemetry` service publishes live printer observations to the existing broker.
+Its logical machine ID defaults to `UM3-01`, which then appears in the existing machine list/card.
+See the [adapter guide](../source/Pleiades.Playground.Ultimaker.Telemetry/README.md) for topic names,
+units, timestamps and how to verify persistence. The existing Home screenshot was not retaken;
+it therefore still shows only simulated machines.
+For deployment from published images, enable `COMPOSE_PROFILES=ultimaker` in the server's private
+.env; both services use the same commit tag as the rest of the stack. See
+[deployment](deployment.md#enable-the-ultimaker-services).
 
 One command builds and starts everything. It needs Docker and nothing else, see the
 [development setup](development-setup.md).

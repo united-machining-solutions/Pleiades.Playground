@@ -67,6 +67,54 @@ internal sealed class ArtifactStore(IOptions<UltimakerOptions> options)
     }
 
     public string GcodePath(string id) => Path.Combine(DirectoryFor(id), "output.gcode");
+    public async Task<(SliceArtifact Slice, byte[] Bytes)> ReadCheckedSliceAsync(string id, CancellationToken token)
+    {
+        var slice = await GetSliceAsync(id, token).ConfigureAwait(false);
+        var bytes = await File.ReadAllBytesAsync(GcodePath(id), token).ConfigureAwait(false);
+        if (Hash(bytes) != slice.Sha256) throw new InvalidDataException("G-code SHA-256 does not match stored metadata.");
+        GcodeHeader.Read(bytes);
+        GcodeValidation.CompleteAndValidate(bytes, slice.MaterialId);
+        return (slice, bytes);
+    }
+
+    internal Task SaveSubmissionAsync(PrintSubmission submission, CancellationToken token)
+    {
+        // Use the same strict UUID validation as artifacts before building a journal path.
+        DirectoryFor(submission.Id);
+        var directory = Path.Combine(_root, "print-submissions");
+        Directory.CreateDirectory(directory);
+        return WriteAsync(Path.Combine(directory, submission.Id + ".json"), submission, token);
+    }
+
+    internal async Task<IReadOnlyList<PrintSubmission>> ReadSubmissionsAsync(CancellationToken token)
+    {
+        var directory = Path.Combine(_root, "print-submissions");
+        if (!Directory.Exists(directory)) return [];
+        var result = new List<PrintSubmission>();
+        foreach (var path in Directory.EnumerateFiles(directory, "*.json"))
+        {
+            var record = JsonSerializer.Deserialize<PrintSubmission>(
+                await File.ReadAllTextAsync(path, token).ConfigureAwait(false))
+                ?? throw new InvalidDataException("Invalid print-submission journal entry.");
+            result.Add(record);
+        }
+        return result.OrderByDescending(s => s.CreatedAt).ThenBy(s => s.Id, StringComparer.Ordinal).ToArray();
+    }
+
+    public async Task<PrintSubmissionPage> SlicePrintsAsync(string sliceId, int offset, int count, CancellationToken token)
+    {
+        ValidatePage(offset, count);
+        await GetSliceAsync(sliceId, token).ConfigureAwait(false);
+        var records = await ReadSubmissionsAsync(token).ConfigureAwait(false);
+        var page = records.Where(s => s.SliceId == sliceId).Skip(offset).Take(count).ToArray();
+        return new(offset, count, page.Length == count ? checked(offset + page.Length) : null, page);
+    }
+
+    internal static void ValidatePage(int offset, int count)
+    {
+        if (offset < 0 || offset > int.MaxValue - 100 || count is < 1 or > 100)
+            throw new ArgumentException("Paging requires offset >= 0 (at most Int32.MaxValue - 100) and count between 1 and 100.");
+    }
     public static string Hash(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
     internal static async Task WriteAsync<T>(string path, T value, CancellationToken token)
     {

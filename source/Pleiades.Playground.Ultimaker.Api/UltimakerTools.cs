@@ -62,6 +62,33 @@ internal sealed class UltimakerTools(ArtifactStore store, CuraSlicer slicer, Pri
         => Guard(() => printer.PairStatusAsync(cancellationToken));
 
     [Authorize(Policy = "ultimaker:write")]
+    [McpServerTool(Name = "ultimaker_slice_validate_header", ReadOnly = false, Idempotent = true, Destructive = false),
+     Description("Ask the paired printer to validate the exact stored slice header without starting a print. Returns slice ID, SHA-256, printer ID and warning/error findings. Passed requires zero findings. Independent of printing enablement; not collision simulation.")]
+    public Task<PrinterHeaderValidation> ValidateHeader(string sliceId, CancellationToken cancellationToken)
+        => Guard(() => printer.ValidateHeaderAsync(sliceId, cancellationToken));
+
+    [McpServerTool(Name = "ultimaker_print_current", ReadOnly = true, Idempotent = true, Destructive = false),
+     Description("Read the current printer job, state, result, progress fraction, times in second and exact slice associations. Job is null if no job exists. Finished does not certify part quality or a clear build plate.")]
+    public Task<CurrentPrinterJob> CurrentPrint(CancellationToken cancellationToken)
+        => Guard(() => printer.CurrentJobAsync(cancellationToken));
+
+    [McpServerTool(Name = "ultimaker_print_history", ReadOnly = true, Idempotent = true, Destructive = false),
+     Description("Read a bounded page of printer history with results, UTC timestamps, durations in second and exact slice associations. Offset starts at zero; count is 1..100. External jobs have no inferred slice association.")]
+    public Task<PrintHistoryPage> PrintHistory(int offset = 0, int count = 20, CancellationToken cancellationToken = default)
+        => Guard(() => printer.HistoryAsync(offset, count, cancellationToken));
+
+    [McpServerTool(Name = "ultimaker_print_get", ReadOnly = true, Idempotent = true, Destructive = false),
+     Description("Read one historical printer job by its UUID, including exact slice associations. Unknown UUIDs are errors.")]
+    public Task<PrinterJob> GetPrint(string printerJobId, CancellationToken cancellationToken)
+        => Guard(() => printer.HistoryJobAsync(printerJobId, cancellationToken));
+
+    [McpServerTool(Name = "ultimaker_slice_prints", ReadOnly = true, Idempotent = true, Destructive = false),
+     Description("List durable local submission attempts for a slice. Includes uploading/unknown attempts whose upload outcome is ambiguous. Do not retry automatically. Count is 1..100; this is not the device's job history.")]
+    public Task<PrintSubmissionPage> SlicePrints(string sliceId, int offset = 0, int count = 20,
+        CancellationToken cancellationToken = default)
+        => Guard(() => store.SlicePrintsAsync(sliceId, offset, count, cancellationToken));
+
+    [Authorize(Policy = "ultimaker:write")]
     [McpServerTool(Name = "ultimaker_print_start", ReadOnly = false, Destructive = true, Idempotent = false),
      Description("UPLOAD AND START a completed slice on the physical printer. Requires printing enabled, paired credentials, idle printer, matching left AA 0.4 / PLA material, and the exact SHA-256 from slicing. Invoke only on an explicit instruction to print this artifact. Do not automatically retry failures: upload may already have started printing.")]
     public Task<PrintResult> Start(string sliceId, string sha256, string jobName, CancellationToken cancellationToken)

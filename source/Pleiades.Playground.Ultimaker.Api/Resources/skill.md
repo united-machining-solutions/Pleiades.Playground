@@ -29,4 +29,17 @@ have the correct model, core and matching loaded PLA. UPLOADING STARTS PRINTING 
 Never automatically retry a failed or timed-out upload: it may already have started the print.
 Read status and ask the person to inspect the printer before retrying an ambiguous result.
 
+Call `ultimaker_slice_validate_header` to send the exact hashed slice to the paired printer for its
+own header checks, without printing. Print-start repeats this; any finding, including warnings or
+unknown severity, blocks the upload. The report identifies slice/hash/printer and check time.
+
+Use `ultimaker_print_current` for current job state/progress and `ultimaker_print_history` for bounded
+history pages (count 1..100, default 20). `ultimaker_print_get` reads one historical UUID. Missing
+current jobs are null; missing historical jobs are errors. Empty timestamps/numbers remain null.
+All progress is a fraction, durations are seconds and timestamps UTC.
+
+Use `ultimaker_slice_prints` for the persistent submission journal. Associations are exact joins
+by printer UUID and printer job UUID. External jobs are not guessed into a slice. Unknown/uploading
+attempts may already have started printing even without a recorded UUID; never retry automatically.
+
 No tools here move axes, heat cores, change firmware, pause or abort an existing print.
