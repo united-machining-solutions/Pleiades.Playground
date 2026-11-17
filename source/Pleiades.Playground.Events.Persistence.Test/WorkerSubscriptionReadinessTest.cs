@@ -25,8 +25,8 @@ namespace Pleiades.Playground.Events.Persistence.Test;
 [TestClass]
 public sealed class WorkerSubscriptionReadinessTest
 {
-    private const string Events = "machines/+/events/#";
-    private const string Alerts = "machines/+/alerts/#";
+    private const string Jobs = "machines/+/events/jobs";
+    private const string Notifications = "machines/+/events/notifications";
 
     public TestContext TestContext { get; set; } = null!;
 
@@ -41,8 +41,8 @@ public sealed class WorkerSubscriptionReadinessTest
         var entry = await CheckAsync(services);
 
         Assert.AreEqual(HealthStatus.Unhealthy, entry.Status, "SubscribeAsync returned, the broker has not answered");
-        Assert.Contains($"'{Events}' (no SUBACK)", entry.Description ?? string.Empty);
-        Assert.Contains($"'{Alerts}' (no SUBACK)", entry.Description ?? string.Empty);
+        Assert.Contains($"'{Jobs}' (no SUBACK)", entry.Description ?? string.Empty);
+        Assert.Contains($"'{Notifications}' (no SUBACK)", entry.Description ?? string.Empty);
         client.Verify(c => c.SubscribeAsync(It.IsAny<IEnumerable<MqttTopicFilter>>()), Times.Exactly(2));
 
         await worker.StopAsync(TestContext.CancellationToken);
@@ -59,13 +59,13 @@ public sealed class WorkerSubscriptionReadinessTest
         var before = await CheckAsync(services);
         Assert.AreEqual(HealthStatus.Unhealthy, before.Status, "no SUBACK yet");
 
-        await RaiseSubackAsync(client, (Events, MqttClientSubscribeResultCode.GrantedQoS1));
+        await RaiseSubackAsync(client, (Jobs, MqttClientSubscribeResultCode.GrantedQoS1));
         var partly = await CheckAsync(services);
-        await RaiseSubackAsync(client, (Alerts, MqttClientSubscribeResultCode.GrantedQoS1));
+        await RaiseSubackAsync(client, (Notifications, MqttClientSubscribeResultCode.GrantedQoS1));
         var granted = await CheckAsync(services);
 
         Assert.AreEqual(HealthStatus.Unhealthy, partly.Status, "one filter granted is not all of them");
-        Assert.Contains($"'{Alerts}' (no SUBACK)", partly.Description ?? string.Empty);
+        Assert.Contains($"'{Notifications}' (no SUBACK)", partly.Description ?? string.Empty);
         Assert.AreEqual(HealthStatus.Healthy, granted.Status, granted.Description);
 
         await worker.StopAsync(TestContext.CancellationToken);
@@ -88,8 +88,8 @@ public sealed class WorkerSubscriptionReadinessTest
             .GetSection("Config")
             .Get<Config>() ?? throw new InvalidOperationException("Missing or invalid configuration.");
         config.Topics.Clear();
-        config.Topics.Add(Events);
-        config.Topics.Add(Alerts);
+        config.Topics.Add(Jobs);
+        config.Topics.Add(Notifications);
 
         var worker = new Worker(
             Options.Create(config),
