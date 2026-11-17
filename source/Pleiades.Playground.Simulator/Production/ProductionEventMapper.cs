@@ -8,12 +8,13 @@ namespace Pleiades.Playground.Simulator.Production;
 
 /// <summary>
 /// Turns an event of the virtual machine into a production event of the playground binding: the same event, the
-/// whole state after it, energy in joule instead of watt hours.
+/// whole state after it, energy in joule instead of watt hours. The data model keeps a job order and its result in
+/// two lists; a production event carries both, and a change of the result is a <c>Changed</c> of the job order.
 /// </summary>
 internal static class ProductionEventMapper
 {
-    private const string JobOrderPrefix = "Production.JobOrder";
-    private const string ProgramExecutionPrefix = "Production.ProgramExecution";
+    private const string JobOrderPrefix = "JobMonitoring.JobOrder";
+    private const string ProgramExecutionPrefix = "WorkMasterMonitoring.ProgramExecution";
 
     /// <summary>Joule in one watt hour.</summary>
     public const double JoulePerWattHour = 3600;
@@ -23,7 +24,8 @@ internal static class ProductionEventMapper
     /// </summary>
     /// <param name="specEvent">The event of the virtual machine.</param>
     /// <param name="serialNumber">The serial number of the machine, the <c>MId</c>.</param>
-    public static ProductionEventDtoV1? From(SpecEvent specEvent, string serialNumber)
+    /// <param name="seq">The number of the production event of the machine, counted by the output.</param>
+    public static ProductionEventDtoV1? From(SpecEvent specEvent, string serialNumber, long? seq = null)
     {
         ArgumentNullException.ThrowIfNull(specEvent);
         var (subject, action) = specEvent.Path switch
@@ -39,7 +41,20 @@ internal static class ProductionEventMapper
             return null;
         }
 
-        var value = specEvent.Value;
+        if (action == "ResultChanged")
+        {
+            action = nameof(ProductionAction.Changed);
+        }
+
+        // The job order and its result in one: the fields of the two lists do not overlap but for JobOrderID.
+        var value = (JsonObject)specEvent.Value.DeepClone();
+        foreach (var (name, node) in specEvent.Related ?? [])
+        {
+            if (!value.ContainsKey(name) && node is not null)
+            {
+                value[name] = node.DeepClone();
+            }
+        }
         var jobOrderId = Text(value, "JobOrderID");
         var executionId = Text(value, "ExecutionId");
         return new ProductionEventDtoV1
@@ -64,7 +79,7 @@ internal static class ProductionEventMapper
             PartsProduced = Number(value, "PartsProduced"),
             EnergyElectricity = Number(value, "EnergyElectricity") * JoulePerWattHour,
             EnergyCompressedAir = Number(value, "EnergyCompressedAir") * JoulePerWattHour,
-            Seq = specEvent.Seq,
+            Seq = seq ?? specEvent.Seq,
         };
     }
 

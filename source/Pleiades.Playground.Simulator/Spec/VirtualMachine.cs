@@ -57,6 +57,7 @@ internal sealed class VirtualMachine
     private int _nextJobNumber;
     private int _nextTemplate;
     private bool _jobOrdersChanged;
+    private readonly List<JobOrder> _resultsChanged = [];
     private bool _alertsChanged;
 
     private double _powerOnDuration;
@@ -186,7 +187,6 @@ internal sealed class VirtualMachine
         Set(SpecElements.ManufacturerUri, string.IsNullOrWhiteSpace(_config.ManufacturerUri) ? $"https://{_config.ManufacturerDomain}" : _config.ManufacturerUri);
         Set(SpecElements.ProductCode, _scenario.ProductCode);
         Set(SpecElements.YearOfConstruction, (long)_scenario.YearOfConstruction);
-        Set(SpecElements.SoftwareRevision, _scenario.SoftwareRevision);
         Set(SpecElements.MonthOfConstruction, (long)_scenario.MonthOfConstruction);
         Set(SpecElements.InitialOperationDate, SpecWire.Timestamp(_scenario.InitialOperationDate));
         Set(SpecElements.DeviceClass, _scenario.DeviceClass);
@@ -259,9 +259,11 @@ internal sealed class VirtualMachine
             return;
         }
 
+        // The result of the job order comes with its start.
         job.StartTime = _now;
         job.ProducedQuantity = 0;
         job.GoodQuantity = 0;
+        job.RunsCompleted = 0;
         ChangeJobState(job, "Running");
         _activeJob = job;
 
@@ -296,10 +298,11 @@ internal sealed class VirtualMachine
 
         var job = execution.Job;
         EndExecution("Ended");
-        if (job.ProducedQuantity >= job.Template.Quantity)
+        if (job.RunsCompleted >= job.RunsPlanned)
         {
             job.EndTime = _now;
             job.JobResult = "Successful";
+            ChangeResult(job);
             ChangeJobState(job, "Ended");
             _activeJob = null;
             SetWorkMaster(job, null);
@@ -326,12 +329,13 @@ internal sealed class VirtualMachine
         {
             _partsProduced++;
             job.ProducedQuantity++;
+            job.RunsCompleted++;
             if (_random.NextDouble() >= _scenario.ScrapRate)
             {
                 job.GoodQuantity++;
             }
             Set(SpecElements.PartsProducedInLifetime, _partsProduced);
-            ChangeJob(job);
+            ChangeResult(job);
         }
 
         SetWorkMaster(job, null);
@@ -394,6 +398,7 @@ internal sealed class VirtualMachine
         EndExecution("Aborted");
         job.EndTime = _now;
         job.JobResult = "Unsuccessful";
+        ChangeResult(job);
         ChangeJobState(job, "Aborted");
         _activeJob = null;
         EnterPhase(Phase.Faulted, TimeSpan.Zero);
@@ -433,7 +438,7 @@ internal sealed class VirtualMachine
             return;
         }
         var job = waiting[_random.Next(waiting.Count)];
-        switch (_random.Next(3))
+        switch (_random.Next(4))
         {
             case 0:
                 if (job.State == "AllowedToStart")
@@ -448,12 +453,18 @@ internal sealed class VirtualMachine
                 ChangeJobState(job, "Aborted");
                 AddJobOrder();
                 break;
-            default:
+            case 2:
                 // Taken back before it started: it leaves the list without a change of state.
                 _jobOrders.Remove(job);
                 _jobOrdersChanged = true;
-                Emit(SpecElements.JobOrderRemoved, job.ToJson());
+                EmitJob(SpecElements.JobOrderRemoved, job);
                 AddJobOrder();
+                break;
+            default:
+                // The planner changes the runs: the job order changes without a change of state.
+                job.RunsPlanned = Math.Max(1, job.RunsPlanned + (_random.Next(2) == 0 ? -1 : 1) * (1 + _random.Next(3)));
+                _jobOrdersChanged = true;
+                EmitJob(SpecElements.JobOrderChanged, job);
                 break;
         }
     }
@@ -595,22 +606,17 @@ internal sealed class VirtualMachine
             ? _scenario.Software
             :
             [
-                new SoftwareTemplate { Manufacturer = "Example Controls", Model = "NC kernel", SoftwareRevision = "6.3.2", DeviceClass = "CNC" },
-                new SoftwareTemplate { Manufacturer = _identity.Manufacturer, Model = "Operator interface", SoftwareRevision = _scenario.SoftwareRevision, DeviceClass = "HMI" },
+                new SoftwareTemplate { Manufacturer = "Example Controls", ComponentName = "NC kernel", SoftwareRevision = "6.3.2" },
+                new SoftwareTemplate { Manufacturer = _identity.Manufacturer, ComponentName = "Operator interface", SoftwareRevision = _scenario.SoftwareRevision },
             ];
         foreach (var entry in software)
         {
-            var json = new JsonObject
+            yield return new JsonObject
             {
                 ["Manufacturer"] = entry.Manufacturer,
-                ["Model"] = entry.Model,
+                ["ComponentName"] = entry.ComponentName,
                 ["SoftwareRevision"] = entry.SoftwareRevision,
             };
-            if (!string.IsNullOrWhiteSpace(entry.DeviceClass))
-            {
-                json["DeviceClass"] = entry.DeviceClass;
-            }
-            yield return json;
         }
     }
 
@@ -631,7 +637,7 @@ internal sealed class VirtualMachine
         };
         _jobOrders.Add(job);
         _jobOrdersChanged = true;
-        Emit(SpecElements.JobOrderAdded, job.ToJson());
+        EmitJob(SpecElements.JobOrderAdded, job);
     }
 
     private void PromoteNextJobOrder()
@@ -666,13 +672,26 @@ internal sealed class VirtualMachine
         job.State = state;
         job.StateSince = _now;
         _jobOrdersChanged = true;
-        Emit(transition, job.ToJson());
+        EmitJob(transition, job);
     }
 
-    private void ChangeJob(JobOrder job)
+    /// <summary>
+    /// Marks the result of a job order as changed: a new quantity, its end. One <c>JobOrderResultChanged</c> per step
+    /// carries it, after the events of the job order; a running time alone brings none.
+    /// </summary>
+    private void ChangeResult(JobOrder job)
     {
         _jobOrdersChanged = true;
-        Emit(SpecElements.JobOrderChanged, job.ToJson());
+        if (!_resultsChanged.Contains(job))
+        {
+            _resultsChanged.Add(job);
+        }
+    }
+
+    /// <summary>An event of a job order with its entry; its result, if it has one, goes along off the wire.</summary>
+    private void EmitJob(string path, JobOrder job)
+    {
+        Emit(path, job.ToJson(), related: job.StartTime is null ? null : job.ResultJson());
     }
 
     private void RemoveExpiredJobOrders()
@@ -681,7 +700,7 @@ internal sealed class VirtualMachine
         {
             _jobOrders.Remove(job);
             _jobOrdersChanged = true;
-            Emit(SpecElements.JobOrderRemoved, job.ToJson());
+            EmitJob(SpecElements.JobOrderRemoved, job);
         }
     }
 
@@ -792,7 +811,7 @@ internal sealed class VirtualMachine
     /// the sequence. An event of a program execution
     /// carries its ExecutionId as <paramref name="correlationId"/>.
     /// </summary>
-    private void Emit(string path, JsonObject value, string? correlationId = null)
+    private void Emit(string path, JsonObject value, string? correlationId = null, JsonObject? related = null)
     {
         // A machine without alert information has no alert events either.
         if (path.StartsWith("Notification.", StringComparison.Ordinal) && _unavailable.Contains(SpecElements.ActiveAlerts))
@@ -804,15 +823,22 @@ internal sealed class VirtualMachine
         _seq[group] = seq;
         var sequence = SpecWire.Sequence(SequencePrefix, seq);
         var id = SpecWire.NameUuid($"{_identity.ProductInstanceUri} {group} {sequence}");
-        _pending.Add(new SpecEvent(path, _now, seq, value, id, sequence, correlationId));
+        _pending.Add(new SpecEvent(path, _now, seq, value, id, sequence, correlationId, related));
     }
 
     private List<SpecMessage> Flush()
     {
+        foreach (var job in _resultsChanged.Where(j => j.StartTime is not null && _jobOrders.Contains(j)))
+        {
+            Emit(SpecElements.JobOrderResultChanged, job.ResultJson(), related: job.ToJson());
+        }
+        _resultsChanged.Clear();
         if (_jobOrdersChanged)
         {
             _jobOrdersChanged = false;
             Set(SpecElements.JobOrders, new JsonArray([.. _jobOrders.Select(j => (JsonNode)j.ToJson())]));
+            // A result from the start of its job order until the job order leaves the list.
+            Set(SpecElements.JobOrderResults, new JsonArray([.. _jobOrders.Where(j => j.StartTime is not null).Select(j => (JsonNode)j.ResultJson())]));
         }
         if (_alertsChanged)
         {
@@ -852,37 +878,48 @@ internal sealed class VirtualMachine
         public double ProducedQuantity { get; set; }
         public double GoodQuantity { get; set; }
         public double ActualProductionTime { get; set; }
-        public string? JobResult { get; set; }
+        public long RunsPlanned { get; set; } = template.Quantity;
+        public long RunsCompleted { get; set; }
+        public string JobResult { get; set; } = "Unknown";
         public DateTimeOffset? HeldUntil { get; set; }
 
+        /// <summary>
+        /// The entry of <c>JobMonitoring.JobOrders</c>: what is ordered. The machine knows no planned times.
+        /// </summary>
         public JsonObject ToJson()
         {
-            var json = new JsonObject
+            return new JsonObject
             {
                 ["JobOrderID"] = Id,
                 [nameof(State)] = State,
+                [nameof(StateSince)] = SpecWire.Timestamp(StateSince),
+                ["JobName"] = Template.JobName,
+                ["WorkMasterID"] = Template.WorkMasterId,
+                ["OrderNumbers"] = new JsonArray(JsonValue.Create($"SO-{Id.Split('/')[0]}")),
+                [nameof(RunsPlanned)] = RunsPlanned,
+                ["JobExecutionMode"] = "ProductionMode",
+                ["PlannedStartTime"] = null,
+                ["PlannedEndTime"] = null,
             };
-            if (StartTime is { } start)
+        }
+
+        /// <summary>
+        /// The entry of <c>JobMonitoring.JobOrderResults</c>: what came of it, from its start. <c>EndTime</c> is
+        /// <see langword="null"/> and <c>JobResult</c> <c>Unknown</c> until it ends.
+        /// </summary>
+        public JsonObject ResultJson()
+        {
+            return new JsonObject
             {
-                json[nameof(ProducedQuantity)] = ProducedQuantity;
-                json[nameof(GoodQuantity)] = GoodQuantity;
-                json[nameof(StartTime)] = SpecWire.Timestamp(start);
-            }
-            if (EndTime is { } end)
-            {
-                json[nameof(EndTime)] = SpecWire.Timestamp(end);
-            }
-            if (StartTime is not null)
-            {
-                json[nameof(ActualProductionTime)] = Math.Round(ActualProductionTime, 3);
-            }
-            json[nameof(StateSince)] = SpecWire.Timestamp(StateSince);
-            json["JobName"] = Template.JobName;
-            if (JobResult is not null)
-            {
-                json[nameof(JobResult)] = JobResult;
-            }
-            return json;
+                ["JobOrderID"] = Id,
+                [nameof(StartTime)] = SpecWire.Timestamp(StartTime!.Value),
+                [nameof(EndTime)] = EndTime is { } end ? SpecWire.Timestamp(end) : null,
+                [nameof(ProducedQuantity)] = ProducedQuantity,
+                [nameof(GoodQuantity)] = GoodQuantity,
+                [nameof(RunsCompleted)] = RunsCompleted,
+                [nameof(ActualProductionTime)] = Math.Round(ActualProductionTime, 3),
+                [nameof(JobResult)] = JobResult,
+            };
         }
     }
 

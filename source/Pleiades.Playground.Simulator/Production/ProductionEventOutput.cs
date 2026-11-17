@@ -12,6 +12,9 @@ namespace Pleiades.Playground.Simulator.Production;
 /// </summary>
 internal sealed class ProductionEventOutput(IManagedMqttClient client, string serialNumber)
 {
+    // The production events count apart from the groups of the data model, without a gap from 1 in each run.
+    private long _seq;
+
     /// <summary>The topic of the production events of a machine.</summary>
     public static string Topic(string serialNumber) => $"machines/{serialNumber}/events/production";
 
@@ -21,8 +24,9 @@ internal sealed class ProductionEventOutput(IManagedMqttClient client, string se
         ArgumentNullException.ThrowIfNull(messages);
         foreach (var specEvent in messages.OfType<SpecEvent>())
         {
-            if (ProductionEventMapper.From(specEvent, serialNumber) is { } production)
+            if (ProductionEventMapper.From(specEvent, serialNumber, _seq + 1) is { } production)
             {
+                _seq++;
                 await client.Publish(Topic(serialNumber), production, MqttQualityOfServiceLevel.AtLeastOnce, retainMessage: false)
                     .ConfigureAwait(false);
             }

@@ -8,7 +8,6 @@ namespace Pleiades.Playground.Simulator.Test.Spec;
 public sealed class VirtualMachineTest
 {
     private static readonly TimeSpan SixHours = TimeSpan.FromHours(6);
-    private static readonly string[] StartedStates = ["Running", "Interrupted", "Ended", "Aborted"];
 
     [TestMethod]
     public void Advance_EveryStep_StatusChannelSpindleAndExecutionAgree()
@@ -47,33 +46,51 @@ public sealed class VirtualMachineTest
     }
 
     [TestMethod]
-    public void Advance_JobOrders_CarryTheFieldsTheirStateRequires()
+    public void Advance_JobOrdersAndResults_CarryEveryField_AResultOnlyFromTheStart()
     {
         var run = MachineRun.For(SixHours);
-        var entries = run.ValuesOf(SpecElements.JobOrders).SelectMany(v => v.Value!.AsArray().Select(e => e!.AsObject()))
-            .Concat(run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("Production.JobOrder", StringComparison.Ordinal)).Select(e => e.Value))
-            .ToList();
-
-        Assert.IsTrue(entries.Count > 100);
-        foreach (var entry in entries)
+        var workMasters = MachineRun.Config().Scenario.Jobs.Select(j => j.WorkMasterId).ToHashSet();
+        var jobFields = new[] { "JobOrderID", "State", "StateSince", "JobName", "WorkMasterID", "OrderNumbers", "RunsPlanned", "JobExecutionMode", "PlannedStartTime", "PlannedEndTime" };
+        var resultFields = new[] { "JobOrderID", "StartTime", "EndTime", "ProducedQuantity", "GoodQuantity", "RunsCompleted", "ActualProductionTime", "JobResult" };
+        JsonArray jobs = [];
+        var pairs = 0;
+        foreach (var value in run.Messages.OfType<SpecValue>())
         {
-            var state = entry["State"]!.GetValue<string>();
-            Assert.IsNotNull(entry["JobOrderID"]);
-            Assert.IsNotNull(entry["StateSince"]);
-            // A cancelled job order is aborted without having run: it has no start and no quantity.
-            var started = StartedStates.Contains(state) && !(state == "Aborted" && !entry.ContainsKey("StartTime"));
-            Assert.AreEqual(started, entry.ContainsKey("ProducedQuantity"), $"ProducedQuantity in {entry}");
-            Assert.AreEqual(started, entry.ContainsKey("StartTime"), $"StartTime in {entry}");
-            Assert.AreEqual(state is "Ended" or "Aborted", entry.ContainsKey("EndTime"), $"EndTime in {entry}");
-            if (started)
+            if (value.Path == SpecElements.JobOrders)
             {
-                Assert.IsTrue(entry["GoodQuantity"]!.GetValue<double>() <= entry["ProducedQuantity"]!.GetValue<double>());
+                jobs = value.Value!.AsArray();
+                foreach (var job in jobs.Select(j => j!.AsObject()))
+                {
+                    CollectionAssert.AreEquivalent(jobFields, job.Select(p => p.Key).ToList(), "every field, always");
+                    Assert.IsTrue(workMasters.Contains(job["WorkMasterID"]!.GetValue<string>()));
+                    Assert.IsNull(job["PlannedStartTime"], "the machine knows no planned times");
+                }
+                continue;
             }
+            if (value.Path != SpecElements.JobOrderResults)
+            {
+                continue;
+            }
+            // The two lists come together; a result for each job order that started and is still listed.
+            pairs++;
+            var states = jobs.ToDictionary(j => j!["JobOrderID"]!.GetValue<string>(), j => j!["State"]!.GetValue<string>());
+            var results = value.Value!.AsArray().Select(r => r!.AsObject()).ToList();
+            foreach (var result in results)
+            {
+                CollectionAssert.AreEquivalent(resultFields, result.Select(p => p.Key).ToList(), "every field, always");
+                var state = states[result["JobOrderID"]!.GetValue<string>()];
+                Assert.AreNotEqual("NotAllowedToStart", state);
+                Assert.AreNotEqual("AllowedToStart", state, "no result before the start");
+                var ended = state is "Ended" or "Aborted";
+                Assert.AreEqual(ended, result["EndTime"] is not null, $"EndTime is null until the end: {result}");
+                Assert.AreEqual(ended, result["JobResult"]!.GetValue<string>() != "Unknown", $"JobResult is Unknown until the end: {result}");
+                Assert.IsTrue(result["GoodQuantity"]!.GetValue<double>() <= result["ProducedQuantity"]!.GetValue<double>());
+                Assert.AreEqual(result["ProducedQuantity"]!.GetValue<double>(), result["RunsCompleted"]!.GetValue<long>(), "one part per run");
+            }
+            var withResult = results.Select(r => r["JobOrderID"]!.GetValue<string>()).ToHashSet();
+            Assert.IsTrue(states.Where(s => s.Value is "Running" or "Interrupted" or "Ended").All(s => withResult.Contains(s.Key)));
         }
-
-        // Every state of a job order occurs, except NotAllowedToStart for a started one.
-        var states = entries.Select(e => e["State"]!.GetValue<string>()).ToHashSet();
-        CollectionAssert.IsSubsetOf(new[] { "NotAllowedToStart", "AllowedToStart", "Running", "Interrupted", "Ended", "Aborted" }, states.ToList());
+        Assert.IsTrue(pairs > 50);
     }
 
     [TestMethod]
@@ -137,9 +154,8 @@ public sealed class VirtualMachineTest
         var lifetime = run.ValuesOf(SpecElements.PartsProducedInLifetime).Select(v => v.Value!.GetValue<long>()).ToList();
         Assert.AreEqual(completed, lifetime[^1] - lifetime[0]);
 
-        // The last entry of a job order holds the parts of all its executions.
-        var lastEntries = run.Messages.OfType<SpecEvent>()
-            .Where(e => e.Path.StartsWith("Production.JobOrder", StringComparison.Ordinal))
+        // The last result of a job order holds the parts of all its executions.
+        var lastEntries = run.EventsOf(SpecElements.JobOrderResultChanged)
             .GroupBy(e => e.Value["JobOrderID"]!.GetValue<string>())
             .ToDictionary(g => g.Key, g => g.Last().Value);
         foreach (var group in ended.GroupBy(e => e.Value["JobOrderID"]!.GetValue<string>()))
@@ -165,7 +181,8 @@ public sealed class VirtualMachineTest
             if (events.Any(e => e.Path == SpecElements.ProgramExecutionAborted && e.Value["ExecutionId"]!.GetValue<string>() == executionId))
             {
                 aborted++;
-                Assert.IsTrue(events.Any(e => e.Path == SpecElements.JobOrderAborted && e.Value.ContainsKey("StartTime")));
+                Assert.IsTrue(events.Any(e => e.Path == SpecElements.JobOrderAborted && e.Related is not null), "aborted after its start: it has a result");
+                Assert.IsTrue(events.Any(e => e.Path == SpecElements.JobOrderResultChanged && e.Value["JobResult"]!.GetValue<string>() == "Unsuccessful"));
             }
             else
             {
@@ -221,16 +238,16 @@ public sealed class VirtualMachineTest
     {
         var retention = TimeSpan.FromMinutes(30);
         var run = MachineRun.For(TimeSpan.FromHours(3), MachineRun.Config(retention));
-        var removed = run.EventsOf(SpecElements.JobOrderRemoved).Where(e => e.Value.ContainsKey("EndTime")).ToList();
+        var removed = run.EventsOf(SpecElements.JobOrderRemoved).Where(e => e.Related?["EndTime"] is not null).ToList();
         Assert.IsTrue(removed.Count > 3);
         foreach (var remove in removed)
         {
-            var end = DateTimeOffset.Parse(remove.Value["EndTime"]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture);
+            var end = DateTimeOffset.Parse(remove.Related!["EndTime"]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture);
             Assert.IsTrue(remove.Timestamp >= end + retention && remove.Timestamp < end + retention + TimeSpan.FromSeconds(2));
         }
 
         var kept = MachineRun.For(TimeSpan.FromHours(3));
-        Assert.IsFalse(kept.EventsOf(SpecElements.JobOrderRemoved).Any(e => e.Value.ContainsKey("EndTime")),
+        Assert.IsFalse(kept.EventsOf(SpecElements.JobOrderRemoved).Any(e => e.Related?["EndTime"] is not null),
             "With 24 hours nothing that ended goes within three hours");
     }
 
@@ -279,14 +296,14 @@ public sealed class VirtualMachineTest
     public void Events_AreNumberedWithoutAGapFromOne()
     {
         var run = MachineRun.For(SixHours);
-        // seq counts within each group of events, Production and Notification apart.
+        // sequence counts within each group of events, JobMonitoring, WorkMasterMonitoring and Notification apart.
         foreach (var group in run.Messages.OfType<SpecEvent>().GroupBy(e => SpecElements.EventGroup(e.Path)))
         {
             var seqs = group.Select(e => e.Seq).ToList();
             Assert.IsTrue(seqs.Count > 20, group.Key);
             CollectionAssert.AreEqual(Enumerable.Range(1, seqs.Count).Select(i => (long)i).ToList(), seqs, group.Key);
         }
-        CollectionAssert.AreEquivalent(new[] { "Production", "Notification" },
+        CollectionAssert.AreEquivalent(new[] { "JobMonitoring", "WorkMasterMonitoring", "Notification" },
             run.Messages.OfType<SpecEvent>().Select(e => SpecElements.EventGroup(e.Path)).Distinct().ToList());
         Assert.AreEqual("20261117T060000Z", run.Machine.SequencePrefix);
         foreach (var specEvent in run.Messages.OfType<SpecEvent>())
@@ -298,61 +315,107 @@ public sealed class VirtualMachineTest
     }
 
     [TestMethod]
-    public void JobOrderChanged_NeverComesForARunningTimeAlone()
+    public void JobOrderChangedAndResultChanged_NeverComeForARunningTimeAlone()
     {
         var run = MachineRun.For(SixHours);
-        var last = new Dictionary<string, JsonObject>();
+        var lastJob = new Dictionary<string, JsonObject>();
+        var lastResult = new Dictionary<string, JsonObject>();
         var changed = 0;
-        foreach (var specEvent in run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("Production.JobOrder", StringComparison.Ordinal)))
+        var resultChanged = 0;
+        foreach (var specEvent in run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("JobMonitoring.", StringComparison.Ordinal)))
         {
             var id = specEvent.Value["JobOrderID"]!.GetValue<string>();
             var discrete = (JsonObject)specEvent.Value.DeepClone();
             discrete.Remove("ActualProductionTime");
+            if (specEvent.Path == SpecElements.JobOrderResultChanged)
+            {
+                resultChanged++;
+                Assert.IsFalse(lastResult.TryGetValue(id, out var before) && JsonNode.DeepEquals(before, discrete),
+                    $"JobOrderResultChanged without a discrete change: {specEvent.Value}");
+                lastResult[id] = discrete;
+                continue;
+            }
             if (specEvent.Path == SpecElements.JobOrderChanged)
             {
                 changed++;
-                Assert.IsFalse(JsonNode.DeepEquals(last[id], discrete), $"JobOrderChanged without a discrete change: {specEvent.Value}");
-                Assert.AreEqual(last[id]["State"]!.GetValue<string>(), discrete["State"]!.GetValue<string>(), "JobOrderChanged never changes the state");
+                Assert.IsFalse(JsonNode.DeepEquals(lastJob[id], discrete), $"JobOrderChanged without a change: {specEvent.Value}");
+                Assert.AreEqual(lastJob[id]["State"]!.GetValue<string>(), discrete["State"]!.GetValue<string>(), "JobOrderChanged never changes the state");
             }
-            last[id] = discrete;
+            lastJob[id] = discrete;
         }
-        Assert.IsTrue(changed > 50);
+        Assert.IsTrue(resultChanged > 50, $"{resultChanged} results changed");
+        Assert.IsTrue(changed > 0, "the planner changes the runs of a waiting job order");
     }
 
     [TestMethod]
-    public void JobOrderEvents_Alone_GiveTheSameListAsTheValue()
+    public void JobOrderEvents_Alone_GiveTheSameListsAsTheValues()
     {
         var run = MachineRun.For(SixHours, MachineRun.Config(TimeSpan.FromMinutes(20)));
-        var replayed = new Dictionary<string, JsonObject>();
+        var jobs = new Dictionary<string, JsonObject>();
+        var results = new Dictionary<string, JsonObject>();
+        var compared = 0;
         foreach (var message in run.Messages)
         {
             switch (message)
             {
                 case SpecEvent { Path: SpecElements.JobOrderAdded } added:
-                    replayed.Add(added.Value["JobOrderID"]!.GetValue<string>(), added.Value);
+                    jobs.Add(added.Value["JobOrderID"]!.GetValue<string>(), added.Value);
+                    break;
+                case SpecEvent { Path: SpecElements.JobOrderStarted } started:
+                    // A result comes with the start: from the start, nothing produced yet.
+                    var startedId = started.Value["JobOrderID"]!.GetValue<string>();
+                    jobs[startedId] = started.Value;
+                    results.Add(startedId, new JsonObject
+                    {
+                        ["JobOrderID"] = startedId,
+                        ["StartTime"] = started.Value["StateSince"]!.DeepClone(),
+                        ["EndTime"] = null,
+                        ["ProducedQuantity"] = 0.0,
+                        ["GoodQuantity"] = 0.0,
+                        ["RunsCompleted"] = 0L,
+                        ["JobResult"] = "Unknown",
+                    });
+                    break;
+                case SpecEvent { Path: SpecElements.JobOrderResultChanged } changed:
+                    var changedId = changed.Value["JobOrderID"]!.GetValue<string>();
+                    Assert.IsTrue(results.ContainsKey(changedId), "a result changes only once it is there");
+                    results[changedId] = changed.Value;
                     break;
                 case SpecEvent { Path: SpecElements.JobOrderRemoved } removed:
-                    Assert.IsTrue(replayed.Remove(removed.Value["JobOrderID"]!.GetValue<string>()));
+                    // ... and goes with its job order.
+                    var removedId = removed.Value["JobOrderID"]!.GetValue<string>();
+                    Assert.IsTrue(jobs.Remove(removedId));
+                    results.Remove(removedId);
                     break;
-                case SpecEvent other when other.Path.StartsWith("Production.JobOrder", StringComparison.Ordinal):
-                    replayed[other.Value["JobOrderID"]!.GetValue<string>()] = other.Value;
+                case SpecEvent other when other.Path.StartsWith("JobMonitoring.JobOrder", StringComparison.Ordinal):
+                    jobs[other.Value["JobOrderID"]!.GetValue<string>()] = other.Value;
                     break;
                 case SpecValue { Path: SpecElements.JobOrders } list:
-                    var entries = list.Value!.AsArray().Select(e => e!.AsObject()).ToList();
-                    Assert.HasCount(entries.Count, replayed);
-                    foreach (var entry in entries)
-                    {
-                        var id = entry["JobOrderID"]!.GetValue<string>();
-                        var expected = (JsonObject)entry.DeepClone();
-                        var actual = (JsonObject)replayed[id].DeepClone();
-                        expected.Remove("ActualProductionTime");
-                        actual.Remove("ActualProductionTime");
-                        Assert.IsTrue(JsonNode.DeepEquals(expected, actual), $"{id} at {list.Timestamp:O}");
-                    }
+                    AssertSameEntries(jobs, list);
+                    compared++;
+                    break;
+                case SpecValue { Path: SpecElements.JobOrderResults } list:
+                    AssertSameEntries(results, list);
                     break;
                 default:
                     break;
             }
+        }
+        Assert.IsTrue(compared > 50);
+    }
+
+    private static void AssertSameEntries(Dictionary<string, JsonObject> replayed, SpecValue list)
+    {
+        var entries = list.Value!.AsArray().Select(e => e!.AsObject()).ToList();
+        Assert.HasCount(entries.Count, replayed, $"{list.Path} at {list.Timestamp:O}");
+        foreach (var entry in entries)
+        {
+            var id = entry["JobOrderID"]!.GetValue<string>();
+            var expected = (JsonObject)entry.DeepClone();
+            var actual = (JsonObject)replayed[id].DeepClone();
+            expected.Remove("ActualProductionTime");
+            actual.Remove("ActualProductionTime");
+            Assert.IsTrue(JsonNode.DeepEquals(expected, actual), $"{list.Path} {id} at {list.Timestamp:O}: {expected} / {actual}");
         }
     }
 
@@ -362,7 +425,8 @@ public sealed class VirtualMachineTest
         var run = MachineRun.For(SixHours, MachineRun.Config(TimeSpan.FromMinutes(20)));
         var states = new Dictionary<string, string>();
         var seen = new HashSet<string>();
-        foreach (var specEvent in run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("Production.JobOrder", StringComparison.Ordinal)))
+        foreach (var specEvent in run.Messages.OfType<SpecEvent>()
+            .Where(e => e.Path.StartsWith("JobMonitoring.JobOrder", StringComparison.Ordinal) && e.Path != SpecElements.JobOrderResultChanged))
         {
             var id = specEvent.Value["JobOrderID"]!.GetValue<string>();
             var state = specEvent.Value["State"]!.GetValue<string>();
@@ -396,7 +460,7 @@ public sealed class VirtualMachineTest
             }
             if (specEvent.Path == SpecElements.JobOrderCancelled)
             {
-                Assert.IsFalse(specEvent.Value.ContainsKey("StartTime"), "A cancelled job order never ran");
+                Assert.IsNull(specEvent.Related, "A cancelled job order never ran: it has no result");
             }
             seen.Add(specEvent.Path);
         }
@@ -420,7 +484,7 @@ public sealed class VirtualMachineTest
         var run = MachineRun.For(SixHours);
         var states = new Dictionary<string, string>();
         var seen = new HashSet<string>();
-        foreach (var specEvent in run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("Production.ProgramExecution", StringComparison.Ordinal)))
+        foreach (var specEvent in run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("WorkMasterMonitoring.ProgramExecution", StringComparison.Ordinal)))
         {
             var id = specEvent.Value["ExecutionId"]!.GetValue<string>();
             var state = specEvent.Value["State"]!.GetValue<string>();
@@ -503,7 +567,7 @@ public sealed class VirtualMachineTest
     public void ProgramExecutionSnapshot_IsStampedWithItsLastChangeOfState()
     {
         var run = MachineRun.For(TimeSpan.FromHours(2));
-        var events = run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("Production.ProgramExecution", StringComparison.Ordinal)).ToList();
+        var events = run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("WorkMasterMonitoring.ProgramExecution", StringComparison.Ordinal)).ToList();
         var snapshots = run.ValuesOf(SpecElements.ProgramExecution).Where(v => v.Value is not null).ToList();
         Assert.HasCount(events.Count, snapshots, "one snapshot per change of state");
         foreach (var (snapshot, specEvent) in snapshots.Zip(events))
@@ -559,13 +623,14 @@ public sealed class VirtualMachineTest
     }
 
     [TestMethod]
-    public void ActiveWorkMaster_ReplacesTheActiveProgram()
+    public void Paths_FollowTheProfiles()
     {
-        Assert.AreEqual("Production.ActiveWorkMaster", SpecElements.ActiveWorkMaster);
+        Assert.AreEqual("WorkMasterMonitoring.ActiveWorkMaster", SpecElements.ActiveWorkMaster);
+        Assert.AreEqual("JobMonitoring.JobOrders", SpecElements.JobOrders);
         var run = MachineRun.For(TimeSpan.FromHours(1));
         Assert.IsTrue(run.ValuesOf(SpecElements.ActiveWorkMaster).Any());
-        Assert.IsFalse(run.Messages.OfType<SpecValue>().Any(v => v.Path == "Production.ActiveProgram"));
-        Assert.IsTrue(run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("Production.ProgramExecution", StringComparison.Ordinal))
+        Assert.IsFalse(run.Messages.Any(m => m.Path.StartsWith("Production.", StringComparison.Ordinal)), "no path below Production");
+        Assert.IsTrue(run.Messages.OfType<SpecEvent>().Where(e => e.Path.StartsWith("WorkMasterMonitoring.ProgramExecution", StringComparison.Ordinal))
             .All(e => e.Value.ContainsKey("ActiveWorkMaster") && !e.Value.ContainsKey("ActiveProgram")));
     }
 
@@ -664,7 +729,7 @@ public sealed class VirtualMachineTest
     }
 
     [TestMethod]
-    public void Software_IsAListAfterSoftwareType()
+    public void Software_IsAListOfComponents()
     {
         var run = MachineRun.For(TimeSpan.FromMinutes(1));
         var software = run.ValuesOf(SpecElements.Software).Single().Value!.AsArray().Select(s => s!.AsObject()).ToList();
@@ -672,10 +737,10 @@ public sealed class VirtualMachineTest
         Assert.IsTrue(software.Count >= 2);
         foreach (var entry in software)
         {
-            CollectionAssert.IsSubsetOf(entry.Select(p => p.Key).ToList(), new[] { "Manufacturer", "Model", "SoftwareRevision", "DeviceClass" });
-            Assert.IsFalse(string.IsNullOrWhiteSpace((string?)entry["Model"]));
+            CollectionAssert.AreEqual(new[] { "Manufacturer", "ComponentName", "SoftwareRevision" }, entry.Select(p => p.Key).ToList());
+            Assert.IsFalse(string.IsNullOrWhiteSpace((string?)entry["ComponentName"]));
         }
-        Assert.AreEqual(software.Count, software.Select(s => $"{s["Manufacturer"]}/{s["Model"]}").Distinct().Count(), "Manufacturer and Model name an entry");
+        Assert.AreEqual(software.Count, software.Select(s => $"{s["Manufacturer"]}/{s["ComponentName"]}").Distinct().Count(), "Manufacturer and ComponentName name an entry");
         Assert.AreEqual("simulators/P-04/umati/Components/Software", SpecWire.Topic("P-04", SpecElements.Software));
     }
 
@@ -721,7 +786,7 @@ public sealed class VirtualMachineTest
         Assert.AreEqual("https://example.com", values[SpecElements.ManufacturerUri]!.GetValue<string>());
         Assert.AreEqual(scenario.ProductCode, values[SpecElements.ProductCode]!.GetValue<string>());
         Assert.AreEqual((long)scenario.YearOfConstruction, values[SpecElements.YearOfConstruction]!.GetValue<long>());
-        Assert.AreEqual(scenario.SoftwareRevision, values[SpecElements.SoftwareRevision]!.GetValue<string>());
+        Assert.IsFalse(values.ContainsKey("Identification.SoftwareRevision"), "no revision of the whole machine since 0.17.0");
         Assert.IsNotNull(values[SpecElements.PowerOnDuration]);
     }
 
@@ -782,8 +847,10 @@ public sealed class VirtualMachineTest
     [TestMethod]
     public void Event_GoesBelowTheEventsLevelAsACloudEvent()
     {
-        Assert.AreEqual("simulators/P-04/events/production", SpecWire.EventTopic("P-04", SpecElements.JobOrderChanged));
-        Assert.AreEqual("simulators/P-04/events/production", SpecWire.EventTopic("P-04", SpecElements.ProgramExecutionStarted));
+        Assert.AreEqual("simulators/P-04/events/jobmonitoring", SpecWire.EventTopic("P-04", SpecElements.JobOrderChanged));
+        Assert.AreEqual("simulators/P-04/events/jobmonitoring", SpecWire.EventTopic("P-04", SpecElements.JobOrderResultChanged));
+        Assert.AreEqual("simulators/P-04/events/workmastermonitoring", SpecWire.EventTopic("P-04", SpecElements.ProgramExecutionStarted));
+        Assert.ThrowsExactly<ArgumentException>(() => SpecWire.EventTopic("P-04", "Production.JobOrderChanged"), "no group Production since 0.17.0");
         Assert.AreEqual("simulators/P-04/events/notifications", SpecWire.EventTopic("P-04", SpecElements.AlertRaised));
         Assert.ThrowsExactly<ArgumentException>(() => SpecWire.EventTopic("P-04", "Maintenance.TaskDue"), "a group without a name");
         CollectionAssert.IsSubsetOf(SpecElements.Events.Select(e => e.Path.Split('.')[0]).Distinct().ToList(), SpecWire.EventTopicNames.Keys.ToList(),
@@ -803,7 +870,7 @@ public sealed class VirtualMachineTest
         Assert.AreEqual("2026-11-17T06:00:00.000Z", wire["time"]!.GetValue<string>());
         Assert.AreEqual("20261117T060000Z.000000000007", wire["sequence"]!.GetValue<string>());
         Assert.AreEqual("exec-1", wire["correlationid"]!.GetValue<string>());
-        Assert.AreEqual("urn:umati2:datamodel:0.16.0:event.schema.json", wire["dataschema"]!.GetValue<string>());
+        Assert.AreEqual("urn:umati2:datamodel:0.17.0:event.schema.json", wire["dataschema"]!.GetValue<string>());
         Assert.AreEqual("a", wire["data"]!["Id"]!.GetValue<string>());
 
         var withoutCorrelation = SpecWire.Event(specEvent with { CorrelationId = null }, "https://example.com/P-04");

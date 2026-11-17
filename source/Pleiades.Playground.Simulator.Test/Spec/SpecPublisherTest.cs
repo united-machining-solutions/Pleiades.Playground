@@ -27,7 +27,7 @@ public sealed class SpecPublisherTest
 
         var events = client.Published.Where(m => m.Topic.Contains("/events/", StringComparison.Ordinal)).ToList();
         Assert.HasCount(2, events);
-        Assert.IsTrue(events.All(m => m.Topic == $"simulators/{SerialNumber}/events/production"));
+        Assert.IsTrue(events.All(m => m.Topic == $"simulators/{SerialNumber}/events/jobmonitoring"));
         Assert.IsTrue(events.All(m => !m.Retain && m.QualityOfServiceLevel == MqttQualityOfServiceLevel.AtLeastOnce));
         Assert.IsTrue(events.All(m => m.ContentType == "application/cloudevents+json; charset=utf-8"));
         CollectionAssert.AreEqual(new long[] { 1, 2 }, events.Select(Seq).ToList());
@@ -48,9 +48,10 @@ public sealed class SpecPublisherTest
         await publisher.PublishAsync(events);
 
         var topics = client.Published.Select(m => m.Topic).Distinct().ToList();
-        CollectionAssert.AreEquivalent(new[] { $"simulators/{SerialNumber}/events/production", $"simulators/{SerialNumber}/events/notifications" }, topics,
-            "one topic per group, none per event");
-        foreach (var (group, name) in new[] { ("Production", "production"), ("Notification", "notifications") })
+        CollectionAssert.AreEquivalent(
+            new[] { $"simulators/{SerialNumber}/events/jobmonitoring", $"simulators/{SerialNumber}/events/workmastermonitoring", $"simulators/{SerialNumber}/events/notifications" },
+            topics, "one topic per group, none per event");
+        foreach (var (group, name) in new[] { ("JobMonitoring", "jobmonitoring"), ("WorkMasterMonitoring", "workmastermonitoring"), ("Notification", "notifications") })
         {
             var onTopic = client.Published.Where(m => m.Topic == $"simulators/{SerialNumber}/events/{name}").Select(Payload).ToList();
             var expected = events.Where(e => e.Path.StartsWith(group + ".", StringComparison.Ordinal)).ToList();
@@ -61,10 +62,11 @@ public sealed class SpecPublisherTest
             CollectionAssert.AreEqual(expected.Select(e => e.Id).ToList(), onTopic.Select(p => p["id"]!.GetValue<string>()).ToList());
         }
 
-        // Job order and program execution share the topic: a job order starts before its first program execution.
-        var production = client.Published.Where(m => m.Topic.EndsWith("/events/production", StringComparison.Ordinal))
-            .Select(m => Payload(m)["type"]!.GetValue<string>()).ToList();
-        Assert.IsTrue(production.IndexOf(SpecElements.JobOrderStarted) < production.IndexOf(SpecElements.ProgramExecutionStarted));
+        // Job order and program execution lie on two topics now: across them only the time orders them.
+        var payloads = client.Published.Select(Payload).ToList();
+        var jobStarted = payloads.First(p => p["type"]!.GetValue<string>() == SpecElements.JobOrderStarted)["time"]!.GetValue<string>();
+        var executionStarted = payloads.First(p => p["type"]!.GetValue<string>() == SpecElements.ProgramExecutionStarted)["time"]!.GetValue<string>();
+        Assert.IsTrue(string.CompareOrdinal(jobStarted, executionStarted) <= 0, "a job order starts before its first program execution");
     }
 
     [TestMethod]

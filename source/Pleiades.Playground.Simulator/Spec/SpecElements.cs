@@ -7,7 +7,7 @@ namespace Pleiades.Playground.Simulator.Spec;
 /// </summary>
 internal static class SpecElements
 {
-    public const string ModelVersion = "0.16.0";
+    public const string ModelVersion = "0.17.0";
     public const string BindingVersion = "0.1.0-draft";
 
     public const string Manufacturer = "Identification.Manufacturer";
@@ -17,7 +17,6 @@ internal static class SpecElements
     public const string ManufacturerUri = "Identification.ManufacturerUri";
     public const string ProductCode = "Identification.ProductCode";
     public const string YearOfConstruction = "Identification.YearOfConstruction";
-    public const string SoftwareRevision = "Identification.SoftwareRevision";
     public const string HardwareRevision = "Identification.HardwareRevision";
     public const string MonthOfConstruction = "Identification.MonthOfConstruction";
     public const string InitialOperationDate = "Identification.InitialOperationDate";
@@ -36,9 +35,10 @@ internal static class SpecElements
     public const string ChannelMode = "Channel.1.ChannelMode";
     public const string RapidOverride = "Channel.1.RapidOverride";
     public const string ChannelName = "Channel.1.Name";
-    public const string JobOrders = "Production.JobOrders";
-    public const string ActiveWorkMaster = "Production.ActiveWorkMaster";
-    public const string ProgramExecution = "Production.ProgramExecution";
+    public const string JobOrders = "JobMonitoring.JobOrders";
+    public const string JobOrderResults = "JobMonitoring.JobOrderResults";
+    public const string ActiveWorkMaster = "WorkMasterMonitoring.ActiveWorkMaster";
+    public const string ProgramExecution = "WorkMasterMonitoring.ProgramExecution";
     public const string PartsProducedInLifetime = "OperationCounters.PartsProducedInLifetime";
     public const string PowerOnDuration = "OperationCounters.PowerOnDuration";
     public const string OperationDuration = "OperationCounters.OperationDuration";
@@ -50,22 +50,23 @@ internal static class SpecElements
     public const string ActivePower = "Consumption.Electricity.Main.AcActivePowerTotal";
     public const string ActiveEnergy = "Consumption.Electricity.Main.AcActiveEnergyTotalImportHp";
 
-    public const string ProgramExecutionStarted = "Production.ProgramExecutionStarted";
-    public const string ProgramExecutionInterrupted = "Production.ProgramExecutionInterrupted";
-    public const string ProgramExecutionResumed = "Production.ProgramExecutionResumed";
-    public const string ProgramExecutionEnded = "Production.ProgramExecutionEnded";
-    public const string ProgramExecutionAborted = "Production.ProgramExecutionAborted";
-    public const string JobOrderAdded = "Production.JobOrderAdded";
-    public const string JobOrderReleased = "Production.JobOrderReleased";
-    public const string JobOrderRevoked = "Production.JobOrderRevoked";
-    public const string JobOrderStarted = "Production.JobOrderStarted";
-    public const string JobOrderInterrupted = "Production.JobOrderInterrupted";
-    public const string JobOrderResumed = "Production.JobOrderResumed";
-    public const string JobOrderEnded = "Production.JobOrderEnded";
-    public const string JobOrderAborted = "Production.JobOrderAborted";
-    public const string JobOrderCancelled = "Production.JobOrderCancelled";
-    public const string JobOrderChanged = "Production.JobOrderChanged";
-    public const string JobOrderRemoved = "Production.JobOrderRemoved";
+    public const string ProgramExecutionStarted = "WorkMasterMonitoring.ProgramExecutionStarted";
+    public const string ProgramExecutionInterrupted = "WorkMasterMonitoring.ProgramExecutionInterrupted";
+    public const string ProgramExecutionResumed = "WorkMasterMonitoring.ProgramExecutionResumed";
+    public const string ProgramExecutionEnded = "WorkMasterMonitoring.ProgramExecutionEnded";
+    public const string ProgramExecutionAborted = "WorkMasterMonitoring.ProgramExecutionAborted";
+    public const string JobOrderAdded = "JobMonitoring.JobOrderAdded";
+    public const string JobOrderReleased = "JobMonitoring.JobOrderReleased";
+    public const string JobOrderRevoked = "JobMonitoring.JobOrderRevoked";
+    public const string JobOrderStarted = "JobMonitoring.JobOrderStarted";
+    public const string JobOrderInterrupted = "JobMonitoring.JobOrderInterrupted";
+    public const string JobOrderResumed = "JobMonitoring.JobOrderResumed";
+    public const string JobOrderEnded = "JobMonitoring.JobOrderEnded";
+    public const string JobOrderAborted = "JobMonitoring.JobOrderAborted";
+    public const string JobOrderCancelled = "JobMonitoring.JobOrderCancelled";
+    public const string JobOrderChanged = "JobMonitoring.JobOrderChanged";
+    public const string JobOrderResultChanged = "JobMonitoring.JobOrderResultChanged";
+    public const string JobOrderRemoved = "JobMonitoring.JobOrderRemoved";
     public const string AlertRaised = "Notification.AlertRaised";
     public const string AlertChanged = "Notification.AlertChanged";
     public const string AlertCleared = "Notification.AlertCleared";
@@ -85,7 +86,7 @@ internal static class SpecElements
     /// Path of the name of the active NC program below the prefix of the manufacturer. The work master is an id of
     /// its own (<see cref="ActiveWorkMaster"/>); the model has no element for the program that carries it out.
     /// </summary>
-    public const string ActiveProgram = "Production.ActiveProgram";
+    public const string ActiveProgram = "WorkMasterMonitoring.ActiveProgram";
 
     /// <summary>
     /// The signals of the manufacturer, in the same tree as the elements of the model. Their paths are relative to
@@ -120,7 +121,6 @@ internal static class SpecElements
         new(Model, null, "adapter", false),
         new(ProductCode, null, "adapter", false),
         new(YearOfConstruction, null, "adapter", false),
-        new(SoftwareRevision, null, "adapter", false),
         new(Heartbeat, null, "adapter", false),
         new(ConnectionState, null, "adapter", false),
         new(Status, null, "source", false),
@@ -157,6 +157,7 @@ internal static class SpecElements
         new(ActiveEnergy, UnitWattHour, "source", false),
         // JobMonitoring
         new(JobOrders, null, "source", false),
+        new(JobOrderResults, null, "source", false),
         // WorkMasterMonitoring
         new(ActiveWorkMaster, null, "source", true),
         new(ProgramExecution, null, "source", false),
@@ -180,7 +181,7 @@ internal static class SpecElements
         new(JobOrderAdded, false), new(JobOrderReleased, false), new(JobOrderRevoked, false),
         new(JobOrderStarted, false), new(JobOrderInterrupted, false), new(JobOrderResumed, false),
         new(JobOrderEnded, false), new(JobOrderAborted, false), new(JobOrderCancelled, false),
-        new(JobOrderChanged, false), new(JobOrderRemoved, false),
+        new(JobOrderChanged, false), new(JobOrderResultChanged, false), new(JobOrderRemoved, false),
         new(ProgramExecutionStarted, true), new(ProgramExecutionInterrupted, true), new(ProgramExecutionResumed, true),
         new(ProgramExecutionEnded, true), new(ProgramExecutionAborted, true),
         new(AlertRaised, true), new(AlertChanged, true), new(AlertCleared, true), new(NotificationEvent, true),

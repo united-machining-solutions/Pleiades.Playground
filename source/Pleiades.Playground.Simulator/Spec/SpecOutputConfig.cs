@@ -129,7 +129,10 @@ internal sealed class ScenarioConfig
     [Range(1000, 9999)]
     public int YearOfConstruction { get; init; } = 2023;
 
-    /// <summary>Software revision of the machine, <c>Identification.SoftwareRevision</c>.</summary>
+    /// <summary>
+    /// Software revision of the operator interface of the manufacturer, an entry of <c>Components.Software</c> when
+    /// <see cref="Software"/> is empty. The model has no revision of the whole machine.
+    /// </summary>
     public string SoftwareRevision { get; init; } = "4.95.2";
 
     /// <summary>Month the machine was built, <c>Identification.MonthOfConstruction</c>.</summary>
@@ -232,7 +235,7 @@ internal sealed class ScenarioConfig
 
     /// <summary>
     /// How often per hour the planner changes a waiting job order: it revokes its release, cancels it (it ends as
-    /// aborted without having run) or takes it back (it leaves the list).
+    /// aborted without having run), takes it back (it leaves the list) or changes the runs it plans.
     /// </summary>
     public double QueueChangesPerHour { get; init; } = 1;
 
@@ -366,14 +369,11 @@ internal sealed class SoftwareTemplate
     [Required]
     public string Manufacturer { get; init; } = string.Empty;
 
-    /// <summary>Name of the software.</summary>
+    /// <summary>Name of the software component; with <see cref="Manufacturer"/> it names the entry.</summary>
     [Required]
-    public string Model { get; init; } = string.Empty;
+    public string ComponentName { get; init; } = string.Empty;
 
     /// <summary>Revision of the software.</summary>
     [Required]
     public string SoftwareRevision { get; init; } = string.Empty;
-
-    /// <summary>Kind of software; empty for none.</summary>
-    public string? DeviceClass { get; init; }
 }

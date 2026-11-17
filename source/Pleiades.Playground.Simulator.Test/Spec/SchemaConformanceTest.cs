@@ -63,7 +63,7 @@ public sealed partial class SchemaConformanceTest
         Assert.AreEqual("number", extension["type"]!.GetValue<string>());
         Assert.AreEqual("CEL", extension["unit"]!["code"]!.GetValue<string>());
         Assert.AreEqual("degreeCelsius", extension["unit"]!["name"]!.GetValue<string>());
-        var program = manifest["elements"]!.AsArray().Single(e => e!["path"]!.GetValue<string>() == "x-example-com.Production.ActiveProgram")!;
+        var program = manifest["elements"]!.AsArray().Single(e => e!["path"]!.GetValue<string>() == "x-example-com.WorkMasterMonitoring.ActiveProgram")!;
         Assert.AreEqual("string", program["type"]!.GetValue<string>());
         Assert.IsNull(program["unit"], "a text has no unit");
     }
@@ -101,7 +101,7 @@ public sealed partial class SchemaConformanceTest
         var unavailable = manifest["elements"]!.AsArray().Where(e => e!["available"]?.GetValue<bool>() == false).Select(e => e!["path"]!.GetValue<string>()).ToList();
         CollectionAssert.AreEquivalent(SpecElements.NotDelivered.ToList(), unavailable);
         var correlated = manifest["events"]!.AsArray().Where(e => e!["correlationId"]?.GetValue<bool>() == true).Select(e => e!["path"]!.GetValue<string>()).ToList();
-        Assert.IsTrue(correlated.All(p => p.StartsWith("Production.ProgramExecution", StringComparison.Ordinal) || p.StartsWith("Notification.", StringComparison.Ordinal)));
+        Assert.IsTrue(correlated.All(p => p.StartsWith("WorkMasterMonitoring.ProgramExecution", StringComparison.Ordinal) || p.StartsWith("Notification.", StringComparison.Ordinal)));
         Assert.HasCount(9, correlated);
     }
 
@@ -117,7 +117,6 @@ public sealed partial class SchemaConformanceTest
             .ToList();
 
         Assert.IsTrue(values.Count > 1000);
-        var cancelled = 0;
         foreach (var value in values)
         {
             // What goes on the wire, parsed back.
@@ -131,16 +130,9 @@ public sealed partial class SchemaConformanceTest
 
             // The unit belongs to the binding, the schema of the model describes the envelope without it.
             envelope.Remove("unit");
-            if (value.Path == SpecElements.JobOrders && envelope["value"] is JsonArray entries)
-            {
-                foreach (var entry in entries)
-                {
-                    cancelled += Cancelled(entry!.AsObject());
-                }
-            }
             AssertValid(runtime, new JsonObject { [value.Path] = envelope }.ToJsonString(), value.Path);
         }
-        Assert.IsTrue(cancelled > 0, "the run cancels job orders");
+        Assert.IsTrue(values.Any(v => v.Path == SpecElements.JobOrderResults && v.Value!.AsArray().Count > 0), "results come");
     }
 
     [TestMethod]
@@ -163,7 +155,7 @@ public sealed partial class SchemaConformanceTest
 
             // A program execution names itself; an alert names the program execution it came up in, if any.
             var correlationId = (string?)wire["correlationid"];
-            if (specEvent.Path.StartsWith("Production.ProgramExecution", StringComparison.Ordinal))
+            if (specEvent.Path.StartsWith("WorkMasterMonitoring.ProgramExecution", StringComparison.Ordinal))
             {
                 Assert.AreEqual(wire["data"]!["ExecutionId"]!.GetValue<string>(), correlationId, specEvent.Path);
             }
@@ -177,9 +169,10 @@ public sealed partial class SchemaConformanceTest
             }
             Assert.IsTrue(correlationId is null || named[specEvent.Path], $"the manifest says {specEvent.Path} carries a correlationid");
 
+            Assert.IsFalse(wire.ContainsKey("related"), "what goes along for the playground stays off the wire");
             if (specEvent.Path == SpecElements.JobOrderCancelled)
             {
-                Assert.AreEqual(1, Cancelled(wire["data"]!.AsObject()), "JobOrderCancelled carries a job order that never ran");
+                Assert.IsNull(specEvent.Related, "JobOrderCancelled carries a job order that never ran and has no result");
             }
             AssertValid(schema, wire.ToJsonString(), specEvent.Path);
         }
@@ -193,22 +186,6 @@ public sealed partial class SchemaConformanceTest
         var run = MachineRun.For(TimeSpan.FromMinutes(10));
         var published = run.Messages.OfType<SpecValue>().Select(v => v.Path).Append(SpecElements.ConnectionState).ToHashSet();
         CollectionAssert.AreEquivalent(elements.ToList(), published.ToList());
-    }
-
-    /// <summary>
-    /// A cancelled job order is aborted without having run: it carries the time it was aborted as EndTime, and
-    /// neither StartTime nor ProducedQuantity. The entry goes to the schema as it is.
-    /// </summary>
-    /// <returns>1 when the entry is a cancelled one, else 0.</returns>
-    private static int Cancelled(JsonObject entry)
-    {
-        if (entry["State"]!.GetValue<string>() != "Aborted" || entry.ContainsKey("StartTime"))
-        {
-            return 0;
-        }
-        Assert.IsFalse(entry.ContainsKey("ProducedQuantity"), "a cancelled job order has no quantity");
-        Assert.IsNotNull(entry["EndTime"], "a cancelled job order has the time it was aborted");
-        return 1;
     }
 
     private static string? ManifestUnit(string path)

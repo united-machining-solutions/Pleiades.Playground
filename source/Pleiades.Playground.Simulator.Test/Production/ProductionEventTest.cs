@@ -20,7 +20,7 @@ public sealed class ProductionEventTest
         var events = run.Messages.OfType<SpecEvent>().ToList();
         var production = events.Select(e => (Spec: e, Dto: ProductionEventMapper.From(e, "P-04"))).ToList();
 
-        Assert.IsTrue(production.Where(p => p.Spec.Path.StartsWith("Production.", StringComparison.Ordinal)).All(p => p.Dto is not null));
+        Assert.IsTrue(production.Where(p => !p.Spec.Path.StartsWith("Notification.", StringComparison.Ordinal)).All(p => p.Dto is not null));
         Assert.IsTrue(production.Where(p => p.Spec.Path.StartsWith("Notification.", StringComparison.Ordinal)).All(p => p.Dto is null),
             "alerts stay notification events");
 
@@ -75,8 +75,30 @@ public sealed class ProductionEventTest
         Assert.AreEqual("Ended", dto.State);
         Assert.IsNotNull(dto.StartTime);
         Assert.IsNotNull(dto.EndTime);
-        Assert.AreEqual(ended.Value["ProducedQuantity"]!.GetValue<double>(), dto.ProducedQuantity);
-        Assert.AreEqual(ended.Value["GoodQuantity"]!.GetValue<double>(), dto.GoodQuantity);
+        // The model keeps the result apart; the production event carries the job order and its result in one.
+        Assert.IsFalse(ended.Value.ContainsKey("ProducedQuantity"));
+        Assert.AreEqual(ended.Related!["ProducedQuantity"]!.GetValue<double>(), dto.ProducedQuantity);
+        Assert.AreEqual(ended.Related["GoodQuantity"]!.GetValue<double>(), dto.GoodQuantity);
+        Assert.IsNull(dto.WorkMaster, "a job order event names no work master, as before");
+    }
+
+    [TestMethod]
+    public void JobOrderResultChanged_IsAChangeOfTheJobOrder_WithItsState()
+    {
+        var run = MachineRun.For(TimeSpan.FromHours(2));
+        var changed = run.EventsOf(SpecElements.JobOrderResultChanged).First();
+        var dto = ProductionEventMapper.From(changed, "P-04")!;
+
+        Assert.AreEqual(ProductionSubject.JobOrder, dto.Subject);
+        Assert.AreEqual(ProductionAction.Changed, dto.Action);
+        Assert.AreEqual(changed.Related!["State"]!.GetValue<string>(), dto.State);
+        Assert.AreEqual(changed.Value["ProducedQuantity"]!.GetValue<double>(), dto.ProducedQuantity);
+        Assert.IsNotNull(dto.StartTime);
+        Assert.IsNull(dto.EndTime, "EndTime is null until the end, as before absent");
+
+        var cancelled = ProductionEventMapper.From(run.EventsOf(SpecElements.JobOrderCancelled).First(), "P-04")!;
+        Assert.IsNull(cancelled.StartTime);
+        Assert.IsNull(cancelled.ProducedQuantity, "a job order that never ran has no quantity");
     }
 
     [TestMethod]
@@ -88,7 +110,7 @@ public sealed class ProductionEventTest
 
         await output.PublishAsync(run.Messages);
 
-        var expected = run.Messages.OfType<SpecEvent>().Count(e => e.Path.StartsWith("Production.", StringComparison.Ordinal));
+        var expected = run.Messages.OfType<SpecEvent>().Count(e => !e.Path.StartsWith("Notification.", StringComparison.Ordinal));
         Assert.HasCount(expected, client.Published);
         foreach (var message in client.Published)
         {

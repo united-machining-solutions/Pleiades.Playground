@@ -20,9 +20,12 @@ internal sealed record SpecValue(string Path, JsonNode? Value, string? Unit, Dat
 /// An event: something that happened once. <see cref="Seq"/> counts the events of its group (the first segment of
 /// the path) without a gap, from 1 in each run of the machine; <see cref="Sequence"/> is that number as the binding
 /// sends it, the start of the run and the count. <see cref="Id"/> is a UUID that stays the same when the event goes
-/// out again. <see cref="Value"/> is a flat struct, the <c>data</c> of the CloudEvent.
+/// out again. <see cref="Value"/> is a flat struct, the <c>data</c> of the CloudEvent. <see cref="Related"/> never goes
+/// on the wire: the entry of the other list of the same job order (its result for an event of the job order, the
+/// job order for an event of its result), for the production events of the playground, which carry both.
 /// </summary>
-internal sealed record SpecEvent(string Path, DateTimeOffset Timestamp, long Seq, JsonObject Value, string Id, string Sequence, string? CorrelationId = null)
+internal sealed record SpecEvent(
+    string Path, DateTimeOffset Timestamp, long Seq, JsonObject Value, string Id, string Sequence, string? CorrelationId = null, JsonObject? Related = null)
     : SpecMessage(Path, Timestamp);
 
 /// <summary>Writes the messages of the spec binding: topics and payloads.</summary>
@@ -87,13 +90,14 @@ internal static class SpecWire
     /// </summary>
     public static readonly IReadOnlyDictionary<string, string> EventTopicNames = new Dictionary<string, string>(StringComparer.Ordinal)
     {
-        ["Production"] = "production",
+        ["JobMonitoring"] = "jobmonitoring",
+        ["WorkMasterMonitoring"] = "workmastermonitoring",
         ["Notification"] = "notifications",
     };
 
     /// <summary>
     /// The topic of an event: one topic per group, below <c>events/</c>, named after <see cref="EventTopicNames"/>.
-    /// So every event of <c>Production</c> goes to <c>events/production</c>. MQTT keeps the order only within a
+    /// So every event of <c>JobMonitoring</c> goes to <c>events/jobmonitoring</c>. MQTT keeps the order only within a
     /// topic; on one topic the events of a group arrive in the order they came up. The attribute <c>type</c>
     /// tells them apart.
     /// </summary>
