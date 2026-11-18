@@ -195,3 +195,10 @@ test("the address names a page from 2 on and needs you by its word, or nothing",
   assert.equal(showOf("needs"), "needs")
   for (const raw of [undefined, "all", "Needs", 1]) assert.equal(showOf(raw), undefined, String(raw))
 })
+
+test("without sites every machine that sends stands under on no site, and no site is empty", () => {
+  const { groups, emptySites } = groupsOf({ ...list, sites: [], machineCount: 0, counts: [] }, { needs: false, query: "" })
+  assert.deepEqual(names(groups), [[null, [["", [P07]]]]])
+  assert.deepEqual(emptySites, [])
+  assert.equal(pageOf(groups, undefined).sites, 0)
+})

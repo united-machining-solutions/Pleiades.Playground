@@ -6,7 +6,7 @@ import { modelOf } from "@pleiades/cards/site/in-words.ts"
 
 import { unknownMachine } from "../live/machines.ts"
 
-// What the page Sites shows of the sites the backend gave: every site with its halls, or only the
+// What Home shows of the sites the backend gave: every site with its halls, or only the
 // machines that need someone, or those that answer a search, ten sites to a page. It chooses among
 // the values and keeps their order; it adds up nothing.
 
@@ -21,7 +21,7 @@ export function pageOfSearch(raw: unknown): number | undefined {
   return Number.isInteger(page) && page > 1 ? page : undefined
 }
 
-/** The states that need someone, as Home has them under "Needs you". */
+/** The states that need someone: in alarm, stopped or without data. */
 const NEEDS: ReadonlyArray<State> = ["alarm", "stopped", "no-data"]
 
 export function needsSomeone(state: State): boolean {
