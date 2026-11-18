@@ -1,10 +1,12 @@
 import { SearchXIcon, ServerOffIcon } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
 
 import { chatTools } from "@/chat/cards.tsx"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 
+import { withAnswer } from "./answers.ts"
+import type { Held } from "./answers.ts"
 import { callPart } from "./call-part.ts"
 import type { PartAnswer } from "./call-part.ts"
 import { drawingTool, noCardFor } from "./parts.ts"
@@ -19,8 +21,11 @@ const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
 /** A part with its answer: what the tool gave now, or why it gave nothing. */
 export type AnsweredPart = RecipePart & { answer: PartAnswer }
 
-/** A part that has been asked: its answer comes when the tool has given it. */
-export type AskedPart = RecipePart & { answer: Promise<PartAnswer> }
+/** A part that has been asked: its answer comes when the tool has given it. `question` counts up. */
+export type AskedPart = RecipePart & { answer: Promise<PartAnswer>; question: number }
+
+/** How many questions this browser has asked: the number of the next one. */
+let questions = 0
 
 /** One part, asked: a tool without a card is not asked, because the server of the app would refuse it too. */
 function askPart(part: RecipePart): Promise<PartAnswer> {
@@ -37,24 +42,33 @@ function askPart(part: RecipePart): Promise<PartAnswer> {
  * the others. Each part answers for itself: one without an answer leaves the others whole.
  */
 export function askParts(parts: ReadonlyArray<RecipePart>): Array<AskedPart> {
-  return parts.map((part) => ({ ...part, answer: askPart(part) }))
+  return parts.map((part) => ({ tool: part.tool, args: part.args, answer: askPart(part), question: ++questions }))
 }
 
-/** The parts that have answered so far, each by the asked part it belongs to. */
-export function useAnswers(asked: ReadonlyArray<AskedPart>): ReadonlyMap<AskedPart, AnsweredPart> {
-  const [answers, setAnswers] = useState<ReadonlyMap<AskedPart, AnsweredPart>>(new Map())
+/**
+ * The answers of the parts, as they come: those of the loader, and of each part asked alone with
+ * `ask`. An answer stands until a newer one of the same part comes (`withAnswer`), so a page that
+ * is read again keeps what it drew while it waits.
+ */
+export function useAnswers(asked: ReadonlyArray<AskedPart>): { answers: Array<AnsweredPart>; ask: (part: RecipePart) => void } {
+  const [held, setHeld] = useState<ReadonlyMap<string, Held<AnsweredPart>>>(new Map())
+  const shown = useRef(true)
   useEffect(() => {
-    let gone = false
-    for (const part of asked) {
-      void part.answer.then((answer) => {
-        if (!gone) setAnswers((before) => new Map(before).set(part, { ...part, answer }))
-      })
-    }
+    shown.current = true
     return () => {
-      gone = true
+      shown.current = false
     }
-  }, [asked])
-  return answers
+  }, [])
+  const settle = useCallback((one: AskedPart) => {
+    void one.answer.then((answer) => {
+      if (shown.current) setHeld((before) => withAnswer(before, { tool: one.tool, args: one.args, answer }, one.question))
+    })
+  }, [])
+  useEffect(() => {
+    for (const one of asked) settle(one)
+  }, [asked, settle])
+  const ask = useCallback((part: RecipePart) => askParts([part]).forEach(settle), [settle])
+  return { answers: [...held.values()].map((one) => one.answered), ask }
 }
 
 /**

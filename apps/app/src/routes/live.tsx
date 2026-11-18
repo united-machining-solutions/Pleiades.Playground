@@ -138,7 +138,7 @@ type QuantityGraphProps = {
   quantity: MeasurementSeries["quantities"][number]
   from: string
   to: string
-  instants: ReadonlyArray<string>
+  instants: MeasurementSeries["instants"]
   machines: ReadonlyArray<string>
   shown: ReadonlyArray<string>
   current: ReadonlyArray<MachineMeasurements>
@@ -156,14 +156,15 @@ function nowOf(current: ReadonlyArray<MachineMeasurements>, quantity: string): s
 
 /**
  * One graph. A message or a tick of the clock changes one quantity at a time, or none: a graph
- * whose line, hours and values of now stay as they were is not drawn again. Drawing all of them
- * for every message kept the browser busy most of the time.
+ * whose line, hours and values of now stay as they were is not drawn again, and one whose values of
+ * now changed draws its title again but not its lines (`MeasurementGraph`). Drawing all of them for
+ * every message kept the browser busy most of the time.
  */
 const QuantityGraph = memo(
   function QuantityGraph({ quantity, from, to, instants, machines, shown, current }: QuantityGraphProps) {
     return (
       <MeasurementGraph
-        series={{ ...quantity, lines: quantity.lines.filter((line) => shown.includes(line.machine)), from, to, instants: [...instants] }}
+        series={{ ...quantity, lines: quantity.lines.filter((line) => shown.includes(line.machine)), from, to, instants }}
         // Every machine, chosen or not, so that each keeps its colour.
         machines={machines}
         current={current.filter((measured) => shown.includes(measured.machine))}

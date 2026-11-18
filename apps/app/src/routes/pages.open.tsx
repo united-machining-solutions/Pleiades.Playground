@@ -12,6 +12,7 @@ import { Column, PartsLoading } from "@/pages/column.tsx"
 import { DrawnPart, askParts, useAnswers, waitsForBackend } from "@/pages/drawn-part.tsx"
 import { RECIPE_PARAM, decodeRecipe } from "@/pages/link.ts"
 import type { Recipe } from "@/pages/recipe.ts"
+import { shownParts } from "@/pages/shown-parts.ts"
 import { savePage } from "@/pages/store.ts"
 
 /**
@@ -55,17 +56,18 @@ const NO_PARTS: ReadonlyArray<never> = []
 
 function OpenedPage() {
   const { opened } = Route.useLoaderData()
-  const answers = useAnswers(opened?.parts ?? NO_PARTS)
-  useRetry([...answers.values()].some(waitsForBackend))
+  // An answer stands until the newer one of its part comes, also while the page is read again.
+  const { answers } = useAnswers(opened?.parts ?? NO_PARTS)
+  const shown = shownParts(opened?.recipe.parts ?? NO_PARTS, answers)
+  useRetry(shown.some(({ answered }) => answered !== undefined && waitsForBackend(answered)))
   if (!opened) return <NoRecipe />
   return (
     <Column>
       <Notice recipe={opened.recipe} />
       <Head title={opened.recipe.title} line={`as of ${clock(opened.readAt)} · from a link`} />
-      {opened.parts.map((part, index) => (
-        // The parts of a page keep their order, so the place is the key.
-        answers.get(part) ? <DrawnPart key={index} part={answers.get(part)!} /> : <Skeleton key={index} className="h-40 w-full" />
-      ))}
+      {shown.map(({ key, answered }) =>
+        answered ? <DrawnPart key={key} part={answered} /> : <Skeleton key={key} className="h-40 w-full" />,
+      )}
     </Column>
   )
 }

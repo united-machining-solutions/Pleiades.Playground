@@ -37,6 +37,14 @@ harness.
   "Remove", by hand and with no language model, and "Done" takes them away again; a change is kept at once,
   and no part is asked again because another one moved or went. A removed part is kept nowhere else, so the
   toast that says so has "Undo". The only part of a page stays: "Delete page" is the way to be rid of it.
+  "Add a card" at the end of a page that is edited adds one, also by hand: a dialog offers the cards a page
+  can hold, each by what it shows, and asks what the chosen one takes, as the input schema of its tool in the
+  backend says: a machine, chosen by its name from the machines Home lists, and the hours of a history in
+  their range. An optional argument left empty stays out, so the measurements without a machine are every
+  machine; the list of machines the energy card can take has no field, and that card shows every machine.
+  The card goes to the end and shows its values at once; the other parts are not asked again. The same card
+  with the same choices, a thirteenth part or a storage that says no adds nothing, and the dialog says why;
+  without an answer of the backend nothing can be added. An added card is removed like any other.
   A pinned page stands in the sidebar on the top level, beside
   Home; under it a group "Pages", which folds, lists the pages that are not pinned, the newest first, and
   there is no group where there is nothing to list. `/pages` lists them all and is reached through the
@@ -176,7 +184,9 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
   `index.tsx` is Home, `sites.index.tsx` the address the list of the sites had before, which leads there, `sites.$machine.tsx` the page of a machine and `machines.$machine.tsx`
   the old address of it, which leads there, `charts.tsx` the last hours of every
-  machine as charts (drawn by `src/charts/state-tiles.tsx`), `pages.index.tsx` the list of the pages kept
+  machine as charts (drawn by `src/charts/state-tiles.tsx`), `where-is-my-job.tsx` a page for discussion
+  that follows an order across the machines (its map, its panels, the grouping of job orders and `getFloor`,
+  which reads its values, in `src/where-is-my-job/`), `pages.index.tsx` the list of the pages kept
   in this browser, `pages.$page.tsx` one of them and `pages.open.tsx` one opened from a link; `health.ts`,
   `api/harness/$.ts` and
   `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
@@ -193,9 +203,13 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   and its size, which is all that is checked, also of a recipe from outside. `store.ts` keeps the pages in
   the `localStorage` of the browser under one key, `pleiades-playground.pages.v1`, and is the only way to
   them: `listPages`, `getPage`, `savePage`, `renamePage`, `pinPage`, `unpinPage`, `removePart`, `movePart`,
-  `putPartBack` (the undo of `removePart`), `deletePage`, and `usePages` for a component that follows every
-  change. `part-controls.tsx` is what "Edit" shows above a part, and `shown-parts.ts` gives each part of the
-  recipe as it is now the answer the loader already has for it. `link.ts` writes a recipe into one search
+  `putPartBack` (the undo of `removePart`), `addPart`, `deletePage`, and `usePages` for a component that
+  follows every change. `part-controls.tsx` is what "Edit" shows above a part, and `shown-parts.ts` gives each
+  part of the recipe as it is now the answer the loader already has for it. `add-card.tsx` is "Add a card"
+  and its dialog; `card-choices.ts` the server function behind it, which reads the tools of the backend with
+  their input schemas and the machines; `add-part.ts` what the form asks for a card, read from its schema (a
+  machine, a whole number in its range, never the time zone), the part it makes, and why a part is not added
+  (`cannotAdd`). A card with a required argument the form does not know is offered as off, with why. `link.ts` writes a recipe into one search
   parameter, `r`, and reads it back (`encodeRecipe`, `decodeRecipe`, `linkOf`): JSON as UTF-8 in base64url,
   at most `MAX_PARAM_LENGTH` (8,000) characters, and what is not exactly a recipe (`recipeOf`) is null.
   `share-page.tsx` is "Share" in the head of a kept page, `column.tsx` the column that a kept page and a page
@@ -224,11 +238,9 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   commit this file; here everything that needs it writes it first.
 - `src/showcases/`: what is made for one demo or one fair, and is in a build only where `APP_SHOWCASES` is
   set ([ADR-0018](../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
-  it is a showcase: `where-is-my-job/` holds the map, the panels and the grouping of job orders into orders
-  of the page "Where is My Job?", and `getFloor`, which reads its values. The pages of
-  the showcases, and their server routes, are the route files under `src/routes/(showcases)/`; the brackets
-  make a folder that adds nothing to an address, so `(showcases)/where-is-my-job.tsx` answers at
-  `/where-is-my-job`. A page belongs to the showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and
+  it is a showcase; there is none yet. The pages of the showcases, and their server routes, are the route
+  files under `src/routes/(showcases)/`; the brackets make a folder that adds nothing to an address, so
+  `(showcases)/titan.tsx` answers at `/titan`. A page belongs to the showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and
   `titan/faces.tsx` are pages of `showcases/titan/`. A build without the setting leaves that folder out
   (`vite.config.ts`): the router does not know the pages, nothing imports the folder of a showcase, and
   `.output` has nothing of one, so neither has the image. There is no switch while the app runs.
@@ -237,7 +249,7 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   from `src/` first, so `../other/data.ts` counts as `@/showcases/other/data.ts` does. The typecheck reads
   every route, with the showcases (`route-tree.mjs`). After a build without the setting, the route tree on
   disk has no showcase routes, and the editor or a plain `tsc` reports `TS2345` in the route files of the
-  showcases (`'"/(showcases)/where-is-my-job"' is not assignable to parameter of type 'keyof FileRoutesByPath'`).
+  showcases (`'"/(showcases)/titan"' is not assignable to parameter of type 'keyof FileRoutesByPath'`).
   `pnpm typecheck` or `node route-tree.mjs` writes the whole tree again, and the error is gone.
 - `src/cards/`: a folder for each card, named like the card. `machine/chat.tsx` is the machine card in the
   chat: what a call of each of its tools is called, what the chat draws for a result (`results.ts` checks it

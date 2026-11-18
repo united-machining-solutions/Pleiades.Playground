@@ -361,6 +361,32 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
 
+  # The SimpleCAM adapter: reads the state of the machine 9042 from the SSE stream of the SimpleCAM backend and
+  # publishes it to the broker after the data model, as machines/united-grinding_simplecam_9042/umati/...
+  # It needs a SimpleCAM backend: without one it is a machine that stays in CommunicationFault and asks for the
+  # stream every five seconds. So it starts only with the profile: docker compose --profile simplecam up -d, or
+  # COMPOSE_PROFILES=simplecam in .env. It is not part of the Margo app.
+  simplecam-adapter-9042:
+    <<: *service
+    profiles: [simplecam]
+    image: ghcr.io/united-machining-solutions/pleiades.playground.simplecam.adapter:${PLEIADES_VERSION:-dev}
+    build:
+      context: .
+      dockerfile: apps/simplecam-adapter-9042/Dockerfile
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-persistence:
+        condition: service_healthy
+    # The backend runs on this computer, outside of Docker: host.docker.internal. Docker Desktop knows the
+    # name; this line gives it to Docker Engine on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      SIMPLECAM_SSE_URL: ${SIMPLECAM_SSE_URL:-http://host.docker.internal:5450/stream/machine-9042/state}
+      MQTT_BROKER_URL: mqtt://broker:1883
+      MQTT_CLIENT_ID: simplecam-adapter-9042
+
   # One simulator per machine. Each publishes after the data model, below machines/{MachineId}/
   # (<manufacturer>_<model>_<serial number>, contracts/mqtt), from a virtual machine of its own with a scenario of
   # its own kind of machine and a made-up manufacturer of its own.
