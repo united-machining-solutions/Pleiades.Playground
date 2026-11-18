@@ -6,6 +6,7 @@ import { chatTools } from "@/chat/cards.tsx"
 import { withTimeZone } from "@/chat/local-times.ts"
 import type { Answer } from "@/machines/get-machines.ts"
 import { textOf } from "@/machines/get-machines.ts"
+import { keptClient } from "@/machines/kept-client.ts"
 import { reasonOf } from "@/reason.ts"
 
 import { drawingTool, noCardFor } from "./parts.ts"
@@ -24,6 +25,11 @@ const partCallSchema = recipePartSchema.extend({ timeZone: z.string().max(64).op
 /** What a part got. `refused`: the tool answered and said no, which asking again does not change. */
 export type PartAnswer = Answer<string> & { refused?: true }
 
+/** The one connection of the server of the app to the backend, kept between parts and pages. */
+const backend = keptClient(() =>
+  createMCPClient({ transport: { type: "http", url: process.env.GENUI_MCP_URL ?? "http://localhost:5520/mcp" } }),
+)
+
 /**
  * Calls the tool of one part and returns what the chat hands to `draw` of that tool for the same
  * call: the values a tool with an output schema gives as `structuredContent`, written as JSON, or
@@ -39,20 +45,15 @@ export const callPart = createServerFn({ method: "GET" })
   .handler(async ({ data: { tool, args, timeZone } }): Promise<PartAnswer> => {
     if (!drawingTool(tool, chatTools)) return { values: null, error: noCardFor(tool) }
     try {
-      const backend = await createMCPClient({
-        transport: { type: "http", url: process.env.GENUI_MCP_URL ?? "http://localhost:5520/mcp" },
-      })
-      try {
+      return await backend(async (client) => {
         // The time zone goes to a tool that takes one, as in the chat (chat/local-times.ts).
-        const listed = (await backend.tools()).find((one) => one.name === tool)
-        const result = await backend.callTool(tool, withTimeZone(args, listed?.inputSchema, { timeZone }) ?? args)
+        const listed = (await client.tools()).find((one) => one.name === tool)
+        const result = await client.callTool(tool, withTimeZone(args, listed?.inputSchema, { timeZone }) ?? args)
         const text = textOf(result)
         if (result.isError) return { values: null, error: text ?? `${tool} returned no values.`, refused: true }
         if (result.structuredContent !== undefined) return { values: JSON.stringify(result.structuredContent), error: null }
         return text === undefined ? { values: null, error: `${tool} returned no values.` } : { values: text, error: null }
-      } finally {
-        await backend.close()
-      }
+      })
     } catch (error) {
       return { values: null, error: `The generative UI backend did not answer: ${reasonOf(error)}.` }
     }

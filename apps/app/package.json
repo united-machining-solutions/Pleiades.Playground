@@ -13,6 +13,7 @@
   "dependencies": {
     "@fontsource-variable/roboto": "catalog:",
     "@pleiades/cards": "workspace:*",
+    "@pleiades/hub-sdk": "catalog:",
     "@pleiades/ui": "workspace:*",
     "@react-three/fiber": "catalog:",
     "@tanstack/ai": "catalog:",

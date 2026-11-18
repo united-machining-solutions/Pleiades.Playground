@@ -11,8 +11,7 @@ import { useRetry } from "@/hooks/use-live.ts"
 import { AddCard } from "@/pages/add-card.tsx"
 import { cannotAdd } from "@/pages/add-part.ts"
 import { Column, PartsLoading } from "@/pages/column.tsx"
-import { DrawnPart, answerParts, waitsForBackend } from "@/pages/drawn-part.tsx"
-import type { AnsweredPart } from "@/pages/drawn-part.tsx"
+import { DrawnPart, askParts, useAnswers, waitsForBackend } from "@/pages/drawn-part.tsx"
 import { OnlyPart, PartControls, controlId } from "@/pages/part-controls.tsx"
 import { MAX_TITLE_LENGTH } from "@/pages/recipe.ts"
 import type { RecipePart, StoredPage } from "@/pages/recipe.ts"
@@ -69,7 +68,7 @@ export const Route = createFileRoute("/pages/$page")({
   loader: async ({ params }) => {
     const page = getPage(params.page)
     if (!page) throw notFound()
-    return { parts: await answerParts(page.recipe.parts), readAt: new Date().toISOString() }
+    return { parts: askParts(page.recipe.parts), readAt: new Date().toISOString() }
   },
   component: KeptPage,
   pendingComponent: Loading,
@@ -98,20 +97,19 @@ function KeptPage() {
  */
 function ShownPage({ page }: { page: StoredPage }) {
   const { parts, readAt } = Route.useLoaderData()
-  // The answers of the parts asked alone, after the loader. Those of the loader come first: when the
-  // page is read again, it has an answer for every part, and a newer one.
-  const [late, setLate] = useState<Array<AnsweredPart>>([])
-  const shown = shownParts(page.recipe.parts, [...parts, ...late])
+  // The answers come part by part: those of the loader, and of each part asked alone after it. An
+  // answer stands until the newer one of its part comes, also while the page is read again.
+  const { answers, ask } = useAnswers(parts)
+  const shown = shownParts(page.recipe.parts, answers)
   useRetry(shown.some(({ answered }) => answered !== undefined && waitsForBackend(answered)))
+  // A part the loader did not ask, one added or put back after the page was read, is asked alone.
+  const askedByLoader = new Set(shownParts(page.recipe.parts, parts).flatMap(({ key, answered }) => (answered ? [key] : [])))
   const asking = useRef(new Set<string>())
   useEffect(() => {
     for (const { key, part, answered } of shown) {
-      if (answered !== undefined || asking.current.has(key)) continue
+      if (answered !== undefined || askedByLoader.has(key) || asking.current.has(key)) continue
       asking.current.add(key)
-      void answerParts([part]).then((answers) => {
-        asking.current.delete(key)
-        setLate((before) => [...before, ...answers])
-      })
+      ask(part)
     }
   })
 

@@ -30,6 +30,12 @@ The stack keeps its data: the project name is fixed, so its volumes stay from on
   | `.env` | The settings of [`.env.example`](../.env.example): ports, `APP_BIND`, the address and the key of the LiteLLM gateway. It is never part of a commit. |
   | `compose.override.yaml` | Optional. What only this computer needs, for example the network of a reverse proxy. |
 
+  The app of the stack registers at the Pleiades Hub by default, with the address
+  `http://localhost:<APP_PORT>/`. That address is right only for a browser on the same computer. On a
+  computer that others reach, set `HUB_APP_URL` in `.env` to the address their browsers use, or switch the
+  registration off with `HUB_MQTT_URL=`: see
+  [`apps/app`: In the demo stack](../apps/app/README.md#in-the-demo-stack).
+
 The live pages of the example app hear the broker from the browser, MQTT over WebSocket. On a demo that people
 open from other computers, the browser has to reach it:
 

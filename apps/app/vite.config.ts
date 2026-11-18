@@ -38,6 +38,7 @@ export default defineConfig({
     "import.meta.env.APP_REVISION": JSON.stringify(process.env.APP_REVISION || checkoutCommit()),
     "import.meta.env.APP_SOURCE": JSON.stringify(process.env.APP_SOURCE || ""),
   },
-  // The React plugin must come after the Start plugin. Nitro builds the Node.js server in .output/.
-  plugins: [tailwindcss(), tanstackStart({ router: { routeFileIgnorePattern: showcases ? undefined : SHOWCASE_ROUTES } }), nitro(), viteReact()],
+  // The React plugin must come after the Start plugin. Nitro builds the Node.js server in .output/,
+  // and runs its plugin when the server starts: the registration at the Pleiades Hub.
+  plugins: [tailwindcss(), tanstackStart({ router: { routeFileIgnorePattern: showcases ? undefined : SHOWCASE_ROUTES } }), nitro({ plugins: ["./src/hub/plugin.ts"] }), viteReact()],
 })

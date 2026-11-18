@@ -7,6 +7,23 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- MQTT binding, draft 0.3.0: a third first level, `hub/`, beside `machines` and `sites`. It carries the
+  registration of apps at the Pleiades Hub (repository `umati/pleiades-hub`), the page that shows the apps of
+  a Pleiades system under one header. The binding only reserves the level and says who owns it: the topics
+  below it and their payloads are defined by the contract of the hub. Its messages are not values, so
+  envelope, units and content types do not apply to them. Nothing changes below `machines` and `sites`.
+- The example app registers at the Pleiades Hub. For the server of the app it is opt-in: with
+  `HUB_MQTT_URL` set to the broker, it registers one app when it starts, "Playground", with a description in
+  English and German and an icon of its own, and `HUB_APP_URL` names the address under which a browser
+  reaches the app. Without `HUB_MQTT_URL` nothing connects and the app behaves as before. The demo stack
+  sets both variables: its app registers at the broker of the stack, with the address
+  `http://localhost:5600/`, which follows `APP_PORT`. An empty `HUB_MQTT_URL` in `.env` switches the
+  registration off, and `HUB_APP_URL` there names another address; both stand in `.env.example`. The hub
+  itself is not part of the stack. The SDK of the hub, `@pleiades/hub-sdk`, is not on npmjs.org: it is
+  checked in as a tarball under `vendor/`, and the catalog refers to it with `file:`. ADR-0021 records the
+  decision and the deviation from "npmjs.org is the only registry". The settings are in
+  `apps/app/README.md`. The tarball is version 0.1.2, licensed under Apache-2.0, which brings the guide
+  `register-an-app.md`, and the skill `register-hub-app`, a copy from the hub's repository, leads an agent to it.
 - Example app: machines are added to a site and taken off it on Home, as in the mock. A bar names the machines
   that sent data in the last 24 hours and stand on no site, with "Review and add"; "Add machine" also takes one by
   its id. The menu of a row moves a machine or removes it, and "Undo" in the toast takes a change back.
@@ -359,6 +376,10 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Example app: "New chat" is back in the head of the chat panel, as a plus in the list and in every chat. It
+  opens a new chat with no question yet and the cursor in its field; the list stays behind "All chats". After
+  the first question asked in the panel, the field of the new chat keeps the cursor, so the next question
+  follows without a click. In the URL the list is `?chat=all` now, and `?chat=new` is the new chat.
 - Notification card: all notifications or those of one level, errors or warnings, ten a page, those that stand
   first, with the pagination of the energy card; the counts at the head and the sums at the foot follow the level.
 - Time series and energy card: power in kilowatts with an area under its line, a taller graph, and times on full
@@ -527,6 +548,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Example app and generative UI backend: the demo stays quick with many machines. Live values draws its graphs
+  at most twice a second and only the graphs whose values changed, instead of all of them for every message of
+  the broker. `genui_machine_show` reads the one machine it shows instead of the whole fleet, so Charts, which asks
+  for every machine, no longer grows with the square of the machines. A kept page or one opened from a link stands
+  at once and draws each part when its answer comes. The server of the app keeps one connection to the backend.
 - OPC UA adapter: the alarms of a machine in `urn:umati2:datamodel:opcua` reach
   `umati/Notification/ActiveAlerts` and `events/notifications`. The adapter reads the list
   `Notification.ActiveAlerts` of that namespace, decodes `DataType.Alert` itself and raises and clears an alert

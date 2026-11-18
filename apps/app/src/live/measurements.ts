@@ -105,6 +105,8 @@ function seriesWithLine(series: MeasurementSeries, machine: string, quantity: Qu
     quantities: series.quantities.map((one) => {
       if (one.quantity !== quantity) return one
       const hasLine = one.lines.some((line) => line.topic === topic)
+      // Unchanged, the graph keeps the same object and is not drawn again.
+      if (hasLine && (one.unit ?? unit) === one.unit) return one
       return {
         ...one,
         unit: one.unit ?? unit,
