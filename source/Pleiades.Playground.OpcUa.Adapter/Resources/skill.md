@@ -97,8 +97,9 @@ browsing each from scratch.
 ## The elements
 
 The paths are those of the MQTT binding of this platform. The profiles are those of the data model,
-specification 0.17.0. **Core** is mandatory, every element of it: the adapter adds no machine without the
-whole core. Of every other profile the adapter publishes the elements only if the profile is complete; a
+specification 0.17.1. **Core** is declared whole for every machine: what you do not map is published as not
+available. Required are only `Identification.ManufacturerUri`, `Identification.Model` and
+`Identification.SerialNumber`, the machine id; without them the machine is not added. Of every other profile the adapter publishes the elements only if the profile is complete; a
 profile with instances (a channel, a spindle, a measuring point) is published for each complete instance,
 and a measuring point needs `Main`. Map what the server offers; the adapter decides what is complete.
 
@@ -173,7 +174,7 @@ holds one variable per element, named by the path of the element. The adapter ma
 tree. Propose with `machineNode` set to the `node` of `opcua_machine_list`, the `serialNumber` and `elements`
 empty; add only what the adapter does not set. `Notification.ActiveAlerts` of that tree is a list, not an
 element: for the core, find the alarm event type of the server and set `alerts`, or put it in `missing`, and
-the machine is not added. `Connection.State` and `Connection.Heartbeat` of that
+the alarms are not available. `Connection.State` and `Connection.Heartbeat` of that
 tree are the connection of the source to the machine, not values of the machine: leave them out. An element
 the server does not fill is moved to `missing` by the adapter.
 
@@ -198,8 +199,8 @@ the server does not fill is moved to `missing` by the adapter.
 - **Evidence.** One sentence per element: the browse path of the node, its unit or enumeration, and why it is
   this element. Where the description of the node decided the match or gave the unit, quote it briefly.
 - **Missing.** Every element of a profile that the server does not offer goes into `missing` with the reason.
-  An element of the core that is neither mapped nor derived makes the proposal fail: the machine is not added.
-  Tell the person which ones the core lacks.
+  An element of the core that is neither mapped nor derived is published as not available. Tell the person
+  which ones the core lacks; only without `ManufacturerUri`, `Model` or `SerialNumber` is the machine not added.
 - **Profiles.** Leave `profiles` out. The adapter names the profiles whose elements are all mapped, and
   publishes no element of a profile that is not complete. The proposal says, profile by profile, what is
   complete and what is lacking (`conformance`); say it to the person.

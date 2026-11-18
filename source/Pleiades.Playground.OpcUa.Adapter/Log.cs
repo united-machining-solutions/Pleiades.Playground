@@ -60,12 +60,14 @@ internal static partial class Log
     [LoggerMessage(20, LogLevel.Warning, "Machine {SerialNumber}: ConditionRefresh failed: {Reason}. New alarms are monitored; alarms that already stand are not caught up.")]
     public static partial void AlertsNotRefreshed(this ILogger logger, string serialNumber, string reason);
 
-    [LoggerMessage(21, LogLevel.Information, "Machine {SerialNumber}: its stored data is deleted, {Values} values and {Events} events.")]
-    public static partial void MachineDataDeleted(this ILogger logger, string serialNumber, long values, long events);
 
-    [LoggerMessage(22, LogLevel.Warning, "Machine {SerialNumber}: its stored data is not deleted completely: {Reason}")]
-    public static partial void MachineDataNotDeleted(this ILogger logger, string serialNumber, string reason);
 
     [LoggerMessage(23, LogLevel.Information, "Machine {SerialNumber} is identified by its first values as {MachineId}; the identity is kept with its registration.")]
     public static partial void MachineIdentified(this ILogger logger, string serialNumber, string machineId);
+
+    [LoggerMessage(24, LogLevel.Warning, "A second registration of machine {SerialNumber} ({MachineId}) is skipped: the first one runs. Remove the file that is not wanted from the data directory.")]
+    public static partial void RegistrationDuplicate(this ILogger logger, string serialNumber, string machineId);
+
+    [LoggerMessage(25, LogLevel.Error, "The stored users of the OPC UA servers cannot be read: {Reason}")]
+    public static partial void CredentialsUnreadable(this ILogger logger, string reason);
 }

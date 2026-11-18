@@ -209,7 +209,18 @@ internal sealed class SharedSession : IAsyncDisposable
                 }
 
                 var session = await _connector.ConnectAsync(Endpoint, cancellationToken).ConfigureAwait(false);
-                await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Stopped between the connect and the gate: the session is not ours yet, so nothing else closes it.
+                    await session.CloseAsync().ConfigureAwait(false);
+                    await session.DisposeAsync().ConfigureAwait(false);
+                    throw;
+                }
+
                 try
                 {
                     _current = session;
@@ -353,7 +364,10 @@ internal sealed class SharedSession : IAsyncDisposable
 internal sealed class SessionPool : IAsyncDisposable
 {
     private readonly Dictionary<EndpointKey, SharedSession> _sessions = [];
-    private readonly SemaphoreSlim _gate = new(1, 1);
+
+    // One gate per endpoint: adding or removing a machine waits only for the other machines of its endpoint, and
+    // a slow gateway does not hold up a registration on another server.
+    private readonly Dictionary<EndpointKey, SemaphoreSlim> _gates = [];
     private readonly ISessionConnector _connector;
     private readonly ILogger _logger;
     private readonly TimeSpan? _firstDelay;
@@ -391,10 +405,11 @@ internal sealed class SessionPool : IAsyncDisposable
     public async Task AddAsync(ISessionTenant tenant, CancellationToken stopping)
     {
         ArgumentNullException.ThrowIfNull(tenant);
-        await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+        var key = EndpointKey.Of(tenant.Endpoint);
+        var gate = GateOf(key);
+        await gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
-            var key = EndpointKey.Of(tenant.Endpoint);
             SharedSession? session;
             lock (_sessions)
             {
@@ -409,7 +424,7 @@ internal sealed class SessionPool : IAsyncDisposable
         }
         finally
         {
-            _gate.Release();
+            gate.Release();
         }
     }
 
@@ -417,10 +432,11 @@ internal sealed class SessionPool : IAsyncDisposable
     public async Task RemoveAsync(ISessionTenant tenant)
     {
         ArgumentNullException.ThrowIfNull(tenant);
-        await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+        var key = EndpointKey.Of(tenant.Endpoint);
+        var gate = GateOf(key);
+        await gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
-            var key = EndpointKey.Of(tenant.Endpoint);
             SharedSession? session;
             lock (_sessions)
             {
@@ -441,7 +457,7 @@ internal sealed class SessionPool : IAsyncDisposable
         }
         finally
         {
-            _gate.Release();
+            gate.Release();
         }
     }
 
@@ -460,6 +476,29 @@ internal sealed class SessionPool : IAsyncDisposable
             await session.DisposeAsync().ConfigureAwait(false);
         }
 
-        _gate.Dispose();
+        lock (_sessions)
+        {
+            foreach (var gate in _gates.Values)
+            {
+                gate.Dispose();
+            }
+
+            _gates.Clear();
+        }
+    }
+
+    /// <summary>The gate of an endpoint. It is kept: there are as many as endpoints were ever used.</summary>
+    private SemaphoreSlim GateOf(EndpointKey key)
+    {
+        lock (_sessions)
+        {
+            if (!_gates.TryGetValue(key, out var gate))
+            {
+                gate = new SemaphoreSlim(1, 1);
+                _gates[key] = gate;
+            }
+
+            return gate;
+        }
     }
 }

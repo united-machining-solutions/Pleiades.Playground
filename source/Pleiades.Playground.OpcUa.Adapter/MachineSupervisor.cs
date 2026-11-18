@@ -63,7 +63,6 @@ internal sealed class MachineSupervisor : BackgroundService
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
         Justification = "Disposed asynchronously at the end of ExecuteAsync, after every machine left it.")]
     private readonly SessionPool _pool;
-    private readonly MachineDataEraser _eraser;
     private readonly SemaphoreSlim _changes = new(1, 1);
     private readonly RegistrationStore _store;
     private readonly AlertStore _alertStore;
@@ -84,12 +83,10 @@ internal sealed class MachineSupervisor : BackgroundService
         IMachineOutputFactory outputs,
         DraftStore drafts,
         CredentialStore credentials,
-        MachineDataEraser eraser,
         IOptions<Config> config,
         ILogger<MachineSupervisor> logger)
     {
         _credentials = credentials;
-        _eraser = eraser;
         _store = store;
         _alertStore = alertStore;
         _client = client;
@@ -190,7 +187,8 @@ internal sealed class MachineSupervisor : BackgroundService
         {
             var best = ranked[0].Endpoint;
             var endpoint = new EndpointRegistration { Url = url, SecurityMode = best.SecurityMode, SecurityPolicy = best.SecurityPolicy, User = credential.User };
-            var (session, _) = await _client.ConnectAsync(endpoint, trial.Token, credential).ConfigureAwait(false);
+            var (session, thumbprint) = await _client.ConnectAsync(endpoint, trial.Token, credential).ConfigureAwait(false);
+            credential = credential with { ServerCertificateThumbprint = thumbprint };
             var tried = new ManagedEndpointSession(session);
             await using (tried.ConfigureAwait(false))
             {
@@ -304,13 +302,10 @@ internal sealed class MachineSupervisor : BackgroundService
             probe = probe with { Elements = [.. probe.Elements.Where(element => registration.Elements.Any(kept => kept.Area == element.Area && kept.Path == element.Path))] };
         }
 
+        // An element of the core the machine lacks is declared as not available, as the other adapters do; the
+        // machine is added all the same. Only the parts of the machine id are required, below.
         var refused = new List<string>();
         refused.AddRange(probe.NotFound.Select(element => $"elements[{element.Path}]: the server has no node {element.Node}."));
-        if (DataModelProfiles.CoreProblem(checks) is { } core)
-        {
-            refused.Add(core);
-        }
-
         if (refused.Count > 0)
         {
             return new RegistrationOutcome(null, refused, endpoints, probe) { Tried = registration };
@@ -329,7 +324,7 @@ internal sealed class MachineSupervisor : BackgroundService
         {
             return new RegistrationOutcome(
                 null,
-                ["identity: Identification.Manufacturer and ProductInstanceUri must each give a text: the machine id of the topics and the source of the events are formed from them."],
+                ["identity: Identification.ManufacturerUri, Model and SerialNumber must each be mapped and give a text: the machine id of the topics, <manufacturer>_<model>_<serial number>, is formed from them."],
                 endpoints,
                 probe) { Tried = registration };
         }
@@ -418,23 +413,20 @@ internal sealed class MachineSupervisor : BackgroundService
     }
 
     /// <summary>
-    /// Removes a machine completely: closes its session, clears the alarms that stand, takes its retained
-    /// messages back from the broker, deletes its registration, and then deletes what it published from the
-    /// Timeseries and the Events API, by its machine id. Returns null if no such machine is added.
+    /// Removes a machine: closes its session, clears the alarms that stand, takes its retained messages back
+    /// from the broker and deletes its registration. What the stores kept of it stays: deleting it is a step
+    /// of its own, with a contract of its own. Returns false if no such machine is added.
     /// </summary>
-    public async Task<DataDeletion?> RemoveAsync(string serialNumber, CancellationToken cancellationToken)
+    public async Task<bool> RemoveAsync(string serialNumber, CancellationToken cancellationToken)
     {
-        string? machineId;
         await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            machineId = Find(serialNumber)?.Output.MachineId
-                ?? _store.LoadAll().FirstOrDefault(stored => stored.SerialNumber == serialNumber)?.Identity?.MachineId;
             await StopAsync(serialNumber, removed: true).ConfigureAwait(false);
             _alertStore.Delete(serialNumber);
             if (!_store.Delete(serialNumber))
             {
-                return null;
+                return false;
             }
 
             _logger.MachineRemoved(serialNumber);
@@ -444,25 +436,7 @@ internal sealed class MachineSupervisor : BackgroundService
             _changes.Release();
         }
 
-        if (machineId is null)
-        {
-            // Never identified: nothing of it went to the broker, so nothing of it is stored.
-            return new DataDeletion(0, 0, []);
-        }
-
-        // The last values and the clearing of the alerts are on their way to the stores: let them arrive, then delete.
-        await Task.Delay(_config.DataSettleTime, cancellationToken).ConfigureAwait(false);
-        var deletion = await _eraser.DeleteAsync(machineId, cancellationToken).ConfigureAwait(false);
-        if (deletion.Problems.Count == 0)
-        {
-            _logger.MachineDataDeleted(serialNumber, deletion.ValuesDeleted ?? 0, deletion.EventsDeleted ?? 0);
-        }
-        else
-        {
-            _logger.MachineDataNotDeleted(serialNumber, string.Join(" ", deletion.Problems));
-        }
-
-        return deletion;
+        return true;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -470,8 +444,18 @@ internal sealed class MachineSupervisor : BackgroundService
         _stopping = stoppingToken;
         var registrations = _store.LoadAll((file, exception) => _logger.RegistrationUnreadable(file, exception.Message));
         _logger.RegistrationsLoaded(registrations.Count, _config.DataDirectory);
+        var machineIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var registration in registrations)
         {
+            // Two files of one machine, copied from another adapter for example, would run it twice, and the first
+            // one could not be stopped any more: the first file wins, the other is left alone and named.
+            if (_machines.ContainsKey(registration.SerialNumber)
+                || (registration.Identity?.MachineId is { } machineId && !machineIds.Add(machineId)))
+            {
+                _logger.RegistrationDuplicate(registration.SerialNumber, registration.Identity?.MachineId ?? registration.SerialNumber);
+                continue;
+            }
+
             await StartAsync(registration).ConfigureAwait(false);
         }
 

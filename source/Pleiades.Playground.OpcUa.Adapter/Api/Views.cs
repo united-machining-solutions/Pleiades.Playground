@@ -20,7 +20,7 @@ internal sealed record EndpointView(string Url, SecurityMode SecurityMode, strin
 /// <param name="MachineId">The machine id of its topics, <c>machines/{machineId}/</c>, or null while it is not identified.</param>
 /// <param name="DisplayName">A name for people.</param>
 /// <param name="Endpoint">Where it is and how the session is secured.</param>
-/// <param name="State"><c>Connecting</c>, <c>Connected</c> or <c>Disconnected</c>.</param>
+/// <param name="State">As <c>Connection/State</c> on the broker: <c>Initializing</c>, <c>Running</c>, <c>CommunicationFault</c> or <c>Shutdown</c>.</param>
 /// <param name="LastError">Why it is not connected.</param>
 /// <param name="Profiles">The profiles of the data model it delivers whole, the core among them if it is complete.</param>
 /// <param name="Conformance">Each profile of the data model: whether it is complete, and what it lacks. The core first.</param>

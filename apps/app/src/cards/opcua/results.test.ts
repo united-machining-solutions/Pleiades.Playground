@@ -6,7 +6,7 @@ import { machineListOf, mappingOf, needingALook, proposalOf, securityOf, serverL
 const server = {
   serialNumber: "A0280O0001",
   endpoint: { url: "opc.tcp://opc-simulator:4840", securityMode: "SignAndEncrypt", securityPolicy: "Aes256_Sha256_RsaPss" },
-  state: "Connected",
+  state: "Running",
   profiles: ["Core"],
   mapping: { ok: 11, derived: 2, unclear: 2, mismatch: 0, missing: 3, needsAttention: true },
   needsRescan: false,

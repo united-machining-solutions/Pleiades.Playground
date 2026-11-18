@@ -40,7 +40,11 @@ internal sealed class AlertStore
     {
         try
         {
-            File.WriteAllText(FileOf(serialNumber), JsonSerializer.Serialize(open, RegistrationJson.Options));
+            // Written beside and moved, as a registration is: a crash leaves the old list or the new one, never half of one.
+            var file = FileOf(serialNumber);
+            var temporary = file + ".tmp";
+            File.WriteAllText(temporary, JsonSerializer.Serialize(open, RegistrationJson.Options));
+            File.Move(temporary, file, overwrite: true);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {

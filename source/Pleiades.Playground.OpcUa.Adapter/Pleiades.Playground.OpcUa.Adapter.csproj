@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Pleiades.Playground.OpcUa.Adapter.Test" />
+    <!-- Moq builds its fakes of internal interfaces there. -->
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Client" />
     <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Mcp.Core" />
     <PackageReference Include="Serilog.Extensions.Hosting" />

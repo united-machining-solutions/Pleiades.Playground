@@ -25,8 +25,8 @@ export type MappingSummary = {
 }
 
 /**
- * Whether a machine delivers a profile of the data model whole (spec v0.17.0). The core is mandatory: a
- * machine without it is not added. Of another profile only a complete one is published.
+ * Whether a machine delivers a profile of the data model whole (spec v0.17.1). The core is declared whole for
+ * every machine: what it lacks is not available. Of another profile only a complete one is published.
  */
 export type ProfileCheck = {
   name: string
@@ -44,7 +44,8 @@ export type Server = {
   serialNumber: string
   displayName?: string
   endpoint: Endpoint
-  state: "Connecting" | "Connected" | "Disconnected"
+  /** As Connection/State on the broker. */
+  state: "Initializing" | "Running" | "CommunicationFault" | "Shutdown"
   lastError?: string
   profiles: Array<string>
   /** Each profile, the core first. Absent from an adapter that does not check them. */

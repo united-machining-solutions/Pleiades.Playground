@@ -95,7 +95,7 @@ public class RegistrationValidatorTest
         Assert.IsEmpty(RegistrationValidator.Validate(sample));
         Assert.AreEqual("A1121O0001", sample.SerialNumber);
         var applied = DataModelProfiles.Apply(KnownMappings.Apply(sample), out var checks);
-        Assert.IsNull(DataModelProfiles.CoreProblem(checks));
+        Assert.IsTrue(DataModelProfiles.CoreOf(checks).Fulfilled);
         CollectionAssert.AreEqual(sample.Profiles.ToArray(), applied.Profiles.ToArray(), "The sample names the profiles the adapter finds.");
         Assert.AreEqual("nsu=urn:umati2:datamodel:opcua;s=Machine", sample.MachineNode);
         Assert.HasCount(sample.Elements.Count + Umati2DataModel.Rules.Count, applied.Elements,
@@ -138,15 +138,15 @@ public class RegistrationValidatorTest
     }
 
     [TestMethod]
-    public void Core_without_one_of_its_mandatory_elements_is_refused()
+    public void Core_without_one_of_its_elements_is_declared_and_names_what_it_lacks()
     {
         var applied = KnownMappings.Apply(Sample());
         var without = applied with { Elements = [.. applied.Elements.Where(element => element.Path != "OperationCounters.PowerOnDuration")] };
 
-        var problem = DataModelProfiles.CoreProblem(DataModelProfiles.Check(without));
+        var published = DataModelProfiles.Apply(without, out var checks);
 
-        Assert.IsNotNull(problem);
-        StringAssert.Contains(problem, "OperationCounters.PowerOnDuration", StringComparison.Ordinal);
+        CollectionAssert.AreEqual(new[] { "OperationCounters.PowerOnDuration" }, DataModelProfiles.CoreOf(checks).Missing.ToArray());
+        Assert.Contains("Core", published.Profiles, "The core is declared whole; the manifest marks what the machine lacks.");
         Assert.IsEmpty(RegistrationValidator.Validate(without), "The validator checks the form; the core is checked against the server.");
     }
 

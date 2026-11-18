@@ -41,14 +41,9 @@ The example has two machines behind a gateway and one machine with an OPC UA ser
   OPC UA servers
 ```
 
-Not drawn: when a machine is removed, the adapter calls the REST APIs of the timeseries and of the events
-directly, `DELETE /machines/{machineId}` and `DELETE /machineEvents/machines/{machineId}`, to delete what the
-machine published.
-
 | Part | Code | What it does |
 |---|---|---|
 | `MachineSupervisor` | [`MachineSupervisor.cs`](MachineSupervisor.cs) | Loads the registrations at start, adds, replaces and removes machines at run time, checks a registration against its server and against the core and the profiles of the data model ([`Mapping/DataModelProfiles.cs`](Mapping/DataModelProfiles.cs)). |
-| `MachineDataEraser` | [`MachineDataEraser.cs`](MachineDataEraser.cs) | Deletes the values and events of a removed machine, by its machine id, through the REST APIs of the timeseries and the events. |
 | `SessionPool` | [`OpcUa/SharedSession.cs`](OpcUa/SharedSession.cs) | One `SharedSession` per endpoint: the same address (case and a slash at the end do not count), security mode, security policy and server certificate. Opened with the first machine of the endpoint, closed with the last one. |
 | `SharedSession` | [`OpcUa/SharedSession.cs`](OpcUa/SharedSession.cs) | Connects, watches the keep-alive, connects again with a back-off of 2 to 60 seconds. Attaches every machine to the session; a machine that cannot be attached is tried again every 30 seconds while the others go on. |
 | `MachineConnection` | [`OpcUa/MachineConnection.cs`](OpcUa/MachineConnection.cs) | One per registered machine: its own subscription on the session, its heartbeat and its alarms, and whether it answers. Behind a gateway it keeps the alarms whose source or condition lies in one of its namespaces. |
@@ -112,7 +107,7 @@ and the certificate of the adapter.
 The file name of a machine is its serial number, escaped as a URI. The registration is the
 [sample](samples/trumpf-trumatic-k09.registration.json) in form, with the thumbprint, the namespaces, the
 profiles and the elements of the known mappings the adapter added. Removing a machine deletes its file, its
-standing alarms, its retained messages on the broker, and through the REST APIs its stored values and events.
+standing alarms and its retained messages on the broker; what the stores kept of it stays.
 
 What is not kept:
 

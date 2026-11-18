@@ -53,6 +53,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@pleiades/ui/components/sidebar"
+import { ScrollArea } from "@pleiades/ui/components/scroll-area"
 import {
   Trace,
   TraceCollapsible,
@@ -621,9 +622,12 @@ function CommandList({
   title?: string
   onPick: (command: ChatCommand) => void
 }) {
+  // A ScrollArea of the design system for the scrolling part; its viewport is bounded, so it scrolls. Not a
+  // Combobox: the list is filtered by what is typed into the message field itself, which a Combobox would
+  // double with an input of its own.
   return (
-    <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
-      {title && <span className="px-2 text-xs font-medium text-muted-foreground">{title}</span>}
+    <ScrollArea className="[&>[data-slot=scroll-area-viewport]]:max-h-64">
+      {title && <span className="block px-2 pb-1 text-xs font-medium text-muted-foreground">{title}</span>}
       <ItemGroup className="gap-0" role="list" aria-label="Commands">
         {commands.map((command) => (
           <Item
@@ -640,7 +644,7 @@ function CommandList({
           </Item>
         ))}
       </ItemGroup>
-    </div>
+    </ScrollArea>
   )
 }
 

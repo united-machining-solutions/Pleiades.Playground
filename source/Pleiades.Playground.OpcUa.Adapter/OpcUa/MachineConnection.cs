@@ -19,7 +19,7 @@ internal sealed record ElementStatus(
 
 /// <summary>What a machine does right now, as the adapter sees it.</summary>
 /// <param name="MachineId">The machine id of its topics, or null while the machine is not identified.</param>
-/// <param name="State"><c>Connecting</c>, <c>Connected</c> or <c>Disconnected</c>.</param>
+/// <param name="State">As <c>Connection/State</c> of the binding: <c>Initializing</c> until the first session, <c>Running</c>, <c>CommunicationFault</c>, or <c>Shutdown</c> once it is stopped.</param>
 /// <param name="LastError">Why the last connect failed or the connection was lost.</param>
 /// <param name="ConnectedSince">Since when the session stands.</param>
 /// <param name="NeedsRescan">A node of the registration is gone: the server changed, scan it again.</param>
@@ -54,7 +54,12 @@ internal sealed class MachineConnection : ISessionTenant
     private readonly AlertTracker _alerts;
     private readonly IReadOnlySet<string> _namespaces;
 
-    private string _state = "Disconnected";
+    private const string Initializing = "Initializing";
+    private const string Running = "Running";
+    private const string CommunicationFault = "CommunicationFault";
+    private const string Shutdown = "Shutdown";
+
+    private string _state = Initializing;
     private string? _lastError;
     private DateTime? _connectedSince;
     private Subscription? _subscription;
@@ -153,13 +158,8 @@ internal sealed class MachineConnection : ISessionTenant
     /// <inheritdoc />
     public void SessionConnecting()
     {
-        lock (_gate)
-        {
-            if (_state != "Connected")
-            {
-                _state = "Connecting";
-            }
-        }
+        // The state stays what it is while the session connects: Initializing before the first one,
+        // CommunicationFault after a lost one, as Connection/State on the broker says.
     }
 
     /// <inheritdoc />
@@ -175,7 +175,7 @@ internal sealed class MachineConnection : ISessionTenant
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             await RemoveSubscriptionAsync(session).ConfigureAwait(false);
-            SetState("Disconnected", exception.Message);
+            SetState(CommunicationFault, exception.Message);
             await Output.LostAsync().ConfigureAwait(false);
             throw;
         }
@@ -183,7 +183,7 @@ internal sealed class MachineConnection : ISessionTenant
         // A registration without its identity learns it from the first values.
         await IdentifyAsync().ConfigureAwait(false);
         await Output.ReachedAsync().ConfigureAwait(false);
-        SetState("Connected", null);
+        SetState(Running, null);
         _logger.MachineConnected(Registration.SerialNumber, Registration.Endpoint.Url, Registration.Endpoint.SecurityMode.ToString(), Registration.Endpoint.SecurityPolicy);
     }
 
@@ -196,7 +196,7 @@ internal sealed class MachineConnection : ISessionTenant
         // The machine leaves on purpose: it is stopped or removed, and its output says so itself.
         _subscription = null;
         _alertSubscription = null;
-        SetState("Disconnected", null);
+        SetState(Shutdown, null);
     }
 
     /// <inheritdoc />
@@ -208,10 +208,10 @@ internal sealed class MachineConnection : ISessionTenant
         bool wasConnected;
         lock (_gate)
         {
-            wasConnected = _state == "Connected";
+            wasConnected = _state == Running;
         }
 
-        SetState("Disconnected", reason);
+        SetState(CommunicationFault, reason);
 
         // Also when the first connect fails: the machine is not reached, CommunicationFault. The output says it once.
         await Output.LostAsync().ConfigureAwait(false);
@@ -265,6 +265,10 @@ internal sealed class MachineConnection : ISessionTenant
         var subscription = new Subscription(session.DefaultSubscription) { PublishingInterval = interval, PublishingEnabled = true };
 #pragma warning restore CA2000, CS0618
         session.AddSubscription(subscription);
+
+        // Kept before it exists on the server, as the alarm subscription is: an attach that fails on the way
+        // removes it, and a retry does not leave one more behind each time.
+        _subscription = subscription;
         await subscription.CreateAsync(cancellationToken).ConfigureAwait(false);
 
         var items = new List<(ElementRuntime Runtime, MonitoredItem Item)>();
@@ -618,7 +622,7 @@ internal sealed class MachineConnection : ISessionTenant
     {
         lock (_gate)
         {
-            _connectedSince = state == "Connected" ? (_state == "Connected" ? _connectedSince : DateTime.UtcNow) : null;
+            _connectedSince = state == Running ? (_state == Running ? _connectedSince : DateTime.UtcNow) : null;
             _state = state;
             _lastError = error;
         }

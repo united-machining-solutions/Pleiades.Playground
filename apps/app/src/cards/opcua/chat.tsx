@@ -109,9 +109,9 @@ function ProfileBadges({ checks }: { checks?: ReadonlyArray<ProfileCheck> }) {
   if (!core) return null
   return (
     <span className="flex flex-wrap gap-1">
-      <Badge variant={core.fulfilled ? "secondary" : "destructive"}>
+      <Badge variant={core.fulfilled ? "secondary" : "outline"}>
         {core.fulfilled ? <CircleCheckIcon data-icon="inline-start" /> : <CircleAlertIcon data-icon="inline-start" />}
-        {core.fulfilled ? "Core fulfilled" : "Core not fulfilled"}
+        {core.fulfilled ? "Core complete" : `Core: ${core.missing.length} not available`}
       </Badge>
       {fulfilled.map((check) => (
         <Badge key={check.name} variant="outline">
@@ -226,6 +226,18 @@ function Done({ outcome, done }: { outcome: Outcome; done: string }) {
   )
 }
 
+/**
+ * What a call to the adapter gave, also when the server function rejects (its validator throws on a user name of
+ * only spaces, for example): then the reason is the outcome, and nothing stays busy.
+ */
+async function outcomeOf(call: () => Promise<Outcome>): Promise<Outcome> {
+  try {
+    return await call()
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) }
+  }
+}
+
 /** Remove, after the person confirmed it. */
 function RemoveServer({ server, onRemoved }: { server: Server; onRemoved: (outcome: Outcome) => void }) {
   const shared = server.sessionSharedWith ?? []
@@ -233,10 +245,12 @@ function RemoveServer({ server, onRemoved }: { server: Server; onRemoved: (outco
   const [busy, setBusy] = useState(false)
   const remove = async () => {
     setBusy(true)
-    const outcome = await removeMachine({ data: server.serialNumber })
-    setBusy(false)
-    setOpen(false)
-    onRemoved(outcome)
+    try {
+      onRemoved(await outcomeOf(() => removeMachine({ data: server.serialNumber })))
+    } finally {
+      setBusy(false)
+      setOpen(false)
+    }
   }
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
@@ -251,8 +265,8 @@ function RemoveServer({ server, onRemoved }: { server: Server; onRemoved: (outco
             {shared.length > 0
               ? `The adapter takes it off the session to ${server.endpoint.url}, which stays open for ${shared.join(", ")}, and forgets the registration.`
               : `The adapter closes its session to ${server.endpoint.url} and forgets the registration.`}{" "}
-            Then it deletes the values and events the machine sent: the machine leaves Home and the
-            history. This cannot be undone. To add it again, scan the server again.
+            Its last values are taken back from the broker. What was stored of it stays in the history. To add
+            it again, scan the server again.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -273,7 +287,9 @@ function ServerRow({ server }: { server: Server }) {
       <ItemContent>
         <ItemTitle>
           {server.serialNumber}
-          <Badge variant={server.state === "Connected" ? "secondary" : "destructive"}>{server.state}</Badge>
+          <Badge variant={server.state === "Running" ? "secondary" : server.state === "Initializing" ? "outline" : "destructive"}>
+            {server.state}
+          </Badge>
           {server.needsRescan && <Badge variant="destructive">Scan again</Badge>}
         </ItemTitle>
         <ItemDescription>
@@ -289,7 +305,7 @@ function ServerRow({ server }: { server: Server }) {
       <ItemActions>{removed?.ok ? null : <RemoveServer server={server} onRemoved={setRemoved} />}</ItemActions>
       {removed && (
         <div className="basis-full">
-          <Done outcome={removed} done={`${server.serialNumber} is removed, with its stored values and events.`} />
+          <Done outcome={removed} done={`${server.serialNumber} is removed.`} />
         </div>
       )}
     </Item>
@@ -422,9 +438,13 @@ function ShownProposal({ values }: { values: Proposal }) {
   const [busy, setBusy] = useState(false)
   const add = async () => {
     if (!values.draftId) return
+    const draftId = values.draftId
     setBusy(true)
-    setOutcome(await commitProposal({ data: values.draftId }))
-    setBusy(false)
+    try {
+      setOutcome(await outcomeOf(() => commitProposal({ data: draftId })))
+    } finally {
+      setBusy(false)
+    }
   }
   const verb = values.replaces ? "Replace the registration" : "Add the machine"
   return (
@@ -492,12 +512,15 @@ function UserForm({ url, user }: { url: string; user?: string }) {
   const store = async (form: HTMLFormElement) => {
     const data = new FormData(form)
     setBusy(true)
-    const result = await storeUser({
-      data: { url, user: String(data.get("user") ?? ""), password: String(data.get("password") ?? "") },
-    })
-    setBusy(false)
-    if (result.ok) form.reset()
-    setOutcome(result)
+    try {
+      const result = await outcomeOf(() =>
+        storeUser({ data: { url, user: String(data.get("user") ?? ""), password: String(data.get("password") ?? "") } }),
+      )
+      if (result.ok) form.reset()
+      setOutcome(result)
+    } finally {
+      setBusy(false)
+    }
   }
   if (outcome?.ok) {
     return <Done outcome={outcome} done="The user is stored. Tell the chat to go on: the scan logs in with it." />

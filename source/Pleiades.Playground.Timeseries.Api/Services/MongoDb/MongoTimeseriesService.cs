@@ -542,55 +542,6 @@ internal sealed class MongoTimeseriesService : ITimeseriesDbService
 
     #endregion
 
-    #region Deletion
-
-    /// <inheritdoc />
-    /// <remarks>
-    /// A filter on the meta field alone, which a time series collection deletes by whole buckets.
-    /// The guard of <c>topic_activity</c> is emptied as well: otherwise a topic that reports again
-    /// within the same minute would not be written to <c>topic_activity</c> again, and discovery
-    /// would miss it until the next minute.
-    /// </remarks>
-    public async Task<TimeseriesDeleteResultDto> DeleteByTopicPrefixAsync(string topicPrefix, CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(topicPrefix);
-
-        var startsWith = new BsonRegularExpression("^" + System.Text.RegularExpressions.Regex.Escape(topicPrefix));
-        var values = Builders<BsonDocument>.Filter.Regex(FieldNames.MetaTopic, startsWith);
-        long count = 0;
-
-        foreach (var (collection, name) in new[]
-                 {
-                     (_baseUnit, MeasurementNames.BaseUnitValues),
-                     (_string, MeasurementNames.StringValues),
-                     (_boolean, MeasurementNames.BooleanValues),
-                 })
-        {
-            count += await DeleteManyAsync(collection, values, name, cancellationToken).ConfigureAwait(false);
-        }
-
-        await DeleteManyAsync(_topicActivity, Builders<BsonDocument>.Filter.Regex(FieldNames.Topic, startsWith), MeasurementNames.TopicActivity, cancellationToken)
-            .ConfigureAwait(false);
-        _topicActivityGuard.Compact(1.0);
-
-        return new TimeseriesDeleteResultDto { ValuesCount = count };
-    }
-
-    private static async Task<long> DeleteManyAsync(IMongoCollection<BsonDocument> collection, FilterDefinition<BsonDocument> filter, string collectionName, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var result = await collection.DeleteManyAsync(filter, cancellationToken).ConfigureAwait(false);
-            return result.DeletedCount;
-        }
-        catch (MongoException ex)
-        {
-            throw new PleiadesWriteException($"Failed to delete data from MongoDB collection '{collectionName}'.", ex);
-        }
-    }
-
-    #endregion
-
     #region Statistics
 
     /// <inheritdoc />

@@ -22,8 +22,9 @@ A machine with an OPC UA server becomes a machine of the platform like the simul
 2. The chat scans the server with the OPC UA MCP tools, finds the endpoint with the best security, and
    matches its nodes to the data model by their browse paths, units, enumerations and descriptions.
 3. The person reviews the proposal, sees whether the machine fulfils the core of the data model, which
-   profiles are complete, and what is unclear or derived, and adds the machine with a click. A machine
-   without the whole core is not added ([Core and profiles](#core-and-profiles)).
+   profiles are complete, and what is unclear or derived, and adds the machine with a click. What the core
+   lacks is declared not available; only the parts of the machine id are required
+   ([Core and profiles](#core-and-profiles)).
 4. From then on the adapter runs the machine from the stored registration alone: after a full restart,
    without the MCP tools and without a language model, until the machine is removed.
 5. On request the chat scans an added server again and shows what changed, for example new profiles.
@@ -37,7 +38,7 @@ A machine with an OPC UA server becomes a machine of the platform like the simul
 | How a person starts a discovery, lists servers, reviews a mapping | In the chat only, no new page. Slash commands with `/help` guide the person |
 | Who adds and removes a machine | A person, with a button on a card in the chat. No tool of the MCP server adds or removes one |
 | How a machine is added and removed | The management API of the adapter; the registrations live in its volume |
-| Core and profiles | Those of the data model, specification 0.17.0. The whole core or no machine; of another profile only a complete one is published |
+| Core and profiles | Those of the data model 0.17.1. The core is declared whole, what the machine lacks `"available": false`, as the other adapters do; required are only `ManufacturerUri`, `Model` and `SerialNumber`, the machine id. Of another profile only a complete one is published |
 | What goes to the broker | The [binding of machines](../../contracts/mqtt/README.md#machines-the-binding-of-the-data-model) of the data model 0.17.1, with the publisher every adapter of the stack shares: manifest, values in the units of the catalogue, `Connection/State`, last will |
 | How a machine is named on the broker | By its machine id, `<manufacturer>_<model>_<serial number>`, formed from the identification read when it is added and kept with its registration |
 | One MQTT connection per machine | Yes: the binding wants a last will per machine, and a connection has one |
@@ -151,8 +152,8 @@ adapter (`OPCUA_MCP_URL`).
 | `/mapping <serial number>` | Shows mismatches and unclear mappings of one machine | `opcua_mapping_show` | mapping card, what needs a look first |
 | `/rescan <serial number>` | Scans an added server again and says what would change | as `/discover` | proposal card with the changes, with the button "Replace the registration" |
 
-Removal is the Remove button on the server list, behind a confirmation. It removes the machine completely, its
-retained messages on the broker and its stored values and events too
+Removal is the Remove button on the server list, behind a confirmation. It removes the machine and its
+retained messages on the broker; what the stores kept of it stays
 ([Restart, removal, a server that changed](#restart-removal-a-server-that-changed)).
 The model can neither add nor remove a machine, and is told never to say that it did.
 
@@ -324,7 +325,7 @@ prefix of a gateway; both are open.
 | `GET /machines` | The registered machines with their state, and the machines each shares its session with. |
 | `GET /machines/{SerialNumber}` | One machine: its registration, the last value of every element, the alarms that stand. |
 | `GET /machines/{SerialNumber}/mapping` | The mapping review of one machine, element by element. |
-| `DELETE /machines/{SerialNumber}` | Removes the machine, takes its retained messages back from the broker and then deletes its stored values and events, by its machine id. Answers how many, `{ "valuesDeleted", "eventsDeleted", "problems": [] }`; `404` if no such machine is added; `502` with the reasons if a store did not delete or the adapter knows no `Config:TimeseriesApi:Uri` or `Config:EventsApi:Uri`. The machine is removed all the same. |
+| `DELETE /machines/{SerialNumber}` | Removes the machine and takes its retained messages back from the broker. `204`, or `404` if no such machine is added. |
 
 A registration is refused with the reasons, one per line of `problems`: `400` if it is malformed, `409` if it
 does not fit its server, is not the machine it says it is or does not fulfil the core (checked once the server
@@ -380,17 +381,19 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
 ## Core and profiles
 
 The adapter checks every registration against the core and the profiles of the data model, specification
-0.17.0 (§5 and §6 of `spec/spec.md` of the data model), on the paths of its registrations
+0.17.1 (§5 and §6 of `spec/spec.md` of the data model), on the paths of its registrations
 ([`Mapping/DataModelProfiles.cs`](Mapping/DataModelProfiles.cs)), and publishes by the binding of the data model
 0.17.1 ([`contracts/datamodel`](../../contracts/datamodel/README.md)).
 
-- **Core.** Mandatory, every element: `Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`,
+- **Core.** Declared whole in every manifest: `Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`,
   `.ManufacturerUri`, `.Model`, `.ProductCode`, `.YearOfConstruction`, `State.MachineryItemState` and
   `State.MachineryOperationMode` (published together as the snapshot `State.Status`), `State.FeedOverride`,
   `OperationCounters.PowerOnDuration`, and `Notification.ActiveAlerts`, which the adapter builds from the alarm
   subscription in `alerts`. `Connection.State` and `Connection.Heartbeat` the adapter publishes
-  itself. An element counts if it is mapped, also as `Derived` or `Unclear`; one in `missing` does not. A
-  registration without the whole core is refused with what it lacks.
+  itself. An element counts if it is mapped, also as `Derived` or `Unclear`; one in `missing` does not. What
+  the machine lacks is `"available": false` in the manifest and goes out once as `null`, as with the Ultimaker
+  telemetry and the juice bar. A registration is refused only without the parts of the machine id:
+  `Identification.ManufacturerUri`, `.Model` and `.SerialNumber` must be mapped and give a value.
 - **Profiles.** `IdentificationExtended`, `MonitoringExtended`, `ChannelMonitoring`, `Spindle` and
   `EnergyElectricity`. A profile is published only if all its elements are mapped; otherwise its elements go
   to `missing` with the reason, and nothing of it reaches the broker. Of a profile with instances, a channel, a
@@ -404,11 +407,10 @@ The adapter checks every registration against the core and the profiles of the d
   `Production.ActiveProgram` as `WorkMasterMonitoring.ActiveWorkMaster`, the active work master, which on a
   machine without work masters of its own is the name of its program. `Identification.SoftwareRevision` is no
   element of the model 0.17.1 (it lists the software in `Components.Software`) and goes out as a signal of the
-  manufacturer, below `oem/`. The manifest declares only the complete profiles; an element
-  of the core the machine lacks cannot occur, since such a machine is not added.
+  manufacturer, below `oem/`. The manifest declares the core and the complete profiles.
 
-The proposal card in the chat and the list of the added servers show it: `Core fulfilled` or `Core not
-fulfilled`, a badge per complete profile, and what an incomplete one lacks. The answers carry it as
+The proposal card in the chat and the list of the added servers show it: `Core complete` or how many
+elements of the core are not available, a badge per complete profile, and what an incomplete one lacks. The answers carry it as
 `conformance`, one entry per profile with `name`, `mandatory`, `fulfilled`, `offered`, `missing` and the complete
 `instances`.
 `profiles` names the complete ones. A machine added before the core was checked keeps running from its
@@ -474,14 +476,10 @@ so none stays open for ever.
   every registration.
 - **Removal.** The machine leaves its session, the alarms that stand are cleared, every retained message of the
   machine is taken back from the broker with an empty one, its connection to the broker ends without its last
-  will, and the registration is deleted. The session closes with the last machine of its endpoint. Then the
-  adapter deletes what the machine published, through the REST contracts of the stores, by its machine id: its
-  values with `DELETE /machines/{machineId}` of the Timeseries API, its events with
-  `DELETE /machineEvents/machines/{machineId}` of the Events API (`Config:TimeseriesApi:Uri`,
-  `Config:EventsApi:Uri`). It waits `Config:DataSettleTime`, 8 seconds, before: the timeseries persistence
-  stores in batches of 5 seconds, and the last values and events are to be stored before they are deleted, or
-  the machine would come back with them. The machine leaves Home and the history, and the broker brings nothing
-  of it back. A store that cannot be reached is named in the answer, and its data stays.
+  will, and the registration is deleted, the manifest last. The session closes with the last machine of its
+  endpoint. The broker brings nothing of the machine back to a new subscriber. What the stores kept of it stays:
+  the machine leaves Home once its values are older than the list looks back, and its history remains. Deleting
+  the stored data of a machine is a step of its own, with a contract of its own, in a later pull request.
 - **A server that changed.** If a registered node is gone, the element says so and the machine has
   `needsRescan: true`. `/rescan` is the discovery again; its proposal says what would change, and the button
   replaces the registration. The subscription is built anew without a restart of the service. That is also how
@@ -511,6 +509,13 @@ What the scan of the TRUMPF simulator found, and what it did not. Another server
 
 ## What is verified
 
+- After the review (2026-11-18, same stack): the K09 example is added again as
+  `trumpf_TruMatic-1000-fiber_A1121O0001`; without its alarm subscription it is added all the same, the manifest
+  declares `Core` with `Notification.ActiveAlerts` `"available": false` and the list goes out once as `null`. With
+  the simulator stopped the machine says `CommunicationFault` within 10 seconds, with the reason in `lastError`
+  and on the broker, and every connect fails at once and backs off (4, 8, 16, 32 s); started again, it is
+  `Running` within 20 seconds. Removal answers `204`, a second one `404`, and no retained message of the machine
+  is left. `/openapi/v1.json` lists the management API.
 - The binding of machines (2026-11-18, the stack of `main` with this branch, simulator `1.4.0-alpha3`, definition
   `K09`): the example registration, on the machine in `urn:umati2:datamodel:opcua`, is added as
   `trumpf_TruMatic-1000-fiber_A1121O0001`. The broker holds the manifest (profiles `Core` and
@@ -518,9 +523,9 @@ What the scan of the TRUMPF simulator found, and what it did not. Another server
   `State.Status`, the numbers with `one`, `second`, `watt` and `wattHour`, `WorkMasterMonitoring/ActiveWorkMaster`,
   `oem/ActivityMeters/DrivesOnDuration`, `Notification.ActiveAlerts`, the heartbeat and `Running`, all retained;
   the alarms of the simulator are stored as `AlertRaised` and `AlertCleared`, and Home shows "TruMatic 1000 fiber
-  A1121O0001" with its alarm and its program. Removal answered after 9 seconds with 149 values and 12 events
-  deleted; no retained message of the machine was left on the broker, and 15 seconds later nothing of it was
-  stored. The earlier example, on the MachineTool instance, was added as `unknown_A1121O0001_A1121O0001`: there
+  A1121O0001" with its alarm and its program. On removal no retained message of the machine was left on the
+  broker. (That run still deleted the stored data too, 149 values and 12 events; that part has left this pull
+  request.) The earlier example, on the MachineTool instance, was added as `unknown_A1121O0001_A1121O0001`: there
   `ManufacturerUri`, `ProductCode` and `YearOfConstruction` answer `BadWaitingForInitialData`, and the known
   mapping gives the serial number as the model. The points below were tried with the earlier binding.
 - The adapter connects to the simulator with SignAndEncrypt and `Aes256_Sha256_RsaPss`, the strongest of seven
@@ -532,9 +537,7 @@ What the scan of the TRUMPF simulator found, and what it did not. Another server
 - Restart of the adapter: the machine comes back from the volume in about a second, without the MCP tools.
 - Loss of the server: the machine goes Disconnected and is Connected again a few seconds after the server is back.
 - Removal, also with the button in the app: session closed, Disconnected published, open alarms reset,
-  registration deleted. With the stored data (2026-11-18, simulator `1.4.0-alpha3`, definition `L26` in the
-  namespace `urn:umati2:datamodel:opcua`): 13 topics stored, the removal answered after 9 seconds with 19
-  values deleted, and 12 seconds later no topic of the machine was left.
+  registration deleted.
 - The MCP endpoint of the adapter: an encrypted scan session through the hosted library, a proposal with 2
   derived and 2 unclear elements (before the known mapping added `Identification.Model` as a third derived one),
   a commit that works once and answers 404 the second time.

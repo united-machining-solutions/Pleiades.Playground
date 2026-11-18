@@ -65,7 +65,8 @@ builder.Services.AddOpcUa()
 
 builder.Services.AddSingleton(new RegistrationStore(dataDirectory));
 builder.Services.AddSingleton(new AlertStore(dataDirectory));
-builder.Services.AddSingleton(new CredentialStore(dataDirectory));
+builder.Services.AddSingleton(services => new CredentialStore(
+    dataDirectory, reason => services.GetRequiredService<ILogger<CredentialStore>>().CredentialsUnreadable(reason)));
 builder.Services.AddSingleton<DraftStore>();
 builder.Services.AddSingleton<OpcUaClient>();
 builder.Services.AddSingleton<RegistrationProbe>();
@@ -73,10 +74,11 @@ builder.Services.AddSingleton<RegistrationProbe>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IMachineOutputFactory, MachineOutputFactory>();
 builder.Services.AddHostedService<OpcUaConfigurationShare>();
-// The values and events of a removed machine are deleted through the REST contracts of the stores.
-builder.Services.AddHttpClient<MachineDataEraser>(http => http.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddSingleton<MachineSupervisor>();
 builder.Services.AddHostedService(services => services.GetRequiredService<MachineSupervisor>());
+
+// The management API describes itself: that document is its contract (contracts/openapi).
+builder.Services.AddOpenApi();
 
 builder.Services.AddPleiadesDefaultJsonOptions();
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -133,6 +135,7 @@ app.Use((context, next) =>
 });
 
 app.MapPleiadesHealthChecks();
+app.MapOpenApi();
 app.MapMachineEndpoints();
 app.MapPleiadesMcp();
 

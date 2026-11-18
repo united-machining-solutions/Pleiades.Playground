@@ -103,15 +103,6 @@ public interface ITimeseriesDbService : IDisposable
     Task<TopicsDto> GetTopicsByTimeRangeAsync(DateTime startTime, DateTime stopTime, TimeSpan timeout, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Deletes every data point (base unit, string and boolean) of every topic that begins with
-    /// <paramref name="topicPrefix"/>, and the topic activity of those topics. The prefix is taken
-    /// literally: it has no wildcards.
-    /// </summary>
-    /// <param name="topicPrefix">The beginning of the topics, for example <c>machines/P-04/</c>. Must not be empty.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    Task<TimeseriesDeleteResultDto> DeleteByTopicPrefixAsync(string topicPrefix, CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Checks if the timeseries database server is reachable.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>

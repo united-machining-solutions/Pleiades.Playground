@@ -40,11 +40,14 @@ public class MachineOutputTest
 
         Assert.IsNotNull(identity);
         Assert.AreEqual(MachineId, identity.MachineId);
-        Assert.AreEqual("trumpf_unknown_A0280O0001",
-            MachineOutput.IdentityOf(path => path == "Identification.Model" ? null : values.GetValueOrDefault(path), "A0280O0001")!.MachineId,
-            "A part that is missing is unknown, as the binding says.");
-        Assert.IsNull(MachineOutput.IdentityOf(path => path == "Identification.ProductInstanceUri" ? null : values.GetValueOrDefault(path), "A0280O0001"),
-            "Without the ProductInstanceUri there is no source of an event.");
+        Assert.IsNull(MachineOutput.IdentityOf(path => path == "Identification.Model" ? null : values.GetValueOrDefault(path), "A0280O0001"),
+            "Without a model there is no machine id.");
+        Assert.IsNull(MachineOutput.IdentityOf(path => path == "Identification.ManufacturerUri" ? null : values.GetValueOrDefault(path), "A0280O0001"),
+            "Without the web address of the manufacturer there is no machine id.");
+        var formed = MachineOutput.IdentityOf(
+            path => path is "Identification.ProductInstanceUri" or "Identification.Manufacturer" ? null : values.GetValueOrDefault(path), "A0280O0001")!;
+        Assert.AreEqual("https://www.trumpf.com/TruLaser%205030/A0280O0001", formed.ProductInstanceUri, "Formed as the binding forms it.");
+        Assert.AreEqual("trumpf.com", formed.Manufacturer, "Named by the domain of its web address.");
     }
 
     [TestMethod]
@@ -188,7 +191,7 @@ public class MachineOutputTest
         var cleared = removedClient.Take();
         Assert.IsTrue(cleared.All(m => m.Retain && m.Payload.IsEmpty), "An empty retained message takes a retained one back.");
         var topics = cleared.Select(m => m.Topic).ToList();
-        CollectionAssert.Contains(topics, $"{Root}/umati/Manifest");
+        Assert.AreEqual($"{Root}/umati/Manifest", topics[^1], "The manifest goes last.");
         CollectionAssert.Contains(topics, $"{Root}/umati/State/FeedOverride");
         CollectionAssert.Contains(topics, $"{Root}/umati/Connection/State");
         CollectionAssert.Contains(topics, $"{Root}/oem/Laser/Power");

@@ -17,7 +17,7 @@ internal enum ProfileSource
 
 /// <summary>A profile of the data model: its elements and whether a machine has to deliver it.</summary>
 /// <param name="Name">The name of the profile in the specification, for example <c>ChannelMonitoring</c>.</param>
-/// <param name="Mandatory">True for <c>Core</c>: a machine without it is not added.</param>
+/// <param name="Mandatory">True for <c>Core</c>: every manifest declares it whole, what the machine lacks as not available.</param>
 /// <param name="Elements">
 /// The paths of its elements as the MQTT binding names them. In a profile with instances, the path
 /// below the instance: <c>ChannelState</c> of <c>Channel[1].ChannelState</c>.
@@ -66,7 +66,7 @@ internal static class DataModelProfiles
     public const string CoreName = "Core";
 
     /// <summary>The version of the specification the profiles follow.</summary>
-    public const string SpecificationVersion = "0.17.0";
+    public const string SpecificationVersion = "0.17.1";
 
     /// <summary>The path of the alarms in the core.</summary>
     public const string ActiveAlertsPath = "Notification.ActiveAlerts";
@@ -142,21 +142,13 @@ internal static class DataModelProfiles
         return checks.First(check => check.Name == CoreName);
     }
 
-    /// <summary>The problem of a registration whose core is not complete, or null.</summary>
-    public static string? CoreProblem(IReadOnlyList<ProfileCheck> checks)
-    {
-        var core = CoreOf(checks);
-        return core.Fulfilled
-            ? null
-            : $"profiles: the machine does not fulfil the core of the data model {SpecificationVersion}, which a machine needs to be added. Not mapped: {string.Join(", ", core.Missing)}.";
-    }
-
     /// <summary>
     /// The registration as it is published: the elements of a profile that is not complete, and of
     /// an instance that is not complete, are taken out and put into <c>missing</c> with the reason;
-    /// <c>profiles</c> names the profiles that are complete. The core is never taken out: a
-    /// registration without it is refused. Elements of no profile, of the maker or of the binding
-    /// alone, are kept.
+    /// <c>profiles</c> names the core, which every manifest declares whole (what the machine lacks is
+    /// <c>"available": false</c>, as with the other adapters of the stack), and the other profiles that are
+    /// complete. An element of the core is never taken out. Elements of no profile, of the maker or of the
+    /// binding alone, are kept.
     /// </summary>
     public static MachineRegistration Apply(MachineRegistration registration, out IReadOnlyList<ProfileCheck> checks)
     {
@@ -183,7 +175,7 @@ internal static class DataModelProfiles
             }
         }
 
-        var profiles = checks.Where(check => check.Fulfilled).Select(check => check.Name).ToList();
+        var profiles = checks.Where(check => check.Mandatory || check.Fulfilled).Select(check => check.Name).ToList();
         return registration with
         {
             Profiles = profiles,

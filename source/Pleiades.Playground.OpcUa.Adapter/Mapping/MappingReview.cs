@@ -86,8 +86,8 @@ internal static class MappingReview
             }
 
             var detail = source == ProfileSource.Alerts
-                ? "Mandatory in the core: the registration subscribes no alarms (alerts)."
-                : "Mandatory in the core, and not mapped.";
+                ? "In the core, and the registration subscribes no alarms (alerts): the manifest says it is not available."
+                : "In the core, and not mapped: the manifest says it is not available.";
             rows.Add(new MappingRow(path, "umati", MappingState.Missing, null, detail, null, null));
         }
 

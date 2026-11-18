@@ -81,6 +81,9 @@ internal sealed class OpcUaClient : ISessionConnector
     private readonly CredentialStore _credentials;
 
     /// <summary>Creates the client on the services of the OPC UA stack.</summary>
+    /// <summary>How long a connect may take before it fails.</summary>
+    public static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(30);
+
     public OpcUaClient(IOpcUaDiscoveryService discovery, IManagedSessionFactory sessions, CredentialStore credentials)
     {
         _discovery = discovery ?? throw new ArgumentNullException(nameof(discovery));
@@ -151,6 +154,15 @@ internal sealed class OpcUaClient : ISessionConnector
         }
 
         var thumbprint = Thumbprint(selected);
+
+        // The password goes to the certificate that accepted the user, and to no other one at the same address.
+        if (credential is not null && !credential.Trusts(thumbprint))
+        {
+            throw new ServerCertificateChangedException(
+                $"The server at {endpoint.Url} presents the certificate {thumbprint}, the user {credential.User} was stored with " +
+                $"{credential.ServerCertificateThumbprint}. The password is not sent; a person enters the user again if the certificate was renewed on purpose.");
+        }
+
         if (endpoint.ServerCertificateThumbprint is { Length: > 0 } pinned
             && !string.Equals(pinned, thumbprint, StringComparison.OrdinalIgnoreCase))
         {
@@ -167,16 +179,27 @@ internal sealed class OpcUaClient : ISessionConnector
             selected.EndpointUrl = new UriBuilder(announced) { Host = reached.IdnHost, Port = reached.Port }.ToString();
         }
 
+        // The managed session of the stack may try a connect again and again; a connect that does not end in
+        // ConnectTimeout fails, so the back-off of the session and the LastError of the machine take over.
+        using var limited = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limited.CancelAfter(ConnectTimeout);
         var configured = new ConfiguredEndpoint(null, selected, null);
-        var session = credential is null
-            ? await _sessions.ConnectAsync(configured, cancellationToken).ConfigureAwait(false)
-            : await _sessions.ConnectAsync(
-                configured,
-                builder => builder
-                    .WithUserIdentity(new UserIdentity(credential.User, Encoding.UTF8.GetBytes(credential.Password)))
-                    .WithReconnectPolicy(new RefusedUserPolicy()),
-                cancellationToken).ConfigureAwait(false);
-        return (session, thumbprint);
+        try
+        {
+            var session = credential is null
+                ? await _sessions.ConnectAsync(configured, limited.Token).ConfigureAwait(false)
+                : await _sessions.ConnectAsync(
+                    configured,
+                    builder => builder
+                        .WithUserIdentity(new UserIdentity(credential.User, Encoding.UTF8.GetBytes(credential.Password)))
+                        .WithReconnectPolicy(new RefusedUserPolicy()),
+                    limited.Token).ConfigureAwait(false);
+            return (session, thumbprint);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException($"The server at {endpoint.Url} did not open a session within {ConnectTimeout.TotalSeconds:0} seconds.");
+        }
     }
 
     /// <inheritdoc />

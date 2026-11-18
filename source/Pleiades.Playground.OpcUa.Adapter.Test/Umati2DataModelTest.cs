@@ -35,7 +35,7 @@ public class Umati2DataModelTest
         Assert.IsTrue(applied.Elements.All(element => element.Evidence!.StartsWith("Known mapping of the adapter for urn:umati2:datamodel:opcua", StringComparison.Ordinal)));
         Assert.IsEmpty(RegistrationValidator.Validate(applied));
         var withAlerts = applied with { Alerts = new AlertRegistration { EventType = "i=2915" } };
-        Assert.IsNull(DataModelProfiles.CoreProblem(DataModelProfiles.Check(withAlerts)), "With an alarm subscription the namespace gives the whole core.");
+        Assert.IsTrue(DataModelProfiles.CoreOf(DataModelProfiles.Check(withAlerts)).Fulfilled, "With an alarm subscription the namespace gives the whole core.");
     }
 
     [TestMethod]

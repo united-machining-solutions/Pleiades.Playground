@@ -35,36 +35,7 @@ internal sealed class Config
     [Required]
     public string ApplicationUri { get; init; } = "urn:pleiades:playground:opcua:adapter";
 
-    /// <summary>
-    /// The Timeseries API, where the values of the machines are stored. Removing a machine deletes its
-    /// values there. Without it they stay stored.
-    /// </summary>
-    public ApiConfig? TimeseriesApi { get; init; }
-
-    /// <summary>
-    /// The Events API, where the notifications of the machines are stored. Removing a machine deletes its
-    /// notifications there. Without it they stay stored.
-    /// </summary>
-    public ApiConfig? EventsApi { get; init; }
-
-    /// <summary>
-    /// How long a removal waits, after the machine has stopped, before it deletes the stored data. It is to
-    /// be longer than the caching time of the timeseries persistence (5 seconds in the stack), so that the
-    /// last values the machine published, and its <c>Disconnected</c>, are stored before they are deleted.
-    /// </summary>
-    [Range(typeof(TimeSpan), "00:00:00", "00:01:00")]
-    public TimeSpan DataSettleTime { get; init; } = TimeSpan.FromSeconds(8);
-
     /// <summary>Loki logging configuration.</summary>
     [Required]
     public required SerilogLokiConfig Loki { get; init; }
-}
-
-/// <summary>A REST API of the stack the adapter calls.</summary>
-[SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",
-    Justification = "Bound by the configuration binder, never constructed in code")]
-internal sealed class ApiConfig
-{
-    /// <summary>The base address, for example <c>http://timeseries-api:8080</c>.</summary>
-    public Uri? Uri { get; init; }
 }

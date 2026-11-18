@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using Pleiades.Playground.OpcUa.Adapter.OpcUa;
 using Pleiades.Playground.OpcUa.Adapter.Registrations;
 
 namespace Pleiades.Playground.OpcUa.Adapter.McpTools;
@@ -120,22 +121,101 @@ internal static class ScanConnect
                 return next(request, cancellationToken);
             }
 
-            if (UserIn(call.Arguments).Count > 0)
-            {
-                return ValueTask.FromResult(Refused());
-            }
-
             var credentials = request.Services?.GetService(typeof(CredentialStore)) as CredentialStore;
-            if (call.Arguments is { } arguments
-                && arguments.TryGetValue("endpointUrl", out var url)
-                && url.ValueKind == JsonValueKind.String
-                && credentials?.Find(url.GetString() ?? string.Empty) is { } credential)
-            {
-                call.Arguments = WithUser(arguments, credential);
-            }
-
-            return next(request, cancellationToken);
+            var client = request.Services?.GetService(typeof(OpcUaClient)) as OpcUaClient;
+            return CallAsync(
+                call,
+                credentials is null ? null : credentials.Find,
+                client is null ? null : client.GetEndpointsAsync,
+                (_, token) => next(request, token),
+                cancellationToken);
         };
+
+    /// <summary>
+    /// What the filter does with a call of the connect tool: a call that brings a user is refused; a call to a
+    /// server with a stored user gets that user, if the server presents the certificate the user was stored with,
+    /// and its result loses the password wherever it might be echoed. Every other call goes on as it is.
+    /// </summary>
+    /// <param name="call">The call of the connect tool.</param>
+    /// <param name="findCredential">The stored user of a server address, or null.</param>
+    /// <param name="offered">The endpoints a server offers, with their certificates; null to skip the check.</param>
+    /// <param name="next">The tool.</param>
+    /// <param name="cancellationToken">Cancels the call.</param>
+    public static async ValueTask<CallToolResult> CallAsync(
+        CallToolRequestParams call,
+        Func<string, Credential?>? findCredential,
+        Func<string, CancellationToken, Task<IReadOnlyList<OfferedEndpoint>>>? offered,
+        Func<CallToolRequestParams, CancellationToken, ValueTask<CallToolResult>> next,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(call);
+        ArgumentNullException.ThrowIfNull(next);
+        if (UserIn(call.Arguments).Count > 0)
+        {
+            return Refused();
+        }
+
+        if (call.Arguments is not { } arguments
+            || !arguments.TryGetValue("endpointUrl", out var url)
+            || url.ValueKind != JsonValueKind.String
+            || findCredential?.Invoke(url.GetString() ?? string.Empty) is not { } credential)
+        {
+            return await next(call, cancellationToken).ConfigureAwait(false);
+        }
+
+        // The password goes only to the certificate the user was stored with: the scan connects to whatever
+        // answers at the address the model chose, and the library accepts every certificate there.
+        if (offered is not null)
+        {
+            var endpoints = await offered(url.GetString()!, cancellationToken).ConfigureAwait(false);
+            if (!endpoints.Any(endpoint => credential.Trusts(endpoint.ServerCertificateThumbprint)))
+            {
+                return CertificateRefused();
+            }
+        }
+
+        call.Arguments = WithUser(arguments, credential);
+        return Redacted(await next(call, cancellationToken).ConfigureAwait(false), credential.Password);
+    }
+
+    /// <summary>What the model reads when the server presents another certificate than the stored user's.</summary>
+    public const string CertificateRefusal =
+        "The server at this address presents another certificate than the one its user was stored with, so the " +
+        "password is not sent. If the certificate was renewed on purpose, a person enters the user again on the card " +
+        "of opcua_endpoint_rank.";
+
+    /// <summary>The answer when the certificate of the server is not the one of the stored user.</summary>
+    public static CallToolResult CertificateRefused() => new()
+    {
+        IsError = true,
+        Content = [new TextContentBlock { Text = CertificateRefusal }],
+    };
+
+    /// <summary>
+    /// The result without the password, wherever a text of the library might echo the arguments, so that the
+    /// model never reads it.
+    /// </summary>
+    public static CallToolResult Redacted(CallToolResult result, string password)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        if (string.IsNullOrEmpty(password))
+        {
+            return result;
+        }
+
+        foreach (var text in result.Content.OfType<TextContentBlock>())
+        {
+            text.Text = text.Text.Replace(password, "***", StringComparison.Ordinal);
+        }
+
+        if (result.StructuredContent is { } structured && structured.GetRawText().Contains(password, StringComparison.Ordinal))
+        {
+            result.StructuredContent = JsonSerializer.SerializeToElement(
+                JsonNode.Parse(structured.GetRawText().Replace(password, "***", StringComparison.Ordinal)));
+        }
+
+        return result;
+    }
 
     /// <summary>
     /// The arguments of a connect call with a stored user: a user name and a password, over an encrypted

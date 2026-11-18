@@ -54,7 +54,7 @@ public class DataModelProfilesTest
         CollectionAssert.AreEqual(
             new[] { "Identification.ProductCode", DataModelProfiles.ActiveAlertsPath },
             DataModelProfiles.CoreOf(checks).Missing.ToArray());
-        StringAssert.Contains(DataModelProfiles.CoreProblem(checks), "Identification.ProductCode, Notification.ActiveAlerts", StringComparison.Ordinal);
+        Assert.IsFalse(DataModelProfiles.CoreOf(checks).Fulfilled);
     }
 
     [TestMethod]
@@ -135,8 +135,8 @@ public class DataModelProfilesTest
 
         Assert.HasCount(1, applied.Elements);
         Assert.IsEmpty(applied.Missing);
-        Assert.IsEmpty(applied.Profiles);
-        Assert.IsNotNull(DataModelProfiles.CoreProblem(checks));
+        CollectionAssert.AreEqual(new[] { "Core" }, applied.Profiles.ToArray(), "The core is declared whole, also when the machine lacks parts of it.");
+        Assert.IsFalse(DataModelProfiles.CoreOf(checks).Fulfilled);
     }
 
     [TestMethod]

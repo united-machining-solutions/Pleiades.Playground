@@ -146,20 +146,23 @@ internal sealed partial class MachineOutput : IMachineOutput
     public string? MachineId => _identity is null ? null : MachineIdentityOf(_identity, _registration.SerialNumber).MachineId;
 
     /// <summary>
-    /// The identity of a machine from the values of its identification, or null without <c>Manufacturer</c> or
-    /// <c>ProductInstanceUri</c>, which every adapter delivers. <c>ManufacturerUri</c> and <c>Model</c> may be
-    /// missing: the binding makes an empty part of the machine id <c>unknown</c>. The serial number is the one of
-    /// the registration.
+    /// The identity of a machine from the values of its identification, or null without <c>ManufacturerUri</c> or
+    /// <c>Model</c>: with the serial number of the registration they are the machine id. A machine without a
+    /// <c>ProductInstanceUri</c> gets the one the binding forms, <c>{ManufacturerUri}/{Model}/{SerialNumber}</c>;
+    /// one without a <c>Manufacturer</c> is named by the domain of its <c>ManufacturerUri</c>.
     /// </summary>
     public static IdentityRegistration? IdentityOf(Func<string, string?> valueOf, string serialNumber)
     {
         ArgumentNullException.ThrowIfNull(valueOf);
+        var manufacturerUri = valueOf(MachineManifest.ManufacturerUri) ?? string.Empty;
+        var model = valueOf(MachineManifest.Model) ?? string.Empty;
         var identity = new IdentityRegistration
         {
-            Manufacturer = valueOf(MachineManifest.Manufacturer) ?? string.Empty,
-            ManufacturerUri = valueOf(MachineManifest.ManufacturerUri) ?? string.Empty,
-            Model = valueOf(MachineManifest.Model) ?? string.Empty,
-            ProductInstanceUri = valueOf(MachineManifest.ProductInstanceUri) ?? string.Empty,
+            Manufacturer = NonEmpty(valueOf(MachineManifest.Manufacturer)) ?? MachineBinding.DomainOf(manufacturerUri),
+            ManufacturerUri = manufacturerUri,
+            Model = model,
+            ProductInstanceUri = NonEmpty(valueOf(MachineManifest.ProductInstanceUri))
+                ?? new MachineIdentity(string.Empty, manufacturerUri, model, serialNumber).EffectiveProductInstanceUri,
         };
         return Complete(identity) is { } complete
             ? complete with { MachineId = MachineIdentityOf(complete, serialNumber).MachineId }
@@ -619,9 +622,9 @@ internal sealed partial class MachineOutput : IMachineOutput
             .WithRetainFlag(false)
             .Build();
 
+    /// <summary>Every retained topic of the machine, the manifest last: a consumer that still sees it knows the values.</summary>
     private IEnumerable<string> RetainedTopics(string machineId)
     {
-        yield return MachineBinding.ManifestTopic(machineId);
         var paths = new HashSet<string>(StringComparer.Ordinal)
         {
             MachineBinding.ConnectionState, MachineBinding.Heartbeat,
@@ -643,6 +646,8 @@ internal sealed partial class MachineOutput : IMachineOutput
         {
             yield return MachineBinding.Topic(machineId, path);
         }
+
+        yield return MachineBinding.ManifestTopic(machineId);
     }
 
     private async Task DrainAsync()
@@ -662,10 +667,14 @@ internal sealed partial class MachineOutput : IMachineOutput
 
     private static IdentityRegistration? Complete(IdentityRegistration? identity) =>
         identity is not null
+        && !string.IsNullOrWhiteSpace(identity.ManufacturerUri)
+        && !string.IsNullOrWhiteSpace(identity.Model)
         && !string.IsNullOrWhiteSpace(identity.Manufacturer)
         && !string.IsNullOrWhiteSpace(identity.ProductInstanceUri)
             ? identity
             : null;
+
+    private static string? NonEmpty(string? text) => string.IsNullOrWhiteSpace(text) ? null : text;
 
     private static MachineSignal Signal(ElementRegistration element)
     {
@@ -683,7 +692,7 @@ internal sealed partial class MachineOutput : IMachineOutput
     private partial void LogStarted(string serialNumber, string machineId);
 
     [LoggerMessage(EventId = 301, Level = LogLevel.Information,
-        Message = "Machine {SerialNumber} has no identity yet: it is published once its server gave Manufacturer and ProductInstanceUri")]
+        Message = "Machine {SerialNumber} has no identity yet: it is published once its server gave ManufacturerUri and Model")]
     private partial void LogNotIdentified(string serialNumber);
 
     [LoggerMessage(EventId = 303, Level = LogLevel.Warning, Message = "Machine {SerialNumber}: the oldest alert event that waited for the identity is dropped")]

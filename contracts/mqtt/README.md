@@ -542,8 +542,8 @@ will (client id `opcua-adapter-<machineId>`). What it publishes follows from the
 
 - The machine id is formed from `Identification.ManufacturerUri`, `Model` and `SerialNumber` as the server gave
   them when the machine was added, and kept with the registration.
-- The manifest declares the profiles whose elements the registration maps whole, the core among them: a
-  machine without the whole core is not added. A value of the maker is a signal of the manufacturer, below
+- The manifest declares the core whole, what the machine lacks `"available": false`, and the other profiles
+  whose elements the registration maps whole. A value of the maker is a signal of the manufacturer, below
   `oem/`, with the prefix of the domain of its `ManufacturerUri`.
 - A value goes out when the server reports a change, with the time of the source (`"timestampSource":
   "source"`), in the unit of the catalogue. `State.Status` is built from the two fields of the state.

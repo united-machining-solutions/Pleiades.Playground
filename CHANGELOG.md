@@ -232,22 +232,17 @@ All notable changes are documented here. The format follows
   item state and the operation mode as the members of the structure `State.Status`, which the adapter
   decodes. An element the server does not fill is moved to `missing`. A machine a server shows twice, in that
   namespace and by the root of its TRUMPF interface, is listed once.
-- OPC UA adapter: the core and the profiles of the data model, specification 0.17.0. A machine is added only if it fulfils the core whole: 13 elements, among them
-  `Identification.ManufacturerUri`, `.Model`, `.ProductCode`, `.YearOfConstruction`, `State.FeedOverride` and
-  the alarms, which come from `alerts`. Of `IdentificationExtended`, `MonitoringExtended`, `ChannelMonitoring`,
+- OPC UA adapter: the core and the profiles of the data model 0.17.1. The core is declared whole, what the
+  machine lacks `"available": false`, as the other adapters do; a machine is refused only without
+  `Identification.ManufacturerUri`, `.Model` and `.SerialNumber`, the parts of its machine id. The alarms of the
+  core come from `alerts`. Of `IdentificationExtended`, `MonitoringExtended`, `ChannelMonitoring`,
   `Spindle` and `EnergyElectricity` only a complete profile, or a complete channel, spindle or measuring point,
   is published; the elements of an incomplete one go to `missing`. The adapter names the profiles itself. The
   proposal card and the list of the added servers in the chat show whether the core is fulfilled and which
   profiles are complete, and the answers carry it as `conformance`.
-- The data of a machine can be deleted. `DELETE /machines/{machineId}` of the Timeseries API deletes every
-  value below `machines/{machineId}/`, `DELETE /machineEvents/machines/{mId}` of the Events API every
-  event of the machine; each says how many, and refuses a machine id with `/`, `+` or `#`. No MCP
-  tool deletes: a language model cannot.
-- OPC UA adapter: removing a machine removes it completely. It takes the retained messages of the machine back
-  from the broker, and after the registration deletes its stored values and events through those two endpoints,
-  by its machine id (`Config:TimeseriesApi:Uri`, `Config:EventsApi:Uri`, set in `compose.yaml`), after
-  `Config:DataSettleTime` (8 s), so that its last values are stored first. The answer says how many; the Remove
-  dialog in the chat says so.
+- OPC UA adapter: removing a machine takes every retained message of it back from the broker, the manifest
+  last, so that a new subscriber no longer sees it. What the stores kept of it stays; deleting it is a pull
+  request of its own.
 - OPC UA adapter: it publishes by the binding of machines, with the publisher the Ultimaker telemetry and the
   juice bar use, and one MQTT connection per machine, each with its own last will. A machine is named by its
   machine id, `<manufacturer>_<model>_<serial number>`, formed from the identification its server gave when it
@@ -355,13 +350,11 @@ All notable changes are documented here. The format follows
 - Stack: the image of the simulator is built once, by `simulator-p-04`, and no longer once per simulator.
 - Stack: the OPC UA simulator runs the image `1.4.0-alpha3` instead of `1.3.1`, still definition `K09`, machine
   `A1121O0001`. That image is built for amd64 only; on arm64, `OPC_SIMULATOR_IMAGE` names another one.
-- OPC UA adapter: a registration that names the profiles `Core` without the 13 elements of the core of the
-  specification 0.17.0 is refused; a machine added before keeps running and the list says what it lacks. The
-  example registration of `K09` names the machine in `urn:umati2:datamodel:opcua` and fulfils the core from it,
+- OPC UA adapter: the example registration of `K09` names the machine in `urn:umati2:datamodel:opcua` and fulfils the core from it,
   with the model `TruMatic 1000 fiber` instead of the serial number the known mapping of the MachineTool instance
   gives; it adds the active program, power, energy and the drive time from the TRUMPF interface. Its channel
   values are no longer published: the simulator has no `RapidOverride`, so `ChannelMonitoring` is not complete.
-  The example of `L26` does not fulfil the core.
+  The example of `L26` lacks the web address of the manufacturer and is refused.
 - `README.md` starts the stack with `--wait` and shows the two lines that enable the chat. The development
   setup has three more known issues: a download that breaks off, `pnpm` through the path, and a key that
   `docker compose restart` does not pick up.
