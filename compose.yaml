@@ -36,6 +36,23 @@ x-simulator: &simulator
     events-persistence:
       condition: service_healthy
 
+x-cutting-simulator: &cutting-simulator
+  <<: *service
+  image: ghcr.io/united-machining-solutions/pleiades.playground.cutting.simulator:${PLEIADES_VERSION:-dev}
+
+# An adapter waits for the stores, so that its first values are not lost.
+x-cutting-adapter-depends: &cutting-adapter-depends
+  broker:
+    condition: service_healthy
+  timeseries-persistence:
+    condition: service_healthy
+  events-persistence:
+    condition: service_healthy
+
+x-cutting-adapter: &cutting-adapter
+  <<: *service
+  image: ghcr.io/united-machining-solutions/pleiades.playground.cutting.adapter:${PLEIADES_VERSION:-dev}
+
 services:
   # Read-only printer observations, independent of the slicer and printer pairing.
   ultimaker-telemetry:
@@ -235,6 +252,8 @@ services:
     environment:
       TIMESERIES_API_URL: http://timeseries-api:8080
       EVENTS_API_URL: http://events-api:8080
+      # The site card reads it; without the Sites API only that card fails.
+      SITES_API_URL: http://sites-api:8080
       # The origins a card file may load the font of its host from; none unless set.
       CARD_RESOURCE_DOMAINS: ${CARD_RESOURCE_DOMAINS:-}
 
@@ -327,6 +346,10 @@ services:
       # address of MQTT_WS_URL for a broker behind a proxy.
       MQTT_WS_PORT: ${MQTT_WS_PORT:-9001}
       MQTT_WS_URL: ${MQTT_WS_URL:-}
+      # The OPC UA adapter. While it does not answer, the chat leaves its tools and commands out; empty,
+      # the chat has no OPC UA.
+      OPCUA_MCP_URL: ${OPCUA_MCP_URL-http://opcua-adapter:8080/mcp}
+      OPCUA_ADAPTER_URL: ${OPCUA_ADAPTER_URL-http://opcua-adapter:8080}
       # The chat needs a language model; everything else works without one. The models come from a LiteLLM
       # gateway: the app offers those it marks for chat, and dictation takes the first it marks for speech
       # to text.
@@ -372,6 +395,164 @@ services:
       # Small parts, machine id merope-microtec_MM-120_M-02.
       Config__SpecOutput__ScenarioName: small-parts
 
+  # Cutting simulators: one machine each, speaking the telegram protocol through files in a volume of its own.
+  # Its adapter (below) mounts the same volume at /exchange and takes the serial number from here (YAML anchor):
+  # the simulator only shows it, the telegrams do not carry it. Simulators and adapters start with the stack.
+  # As above, only the first one builds or pulls the image.
+  cutting-laser-2d:
+    <<: *cutting-simulator
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Cutting.Simulator/Dockerfile
+    ports:
+      - "127.0.0.1:${CUTTING_LASER_2D_PORT:-5611}:8080"
+    environment:
+      Config__MachineType: Laser2D
+      Config__MachineNumber: "1"
+      Config__MachineName: 2D laser
+      Config__SerialNumber: &cutting-laser-2d-serial L-01
+    volumes:
+      - cutting-laser-2d-exchange:/exchange
+      - cutting-laser-2d-data:/data
+
+  cutting-tube:
+    <<: *cutting-simulator
+    pull_policy: never
+    ports:
+      - "127.0.0.1:${CUTTING_TUBE_PORT:-5612}:8080"
+    environment:
+      Config__MachineType: Tube
+      Config__MachineNumber: "1"
+      Config__MachineName: Tube laser
+      Config__SerialNumber: &cutting-tube-serial T-01
+    volumes:
+      - cutting-tube-exchange:/exchange
+      - cutting-tube-data:/data
+
+  cutting-punch:
+    <<: *cutting-simulator
+    pull_policy: never
+    ports:
+      - "127.0.0.1:${CUTTING_PUNCH_PORT:-5613}:8080"
+    environment:
+      Config__MachineType: Punch
+      Config__MachineNumber: "1"
+      Config__MachineName: Punching machine
+      Config__SerialNumber: &cutting-punch-serial PU-01
+    volumes:
+      - cutting-punch-exchange:/exchange
+      - cutting-punch-data:/data
+
+  # Cutting adapters: one per machine, the host side of the protocol. Each mounts the volume of its machine and
+  # publishes the binding of machines below machines/trumpf_<Model>_<SerialNumber>/ (umati/, oem/, events/notifications).
+  # As above, only the first one builds or pulls the image.
+  cutting-adapter-laser-2d:
+    <<: *cutting-adapter
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Cutting.Adapter/Dockerfile
+    depends_on:
+      <<: *cutting-adapter-depends
+      cutting-laser-2d:
+        condition: service_started
+    environment:
+      Config__SerialNumber: *cutting-laser-2d-serial
+      Config__Model: Laser2D
+      Config__MachineNumber: "1"
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: cutting-adapter-l-01
+    volumes:
+      - cutting-laser-2d-exchange:/exchange
+
+  cutting-adapter-tube:
+    <<: *cutting-adapter
+    pull_policy: never
+    depends_on:
+      <<: *cutting-adapter-depends
+      cutting-tube:
+        condition: service_started
+    environment:
+      Config__SerialNumber: *cutting-tube-serial
+      Config__Model: Tube
+      Config__MachineNumber: "1"
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: cutting-adapter-t-01
+    volumes:
+      - cutting-tube-exchange:/exchange
+
+  cutting-adapter-punch:
+    <<: *cutting-adapter
+    pull_policy: never
+    depends_on:
+      <<: *cutting-adapter-depends
+      cutting-punch:
+        condition: service_started
+    environment:
+      Config__SerialNumber: *cutting-punch-serial
+      Config__Model: Punch
+      Config__MachineNumber: "1"
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: cutting-adapter-pu-01
+    volumes:
+      - cutting-punch-exchange:/exchange
+
+  # OPC UA: machines that speak OPC UA, added in the chat.
+  #
+  #   opc-simulator ──OPC UA──▶ opcua-adapter ──MQTT──▶ broker
+  #                                   └──REST, delete a removed machine──▶ timeseries-api, events-api
+  #
+  # The adapter runs every machine that is registered with it, from the registrations in its volume.
+  # See source/Pleiades.Playground.OpcUa.Adapter/README.md.
+  opcua-adapter:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.opcua.adapter:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.OpcUa.Adapter/Dockerfile
+    ports:
+      # Whoever reaches this port can add and remove machines: it has no sign-in. So it answers on
+      # this computer only, unless OPCUA_ADAPTER_BIND opens it to the network.
+      - "${OPCUA_ADAPTER_BIND:-127.0.0.1}:${OPCUA_ADAPTER_PORT:-5560}:8080"
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-persistence:
+        condition: service_healthy
+      events-persistence:
+        condition: service_healthy
+    environment:
+      <<: *logging-env
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: opcua-adapter
+      Config__DataDirectory: /data
+    volumes:
+      - opcua_adapter_data:/data
+
+  # A machine to try the adapter with: the TRUMPF OPC UA simulator with a TruMatic, definition K09, as
+  # umati publishes it. It is not registered with the adapter: a person adds it in the chat,
+  # /discover A1121O0001. OPC_SIMULATOR_IMAGE names another image of it, for example one built on this
+  # computer.
+  opc-simulator:
+    image: ${OPC_SIMULATOR_IMAGE:-ghcr.io/umati/trumpf/edge/opc-simulator:1.4.0-alpha3}
+    restart: unless-stopped
+    # The name the server announces in its endpoints and carries in its certificate, and the machine
+    # of the definition.
+    hostname: A1121O0001
+    command: ["run", "-c", "/opt/opcsim/samples/definitions/K09.simulation.yaml"]
+    ports:
+      # The web UI of the simulator. Its OPC UA port, 4840, is reached inside the demo network only.
+      - "${OPC_SIMULATOR_UI_PORT:-8090}:8080"
+    volumes:
+      - opc_simulator_pki:/data/pki
+
 volumes:
   ultimaker_data:
   mongodb_data:
+  cutting-laser-2d-exchange:
+  cutting-laser-2d-data:
+  cutting-tube-exchange:
+  cutting-tube-data:
+  cutting-punch-exchange:
+  cutting-punch-data:
+  opcua_adapter_data:
+  opc_simulator_pki:

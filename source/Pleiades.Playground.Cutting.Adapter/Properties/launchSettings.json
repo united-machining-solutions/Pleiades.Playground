@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Laser2D": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:5621",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Config__SerialNumber": "L-01",
+        "Config__ExchangeDirectory": "../../.cutting/exchange"
+      }
+    },
+    "Tube": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:5622",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Config__SerialNumber": "T-01",
+        "Config__Model": "Tube",
+        "Config__ExchangeDirectory": "../../.cutting/exchange-tube"
+      }
+    },
+    "Punch": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:5623",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Config__SerialNumber": "PU-01",
+        "Config__Model": "Punch",
+        "Config__ExchangeDirectory": "../../.cutting/exchange-punch"
+      }
+    }
+  }
+}

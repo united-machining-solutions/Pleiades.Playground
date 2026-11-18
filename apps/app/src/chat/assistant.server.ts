@@ -26,10 +26,34 @@ If none fits, say only that your tools do not show it. Name a maker, a person or
 Answer in a few plain sentences. The app shows the values of a tool call next to your answer, so do not repeat them as a list or a table.
 The tools write every time as the clock of the person you answer shows it. Say a time the way a clock does, for example 09:30: take the hours and minutes as they stand in the result, do not convert them, and name no time zone and no offset.`
 
-// The tools of the generative UI backend, and of the further servers the settings name, under their own
-// names (mcp-servers.ts). A server that does not answer has no tools until it does; the others work.
-// Created once, shared by all chats.
-const tools = mcp({ servers: mcpServers() })
+// The OPC UA adapter, if the app has one: it scans OPC UA servers and proposes their registration.
+// Adding and removing a machine are buttons of its cards, not tools (src/cards/opcua).
+const opcuaUrl = process.env.OPCUA_MCP_URL?.trim() || undefined
+
+const opcuaInstructions = `OPC UA machines: the tools named opcua_* belong to the OPC UA adapter. Read opcua_get_skill_guide before you scan a server, and follow it.
+You can list the added OPC UA servers, show the mapping of one, and scan a server and propose its registration.
+A machine named without an address, for example A1121O0001, has the endpoint opc.tcp://A1121O0001:4840. If that endpoint does not answer, ask the person for the endpoint; do not try another address of your own.
+An address the person gives may be a gateway that serves several machines: call opcua_machine_list for it, and propose one registration per machine that is not added yet, each with its machineNode and the serial number the list gives. A machine found behind an address is reached at that address, never at opc.tcp://<machine>:4840.
+A server may want a user (opcua_endpoint_rank says needsUser). Never ask for a user name or a password in the chat, and never pass one to a tool: the card of opcua_endpoint_rank asks the person for them and stores them. Wait until the person says it is done, then go on; the tools log in with the stored user by themselves.
+You cannot add or remove a machine: the person does that with the buttons of the cards. Never say that a machine was added or removed.`
+
+// The tools of the generative UI backend, of the OPC UA adapter if the app has one, and of the further
+// servers the settings name, under their own names (mcp-servers.ts). A server that does not answer has no
+// tools until it does; the others work. Created once, shared by all chats.
+const tools = mcp({
+  servers: {
+    ...mcpServers(),
+    ...(opcuaUrl && {
+      opcua: {
+        type: "http" as const,
+        url: opcuaUrl,
+        toolName: (tool: { name: string }) => tool.name,
+        // A scan browses and reads a whole address space: give a call more time than the default.
+        timeoutMs: 120_000,
+      },
+    }),
+  },
+})
 
 // A chat switches a further server off and on (the panel "Tools" of the chat). The setting is the chat's,
 // kept by the harness, and it holds here, on the server: before every turn the tools of a server that is
@@ -106,7 +130,7 @@ function build(settings: ModelSettings | undefined): Handler | null {
       // on, and nothing else.
       expose: { settings: ["model"], config: switches.exposed },
       middleware: [localTimes],
-      systemPrompts: [instructions],
+      systemPrompts: opcuaUrl ? [instructions, opcuaInstructions] : [instructions],
       plugins: () => [tools, switchPlugin, modelTools],
     }),
     // The demo has no sign-in: every request runs without a user.
