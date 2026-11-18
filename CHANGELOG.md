@@ -13,11 +13,33 @@ All notable changes are documented here. The format follows
   `genui_site_list` counts how many machines on the sites send and how many need someone.
 - Sites API: a write of a site may name a condition. `If-None-Match: *` makes it only where there is none,
   `If-Match` with the `etag` of the site changes or removes only the site that was read; 412 otherwise.
+- Example app: the drink card of the juice bar. For the result of `juicebar_drinks_list` the chat draws the
+  drinks whose bottles do not warn, each in the glass its author chose in the marketplace, filled with its
+  colour; a person picks one, and its button orders it at once, without a question of the language model.
+  The card follows the order and shows the glass waiting for the start button of the machine, filling while
+  the pumps run, and full, with an umbrella. Without motion the glass shows the same, still.
+- Example app: the showcase page `/juice-bar`, the same drink card on a page of its own, for a screen next to
+  the machine at a fair: a guest picks and orders without a language model. It reads the card of the machine
+  every half minute. Only a build with `APP_SHOWCASES` has it.
+- Juice bar API: a drink carries its colour and the picture of a glass its author chose (`color`, `picture`),
+  an ingredient its colour and whether its bottle runs low (`color`, `runsLow`). Colours that are not `#rrggbb`
+  are left out.
+- Example app: "Add a card" at the end of a kept page in "Edit" adds a card by hand, with no language model:
+  the cards a page can hold, by what they show, and what the chosen one takes, read from its input schema
+  (a machine by its name, the hours of its history). The same card twice or a thirteenth is not added.
+- Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
+  no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
+- OPC UA adapter: a server without a node for `Identification.ManufacturerUri` is added if it gives
+  `Identification.Manufacturer`: that name without any character but `A-Z`, `a-z` and `0-9` stands in for the
+  `ManufacturerUri` and forms the machine id (`TRUMPF SE + Co. KG` gives `trumpfsecokg_<model>_<serial number>`).
+  A mapped `ManufacturerUri` without a value yet is still waited for. The MQTT contract describes the rule
+  ([Without a ManufacturerUri](contracts/mqtt/README.md#without-a-manufactureruri)). The proposal in the chat says
+  so under "Good to know" (`notices`, with the `machineId`), and the registration keeps it as
+  `identity.manufacturerUriFromManufacturer`. A `Manufacturer` without any letter or digit `A-Z`, `0-9` is refused
+  with that reason.
 - Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
   `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
   shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0020).
-- Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
-  no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
 - Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
   each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
   draws them with the notification card.

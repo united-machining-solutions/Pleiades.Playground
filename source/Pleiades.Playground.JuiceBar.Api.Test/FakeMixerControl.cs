@@ -20,7 +20,7 @@ namespace Pleiades.Playground.JuiceBar.Api.Test;
 internal sealed class FakeMixerControl : IAsyncDisposable
 {
     internal const string Tropical = "8ab4c332-8b37-44f1-9645-31ce2aa204c9";
-    private const string Orange = "f6d361a9-5a6f-42ad-bff7-0913750809e4";
+    internal const string Orange = "f6d361a9-5a6f-42ad-bff7-0913750809e4";
     private readonly WebApplication _app;
     private readonly ConcurrentDictionary<WebSocket, SemaphoreSlim> _sockets = new();
     private readonly List<int> _queue = [];
@@ -61,12 +61,21 @@ internal sealed class FakeMixerControl : IAsyncDisposable
                 id = Tropical,
                 title = "Tropical Mix",
                 description = "language=" + request.Cookies["language"],
-                components = new[] { new { id = Orange, name = "Orange Juice" } },
+                backgroundColor = "#FF9900",
+                // The second ingredient sits on pump 2, whose bottle warns.
+                components = new[] { new { id = Orange, name = "Orange Juice" }, new { id = "unknown", name = "Mystery" } },
             },
         }));
+        app.MapGet("/api/drinks/{id}/image", (string id) => id == Tropical
+            ? Results.Text("""<?xml version="1.0"?><svg viewBox="0 0 900 900"><g id="_22"><path d="M0 0"/></g></svg>""", "image/svg+xml")
+            : Results.NotFound());
         app.MapGet("/api/admin/pumps", () => Results.Json(new[] { new { nr = 1, componentId = Orange }, new { nr = 2, componentId = "unknown" } }));
         app.MapGet("/api/admin/pumps/standardAmount", () => Results.Json(new Dictionary<string, int> { ["1"] = 1500, ["2"] = 1000 }));
-        app.MapGet("/api/components", () => Results.Json(new { available = new[] { new { id = Orange, name = "Orange Juice" } } }));
+        // A colour that is not #rrggbb is left out: here the display colour, so the colour stands.
+        app.MapGet("/api/components", () => Results.Json(new
+        {
+            available = new[] { new { id = Orange, name = "Orange Juice", color = "#FF9900", displayColor = "orange;x" } },
+        }));
         app.MapGet("/api/orders/{number:int}", (int number) => number == 7 || fake.Queued(number)
             ? Results.Json(new { orderNumber = number, orderName = "Tropical Mix", drinkId = Tropical })
             : Results.NotFound());
