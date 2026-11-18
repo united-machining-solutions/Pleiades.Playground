@@ -1,0 +1,108 @@
+@page "/notify"
+@inherits LiveComponent
+
+<PageTitle>Send notification · @State.DisplayName</PageTitle>
+
+<div class="page-head">
+    <h1>Send notification</h1>
+    <span class="muted">Any notification this machine type sends, with fields you choose</span>
+</div>
+
+<section class="card">
+    <div class="form-row">
+        <label class="grow">
+            Notification
+            <select class="input" value="@_name" @onchange="Select">
+                @foreach (var definition in Definitions)
+                {
+                    <option value="@definition.Name">@definition.Name: @definition.Description (§@definition.Section)</option>
+                }
+            </select>
+        </label>
+    </div>
+
+    @if (_definition is not null)
+    {
+        <div class="form-grid">
+            @for (var i = 0; i < _fields.Count; i++)
+            {
+                var index = i;
+                var field = _definition.FieldsFor(State.Type)[index];
+                <label>
+                    <span>@field.Number. @field.Name @(field.MachineTypes.Contains(State.Type) ? "" : "(not this type)")</span>
+                    <input class="input @(field.Kind == CuttingFieldKind.Text ? "" : "mono")" value="@_fields[index]" @onchange="e => _fields[index] = e.Value?.ToString() ?? string.Empty" />
+                </label>
+            }
+        </div>
+        <p class="small muted">Telegram:</p>
+        <code class="raw block">@Preview</code>
+        <div class="actions">
+            <button class="btn primary" disabled="@(!State.Online)" @onclick="Send">Send</button>
+            <button class="btn" @onclick="Fill">Reset fields</button>
+            @if (!State.HostConnected)
+            {
+                <span class="muted small">No host is connected: the notification is held, not written.</span>
+            }
+            else if (_sent.Length > 0)
+            {
+                <span class="muted small">@_sent</span>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private string _name = string.Empty;
+    private CuttingNotificationDefinition? _definition;
+    private List<string> _fields = [];
+    private string _sent = string.Empty;
+
+    private IReadOnlyList<CuttingNotificationDefinition> Definitions => CuttingSupport.Notifications(State.Type);
+
+    private string Preview => _definition is null ? string.Empty : CuttingNotification.Create(_definition.Name, _fields).Format();
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _definition = Definitions.FirstOrDefault();
+        _name = _definition?.Name ?? string.Empty;
+        Fill();
+    }
+
+    private void Select(ChangeEventArgs e)
+    {
+        _name = e.Value?.ToString() ?? string.Empty;
+        _definition = CuttingNotifications.Find(_name);
+        _sent = string.Empty;
+        Fill();
+    }
+
+    private void Fill()
+    {
+        _fields = _definition?.FieldsFor(State.Type).Select(Default).ToList() ?? [];
+    }
+
+    private string Default(CuttingFieldDefinition field)
+    {
+        if (!field.MachineTypes.Contains(State.Type))
+        {
+            return string.Empty;
+        }
+
+        return field.Name switch
+        {
+            "machine_number" => State.MachineNumber,
+            "nc_program" => State.CurrentProgram.Length > 0 ? State.CurrentProgram : State.Archive.FirstOrDefault() ?? string.Empty,
+            "batch_number" => "*",
+            _ when field.Kind == CuttingFieldKind.Timestamp => CuttingFormat.Timestamp(DateTime.Now),
+            _ when field.Kind is CuttingFieldKind.WholeNumber or CuttingFieldKind.Number => "0",
+            _ => string.Empty,
+        };
+    }
+
+    private async Task Send()
+    {
+        await Do(() => Actions.SendNotificationAsync(_name, [.. _fields]));
+        _sent = $"{_name} sent.";
+    }
+}
