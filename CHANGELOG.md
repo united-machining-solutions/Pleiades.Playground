@@ -35,6 +35,8 @@ All notable changes are documented here. The format follows
 - Page of a machine: the title switches to another machine, with a search over the serial number and the
   state, and the history of the card covers the last 1, 8 or 24 hours (`?hours=`). The page is wider, with
   room for actions on the right.
+- Energy card: `genui_energy_show` says how much energy machines imported over the last 1 to 24 hours, from
+  their meters, with mean and peak power; the card draws their power as a graph (`genui_energy_series`).
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
@@ -53,6 +55,13 @@ All notable changes are documented here. The format follows
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
 - Simulator for values, states and notifications of several machines.
+- Cutting machines, part of the stack: simulators of a 2D laser, a tube laser and a punching machine that take
+  their jobs through telegram files, each with a web page, and one adapter per machine that publishes it to the
+  broker by the binding of machines as `trumpf_Laser2D_L-01`, `trumpf_Tube_T-01` and `trumpf_Punch_PU-01`:
+  manifest, identification, `State/Status`, channel, feed override, the NC program below `oem/`, and its alarms as
+  `Notification.ActiveAlerts` and CloudEvents on `events/notifications`. The web page shows the serial number, and an endless mode writes new
+  orders into the plan and refills the stacks, so that a machine produces without anyone at it. They are part of
+  the Margo app too, there in endless mode.
 - Deployment (`docs/deployment.md`): the workflow "Deploy" starts the stack with `docker compose` on a runner of
   your own, from the images of the commit that was merged into `main`. It is off until the variable
   `DEPLOY_ENABLED` is `true`.
@@ -219,6 +228,59 @@ All notable changes are documented here. The format follows
   the last hours, as stacked bars, and its state over the last 30 minutes, as a step line per machine. One
   server function, `getCharts`, reads the values over one connection, the spans of the last 30 minutes only.
   The charts are the chart of shadcn/ui; `recharts` is new in the app.
+- OPC UA adapter `opcua-adapter` in the demo stack on port 5560, a proof of concept, with the TRUMPF OPC UA
+  simulator as a machine to try it with (`ghcr.io/umati/trumpf/edge/opc-simulator`). It runs every registered
+  OPC UA machine from its registration in the volume `/data` and publishes its values and alarms by the binding
+  of machines of the data model 0.17.1, also after a restart. It hosts the read-only tools of the OPC UA MCP library of the OPC Foundation.
+  In the chat of the example app, `/discover` scans a server and proposes its registration, which a person
+  adds with a button; `/opcua`, `/mapping`, `/rescan` and `/help` list servers, show mismatched and unclear
+  mappings and scan again. Machines behind an OPC UA aggregation server (a gateway) are listed by
+  `opcua_machine_list`, each with the serial number read on the server, get one registration each, and share
+  one session per endpoint. The simulator of the stack runs definition `K09`, machine `A1121O0001`. Known
+  mappings: for a namespace whose meaning is fixed the adapter sets an element itself, so far
+  `Identification.Model` of a TRUMPF MachineTool instance. A server that wants a user: a person enters user
+  name and password in a card of the chat, the adapter tries them and keeps them in its data volume, and every
+  session of that server logs in with them; the password never enters the chat. Alarms have a subscription of
+  their own, apart from the values: a server built on open62541 refuses ConditionRefresh on a subscription
+  that also holds values (`BadFilterNotAllowed`), so such a machine ran no values at all. A refresh that still
+  fails is logged, and the machine runs without the catch-up of alarms that already stand.
+- OPC UA adapter: a machine in the namespace `urn:umati2:datamodel:opcua`, the data model published one
+  variable per element (`s=State.FeedOverride`), is mapped by the adapter itself, also behind the prefix of a
+  gateway: identification, `State.FeedOverride` and `OperationCounters.PowerOnDuration` as they are, and the
+  item state and the operation mode as the members of the structure `State.Status`, which the adapter
+  decodes. An element the server does not fill is moved to `missing`. A machine a server shows twice, in that
+  namespace and by the root of its TRUMPF interface, is listed once.
+- OPC UA adapter: the core and the profiles of the data model 0.17.1. The core is declared whole, what the
+  machine lacks `"available": false`, as the other adapters do; a machine is refused only without
+  `Identification.ManufacturerUri`, `.Model` and `.SerialNumber`, the parts of its machine id. The alarms of the
+  core come from `alerts`. Of `IdentificationExtended`, `MonitoringExtended`, `ChannelMonitoring`,
+  `Spindle` and `EnergyElectricity` only a complete profile, or a complete channel, spindle or measuring point,
+  is published; the elements of an incomplete one go to `missing`. The adapter names the profiles itself. The
+  proposal card and the list of the added servers in the chat show whether the core is fulfilled and which
+  profiles are complete, and the answers carry it as `conformance`.
+- OPC UA adapter: removing a machine takes every retained message of it back from the broker, the manifest
+  last, so that a new subscriber no longer sees it. While the broker cannot be reached the removal answers `503`
+  and the machine stays added. What the stores kept of it stays; deleting it is a pull request of its own.
+- OPC UA adapter: it publishes by the binding of machines, with the publisher the Ultimaker telemetry and the
+  juice bar use, and one MQTT connection per machine, each with its own last will. A machine is named by its
+  machine id, `<manufacturer>_<model>_<serial number>`, formed from the identification its server gave when it
+  was added and kept with its registration as `identity`; a registration from before learns it from the first
+  values. The manifest declares the complete profiles; `State.Status` is the snapshot of the item state and the
+  operation mode; a value of the maker is a signal of the manufacturer below `oem/`; `Connection/State` says
+  `Initializing`, `Running`, `CommunicationFault` and `Shutdown`. Numbers are in the units of the catalogue,
+  energy in `wattHour`: a registration of version 1 is moved over when it is read (`joule` to `wattHour`, a
+  count to `piece`, a year without a unit), and the examples are version 2. The alarms are the list
+  `Notification.ActiveAlerts` and the CloudEvents `Notification.AlertRaised` and `AlertCleared`, with the
+  category of NE 107 from the severity of OPC UA. An alarm that stood before a restart of the adapter and still
+  stands is raised once more in the new run, with its `Id`, so that every run names the alarms that stand. A value of the maker is in the area `oem` of a registration, as
+  the namespace level of the binding; a registration that says `vendor` is moved over. `Production.ActiveProgram`
+  goes out as `WorkMasterMonitoring.ActiveWorkMaster`, and `Identification.SoftwareRevision`, no element of the
+  model 0.17.1, as a signal of the manufacturer. The adapter answers on port 5560 (`OPCUA_ADAPTER_PORT`), since
+  5530 is the Ultimaker API; the Margo app has the adapter and the simulator too.
+- OPC UA adapter: the scan in the chat reads the descriptions of the nodes. The model reads the `Description`
+  attribute of all candidates in one call and uses it to choose between them, to tell what a node of the maker
+  means, and as the unit of a node without `EngineeringUnits`. A description that contradicts the element, or
+  disagrees with the `EngineeringUnits`, makes the match `Unclear`.
 
 ### Changed
 
@@ -305,6 +367,13 @@ All notable changes are documented here. The format follows
   an origin of its own needs it set, or the card falls back to a system font there.
 - The images of `genui-mcp` and `app` carry `LICENSE` and `NOTICE` under `/app`.
 - Stack: the image of the simulator is built once, by `simulator-p-04`, and no longer once per simulator.
+- Stack: the OPC UA simulator runs the image `1.4.0-alpha3` instead of `1.3.1`, still definition `K09`, machine
+  `A1121O0001`. That image is built for amd64 only; on arm64, `OPC_SIMULATOR_IMAGE` names another one.
+- OPC UA adapter: the example registration of `K09` names the machine in `urn:umati2:datamodel:opcua` and fulfils the core from it,
+  with the model `TruMatic 1000 fiber` instead of the serial number the known mapping of the MachineTool instance
+  gives; it adds the active program, power, energy and the drive time from the TRUMPF interface. Its channel
+  values are no longer published: the simulator has no `RapidOverride`, so `ChannelMonitoring` is not complete.
+  The example of `L26` lacks the web address of the manufacturer and is refused.
 - `README.md` starts the stack with `--wait` and shows the two lines that enable the chat. The development
   setup has three more known issues: a download that breaks off, `pnpm` through the path, and a key that
   `docker compose restart` does not pick up.

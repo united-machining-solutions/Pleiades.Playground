@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 2,
+  "serialNumber": "A0280O0001",
+  "displayName": "Sample: TRUMPF TruLaser in the namespace urn:umati2:datamodel:opcua behind the gateway of an edge device",
+  "modelVersion": "0.8.0",
+  "profiles": [],
+  "endpoint": {
+    "url": "opc.tcp://Z0009A0033.sfh.edge-device.net:11878",
+    "securityMode": "SignAndEncrypt",
+    "securityPolicy": "Aes256_Sha256_RsaPss"
+  },
+  "machineNode": "nsu=urn:Z0009A0033:TRUMPF:UAInterfaces/urn:umati2:datamodel:opcua;s=Machine",
+  "elements": [],
+  "missing": [
+    {
+      "path": "Notification.ActiveAlerts",
+      "reason": "A list of the structure DataType.Alert; the MQTT binding publishes no lists."
+    }
+  ],
+  "discovery": {
+    "by": "Known mapping of the adapter for urn:umati2:datamodel:opcua",
+    "at": "2026-11-17T21:00:00Z"
+  }
+}

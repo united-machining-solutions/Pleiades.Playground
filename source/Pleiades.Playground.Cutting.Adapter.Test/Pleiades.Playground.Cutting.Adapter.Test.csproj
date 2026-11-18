@@ -1,0 +1,32 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Cutting.Adapter.Test</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Cutting.Adapter.Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" />
+    <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Cutting.Adapter\Pleiades.Playground.Cutting.Adapter.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- A broker without a broker, and the schemas of the data model: shared with the tests of the MQTT extensions. -->
+    <Compile Include="../Pleiades.Playground.Mqtt.Extensions.Test/RecordingManagedMqttClient.cs" Link="Shared/RecordingManagedMqttClient.cs" />
+    <Compile Include="../Pleiades.Playground.Mqtt.Extensions.Test/ModelSchemas.cs" Link="Shared/ModelSchemas.cs" />
+  </ItemGroup>
+
+</Project>
