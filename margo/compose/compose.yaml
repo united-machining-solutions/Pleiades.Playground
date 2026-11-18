@@ -9,8 +9,8 @@
 # - every image is a literal reference: bart mirrors each one as it stands and does not interpolate it;
 # - no YAML anchors or merge keys: bart's compose parser does not resolve them, so each service says
 #   everything itself;
-# - no bind mount out of this folder: the configurations of the broker and of Traefik are config files
-#   next to this one, and Traefik reads its routes from a file rather than from the Docker socket.
+# - no bind mount and no config file: the configurations of the broker and of Traefik are `configs:` with
+#   inline `content:`, and Traefik reads its routes from that config rather than from the Docker socket.
 # Every ${VAR} is a parameter in app/margo.yaml; the default after `:-` is the same as the value there.
 # A machine publishes after the umati data model, in its units (energy in watt hours); a place below sites/
 # keeps the coherent SI units (contracts/mqtt).
@@ -312,11 +312,39 @@ services:
       # Small parts, machine id merope-microtec_MM-120_M-02.
       Config__SpecOutput__ScenarioName: small-parts
 
+# The configurations inline, as `content:`, not as `file:`: the Margo client does not mount a file of the
+# package into a container. Compose interpolates ${VAR} in content, so a literal dollar sign is written $$.
 configs:
+  # The broker configuration of the stack; CI checks it is the same as stacks/broker/mosquitto.conf.
   mosquitto:
-    file: ./broker/mosquitto.conf
+    content: |
+      # Demo broker: anonymous access inside the compose network and on the published ports.
+      # Do not expose this configuration to a network you do not control.
+      persistence false
+      log_dest stdout
+
+      listener 1883
+      protocol mqtt
+
+      listener 9001
+      protocol websockets
+
+      allow_anonymous true
+  # The dynamic configuration of Traefik (service traefik). Traefik renders it as a Go template before it
+  # reads it, so the host names come from the environment of the container: APP_HOST and SERVER_HOST.
   traefik:
-    file: ./traefik/dynamic.yaml
+    content: |
+      http:
+        routers:
+          app:
+            entryPoints: [web]
+            rule: 'Host(`{{ env "APP_HOST" }}`) || Host(`{{ env "SERVER_HOST" }}`)'
+            service: app
+        services:
+          app:
+            loadBalancer:
+              servers:
+                - url: http://app:8080
 
 volumes:
   mongodb_data:
