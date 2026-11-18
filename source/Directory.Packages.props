@@ -48,6 +48,7 @@
     <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="11.0.1" />
   </ItemGroup>
   <ItemGroup Label="Test and analysis">
+    <PackageVersion Include="JsonSchema.Net" Version="9.6.0" />
     <PackageVersion Include="Moq" Version="4.21.0" />
     <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.36.0.15337" />
   </ItemGroup>

@@ -4,7 +4,7 @@
 #                          └─────▶ events-persistence ─────REST──▶ events-api ──────▶ mongodb
 #
 # Start:  docker compose up -d --build
-# Every numeric value on the broker is in its coherent SI unit (contracts/mqtt).
+# The simulators publish after the data model, in its units (contracts/mqtt).
 name: pleiades-playground
 
 x-service: &service
@@ -29,12 +29,57 @@ x-simulator: &simulator
   depends_on:
     broker:
       condition: service_healthy
+    # A persistence service is healthy once the broker has acknowledged its subscriptions. Events are not
+    # retained, so one a simulator sends before that is lost for good and stays a gap in its sequence.
     timeseries-persistence:
-      condition: service_started
+      condition: service_healthy
     events-persistence:
-      condition: service_started
+      condition: service_healthy
 
 services:
+  # Read-only printer observations, independent of the slicer and printer pairing.
+  ultimaker-telemetry:
+    <<: *service
+    profiles: [ultimaker]
+    image: ghcr.io/united-machining-solutions/pleiades.playground.ultimaker.telemetry:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Ultimaker.Telemetry/Dockerfile
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-persistence:
+        condition: service_healthy
+    environment:
+      Config__SerialNumber: ${ULTIMAKER_SERIAL_NUMBER:-UM3-01}
+      Config__PrinterBaseUrl: ${ULTIMAKER_PRINTER_URL:-http://ultimaker.local/}
+      Config__PollIntervalSecond: ${ULTIMAKER_POLL_INTERVAL_SECOND:-2}
+      Config__MqttDestination__ConnectionString: ${ULTIMAKER_MQTT_URL:-mqtt://broker:1883}
+      Config__MqttDestination__ClientId: ultimaker-telemetry-${ULTIMAKER_SERIAL_NUMBER:-UM3-01}
+      Config__MqttDestination__User: ${ULTIMAKER_MQTT_USER:-}
+      Config__MqttDestination__Password: ${ULTIMAKER_MQTT_PASSWORD:-}
+
+  # Optional physical-printer service. Starting it never pairs or starts a print.
+  ultimaker-api:
+    <<: *service
+    profiles: [ultimaker]
+    image: ghcr.io/united-machining-solutions/pleiades.playground.ultimaker.api:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Ultimaker.Api/Dockerfile
+    ports:
+      - "${ULTIMAKER_BIND:-127.0.0.1}:${ULTIMAKER_API_PORT:-5530}:8080"
+    volumes:
+      - ultimaker_data:/data
+    environment:
+      Config__Auth__Enabled: ${ULTIMAKER_AUTH_ENABLED:-false}
+      Config__Auth__MetadataAddress: ${ULTIMAKER_AUTH_METADATA_ADDRESS:-}
+      Config__Auth__ValidIssuer: ${ULTIMAKER_AUTH_VALID_ISSUER:-}
+      Config__Auth__Audience: ${ULTIMAKER_AUTH_AUDIENCE:-}
+      Ultimaker__PrinterBaseUrl: ${ULTIMAKER_PRINTER_URL:-http://ultimaker.local/}
+      Ultimaker__EnablePrinting: ${ULTIMAKER_ENABLE_PRINTING:-false}
+      Ultimaker__SliceTimeoutSecond: ${ULTIMAKER_SLICE_TIMEOUT_SECOND:-180}
+
   broker:
     image: eclipse-mosquitto:${MOSQUITTO_VERSION:-2}
     restart: unless-stopped
@@ -104,7 +149,7 @@ services:
       Config__MqttSource__Password: ""
       Config__MqttSource__ClientId: timeseries-persistence
       Config__Topics__0: machines/+/umati/#
-      Config__Topics__1: machines/+/vendor/#
+      Config__Topics__1: machines/+/oem/#
       # Values about a place, see contracts/mqtt. A first level the binding does not name is not stored.
       Config__Topics__2: sites/+/#
       Config__CachingTime: "00:00:05"
@@ -145,8 +190,32 @@ services:
       Config__MqttSource__User: ""
       Config__MqttSource__Password: ""
       Config__MqttSource__ClientId: events-persistence
-      Config__Topics__0: machines/+/events/#
+      # A persistent session: the broker keeps the CloudEvents (QoS 1) while the service restarts.
+      Config__MqttSource__CleanSession: "false"
+      Config__MqttSource__SessionExpiry: "1.00:00:00"
+      Config__Topics__0: machines/+/events/jobs
+      Config__Topics__1: machines/+/events/workmasters
+      Config__Topics__2: machines/+/events/notifications
       Config__EventsApi__Uri: http://events-api:8080
+
+  # Sites and the machines placed on them, as people enter them.
+  sites-api:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.sites.api:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Sites.Api/Dockerfile
+    ports:
+      # Writing needs no sign-in in the demo: this computer only, unless SITES_BIND opens it.
+      - "${SITES_BIND:-127.0.0.1}:${SITES_API_PORT:-5540}:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      <<: *logging-env
+      Config__MongoDb__ConnectionString: mongodb://mongodb:27017/?replicaSet=rs0
+      Config__MongoDb__DatabaseName: Sites
+      Config__Auth__Enabled: "false"
 
   # The generative UI backend: an MCP server that reads both APIs. The TypeScript images are built
   # from the repository root.
@@ -192,6 +261,46 @@ services:
       timeout: 5s
       retries: 12
 
+  # A juice bar as a tool: its card and state over REST and MCP, an order on request, its state on the
+  # broker. It starts only with the profile: docker compose --profile juicebar up -d. It needs a machine
+  # that runs MixerControl at JUICEBAR_URL. It places orders and never starts the production: a person
+  # presses the start button on the machine. JUICEBAR_ENABLE_ORDERING=false makes it read-only.
+  juicebar-api:
+    <<: *service
+    profiles: [juicebar]
+    image: ghcr.io/united-machining-solutions/pleiades.playground.juicebar.api:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.JuiceBar.Api/Dockerfile
+    ports:
+      # No sign-in, and it orders at a real machine: it answers on this computer only, unless
+      # JUICEBAR_BIND opens it to the network. The containers of this stack reach it either way.
+      - "${JUICEBAR_BIND:-127.0.0.1}:${JUICEBAR_API_PORT:-5550}:8080"
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-persistence:
+        condition: service_healthy
+    environment:
+      # Sign-in is off for the demo. On: reading needs the permission juicebar:read, an order juicebar:write.
+      Config__Auth__Enabled: ${JUICEBAR_AUTH_ENABLED:-false}
+      Config__Auth__MetadataAddress: ${JUICEBAR_AUTH_METADATA_ADDRESS:-}
+      Config__Auth__ValidIssuer: ${JUICEBAR_AUTH_VALID_ISSUER:-}
+      Config__Auth__Audience: ${JUICEBAR_AUTH_AUDIENCE:-}
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: juicebar-api-${JUICEBAR_SERIAL_NUMBER:-JUICEBAR-01}
+      JuiceBar__BaseUrl: ${JUICEBAR_URL:-http://juicebar.local:3000/}
+      JuiceBar__EnableOrdering: ${JUICEBAR_ENABLE_ORDERING:-true}
+      JuiceBar__MaximumQueueLength: ${JUICEBAR_MAX_QUEUE_LENGTH:-3}
+      # The machine id in every topic is <manufacturer>_<model>_<serial number>, by default
+      # trumpf_JuiceBar_JUICEBAR-01: the juice bar of the demo was built by TRUMPF. The manufacturer is the domain
+      # of its web address without www. and its ending, as the MQTT binding forms it.
+      JuiceBar__ManufacturerUri: ${JUICEBAR_MANUFACTURER_URI:-https://www.trumpf.com}
+      JuiceBar__ManufacturerName: ${JUICEBAR_MANUFACTURER_NAME:-TRUMPF}
+      JuiceBar__Model: ${JUICEBAR_MODEL:-JuiceBar}
+      JuiceBar__SerialNumber: ${JUICEBAR_SERIAL_NUMBER:-JUICEBAR-01}
+      JuiceBar__Language: ${JUICEBAR_LANGUAGE:-en}
+
   # The example application.
   app:
     <<: *service
@@ -212,6 +321,12 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       GENUI_MCP_URL: http://genui-mcp:8080/mcp
+      # The MCP servers of optional services whose tools the chat has too, see .env.example.
+      APP_MCP_SERVERS: ${APP_MCP_SERVERS:-}
+      # Where the browser hears live values at the broker: the host of the page and this port, or the whole
+      # address of MQTT_WS_URL for a broker behind a proxy.
+      MQTT_WS_PORT: ${MQTT_WS_PORT:-9001}
+      MQTT_WS_URL: ${MQTT_WS_URL:-}
       # The chat needs a language model; everything else works without one. The models come from a LiteLLM
       # gateway: the app offers those it marks for chat, and dictation takes the first it marks for speech
       # to text.
@@ -238,7 +353,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  # One simulator per machine. The serial number is the machine id in every topic.
+  # One simulator per machine. Each publishes after the data model, below machines/{MachineId}/
+  # (<manufacturer>_<model>_<serial number>, contracts/mqtt), from a virtual machine of its own with a scenario of
+  # its own kind of machine and a made-up manufacturer of its own.
   # All three run the same image. Only the first one builds it, or pulls it, so that happens once and not
   # three times; the other two take the image that is then on this computer (pull_policy: never).
   simulator-p-04:
@@ -251,6 +368,7 @@ services:
       Config__SerialNumber: P-04
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-p-04
+      # Shafts, flanges and bushings: the default scenario, machine id alcyone-machines_AX-400_P-04.
 
   simulator-p-07:
     <<: *simulator
@@ -260,6 +378,8 @@ services:
       Config__SerialNumber: P-07
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-p-07
+      # Housings, machine id taygeta-precision_TP-800_P-07.
+      Config__SpecOutput__ScenarioName: housings
 
   simulator-m-02:
     <<: *simulator
@@ -269,6 +389,9 @@ services:
       Config__SerialNumber: M-02
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-m-02
+      # Small parts, machine id merope-microtec_MM-120_M-02.
+      Config__SpecOutput__ScenarioName: small-parts
 
 volumes:
+  ultimaker_data:
   mongodb_data:

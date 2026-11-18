@@ -9,7 +9,7 @@ namespace Pleiades.Playground.Events.Api;
 internal interface IEventsDbContext
 {
     /// <summary>
-    /// Notification events collection.
+    /// The CloudEvents of machines, stored as they came.
     /// </summary>
-    IMongoCollection<NotificationEventDao> NotificationEvents { get; }
+    IMongoCollection<MachineEventDao> MachineEvents { get; }
 }

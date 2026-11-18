@@ -27,11 +27,11 @@ internal sealed class TimeseriesTools(ITimeseriesDbService timeseriesDbService, 
     [McpServerTool(Name = "timeseries_baseunit_query", ReadOnly = true),
      Description(
          "Query numeric (base unit) time-series data from industrial machine sensors. " +
-         "Returns timestamps and double values with a physical unit (Meter, Newton, Celsius, etc.). " +
+         "Returns timestamps and double values with the unit they came in (machines: the units of the data model, e.g. wattHour, watt, second, one, degreeCelsius). " +
          "Supports LTTB downsampling to reduce data points while preserving visual shape. " +
          "Use timeseries_topics_query first to discover available topics.")]
     public async Task<BaseUnitSeriesResponseDto> QueryBaseUnitValues(
-        [Description("Topic path identifying the sensor (e.g. 'machines/9000-0001/sensors/spindleSpeed'). Supports wildcard '*'.")] string topic,
+        [Description("Topic path identifying the sensor (e.g. 'machines/alcyone-machines_AX-400_P-04/umati/Consumption/Electricity/Main/AcActivePowerTotal' or 'machines/*/umati/State/Status/MachineryItemState'). Supports wildcard '*'.")] string topic,
         [Description("Start of time range (ISO 8601, e.g. '2024-12-12T08:00:00Z')")] DateTime startTime,
         [Description("End of time range (ISO 8601, e.g. '2024-12-12T09:00:00Z')")] DateTime stopTime,
         [Description(LimitDescription)] long? limit = null,

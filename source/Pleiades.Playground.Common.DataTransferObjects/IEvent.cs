@@ -1,9 +1,9 @@
-
 namespace Pleiades.Playground.Common.DataTransferObjects;
 
-public interface IEvent : IMessage
+/// <summary>
+/// An event of one machine that carries a level, such as a notification.
+/// </summary>
+public interface IEvent : IMachineEvent
 {
-    public string Id { get; set; }
-    public string MId { get; set; }
     public EventLevel Level { get; set; }
 }

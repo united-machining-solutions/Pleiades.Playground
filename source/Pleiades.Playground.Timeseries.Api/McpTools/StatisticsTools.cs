@@ -16,7 +16,7 @@ internal sealed class StatisticsTools(ITimeseriesDbService timeseriesDbService, 
          "aggregated across the union of the windows. " +
          "To compare distinct periods separately, call this once per period.")]
     public async Task<Dictionary<string, StatisticValueDtoV1>> QueryStatistics(
-        [Description("Topic path for the numeric sensor (e.g. 'machines/9000-0001/sensors/spindleSpeed'). Supports wildcard '*'.")] string topic,
+        [Description("Topic path for the numeric sensor (e.g. 'machines/alcyone-machines_AX-400_P-04/umati/Consumption/Electricity/Main/AcActivePowerTotal'). Supports wildcard '*'.")] string topic,
         [Description("Time windows whose union is analyzed. Each window has 'start' and 'stop' (ISO 8601). Example: [{'start':'2024-12-12T08:00:00Z','stop':'2024-12-12T09:00:00Z'}]")] List<TimeRangeDtoV1> timeWindows,
         [Description("Query timeout (e.g. '00:00:30' for 30 seconds). Default: 30s.")] TimeSpan? timeout = null,
         CancellationToken cancellationToken = default)

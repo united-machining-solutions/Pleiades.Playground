@@ -72,7 +72,7 @@ internal sealed class MongoDbInitializer(
         {
             var database = client.GetDatabase(_settings.DatabaseName);
 
-            await InitializeNotificationEventCollectionAsync(database, linkedCts.Token).ConfigureAwait(false);
+            await InitializeMachineEventCollectionAsync(database, linkedCts.Token).ConfigureAwait(false);
 
             // The TTL index is reconciled against retention (applied to an existing collection too),
             // so a changed/removed DataRetentionPeriod is honored every boot — without a rebuild.
@@ -97,29 +97,40 @@ internal sealed class MongoDbInitializer(
 
     public Task StoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private async Task InitializeNotificationEventCollectionAsync(
+    private async Task InitializeMachineEventCollectionAsync(
         IMongoDatabase database, CancellationToken cancellationToken)
     {
-        var collectionName = _settings.NotificationEventCollection;
-        var collection = database.GetCollection<NotificationEventDao>(collectionName);
+        var collectionName = _settings.MachineEventCollection;
+        var collection = database.GetCollection<MachineEventDao>(collectionName);
 
-        var indexes = new List<CreateIndexModel<NotificationEventDao>>
+        var indexes = new List<CreateIndexModel<MachineEventDao>>
         {
-            new(Builders<NotificationEventDao>.IndexKeys
-                    .Ascending(e => e.Action)
+            // A CloudEvent is unique by its source and its id: a repeated delivery is refused.
+            new(Builders<MachineEventDao>.IndexKeys
+                    .Ascending(e => e.Source)
+                    .Ascending(e => e.EventId),
+                new CreateIndexOptions { Name = "idx_source_id_unique", Unique = true }),
+
+            new(Builders<MachineEventDao>.IndexKeys
                     .Ascending(e => e.MId)
-                    .Ascending(e => e.Level)
-                    .Descending(e => e.Timestamp),
-                new CreateIndexOptions { Name = "idx_action_mid_level_timestamp" }),
+                    .Ascending(e => e.Group)
+                    .Descending(e => e.Time),
+                new CreateIndexOptions { Name = "idx_mid_group_time" }),
 
-            new(Builders<NotificationEventDao>.IndexKeys
-                    .Ascending(e => e.NotificationId)
-                    .Descending(e => e.Timestamp),
-                new CreateIndexOptions { Name = "idx_notificationid_timestamp" }),
+            new(Builders<MachineEventDao>.IndexKeys
+                    .Ascending(e => e.MId)
+                    .Ascending(e => e.Group)
+                    .Ascending(e => e.SequencePrefix)
+                    .Ascending(e => e.SequenceCount),
+                new CreateIndexOptions { Name = "idx_mid_group_sequence" }),
 
-            new(Builders<NotificationEventDao>.IndexKeys
+            new(Builders<MachineEventDao>.IndexKeys
                     .Ascending(e => e.CorrelationId),
-                new CreateIndexOptions { Name = "idx_correlationid" })
+                new CreateIndexOptions { Name = "idx_correlationid" }),
+
+            new(Builders<MachineEventDao>.IndexKeys
+                    .Ascending("Data.JobOrderID"),
+                new CreateIndexOptions { Name = "idx_data_joborderid" }),
         };
 
         await EnsureIndexesAsync(collection, indexes, cancellationToken).ConfigureAwait(false);
@@ -160,7 +171,7 @@ internal sealed class MongoDbInitializer(
     // ── TTL indexes: reconcile by retention, never drop-and-rebuild ──────────────────
 
     /// <summary>
-    /// Reconciles the retention TTL index on the event collection, regardless of collection
+    /// Reconciles the retention TTL index on the event collections, regardless of collection
     /// existence, so a changed/removed <see cref="MongoDbSettings.DataRetentionPeriod"/> is honored.
     /// </summary>
     private async Task EnsureTtlIndexesAsync(IMongoDatabase database, CancellationToken cancellationToken)
@@ -168,9 +179,9 @@ internal sealed class MongoDbInitializer(
         var retention = _settings.DataRetentionPeriod;
 
         await ApplyTtlAsync(
-            database.GetCollection<NotificationEventDao>(_settings.NotificationEventCollection),
-            Builders<NotificationEventDao>.IndexKeys.Ascending(e => e.Timestamp),
-            _settings.NotificationEventCollection, retention, cancellationToken).ConfigureAwait(false);
+            database.GetCollection<MachineEventDao>(_settings.MachineEventCollection),
+            Builders<MachineEventDao>.IndexKeys.Ascending(e => e.Time),
+            _settings.MachineEventCollection, retention, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
