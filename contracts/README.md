@@ -7,6 +7,7 @@ them may bring their own implementation.
 |---|---|---|---|
 | [`datamodel/`](datamodel/README.md) | Data | Reference to the technology-independent data model for machine tools | The umati data model project, pinned to a commit. Not part of this repository and not licensed by it. |
 | [`mqtt/`](mqtt/README.md) | Data | MQTT binding: topics, value envelope, units, events | This repository |
+| [`nats/`](nats/README.md) | Data | NATS binding: subjects and CloudEvents of every value and event of the MQTT binding | This repository |
 | [`openapi/`](openapi/README.md) | Interfaces | REST contracts of the Timeseries, Events and Sites APIs | The running services (`/openapi/v1.json`) |
 | [`mcp/`](mcp/README.md) | Interfaces | MCP tools per server | The running services (`/mcp`, `tools/list`) |
 

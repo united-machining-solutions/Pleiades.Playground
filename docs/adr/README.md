@@ -24,3 +24,4 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0013](0013-live-values-from-the-broker.md) | Live values reach the browser from the broker | proposed |
 | [0014](0014-a-page-from-the-chat-is-a-recipe-kept-in-the-browser.md) | A page from the chat is a recipe, kept in the browser | proposed |
 | [0015](0015-the-binding-of-machines-follows-the-data-model.md) | The tree of machines on the broker follows the data model exactly | proposed |
+| [0017](0017-machine-data-leaves-the-stack-as-cloudevents-over-nats.md) | Machine data leaves the stack as CloudEvents over NATS | proposed |

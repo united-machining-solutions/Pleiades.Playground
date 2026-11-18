@@ -7,6 +7,12 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Optional NATS bridge `nats-bridge` (Compose profile `nats`): sends every value and event of the MQTT broker on to
+  a NATS server as a CloudEvent, through JetStream with `Nats-Msg-Id` or as plain core NATS. A value is wrapped, an
+  event goes on unchanged. The subjects are a prefix (`local.pleiades` by default) and the levels of the MQTT
+  topic. Address, sign-in and TLS are configurable (`NATS_*` in `.env.example`); by default it writes to a NATS
+  server on the same computer. The format is in `contracts/nats`, the decision in ADR-0017.
+
 - Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
   shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
   from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no

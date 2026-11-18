@@ -1,0 +1,20 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>Pleiades.Playground.Nats.Bridge.Test</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Moq" />
+    <PackageReference Include="SonarAnalyzer.CSharp">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Nats.Bridge\Pleiades.Playground.Nats.Bridge.csproj" />
+  </ItemGroup>
+
+</Project>

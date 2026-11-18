@@ -49,6 +49,10 @@
     <Project Path="Pleiades.Playground.Timeseries.Persistence/Pleiades.Playground.Timeseries.Persistence.csproj" />
     <Project Path="Pleiades.Playground.Timeseries.Persistence.Test/Pleiades.Playground.Timeseries.Persistence.Test.csproj" />
   </Folder>
+  <Folder Name="/Nats/">
+    <Project Path="Pleiades.Playground.Nats.Bridge/Pleiades.Playground.Nats.Bridge.csproj" />
+    <Project Path="Pleiades.Playground.Nats.Bridge.Test/Pleiades.Playground.Nats.Bridge.Test.csproj" />
+  </Folder>
   <Folder Name="/Events/">
     <Project Path="Pleiades.Playground.Events.Api/Pleiades.Playground.Events.Api.csproj" />
     <Project Path="Pleiades.Playground.Events.Api.Client/Pleiades.Playground.Events.Api.Client.csproj" />

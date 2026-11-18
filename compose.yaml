@@ -198,6 +198,53 @@ services:
       Config__Topics__2: machines/+/events/notifications
       Config__EventsApi__Uri: http://events-api:8080
 
+  # Optional (profile "nats"): sends what the broker carries on to a NATS server as CloudEvents, see
+  # contracts/nats. The NATS server is not part of the stack; by default it is one on this computer.
+  nats-bridge:
+    <<: *service
+    profiles: [nats]
+    image: ghcr.io/united-machining-solutions/pleiades.playground.nats.bridge:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Nats.Bridge/Dockerfile
+    depends_on:
+      broker:
+        condition: service_healthy
+    # A NATS server on this computer is host.docker.internal. Docker Desktop knows the name; this line
+    # gives it to Docker Engine on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      <<: *logging-env
+      Config__MqttSource__ConnectionString: mqtt://broker:1883
+      Config__MqttSource__User: ""
+      Config__MqttSource__Password: ""
+      Config__MqttSource__ClientId: nats-bridge
+      # A persistent session: the broker keeps what comes (QoS 1) while the bridge restarts.
+      Config__MqttSource__CleanSession: "false"
+      Config__MqttSource__SessionExpiry: "1.00:00:00"
+      Config__Topics__0: machines/+/umati/#
+      Config__Topics__1: machines/+/oem/#
+      Config__Topics__2: machines/+/events/+
+      Config__Topics__3: sites/+/#
+      Config__ForwardRetained: ${NATS_FORWARD_RETAINED:-true}
+      Config__Nats__Url: ${NATS_URL:-nats://host.docker.internal:4222}
+      Config__Nats__SubjectPrefix: ${NATS_SUBJECT_PREFIX:-local.pleiades}
+      Config__Nats__JetStream: ${NATS_JETSTREAM:-true}
+      Config__Nats__CreateStream: ${NATS_CREATE_STREAM:-false}
+      Config__Nats__StreamName: ${NATS_STREAM_NAME:-pleiades}
+      Config__Nats__StreamMaxAge: ${NATS_STREAM_MAX_AGE:-7.00:00:00}
+      Config__Nats__User: ${NATS_USER:-}
+      Config__Nats__Password: ${NATS_PASSWORD:-}
+      Config__Nats__Token: ${NATS_TOKEN:-}
+      Config__Nats__CredsFile: ${NATS_CREDS_FILE:-}
+      Config__Nats__NKeyFile: ${NATS_NKEY_FILE:-}
+      Config__Nats__Tls__Mode: ${NATS_TLS_MODE:-Disable}
+      Config__Nats__Tls__CertFile: ${NATS_TLS_CERT_FILE:-}
+      Config__Nats__Tls__KeyFile: ${NATS_TLS_KEY_FILE:-}
+      Config__Nats__Tls__CaFile: ${NATS_TLS_CA_FILE:-}
+      Config__Nats__Tls__InsecureSkipVerify: ${NATS_TLS_INSECURE_SKIP_VERIFY:-false}
+
   # Sites and the machines placed on them, as people enter them.
   sites-api:
     <<: *service
