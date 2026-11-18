@@ -35,6 +35,11 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
      user name and password. Say so in one sentence, never ask for them in the chat, and stop. When the person
      says it is done, call `opcua_endpoint_rank` again; with `user` set, go on. Every later connect logs in with
      that user by itself.
+   - `needsUser` false and `acceptsUser` true: the server works without a user, and the card offers the person
+     to log in with one. Go on without waiting; do not mention it unless the person asks.
+   - `acceptsUser` false: the server takes no user name on an encrypted endpoint, and the card has no form. If
+     the person asks for a login, say so. If `needsUser` is true as well, the adapter cannot connect at all:
+     say that the server would have to offer a user on an encrypted endpoint, and stop.
 2. **Machines.** `opcua_machine_list` with the same address. It lists the machines the server serves, each
    with its `node`, its `path` below Objects and the serial number read below it.
    - One machine: a server of one machine. Scan it as below; `machineNode` may stay out.
@@ -47,15 +52,21 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
      gateway prefixed for it. No browse from Objects leads there; browse from that `node`, as step 5 says.
    - No machine: the server has no object with an `Identification`. A gateway may not reach its machines
      right now. Say so; scan the server as below only if the person wants it.
+   - **A machine whose `node` is in `urn:umati2:datamodel:opcua`** (`nsu=urn:umati2:datamodel:opcua;s=Machine`,
+     also behind the prefix of a gateway) is the data model itself, and the adapter maps it whole: skip steps 4
+     to 7. Do not read the namespace array, do not browse the machine, do not read its elements. Open the
+     session of step 3 only to find the alarm type of step 8, then propose as step 9 says, with `machineNode`
+     set to that `node`, `serialNumber` from the list and `elements` empty. See
+     [A machine in `urn:umati2:datamodel:opcua`](#what-the-adapter-maps-itself).
 3. **Session.** `opcua_ua_connect` with `endpointUrl`, `autoAcceptCerts: true` and `name: "scan"`. Leave the
    security arguments out: the tool takes the strongest endpoint by itself. Pass `sessionName: "scan"` to every
    later `opcua_ua_*` call. The person sees the thumbprint of the certificate on the proposal and confirms it
    there. Never pass a user name or a password: if a person stored a user for the server, the session logs in
    with it by itself, else it is anonymous.
-4. **Namespaces.** `opcua_ua_read_value` of `i=2255`: the namespace array. Position `n` is the URI of
-   `ns=n`. You need it for every node of the registration.
+4. **Namespaces.** `opcua_ua_read_value` with `{"nodeId": "i=2255", "sessionName": "scan"}`: the namespace
+   array. Position `n` is the URI of `ns=n`. You need it for every node of the registration.
 5. **The machine.** `opcua_ua_browse_all` from the `node` of the machine, as `opcua_machine_list` gave it, with
-   `maxDepth` 5 and `maxResults` 600. On a gateway, stay below that node: a node of another machine is
+   `maxDepth` 5, `maxResults` 600 and `sessionName: "scan"`. On a gateway, stay below that node: a node of another machine is
    refused.
 6. **The elements.** For every element of the table below, find the node. Read the candidates with
    `opcua_ua_read_values`, several nodes in one call. For a number, find its unit: the `EngineeringUnits` and
@@ -88,6 +99,11 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
    again. After the last machine, `opcua_ua_disconnect` with `name: "scan"`.
 10. **Tell the person** in two sentences what the proposals cover and what needs their attention. They add each
    machine with the button on its proposal.
+
+Every `opcua_ua_*` call that reads or browses names its nodes: `nodeId` for `opcua_ua_read_value`,
+`opcua_ua_read_node` and `opcua_ua_browse`, `nodeIds` for `opcua_ua_read_values` and `opcua_ua_read`. A node id
+comes from the namespace array, a browse or `opcua_machine_list`; never call such a tool before you have one,
+and never call it without its arguments. A call that lacks them is refused before it reaches the server.
 
 Work in few calls: browse wide once, then read many nodes at once. A scan needs ten to twenty calls per
 machine. Machines of one kind behind one gateway have the same structure in their own namespaces: map the

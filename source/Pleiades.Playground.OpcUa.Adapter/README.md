@@ -452,9 +452,21 @@ so none stays open for ever.
   clients has to trust it once.
 - **A server that wants a user.** A session is anonymous, or logs in with a user name and a password that a
   person stored for the server. One user per server; a user certificate is not supported.
-  - The person enters user name and password in the card of `opcua_endpoint_rank`, which shows a form when
-    the server says it wants a user (`needsUser`), and offers one when it only accepts one. The app sends them
-    from its server to `PUT /users`; they are never part of the chat, so the language model does not see them.
+  - The person enters user name and password in the card of `opcua_endpoint_rank`, and only there: a turn of
+    the chat that does not call that tool shows no form. The app sends them from its server to `PUT /users`;
+    they are never part of the chat, so the language model does not see them.
+  - Whether the card shows the form follows from what the server offers on its endpoints. `acceptsUser` is
+    true if at least one `SignAndEncrypt` endpoint accepts a user name token; `needsUser` is true if no
+    endpoint accepts an anonymous session.
+
+    | The server offers | `needsUser` | `acceptsUser` | The card |
+    | --- | --- | --- | --- |
+    | A user name on an encrypted endpoint, no anonymous session | true | true | Asks for user name and password before the scan can go on; once stored, "change the user" |
+    | A user name on an encrypted endpoint, and an anonymous session | false | true | The endpoints, with "Log in with a user instead" (folded) |
+    | Anonymous sessions only, or a user name only on endpoints that sign or have no security | – | false | The endpoints, no form |
+
+    A server with anonymous sessions only, the opc-simulator among them, has no form, by design. To see it,
+    configure a user on the server. The rule is `userStep` in `apps/app/src/cards/opcua/results.ts`.
   - The adapter tries the user on the server first, on its strongest encrypted endpoint, and keeps it only if
     the server accepts it: `secrets/credentials.json` in the data directory, readable by the adapter only.
     No answer of the adapter contains a password; `GET /users` names the servers and users.
