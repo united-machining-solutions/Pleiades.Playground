@@ -16,9 +16,12 @@ export function machinesInWords(count: number): string {
   return `${count} ${count === 1 ? "machine" : "machines"}`
 }
 
-/** What a machine is, by its model and serial number: from its identification, or from its machine id. */
+/**
+ * What a machine is, by its model and serial number: from its identification, or from its machine id
+ * where it reported neither, as a source does that sends no identification.
+ */
 export function modelOf({ machine, now }: Pick<PlacedMachine, "machine" | "now">): string {
-  return now ? titleOf(now) : labelOf(machine)
+  return now && (now.identity.model || now.identity.serialNumber) ? titleOf(now) : labelOf(machine)
 }
 
 /** The title of a machine on a site: the name people know it by, or what it is. */
@@ -53,7 +56,7 @@ export function siteListInWords(list: SiteList): string {
           ...list.sites.map(siteInWords),
         ]
   if (list.unplaced.length > 0) {
-    const machines = list.unplaced.map((one) => `${labelOf(one.machine)} (${one.machine}) ${stateLabel[one.state].toLowerCase()}`).join(", ")
+    const machines = list.unplaced.map((one) => `${modelOf(one)} (${one.machine}) ${stateLabel[one.state].toLowerCase()}`).join(", ")
     lines.push(`Sent values in the last 24 hours and stand on no site: ${machines}.`)
   }
   lines.push(`Read at ${written(list.asOf)}.`)
