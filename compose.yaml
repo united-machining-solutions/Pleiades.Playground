@@ -323,10 +323,15 @@ services:
   # The example application.
   app:
     <<: *service
-    image: ghcr.io/united-machining-solutions/pleiades.playground.app:${PLEIADES_VERSION:-dev}
+    # With APP_SHOWCASES set to anything this is the image pleiades.playground.app.showcases, the same app
+    # built with the showcases: pages made for one demo or one fair. Without it nothing of a showcase is in
+    # the image, see .env.example.
+    image: ghcr.io/united-machining-solutions/pleiades.playground.app${APP_SHOWCASES:+.showcases}:${PLEIADES_VERSION:-dev}
     build:
       context: .
       dockerfile: apps/app/Dockerfile
+      args:
+        SHOWCASES: ${APP_SHOWCASES:-}
     ports:
       # The chat has no sign-in, and with a key set it spends that key. So the app answers on this
       # computer only, unless APP_BIND opens it to the network.

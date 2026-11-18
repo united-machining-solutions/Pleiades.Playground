@@ -1,4 +1,4 @@
-import { pageLinks } from "@pleiades/cards/energy/order.ts"
+import { pageLinks } from "@pleiades/cards/shared/paging.ts"
 import { stateLabel } from "@pleiades/cards/machine/state.ts"
 import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
 import type { SiteList, StateCount } from "@pleiades/cards/site/contract.ts"

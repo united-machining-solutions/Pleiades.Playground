@@ -5,7 +5,7 @@ import type { Machine } from "@pleiades/cards/machine/contract.ts"
 import type { PlacedMachine, SiteList } from "@pleiades/cards/site/contract.ts"
 
 import { unknownMachine } from "./machines.ts"
-import { countsOf, sitesAt, sitesWith } from "./sites.ts"
+import { sitesAt, sitesWith } from "./sites.ts"
 
 const P04 = "alcyone-machines_AX-400_P-04"
 const M09 = "alcyone-machines_AX-400_M-09"
@@ -87,15 +87,6 @@ const list: SiteList = {
 const north = (sites: SiteList) => sites.sites[0]!
 const south = (sites: SiteList) => sites.sites[1]!
 
-test("the counts stand in the order a display reads the states, without a state no machine is in", () => {
-  assert.deepEqual(countsOf(["no-data", "running", "alarm", "running"]), [
-    { state: "running", machines: 2 },
-    { state: "alarm", machines: 1 },
-    { state: "no-data", machines: 1 },
-  ])
-  assert.deepEqual(countsOf([]), [])
-})
-
 test("a machine on a site that stops: its state, the counts of its site and of all sites follow", () => {
   const next = sitesWith(list, `machines/${P04}/umati/State/Status`, status("2026-11-18T09:31:00Z", "OutOfService"), NOW)
   assert.equal(north(next).halls[0]!.machines[0]!.state, "stopped")
@@ -104,8 +95,8 @@ test("a machine on a site that stops: its state, the counts of its site and of a
     { state: "stopped", machines: 1 },
     { state: "no-data", machines: 1 },
   ])
-  // The other site stays as it was.
-  assert.deepEqual(south(next), south(list))
+  // The other site stays as it was, the same object.
+  assert.equal(south(next), south(list))
 })
 
 test("a machine without data that sends again gets its values with its first sign of life", () => {
@@ -118,7 +109,47 @@ test("a machine without data that sends again gets its values with its first sig
 
 test("a retained value older than the backend looks for a machine does not wake a machine without data", () => {
   const next = sitesWith(list, `machines/${M09}/umati/State/Status`, status("2026-11-16T09:00:00Z", "Executing"), NOW)
-  assert.equal(next, list)
+  assert.equal(south(next).halls[0]!.machines[0]!.state, "no-data")
+  assert.deepEqual(south(next).counts, south(list).counts)
+  assert.deepEqual(next.counts, list.counts)
+})
+
+test("a machine without data keeps its identity and a standing alert that come before its first value", () => {
+  const named = sitesWith(list, `machines/${M09}/umati/Identification/Model`, value("2026-11-16T09:00:00Z", "AX-400"), NOW)
+  const alert = JSON.stringify({
+    specversion: "1.0",
+    id: "a1-Raised",
+    source: "https://www.alcyone-machines.example/AX-400/M-09",
+    type: "Notification.AlertRaised",
+    time: "2026-11-18T09:00:00Z",
+    data: { Id: "a1", ErrorCode: "5120", Message: "Bar feeder empty", Severity: "Error", SeverityValue: 900, Time: "2026-11-18T09:00:00Z" },
+  })
+  const alarmed = sitesWith(named, `machines/${M09}/events/notifications`, alert, NOW)
+  const awake = sitesWith(alarmed, `machines/${M09}/umati/State/Status`, status("2026-11-18T09:31:30Z", "Executing"), NOW)
+  assert.equal(south(named).halls[0]!.machines[0]!.state, "no-data")
+  const m09 = south(awake).halls[0]!.machines[0]!
+  assert.equal(m09.now?.identity.model, "AX-400")
+  assert.deepEqual(
+    m09.now?.notifications.map((one) => one.correlationId),
+    ["a1"],
+  )
+  assert.equal(m09.now?.itemState.value, "Executing")
+})
+
+test("a machine that starts sending after the page opened joins on no site, in the order of the ids", () => {
+  const stranger = "aldebaran-tools_AT-1_S-01"
+  const connected = sitesWith(list, `machines/${stranger}/umati/Connection/State`, value("2026-11-18T09:30:58Z", "Running"), NOW)
+  const next = sitesWith(connected, `machines/${stranger}/umati/State/Status`, status("2026-11-18T09:31:00Z", "Executing"), NOW)
+  assert.deepEqual(
+    next.unplaced.map((one) => [one.machine, one.state]),
+    [
+      [stranger, "running"],
+      [P07, "setup"],
+    ],
+  )
+  // The sites and their counts stay without it.
+  assert.equal(next.sites, list.sites)
+  assert.deepEqual(next.counts, list.counts)
 })
 
 test("a machine on no site follows the broker as well, and the counts of the sites stay without it", () => {
@@ -130,9 +161,10 @@ test("a machine on no site follows the broker as well, and the counts of the sit
   assert.deepEqual(next.sites, list.sites)
 })
 
-test("a message of a machine the list does not hold, or of no machine at all, changes nothing", () => {
+test("an old value of a machine the list does not hold, or a message of no machine at all, changes nothing", () => {
   const stranger = "taygeta-tools_TX-9_M-07"
-  assert.equal(sitesWith(list, `machines/${stranger}/umati/State/Status`, status("2026-11-18T09:31:00Z", "Executing"), NOW), list)
+  assert.equal(sitesWith(list, `machines/${stranger}/umati/State/Status`, status("2026-11-16T09:31:00Z", "Executing"), NOW), list)
+  assert.equal(sitesWith(list, `machines/${stranger}/umati/Identification/Model`, value("2026-11-18T09:31:00Z", "TX-9"), NOW), list)
   assert.equal(sitesWith(list, "sites/north-plant/energy", value("2026-11-18T09:31:00Z", 3), NOW), list)
 })
 
@@ -148,6 +180,12 @@ test("as time passes, a machine on no site that falls silent has no data too", (
   const later = sitesAt(list, "2026-11-18T09:31:00.000Z")
   assert.equal(later.unplaced[0]!.state, "no-data")
   assert.deepEqual(later.counts, [{ state: "no-data", machines: 2 }])
+})
+
+test("as time passes, a site whose machines keep their state stays the same object", () => {
+  const later = sitesAt(list, "2026-11-18T09:31:00.000Z")
+  // M-09 had no data before and has none now.
+  assert.equal(south(later), south(list))
 })
 
 test("an earlier instant changes nothing", () => {

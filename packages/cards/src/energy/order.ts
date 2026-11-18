@@ -1,3 +1,4 @@
+import { sliceOf } from "../shared/paging.ts"
 import type { MachineEnergy } from "./contract.ts"
 import { inKilowattHours } from "./words.ts"
 
@@ -46,10 +47,7 @@ export type EnergyPage = {
 /** The machines of one page, in the order chosen. */
 export function pageOf(machines: ReadonlyArray<MachineEnergy>, order: EnergyOrder, page: number): EnergyPage {
   const all = ordered(machines, order)
-  const pages = Math.max(1, Math.ceil(all.length / MACHINES_PER_PAGE))
-  const shown = Math.min(Math.max(1, Math.floor(page)), pages)
-  const start = (shown - 1) * MACHINES_PER_PAGE
-  const onPage = all.slice(start, start + MACHINES_PER_PAGE)
+  const { items: onPage, page: shown, pages, start } = sliceOf(all, MACHINES_PER_PAGE, page)
   return {
     machines: onPage,
     page: shown,
@@ -58,23 +56,4 @@ export function pageOf(machines: ReadonlyArray<MachineEnergy>, order: EnergyOrde
     last: start + onPage.length,
     total: all.length,
   }
-}
-
-/** A link of the pagination: a page, or a gap for the pages between that it leaves out. */
-export type PageLink = number | "gap"
-
-/**
- * The links the pagination shows for a page among so many: the first, the current one and its
- * neighbours, the last, and a gap where pages are left out. A gap of one page shows that page.
- * Where the card is narrow, it shows no neighbours.
- */
-export function pageLinks(page: number, pages: number, neighbours = 1): Array<PageLink> {
-  const near = Array.from({ length: 2 * neighbours + 1 }, (_, index) => page - neighbours + index)
-  const shown = new Set([1, ...near, pages].filter((one) => one >= 1 && one <= pages))
-  const sorted = [...shown].sort((a, b) => a - b)
-  return sorted.flatMap((one, index): Array<PageLink> => {
-    const before = sorted[index - 1]
-    if (before === undefined || one - before === 1) return [one]
-    return one - before === 2 ? [before + 1, one] : ["gap", one]
-  })
 }
