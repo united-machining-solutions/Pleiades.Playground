@@ -111,11 +111,15 @@ function failure(api: Api, url: URL, what: string, cause?: unknown): Error {
   return new Error(message, { cause })
 }
 
-async function getJson<TAnswer>(api: Api, url: URL, answer: z.ZodType<TAnswer>): Promise<TAnswer> {
+/**
+ * Asks an API and checks its answer against the shape this server knows. A GET unless `init` says
+ * otherwise, as the statistics do with a POST: every request fails the same way, with the same words.
+ */
+async function getJson<TAnswer>(api: Api, url: URL, answer: z.ZodType<TAnswer>, init?: RequestInit): Promise<TAnswer> {
   const unanswered = (error: unknown): never => {
     throw failure(api, url, `did not answer: ${reasonOf(error)}`, error)
   }
-  const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_SECONDS * 1000) }).catch(unanswered)
+  const response = await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_SECONDS * 1000) }).catch(unanswered)
   if (!response.ok) throw failure(api, url, `answered ${response.status}`)
   const checked = answer.safeParse(await response.json().catch(unanswered))
   if (!checked.success) {
@@ -130,11 +134,20 @@ function between(url: URL, names: [from: string, to: string], from: Date, to: Da
   return url
 }
 
-/** Every topic that had a value between the two instants. */
-export async function listTopics(apis: Apis, from: Date, to: Date): Promise<Array<string>> {
+/** The topics that had a value between two instants, by what their values are. */
+export type TopicKinds = { numbers: Array<string>; texts: Array<string>; yesNo: Array<string> }
+
+/** Every topic that had a value between the two instants, the numbers, texts and yes or no apart. */
+export async function listTopicKinds(apis: Apis, from: Date, to: Date): Promise<TopicKinds> {
   const url = between(new URL("/topics", apis.timeseriesUrl), ["startTime", "stopTime"], from, to)
   const answer = await getJson("Timeseries API", url, topicsAnswer)
-  return [...answer.baseUnitTopics, ...answer.stringTopics, ...answer.booleanTopics]
+  return { numbers: answer.baseUnitTopics, texts: answer.stringTopics, yesNo: answer.booleanTopics }
+}
+
+/** Every topic that had a value between the two instants, whatever its values are. */
+export async function listTopics(apis: Apis, from: Date, to: Date): Promise<Array<string>> {
+  const { numbers, texts, yesNo } = await listTopicKinds(apis, from, to)
+  return [...numbers, ...texts, ...yesNo]
 }
 
 /**
@@ -285,7 +298,8 @@ const newestAnswer = z.object({
 })
 
 /**
- * The newest value of one topic before `to`, however old, or null if it never had one. A number
+ * The newest value of one topic before `to`, however old, or null if it never had one. With
+ * `sorting: "Ascending"` and a `from`, the first value between the two instants instead. A number
  * keeps the unit the Timeseries API stored with it.
  */
 export async function readNewest(
@@ -293,15 +307,16 @@ export async function readNewest(
   kind: "baseUnitValues" | "booleanValues",
   topic: string,
   to: Date,
+  { from = EVER, sorting = "Descending" }: { from?: Date; sorting?: "Ascending" | "Descending" } = {},
 ): Promise<Newest | null> {
   const url = between(
     new URL(`/timeseries/${kind}/topics/${inPath(topic)}`, apis.timeseriesUrl),
     ["startTime", "stopTime"],
-    EVER,
+    from,
     to,
   )
   url.searchParams.set("limit", "1")
-  url.searchParams.set("sorting", "Descending")
+  url.searchParams.set("sorting", sorting)
   const { series } = await getJson("Timeseries API", url, newestAnswer)
   const found = series.find((one) => one.topic === topic)
   const value = found?.values[0]
@@ -315,7 +330,9 @@ export type Timeline = { topic: string; unit: string | null; samples: Array<{ at
 
 /**
  * The values of a topic between the two instants, oldest first. The topic may contain `*` as a
- * wildcard and then yields one timeline per topic.
+ * wildcard and then yields one timeline per topic. With `points`, the Timeseries API thins each
+ * timeline to at most that many (LTTB for numbers), and keeps all where there are fewer. It thins a
+ * yes or no by taking every n-th value, which loses changes: read those whole.
  */
 export async function readTimelines(
   apis: Apis,
@@ -323,6 +340,7 @@ export async function readTimelines(
   topic: string,
   from: Date,
   to: Date,
+  points?: number,
 ): Promise<Array<Timeline>> {
   const url = between(
     new URL(`/timeseries/${kind}/topics/${inPath(topic)}`, apis.timeseriesUrl),
@@ -330,6 +348,10 @@ export async function readTimelines(
     from,
     to,
   )
+  if (points !== undefined) {
+    url.searchParams.set("downsample", "true")
+    url.searchParams.set("limit", String(points))
+  }
   const { series } = await getJson("Timeseries API", url, newestAnswer)
   return series.map((one) => ({
     topic: one.topic,
@@ -383,57 +405,6 @@ export async function readPlacements(apis: Apis): Promise<Array<Placement>> {
   return placements.map((one) => ({ ...one, placedAt: new Date(one.placedAt).toISOString() }))
 }
 
-/** The first value of one topic between two instants, or null if it had none. */
-export async function readOldest(
-  apis: Apis,
-  kind: "baseUnitValues" | "booleanValues",
-  topic: string,
-  from: Date,
-  to: Date,
-): Promise<Newest | null> {
-  const url = between(
-    new URL(`/timeseries/${kind}/topics/${inPath(topic)}`, apis.timeseriesUrl),
-    ["startTime", "stopTime"],
-    from,
-    to,
-  )
-  url.searchParams.set("limit", "1")
-  url.searchParams.set("sorting", "Ascending")
-  const { series } = await getJson("Timeseries API", url, newestAnswer)
-  const found = series.find((one) => one.topic === topic)
-  const value = found?.values[0]
-  const timestamp = found?.timestamps[0]
-  if (value == null || timestamp === undefined) return null
-  return { at: fromMicroseconds(timestamp), value, unit: found?.unit ?? null }
-}
-
-/**
- * The numbers of a topic between the two instants, thinned by the Timeseries API to at most
- * `points` for each topic (LTTB), oldest first; all of them where there are fewer. The topic may
- * contain `*` as a wildcard and then yields one timeline per topic.
- */
-export async function readThinned(apis: Apis, topic: string, from: Date, to: Date, points: number): Promise<Array<Timeline>> {
-  const url = between(
-    new URL(`/timeseries/baseUnitValues/topics/${inPath(topic)}`, apis.timeseriesUrl),
-    ["startTime", "stopTime"],
-    from,
-    to,
-  )
-  url.searchParams.set("downsample", "true")
-  url.searchParams.set("limit", String(points))
-  const { series } = await getJson("Timeseries API", url, newestAnswer)
-  return series.map((one) => ({
-    topic: one.topic,
-    unit: one.unit ?? null,
-    samples: one.timestamps
-      .flatMap((timestamp, index) => {
-        const value = one.values[index]
-        return value == null ? [] : [{ at: fromMicroseconds(timestamp), value }]
-      })
-      .sort((a, b) => a.at.localeCompare(b.at)),
-  }))
-}
-
 /** What the Timeseries API sums up of the numbers of a topic: their unit, mean, largest and how many. */
 export type Statistics = { unit: string; mean: number; max: number; min: number; count: number }
 
@@ -450,19 +421,10 @@ const statisticsAnswer = z.record(
  */
 export async function readStatistics(apis: Apis, topic: string, from: Date, to: Date): Promise<Map<string, Statistics>> {
   const url = new URL(`/statistics/baseUnitValues/topics/${encodeURIComponent(topic)}`, apis.timeseriesUrl)
-  const unanswered = (error: unknown): never => {
-    throw failure("Timeseries API", url, `did not answer: ${reasonOf(error)}`, error)
-  }
-  const response = await fetch(url, {
+  const statistics = await getJson("Timeseries API", url, statisticsAnswer, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify([{ start: from.toISOString(), stop: to.toISOString() }]),
-    signal: AbortSignal.timeout(TIMEOUT_SECONDS * 1000),
-  }).catch(unanswered)
-  if (!response.ok) throw failure("Timeseries API", url, `answered ${response.status}`)
-  const checked = statisticsAnswer.safeParse(await response.json().catch(unanswered))
-  if (!checked.success) {
-    throw failure("Timeseries API", url, `answered in a shape this server does not know: ${z.prettifyError(checked.error)}`)
-  }
-  return new Map(Object.entries(checked.data))
+  })
+  return new Map(Object.entries(statistics))
 }

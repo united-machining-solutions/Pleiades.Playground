@@ -1,11 +1,12 @@
 import type { EnergySeries } from "@pleiades/cards/energy/contract.ts"
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
 import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
+import type { TimeseriesRange, TimeseriesSeries, TimeseriesSignals } from "@pleiades/cards/timeseries/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
-import { ENERGY_SERIES_TOOL, MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL } from "./card-tools.ts"
+import { ENERGY_SERIES_TOOL, MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL, TIMESERIES_SERIES_TOOL, TIMESERIES_SIGNALS_TOOL } from "./card-tools.ts"
 
 // The values come from the generative UI backend. These functions run on the server of the app:
 // the browser never talks to the backend itself.
@@ -199,3 +200,33 @@ export const getEnergySeries = createServerFn({ method: "GET" })
     })
     return answer.values
   })
+
+/**
+ * The lines of a time series card, for the lines and range a person chose on it. They are not among the
+ * values, because a language model reads those. Null if they are not to be had: the card says so.
+ */
+export const getTimeseriesSeries = createServerFn({ method: "GET" })
+  .validator((asked: { lines: Array<{ machine: string; signal: string }>; range: TimeseriesRange; to?: string }) => asked)
+  .handler(async ({ data }): Promise<TimeseriesSeries | null> => {
+    const answer = await ask(async (backend) => {
+      // The name is checked against the tools of the backend: if it changes there, this fails to compile.
+      const result = await backend.callTool(TIMESERIES_SERIES_TOOL, data)
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? `${TIMESERIES_SERIES_TOOL} returned no values.`)
+      }
+      return result.structuredContent
+    })
+    return answer.values
+  })
+
+/** What a person can add to a time series card: the signals of each machine. Null if they are not to be had. */
+export const getTimeseriesSignals = createServerFn({ method: "GET" }).handler(async (): Promise<TimeseriesSignals | null> => {
+  const answer = await ask(async (backend) => {
+    const result = await backend.callTool(TIMESERIES_SIGNALS_TOOL, {})
+    if (result.isError || !result.structuredContent) {
+      throw new Refused(textOf(result) ?? `${TIMESERIES_SIGNALS_TOOL} returned no values.`)
+    }
+    return result.structuredContent
+  })
+  return answer.values
+})
