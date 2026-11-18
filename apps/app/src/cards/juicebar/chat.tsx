@@ -43,7 +43,7 @@ type Step =
 /** How often in a row reading an order may fail before the card says so, at one read a second. */
 const patience = 10
 
-function DrinkPicker({ drinks: listed }: { drinks: Array<Drink> }) {
+export function DrinkPicker({ drinks: listed }: { drinks: Array<Drink> }) {
   const { drinks, hidden, low } = orderable(listed)
   const [pickedId, setPickedId] = useState(drinks[0]?.id)
   const [step, setStep] = useState<Step>({ at: "pick" })

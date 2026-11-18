@@ -13,7 +13,8 @@ import { reasonOf, textOf } from "@/machines/get-machines.ts"
 /** What a call got: the JSON the tool wrote, or why there is none in a sentence. */
 export type JuiceBarAnswer = { ok: true; json: string } | { ok: false; reason: string }
 
-async function call(tool: string, args: Record<string, unknown>): Promise<JuiceBarAnswer> {
+/** Calls a tool of the juice bar on the server of the app: the JSON it wrote, or why there is none. */
+export async function callJuiceBar(tool: string, args: Record<string, unknown>): Promise<JuiceBarAnswer> {
   const url = furtherServers().juicebar
   if (!url) return { ok: false, reason: "The app has no juice bar (APP_MCP_SERVERS names none)." }
   try {
@@ -38,7 +39,7 @@ export const orderDrink = createServerFn({ method: "POST" })
     if (!/^[\w-]{1,64}$/.test(drinkId)) throw new Error("A drink is named by its id.")
     return drinkId
   })
-  .handler(({ data: drinkId }) => call("juicebar_order_create", { drinkId }))
+  .handler(({ data: drinkId }) => callJuiceBar("juicebar_order_create", { drinkId }))
 
 /** Reads an order: its state and its progress. */
 export const readOrder = createServerFn({ method: "GET" })
@@ -46,4 +47,4 @@ export const readOrder = createServerFn({ method: "GET" })
     if (!Number.isInteger(orderNumber) || orderNumber < 0) throw new Error("An order is named by its number.")
     return orderNumber
   })
-  .handler(({ data: orderNumber }) => call("juicebar_order_get", { orderNumber }))
+  .handler(({ data: orderNumber }) => callJuiceBar("juicebar_order_get", { orderNumber }))

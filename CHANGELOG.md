@@ -12,6 +12,9 @@ All notable changes are documented here. The format follows
   colour; a person picks one, and its button orders it at once, without a question of the language model.
   The card follows the order and shows the glass waiting for the start button of the machine, filling while
   the pumps run, and full, with an umbrella. Without motion the glass shows the same, still.
+- Example app: the showcase page `/juice-bar`, the same drink card on a page of its own, for a screen next to
+  the machine at a fair: a guest picks and orders without a language model. It reads the card of the machine
+  every half minute. Only a build with `APP_SHOWCASES` has it.
 - Juice bar API: a drink carries its colour and the picture of a glass its author chose (`color`, `picture`),
   an ingredient its colour and whether its bottle runs low (`color`, `runsLow`). Colours that are not `#rrggbb`
   are left out.
