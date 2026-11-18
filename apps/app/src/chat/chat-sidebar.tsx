@@ -10,6 +10,7 @@ import {
   CircleCheckIcon,
   LoaderCircleIcon,
   MessageCircleDashedIcon,
+  PlusIcon,
   SlashIcon,
   SquareIcon,
   XIcon,
@@ -70,6 +71,7 @@ import { keepOfAnswer } from "@/pages/from-answer.ts"
 
 import { Answer } from "./answer.tsx"
 import {
+  CHAT_LIST,
   NEW_CHAT,
   afterSwitch,
   markPress,
@@ -86,7 +88,7 @@ import {
 import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
 import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
-import { chatName, nameOfQuestion } from "./chat-name.ts"
+import { UNNAMED_CHAT, chatName, nameOfQuestion } from "./chat-name.ts"
 import { DictateButton } from "./dictate.tsx"
 import { SaveAsPage } from "./save-as-page.tsx"
 import { chooseChatModel, fetchChatSettings, switchChatServer } from "./status.ts"
@@ -100,9 +102,9 @@ const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
 /**
  * Everything about the chat lives in this panel on the right, after the shadcn block sidebar-15:
  * the list of the chats and the chat itself. It works like a chat app on a phone, a list and a
- * chat with a way back: in a chat the head says what the chat is called and leads back to the list,
- * and the list is where a new chat begins. Without the panel the app is complete; it only loses the
- * chat.
+ * chat with a way back: in a chat the head says what the chat is called and leads back to the list.
+ * "New chat" in the head begins a new one, and so does the field at the foot of the list. Without the
+ * panel the app is complete; it only loses the chat.
  *
  * It never covers the page. It stands next to it, and where the two do not fit side by side it
  * takes the lower half of the screen.
@@ -118,8 +120,12 @@ export function ChatSidebar({ chat }: { chat: string }) {
     >
       {!chatStatus.configured ? (
         <NoLanguageModel />
+      ) : chat === CHAT_LIST ? (
+        // The keys keep the two views apart: going from one to the other mounts the new one, so its
+        // head and its field take the focus a press asked for.
+        <Start key={CHAT_LIST} />
       ) : chat === NEW_CHAT ? (
-        <Start />
+        <Start key={NEW_CHAT} fresh />
       ) : (
         // The key gives every chat its own state.
         <Conversation key={chat} threadId={chat} />
@@ -131,17 +137,19 @@ export function ChatSidebar({ chat }: { chat: string }) {
 /**
  * The head of the panel. In a chat (`back`) a button leads back to the list, then comes the name of
  * the chat; elsewhere there is only the title of the view. The name takes the room that is left and
- * is cut where it is too long: the buttons never give way.
+ * is cut where it is too long: the buttons never give way. Where a new chat can begin (`add`), "New
+ * chat" stands before the button that closes the panel, in the list and in every chat.
  *
  * "All chats" and the link of a chat go away with the view they stand in. After such a press the
  * heading of the new view takes the focus, so it does not fall to the page and a screen reader says
- * where it is. On a page load the focus stays where it was.
+ * where it is; after "New chat" the field takes it (`Composer`). On a page load the focus stays where
+ * it was.
  */
-function PanelHead({ title, back = false }: { title: string; back?: boolean }) {
+function PanelHead({ title, back = false, add = false }: { title: string; back?: boolean; add?: boolean }) {
   const panel = useChatPanel()
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
-    if (takePress()) heading.current?.focus()
+    if (takePress("heading")) heading.current?.focus()
   }, [])
   return (
     <SidebarHeader className="h-14 flex-row items-center gap-1 border-b">
@@ -153,6 +161,11 @@ function PanelHead({ title, back = false }: { title: string; back?: boolean }) {
       <h2 ref={heading} tabIndex={-1} className="min-w-0 flex-1 truncate px-2 font-medium outline-none">
         {title}
       </h2>
+      {add && (
+        <Button variant="ghost" size="icon-sm" aria-label="New chat" onClick={panel.newChat}>
+          <PlusIcon />
+        </Button>
+      )}
       <Button variant="ghost" size="icon-sm" aria-label="Close the chat" onClick={panel.close}>
         <XIcon />
       </Button>
@@ -187,8 +200,15 @@ function NoLanguageModel() {
  * The list of the chats, where a chat leads back to: the chats so far, and below them the field that
  * begins a new chat, with questions to begin with above it. The head says "Chats", so the group has no
  * label of its own.
+ *
+ * `fresh` is a new chat that has no question yet, where "New chat" leads: the head says so and leads
+ * back to the list, and there is only the field with its questions to begin with. A chat exists from
+ * its first question on; until then it is in no list.
+ *
+ * A question asked here opens its chat, and the field of that chat takes the focus, so the next
+ * question can follow without a click.
  */
-function Start() {
+function Start({ fresh = false }: { fresh?: boolean }) {
   const { chats, chatStatus } = root.useLoaderData()
   const panel = useChatPanel()
   // The next chat begins with the model picked here.
@@ -204,17 +224,21 @@ function Start() {
     pickSwitchedOff(next)
     setOff(next)
   }
+  const ask = (question: string) => {
+    markPress("field")
+    panel.ask(question)
+  }
   return (
     <>
-      <PanelHead title="Chats" />
+      {fresh ? <PanelHead title={UNNAMED_CHAT} back /> : <PanelHead title="Chats" add />}
       <SidebarContent>
-        {chats.length > 0 ? (
+        {!fresh && chats.length > 0 ? (
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
                 {chats.map((entry) => (
                   <SidebarMenuItem key={entry.threadId}>
-                    <SidebarMenuButton render={<Link to="." search={{ chat: entry.threadId }} onClick={markPress} />}>
+                    <SidebarMenuButton render={<Link to="." search={{ chat: entry.threadId }} onClick={() => markPress()} />}>
                       <span>{entry.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -228,7 +252,7 @@ function Start() {
               <EmptyMedia variant="icon">
                 <MessageCircleDashedIcon />
               </EmptyMedia>
-              <EmptyTitle>No chats yet</EmptyTitle>
+              <EmptyTitle>{fresh ? "No question yet" : "No chats yet"}</EmptyTitle>
               <EmptyDescription>
                 Ask what the machines do, begin with one of the questions below, or type <code>/help</code> for the
                 commands.
@@ -241,7 +265,7 @@ function Start() {
         placeholder="Ask about the machines, or type / for commands"
         suggestions={suggestions}
         commands={commandsFor(chatStatus.opcua)}
-        onSend={panel.ask}
+        onSend={ask}
         models={chatStatus.models}
         model={model}
         onModel={choose}
@@ -394,7 +418,7 @@ function Conversation({ threadId }: { threadId: string }) {
 
   return (
     <>
-      <PanelHead title={chatName(entry, firstQuestion ?? asked)} back />
+      <PanelHead title={chatName(entry, firstQuestion ?? asked)} back add />
       <div className="min-h-0 flex-1">
         {/* A new question settles near the top and the answer grows under it; a chat from before
             opens at its last question. */}
@@ -689,6 +713,10 @@ function Composer({
   const [help, setHelp] = useState(false)
   const [notice, setNotice] = useState<string>()
   const field = useRef<HTMLTextAreaElement>(null)
+  // After "New chat", and in a chat its first question opened from the panel, the field takes the focus.
+  useEffect(() => {
+    if (takePress("field")) field.current?.focus()
+  }, [])
   const prepare = (value: string) => {
     setText(value)
     setNotice(undefined)

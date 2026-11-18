@@ -173,6 +173,9 @@ catalogs:
     '@modelcontextprotocol/ext-apps':
       specifier: 2.0.4
       version: 2.0.4
+    '@pleiades/hub-sdk':
+      specifier: file:vendor/pleiades-hub-sdk-0.1.2.tgz
+      version: file:vendor/pleiades-hub-sdk-0.1.2.tgz
     '@react-three/fiber':
       specifier: 9.8.2
       version: 9.8.2
@@ -312,6 +315,9 @@ importers:
       '@pleiades/cards':
         specifier: workspace:*
         version: link:../../packages/cards
+      '@pleiades/hub-sdk':
+        specifier: 'catalog:'
+        version: file:vendor/pleiades-hub-sdk-0.1.2.tgz
       '@pleiades/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -975,6 +981,10 @@ packages:
 
   '@oxc-project/types@0.156.0':
     resolution: {integrity: sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw==}
+
+  '@pleiades/hub-sdk@file:vendor/pleiades-hub-sdk-0.1.2.tgz':
+    resolution: {integrity: sha512-YnWyhZqzmnZKgxI23qJ5jdEf43eP3LGG6a3i7YX/szoeVxvA/QJ0O/wTP9Evk5oFGcVfU8Af7oZxAXJ/SiQyKg==, tarball: file:vendor/pleiades-hub-sdk-0.1.2.tgz}
+    version: 0.1.2
 
   '@react-three/fiber@9.8.2':
     resolution: {integrity: sha512-6s0ejw0bT1myQ/aLLugcil8/zBmNnnHw/AISWF1yfDLOxfX3yYaTS+0IkpJITEnm/SSMLtxje6CJDt0i5Wu1Sw==}
@@ -3678,6 +3688,14 @@ snapshots:
     optional: true
 
   '@oxc-project/types@0.156.0': {}
+
+  '@pleiades/hub-sdk@file:vendor/pleiades-hub-sdk-0.1.2.tgz':
+    dependencies:
+      mqtt: 5.16.1
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
 
   '@react-three/fiber@9.8.2(@types/react@19.3.0)(immer@11.2.10)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(three@0.187.0)':
     dependencies:

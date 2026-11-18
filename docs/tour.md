@@ -263,7 +263,8 @@ The panel works like a chat app on a phone: a list and a chat, with a way back. 
 chat it says the name of the chat, which is its first question, on one line and cut where it is too long; the
 button "All chats" at its left leads back to the list, and the page beside the panel stays where it is. The
 list, headed "Chats", shows the chats so far, and the field at its foot begins a new one, with the questions to
-begin with above it. Close the panel and open it again, and the chat you left is there. The chats are kept in
+begin with above it. The plus "New chat" in the head of the list and of every chat opens a new chat with the
+cursor in its field. Close the panel and open it again, and the chat you left is there. The chats are kept in
 the memory of the app's server and are gone when it restarts.
 
 Under an answer that has ended and for which the chat drew a card, the chat offers "Save as page". It keeps all

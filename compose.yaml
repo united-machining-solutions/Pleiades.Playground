@@ -366,6 +366,10 @@ services:
       # to text.
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      # The app registers at the Pleiades Hub, at the broker of this stack; an empty HUB_MQTT_URL switches
+      # that off. HUB_APP_URL is the address under which a browser reaches the app.
+      HUB_MQTT_URL: ${HUB_MQTT_URL-mqtt://broker:1883}
+      HUB_APP_URL: ${HUB_APP_URL:-http://localhost:${APP_PORT:-5600}/}
 
   # The SimpleCAM adapter: reads the state of the machine 9042 from the SSE stream of the SimpleCAM backend and
   # publishes it to the broker after the data model, as machines/united-grinding_simplecam_9042/umati/...

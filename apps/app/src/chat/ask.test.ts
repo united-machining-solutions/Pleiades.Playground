@@ -1,7 +1,23 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { afterSwitch, chatOf, pickSwitchedOff, pickedSwitchedOff } from "./ask.ts"
+import { afterSwitch, chatOf, markPress, pickSwitchedOff, pickedSwitchedOff, takePress } from "./ask.ts"
+
+test("a press gives the focus to what it asked for, once, and the other does not take it", () => {
+  // On a page load nothing was pressed: neither the heading nor the field takes the focus.
+  assert.equal(takePress("heading"), false)
+  assert.equal(takePress("field"), false)
+  // "All chats": the heading of the view it leads to.
+  markPress()
+  assert.equal(takePress("field"), false)
+  assert.equal(takePress("heading"), true)
+  assert.equal(takePress("heading"), false)
+  // "New chat": the head of the new view asks first and leaves it to the field.
+  markPress("field")
+  assert.equal(takePress("heading"), false)
+  assert.equal(takePress("field"), true)
+  assert.equal(takePress("field"), false)
+})
 
 test("switching a server changes the ones that are off, each named once", () => {
   assert.deepEqual(afterSwitch([], "ultimaker", false), ["ultimaker"])
