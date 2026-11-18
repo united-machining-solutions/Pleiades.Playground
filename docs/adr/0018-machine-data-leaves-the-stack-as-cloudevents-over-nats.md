@@ -4,7 +4,7 @@ status: proposed
 date: 2026-11-18
 ---
 
-# ADR-0017: Machine data leaves the stack as CloudEvents over NATS
+# ADR-0018: Machine data leaves the stack as CloudEvents over NATS
 
 ## Context
 

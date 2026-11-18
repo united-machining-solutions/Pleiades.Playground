@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <title>Cutting simulator</title>
+    <link rel="icon" type="image/svg+xml" href="@Assets["favicon.svg"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <ImportMap />
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+
+<body>
+    <Routes @rendermode="InteractiveServer" />
+    <div id="blazor-error-ui" data-nosnippet>
+        The page lost its connection to the simulator.
+        <a href="." class="reload">Reload</a>
+    </div>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>

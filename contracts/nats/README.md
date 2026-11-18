@@ -10,7 +10,7 @@ simulator/adapter ──MQTT──▶ broker ──▶ nats-bridge ──CloudEv
 ```
 
 The NATS server is not part of the stack. By default the bridge writes to one on the computer that runs the stack.
-Why: see [ADR-0017](../../docs/adr/0017-machine-data-leaves-the-stack-as-cloudevents-over-nats.md).
+Why: see [ADR-0018](../../docs/adr/0018-machine-data-leaves-the-stack-as-cloudevents-over-nats.md).
 
 ## Subjects
 

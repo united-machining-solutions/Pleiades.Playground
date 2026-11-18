@@ -11,7 +11,7 @@ All notable changes are documented here. The format follows
   a NATS server as a CloudEvent, through JetStream with `Nats-Msg-Id` or as plain core NATS. A value is wrapped, an
   event goes on unchanged. The subjects are a prefix (`local.pleiades` by default) and the levels of the MQTT
   topic. Address, sign-in and TLS are configurable (`NATS_*` in `.env.example`); by default it writes to a NATS
-  server on the same computer. The format is in `contracts/nats`, the decision in ADR-0017.
+  server on the same computer. The format is in `contracts/nats`, the decision in ADR-0018.
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
   self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
   that live values work over HTTPS. HTTP stays as it is.
@@ -40,6 +40,8 @@ All notable changes are documented here. The format follows
 - Page of a machine: the title switches to another machine, with a search over the serial number and the
   state, and the history of the card covers the last 1, 8 or 24 hours (`?hours=`). The page is wider, with
   room for actions on the right.
+- Energy card: `genui_energy_show` says how much energy machines imported over the last 1 to 24 hours, from
+  their meters, with mean and peak power; the card draws their power as a graph (`genui_energy_series`).
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
@@ -58,6 +60,13 @@ All notable changes are documented here. The format follows
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
 - Simulator for values, states and notifications of several machines.
+- Cutting machines, part of the stack: simulators of a 2D laser, a tube laser and a punching machine that take
+  their jobs through telegram files, each with a web page, and one adapter per machine that publishes it to the
+  broker by the binding of machines as `trumpf_Laser2D_L-01`, `trumpf_Tube_T-01` and `trumpf_Punch_PU-01`:
+  manifest, identification, `State/Status`, channel, feed override, the NC program below `oem/`, and its alarms as
+  `Notification.ActiveAlerts` and CloudEvents on `events/notifications`. The web page shows the serial number, and an endless mode writes new
+  orders into the plan and refills the stacks, so that a machine produces without anyone at it. They are part of
+  the Margo app too, there in endless mode.
 - Deployment (`docs/deployment.md`): the workflow "Deploy" starts the stack with `docker compose` on a runner of
   your own, from the images of the commit that was merged into `main`. It is off until the variable
   `DEPLOY_ENABLED` is `true`.

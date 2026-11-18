@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Laser2D": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5611",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Config__MachineType": "Laser2D",
+        "Config__SerialNumber": "L-01"
+      }
+    },
+    "Tube": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5612",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Config__MachineType": "Tube",
+        "Config__SerialNumber": "T-01",
+        "Config__ExchangeDirectory": "../../.cutting/exchange-tube",
+        "Config__StatePath": "../../.cutting/state-tube.json"
+      }
+    },
+    "Punch": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5613",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Config__MachineType": "Punch",
+        "Config__SerialNumber": "PU-01",
+        "Config__ExchangeDirectory": "../../.cutting/exchange-punch",
+        "Config__StatePath": "../../.cutting/state-punch.json"
+      }
+    }
+  }
+}
