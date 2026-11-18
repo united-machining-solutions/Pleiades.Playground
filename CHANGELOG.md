@@ -7,6 +7,11 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Optional NATS bridge `nats-bridge` (Compose profile `nats`): sends every value and event of the MQTT broker on to
+  a NATS server as a CloudEvent, through JetStream with `Nats-Msg-Id` or as plain core NATS. A value is wrapped, an
+  event goes on unchanged. The subjects are a prefix (`local.pleiades` by default) and the levels of the MQTT
+  topic. Address, sign-in and TLS are configurable (`NATS_*` in `.env.example`); by default it writes to a NATS
+  server on the same computer. The format is in `contracts/nats`, the decision in ADR-0018.
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
   self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
   that live values work over HTTPS. HTTP stays as it is.

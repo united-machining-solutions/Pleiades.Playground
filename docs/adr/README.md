@@ -26,3 +26,4 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0015](0015-the-binding-of-machines-follows-the-data-model.md) | The tree of machines on the broker follows the data model exactly | proposed |
 | [0016](0016-blazor-for-the-page-of-a-dotnet-service.md) | A .NET service draws its own page with Blazor (an exception for the cutting simulator only) | rejected |
 | [0017](0017-the-words-of-a-tool-result-are-a-display.md) | The words of a tool result may name the unit people use | proposed |
+| [0018](0018-machine-data-leaves-the-stack-as-cloudevents-over-nats.md) | Machine data leaves the stack as CloudEvents over NATS | proposed |

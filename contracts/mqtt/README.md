@@ -101,6 +101,9 @@ and the stack reads only it; the earlier text of this section is in the history 
   session expiry of one day), takes what has the content type `application/cloudevents+json`, and stores the
   CloudEvent as it came with the machine id of its topic. `source` and `id` together are unique, so an event the
   broker delivers twice is stored once.
+- The optional NATS bridge (Compose profile `nats`) subscribes to `machines/+/umati/#`, `machines/+/oem/#`,
+  `machines/+/events/+` and `sites/+/#` in the same kind of session and sends every message on to a NATS server as
+  a CloudEvent, an event unchanged; see [`../nats`](../nats/README.md).
 
 ### Example topics of a source
 

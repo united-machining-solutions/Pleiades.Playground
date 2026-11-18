@@ -60,6 +60,9 @@ An optional [juice bar service](source/Pleiades.Playground.JuiceBar.Api/README.m
 drinks behind REST and MCP and publishes its state to the broker. It is started only with the `juicebar`
 Compose profile and needs a machine that runs MixerControl; it places orders and never starts the production.
 For a deployment, see [deployment](docs/deployment.md#enable-the-juice-bar-service).
+An optional NATS bridge sends every value and event of the broker on to a NATS server as CloudEvents, by
+default to one on the same computer. It is started only with the `nats` Compose profile; the subjects and
+the CloudEvents are in [contracts/nats](contracts/nats/README.md).
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo; only
 the chat of the example app needs a language model, through a LiteLLM gateway:
 

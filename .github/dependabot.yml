@@ -39,6 +39,7 @@ updates:
       - /source/Pleiades.Playground.Timeseries.Persistence
       - /source/Pleiades.Playground.Events.Api
       - /source/Pleiades.Playground.Events.Persistence
+      - /source/Pleiades.Playground.Nats.Bridge
       - /source/Pleiades.Playground.Simulator
       - /apps/genui-mcp
       - /apps/app
