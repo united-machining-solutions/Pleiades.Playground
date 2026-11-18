@@ -334,7 +334,7 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
 
   # SimpleCAM Adapter: consumes SSE from SimpleCAM backend, publishes to MQTT (AG2 v0.17.1).
-  # SimpleCAM runs externally on localhost:5461; this adapter runs in Docker and forwards data to Pleiades.
+  # SimpleCAM runs externally on localhost:5450; this adapter runs in Docker and forwards data to Pleiades.
   # Requires SIMPLECAM_SSE_URL to point to the external SimpleCAM backend.
   simplecam-adapter-9042:
     <<: *service
@@ -347,7 +347,7 @@ services:
       timeseries-persistence:
         condition: service_healthy
     environment:
-      SIMPLECAM_SSE_URL: ${SIMPLECAM_SSE_URL:-http://host.docker.internal:5461/stream/machine-9042/state}
+      SIMPLECAM_SSE_URL: ${SIMPLECAM_SSE_URL:-http://host.docker.internal:5450/stream/machine-9042/state}
       MQTT_BROKER_URL: ${MQTT_BROKER_URL:-mqtt://broker:1883}
       MQTT_CLIENT_ID: simplecam-adapter-9042
       HEALTH_PORT: "3042"
