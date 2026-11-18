@@ -184,6 +184,15 @@ the tool's and the wording is the model's: the card says 6 minutes of running, t
 minutes". The stack had just started, so most of the 8 hours have no data. The card on the left is one minute
 newer than the one in the chat: the page reads again, an answer shows what was true when it was given.
 
+With an external documentation service configured as `docs` in `APP_MCP_SERVERS` and enabled under
+"Tools" in the message field, ask how to operate,
+maintain or program a machine. The chat searches its manuals and shows source references by filename and
+page label, with the physical PDF page also shown when it differs. Select one to open that physical PDF page. Use the page controls, zoom and **Find**
+to explore it; **Next match** moves between matching pages. The **Extracted text** tab shows the evidence
+used by chat. A replaced or unavailable source asks you to search again. Both views read documentation
+through MCP; the app has no direct connection to the documentation REST API.
+Documentation source references stay in the chat and are not cards for "Save as page".
+
 The panel works like a chat app on a phone: a list and a chat, with a way back. The head says what is open. In a
 chat it says the name of the chat, which is its first question, on one line and cut where it is too long; the
 button "All chats" at its left leads back to the list, and the page beside the panel stays where it is. The
@@ -205,6 +214,13 @@ link that carries the recipe: which answers, for which machines and hours, and n
 window to see what a colleague sees: the page with the values of now, no chat and no language model needed,
 and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for says so,
 and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
+
+Ask about the alarms of a machine, for example "Which warnings and errors did P-04 have today?", and the chat
+draws the notification card of the tool `genui_notification_list`: each warning and error with when it was
+raised, when it went and how long it stood, and the ones that have not gone first. The card is
+[`packages/cards/src/notification/notification-card.tsx`](../packages/cards/src/notification/notification-card.tsx),
+the tool is in [`apps/genui-mcp/src/notifications.ts`](../apps/genui-mcp/src/notifications.ts). No screenshot
+shows it yet.
 
 The chat needs a language model, and the demo starts without one. Then the panel says "No language model
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
