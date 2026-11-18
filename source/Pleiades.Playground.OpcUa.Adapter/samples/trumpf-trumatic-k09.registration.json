@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 2,
+  "serialNumber": "A1121O0001",
+  "displayName": "Sample: TRUMPF TruMatic of the TRUMPF OPC UA simulator, definition K09",
+  "modelVersion": "0.17.1",
+  "profiles": [
+    "Core",
+    "EnergyElectricity"
+  ],
+  "endpoint": {
+    "url": "opc.tcp://opc-simulator:4840",
+    "securityMode": "SignAndEncrypt",
+    "securityPolicy": "Aes256_Sha256_RsaPss"
+  },
+  "machineNode": "nsu=urn:umati2:datamodel:opcua;s=Machine",
+  "elements": [
+    {
+      "path": "Production.ActiveProgram",
+      "kind": "Text",
+      "node": "nsu=http://trumpf.com/UA/MachineTool/;i=3012",
+      "match": "Direct",
+      "evidence": "5:Production/5:ActiveProgram/5:Name."
+    },
+    {
+      "path": "Consumption.Electricity[Main].AcActivePowerTotal",
+      "kind": "Number",
+      "unit": "watt",
+      "node": "nsu=http://trumpf.com/TRUMPF-Interfaces/;s=195",
+      "scale": 1000,
+      "match": "Unclear",
+      "evidence": "TRUMPF interface, Machine/EnergyMetering/InstantaneousValues/Power/PowerTotal. The node has no EngineeringUnits; the simulator documents kilowatt; times 1000. Unclear until a person confirms the unit of the real meter."
+    },
+    {
+      "path": "Consumption.Electricity[Main].AcActiveEnergyTotalImportHp",
+      "kind": "Number",
+      "unit": "wattHour",
+      "node": "nsu=http://trumpf.com/TRUMPF-Interfaces/;s=202",
+      "scale": 1000,
+      "match": "Unclear",
+      "evidence": "TRUMPF interface, Machine/EnergyMetering/MeterReadings/Energy/ReceivedEnergy. The node has no EngineeringUnits; the simulator documents kilowatt hours; times 1000 for wattHour, the unit of the catalogue of the data model. Unclear until a person confirms the unit of the real meter."
+    },
+    {
+      "path": "ActivityMeters.DrivesOnDuration",
+      "area": "oem",
+      "kind": "Number",
+      "unit": "second",
+      "node": "nsu=http://trumpf.com/TRUMPF-Interfaces/;s=336",
+      "scale": 3600,
+      "match": "Direct",
+      "evidence": "TRUMPF interface, ActivityMeters/DrivesOnTime, hours. The data model has no such element, so it is a value of the maker."
+    }
+  ],
+  "alerts": {
+    "eventType": "nsu=http://trumpf.com/TRUMPF-Interfaces/;i=1006",
+    "codeField": "nsu=http://trumpf.com/TRUMPF-Interfaces/;AlarmIdentifier"
+  },
+  "missing": [
+    {
+      "path": "OperationCounters.PartsProducedInLifetime",
+      "reason": "Conditional, and the condition does not hold: the server counts parts per program (TRUMPF CurrentQuantity), not over the lifetime of the machine."
+    },
+    {
+      "path": "Production.JobOrders",
+      "reason": "The server has no job management, and the MQTT binding of this repository publishes no list values."
+    },
+    {
+      "path": "Channel[1].ChannelState",
+      "reason": "Not published: the profile ChannelMonitoring is not complete, it lacks Channel[1].RapidOverride."
+    },
+    {
+      "path": "Channel[1].ChannelMode",
+      "reason": "Not published: the profile ChannelMonitoring is not complete, it lacks Channel[1].RapidOverride."
+    },
+    {
+      "path": "Channel[1].FeedOverride",
+      "reason": "Not published: the profile ChannelMonitoring is not complete, it lacks Channel[1].RapidOverride."
+    },
+    {
+      "path": "Channel[1].Name",
+      "reason": "Not published: the profile ChannelMonitoring is not complete, it lacks Channel[1].RapidOverride."
+    },
+    {
+      "path": "Identification.SoftwareRevision",
+      "reason": "The variable of urn:umati2:datamodel:opcua has no value on this server."
+    }
+  ],
+  "discovery": {
+    "by": "The simulator 1.4.0-alpha3 serves the machine in urn:umati2:datamodel:opcua, which the adapter maps itself: identification, state, feed override and power-on duration. Active program, energy and the drive time come from the TRUMPF interface and the MachineTool instance, as in the sample of definition L26.",
+    "at": "2026-11-18T09:00:00Z"
+  }
+}

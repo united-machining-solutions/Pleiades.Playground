@@ -15,4 +15,6 @@
 @source "../../ui/src/components/badge.tsx";
 @source "../../ui/src/components/card.tsx";
 @source "../../ui/src/components/chart.tsx";
+@source "../../ui/src/components/item.tsx";
+@source "../../ui/src/components/separator.tsx";
 @source "../../ui/src/components/skeleton.tsx";

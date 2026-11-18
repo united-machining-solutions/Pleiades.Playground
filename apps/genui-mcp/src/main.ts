@@ -6,6 +6,7 @@ import { server } from "./server.ts"
 const apis = {
   timeseriesUrl: process.env.TIMESERIES_API_URL ?? "http://localhost:5500",
   eventsUrl: process.env.EVENTS_API_URL ?? "http://localhost:5510",
+  sitesUrl: process.env.SITES_API_URL ?? "http://localhost:5540",
 }
 
 if (process.argv.includes("--stdio")) {

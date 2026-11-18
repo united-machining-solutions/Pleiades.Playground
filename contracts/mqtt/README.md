@@ -125,8 +125,8 @@ to be settled at the umati hackathon. Here everything is as the model says: path
 lists, events, manifest and connection. It is the binding of `machines/`; why: see
 [ADR-0015](../../docs/adr/0015-the-binding-of-machines-follows-the-data-model.md).
 
-In the demo stack every simulator (P-04, P-07, M-02) and the adapters of two real devices, an Ultimaker printer
-and a juice bar, publish this tree, and the services of the playground read only it (see "How the stack stores
+In the demo stack every simulator (P-04, P-07, M-02), the adapters of two real devices, an Ultimaker printer
+and a juice bar, the adapters of the three cutting machines and the OPC UA adapter publish this tree, and the services of the playground read only it (see "How the stack stores
 it").
 
 ### Topics
@@ -517,24 +517,54 @@ next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; withou
 
 ### What the adapters of real devices publish
 
-Two adapters bring real devices into the stack with the same binding, each in a Compose profile of its own:
-the [Ultimaker telemetry](../ultimaker/telemetry.md) and the
-[juice bar](../../source/Pleiades.Playground.JuiceBar.Api/README.md). They publish with the same code as the
+Three adapters bring real devices into the stack with the same binding: the first two each in a Compose profile of
+its own, the third with the stack:
+the [Ultimaker telemetry](../ultimaker/telemetry.md), the
+[juice bar](../../source/Pleiades.Playground.JuiceBar.Api/README.md) and the
+[cutting adapter](../../source/Pleiades.Playground.Cutting.Adapter/README.md), one per cutting machine. They publish with the same code as the
 simulators (`Pleiades.Playground.Mqtt.Extensions.Machines`): every value retained with QoS 1 in the envelope
 above, the manifest before the values, `Connection/State` `Initializing`, `Running`, `CommunicationFault` while the
 device does not answer and `Shutdown` at a clean stop, every value again after a reconnect or when the device
-answers again, and the last will. Unlike a simulator they see the device only from outside: the time of a value
-is the time the adapter read it (`"timestampSource": "adapter"`), and a value goes out when it changes.
+answers again, and the last will. Unlike a simulator they see the device only from outside, and a value goes out when it changes. The time of a value
+is the time the adapter read it (`"timestampSource": "adapter"`), unless the device gives one, as a cutting
+machine does.
 
 | Adapter | Topics below | `ManufacturerUri` | Prefix of its signals | Profiles |
 |---|---|---|---|---|
 | Ultimaker telemetry | `machines/ultimaker_UM3_UM3-01/` | `https://ultimaker.com` | `x-ultimaker-com`, on `oem/Ultimaker/…` | `Core` |
 | Juice bar | `machines/trumpf_JuiceBar_JUICEBAR-01/` | `https://www.trumpf.com` | `x-trumpf-com`, on `oem/JuiceBar/…` | `Core` |
+| Cutting adapter | `machines/trumpf_Laser2D_L-01/`, `trumpf_Tube_T-01/`, `trumpf_Punch_PU-01/` | `https://www.trumpf.com` | `x-trumpf-com`, on `oem/WorkMasterMonitoring/ActiveProgram` | `Core` |
 
 Each delivers of `Core` the identification, the connection and `State/Status`, with `MachineryOperationMode`
-`None`, the value of the model for a machine without operation modes; `ProductCode`, `YearOfConstruction`,
-`State.FeedOverride`, `Notification.ActiveAlerts` and `OperationCounters.PowerOnDuration` are
-`"available": false`. Neither publishes events yet.
+`None`, the value of the model for a machine without operation modes; `ProductCode`, `YearOfConstruction`
+and `OperationCounters.PowerOnDuration` are `"available": false`. Printer and juice bar do not deliver
+`State.FeedOverride` and `Notification.ActiveAlerts` either, and publish no events. The cutting adapter delivers
+both, besides `Channel/1/ChannelState` and `WorkMasterMonitoring/ActiveWorkMaster`, which carries the name of the NC program, the same value as its signal: the machine has no work master of its own; its timestamps are those of the machine (`"timestampSource": "source"`), save a `null` for not known, which carries the time of the connect,
+and each alarm of the machine is an entry of `ActiveAlerts` with the events `Notification.AlertRaised` and
+`Notification.AlertCleared` on `events/notifications`. The protocol of the cutting machines has no request for
+the current alarms, so after a start of the adapter `ActiveAlerts` is `null` until the machine runs, stands
+without a fault or names an alarm; the list goes out before the events that change it.
+
+The [OPC UA adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md) brings in every machine a person
+adds in the chat, with the same publisher and one MQTT connection per machine, so that each has its own last
+will (client id `opcua-adapter-<machineId>`). What it publishes follows from the registration of the machine:
+
+- The machine id is formed from `Identification.ManufacturerUri`, `Model` and `SerialNumber` as the server gave
+  them when the machine was added, and kept with the registration.
+- The manifest declares the core whole, what the machine lacks `"available": false`, and the other profiles
+  whose elements the registration maps whole. A value of the maker is a signal of the manufacturer, below
+  `oem/`, with the prefix of the domain of its `ManufacturerUri`.
+- A value goes out when the server reports a change, with the time of the source (`"timestampSource":
+  "source"`), in the unit of the catalogue. `State.Status` is built from the two fields of the state.
+- `Connection/State` is `Running` while the OPC UA session stands and `CommunicationFault` while it does not.
+- The alarms of the server are `Notification.ActiveAlerts` and the events `Notification.AlertRaised` and
+  `Notification.AlertCleared` on `events/notifications`; `Severity` is the category of NE 107 from the severity of
+  OPC UA (from 667 `Failure`, from 334 `OffSpec`, below `MaintenanceRequired`), an assumption of the adapter.
+  `sequence` counts from 1 in every run of the adapter; the outbox holds the events while the broker is away, as
+  the managed client keeps every message. An alarm that stood before a restart of the adapter and still stands is
+  raised once more in the new run, with its `Id` and its `Time`, so that every run names the alarms that stand.
+- When a machine is removed, the adapter takes every retained message of it back with an empty one and ends its
+  connection without its last will. While the broker cannot be reached it does not remove the machine.
 
 ### Open for the hackathon
 
@@ -562,7 +592,12 @@ Each delivers of `Core` the identification, the connection and `State/Status`, w
   only as a signal of the manufacturer, `oem/WorkMasterMonitoring/ActiveProgram`; the model has no element for the
   program, and its catalogue still says the work master of a machine tool is mostly the name of the NC program.
   Open: whether the model wants an element for the program (for example in `ProgramExecution`), or the work master
-  stays the program name on machines without a work master of their own.
+  stays the program name on machines without a work master of their own. The cutting adapter does the latter.
+- Programs and jobs of the cutting machines. The model has `WorkMasterMonitoring.ProgramExecution` with the
+  events `ProgramExecutionStarted`, `Ended`, `Aborted`, `Interrupted` and `Resumed`; `StartNCP`, `EndeNCP`,
+  `ResetNCP` and the halts the cutting adapter detects map onto them almost one to one, and the production plan
+  (`PRD_SHOW`) could become `JobMonitoring.JobOrders`. Then the cutting machines would show up in the job and
+  program views of the app like the virtual machine. Open: who builds it.
 - The planned times of a job order. The model asks for `PlannedStartTime` and `PlannedEndTime` and allows `null`;
   the virtual machine knows no plan and sends `null`. `OrderNumbers` is made up (`SO-` and the number of the job
   order).
