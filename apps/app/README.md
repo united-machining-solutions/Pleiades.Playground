@@ -256,6 +256,10 @@ be assumed reachable from another container. The standard demo has no documentat
 
 Ask about a manual, for example “Welche vier technologischen Bearbeitungen unterscheidet CYCLE832?”.
 The chat uses `docs_search` and `docs_read_page`, cites the document and page, and shows clickable sources.
-Selecting a source reads its MCP page resource through the Playground backend and displays plain extracted
-text. Missing, changed or unavailable sources show an error. This does not display a PDF or its diagrams.
+Selecting a PDF source opens its original physical page in a PDF.js viewer, with paging, zoom, download
+and literal search. Search combines native PDF text and indexed OCR page matches; only native text can
+be highlighted. The **Extracted text** tab retains the plain-text evidence. The backend reads metadata and
+bounded binary resources through MCP and serves PDF bytes to the browser, including HTTP ranges.
+Missing, changed or unavailable sources show an error and require a new search.
+See [ADR-0017](../../docs/adr/0017-original-pdf-sources-over-mcp.md).
 The Playground never calls the documentation REST API or accesses its database.

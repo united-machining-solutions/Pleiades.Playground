@@ -11,6 +11,9 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Documentation sources: original PDF viewer with paging, zoom and native/OCR page search, retrieved
+  through bounded MCP binary resources without adding PDFs to model context.
+
 - Example app: optional documentation MCP tools with clickable, revision-specific manual page sources in chat.
 
 

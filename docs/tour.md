@@ -168,8 +168,10 @@ newer than the one in the chat: the page reads again, an answer shows what was t
 With an external documentation service configured as `docs` in `APP_MCP_SERVERS` and enabled under
 "Tools" in the message field, ask how to operate,
 maintain or program a machine. The chat searches its manuals and shows source references by filename and
-page. Select one to read the extracted page in a dialog. A replaced or unavailable source asks you to
-search again. This reads documentation through MCP; it does not open the original PDF.
+page. Select one to open the original PDF at that physical page. Use the page controls, zoom and **Find**
+to explore it; **Next match** moves between matching pages. The **Extracted text** tab shows the evidence
+used by chat. A replaced or unavailable source asks you to search again. Both views read documentation
+through MCP; the app has no direct connection to the documentation REST API.
 Documentation source references stay in the chat and are not cards for "Save as page".
 
 The panel works like a chat app on a phone: a list and a chat, with a way back. The head says what is open. In a

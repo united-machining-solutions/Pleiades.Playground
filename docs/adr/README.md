@@ -25,3 +25,4 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0014](0014-a-page-from-the-chat-is-a-recipe-kept-in-the-browser.md) | A page from the chat is a recipe, kept in the browser | proposed |
 | [0015](0015-the-binding-of-machines-follows-the-data-model.md) | The tree of machines on the broker follows the data model exactly | proposed |
 | [0016](0016-documentation-sources-in-chat.md) | Documentation sources in chat through MCP | proposed |
+| [0017](0017-original-pdf-sources-over-mcp.md) | Original PDF sources over MCP | proposed |

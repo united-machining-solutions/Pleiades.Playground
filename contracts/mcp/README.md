@@ -57,4 +57,17 @@ The app displays citations from tool results and reads a selected page through M
 Only `docs://documents/<64 lowercase hex ID>/<64 lowercase hex revision>/pages/<positive page>`
 resources are accepted. The browser chooses no server URL: the app connects only to the configured `docs`
 endpoint. Changed or unavailable revisions show an error and require another search. Source text is
-rendered as plain text, never as HTML. Original PDF viewing is outside this integration.
+rendered as plain text, never as HTML.
+
+For PDF citations, `/api/documentation/pdf` accepts the document ID and revision, never an arbitrary URL.
+The backend reads `docs://documents/{id}/{revision}/metadata`, validates identity and PDF metadata, then
+reads base64 byte resources at `.../original/{offset}/{length}` with a maximum of 262144 bytes each.
+It validates each URI, MIME type and byte length, and serves an HTTP PDF stream with single-range support.
+Only the configured `docs` MCP endpoint is contacted; the browser never calls the documentation API.
+The full `.../original` application/pdf resource is available for documents up to 8 MiB but is not used by
+the viewer. Binary resources never enter model context.
+
+`docs_get_document` returns metadata only. `docs_search_document` returns literal case-insensitive
+extraction/OCR page matches (query 1–200 characters), used alongside native PDF text search. The browser
+can navigate matching pages; OCR matches have no positional highlight. The chat retains the extracted-text
+tab and opens the original PDF at the cited physical page.
