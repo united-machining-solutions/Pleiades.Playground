@@ -5,7 +5,7 @@ import { drawingTool } from "./parts.ts"
 import { MAX_PARTS, recipeOf, recipePartSchema, titleOf } from "./recipe.ts"
 import type { Recipe, RecipePart } from "./recipe.ts"
 
-// A page the chat proposes (ADR-0018). The language model composes a recipe and nothing else: a title,
+// A page the chat proposes (ADR-0020). The language model composes a recipe and nothing else: a title,
 // and the parts in their order, each a tool a page can call with its arguments. It writes no value and
 // keeps nothing. The app checks what it sent, the chat shows the page that is left, and only the
 // person keeps it. Everything else holds as ADR-0014 says: the page is a recipe in the browser.

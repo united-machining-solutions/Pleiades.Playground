@@ -4,7 +4,7 @@ status: proposed
 date: 2026-11-18
 ---
 
-# ADR-0018: The language model composes a page, and nothing else
+# ADR-0020: The language model composes a page, and nothing else
 
 ## Context
 
