@@ -3,7 +3,7 @@ import { test } from "node:test"
 
 import { energyShow } from "./contract.ts"
 import { energyShowInWords } from "./in-words.ts"
-import { axisKilowatts, cardRange, kilowattHours, kilowatts, machineIdPieces } from "./words.ts"
+import { axisKilowatts, cardRange, kilowattHours, kilowatts } from "./words.ts"
 
 test("watt hours and joule are written as kilowatt hours, and watt as kilowatts", () => {
   assert.equal(kilowattHours(3_600_000, "joule"), "1.00 kWh")
@@ -81,12 +81,6 @@ test("an empty result says so", () => {
     energyShowInWords(empty),
     "No machine published active power or its energy meter in the last hour, from 15:00 UTC to 16:00 UTC.",
   )
-})
-
-test("a machine id breaks only after an underscore, never inside a model or a serial number", () => {
-  assert.deepEqual(machineIdPieces("alcyone-machines_AX-400_P-04"), ["alcyone-machines_", "AX-400_", "P-04"])
-  assert.deepEqual(machineIdPieces("P-04"), ["P-04"])
-  assert.deepEqual(machineIdPieces("a__b_"), ["a_", "_", "b_"])
 })
 
 test("an axis never writes -0.0", () => {

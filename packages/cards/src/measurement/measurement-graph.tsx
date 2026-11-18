@@ -5,15 +5,13 @@ import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartToo
 import type { ChartConfig } from "@pleiades/ui/components/chart"
 import { clock } from "../machine/format.ts"
 import { labelOf } from "../machine/in-words.ts"
+import { categoryColour } from "../shared/colour.ts"
 import type { MachineMeasurements, MeasurementSeries } from "./contract.ts"
 import { axisNumber, clockWithSeconds, measuredValue, quantityLabel, unitSign } from "./words.ts"
 
 /** One quantity of the result, with the minutes the result is about and the instants of its lines. */
 type QuantitySeries = MeasurementSeries["quantities"][number] & Pick<MeasurementSeries, "from" | "to" | "instants">
 
-
-/** How many machines the categorical colours of the theme name, `--chart-1` and on. */
-const COLOURS = 14
 
 /**
  * The graph of one quantity: a line for each machine over the last minutes, with what each
@@ -40,7 +38,7 @@ export function MeasurementGraph({
   const config = Object.fromEntries(
     lines.map((line) => [
       keyOf(line.machine),
-      { label: labelOf(line.machine), color: `var(--chart-${(machines.indexOf(line.machine) % COLOURS) + 1})` },
+      { label: labelOf(line.machine), color: categoryColour(machines.indexOf(line.machine)) },
     ]),
   ) satisfies ChartConfig
 

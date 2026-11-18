@@ -11,10 +11,13 @@ the server is the source of truth for tool names and parameters.
 | Timeseries | `http://localhost:5500/mcp` | `timeseries_topics_query`, `timeseries_baseunit_query`, `timeseries_string_query`, `timeseries_boolean_query`, `timeseries_statistics_query` |
 | Events | `http://localhost:5510/mcp` | `events_machine_events_query`, `events_sequence_gaps_query`, `events_active_alerts_query`, `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query`, `events_program_executions_query` |
 | Sites | `http://localhost:5540/mcp` | `sites_site_list`, `sites_placement_list`, read-only: placing a machine is REST only |
-| Generative UI | `http://localhost:5520/mcp` | `genui_energy_show`, `genui_machine_list`, `genui_machine_show`, `genui_measurement_list`, `genui_site_list`, and for cards `genui_energy_series`, `genui_span_list` and `genui_measurement_series` |
+| Generative UI | `http://localhost:5520/mcp` | `genui_energy_show`, `genui_machine_list`, `genui_machine_show`, `genui_measurement_list`, `genui_site_list`, `genui_timeseries_show`, and for cards `genui_energy_series`, `genui_span_list`, `genui_measurement_series`, `genui_timeseries_series` and `genui_timeseries_signals` |
 | Ultimaker (optional) | `http://localhost:5530/mcp` | Profile selection, STL storage, slicing, validation, artifacts and explicit printer pairing/start; see [contract](../ultimaker/README.md) |
 | Juice bar (optional) | `http://localhost:5550/mcp` | `juicebar_drinks_list`, `juicebar_drink_get`, `juicebar_status`, `juicebar_order_get`, `juicebar_order_create`; see the [service guide](../../source/Pleiades.Playground.JuiceBar.Api/README.md) |
 | OPC UA adapter (proof of concept) | `http://localhost:5560/mcp` | `opcua_server_list`, `opcua_mapping_show`, `opcua_endpoint_rank`, `opcua_machine_list`, `opcua_registration_propose`, and the read-only tools of the OPC UA MCP library of the OPC Foundation as `opcua_ua_*` (`get_endpoints`, `connect`, `disconnect`, `get_connection_status`, `browse`, `browse_next`, `browse_all`, `translate_browse_paths`, `read`, `read_node`, `read_value`, `read_values`). No tool adds or removes a machine: a person does that with the buttons of the cards, over the management API; see the [adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md) |
+
+The tools `genui_timeseries_*` belong to the generative UI server and draw the time series card; the tools of the
+Timeseries API itself are `timeseries_*`, without the prefix, and return its stored values.
 
 The generative UI server is not an API of its own: it reads the three servers above over REST and returns what
 a display needs, each value with the topic or notification it comes from. Its results are answers, not raw
