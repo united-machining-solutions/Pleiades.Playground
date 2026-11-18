@@ -91,6 +91,16 @@ export function stageOf(order: Order): Stage {
   return "queued"
 }
 
+/**
+ * Where an order stands that the card lost sight of, by the state it was read in last: one that waited for
+ * the start button waits there still, one that was mixing fills its glass at the machine.
+ */
+export function whereLost(order: Order): string {
+  return stageOf(order) === "queued"
+    ? `Order ${order.orderNumber} was placed and waits in the machine: put a glass under the outlet and press start there.`
+    : `Order ${order.orderNumber} was mixing when the card lost sight of it: take the glass from the outlet when the machine is done.`
+}
+
 /** The shapes of glass the card draws. */
 export type Glass = "highball" | "straw" | "hurricane" | "martini" | "margarita"
 

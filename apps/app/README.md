@@ -250,7 +250,8 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   `results.ts` checks what its tools give back. `juicebar/chat.tsx` is the drink card of the
   [juice bar](../../source/Pleiades.Playground.JuiceBar.Api/README.md), for the result of
   `juicebar_drinks_list`: a drink to pick, its glass (`glass.tsx`, moving by `glass.css`), and a button that
-  orders it at once over the server functions of `src/juicebar/orders.ts`.
+  orders it at once over the server functions of `src/juicebar/orders.ts`; `follow.ts` reads the order again
+  until it is done, also after a call that did not reach the server of the app.
 - `src/machines/`: what the pages and the chat both take of a machine. `get-machines.ts` holds the server
   functions that call the backend as a typed MCP client, `card-tools.ts` the names of the tools only a card
   calls, `machine-item.tsx` draws a machine as a row or a tile. A card folder imports from here, never the

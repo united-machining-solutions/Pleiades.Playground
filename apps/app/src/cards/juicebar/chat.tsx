@@ -11,9 +11,10 @@ import { Field, FieldContent, FieldDescription, FieldLabel, FieldLegend, FieldSe
 import { RadioGroup, RadioGroupItem } from "@pleiades/ui/components/radio-group"
 import { Spinner } from "@pleiades/ui/components/spinner"
 
+import { readAgainAndAgain, reached } from "./follow.ts"
 import { PouringGlass, SmallGlass } from "./glass.tsx"
 import type { Pour } from "./glass.tsx"
-import { drinksOf, glassOf, ingredientsOf, isFizzy, orderOf, orderable, shortName, stageOf, whyNoOrder } from "./results.ts"
+import { drinksOf, glassOf, ingredientsOf, isFizzy, orderOf, orderable, shortName, stageOf, whereLost, whyNoOrder } from "./results.ts"
 import type { Drink, Order, Stage } from "./results.ts"
 
 // The drink card in the chat: what the juice bar can mix now, one drink to pick, and its order. The
@@ -66,9 +67,8 @@ export function DrinkPicker({ drinks: listed }: { drinks: Array<Drink> }) {
   useEffect(() => {
     if (!following || orderNumber === undefined) return
     let stopped = false
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const read = async () => {
-      const answer = await readOrder({ data: orderNumber })
+    const stop = readAgainAndAgain(async () => {
+      const answer = await reached(readOrder({ data: orderNumber }))
       if (stopped) return
       const order = answer.ok ? orderOf(answer.json) : null
       setStep((now) => {
@@ -77,18 +77,16 @@ export function DrinkPicker({ drinks: listed }: { drinks: Array<Drink> }) {
         if (now.misses + 1 < patience) return { ...now, misses: now.misses + 1 }
         return { at: "lost", drink: now.drink, order: now.order, reason: answer.ok ? "The juice bar answered without the order." : answer.reason }
       })
-      timer = setTimeout(read, READ_EVERY_MS)
-    }
-    timer = setTimeout(read, READ_EVERY_MS)
+    }, READ_EVERY_MS)
     return () => {
       stopped = true
-      clearTimeout(timer)
+      stop()
     }
   }, [following, orderNumber])
 
   async function order(drink: Drink) {
     setStep({ at: "sending", drink })
-    const answer = await orderDrink({ data: drink.id })
+    const answer = await reached(orderDrink({ data: drink.id }))
     if (!answer.ok) return setStep({ at: whyNoOrder(answer), drink, reason: answer.reason })
     const placed = orderOf(answer.json)
     if (!placed) return setStep({ at: "unsure", drink, reason: "The juice bar answered without an order number." })
@@ -188,7 +186,7 @@ function trouble(step: AfterTheButton): { title: string; text: string } | null {
     case "lost":
       return {
         title: "Lost track of the order",
-        text: `Order ${step.order.orderNumber} was placed and waits in the machine: put a glass under the outlet and press start there. ${step.reason}`,
+        text: `${whereLost(step.order)} ${step.reason}`,
       }
     case "order":
       return step.stage === "failed"

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { drinksOf, glassOf, ingredientsOf, isFizzy, orderOf, orderable, shortName, stageOf, whyNoOrder } from "./results.ts"
+import { drinksOf, glassOf, ingredientsOf, isFizzy, orderOf, orderable, shortName, stageOf, whereLost, whyNoOrder } from "./results.ts"
 import type { Drink } from "./results.ts"
 
 /** Two drinks as juicebar_drinks_list returns them, from the machine of the demo on 18 Nov 2026. */
@@ -103,6 +103,15 @@ test("an order is in the queue until the pumps run, then mixing, then ready", ()
   assert.equal(stageOf({ ...placed, state: "productionFinished", progressFraction: 1 }), "ready")
   assert.equal(stageOf({ ...placed, state: "error" }), "failed")
   assert.equal(orderOf("The juice bar refused the order."), null)
+})
+
+test("a lost order is told by the state it was read in last: waiting for the start button, or mixing", () => {
+  const placed = orderOf(JSON.stringify({ orderNumber: 4, orderName: "Tropical Mix", state: "waitForProduction", progressFraction: null }))
+  assert.ok(placed)
+  assert.match(whereLost(placed), /^Order 4 was placed and waits in the machine: put a glass under the outlet and press start there\.$/)
+  const mixing = whereLost({ ...placed, state: "inProduction", progressFraction: 0.4 })
+  assert.match(mixing, /^Order 4 was mixing/)
+  assert.doesNotMatch(mixing, /press start|put a glass/)
 })
 
 test("an order without a number is refused only where the juice bar said so; else it may stand in the machine", () => {
