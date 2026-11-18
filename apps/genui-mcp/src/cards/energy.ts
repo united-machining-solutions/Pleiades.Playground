@@ -94,6 +94,8 @@ first. Pass the \`timeZone\` of the person you answer, if you know it.
 
 On the wire energy is in joule. Say it to a person in kilowatt hours, as the text of the result does:
 3,600,000 J are 1 kWh. Compare the machines with these numbers; do not add or divide them yourself.
+That holds for the energy over these hours: a value of the meter itself, as \`genui_measurement_list\` gives
+it, stays in joule, as the section on measurements says.
 
 The power over these hours, a line for each machine, is what the graph of the card draws. It grows
 with time, so it is not in that result: the card asks \`genui_energy_series\` for it itself. You do not
