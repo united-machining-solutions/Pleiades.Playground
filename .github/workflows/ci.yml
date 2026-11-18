@@ -259,8 +259,11 @@ jobs:
         run: |
           curl -fsSk -o /dev/null -w '%{http_code}\n' --resolve device.example.internal:443:127.0.0.1 https://device.example.internal/
           curl -fsSk -o /dev/null -w '%{http_code}\n' --resolve pleiades.example.internal:443:127.0.0.1 https://pleiades.example.internal/
-          curl -sk -v -o /dev/null --resolve device.example.internal:443:127.0.0.1 https://device.example.internal/ 2>&1 \
-            | grep -q 'TRAEFIK DEFAULT CERT'
+          # curl -k prints no certificate; openssl names its subject.
+          subject="$(openssl s_client -connect 127.0.0.1:443 -servername device.example.internal < /dev/null 2> /dev/null \
+            | openssl x509 -noout -subject)"
+          echo "$subject"
+          case "$subject" in *"TRAEFIK DEFAULT CERT"*) ;; *) exit 1 ;; esac
           # The broker's WebSocket at /mqtt of the HTTPS port: the handshake is answered with 101.
           test "$(curl -sk -o /dev/null -w '%{http_code}' --max-time 3 --resolve device.example.internal:443:127.0.0.1             -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13'             -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Sec-WebSocket-Protocol: mqtt'             https://device.example.internal/mqtt)" = 101
       - name: Logs on failure
