@@ -355,6 +355,10 @@ services:
       # the chat has no OPC UA.
       OPCUA_MCP_URL: ${OPCUA_MCP_URL-http://opcua-adapter:8080/mcp}
       OPCUA_ADAPTER_URL: ${OPCUA_ADAPTER_URL-http://opcua-adapter:8080}
+      # The page "OSACA cell": the broker it listens to, and the simulation it loads the 3D model from and
+      # starts the job on, see .env.example. Without OSACA_SIM_URL the page shows the values, not the model.
+      OSACA_MQTT_URL: ${OSACA_MQTT_URL:-mqtt://broker:1883}
+      OSACA_SIM_URL: ${OSACA_SIM_URL:-}
       # The chat needs a language model; everything else works without one. The models come from a LiteLLM
       # gateway: the app offers those it marks for chat, and dictation takes the first it marks for speech
       # to text.
