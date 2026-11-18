@@ -78,7 +78,7 @@ export function liveness(connected: boolean, asOf: string): string {
 }
 
 /** How long a page that got no answer waits before it asks the backend again. */
-const RETRY_MS = 10_000
+export const RETRY_MS = 10_000
 
 /**
  * A page that got no answer from the backend keeps asking, until it has one. This is the only time

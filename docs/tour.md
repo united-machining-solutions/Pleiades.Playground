@@ -151,18 +151,17 @@ read once by one server function, `getCharts` in
 [`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts); from then on the page is
 live from the broker, as Home is.
 
-A stack started with `APP_SHOWCASES` set has one more page in the sidebar, "Where is My Job?",
-<http://localhost:5600/where-is-my-job>. It is a showcase, a basis for discussion: how an order could be
-followed across the shop floor. It shows the machines of the stack from above, with their state, utilisation
+The page "Where is My Job?" in the sidebar, <http://localhost:5600/where-is-my-job>, is a basis for
+discussion: how an order could be followed across the shop floor. It shows the machines of the stack from above, with their state, utilisation
 and job orders; a machine with what it did, does and what waits for it; and an order on its way. An order is
 every job order that names the same order number, read from the backend (`genui_job_order_list`) and kept
 live by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines,
 packing after them and the single part on its sheet have no source yet: the page draws them dashed, as the
 gaps to discuss. It has no picture in this tour.
 
-**In the code:** [`apps/app/src/routes/(showcases)/where-is-my-job.tsx`](../apps/app/src/routes/%28showcases%29/where-is-my-job.tsx)
+**In the code:** [`apps/app/src/routes/where-is-my-job.tsx`](../apps/app/src/routes/where-is-my-job.tsx)
 is the page; the map, the panels and `getFloor` live in
-[`apps/app/src/showcases/where-is-my-job/`](../apps/app/src/showcases/where-is-my-job/), and `floor.ts` there
+[`apps/app/src/where-is-my-job/`](../apps/app/src/where-is-my-job/), and `floor.ts` there
 groups the job orders into orders.
 
 ## 3. The page of one machine
@@ -243,7 +242,14 @@ show what holds now. The row under the answer then says "Saved as page" and link
 card, such as one in words only, has no button. The group "Pages" in the sidebar lists the pages of this browser
 that are not pinned, the newest first, and a page that is pinned from its head moves to the top of the sidebar,
 beside Home. "Edit" in its head moves a card up or down and removes one, with no language model; "Undo" in
-the toast puts a removed card back.
+the toast puts a removed card back. "Add a card" at the end of the page adds one by hand: choose what it shows,
+and for one machine which machine and how many hours.
+
+Ask the chat for a page, for example "Make me a page with all machines and P-04", and it proposes one. The model
+reads with its tools what there is to show and composes the page: a title, and the cards in their order, each
+with the machine and the hours it shows. It writes no value and cannot keep the page. The chat shows the
+proposal with its parts in words; "Preview" opens it with the values of now, and "Save to my pages" keeps it in
+this browser. What you asked for that no card shows, the model says in words.
 
 Ask the chat for a page, for example "Make me a page with all machines and P-04", and it proposes one. The model
 reads with its tools what there is to show and composes the page: a title, and the cards in their order, each

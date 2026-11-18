@@ -82,7 +82,10 @@ the language model its tools, and which file says what the app draws for which t
   request needs the issue.
 - `apps/app/src/cards/<name>/chat.tsx`: new, the card in the chat: what a call of each of its tools is called,
   what the chat draws for a result, which tool only a card calls, and in a few words what a part of a page
-  with the tool shows (`part`), with which the chat names it in a page it proposes. Next to it, as in `src/cards/machine/`:
+  with the tool shows (`part`), with which the chat names it in a page it proposes and a person finds it under
+  "Add a card" on a page. That dialog asks what the input schema of the tool takes, if it knows it: `machine`,
+  a whole number in a range; a required argument of another kind keeps the card from being added by hand.
+  Next to it, as in `src/cards/machine/`:
   what checks a result against the contract, with tests. If the card fetches a series with a tool only the
   card calls, the name of that tool goes into `apps/app/src/machines/card-tools.ts` and its server function
   next to the others in `get-machines.ts`: the card folder imports from `src/machines/`, never the other way.

@@ -1,9 +1,9 @@
 import { JOB_ORDER_RESULTS_PATH, JOB_ORDERS_PATH } from "@pleiades/cards/machine/contract.ts"
 import type { JobOrderList, MachineShow } from "@pleiades/cards/machine/contract.ts"
 
-import { chartsAt, chartsWith, machineFilters } from "../../live/machines.ts"
-import type { ChartsPage } from "../../live/machines.ts"
-import { instantOf, listOf, machineOf } from "../../live/messages.ts"
+import { chartsAt, chartsWith, machineFilters } from "../live/machines.ts"
+import type { ChartsPage } from "../live/machines.ts"
+import { instantOf, listOf, machineOf } from "../live/messages.ts"
 
 /**
  * The shop floor of the page "Where is My Job?", from the values of the stack: every machine with
