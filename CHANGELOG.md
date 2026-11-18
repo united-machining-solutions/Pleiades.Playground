@@ -15,6 +15,9 @@ All notable changes are documented here. The format follows
 - Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
   `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
   shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0020).
+- Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
+  each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
+  draws them with the notification card.
 - Example app: showcases. What is made for one demo or one fair lives in a folder of its own,
   `apps/app/src/showcases/<name>/`, with its pages under `src/routes/(showcases)/`, and is built in only
   where `APP_SHOWCASES` is set. The image `pleiades.playground.app` is the app alone, with nothing of a
@@ -461,6 +464,7 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page
   never reached the broker ("not live, no connection to the broker"), and a question asked outside the chat did
