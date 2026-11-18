@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react"
 
 import { recipeSchema, storedPageSchema, titleSchema } from "./recipe.ts"
-import type { Recipe, StoredPage } from "./recipe.ts"
+import type { Recipe, RecipePart, StoredPage } from "./recipe.ts"
 
 // The pages of this browser, in its localStorage: no service of the stack keeps them, and nobody
 // signs in. The pages are an array of stored pages under one key, the newest first. A page that
@@ -34,6 +34,11 @@ export function pagesOf(raw: string | null): ReadonlyArray<StoredPage> {
     if (page.success && !pages.some((other) => other.id === page.data.id)) pages.push(page.data)
   }
   return pages
+}
+
+/** Whether `at` is the place of a part: a whole number from 0 to one less than the parts. */
+function placeIn(parts: ReadonlyArray<RecipePart>, at: number): boolean {
+  return Number.isInteger(at) && at >= 0 && at < parts.length
 }
 
 /** A new id: twelve hex digits, safe in an address. `crypto.randomUUID` needs https, this does not. */
@@ -85,6 +90,21 @@ export function createPageStore(backing: () => Backing | undefined) {
     return write(pages.map((page) => (page.id === id ? changed(page) : page)))
   }
 
+  /**
+   * The page with other parts, in another order or fewer. False if there is no such page, `changed`
+   * returns null, the recipe with the new parts does not keep the schema (a page keeps one part at
+   * least, and `MAX_PARTS` at most), or the storage did not take it.
+   */
+  function changeParts(id: string, changed: (parts: ReadonlyArray<RecipePart>) => Array<RecipePart> | null): boolean {
+    const page = listPages().find((one) => one.id === id)
+    if (!page) return false
+    const parts = changed(page.recipe.parts)
+    if (parts === null) return false
+    const recipe = recipeSchema.safeParse({ ...page.recipe, parts })
+    if (!recipe.success) return false
+    return change(id, (kept) => ({ ...kept, recipe: recipe.data }))
+  }
+
   /** The other tabs of this browser write to the same storage, and the browser says so. */
   function onStorage(event: StorageEvent) {
     if (event.key === PAGES_KEY || event.key === null) for (const listener of listeners) listener()
@@ -133,6 +153,39 @@ export function createPageStore(backing: () => Backing | undefined) {
       return change(id, (page) => ({ ...page, pinned: false }))
     },
 
+    /**
+     * Takes the part at place `at` (from 0) off a page; the others keep their order. False if the page
+     * has no part there, or it is its only part: a page keeps one at least, and "Delete page" is for
+     * the rest. Nothing else keeps the part, so whoever removes it keeps it for `putPartBack`.
+     */
+    removePart(id: string, at: number): boolean {
+      return changeParts(id, (parts) => (placeIn(parts, at) ? parts.filter((_, index) => index !== at) : null))
+    },
+
+    /**
+     * Puts the part at place `from` to place `to` (both from 0); the parts between move up or down by
+     * one. False if either place is not on the page, or they are the same.
+     */
+    movePart(id: string, from: number, to: number): boolean {
+      return changeParts(id, (parts) => {
+        if (!placeIn(parts, from) || !placeIn(parts, to) || from === to) return null
+        const moved = [...parts]
+        const [part] = moved.splice(from, 1)
+        moved.splice(to, 0, part)
+        return moved
+      })
+    },
+
+    /**
+     * Puts a removed part back at place `at`, or at the end if the page has fewer parts by now: the
+     * undo of `removePart`. False if the part does not keep the schema, or the page holds as many
+     * parts as a page may.
+     */
+    putPartBack(id: string, at: number, part: RecipePart): boolean {
+      if (!Number.isInteger(at) || at < 0) return false
+      return changeParts(id, (parts) => [...parts.slice(0, at), part, ...parts.slice(at)])
+    },
+
     /** Deletes a page. This browser was the only place that kept it. */
     deletePage(id: string): boolean {
       const pages = listPages()
@@ -154,7 +207,19 @@ export function createPageStore(backing: () => Backing | undefined) {
 
 const browser = createPageStore(() => (typeof window === "undefined" ? undefined : window.localStorage))
 
-export const { listPages, getPage, savePage, renamePage, pinPage, unpinPage, deletePage, subscribe } = browser
+export const {
+  listPages,
+  getPage,
+  savePage,
+  renamePage,
+  pinPage,
+  unpinPage,
+  removePart,
+  movePart,
+  putPartBack,
+  deletePage,
+  subscribe,
+} = browser
 
 /** The pages of this browser, the newest first. A component that reads them follows every change. */
 export function usePages(): ReadonlyArray<StoredPage> {

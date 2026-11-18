@@ -6,9 +6,15 @@ harness.
 
 - **Home** asks "what needs you?": it lists the machines of the demo stack, first those in alarm, stopped or
   without data, then those in setup, then the running ones. It is live: see below.
-- **A page per machine** (`/machines/alcyone-machines_AX-400_P-04`, by the machine id) shows the machine card of the
+- **Sites** (`/sites`) shows where the machines stand: site by site and hall by hall, in rows like those of
+  Home, each site under a head with how many of its machines are in each state, and the machines that send values
+  and stand on no site. "Needs you" keeps the machines that need someone, a search finds one; ten sites make a
+  page, and the choice and the page stay in the URL (`?show=needs`, `?page=`). The sites come from the Sites API through `genui_site_list`, and the page is
+  live like Home. It needs no language model.
+- **A page per machine** (`/sites/alcyone-machines_AX-400_P-04`, by the machine id) shows the machine card of the
   [card catalogue](../../packages/cards/README.md): what the machine does now and what it did over the last
-  hours. It needs no language model. Home leads to it. For a machine the backend does not know, the page
+  hours. It needs no language model. Home and Sites lead to it, and it stands under Sites. An address of before, `/machines/<machine id>`, leads to it with
+  the hours of its history. For a machine the backend does not know, the page
   says so and does not ask again.
 - **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
   machine, live. A choice above the graphs shows one machine or all of them, and stays in the URL
@@ -24,7 +30,11 @@ harness.
   the chat draws for that tool, so it shows what holds now and needs no language model. It is read once, and
   its head says as of when; only while a part waits for the backend is it read again. A part whose tool
   the app has no card for stays where it is and says so; the rest of the page is whole. A page can be
-  renamed, pinned and deleted from its head. A pinned page stands in the sidebar on the top level, beside
+  renamed, pinned and deleted from its head. "Edit" there shows above each part "Move up", "Move down" and
+  "Remove", by hand and with no language model, and "Done" takes them away again; a change is kept at once,
+  and no part is asked again because another one moved or went. A removed part is kept nowhere else, so the
+  toast that says so has "Undo". The only part of a page stays: "Delete page" is the way to be rid of it.
+  A pinned page stands in the sidebar on the top level, beside
   Home; under it a group "Pages", which folds, lists the pages that are not pinned, the newest first, and
   there is no group where there is nothing to list. `/pages` lists them all and is reached through the
   breadcrumb. Another browser, or a private window, has pages of its own. "Share" in the
@@ -52,7 +62,7 @@ The values come from `genui-mcp`, and what is live comes from the broker. Withou
 which settings are missing; everything else works.
 
 **Live, not read again** ([ADR-0013](../../docs/adr/0013-live-values-from-the-broker.md)). Home, the page of a
-machine, Live values and Charts read once, in their loader, what `genui-mcp` knows: what held when the page was opened,
+machine, Sites, Live values and Charts read once, in their loader, what `genui-mcp` knows: what held when the page was opened,
 and the history before it. From then on the browser subscribes at the broker, MQTT over WebSocket, to the
 topics the page shows, and every value appears the moment a machine publishes it: a state, a work master, the
 job order that runs, an alert that is raised or cleared, a point of a graph. The clock of the page moves on by itself, by the clock of the
@@ -161,7 +171,8 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
-  `index.tsx` is Home, `machines.$machine.tsx` the page of a machine, `charts.tsx` the last hours of every
+  `index.tsx` is Home, `sites.index.tsx` Sites, `sites.$machine.tsx` the page of a machine and `machines.$machine.tsx`
+  the old address of it, which leads there, `charts.tsx` the last hours of every
   machine as charts (drawn by `src/charts/state-tiles.tsx`), `pages.index.tsx` the list of the pages kept
   in this browser, `pages.$page.tsx` one of them and `pages.open.tsx` one opened from a link; `health.ts`,
   `api/harness/$.ts` and
@@ -178,8 +189,10 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
 - `src/pages/`: the pages kept from the chat. `recipe.ts` is the recipe and its schema (zod): its shape
   and its size, which is all that is checked, also of a recipe from outside. `store.ts` keeps the pages in
   the `localStorage` of the browser under one key, `pleiades-playground.pages.v1`, and is the only way to
-  them: `listPages`, `getPage`, `savePage`, `renamePage`, `pinPage`, `unpinPage`, `deletePage`, and
-  `usePages` for a component that follows every change. `link.ts` writes a recipe into one search
+  them: `listPages`, `getPage`, `savePage`, `renamePage`, `pinPage`, `unpinPage`, `removePart`, `movePart`,
+  `putPartBack` (the undo of `removePart`), `deletePage`, and `usePages` for a component that follows every
+  change. `part-controls.tsx` is what "Edit" shows above a part, and `shown-parts.ts` gives each part of the
+  recipe as it is now the answer the loader already has for it. `link.ts` writes a recipe into one search
   parameter, `r`, and reads it back (`encodeRecipe`, `decodeRecipe`, `linkOf`): JSON as UTF-8 in base64url,
   at most `MAX_PARAM_LENGTH` (8,000) characters, and what is not exactly a recipe (`recipeOf`) is null.
   `share-page.tsx` is "Share" in the head of a kept page, `column.tsx` the column that a kept page and a page
@@ -202,7 +215,8 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   commit this file; here everything that needs it writes it first.
 - `src/showcases/`: what is made for one demo or one fair, and is in a build only where `APP_SHOWCASES` is
   set ([ADR-0018](../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
-  it is a showcase: `where-is-my-job/` is the made-up shop floor of the page "Where is My Job?". The pages of
+  it is a showcase: `where-is-my-job/` holds the map, the panels and the grouping of job orders into orders
+  of the page "Where is My Job?", and `getFloor`, which reads its values. The pages of
   the showcases, and their server routes, are the route files under `src/routes/(showcases)/`; the brackets
   make a folder that adds nothing to an address, so `(showcases)/where-is-my-job.tsx` answers at
   `/where-is-my-job`. A page belongs to the showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and
@@ -231,7 +245,11 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   over WebSocket, which only subscribes; `broker-address.ts` the server function that says where the broker
   is. `messages.ts` reads what the binding publishes, `machines.ts` and `measurements.ts` lay a message, and
   the passing of time, onto what the backend read, by the rules of `genui-mcp`; each has its tests.
+  `sites.ts` keeps the machines of the sites live and counts them again by the rules of `genui_site_list`.
   `src/hooks/use-live.ts` puts it together for a route: `useLive(loaded, live)`.
+- `src/sites/`: what the page Sites chooses to show. `filter.ts` groups the values of `genui_site_list` by site
+  and hall, keeps what "Needs you" and a search ask for, cuts the pages, and adds up nothing; `moved.ts` says where an old address of the page of a
+  machine leads.
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `mcp-servers.ts` reads the servers whose tools the chat has and holds a chat to the ones it left on,
