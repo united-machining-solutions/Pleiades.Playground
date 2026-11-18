@@ -2,7 +2,8 @@
 #
 #   simulator ──MQTT──▶ broker ──▶ timeseries-persistence ──REST──▶ timeseries-api ──▶ mongodb
 #                          └─────▶ events-persistence ─────REST──▶ events-api ──────▶ mongodb
-#   browser ──HTTP──▶ traefik ──▶ app ──MCP──▶ genui-mcp ──▶ both APIs
+#   browser ──HTTP(S)──▶ traefik ──▶ app ──MCP──▶ genui-mcp ──▶ both APIs
+#   browser ──WS :9001, or WSS at /mqtt of traefik──▶ broker (live values)
 #
 # The same stack as compose.yaml at the root of the repository, in the form bart accepts:
 # - no `build:`: the images are the ones the workflow "Images" publishes to ghcr.io;
@@ -198,8 +199,10 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       GENUI_MCP_URL: http://genui-mcp:8080/mcp
-      # The browser hears live values at the broker's WebSocket: at the host of the page and this port.
+      # The browser hears live values at the broker's WebSocket: at the host of the page and this port, and on a
+      # page over HTTPS at this path of Traefik, which forwards it to the broker (the broker speaks no TLS).
       MQTT_WS_PORT: ${MQTT_WS_PORT:-9001}
+      MQTT_WSS_PATH: /mqtt
       # The chat needs a language model; everything else works without one. The models come from a LiteLLM
       # gateway: the app offers those it marks for chat, and dictation takes the first it marks for speech
       # to text.
@@ -217,6 +220,9 @@ services:
       - --global.sendAnonymousUsage=false
       # Inside the container on an unprivileged port, so it needs no capability.
       - --entryPoints.web.address=:8000
+      # HTTPS. No certificate is configured, so Traefik serves the self-signed one it generates at start, in
+      # memory: the host names are internal to the device, and no public CA (and no ACME) can sign them.
+      - --entryPoints.websecure.address=:8443
       - --providers.file.filename=/etc/traefik/dynamic.yaml
       # /ping on the internal entry point "traefik" (:8080), which is not published.
       - --ping=true
@@ -224,6 +230,7 @@ services:
       # The same reason as for the app: Traefik answers on the device only, unless HTTP_BIND opens it to the
       # network. Its Host() rule is no guard, a client sets the Host header it likes.
       - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-80}:8000"
+      - "${HTTP_BIND:-127.0.0.1}:${HTTPS_PORT:-443}:8443"
     configs:
       - source: traefik
         target: /etc/traefik/dynamic.yaml
@@ -340,11 +347,29 @@ configs:
             entryPoints: [web]
             rule: 'Host(`{{ env "APP_HOST" }}`) || Host(`{{ env "SERVER_HOST" }}`)'
             service: app
+          # The same route over HTTPS, with Traefik's own self-signed certificate. HTTP is not redirected: the app
+          # works over both.
+          app-secure:
+            entryPoints: [websecure]
+            rule: 'Host(`{{ env "APP_HOST" }}`) || Host(`{{ env "SERVER_HOST" }}`)'
+            service: app
+            tls: {}
+          # A page over HTTPS may not open ws://, and the broker speaks no TLS: its WebSocket over HTTPS is this
+          # path of Traefik (MQTT_WSS_PATH of the app). Over HTTP the page reaches the published port itself.
+          broker-secure:
+            entryPoints: [websecure]
+            rule: '(Host(`{{ env "APP_HOST" }}`) || Host(`{{ env "SERVER_HOST" }}`)) && Path(`/mqtt`)'
+            service: broker
+            tls: {}
         services:
           app:
             loadBalancer:
               servers:
                 - url: http://app:8080
+          broker:
+            loadBalancer:
+              servers:
+                - url: http://broker:9001
 
 volumes:
   mongodb_data:

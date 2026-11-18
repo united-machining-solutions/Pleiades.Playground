@@ -7,6 +7,11 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
+  self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
+  that live values work over HTTPS. HTTP stays as it is.
+- Example app: the setting `MQTT_WSS_PATH` sends a page over HTTPS to the broker at that path of the page's
+  origin, for a proxy in front of the app that forwards it to the broker.
 - Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
   shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
   from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
