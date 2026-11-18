@@ -38,6 +38,45 @@ public class ScanConnectFilterTest
     private static readonly Credential Stored = new("operator", "s3cret-pass", Pinned);
 
     [TestMethod]
+    public async Task A_scan_the_server_refuses_for_an_untrusted_adapter_says_how_to_trust_it()
+    {
+        var result = await ScanConnect.CallAsync(
+            Call($$"""{"endpointUrl":"{{Url}}"}"""),
+            _ => null,
+            Presents(Pinned),
+            (_, _) => ValueTask.FromResult(new CallToolResult
+            {
+                IsError = true,
+                Content = [new TextContentBlock { Text = "Connect failed: [80130000] (BadSecurityChecksFailed)" }],
+            }),
+            TestContext.CancellationToken);
+
+        Assert.IsTrue(result.IsError);
+        var texts = result.Content.OfType<TextContentBlock>().Select(block => block.Text).ToList();
+        Assert.HasCount(2, texts, "The error of the library stays, the hint comes after it.");
+        Assert.Contains("does not trust the certificate of the adapter", texts[1]);
+        Assert.Contains(Url, texts[1]);
+        Assert.Contains(OpcUaClient.ApplicationName, texts[1]);
+    }
+
+    [TestMethod]
+    public async Task Another_error_of_a_scan_gets_no_trust_hint()
+    {
+        var result = await ScanConnect.CallAsync(
+            Call($$"""{"endpointUrl":"{{Url}}"}"""),
+            _ => null,
+            Presents(Pinned),
+            (_, _) => ValueTask.FromResult(new CallToolResult
+            {
+                IsError = true,
+                Content = [new TextContentBlock { Text = "Connect failed: [80AE0000] (BadNotConnected)" }],
+            }),
+            TestContext.CancellationToken);
+
+        Assert.HasCount(1, result.Content);
+    }
+
+    [TestMethod]
     public async Task A_stored_user_goes_into_the_call_and_its_password_out_of_the_result()
     {
         CallToolRequestParams? passed = null;
@@ -178,6 +217,26 @@ public class CertificatePinTest
         Assert.Contains("urn:UmatiSampleServer", rejected.Message);
         Assert.Contains(Url, rejected.Message);
         Assert.IsTrue(Api.MachineEndpoints.IsServerFault(rejected), "The chat and the API tell it as a fault of the server.");
+    }
+
+    [TestMethod]
+    public async Task A_server_that_does_not_trust_the_adapter_is_told_with_how_to_trust_it()
+    {
+        using var directory = new TemporaryDirectory();
+        var sessions = new Mock<IManagedSessionFactory>(MockBehavior.Strict);
+        sessions
+            .Setup(factory => factory.ConnectAsync(It.IsAny<ConfiguredEndpoint>(), It.IsAny<Action<ManagedSessionBuilder>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ServiceResultException(StatusCodes.BadSecurityChecksFailed, "Error received from remote host"));
+        var client = Client(new CredentialStore(directory.Path), sessions);
+
+        var rejected = await Assert.ThrowsExactlyAsync<ServerCertificateRejectedException>(
+            () => client.ConnectAsync(Endpoint(), TestContext.CancellationToken));
+
+        Assert.Contains(Url, rejected.Message);
+        Assert.Contains("BadSecurityChecksFailed", rejected.Message);
+        Assert.Contains("does not trust the certificate of the adapter", rejected.Message);
+        Assert.Contains(OpcUaClient.ApplicationName, rejected.Message, "The person finds the certificate by the name the server shows.");
+        Assert.Contains("trusted", rejected.Message);
     }
 
     [TestMethod]

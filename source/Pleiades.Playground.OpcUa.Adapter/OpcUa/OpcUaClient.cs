@@ -108,6 +108,12 @@ internal sealed class OpcUaClient : ISessionConnector
     /// <summary>How long a connect may take before it fails.</summary>
     public static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// The name of the adapter as an OPC UA application. A server shows its certificate under this name, so a
+    /// person finds it there to trust it.
+    /// </summary>
+    public const string ApplicationName = "Pleiades Playground OPC UA Adapter";
+
     public OpcUaClient(IOpcUaDiscoveryService discovery, IManagedSessionFactory sessions, CredentialStore credentials)
     {
         _discovery = discovery ?? throw new ArgumentNullException(nameof(discovery));
@@ -224,7 +230,8 @@ internal sealed class OpcUaClient : ISessionConnector
                 limited.Token).ConfigureAwait(false);
             return (session, thumbprint);
         }
-        catch (ServiceResultException exception) when (RefusalPolicy.IsRejectedCertificate(exception.StatusCode))
+        catch (ServiceResultException exception) when (RefusalPolicy.IsRejectedCertificate(exception.StatusCode)
+            || RefusalPolicy.IsUntrustedClient(exception.StatusCode))
         {
             throw new ServerCertificateRejectedException(RejectedCertificate(endpoint.Url, exception), exception);
         }
@@ -238,10 +245,26 @@ internal sealed class OpcUaClient : ISessionConnector
     internal static string RejectedCertificate(string url, ServiceResultException exception)
     {
         var status = StatusCode.LookupSymbolicId(exception.StatusCode.Code) ?? exception.StatusCode.ToString();
+        if (RefusalPolicy.IsUntrustedClient(exception.StatusCode))
+        {
+            return UntrustedClient(url, status);
+        }
+
         var reason = exception.LocalizedText.Text is { Length: > 0 } text ? text : exception.Message;
         return $"The certificate check with the server at {url} failed with {status}: {reason} " +
             "Trying again does not help until the certificate of the server is fixed, or the server trusts the certificate of the adapter.";
     }
+
+    /// <summary>
+    /// What a person reads when the server refused the adapter without its reason (<paramref name="status"/>): it
+    /// most likely does not trust the certificate of the adapter yet, and says how to trust it.
+    /// </summary>
+    internal static string UntrustedClient(string url, string status) =>
+        $"The server at {url} refused the adapter with {status}: it most likely does not trust the certificate of " +
+        "the adapter yet. Trust it once on the server: the server keeps it among its rejected certificates as " +
+        $"\"{ApplicationName} [<thumbprint>].der\"; move it to its trusted certificates (for a UaGateway from " +
+        "pki/pkiserver/rejected to pki/pkiserver/trusted/certs), or accept it in the configuration of the server. " +
+        "Then try again; a running machine connects again by itself.";
 
     /// <inheritdoc />
     async Task<IEndpointSession> ISessionConnector.ConnectAsync(EndpointRegistration endpoint, CancellationToken cancellationToken)

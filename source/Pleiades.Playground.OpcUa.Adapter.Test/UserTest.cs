@@ -128,10 +128,13 @@ public class UserSessionTest
         Assert.IsNull(rejected);
         Assert.IsTrue(policy.TryGetNextDelay(0, Opc.Ua.StatusCodes.BadCertificateUriInvalid, null, out var certificate));
         Assert.IsNull(certificate, "A certificate without the ApplicationUri of its server is not tried again.");
+        Assert.IsTrue(policy.TryGetNextDelay(0, Opc.Ua.StatusCodes.BadSecurityChecksFailed, null, out var untrusted));
+        Assert.IsNull(untrusted, "A server that does not trust the adapter is not tried again until the timeout.");
         Assert.IsTrue(policy.TryGetNextDelay(0, Opc.Ua.StatusCodes.BadNotConnected, null, out var notConnected));
         Assert.IsNotNull(notConnected, "A server that does not answer is tried again by the default policy.");
         Assert.IsFalse(RefusalPolicy.IsRefusedUser(Opc.Ua.StatusCodes.BadNotConnected));
         Assert.IsFalse(RefusalPolicy.IsRejectedCertificate(Opc.Ua.StatusCodes.BadNotConnected));
+        Assert.IsFalse(RefusalPolicy.IsUntrustedClient(Opc.Ua.StatusCodes.BadNotConnected));
     }
 
     [TestMethod]
