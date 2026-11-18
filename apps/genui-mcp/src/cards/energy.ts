@@ -64,7 +64,7 @@ const energySeriesTool = toolDefinition({
       .max(1000)
       .optional()
       .describe(
-        `How many values a line has, ${ENERGY_SLOTS} if omitted: about one for every few pixels of the graph. Each is the mean of its slot; the instants stand once in the result, the same for every line.`,
+        `How many values a line has, ${ENERGY_SLOTS} if omitted: about one for every few pixels of the graph. Each is the value that held at its instant, none where the machine was silent; the instants stand once in the result, the same for every line.`,
       ),
   }),
   outputSchema: energySeries,
@@ -85,9 +85,12 @@ omitted, at most ${MOST_ENERGY_HOURS}), every machine or those in \`machines\`, 
 first. Pass the \`timeZone\` of the person you answer, if you know it.
 
 - \`energy.joule\`: the meter \`umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp\` at \`end\` less
-  at \`start\`, in joule. Null if the meter had no value, or if it went back (\`meterWentBack\`, a reset).
+  at \`start\`, in joule. Null if it is not known, and the result says why: the meter had no value (\`unit\`
+  null), published in another unit than joule (\`unit\`), or went back (\`meterWentBack\`, a reset). A value of
+  the meter from before a gap is not counted: then it counts from its first value in these hours.
 - \`power.meanWatt\`, \`power.peakWatt\`: mean and largest value of
   \`umati/Consumption/Electricity/Main/AcActivePowerTotal\` in these hours, in watt, while the machine published.
+  Null if there was no value, or if it was published in another unit than watt (\`power.unit\`).
 
 On the wire energy is in joule. Say it to a person in kilowatt hours, as the text of the result does:
 3,600,000 J are 1 kWh. Compare the machines with these numbers; do not add or divide them yourself.

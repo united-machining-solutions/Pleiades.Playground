@@ -17,9 +17,10 @@ const shown = {
         start: { joule: 1_000_000, at: "2026-11-17T07:59:55.000Z" },
         end: { joule: 8_200_000, at: "2026-11-17T15:59:58.000Z" },
         meterWentBack: false,
+        unit: "joule",
         topic: meter,
       },
-      power: { meanWatt: 900, peakWatt: 2400, values: 14400, topic: power },
+      power: { meanWatt: 900, peakWatt: 2400, values: 14400, unit: "watt", topic: power },
     },
   ],
 }

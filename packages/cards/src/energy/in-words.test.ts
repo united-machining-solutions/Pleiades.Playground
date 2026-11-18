@@ -12,19 +12,25 @@ test("joule are written as kilowatt hours and watt as kilowatts", () => {
   assert.equal(kilowatts(2410), "2.41 kW")
 })
 
-const machine = (serial: string, joule: number | null, more: Partial<{ meterWentBack: boolean; startAt: string; meanWatt: number | null }> = {}) => ({
+const machine = (
+  serial: string,
+  joule: number | null,
+  more: Partial<{ meterWentBack: boolean; startAt: string; meanWatt: number | null; meterUnit: string | null; powerUnit: string | null }> = {},
+) => ({
   machine: serial,
   energy: {
     joule,
     start: joule === null && !more.meterWentBack ? null : { joule: 1_000, at: more.startAt ?? "2026-11-17T07:59:55.000Z" },
     end: joule === null && !more.meterWentBack ? null : { joule: 1_000 + (joule ?? 0), at: "2026-11-17T15:59:58.000Z" },
     meterWentBack: more.meterWentBack ?? false,
+    unit: more.meterUnit === undefined ? "joule" : more.meterUnit,
     topic: `machines/${serial}/umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp`,
   },
   power: {
     meanWatt: more.meanWatt === undefined ? 1550 : more.meanWatt,
     peakWatt: more.meanWatt === null ? null : 3400,
     values: more.meanWatt === null ? 0 : 14400,
+    unit: more.powerUnit === undefined ? (more.meanWatt === null ? null : "watt") : more.powerUnit,
     topic: `machines/${serial}/umati/Consumption/Electricity/Main/AcActivePowerTotal`,
   },
 })
@@ -38,7 +44,8 @@ test("the card in words: the hours, then a line for each machine in the order of
       machine("P-04", 44_640_000),
       machine("M-02", 1_260_000, { startAt: "2026-11-17T09:30:00.000Z" }),
       machine("P-07", null, { meterWentBack: true }),
-      machine("X-01", null, { meanWatt: null }),
+      machine("X-01", null, { meanWatt: null, meterUnit: null }),
+      machine("K-01", null, { meanWatt: null, meterUnit: "wattHour", powerUnit: "kilowatt" }),
     ],
   })
   assert.equal(
@@ -49,6 +56,7 @@ test("the card in words: the hours, then a line for each machine in the order of
       "M-02: 0.35 kWh (counted from 09:30 UTC, its first value), mean power 1.55 kW while it published, peak 3.40 kW.",
       "P-07: energy not known, its meter went back in this time, mean power 1.55 kW while it published, peak 3.40 kW.",
       "X-01: energy not known, its meter published no value, no value of active power.",
+      "K-01: energy not known, its meter publishes in wattHour, not joule, and its active power in kilowatt, not watt.",
     ].join("\n"),
   )
 })

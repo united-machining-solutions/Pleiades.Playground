@@ -88,7 +88,7 @@ function EnergyTable({ machines, colours }: { machines: ReadonlyArray<MachineEne
               {energy.joule !== null ? (
                 kilowattHours(energy.joule)
               ) : (
-                <span className="text-muted-foreground">{energy.meterWentBack ? "meter reset" : "no meter"}</span>
+                <span className="text-muted-foreground">{meterNote(energy)}</span>
               )}
             </TableCell>
             <TableCell className="text-right tabular-nums">
@@ -98,7 +98,7 @@ function EnergyTable({ machines, colours }: { machines: ReadonlyArray<MachineEne
                   <span className="block text-xs text-muted-foreground">peak {kilowatts(power.peakWatt)}</span>
                 </>
               ) : (
-                <span className="text-muted-foreground">no value</span>
+                <span className="text-muted-foreground">{power.unit !== null && power.unit !== "watt" ? `in ${power.unit}` : "no value"}</span>
               )}
             </TableCell>
           </TableRow>
@@ -106,6 +106,13 @@ function EnergyTable({ machines, colours }: { machines: ReadonlyArray<MachineEne
       </TableBody>
     </Table>
   )
+}
+
+/** Why the energy of a machine is not known, in a few words. */
+function meterNote(energy: MachineEnergy["energy"]): string {
+  if (energy.meterWentBack) return "meter reset"
+  if (energy.unit !== null && energy.unit !== "joule") return `meter in ${energy.unit}`
+  return "no meter"
 }
 
 /** The active power of each machine over the hours of the card, a line for each. */

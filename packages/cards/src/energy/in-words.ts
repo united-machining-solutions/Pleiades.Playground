@@ -9,18 +9,24 @@ import { kilowattHours, kilowatts, lastHours } from "./words.ts"
 export function machineEnergyInWords({ machine, energy, power }: MachineEnergy, from: string): string {
   let said: string
   if (energy.joule !== null) {
-    // A meter without a value before the hours began is counted from its first one in them.
+    // A meter counted from its first value in the hours says so: it had none just before them.
     const late = energy.start && Date.parse(energy.start.at) > Date.parse(from) ? ` (counted from ${written(energy.start.at)}, its first value)` : ""
     said = `${machine}: ${kilowattHours(energy.joule)}${late}`
   } else if (energy.meterWentBack) {
     said = `${machine}: energy not known, its meter went back in this time`
+  } else if (energy.unit !== null && energy.unit !== "joule") {
+    said = `${machine}: energy not known, its meter publishes in ${energy.unit}, not joule`
   } else {
     said = `${machine}: energy not known, its meter published no value`
   }
-  const drawn =
-    power.meanWatt !== null && power.peakWatt !== null
-      ? `, mean power ${kilowatts(power.meanWatt)} while it published, peak ${kilowatts(power.peakWatt)}`
-      : ", no value of active power"
+  let drawn: string
+  if (power.meanWatt !== null && power.peakWatt !== null) {
+    drawn = `, mean power ${kilowatts(power.meanWatt)} while it published, peak ${kilowatts(power.peakWatt)}`
+  } else if (power.unit !== null && power.unit !== "watt") {
+    drawn = `, and its active power in ${power.unit}, not watt`
+  } else {
+    drawn = ", no value of active power"
+  }
   return `${said}${drawn}.`
 }
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { energyShowOf } from "./results.ts"
+import { energyShowOf, machinesKey, machinesOf } from "./results.ts"
 
 const machine = {
   machine: "P-04",
@@ -10,9 +10,10 @@ const machine = {
     start: { joule: 1_000_000, at: "2026-11-17T08:00:00.000Z" },
     end: { joule: 8_200_000, at: "2026-11-17T15:59:58.000Z" },
     meterWentBack: false,
+    unit: "joule",
     topic: "machines/P-04/umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp",
   },
-  power: { meanWatt: 900, peakWatt: 2400, values: 14400, topic: "machines/P-04/umati/Consumption/Electricity/Main/AcActivePowerTotal" },
+  power: { meanWatt: 900, peakWatt: 2400, values: 14400, unit: "watt", topic: "machines/P-04/umati/Consumption/Electricity/Main/AcActivePowerTotal" },
 }
 
 test("the JSON of genui_energy_show becomes the energy of every machine", () => {
@@ -26,4 +27,10 @@ test("what does not keep the contract of the card is not drawn as one", () => {
   assert.equal(energyShowOf('{"from":"2026-11-17T08:00:00.000Z","to":"2026-11-17T16:00:00.000Z","hours":8,"machines":[{"machine":"P-04"}]}'), null)
   assert.equal(energyShowOf("no energy"), null)
   assert.equal(energyShowOf(undefined), null)
+})
+
+test("a serial number with a comma stays one machine on the way to the lines of the card", () => {
+  // The MQTT binding forbids only `/`, `+` and `#` in a serial number.
+  assert.deepEqual(machinesOf(machinesKey(["A,1", "P-04"])), ["A,1", "P-04"])
+  assert.deepEqual(machinesOf(machinesKey([])), [])
 })

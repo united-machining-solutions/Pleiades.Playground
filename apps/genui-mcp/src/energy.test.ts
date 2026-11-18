@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { afterEach, mock, test } from "node:test"
 
-import { listEnergySeries, showEnergy, slotMeans } from "./energy.ts"
+import { listEnergySeries, showEnergy } from "./energy.ts"
 
 const apis = { timeseriesUrl: "http://timeseries:8080", eventsUrl: "http://events:8080" }
 const now = new Date("2026-11-17T16:00:00.000Z")
@@ -108,7 +108,8 @@ test("the energy of a machine is the meter at the end less the meter where the h
   assert.deepEqual(p04.energy.end, { joule: 5_000_000 + 119 * 60_000, at: ago(0.5) })
   assert.equal(p04.energy.joule, 3_600_000)
   assert.equal(p04.energy.topic, meterOf("P-04"))
-  assert.deepEqual(p04.power, { meanWatt: 2000, peakWatt: 3000, values: 60, topic: powerOf("P-04") })
+  assert.deepEqual(p04.power, { meanWatt: 2000, peakWatt: 3000, values: 60, unit: "watt", topic: powerOf("P-04") })
+  assert.equal(p04.energy.unit, "joule")
   assert.equal(shown.machines[0]!.energy.joule, 7_200_000)
 })
 
@@ -121,9 +122,23 @@ test("a meter without a value before the hours is counted from its first one in 
   assert.equal(p07.energy.joule, 19 * 60_000)
 })
 
+test("a meter value from before a gap is not counted: the energy begins with the first value in the hours", async () => {
+  serve({
+    // The adapter was away for three days while the machine ran, and came back twenty minutes ago.
+    [meterOf("P-04")]: {
+      unit: "joule",
+      values: [{ at: ago(3 * 24 * 60), value: 1_000_000 }, ...meter(90_000_000, 60_000, 20).values],
+    },
+  })
+  const p04 = (await showEnergy(apis, 1, undefined, now)).machines[0]!
+  assert.deepEqual(p04.energy.start, { joule: 90_000_000, at: ago(19.5) })
+  assert.equal(p04.energy.joule, 19 * 60_000)
+})
+
 test("a meter that went back was reset: its energy is not known, and the machine comes last", async () => {
   serve({
-    [meterOf("P-04")]: { unit: "joule", values: [{ at: ago(90), value: 8_000_000 }, { at: ago(30), value: 1_000 }] },
+    // The meter published a quarter of a minute before the hours began, then less.
+    [meterOf("P-04")]: { unit: "joule", values: [{ at: ago(60.25), value: 8_000_000 }, { at: ago(30), value: 1_000 }] },
     [meterOf("M-02")]: meter(0, 1_000, 60),
     // A meter or a power in another unit than the binding's is not read as joule or watt.
     [meterOf("K-01")]: meter(0, 1, 60, "wattHour"),
@@ -135,9 +150,11 @@ test("a meter that went back was reset: its energy is not known, and the machine
     ["K-01", null, false],
     ["P-04", null, true],
   ])
-  assert.deepEqual(shown.machines[1]!.power, { meanWatt: null, peakWatt: null, values: 0, topic: powerOf("K-01") })
+  // The unit that was found says why there is no energy and no power.
+  assert.equal(shown.machines[1]!.energy.unit, "wattHour")
+  assert.deepEqual(shown.machines[1]!.power, { meanWatt: null, peakWatt: null, values: 0, unit: "kilowatt", topic: powerOf("K-01") })
   // No power was published: neither mean nor peak.
-  assert.deepEqual(shown.machines[2]!.power, { meanWatt: null, peakWatt: null, values: 0, topic: powerOf("P-04") })
+  assert.deepEqual(shown.machines[2]!.power, { meanWatt: null, peakWatt: null, values: 0, unit: null, topic: powerOf("P-04") })
 })
 
 test("a topic below the path of a machine is neither a machine nor its power", async () => {
@@ -167,38 +184,50 @@ test("a machine that published nothing is refused in words, with the machines th
   })
 })
 
-test("the lines share their instants, each slot the mean of its values, none where there is none", async () => {
+/** A heartbeat every ten seconds in each stretch, from so many minutes ago to so many. */
+const heartbeat = (machine: string, ...stretches: Array<[from: number, to: number]>) => ({
+  [`machines/${machine}/umati/Connection/Heartbeat`]: {
+    unit: "one",
+    values: stretches.flatMap(([fromMinutes, toMinutes]) =>
+      Array.from({ length: Math.floor(((fromMinutes - toMinutes) * 60) / 10) + 1 }, (_, index) => ({
+        at: ago(fromMinutes - index / 6),
+        value: index,
+      })),
+    ),
+  },
+})
+
+test("a line holds the value that held at each instant, also where the API kept none, and breaks where the machine was silent", async () => {
   const requested = serve({
-    // Six slots of ten minutes: P-04 two values a slot, M-02 silent in the middle.
-    [powerOf("P-04")]: { unit: "watt", values: Array.from({ length: 12 }, (_, index) => ({ at: ago(57.5 - index * 5), value: index * 100 })) },
+    // P-04 publishes on change: twice at the start, once while idle, once at the end. Its heartbeat
+    // stops for ten minutes in the middle.
+    [powerOf("P-04")]: {
+      unit: "watt",
+      values: [
+        { at: ago(58), value: 1000 },
+        { at: ago(57), value: 1200 },
+        { at: ago(35), value: 300 },
+        { at: ago(8), value: 2000 },
+      ],
+    },
+    ...heartbeat("P-04", [61, 25], [15, 0]),
     [powerOf("M-02")]: { unit: "watt", values: [{ at: ago(55), value: 2000 }, { at: ago(5), value: 4000 }] },
+    ...heartbeat("M-02", [61, 0]),
   })
   const series = await listEnergySeries(apis, ago(60), now.toISOString(), ["P-04", "M-02"], 6)
   assert.deepEqual(series.instants, [ago(50), ago(40), ago(30), ago(20), ago(10), ago(0)])
   assert.deepEqual(series.lines.map((line) => line.machine), ["P-04", "M-02"])
-  assert.deepEqual(series.lines[0]!.watt, [50, 250, 450, 650, 850, 1050])
-  assert.deepEqual(series.lines[1]!.watt, [2000, null, null, null, null, 4000])
-  // Thinned by the API to twice the slots, one request for every machine.
+  assert.deepEqual(series.lines[0]!.watt, [1200, 1200, 300, null, null, 2000])
+  assert.deepEqual(series.lines[1]!.watt, [2000, 2000, 2000, 2000, 2000, 4000])
+  // The power thinned by the API to twice the slots, and the heartbeats: one request each for every machine.
   const read = requested.filter(({ url }) => url.pathname.startsWith("/timeseries/"))
-  assert.equal(read.length, 1)
-  assert.equal(read[0]!.url.searchParams.get("downsample"), "true")
-  assert.equal(read[0]!.url.searchParams.get("limit"), "12")
+  assert.equal(read.length, 2)
+  const thinned = read.find(({ url }) => url.searchParams.get("downsample") === "true")
+  assert.equal(thinned?.url.searchParams.get("limit"), "12")
 })
 
 test("the lines cover a day at most", async () => {
   serve({})
   await assert.rejects(listEnergySeries(apis, "2026-11-15T16:00:00.000Z", now.toISOString()), /at most 24 hours/)
   await assert.rejects(listEnergySeries(apis, now.toISOString(), ago(60)), /must lie after/)
-})
-
-test("a value on the border of two slots belongs to the slot it ends", () => {
-  const instants = ["2026-11-17T15:10:00.000Z", "2026-11-17T15:20:00.000Z"]
-  const samples = [
-    { at: "2026-11-17T14:59:59.000Z", value: 999 },
-    { at: "2026-11-17T15:00:00.000Z", value: 10 },
-    { at: "2026-11-17T15:10:00.000Z", value: 30 },
-    { at: "2026-11-17T15:10:01.000Z", value: 7 },
-    { at: "2026-11-17T15:20:01.000Z", value: 999 },
-  ]
-  assert.deepEqual(slotMeans(samples, "2026-11-17T15:00:00.000Z", instants), [20, 7])
 })

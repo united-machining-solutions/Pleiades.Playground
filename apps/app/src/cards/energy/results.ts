@@ -11,3 +11,17 @@ export function energyShowOf(content: unknown): EnergyShow | null {
   const shown = energyShow.safeParse(jsonOf(content))
   return shown.success ? shown.data : null
 }
+
+/**
+ * The machines of a card as one text, so that an effect sees a change of them and not a new list
+ * with the same machines.
+ */
+export function machinesKey(machines: ReadonlyArray<string>): string {
+  // A serial number never contains `/`: the MQTT binding forbids it, a comma it allows.
+  return machines.join("/")
+}
+
+/** The machines of a key again. */
+export function machinesOf(key: string): Array<string> {
+  return key === "" ? [] : key.split("/")
+}
