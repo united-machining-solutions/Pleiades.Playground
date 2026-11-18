@@ -214,6 +214,24 @@ services:
       # The OPC UA adapter. While it does not answer, the chat leaves its tools and commands out.
       OPCUA_MCP_URL: http://opcua-adapter:8080/mcp
       OPCUA_ADAPTER_URL: http://opcua-adapter:8080
+      # The voice of Tom for Titan; set empty, Titan speaks with the voice of the browser.
+      TITAN_VOICE_URL: ${TITAN_VOICE_URL-http://titan-voice:8080}
+
+  # The voice of Tom for Titan, the assistant of the app: a German sentence in, a wav out, by Piper on the
+  # CPU. The voice is in the image; the app reaches it inside the stack, no port is published.
+  titan-voice:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.titan.voice:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      THREADS: ${TITAN_VOICE_THREADS:-4}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # The reverse proxy in front of the example app, found by its host name. Not in compose.yaml at the root.
   traefik:

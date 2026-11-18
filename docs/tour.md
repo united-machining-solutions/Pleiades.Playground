@@ -356,8 +356,8 @@ With a camera, Titan greets whoever steps in front of it: by name when the face 
 with the machines that stand still with an error. It checks every few seconds who stands there, and greets
 someone known who steps in. Faces are enrolled at <http://localhost:5600/titan/faces> ("Faces");
 what describes a face stays in that browser, and no photo is kept. Titan speaks with the voice of Tom, who
-agreed to it, made by [`apps/titan-voice`](../apps/titan-voice/README.md) in the stack with the profile `titan`
-(`COMPOSE_PROFILES=titan` in `.env`); when that does not answer, with the voice of the system. It falls silent when the page is closed. What Titan knows stands on
+agreed to it, made by [`apps/titan-voice`](../apps/titan-voice/README.md) in the stack; when that does not
+answer, with the voice of the system. It falls silent when the page is closed. What Titan knows stands on
 one screen at <http://localhost:5600/hall> ("Hall"): the hall plan and every machine.
 
 The cloud shows what the assistant does: it breathes while it waits, draws together while it listens,

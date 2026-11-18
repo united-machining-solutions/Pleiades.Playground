@@ -118,6 +118,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
+      # The voice of Tom is in Git LFS, and titan-voice is built from it. Only the voice: Tom's recording is
+      # for training it, not for the image.
+      - name: The voice of Tom, from Git LFS
+        run: git lfs pull --include "apps/titan-voice/voice/*"
       - name: Start the stack
         run: docker compose up -d --build --wait --wait-timeout 300
       - name: The APIs answer
@@ -228,6 +232,10 @@ jobs:
       COMPOSE_PROJECT_NAME: pleiades-margo
     steps:
       - uses: actions/checkout@v7
+      # The voice of Tom is in Git LFS, and titan-voice is built from it. Only the voice: Tom's recording is
+      # for training it, not for the image.
+      - name: The voice of Tom, from Git LFS
+        run: git lfs pull --include "apps/titan-voice/voice/*"
       # Pinned by digest, the same as in margo-push.yml, so that CI checks with the bart the release runs.
       - name: bart validate
         run: |

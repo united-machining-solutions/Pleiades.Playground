@@ -10,7 +10,7 @@ learns only from Tom. No other voice speaks first, and nothing is converted or m
 
 | | |
 |---|---|
-| In the demo stack | `titan-voice` in `compose.yaml`, with the profile `titan`. The port is not published: the app reaches it as `http://titan-voice:8080` (`TITAN_VOICE_URL`; set it empty to leave Titan with the voice of the browser) |
+| In the demo stack | `titan-voice` in `compose.yaml` and in the Margo app, always on. The port is not published: the app reaches it as `http://titan-voice:8080` (`TITAN_VOICE_URL`; set it empty to leave Titan with the voice of the browser) |
 | Liveness | `GET /health`: `Healthy` once the voice is loaded and warm, `503` before |
 | Speech | `POST /speak` with JSON `{ "text": "..." }`, one sentence, at most 1000 characters; answers `audio/wav`, mono, 16 bit, 22 050 Hz |
 | Image | `pleiades.playground.titan.voice`, about 600 MB, the voice included |
@@ -38,11 +38,11 @@ the service reports `Unhealthy`. After a clone without it: `git lfs pull`.
 
 ## Run it
 
-It starts with the stack when the profile `titan` is on, in `.env` as `COMPOSE_PROFILES=titan` or on the
-command line. Its voice is in Git LFS, so the repository needs `git lfs pull` first:
+It starts with the stack. Its voice is in Git LFS: a clone needs `git lfs pull` before the image is built,
+and the build stops with a message if the voice is only the pointer of Git LFS:
 
 ```bash
-docker compose --profile titan up -d
+docker compose up -d
 docker compose ps titan-voice    # healthy once the voice is loaded and has spoken a first sentence
 ```
 
@@ -82,7 +82,7 @@ docker run --rm --network none -v $W:/work/out pleiades.playground.titan.voice.t
   'python -m piper.train.export_onnx --checkpoint "$(ls -t /work/out/run/lightning_logs/*/checkpoints/*.ckpt | head -1)" \
    --output-file /work/out/voice/de_DE-tom-medium.onnx'
 cp $W/voice/de_DE-tom-medium.onnx* apps/titan-voice/voice/
-docker compose --profile titan up -d --build titan-voice
+docker compose up -d --build titan-voice
 ```
 
 Read `$W/train/metadata.csv` after step 1: what Whisper misheard, correct there before step 3. To learn from
