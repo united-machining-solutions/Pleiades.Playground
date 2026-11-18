@@ -29,8 +29,8 @@ const imports = (text: string) => [...text.matchAll(/(?:\bfrom|\bimport)\s*\(?\s
 
 /**
  * What a file imports, by the paths from `src/` the modules resolve to: `@/` is `src/` (tsconfig.json), and
- * `./` and `../` start at the folder of the file. A package is left out. So `../where-is-my-job/data.ts`,
- * written in `showcases/titan/`, is `showcases/where-is-my-job/data.ts`, as `@/showcases/where-is-my-job/data.ts` is.
+ * `./` and `../` start at the folder of the file. A package is left out. So `../other/data.ts`,
+ * written in `showcases/titan/`, is `showcases/other/data.ts`, as `@/showcases/other/data.ts` is.
  */
 const targets = (file: string) =>
   imports(read(file)).flatMap((module) => {
@@ -63,8 +63,10 @@ const ofShowcases = files.filter((file) => showcaseOf(file) !== undefined)
 const addressOf = (file: string) =>
   `/${file.slice(PAGES.length).replace(/\.tsx?$/, "").replaceAll(".", "/").replace(/(^|\/)index$/, "")}`
 
-test("there is a showcase to hold to the rule", () => {
-  assert.ok(pages.length > 0, "no route file under routes/(showcases)/: if the folder moved, these tests check nothing")
+test("the folder of the pages is the one a build without the showcases leaves out", () => {
+  // There may be no showcase at all. If the folder of their pages moved, these tests would check nothing.
+  const config = readFileSync(join(src, "..", "vite.config.ts"), "utf8")
+  assert.ok(config.includes(String.raw`const SHOWCASE_ROUTES = "^\\(showcases\\)$"`), "vite.config.ts leaves out another folder than routes/(showcases)/")
 })
 
 test("nothing of the app reads from a showcase", () => {

@@ -176,7 +176,9 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
   `index.tsx` is Home, `sites.index.tsx` the address the list of the sites had before, which leads there, `sites.$machine.tsx` the page of a machine and `machines.$machine.tsx`
   the old address of it, which leads there, `charts.tsx` the last hours of every
-  machine as charts (drawn by `src/charts/state-tiles.tsx`), `pages.index.tsx` the list of the pages kept
+  machine as charts (drawn by `src/charts/state-tiles.tsx`), `where-is-my-job.tsx` a page for discussion
+  that follows an order across the machines (its map, its panels, the grouping of job orders and `getFloor`,
+  which reads its values, in `src/where-is-my-job/`), `pages.index.tsx` the list of the pages kept
   in this browser, `pages.$page.tsx` one of them and `pages.open.tsx` one opened from a link; `health.ts`,
   `api/harness/$.ts` and
   `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
@@ -224,11 +226,9 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   commit this file; here everything that needs it writes it first.
 - `src/showcases/`: what is made for one demo or one fair, and is in a build only where `APP_SHOWCASES` is
   set ([ADR-0018](../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
-  it is a showcase: `where-is-my-job/` holds the map, the panels and the grouping of job orders into orders
-  of the page "Where is My Job?", and `getFloor`, which reads its values. The pages of
-  the showcases, and their server routes, are the route files under `src/routes/(showcases)/`; the brackets
-  make a folder that adds nothing to an address, so `(showcases)/where-is-my-job.tsx` answers at
-  `/where-is-my-job`. A page belongs to the showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and
+  it is a showcase; there is none yet. The pages of the showcases, and their server routes, are the route
+  files under `src/routes/(showcases)/`; the brackets make a folder that adds nothing to an address, so
+  `(showcases)/titan.tsx` answers at `/titan`. A page belongs to the showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and
   `titan/faces.tsx` are pages of `showcases/titan/`. A build without the setting leaves that folder out
   (`vite.config.ts`): the router does not know the pages, nothing imports the folder of a showcase, and
   `.output` has nothing of one, so neither has the image. There is no switch while the app runs.
@@ -237,7 +237,7 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   from `src/` first, so `../other/data.ts` counts as `@/showcases/other/data.ts` does. The typecheck reads
   every route, with the showcases (`route-tree.mjs`). After a build without the setting, the route tree on
   disk has no showcase routes, and the editor or a plain `tsc` reports `TS2345` in the route files of the
-  showcases (`'"/(showcases)/where-is-my-job"' is not assignable to parameter of type 'keyof FileRoutesByPath'`).
+  showcases (`'"/(showcases)/titan"' is not assignable to parameter of type 'keyof FileRoutesByPath'`).
   `pnpm typecheck` or `node route-tree.mjs` writes the whole tree again, and the error is gone.
 - `src/cards/`: a folder for each card, named like the card. `machine/chat.tsx` is the machine card in the
   chat: what a call of each of its tools is called, what the chat draws for a result (`results.ts` checks it
