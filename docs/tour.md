@@ -58,7 +58,7 @@ timeseries-persistence   Up 3 minutes (healthy)
 | <http://localhost:5520/mcp> | The generative UI backend, an MCP server. The app reads every value from it. |
 | <http://localhost:5500/> | The Timeseries API: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
 | <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
-| `http://<host>:5590/` | The gateway, the one entry for clients on other computers: below `/timeseries` and `/events` the reading endpoints of the two APIs, and nothing else. |
+| `http://<host>:5590/` | The gateway, the one entry for clients on other computers: below `/timeseries` and `/events` the reading endpoints of the two APIs, and nothing else. They are described at `/timeseries/docs/` and `/events/docs/`. |
 | <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
 | `localhost:1883` | The MQTT broker the simulators publish to. |
 | <http://localhost:5560/machines> | The OPC UA adapter: the machines added over OPC UA. It answers on this computer only. |

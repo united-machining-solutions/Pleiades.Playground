@@ -485,6 +485,12 @@ configs:
             rule: Method(`POST`) && PathRegexp(`^/timeseries/statistics/baseUnitValues/topics/.+`)
             middlewares: [strip-timeseries]
             service: timeseries-api
+          timeseries-docs:
+            entryPoints: [web]
+            # The document of the reading endpoints and its Swagger UI (ADR-0017); not v1.json, which lists writes.
+            rule: Method(`GET`) && (Path(`/timeseries/openapi/read.json`) || Path(`/timeseries/docs`) || PathPrefix(`/timeseries/docs/`))
+            middlewares: [strip-timeseries]
+            service: timeseries-api
           events-read:
             entryPoints: [web]
             rule: >-
@@ -496,6 +502,11 @@ configs:
               || Path(`/events/jobOrders`) || Path(`/events/jobOrders/`)
               || Path(`/events/programExecutions`) || Path(`/events/programExecutions/`)
               || PathRegexp(`^/events/jobOrders/[^/]+/.+`))
+            middlewares: [strip-events]
+            service: events-api
+          events-docs:
+            entryPoints: [web]
+            rule: Method(`GET`) && (Path(`/events/openapi/read.json`) || Path(`/events/docs`) || PathPrefix(`/events/docs/`))
             middlewares: [strip-events]
             service: events-api
         middlewares:

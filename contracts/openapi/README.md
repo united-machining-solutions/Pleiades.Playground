@@ -5,9 +5,23 @@ Each API serves its own description; that document is the contract.
 The Timeseries and Events APIs answer on the computer of the stack only. A client on another computer reads them
 through the gateway, `http://<host>:5590/timeseries` and `http://<host>:5590/events` as base addresses, with the
 paths of the documents below them. The gateway passes only the reading operations, the statistics of the Timeseries
-API (`POST /statistics/baseUnitValues/topics/{topic}`) included; the writing operations, the documents themselves,
-the Swagger UI and `/mcp` are not reachable through it. The routes are the config `gateway` in
+API (`POST /statistics/baseUnitValues/topics/{topic}`) included; the writing operations, `/openapi/v1.json`,
+the Swagger UI at the root and `/mcp` are not reachable through it. The routes are the config `gateway` in
 [`compose.yaml`](../../compose.yaml), see [ADR-0017](../../docs/adr/0017-a-read-only-gateway-for-outside-clients.md).
+
+What the gateway passes has a document of its own: each of the two APIs also serves `/openapi/read.json`, the
+operations that require its read permission and nothing else, and a Swagger UI for it at `/docs/`. The gateway
+passes both, so a client on another computer sees the interface it can use, and "Try it out" goes through the
+gateway, whose address and prefix the document names as its server:
+
+| At the gateway | OpenAPI | Swagger UI |
+|---|---|---|
+| Timeseries API | `http://<host>:5590/timeseries/openapi/read.json` | `http://<host>:5590/timeseries/docs/` |
+| Events API | `http://<host>:5590/events/openapi/read.json` | `http://<host>:5590/events/docs/` |
+
+CI checks the routes against these documents on the running stack
+([`check-gateway.mjs`](../../.github/scripts/check-gateway.mjs)): every operation of `read.json` passes the gateway,
+every other operation of `v1.json` ends there.
 
 | Service | OpenAPI | Swagger UI |
 |---|---|---|

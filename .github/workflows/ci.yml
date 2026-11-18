@@ -173,6 +173,10 @@ jobs:
           refused GET /events/openapi/v1.json
           refused GET /timeseries/
           refused GET /sites/sites
+      # Both directions against the documents of the APIs: what read.json lists passes, every other operation of
+      # v1.json ends at the gateway, and read.json and its Swagger UI are served there.
+      - name: The gateway passes what read.json lists, and only that
+        run: node .github/scripts/check-gateway.mjs
       - name: The backend lists the simulated machines
         run: |
           curl -fsS -X POST http://localhost:5520/mcp \

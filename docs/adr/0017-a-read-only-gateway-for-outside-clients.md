@@ -44,11 +44,22 @@ Reading is not the same as `GET`: the Timeseries API reads its statistics with a
 
   The topic of the statistics is one segment, its slashes encoded as `%2F`, so the entry point allows an encoded
   slash. Traefik matches the decoded and cleaned path, so `..` does not lead out of an allowed route.
-- **Not through the gateway, for now:** `/mcp` and `/skill`, the OpenAPI documents (`/openapi/v1.json`) and the
-  Swagger UI. The MCP tools of both APIs are all read-only today, but an MCP call is a `POST` whose effect the
-  path does not show, so the allowlist could not keep a write tool out that someone adds later. The OpenAPI
-  documents list the writing operations as well, which the gateway refuses; their description stays where it is,
-  on the APIs and in [`contracts/openapi`](../../contracts/openapi/README.md).
+- **The interface at the gateway has a document of its own.** Each API serves a second OpenAPI document,
+  `/openapi/read.json`, with the operations that require its read policy (`RequireFeatureRead`) and no other, and
+  a Swagger UI for it at `/docs/` (`AddPleiadesReadOnlyOpenApi`, `UsePleiadesReadOnlySwaggerUI` in
+  `Pleiades.Playground.Common.AspNetCore`). The gateway passes both: `GET /timeseries/openapi/read.json`,
+  `/timeseries/docs/...`, and the same below `/events`. The server the document names comes from the request, so
+  behind the gateway it is the gateway with its prefix (`X-Forwarded-Prefix`), and "Try it out" goes through it.
+  Traefik cannot write or filter a document itself; the API knows its endpoints and their policies, so it does.
+- **Routes and document checked against each other.** CI runs
+  [`check-gateway.mjs`](../../.github/scripts/check-gateway.mjs) on the running stack: every operation of
+  `read.json` must pass the gateway, every other operation of `v1.json` must end there with Traefik's 404. A new
+  reading endpoint without a route, or a route that lets a writing one through, fails the check.
+- **Not through the gateway, for now:** `/mcp` and `/skill`, `/openapi/v1.json` and the Swagger UI at the root of
+  each API. The MCP tools of both APIs are all read-only today, but an MCP call is a `POST` whose effect the
+  path does not show, so the allowlist could not keep a write tool out that someone adds later. `v1.json` lists
+  the writing operations as well, which the gateway refuses; it stays on the APIs and in
+  [`contracts/openapi`](../../contracts/openapi/README.md).
 - **The APIs no longer answer the network.** `timeseries-api` and `events-api` are published on `127.0.0.1`
   (`TIMESERIES_BIND`, `EVENTS_BIND`), as the Sites API is. The containers of the stack reach them by their
   service names, and tools on the same computer by `localhost`, as before.
@@ -62,11 +73,12 @@ Reading is not the same as `GET`: the Timeseries API reads its statistics with a
 
 ## Consequences
 
-- An outside client changes its base addresses to the gateway and nothing else; the Swagger UI and the OpenAPI
-  documents stay on the APIs, on the computer of the stack.
+- An outside client changes its base addresses to the gateway and nothing else. It finds the interface it can use
+  at `http://<host>:5590/timeseries/docs/` and `/events/docs/`; the full documents and their Swagger UI stay on the
+  APIs, on the computer of the stack.
 - Nothing outside the stack writes values or events over REST any more, unless a `*_BIND` setting opens an API
   again. A new reading endpoint in either API is not reachable from outside until it gets a route in the config
-  `gateway`; CI checks the routes against the running stack.
+  `gateway`; it appears in `read.json` at once, so CI fails until the route is there.
 - A browser on another origin cannot call the statistics: its preflight (`OPTIONS`) is not on the list.
 - **Open:** the MQTT broker still takes anonymous clients on `1883` and `9001`, on every address, and they may
   publish: whoever reaches the broker can write values and events that the stack stores. Closing it needs
@@ -83,3 +95,8 @@ Reading is not the same as `GET`: the Timeseries API reads its statistics with a
 - **Prefix routing without stripping**, the paths of the APIs as they are (`/topics`, `/alerts/...`). The route
   groups of the two APIs do not overlap today, but nothing keeps them apart; a prefix per API does, and the
   client keeps one base address per API as before.
+- **Swagger for the gateway from a static, filtered copy of `v1.json`.** Needs no change to the APIs, but a script
+  must write the copy again after every change of an API, and it says nothing the code does not already know.
+- **A gateway of our own in .NET (YARP) instead of Traefik,** whose route configuration is the allowlist and the
+  document at once. One source, but a service with code of its own; worth it once the gateway does more than
+  pass, for example sign-in or limits.
