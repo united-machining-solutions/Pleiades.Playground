@@ -318,6 +318,8 @@ All notable changes are documented here. The format follows
   an origin of its own needs it set, or the card falls back to a system font there.
 - The images of `genui-mcp` and `app` carry `LICENSE` and `NOTICE` under `/app`.
 - Stack: the image of the simulator is built once, by `simulator-p-04`, and no longer once per simulator.
+- Stack: the OPC UA simulator runs the image `1.4.0-alpha3` instead of `1.3.1`, still definition `K09`, machine
+  `A1121O0001`. That image is built for amd64 only; on arm64, `OPC_SIMULATOR_IMAGE` names another one.
 - `README.md` starts the stack with `--wait` and shows the two lines that enable the chat. The development
   setup has three more known issues: a download that breaks off, `pnpm` through the path, and a key that
   `docker compose restart` does not pick up.

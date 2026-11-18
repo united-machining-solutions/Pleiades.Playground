@@ -75,9 +75,10 @@ docker compose up -d --build --wait
 ```
 
 The simulated machine is the TRUMPF OPC UA simulator with its definition `K09`, a TruMatic, from the image
-that umati publishes for amd64 and arm64,
-[`ghcr.io/umati/trumpf/edge/opc-simulator:1.3.1`](https://github.com/orgs/umati/packages/container/package/trumpf%2Fedge%2Fopc-simulator).
-`OPC_SIMULATOR_IMAGE` in `.env` names another one, for example a build of your own. The simulator is not
+that umati publishes,
+[`ghcr.io/umati/trumpf/edge/opc-simulator:1.4.0-alpha3`](https://github.com/orgs/umati/packages/container/package/trumpf%2Fedge%2Fopc-simulator).
+That image is built for amd64 only; `1.3.1` is the last one for arm64 as well. `OPC_SIMULATOR_IMAGE` in `.env`
+names another one, for example a build of your own. The simulator is not
 registered at the start: the stack shows it once a person adds it in the chat, `/discover A1121O0001`, or with
 the request below.
 
@@ -120,7 +121,7 @@ whose nodes the server does not have.
 
 The images of umati, `1.3.0` and later, report `A0280O0001` for `L26`. An image of the simulator built before its
 machine numbers were replaced reports `A0280E0062` instead: the example registration of `L26` is then refused or
-publishes under the wrong number. The machine of `K09` is `A1121O0001` in the image `1.3.1`.
+publishes under the wrong number. The machine of `K09` is `A1121O0001` in the images `1.3.1` and `1.4.0-alpha3`.
 
 ## In the chat
 
