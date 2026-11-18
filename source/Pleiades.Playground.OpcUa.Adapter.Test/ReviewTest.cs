@@ -160,6 +160,27 @@ public class CertificatePinTest
     }
 
     [TestMethod]
+    public async Task A_rejected_server_certificate_is_told_with_its_reason_not_as_a_timeout()
+    {
+        using var directory = new TemporaryDirectory();
+        var sessions = new Mock<IManagedSessionFactory>(MockBehavior.Strict);
+        sessions
+            .Setup(factory => factory.ConnectAsync(It.IsAny<ConfiguredEndpoint>(), It.IsAny<Action<ManagedSessionBuilder>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ServiceResultException(
+                StatusCodes.BadCertificateUriInvalid,
+                new LocalizedText("The Application in the EndpointDescription (urn:UmatiSampleServer) is not in the Server Certificate.")));
+        var client = Client(new CredentialStore(directory.Path), sessions);
+
+        var rejected = await Assert.ThrowsExactlyAsync<ServerCertificateRejectedException>(
+            () => client.ConnectAsync(Endpoint(), TestContext.CancellationToken));
+
+        Assert.Contains("BadCertificateUriInvalid", rejected.Message);
+        Assert.Contains("urn:UmatiSampleServer", rejected.Message);
+        Assert.Contains(Url, rejected.Message);
+        Assert.IsTrue(Api.MachineEndpoints.IsServerFault(rejected), "The chat and the API tell it as a fault of the server.");
+    }
+
+    [TestMethod]
     public async Task A_password_goes_only_to_the_certificate_its_user_was_stored_with()
     {
         using var directory = new TemporaryDirectory();

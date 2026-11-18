@@ -28,6 +28,30 @@ internal sealed class ServerCertificateChangedException : Exception
     }
 }
 
+/// <summary>
+/// The certificate check between the adapter and a server failed: the server presents a certificate the
+/// adapter rejects, or the server rejects the one of the adapter. Trying again does not help.
+/// </summary>
+internal sealed class ServerCertificateRejectedException : Exception
+{
+    /// <summary>Creates the exception.</summary>
+    public ServerCertificateRejectedException()
+    {
+    }
+
+    /// <summary>Creates the exception with a message.</summary>
+    public ServerCertificateRejectedException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>Creates the exception with a message and a cause.</summary>
+    public ServerCertificateRejectedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
 /// <summary>The endpoint a registration names is not offered by the server.</summary>
 internal sealed class EndpointNotOfferedException : Exception
 {
@@ -183,23 +207,40 @@ internal sealed class OpcUaClient : ISessionConnector
         // ConnectTimeout fails, so the back-off of the session and the LastError of the machine take over.
         using var limited = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         limited.CancelAfter(ConnectTimeout);
+        // A refused user or a rejected certificate ends the connect at once, with its reason (RefusalPolicy).
         var configured = new ConfiguredEndpoint(null, selected, null);
         try
         {
-            var session = credential is null
-                ? await _sessions.ConnectAsync(configured, limited.Token).ConfigureAwait(false)
-                : await _sessions.ConnectAsync(
-                    configured,
-                    builder => builder
-                        .WithUserIdentity(new UserIdentity(credential.User, Encoding.UTF8.GetBytes(credential.Password)))
-                        .WithReconnectPolicy(new RefusedUserPolicy()),
-                    limited.Token).ConfigureAwait(false);
+            var session = await _sessions.ConnectAsync(
+                configured,
+                builder =>
+                {
+                    builder.WithReconnectPolicy(new RefusalPolicy());
+                    if (credential is not null)
+                    {
+                        builder.WithUserIdentity(new UserIdentity(credential.User, Encoding.UTF8.GetBytes(credential.Password)));
+                    }
+                },
+                limited.Token).ConfigureAwait(false);
             return (session, thumbprint);
+        }
+        catch (ServiceResultException exception) when (RefusalPolicy.IsRejectedCertificate(exception.StatusCode))
+        {
+            throw new ServerCertificateRejectedException(RejectedCertificate(endpoint.Url, exception), exception);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             throw new TimeoutException($"The server at {endpoint.Url} did not open a session within {ConnectTimeout.TotalSeconds:0} seconds.");
         }
+    }
+
+    /// <summary>What a person reads when the certificate check with a server failed.</summary>
+    internal static string RejectedCertificate(string url, ServiceResultException exception)
+    {
+        var status = StatusCode.LookupSymbolicId(exception.StatusCode.Code) ?? exception.StatusCode.ToString();
+        var reason = exception.LocalizedText.Text is { Length: > 0 } text ? text : exception.Message;
+        return $"The certificate check with the server at {url} failed with {status}: {reason} " +
+            "Trying again does not help until the certificate of the server is fixed, or the server trusts the certificate of the adapter.";
     }
 
     /// <inheritdoc />

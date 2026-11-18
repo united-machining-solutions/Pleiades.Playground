@@ -438,6 +438,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- `opcua-adapter`: a rejected certificate is reported with its reason instead of a timeout. A server whose
+  certificate does not carry the ApplicationUri it announces was told in the chat as "did not open a session
+  within 30 seconds"; the reason was only in the log. A connect now stops on the first certificate error and
+  says the status and why, for example `BadCertificateUriInvalid`, in the chat, the REST API and `lastError`.
+  (#179)
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page
   never reached the broker ("not live, no connection to the broker"), and a question asked outside the chat did
