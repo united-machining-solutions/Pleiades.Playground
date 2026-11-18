@@ -67,6 +67,14 @@
     <Project Path="Pleiades.Playground.Sites.Api/Pleiades.Playground.Sites.Api.csproj" />
     <Project Path="Pleiades.Playground.Sites.Api.Test/Pleiades.Playground.Sites.Api.Test.csproj" />
   </Folder>
+  <Folder Name="/Cutting/">
+    <Project Path="Pleiades.Playground.Cutting.Adapter/Pleiades.Playground.Cutting.Adapter.csproj" />
+    <Project Path="Pleiades.Playground.Cutting.Adapter.Test/Pleiades.Playground.Cutting.Adapter.Test.csproj" />
+    <Project Path="Pleiades.Playground.Cutting.Protocol/Pleiades.Playground.Cutting.Protocol.csproj" />
+    <Project Path="Pleiades.Playground.Cutting.Protocol.Test/Pleiades.Playground.Cutting.Protocol.Test.csproj" />
+    <Project Path="Pleiades.Playground.Cutting.Simulator/Pleiades.Playground.Cutting.Simulator.csproj" />
+    <Project Path="Pleiades.Playground.Cutting.Simulator.Test/Pleiades.Playground.Cutting.Simulator.Test.csproj" />
+  </Folder>
   <Folder Name="/OpcUa/">
     <Project Path="Pleiades.Playground.OpcUa.Adapter/Pleiades.Playground.OpcUa.Adapter.csproj" />
     <Project Path="Pleiades.Playground.OpcUa.Adapter.Test/Pleiades.Playground.OpcUa.Adapter.Test.csproj" />

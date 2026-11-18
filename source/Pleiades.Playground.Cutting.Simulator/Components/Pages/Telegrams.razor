@@ -1,0 +1,98 @@
+@page "/telegrams"
+@inherits LiveComponent
+
+<PageTitle>Telegrams · @State.DisplayName</PageTitle>
+
+<div class="page-head">
+    <h1>Telegrams</h1>
+    <span class="muted">The last 500, newest first</span>
+</div>
+
+<section class="card">
+    <div class="toolbar">
+        <input class="input grow" placeholder="Filter: name or text" @bind="_filter" @bind:event="oninput" />
+        <label class="check"><input type="checkbox" @bind="_showIn" /> In</label>
+        <label class="check"><input type="checkbox" @bind="_showOut" /> Out</label>
+        <label class="check"><input type="checkbox" @bind="_showHeld" /> Held</label>
+        <label class="check"><input type="checkbox" @bind="_showErrors" /> Errors</label>
+        <label class="check"><input type="checkbox" @bind="_paused" /> Pause</label>
+        <button class="btn small" @onclick="Log.Clear">Clear</button>
+    </div>
+
+    @{
+        var entries = Visible();
+    }
+    @if (entries.Count == 0)
+    {
+        <p class="muted">No telegram yet. The host writes into <span class="mono">@HostFile</span>; the machine answers into <span class="mono">@MachineFile</span>.</p>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table log">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Direction</th>
+                        <th>Telegram</th>
+                        <th>Line</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in entries)
+                    {
+                        <tr>
+                            <td class="mono nowrap">@entry.Time.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture)</td>
+                            <td><span class="badge @Labels.DirectionTone(entry.Direction)">@Labels.Direction(entry.Direction)</span></td>
+                            <td class="nowrap">@entry.Name</td>
+                            <td>
+                                <code class="raw">@entry.Raw</code>
+                                @if (entry.Note.Length > 0)
+                                {
+                                    <div class="muted small">@entry.Note</div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    [Inject]
+    private Microsoft.Extensions.Options.IOptions<Config> Config { get; set; } = default!;
+
+    private string _filter = string.Empty;
+    private bool _showIn = true;
+    private bool _showOut = true;
+    private bool _showHeld = true;
+    private bool _showErrors = true;
+    private bool _paused;
+    private IReadOnlyList<TelegramLogEntry> _frozen = [];
+
+    private string HostFile => Path.Combine(Config.Value.ExchangeDirectory, Config.Value.HostFileName);
+
+    private string MachineFile => Path.Combine(Config.Value.ExchangeDirectory, Config.Value.MachineFileName);
+
+    private List<TelegramLogEntry> Visible()
+    {
+        if (!_paused)
+        {
+            _frozen = Log.Entries();
+        }
+
+        return _frozen.Where(e => e.Direction switch
+            {
+                TelegramDirection.In => _showIn,
+                TelegramDirection.Out => _showOut,
+                TelegramDirection.Held => _showHeld,
+                _ => _showErrors,
+            })
+            .Where(e => _filter.Length == 0 ||
+                e.Raw.Contains(_filter, StringComparison.OrdinalIgnoreCase) ||
+                e.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+}

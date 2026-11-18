@@ -9,6 +9,13 @@ All notable changes are documented here. The format follows
 
 - Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
   no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
+- Documentation sources: original PDF viewer with paging, zoom and native/OCR page search, retrieved
+  through bounded MCP binary resources without adding PDFs to model context.
+
+- Example app: optional documentation MCP tools with clickable, revision-specific manual page sources in chat,
+  showing printed page labels alongside differing physical pages. Margo exposes the additional MCP server setting.
+
+
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
   self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
   that live values work over HTTPS. HTTP stays as it is.
@@ -37,6 +44,10 @@ All notable changes are documented here. The format follows
 - Page of a machine: the title switches to another machine, with a search over the serial number and the
   state, and the history of the card covers the last 1, 8 or 24 hours (`?hours=`). The page is wider, with
   room for actions on the right.
+- Energy card: `genui_energy_show` says how much energy machines imported over the last 1 to 24 hours, from
+  their meters, with mean and peak power; the card draws their power as a graph (`genui_energy_series`).
+- Time series card: `genui_timeseries_show` draws any signal of any machine over 15 minutes to 24 hours, a line for each
+  pair of a machine and a signal, on two y axes at most; a person changes the range and the lines on the card.
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
@@ -55,6 +66,13 @@ All notable changes are documented here. The format follows
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
 - Simulator for values, states and notifications of several machines.
+- Cutting machines, part of the stack: simulators of a 2D laser, a tube laser and a punching machine that take
+  their jobs through telegram files, each with a web page, and one adapter per machine that publishes it to the
+  broker by the binding of machines as `trumpf_Laser2D_L-01`, `trumpf_Tube_T-01` and `trumpf_Punch_PU-01`:
+  manifest, identification, `State/Status`, channel, feed override, the NC program below `oem/`, and its alarms as
+  `Notification.ActiveAlerts` and CloudEvents on `events/notifications`. The web page shows the serial number, and an endless mode writes new
+  orders into the plan and refills the stacks, so that a machine produces without anyone at it. They are part of
+  the Margo app too, there in endless mode.
 - Deployment (`docs/deployment.md`): the workflow "Deploy" starts the stack with `docker compose` on a runner of
   your own, from the images of the commit that was merged into `main`. It is off until the variable
   `DEPLOY_ENABLED` is `true`.
@@ -276,6 +294,9 @@ All notable changes are documented here. The format follows
   disagrees with the `EngineeringUnits`, makes the match `Unclear`.
 
 ### Changed
+
+- Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
+  computer, as the web UI of the OPC UA simulator does; in the stack and in the Margo app.
 
 - The Ultimaker telemetry and the juice bar publish the payloads and the delivery of the MQTT binding of
   machines, not only its tree, as the simulators do: every value retained with QoS 1 in the envelope

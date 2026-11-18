@@ -16,24 +16,32 @@ from, and numbers, order and durations are computed here, never by a language mo
 
 | Tool | What it returns |
 |---|---|
+| `genui_energy_show` | Every machine that published active power or its energy meter, or those in `machines`, over the last hours (`hours`, 8 if omitted, at most 24): the energy it imported, the difference of its meter in the unit the meter published in (watt hours, or joule for values from before the data model 0.17.1), unconverted; the mean power over that time, the energy divided by it; and the peak of its active power in watt, from the statistics of the Timeseries API. Machines in watt hours first, then those in joule, each the one that imported the most first. Its output is the contract of the energy card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_energy_series` | The active power of machines between two instants (`from`, `to`, at most 24 hours), a line for each machine on the same instants (`slots`, 240 if omitted): the graph of the energy card. Each value is the one that held at its instant, the newest of those the Timeseries API keeps when it thins a line to twice the slots; none where the machine was silent, as in the graphs of the measurements. A card calls it after `genui_energy_show`. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_machine_list` | Every machine with what it does now: manufacturer, model and serial number, connection, heartbeat, state and operation mode with the time since when, the active work master and job order, and the alerts of the last 24 hours that have not been cleared. |
 | `genui_machine_show` | One machine (`machine`, the machine id): the same readings, and how long each state lasted in total over the last hours (`hours`, 8 if omitted). Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_span_list` | The states of one machine between two instants (`from`, `to`) as spans without a gap: the band of the machine card. A card calls it after `genui_machine_show`. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_measurement_list` | Every machine, or one (`machine`), with the newest value of each physical quantity: active power, energy imported, spindle bearing temperature, whether the spindle rotates, feed and spindle override, power-on duration. Each in the unit it was published in, and whether it is current: a value holds until the next one, as long as the machine is there (see below). Its output is the contract of the measurement card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_measurement_series` | Every physical quantity over the last minutes (`minutes`, 15 if omitted), a line for each machine on the same instants (`slots`, 180 if omitted): what the graphs of the measurements draw. Each point is the value that held at its instant, also one published before the minutes began; none while the machine is silent, and none after a silence until the next value. The card file of the measurements calls it and draws the graphs below its cards; the page "Live values" of the example app calls it too. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_site_list` | Every site of the [Sites API](../../source/Pleiades.Playground.Sites.Api/README.md) with the machines on it, hall by hall, what each does now and how many on each site are in each state; and the machines that sent values in the last 24 hours and stand on no site. Its output is the contract of the site card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_timeseries_show` | Signals of machines over the last `range` (`15m`, `1h`, `8h` or `24h`, `1h` if omitted), in the `timeZone` of the person if given, a line for each pair of a machine and a signal in `lines`, freely combined, at most 8. A signal is named by its path below the machine, as an element of the data model, or as a quantity of the measurement card, and must be a number or a yes or no the machine published in the last 24 hours; numbers of at most two units. For each line the newest value and whether it is current, and the smallest and largest value in the range from the statistics of the Timeseries API, in the unit it was published in. Its output is the contract of the time series card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_timeseries_series` | The values of the lines of a time series card over a range, up to `to` or up to now, on the instants of all of them: every instant at which a line has a value. Numbers are thinned by the Timeseries API (`points`, 480 if omitted) and keep their own instants; a yes or no is read whole. At each instant a line has the value that held, none where the machine was silent. The card calls it after `genui_timeseries_show` and again when a person changes the range or the lines. A host that shows MCP Apps does not offer it to its language model. |
+| `genui_timeseries_signals` | The numbers and yes or no each machine published in the last 24 hours, by path: what a person can add to a time series card. The card calls it. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. A question about a machine needs neither: a result answers it. |
 
 | Resource | What it is |
 |---|---|
 | `genui://skill` | The skill guide, as markdown. |
+| `ui://genui/energy` | The energy card as a file for other hosts: the energy of each machine, and the graph of their power, which it asks `genui_energy_series` for. |
 | `ui://genui/machine` | The machine card as a file for other hosts, see below. |
 | `ui://genui/site` | The site card as a file for other hosts: a card for each site, and one for the machines on no site. |
 | `ui://genui/measurement` | The measurement card as a file for other hosts: the cards, and below them the graphs of the last minutes, which it asks `genui_measurement_series` for, as the machine card asks for its band. |
+| `ui://genui/timeseries` | The time series card as a file for other hosts: the lines of the result, which it asks `genui_timeseries_series` for, again when a person changes the range or the lines, and what a person can add, which it asks `genui_timeseries_signals` for. |
 
-Every instant of a result is ISO 8601 in UTC. The two machine tools also take a `timeZone`, an IANA name such
-as `Europe/Zurich`: then every instant is a local time there with its offset, `2026-11-11T09:00:41.000+01:00`.
-So whoever reads the result, a language model included, has nothing to convert.
+Every instant of a result is ISO 8601 in UTC. The tools a language model calls, `genui_timeseries_show` among
+them, also take a `timeZone`, an IANA name such as `Europe/Zurich`: then every instant is a local time there with
+its offset, `2026-11-11T09:00:41.000+01:00`. So whoever reads the result, a language model included, has nothing
+to convert.
 
 ## A result is an answer
 

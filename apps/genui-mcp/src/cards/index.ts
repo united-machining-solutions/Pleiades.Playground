@@ -1,6 +1,8 @@
+import { energyCard } from "./energy.ts"
 import { machineCard } from "./machine.ts"
 import { measurementCard } from "./measurement.ts"
 import { siteCard } from "./site.ts"
+import { timeseriesCard } from "./timeseries.ts"
 
 /**
  * The cards of this server: one module each, and one line each here, in the order of the alphabet.
@@ -8,7 +10,9 @@ import { siteCard } from "./site.ts"
  * file from it, and the description and the guide take their text about the card.
  */
 export const cards = [
+  energyCard,
   machineCard,
   measurementCard,
   siteCard,
+  timeseriesCard,
 ] as const
