@@ -185,9 +185,11 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
  * The signs of life of every machine between two instants: when it published its connection, its
  * heartbeat, its state, its operation mode or its program. Other values are signs of life too; a
  * caller that reads them adds them.
+ *
+ * With `machine`, the signs of that machine only, so a page of one machine reads no others.
  */
-export async function readSignsOfLife(apis: Apis, from: Date, to: Date): Promise<Map<string, Array<string>>> {
-  const series = await Promise.all(names.map((name) => readValues(name)(apis, `machines/*/${paths[name]}`, from, to)))
+export async function readSignsOfLife(apis: Apis, from: Date, to: Date, machine = "*"): Promise<Map<string, Array<string>>> {
+  const series = await Promise.all(names.map((name) => readValues(name)(apis, `machines/${machine}/${paths[name]}`, from, to)))
   const signs = new Map<string, Array<string>>()
   names.forEach((name, index) => {
     for (const one of series[index] ?? []) {

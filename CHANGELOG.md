@@ -7,11 +7,52 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: machines are added to a site and taken off it on Home, as in the mock. A bar names the machines
+  that sent data in the last 24 hours and stand on no site, with "Review and add"; "Add machine" also takes one by
+  its id. The menu of a row moves a machine or removes it, and "Undo" in the toast takes a change back.
+  `genui_site_list` counts how many machines on the sites send and how many need someone.
+- Sites API: a write of a site may name a condition. `If-None-Match: *` makes it only where there is none,
+  `If-Match` with the `etag` of the site changes or removes only the site that was read; 412 otherwise.
+- Example app: the drink card of the juice bar. For the result of `juicebar_drinks_list` the chat draws the
+  drinks whose bottles do not warn, each in the glass its author chose in the marketplace, filled with its
+  colour; a person picks one, and its button orders it at once, without a question of the language model.
+  The card follows the order and shows the glass waiting for the start button of the machine, filling while
+  the pumps run, and full, with an umbrella. Without motion the glass shows the same, still.
+- Example app: the showcase page `/juice-bar`, the same drink card on a page of its own, for a screen next to
+  the machine at a fair: a guest picks and orders without a language model. It reads the card of the machine
+  every half minute. Only a build with `APP_SHOWCASES` has it.
+- Juice bar API: a drink carries its colour and the picture of a glass its author chose (`color`, `picture`),
+  an ingredient its colour and whether its bottle runs low (`color`, `runsLow`). Colours that are not `#rrggbb`
+  are left out.
+- Example app: "Add a card" at the end of a kept page in "Edit" adds a card by hand, with no language model:
+  the cards a page can hold, by what they show, and what the chosen one takes, read from its input schema
+  (a machine by its name, the hours of its history). The same card twice or a thirteenth is not added.
+- Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
+  no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
+- OPC UA adapter: a server without a node for `Identification.ManufacturerUri` is added if it gives
+  `Identification.Manufacturer`: that name without any character but `A-Z`, `a-z` and `0-9` stands in for the
+  `ManufacturerUri` and forms the machine id (`TRUMPF SE + Co. KG` gives `trumpfsecokg_<model>_<serial number>`).
+  A mapped `ManufacturerUri` without a value yet is still waited for. The MQTT contract describes the rule
+  ([Without a ManufacturerUri](contracts/mqtt/README.md#without-a-manufactureruri)). The proposal in the chat says
+  so under "Good to know" (`notices`, with the `machineId`), and the registration keeps it as
+  `identity.manufacturerUriFromManufacturer`. A `Manufacturer` without any letter or digit `A-Z`, `0-9` is refused
+  with that reason.
 - Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
   `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
   shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0020).
+- Example app: the page "OSACA cell" (`/osaca`) shows the OSACA demo cell, a robot that feeds a milling machine,
+  as a live 3D model with its key figures, axes, job orders, NC channels, alerts and machine data, from the
+  values the cell publishes over MQTT (`<root>/oem/…` and `<root>/umati/…`), and starts its preconfigured job
+  again after a confirmation. The settings `OSACA_MQTT_URL` and `OSACA_SIM_URL` name the broker and the
+  simulation.
 - Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
   no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
+- Page of a machine: under the title where the machine stands, and below the machine card three sections as the
+  mock has them: Now, live tiles of its power, energy, spindle and feed; Alarms & warnings; Power and energy over
+  the chosen hours. Other hours read the sections again without loading the page again; a section that gets no
+  answer says so and asks again on its own, one question at a time. The page draws the cards without their feet
+  and topic lines, the chat with them. It reads the measurements of its machine only, and the alarms once after a
+  burst of alerts.
 - Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
   each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
   draws them with the notification card.
@@ -318,6 +359,13 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Notification card: all notifications or those of one level, errors or warnings, ten a page, those that stand
+  first, with the pagination of the energy card; the counts at the head and the sums at the foot follow the level.
+- Time series and energy card: power in kilowatts with an area under its line, a taller graph, and times on full
+  hours and quarter hours; the energy table has columns for the meter, kWh, Avg kW and Peak kW. The machine card
+  writes the times under its band. This holds in the chat as well, which draws the same cards.
+- Generative UI backend: `genui_measurement_series` takes an optional `machine`, as `genui_measurement_list` does,
+  and then reads the values and signs of life of that machine only.
 - Example app: Home (`/`) shows where the machines stand, by site and hall; "Needs you" keeps what it showed first.
   The tiles of the running machines are gone. `/sites` leads to `/`.
 - Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
@@ -479,6 +527,15 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- OPC UA adapter: the alarms of a machine in `urn:umati2:datamodel:opcua` reach
+  `umati/Notification/ActiveAlerts` and `events/notifications`. The adapter reads the list
+  `Notification.ActiveAlerts` of that namespace, decodes `DataType.Alert` itself and raises and clears an alert
+  as it comes into the list and leaves it, with the severity the server gives (`alerts.list`, set by the rules of
+  the namespace). Before, the list went out once as `null`, and alarm events were dropped because their
+  conditions lie in the TRUMPF interface. A TRUMPF machine outside that namespace gets the events of
+  `TcMachineAlarmType` with `AlarmIdentifier` if its registration names no alarms and its server has that type,
+  and the TRUMPF interface counts as its own namespace. A server without the list or the type moves
+  `Notification.ActiveAlerts` to `missing`. A stored registration takes this on `/rescan` (issue 180).
 - `app`: a new question in the chat stays at the top of the panel and its answer grows under it, also when the
   answer is a card taller than the panel. Until now the chat ran to the end of such an answer at once, so the
   question and the head of the card were out of sight; with the machines of the stack today, the cards of power

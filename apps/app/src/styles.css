@@ -17,6 +17,8 @@
 @import "@pleiades/cards/styles.css";
 /* The brands the switch at the top of the sidebar offers: each a block of tokens over the theme. */
 @import "@pleiades/ui/brands.css";
+/* The motion of the glass of the drink card. */
+@import "./cards/juicebar/glass.css";
 
 /*
  * The font is this application's own. Not "inline", so that a class asks for the variable and a

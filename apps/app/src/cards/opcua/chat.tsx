@@ -1,4 +1,4 @@
-import { CircleAlertIcon, CircleCheckIcon, NetworkIcon, ServerIcon, Trash2Icon } from "lucide-react"
+import { CircleAlertIcon, CircleCheckIcon, InfoIcon, NetworkIcon, ServerIcon, Trash2Icon } from "lucide-react"
 import { Fragment, useId, useState } from "react"
 
 import type { ChatTool, ToolLabel } from "@/chat/tool-results.ts"
@@ -466,6 +466,19 @@ function ShownProposal({ values }: { values: Proposal }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <ProfileGaps checks={values.conformance} />
+        {values.notices && values.notices.length > 0 && (
+          <Alert>
+            <InfoIcon />
+            <AlertTitle>Good to know</AlertTitle>
+            <AlertDescription>
+              <ul>
+                {values.notices.map((notice) => (
+                  <li key={notice}>{notice}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
         {!values.accepted && (
           <Alert variant="destructive">
             <CircleAlertIcon />

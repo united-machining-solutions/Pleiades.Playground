@@ -31,6 +31,8 @@ const result = {
   source: "Sites API /sites and /placements",
   machineCount: 1,
   counts: [{ state: "no-data", machines: 1 }],
+  sending: 0,
+  needsYou: 1,
   sites: [
     {
       siteId: "north-plant",

@@ -1,0 +1,59 @@
+/*
+ * The motion of the glass of the drink card (cards/juicebar/glass.tsx). It is an illustration, not a
+ * state of a component, so no utility of the design system covers it: the juice runs, rises in a wave
+ * and fizzes, and the umbrella springs in when the glass is full. Without motion the glass shows the
+ * same states, only still.
+ */
+.juice-wave { animation: juice-wave 1.4s linear infinite; }
+.juice-shimmer { animation: juice-shimmer 450ms linear infinite; }
+.juice-rise { animation: juice-rise 2s ease-in infinite; }
+.juice-hop { animation: juice-hop 520ms ease-in-out infinite alternate; }
+.juice-ripple { animation: juice-ripple 700ms ease-out infinite; }
+.juice-wobble { animation: juice-wobble 1.6s ease-in-out infinite; transform-origin: 50% 100%; }
+.juice-drop { animation: juice-drop 620ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.juice-spring { animation: juice-spring 760ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.juice-burst { animation: juice-burst 1100ms cubic-bezier(0.15, 0.8, 0.3, 1) both; }
+.juice-level { transition: transform 300ms linear; }
+.juice-stream { transition: transform 340ms cubic-bezier(0.4, 0, 0.2, 1); }
+.juice-umbrella { transition: transform 460ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 180ms ease; }
+
+@keyframes juice-wave { to { transform: translateX(-60px); } }
+@keyframes juice-shimmer { to { stroke-dashoffset: -23; } }
+@keyframes juice-rise {
+  0% { transform: translateY(0); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(-48px); opacity: 0; }
+}
+@keyframes juice-hop { to { transform: translateY(-4px); } }
+@keyframes juice-ripple {
+  from { transform: scale(0.4); opacity: 0.8; }
+  to { transform: scale(1.5); opacity: 0; }
+}
+@keyframes juice-wobble {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+@keyframes juice-drop {
+  0% { opacity: 0; transform: translateY(-36px) scale(0.8); }
+  60% { opacity: 1; transform: translateY(4px) scale(1.03, 0.97); }
+  100% { transform: none; }
+}
+@keyframes juice-spring {
+  0% { opacity: 0; transform: scale(0) rotate(-50deg); }
+  55% { opacity: 1; transform: scale(1.12) rotate(7deg); }
+  78% { transform: scale(0.97) rotate(-3deg); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes juice-burst {
+  0% { opacity: 1; transform: scale(0.1); }
+  65% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.2); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .juice-wave, .juice-shimmer, .juice-rise, .juice-hop, .juice-ripple, .juice-wobble, .juice-drop, .juice-spring {
+    animation: none;
+  }
+  .juice-burst { animation: none; opacity: 0; }
+  .juice-level, .juice-stream, .juice-umbrella { transition: none; }
+}
