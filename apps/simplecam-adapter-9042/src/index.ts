@@ -29,7 +29,7 @@ const EVENTS_TOPIC = `machines/${MACHINE_ID}/events`;
 
 let mqttClient: mqtt.MqttClient;
 let isConnected = false;
-let heartbeatTimer: NodeJS.Timeout;
+let heartbeatTimer: NodeJS.Timeout | undefined;
 
 /**
  * Connect to MQTT broker
