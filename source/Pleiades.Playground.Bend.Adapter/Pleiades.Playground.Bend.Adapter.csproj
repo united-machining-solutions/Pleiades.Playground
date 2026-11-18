@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Bend.Adapter</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Bend.Adapter</RootNamespace>
+    <Description>Reads one bending machine over its RCI telegram files and publishes it to the MQTT broker.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="$(AssemblyName).Test" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging\Pleiades.Playground.Common.Logging.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging.Configuration\Pleiades.Playground.Common.Logging.Configuration.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.HealthChecks.AspNetCore\Pleiades.Playground.HealthChecks.AspNetCore.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.HealthChecks.Mqtt\Pleiades.Playground.HealthChecks.Mqtt.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Mqtt.Extensions\Pleiades.Playground.Mqtt.Extensions.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Bend.Protocol\Pleiades.Playground.Bend.Protocol.csproj" />
+  </ItemGroup>
+</Project>

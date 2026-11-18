@@ -534,6 +534,7 @@ machine does.
 | Ultimaker telemetry | `machines/ultimaker_UM3_UM3-01/` | `https://ultimaker.com` | `x-ultimaker-com`, on `oem/Ultimaker/…` | `Core` |
 | Juice bar | `machines/trumpf_JuiceBar_JUICEBAR-01/` | `https://www.trumpf.com` | `x-trumpf-com`, on `oem/JuiceBar/…` | `Core` |
 | Cutting adapter | `machines/trumpf_Laser2D_L-01/`, `trumpf_Tube_T-01/`, `trumpf_Punch_PU-01/` | `https://www.trumpf.com` | `x-trumpf-com`, on `oem/WorkMasterMonitoring/ActiveProgram` | `Core` |
+| Bending adapter | `machines/trumpf_5085_AE325085TB46/` | `https://www.trumpf.example` | `x-trumpf-example`, on `oem/WorkMasterMonitoring/ActiveProgram`, `oem/Rci/…`, `oem/Production/…` | `Core` |
 
 Each delivers of `Core` the identification, the connection and `State/Status`, with `MachineryOperationMode`
 `None`, the value of the model for a machine without operation modes; `ProductCode`, `YearOfConstruction`
@@ -541,7 +542,11 @@ and `OperationCounters.PowerOnDuration` are `"available": false`. Printer and ju
 `State.FeedOverride` and `Notification.ActiveAlerts` either, and publish no events. The cutting adapter delivers
 both, besides `Channel/1/ChannelState`; its timestamps are those of the machine (`"timestampSource": "source"`), save a `null` for not known, which carries the time of the connect,
 and each alarm of the machine is an entry of `ActiveAlerts` with the events `Notification.AlertRaised` and
-`Notification.AlertCleared` on `events/notifications`.
+`Notification.AlertCleared` on `events/notifications`. The
+[bending adapter](../../source/Pleiades.Playground.Bend.Adapter/README.md), one per press brake that reports through RCI
+telegram files, delivers `ActiveAlerts` with the same two events for a fault of the machine, and an operator message
+or a finished order as `Notification.NotificationEvent`; its timestamps are those of the machine as well, and the RCI
+operating state offline is `CommunicationFault`.
 
 ### Open for the hackathon
 

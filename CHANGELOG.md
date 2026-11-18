@@ -7,6 +7,12 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Bending machine, started with the stack: a simulator of a press brake that reports through RCI telegram files, with a
+  web page, and one adapter per machine that publishes it after the binding of machines (data model 0.17.1) as
+  `trumpf_5085_AE325085TB46`: identification, `State/Status`, `Notification/ActiveAlerts` with `AlertRaised` and
+  `AlertCleared`, operator messages as `Notification.NotificationEvent`, and program, order and parts as signals of
+  the manufacturer below `oem/`. The automatic processing reports running and idle around each position and ends it
+  with `ProcessingStopped`, after which the adapter shows no program.
 - Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
   shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
   from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
