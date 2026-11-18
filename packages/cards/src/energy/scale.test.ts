@@ -22,3 +22,7 @@ test("without a value the graph chooses its axis itself", () => {
   assert.equal(powerScale([]), null)
   assert.equal(powerScale([{ watt: [null, null] }]), null)
 })
+
+test("a power of 0 W only: the axis begins at 0 and has room above, never below", () => {
+  assert.deepEqual(powerScale([{ watt: [0, 0, null] }, { watt: [0] }]), { domain: [0, 1_000], ticks: [0, 250, 500, 750, 1_000] })
+})

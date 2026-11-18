@@ -91,12 +91,15 @@ if you know it.
   had no value (\`unit\` null), published in a unit that is not one of energy (\`unit\`), changed its unit
   (\`start.unit\`, \`end.unit\`), or went back (\`meterWentBack\`, a reset). A value of the meter from before a gap
   is not counted: then it counts from its first value in these hours.
-- \`power.meanWatt\`, \`power.peakWatt\`: mean and largest value of
-  \`umati/Consumption/Electricity/Main/AcActivePowerTotal\` in these hours, in watt, while the machine published.
-  Null if there was no value, or if it was published in another unit than watt (\`power.unit\`).
+- \`power.meanWatt\`: the mean power over the time the energy covers, weighted by time: the energy divided
+  by the time between its two values of the meter, in watt; 0 where the meter did not change. Null where the
+  energy is not known.
+- \`power.peakWatt\`: the largest value of \`umati/Consumption/Electricity/Main/AcActivePowerTotal\` in these
+  hours, in watt. Null if there was no value, if it was published in another unit than watt (\`power.unit\`),
+  or if the statistics of the Timeseries API did not answer (\`power.error\`).
 
 On the wire the energy keeps the unit of the meter. Say it to a person in kilowatt hours, as the text of
-the result does; it has converted them for you. Compare the machines with the words of the result; do not
+the result does; it has converted them for you (ADR-0017). Compare the machines with the words of the result; do not
 add, divide or convert the numbers yourself. That holds for the energy over these hours: a value of the meter
 itself, as \`genui_measurement_list\` gives it, stays in the unit it was published in, as the section on
 measurements says.

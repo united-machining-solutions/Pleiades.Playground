@@ -38,7 +38,7 @@ export const machineEnergy = z.object({
     start: meterReading
       .nullable()
       .describe(
-        `The value of the meter the energy is counted from: the newest at or before \`from\` of the result if it is at most ${SILENT_AFTER_SECONDS} seconds older, else the first after it. An older value may lie before a gap in which the machine imported energy outside these hours.`,
+        `The value of the meter the energy is counted from: the newest at or before \`from\` of the result, if the machine was there since, without a silence of more than ${SILENT_AFTER_SECONDS} seconds, else its first value after \`from\`. A value before a silence may lie before a gap in which the machine imported energy outside these hours.`,
       ),
     end: meterReading.nullable().describe("The value of the meter the energy is counted to: the newest at or before `to` of the result."),
     meterWentBack: z.boolean().describe("True if the meter at `end` is less than at `start`: it was reset in between."),
@@ -52,13 +52,22 @@ export const machineEnergy = z.object({
     meanWatt: z
       .number()
       .nullable()
-      .describe("The mean of the values of active power published between `from` and `to`, in watt: while the machine published, not over silence. Null if there was none."),
-    peakWatt: z.number().nullable().describe("The largest of those values, in watt. Null if there was none."),
-    values: z.number().int().describe("How many values of active power the mean and the peak are taken from."),
+      .describe(
+        "The mean power over the time the energy covers, weighted by time: the energy divided by the time from `start.at` to `end.at`, in watt (a watt hour an hour, or a joule a second); 0 where the meter did not change. Null if the energy is not known.",
+      ),
+    peakWatt: z
+      .number()
+      .nullable()
+      .describe("The largest value of active power published between `from` and `to`, in watt. Null if there was none, or if the statistics did not answer (`error`)."),
+    values: z.number().int().describe("How many values of active power the peak is taken from."),
     unit: z
       .string()
       .nullable()
-      .describe("The unit the active power was published in: watt, as the MQTT binding wants. Null if there was no value. In another unit, mean and peak are null."),
+      .describe("The unit the active power was published in: watt, as the MQTT binding wants. Null if there was no value. In another unit, the peak is null."),
+    error: z
+      .string()
+      .nullable()
+      .describe("Why the peak is not known although the machine may have published power: the statistics of the Timeseries API did not answer. Null otherwise."),
     topic: z.string().describe("The MQTT topic of the active power."),
   }),
 })

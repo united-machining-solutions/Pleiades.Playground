@@ -9,6 +9,7 @@ import type { ReactNode } from "react"
 import { createRoot } from "react-dom/client"
 
 import { ENERGY_SERIES_TOOL } from "../src/cards/energy.names.ts"
+import { lastAsked } from "./latest.ts"
 import "./styles.css"
 
 // The energy card as an MCP App: the file a host loads from ui://genui/energy and shows with a
@@ -56,6 +57,9 @@ function takeFont(context: McpUiHostContext | undefined) {
   if (sans) document.documentElement.style.setProperty("--font-sans", sans)
 }
 
+/** The lines of the newest result only: a host may send a second result before the first is answered. */
+const askLines = lastAsked()
+
 function Energy() {
   const [shown, setShown] = useState<Shown>()
   const [series, setSeries] = useState<Lines>()
@@ -68,7 +72,7 @@ function Energy() {
         const next = shownFor(result)
         setShown(next)
         setSeries(undefined)
-        if ("values" in next) void seriesOf(created, next.values).then(setSeries)
+        if ("values" in next) askLines(seriesOf(created, next.values), setSeries)
       })
       created.addEventListener("hostcontextchanged", takeFont)
     },

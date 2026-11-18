@@ -2,13 +2,13 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { MachineEnergy } from "./contract.ts"
-import { MACHINES_PER_PAGE, ordered, pageOf } from "./order.ts"
+import { MACHINES_PER_PAGE, ordered, pageLinks, pageOf } from "./order.ts"
 
 /** A machine with an energy in a unit, and a mean and a peak power in watt. */
 const machine = (id: string, value: number | null, unit: string | null, meanWatt: number | null, peakWatt: number | null): MachineEnergy => ({
   machine: id,
   energy: { value, unit, start: null, end: null, meterWentBack: false, topic: `machines/${id}/umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp` },
-  power: { meanWatt, peakWatt, values: meanWatt === null ? 0 : 100, unit: meanWatt === null ? null : "watt", topic: `machines/${id}/umati/Consumption/Electricity/Main/AcActivePowerTotal` },
+  power: { meanWatt, peakWatt, values: meanWatt === null ? 0 : 100, unit: meanWatt === null ? null : "watt", error: null, topic: `machines/${id}/umati/Consumption/Electricity/Main/AcActivePowerTotal` },
 })
 
 // The order of the backend: watt hours first, then joule, then unknown. 2 kWh in watt hours,
@@ -51,4 +51,20 @@ test("pages of five: where a page lies among all, and a page beyond the last sho
   assert.equal(pageOf(twelve, "energy", 0).page, 1)
   assert.deepEqual(pageOf(result, "energy", 1).pages, 1)
   assert.deepEqual(pageOf([], "energy", 1), { machines: [], page: 1, pages: 1, first: 0, last: 0, total: 0 })
+})
+
+test("many pages: the first, the current one with its neighbours, the last, and a gap between", () => {
+  assert.deepEqual(pageLinks(12, 24), [1, "gap", 11, 12, 13, "gap", 24])
+  assert.deepEqual(pageLinks(1, 24), [1, 2, "gap", 24])
+  assert.deepEqual(pageLinks(24, 24), [1, "gap", 23, 24])
+  // A gap of one page shows that page instead.
+  assert.deepEqual(pageLinks(3, 24), [1, 2, 3, 4, "gap", 24])
+  assert.deepEqual(pageLinks(2, 3), [1, 2, 3])
+})
+
+test("where the card is narrow, the pagination leaves out the neighbours of the current page", () => {
+  assert.deepEqual(pageLinks(6, 12, 0), [1, "gap", 6, "gap", 12])
+  assert.deepEqual(pageLinks(1, 12, 0), [1, "gap", 12])
+  assert.deepEqual(pageLinks(2, 12, 0), [1, 2, "gap", 12])
+  assert.deepEqual(pageLinks(3, 5, 0), [1, 2, 3, 4, 5])
 })

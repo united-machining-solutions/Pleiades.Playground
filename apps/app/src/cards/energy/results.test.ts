@@ -13,7 +13,7 @@ const machine = {
     unit: "joule",
     topic: "machines/P-04/umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp",
   },
-  power: { meanWatt: 900, peakWatt: 2400, values: 14400, unit: "watt", topic: "machines/P-04/umati/Consumption/Electricity/Main/AcActivePowerTotal" },
+  power: { meanWatt: 900, peakWatt: 2400, values: 14400, unit: "watt", error: null, topic: "machines/P-04/umati/Consumption/Electricity/Main/AcActivePowerTotal" },
 }
 
 test("the JSON of genui_energy_show becomes the energy of every machine", () => {

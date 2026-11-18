@@ -108,7 +108,8 @@ test("the energy of a machine is the meter at the end less the meter where the h
   assert.deepEqual(p04.energy.end, { value: 5_000_000 + 119 * 60_000, unit: "joule", at: ago(0.5) })
   assert.equal(p04.energy.value, 3_600_000)
   assert.equal(p04.energy.topic, meterOf("P-04"))
-  assert.deepEqual(p04.power, { meanWatt: 2000, peakWatt: 3000, values: 60, unit: "watt", topic: powerOf("P-04") })
+  // 3,600,000 J between two values of the meter an hour apart: 1,000 W, whatever the values of the power were.
+  assert.deepEqual(p04.power, { meanWatt: 1000, peakWatt: 3000, values: 60, unit: "watt", error: null, topic: powerOf("P-04") })
   assert.equal(p04.energy.unit, "joule")
   assert.equal(shown.machines[0]!.energy.value, 7_200_000)
 })
@@ -202,9 +203,9 @@ test("a meter that went back was reset: its energy is not known, and the machine
   ])
   // The unit that was found says why there is no energy and no power.
   assert.equal(shown.machines[1]!.energy.unit, "kilowattHour")
-  assert.deepEqual(shown.machines[1]!.power, { meanWatt: null, peakWatt: null, values: 0, unit: "kilowatt", topic: powerOf("K-01") })
+  assert.deepEqual(shown.machines[1]!.power, { meanWatt: null, peakWatt: null, values: 0, unit: "kilowatt", error: null, topic: powerOf("K-01") })
   // No power was published: neither mean nor peak.
-  assert.deepEqual(shown.machines[2]!.power, { meanWatt: null, peakWatt: null, values: 0, unit: null, topic: powerOf("P-04") })
+  assert.deepEqual(shown.machines[2]!.power, { meanWatt: null, peakWatt: null, values: 0, unit: null, error: null, topic: powerOf("P-04") })
 })
 
 test("a topic below the path of a machine is neither a machine nor its power", async () => {
@@ -230,7 +231,7 @@ test("a topic below the path of a machine is neither a machine nor its power", a
 test("a machine that published nothing is refused in words, with the machines that did", async () => {
   serve({ [meterOf("P-04")]: meter(0, 1_000, 60) })
   await assert.rejects(showEnergy(apis, 1, ["P-04", "Z-99"], now), {
-    message: 'No machine "Z-99" published active power or its energy meter in the last hour. Machines that did: P-04.',
+    message: 'No machine "Z-99" published active power, its energy meter or a heartbeat in the last hour. Machines that did: P-04.',
   })
 })
 
@@ -269,11 +270,89 @@ test("a line holds the value that held at each instant, also where the API kept 
   assert.deepEqual(series.lines.map((line) => line.machine), ["P-04", "M-02"])
   assert.deepEqual(series.lines[0]!.watt, [1200, 1200, 300, null, null, 2000])
   assert.deepEqual(series.lines[1]!.watt, [2000, 2000, 2000, 2000, 2000, 4000])
-  // The power thinned by the API to twice the slots, and the heartbeats: one request each for every machine.
-  const read = requested.filter(({ url }) => url.pathname.startsWith("/timeseries/"))
-  assert.equal(read.length, 2)
-  const thinned = read.find(({ url }) => url.searchParams.get("downsample") === "true")
-  assert.equal(thinned?.url.searchParams.get("limit"), "12")
+  // The power of each machine thinned by the API to twice the slots.
+  const thinned = requested.filter(({ url }) => url.searchParams.get("downsample") === "true")
+  assert.deepEqual(thinned.map(({ url }) => url.searchParams.get("limit")), ["12", "12"])
+})
+
+test("a line begins with the value that held where the hours begin, as the graphs of the measurements do", async () => {
+  serve({
+    // 1.2 kW from before the hours until 300 W a little after their middle.
+    [powerOf("P-04")]: { unit: "watt", values: [{ at: ago(65), value: 1200 }, { at: ago(25), value: 300 }] },
+    ...heartbeat("P-04", [66, 0]),
+  })
+  const series = await listEnergySeries(apis, ago(60), now.toISOString(), ["P-04"], 6)
+  assert.deepEqual(series.lines[0]!.watt, [1200, 1200, 1200, 300, 300, 300])
+})
+
+test("the lines read the topics of the machines asked for only, not those of every machine", async () => {
+  const requested = serve({
+    [powerOf("P-04")]: power(60, [1000]),
+    ...heartbeat("P-04", [61, 0]),
+    [powerOf("M-02")]: power(60, [2000]),
+    ...heartbeat("M-02", [61, 0]),
+  })
+  const series = await listEnergySeries(apis, ago(60), now.toISOString(), ["P-04"], 6)
+  assert.deepEqual(series.lines.map((line) => line.machine), ["P-04"])
+  const topics = requested
+    .filter(({ url }) => url.pathname.startsWith("/timeseries/"))
+    .map(({ url }) => decodeURIComponent(url.pathname.replace(/^\/timeseries\/\w+\/topics\//, "")))
+  assert.ok(topics.length > 0)
+  for (const topic of topics) assert.match(topic, /^machines\/P-04\//)
+})
+
+test("a machine switched off, with a meter that publishes on change: 0 kWh, counted from its value before the hours", async () => {
+  serve({
+    // The meter last changed five hours ago; the heartbeat says the machine was there all the time.
+    [meterOf("P-04")]: { unit: "wattHour", values: [{ at: ago(300), value: 5_000 }] },
+    ...heartbeat("P-04", [301, 0]),
+  })
+  for (const named of [undefined, ["P-04"]]) {
+    const shown = await showEnergy(apis, 1, named, now)
+    assert.deepEqual(shown.machines.map((one) => one.machine), ["P-04"])
+    const p04 = shown.machines[0]!
+    assert.equal(p04.energy.value, 0)
+    assert.deepEqual(p04.energy.start, { value: 5_000, unit: "wattHour", at: ago(300) })
+    assert.equal(p04.power.meanWatt, 0)
+  }
+})
+
+test("a meter value before a silence of the machine is not counted, however young", async () => {
+  serve({
+    // Two minutes before the hours, then the machine fell silent until ten minutes into them.
+    [meterOf("P-04")]: { unit: "wattHour", values: [{ at: ago(62), value: 1_000 }, { at: ago(50), value: 9_000 }, { at: ago(0), value: 9_500 }] },
+    ...heartbeat("P-04", [63, 62], [50, 0]),
+  })
+  const p04 = (await showEnergy(apis, 1, undefined, now)).machines[0]!
+  assert.deepEqual(p04.energy.start, { value: 9_000, unit: "wattHour", at: ago(50) })
+  assert.equal(p04.energy.value, 500)
+})
+
+test("the mean power is weighted by time: the energy over the time it covers", async () => {
+  serve({
+    // 3,000 W for a minute, then 500 W held for 59 minutes: about 541.7 Wh, not a mean of 1,750 W.
+    [meterOf("P-04")]: { unit: "wattHour", values: [{ at: ago(60), value: 0 }, { at: ago(0), value: 50 + (500 * 59) / 60 }] },
+    [powerOf("P-04")]: { unit: "watt", values: [{ at: ago(60), value: 3_000 }, { at: ago(59), value: 500 }] },
+    ...heartbeat("P-04", [61, 0]),
+  })
+  const p04 = (await showEnergy(apis, 1, undefined, now)).machines[0]!
+  assert.ok(Math.abs(p04.power.meanWatt! - (50 + (500 * 59) / 60)) < 1e-9, String(p04.power.meanWatt))
+  assert.equal(p04.power.peakWatt, 3_000)
+})
+
+test("statistics that fail leave the energy and the mean; the peak is not known, and the result says why", async () => {
+  serve({ [meterOf("P-04")]: meter(0, 1_000, 60, "wattHour"), [powerOf("P-04")]: power(60, [1000]) })
+  const fake = globalThis.fetch
+  globalThis.fetch = (async (input, init) => {
+    if (new URL(String(input)).pathname.startsWith("/statistics/")) return new Response("Unit is missing", { status: 404 })
+    return fake(input, init)
+  }) as typeof fetch
+  const p04 = (await showEnergy(apis, 1, undefined, now)).machines[0]!
+  assert.equal(p04.energy.value, 59_000)
+  // 59,000 Wh between the first and the last value of the meter, 59 minutes apart: 60,000 W.
+  assert.ok(Math.abs(p04.power.meanWatt! - 60_000) < 1e-6, String(p04.power.meanWatt))
+  assert.equal(p04.power.peakWatt, null)
+  assert.match(p04.power.error ?? "", /Timeseries API answered 404/)
 })
 
 test("the lines cover a day at most", async () => {

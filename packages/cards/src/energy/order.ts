@@ -59,3 +59,22 @@ export function pageOf(machines: ReadonlyArray<MachineEnergy>, order: EnergyOrde
     total: all.length,
   }
 }
+
+/** A link of the pagination: a page, or a gap for the pages between that it leaves out. */
+export type PageLink = number | "gap"
+
+/**
+ * The links the pagination shows for a page among so many: the first, the current one and its
+ * neighbours, the last, and a gap where pages are left out. A gap of one page shows that page.
+ * Where the card is narrow, it shows no neighbours.
+ */
+export function pageLinks(page: number, pages: number, neighbours = 1): Array<PageLink> {
+  const near = Array.from({ length: 2 * neighbours + 1 }, (_, index) => page - neighbours + index)
+  const shown = new Set([1, ...near, pages].filter((one) => one >= 1 && one <= pages))
+  const sorted = [...shown].sort((a, b) => a - b)
+  return sorted.flatMap((one, index): Array<PageLink> => {
+    const before = sorted[index - 1]
+    if (before === undefined || one - before === 1) return [one]
+    return one - before === 2 ? [before + 1, one] : ["gap", one]
+  })
+}
