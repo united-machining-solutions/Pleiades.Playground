@@ -82,8 +82,10 @@ TruLaser `A0280O0001` (`L26`).
   encoding. Read: `AwAAAAMAAAA=`, Executing and Processing. The definition was read from the attribute
   DataTypeDefinition.
 - **`Notification.ActiveAlerts`** is a list of `DataType.Alert`: the condition node in the TRUMPF interface
-  (`nsu=http://trumpf.com/TRUMPF-Interfaces/;s=179.BasePlc.5.11.5.4`), the code, the text, an Int32, the severity
-  (UInt16, 400), the time and the source (`BasePlc`).
+  (`nsu=http://trumpf.com/TRUMPF-Interfaces/;s=179.BasePlc.5.11.5.4`), the code, the text, the category
+  (`DataType.AlertSeverity`, an Int32: 1 Failure, 2 CheckFunction, 3 OffSpec, 4 MaintenanceRequired), the severity
+  (UInt16, 400), the time, the source (`BasePlc`) and `correlationId`, the execution of the program. The
+  definition was read from the attribute DataTypeDefinition of the simulator of `L26` on 2026-11-18.
 - **`Connection.State`** (`DataType.AdapterState`: 0 Running, 4 Shutdown, 6 CommunicationFault, 8 Initializing)
   and **`Connection.Heartbeat`** (UInt32) are the connection of the source on the edge device to the machine.
 - **The same machine twice.** `/endpoints/machines` listed `s=Machine` in `urn:umati2:datamodel:opcua` (found by
@@ -470,6 +472,6 @@ sample and the changelog are changed already. For the rest of the plan:
 | 9 | Alarms: subscribe at `TI:Machine/TI:Messages` (179), the notifier the model names, instead of the Server object? | Yes for a server of one machine; behind a gateway the Server object stays, with the filter by namespace. |
 | 10 | Where does the work go? | A branch `feat/opcua-strict-mappings` off `feat/opcua-adapter-poc`, with a pull request into it, signed-off commits and the template, as [AGENTS.md](../../AGENTS.md) asks. |
 | 11 | Does the TRUMPF rule of `Identification.Model` match its namespace behind the prefix of a gateway, with `KnownMappings.IsNamespace`, as the rule of `urn:umati2:datamodel:opcua` does? | Yes, together with the strict rules of the TRUMPF interface, so the machine list and the rules agree on the model. |
-| 12 | Alarms of a machine in `urn:umati2:datamodel:opcua`: a registration of it has nodes in that namespace only, and `MachineConnection` keeps an alarm only if its source or condition lies in a namespace of the registration. The conditions of the gateway are in the TRUMPF interface. How do its alarms pass? | Count the namespaces of the machine as `MachineFinder.Merge` found them (umati2, MachineTool, TRUMPF interface) as its own, or the namespace of `alerts.notifier`; set `alerts` for this namespace by the rule (`TI;i=1006`, `TI;AlarmIdentifier`). Alternatively derive notifications from `Notification.ActiveAlerts`. |
+| 12 | Alarms of a machine in `urn:umati2:datamodel:opcua`: a registration of it has nodes in that namespace only, and `MachineConnection` keeps an alarm only if its source or condition lies in a namespace of the registration. The conditions of the gateway are in the TRUMPF interface. How do its alarms pass? | Count the namespaces of the machine as `MachineFinder.Merge` found them (umati2, MachineTool, TRUMPF interface) as its own, or the namespace of `alerts.notifier`; set `alerts` for this namespace by the rule (`TI;i=1006`, `TI;AlarmIdentifier`). Alternatively derive notifications from `Notification.ActiveAlerts`. **Done (issue 180):** a machine in `urn:umati2:datamodel:opcua` takes its alarms from `Notification.ActiveAlerts`, which the adapter decodes (`alerts.list`); a TRUMPF machine outside that namespace gets `TI;i=1006` with `TI;AlarmIdentifier`, and the TRUMPF interface counts as its own namespace. |
 | 13 | `Connection.State` of `urn:umati2:datamodel:opcua` says whether the source on the edge device reaches the machine. Does the adapter report `Disconnected` while it is not `Running`, though its own session stands? | Yes, as a later step; today it is left out. |
 | 14 | `Production.ActiveProgram`, `Channel[n]`, `Spindle[n]` and the consumption elements were not on the server, so their node ids in `urn:umati2:datamodel:opcua` are unknown. Are they `s=<path>` too, with the instance in brackets? | Add them as rules only once a server shows them. |

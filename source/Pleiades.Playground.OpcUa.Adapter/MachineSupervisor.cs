@@ -307,6 +307,12 @@ internal sealed class MachineSupervisor : BackgroundService
             probe = probe with { Elements = [.. probe.Elements.Where(element => !(element.Area == "umati" && absent.Contains(element.Path)))] };
         }
 
+        // So is the list of alerts it set: the alerts are then not available.
+        if (!probe.AlertListFound)
+        {
+            registration = Umati2DataModel.WithoutAlertList(registration);
+        }
+
         // An element that left makes its profile incomplete; the core decides whether the machine is added.
         var before = registration.Elements;
         registration = DataModelProfiles.Apply(registration, out var checks);

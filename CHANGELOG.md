@@ -438,6 +438,14 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- OPC UA adapter: the alarms of a machine in `urn:umati2:datamodel:opcua` reach
+  `umati/Notification/ActiveAlerts` and `events/notifications`. The adapter reads the list
+  `Notification.ActiveAlerts` of that namespace, decodes `DataType.Alert` itself and raises and clears an alert
+  as it comes into the list and leaves it, with the severity the server gives (`alerts.list`, set by the rules of
+  the namespace). Before, the list went out once as `null`, and alarm events were dropped because their
+  conditions lie in the TRUMPF interface. A TRUMPF machine outside that namespace gets the events of
+  `TcMachineAlarmType` with `AlarmIdentifier` if its registration names no alarms, and the TRUMPF interface counts
+  as its own namespace. A stored registration takes this on `/rescan` (issue 180).
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page
   never reached the broker ("not live, no connection to the broker"), and a question asked outside the chat did

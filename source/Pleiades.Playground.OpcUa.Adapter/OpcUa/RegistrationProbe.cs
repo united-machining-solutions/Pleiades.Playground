@@ -40,6 +40,9 @@ internal sealed record ProbeResult(
 
     /// <summary>The elements whose node the server does not have.</summary>
     public IReadOnlyList<ProbedElement> NotFound => [.. Elements.Where(element => !element.NodeFound)];
+
+    /// <summary>False if the registration lists its alerts in a variable (<c>alerts.list</c>) the server does not have.</summary>
+    public bool AlertListFound { get; init; } = true;
 }
 
 /// <summary>Tries a registration against its server without storing or publishing anything.</summary>
@@ -94,7 +97,28 @@ internal sealed class RegistrationProbe : IRegistrationProbe
                 machines = [];
             }
 
-            return new ProbeResult(thumbprint, namespaces, elements, machines);
+            var listFound = registration.Alerts?.List is not { } list
+                || await FoundAsync(session, list, cancellationToken).ConfigureAwait(false);
+            return new ProbeResult(thumbprint, namespaces, elements, machines) { AlertListFound = listFound };
+        }
+    }
+
+    /// <summary>Whether the server has a node: a read that answers is enough, whatever the value.</summary>
+    private static async Task<bool> FoundAsync(ManagedSession session, string text, CancellationToken cancellationToken)
+    {
+        if (!MachineConnection.TryResolve(session, text, out var node))
+        {
+            return false;
+        }
+
+        try
+        {
+            await session.ReadValueAsync(node, cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (ServiceResultException exception)
+        {
+            return exception.StatusCode != StatusCodes.BadNodeIdUnknown && exception.StatusCode != StatusCodes.BadNodeIdInvalid;
         }
     }
 
