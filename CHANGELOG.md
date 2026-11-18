@@ -460,6 +460,8 @@ All notable changes are documented here. The format follows
 
 ### Removed
 
+- arm64: the workflow "Images" builds every image for `linux/amd64` only, and the Margo app asks for an amd64
+  device. Some images the stack takes, such as the OPC UA simulator of umati, are built for amd64 only.
 - `NotificationEventDtoV1`, its collection, the endpoints `/notificationEvents` and the MCP tools
   `events_notification_*`.
 - The libraries `Pleiades.Playground.Events.Generators` and `Pleiades.Playground.Timeseries.Generators`.

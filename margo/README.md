@@ -22,7 +22,7 @@ margo/
 that bart accepts it, and one more, Traefik:
 
 - **No `build:`.** The services take the images that the workflow "Images" publishes to
-  `ghcr.io/united-machining-solutions`, for `linux/amd64` and `linux/arm64`. `bart build` does not fit here: it
+  `ghcr.io/united-machining-solutions`, for `linux/amd64` only. `bart build` does not fit here: it
   builds `src/<service>/Dockerfile` with that folder as the context, and every image of this repository needs
   `source/` or the root as its context.
 - **Literal image references.** bart mirrors each `image:` as it stands and does not interpolate it, so there is
