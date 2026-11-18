@@ -29,11 +29,15 @@ All notable changes are documented here. The format follows
   that live values work over HTTPS. HTTP stays as it is.
 - Example app: the setting `MQTT_WSS_PATH` sends a page over HTTPS to the broker at that path of the page's
   origin, for a proxy in front of the app that forwards it to the broker.
-- Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
-  shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
-  from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
-  entry in the sidebar. It is the first showcase: only a stack started with `APP_SHOWCASES` set has the
-  page.
+- Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion of how an order is
+  followed across the shop floor. It shows the machines of the stack from above, one machine with its job
+  orders done, running and waiting, and one order on its way: every job order that names the same order
+  number. The values are those of the stack; programming, packing and the single part on its sheet have no
+  source yet and stand on the page as such. The page reads the job orders from the new tool
+  `genui_job_order_list` of `genui-mcp`, the job orders on the lists of the machines from the Events API, so
+  they stand also after a reload or a reconnect; a job order the planner took back before it ran is left out.
+  It is the first showcase: only a stack started with `APP_SHOWCASES` set has the page and its entry in the
+  sidebar.
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
