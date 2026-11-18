@@ -14,6 +14,14 @@ All notable changes are documented here. The format follows
   the model or the extension, and is a tool of `genui-mcp` of its own (`genui_trulaser_status`,
   `genui_trulaser_joborder`, `genui_trulaser_devices`, `genui_trulaser_technology`,
   `genui_trulaser_collision`, `genui_trulaser_conditions`), which the chat shows as a card.
+- OPC UA adapter: a server without a node for `Identification.ManufacturerUri` is added if it gives
+  `Identification.Manufacturer`: that name without any character but `A-Z`, `a-z` and `0-9` stands in for the
+  `ManufacturerUri` and forms the machine id (`TRUMPF SE + Co. KG` gives `trumpfsecokg_<model>_<serial number>`).
+  A mapped `ManufacturerUri` without a value yet is still waited for. The MQTT contract describes the rule
+  ([Without a ManufacturerUri](contracts/mqtt/README.md#without-a-manufactureruri)). The proposal in the chat says
+  so under "Good to know" (`notices`, with the `machineId`), and the registration keeps it as
+  `identity.manufacturerUriFromManufacturer`. A `Manufacturer` without any letter or digit `A-Z`, `0-9` is refused
+  with that reason.
 - Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
   `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
   shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0020).
