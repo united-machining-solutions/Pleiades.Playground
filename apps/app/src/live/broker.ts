@@ -1,6 +1,7 @@
 import mqtt from "mqtt"
 import type { MqttClient } from "mqtt"
 
+import { randomId } from "../random-id.ts"
 import { getBrokerAddress } from "./broker-address.ts"
 import { matches } from "./messages.ts"
 
@@ -57,7 +58,7 @@ async function connect() {
   const connection = mqtt.connect(address, {
     protocolVersion: 5,
     clean: true,
-    clientId: `pleiades-app-${crypto.randomUUID().slice(0, 8)}`,
+    clientId: `pleiades-app-${randomId().slice(0, 8)}`,
     reconnectPeriod: RECONNECT_MS,
     connectTimeout: 10_000,
     // This module asks for the filters again after every connect, so the client does not.

@@ -1,5 +1,7 @@
 import { useNavigate } from "@tanstack/react-router"
 
+import { randomId } from "../random-id.ts"
+
 // The chat is the panel on the right. Whether it is open, and with which chat, is in the URL:
 // no `chat` is closed, `chat=new` is the start of the panel, anything else is the thread of a chat.
 
@@ -84,7 +86,7 @@ export function useChatPanel() {
     },
     /** A new chat that begins with this question. */
     ask: (question: string) => {
-      const threadId = crypto.randomUUID()
+      const threadId = randomId()
       firstQuestions.set(threadId, question)
       show(threadId)
     },
