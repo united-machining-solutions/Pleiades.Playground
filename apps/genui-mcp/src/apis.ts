@@ -424,3 +424,13 @@ export async function readStatistics(apis: Apis, topic: string, from: Date, to: 
   }
   return new Map(Object.entries(checked.data))
 }
+
+/** The topics that had a value between two instants, by what their values are. */
+export type TopicKinds = { numbers: Array<string>; texts: Array<string>; yesNo: Array<string> }
+
+/** Every topic that had a value between the two instants, the numbers, texts and yes or no apart. */
+export async function listTopicKinds(apis: Apis, from: Date, to: Date): Promise<TopicKinds> {
+  const url = between(new URL("/topics", apis.timeseriesUrl), ["startTime", "stopTime"], from, to)
+  const answer = await getJson("Timeseries API", url, topicsAnswer)
+  return { numbers: answer.baseUnitTopics, texts: answer.stringTopics, yesNo: answer.booleanTopics }
+}

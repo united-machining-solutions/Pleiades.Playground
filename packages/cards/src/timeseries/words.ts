@@ -1,0 +1,38 @@
+import { QUANTITIES, QUANTITY_PATHS } from "../measurement/contract.ts"
+import { quantityLabel } from "../measurement/words.ts"
+import type { TimeseriesRange } from "./contract.ts"
+
+// The words of the time series card. A value keeps the unit it was published in; the card writes it as
+// the measurement card does (measurement/words.ts), so the two cards never say a value two ways.
+
+/** "the last 15 minutes", "the last hour". */
+export const rangeWords: Record<TimeseriesRange, string> = {
+  "15m": "the last 15 minutes",
+  "1h": "the last hour",
+  "8h": "the last 8 hours",
+  "24h": "the last 24 hours",
+}
+
+/** What each range is called on its toggle. */
+export const rangeLabel: Record<TimeseriesRange, string> = { "15m": "15 min", "1h": "1 h", "8h": "8 h", "24h": "24 h" }
+
+/** BearingTemperature to Bearing temperature, AcActivePowerTotal to Ac active power total. */
+function spaced(level: string): string {
+  const words = level.replace(/([a-z0-9])([A-Z])/g, "$1 $2").split(" ")
+  return words.map((word, index) => (index === 0 ? word : word.toLowerCase())).join(" ")
+}
+
+/**
+ * What a signal is called, from its path below the machine: a quantity of the measurement card by
+ * its name there, any other by its levels without the namespace, the last one set apart.
+ * umati/Spindle/1/Override is "Spindle 1 · Override", oem/Spindle/1/BearingTemperature is "Spindle bearing
+ * temperature", as on the measurement card.
+ */
+export function signalLabel(path: string): string {
+  const quantity = QUANTITIES.find((one) => QUANTITY_PATHS[one] === path)
+  if (quantity !== undefined) return quantityLabel[quantity]
+  const levels = path.split("/").slice(1)
+  const last = levels.pop()
+  if (last === undefined) return path
+  return levels.length === 0 ? spaced(last) : `${levels.map(spaced).join(" ")} · ${spaced(last)}`
+}
