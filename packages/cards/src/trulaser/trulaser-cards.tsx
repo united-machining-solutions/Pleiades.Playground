@@ -67,11 +67,16 @@ function Heading({
   )
 }
 
+/** A time of a value as a clock shows it; a dash for one that is empty or no time. */
+function clockOf(instant: string | null | undefined): string {
+  return instant && !Number.isNaN(Date.parse(instant)) ? clock(instant) : "–"
+}
+
 /** Where a card's values come from, and as of when. */
 function Source({ asOf, children }: { asOf: string; children: ReactNode }) {
   return (
     <CardFooter className="block text-xs break-words text-muted-foreground">
-      Read at {clock(asOf)} from {children}
+      Read at {clockOf(asOf)} from {children}
     </CardFooter>
   )
 }
@@ -129,7 +134,7 @@ function AlertRow({ alert }: { alert: Alert }) {
       <TableCell className={`font-mono text-xs ${failure ? "font-semibold text-destructive" : ""}`}>{alert.SourceName || "–"}</TableCell>
       <TableCell className="font-mono text-xs">{alert.ErrorCode}</TableCell>
       <TableCell className="text-xs whitespace-normal">{alert.Message}</TableCell>
-      <TableCell className="text-xs tabular-nums">{clock(alert.Time)}</TableCell>
+      <TableCell className="text-xs tabular-nums">{clockOf(alert.Time)}</TableCell>
     </TableRow>
   )
 }
@@ -145,7 +150,7 @@ export function StatusCard({ status }: { status: TrulaserStatus }) {
     <Card size="sm" className={failures.length > 0 ? "ring-2 ring-destructive" : undefined}>
       <Heading
         origin="umati"
-        action={signals.itemState.at && <span className="text-xs text-muted-foreground">since {clock(signals.itemState.at)}</span>}
+        action={signals.itemState.at && <span className="text-xs text-muted-foreground">since {clockOf(signals.itemState.at)}</span>}
       >
         State.Status
       </Heading>
@@ -277,7 +282,7 @@ export function JobOrderCard({ jobOrder, readTimeline }: { jobOrder: TrulaserJob
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <StateBadge value={job.State} />
-                {job.StateSince && <span className="text-xs text-muted-foreground">since {clock(job.StateSince)}</span>}
+                {job.StateSince && <span className="text-xs text-muted-foreground">since {clockOf(job.StateSince)}</span>}
               </div>
               <Rows
                 rows={[
@@ -304,7 +309,7 @@ export function JobOrderCard({ jobOrder, readTimeline }: { jobOrder: TrulaserJob
               [
                 "StartTime",
                 <span className="tabular-nums">
-                  {typeof signals.executionStartTime.value === "string" ? clock(signals.executionStartTime.value) : "–"}
+                  {typeof signals.executionStartTime.value === "string" ? clockOf(signals.executionStartTime.value) : "–"}
                 </span>,
               ],
               ["JobOrderID", mono(signalText(signals.executionJobOrderId))],

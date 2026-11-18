@@ -72,7 +72,7 @@ export function trulaserJobOrderInWords(jobOrder: TrulaserJobOrder): string {
   const job = jobOrder.jobOrder
   return [
     job
-      ? `${trulaserTitle(jobOrder)}: JobOrder ${job.JobOrderID} ${job.State}${job.StateSince ? ` since ${written(job.StateSince)}` : ""}, ${job.RunsCompleted ?? 0} runs completed.`
+      ? `${trulaserTitle(jobOrder)}: JobOrder ${job.JobOrderID} ${job.State}${job.StateSince ? ` since ${written(job.StateSince)}` : ""}, ${job.RunsCompleted === null ? "no runs reported yet" : `${job.RunsCompleted} runs completed`}.`
       : `${trulaserTitle(jobOrder)}: no JobOrder.`,
     `ProgramExecution ${signalText(signals.executionId)}: ActiveWorkMaster ${signalText(signals.activeWorkMaster)}, State ${signalText(signals.executionState)}, JobOrderID ${signalText(signals.executionJobOrderId)}.`,
     read(jobOrder),

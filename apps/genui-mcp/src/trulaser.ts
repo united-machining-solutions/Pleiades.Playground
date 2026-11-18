@@ -38,7 +38,16 @@ import type {
   TrulaserTimeline,
 } from "@pleiades/cards/trulaser/contract.ts"
 
-import { EVER, listTopics, readAlertSpans, readJobOrderEntries, readNewest, readStrings, readTimelines } from "./apis.ts"
+import {
+  EVER,
+  listTopics,
+  readAlertSpans,
+  readJobOrderEntries,
+  readJobOrderStateSince,
+  readNewest,
+  readStrings,
+  readTimelines,
+} from "./apis.ts"
 import type { AlertSpan, Apis, JobOrderEntry, Sample } from "./apis.ts"
 import { HORIZON_SECONDS, machineOf } from "./machines.ts"
 import { secondsBefore } from "./time.ts"
@@ -49,13 +58,34 @@ import { secondsBefore } from "./time.ts"
 // does not know comes from the extension of TRUMPF below oem/Dalle/. Nothing is converted: a display
 // writes the units.
 
-/** The topic every machine with the extension of the edge component publishes: by it a TruLaser is found. */
+/** The topic every machine with the extension of the edge component has published once: by it a TruLaser is found. */
 const MARK = "oem/Dalle/MachineState/ItemState"
 
-/** The machines that published the signals of an edge component in the last 24 hours, sorted. */
+/** The sign of life of a machine: its adapter publishes it every few seconds, whatever the machine does. */
+const HEARTBEAT = "umati/Connection/Heartbeat"
+
+/**
+ * The machines that gave a sign of life in the last 24 hours and ever published the signals of an edge
+ * component, sorted. The mark is published only when the state changes: a machine that stood in one state
+ * all weekend has no value of it in the last 24 hours, but its heartbeat.
+ */
 export async function listTrulasers(apis: Apis, now = new Date()): Promise<Array<string>> {
   const topics = await listTopics(apis, secondsBefore(now, HORIZON_SECONDS), now)
-  return [...new Set(topics.filter((topic) => topic.endsWith(`/${MARK}`)).flatMap((topic) => machineOf(topic) ?? []))].sort()
+  const alive = [
+    ...new Set(
+      topics
+        .filter((topic) => topic.endsWith(`/${HEARTBEAT}`) || topic.endsWith(`/${MARK}`))
+        .flatMap((topic) => machineOf(topic) ?? []),
+    ),
+  ]
+  const marked = await Promise.all(
+    alive.map(async (machine) => {
+      const topic = `machines/${machine}/${MARK}`
+      const [series] = (await readStrings(apis, topic, EVER, now, 1)).filter((one) => one.topic === topic)
+      return (series?.samples.length ?? 0) > 0 ? machine : null
+    }),
+  )
+  return marked.flatMap((one) => one ?? []).sort()
 }
 
 /** The machine that was asked for, or the first TruLaser if none was. Refused with a sentence if there is none. */
@@ -114,6 +144,11 @@ async function adapterStarts(apis: Apis, machine: string, from: Date, to: Date):
   return (series?.samples ?? []).filter((one) => one.value === "Initializing").map((one) => Date.parse(one.at))
 }
 
+/** The oldest raise of the alerts, or `from` if none is older: from there on the starts of the adapter count. */
+export function oldestRaise(alerts: ReadonlyArray<Pick<AlertSpan, "raisedAt">>, from: Date): Date {
+  return new Date(Math.min(from.getTime(), ...alerts.map((one) => Date.parse(one.raisedAt))))
+}
+
 /** Until when an alert stood: its clear, else the next start of the adapter after its raise, else `to`. */
 export function alertEnd(alert: Pick<AlertSpan, "raisedAt" | "clearedAt">, starts: ReadonlyArray<number>, to: number): number {
   if (alert.clearedAt !== null) return Date.parse(alert.clearedAt)
@@ -146,11 +181,12 @@ export function activeAlertsOf(alerts: ReadonlyArray<AlertSpan>, starts: Readonl
 export async function showStatus(apis: Apis, asked?: string, now = new Date()): Promise<TrulaserStatus> {
   const about = await aboutOf(apis, asked, now)
   const dayBefore = secondsBefore(now, HORIZON_SECONDS)
-  const [signals, alerts, starts] = await Promise.all([
+  const [signals, alerts] = await Promise.all([
     readSignals(apis, about.machine, CARD_SIGNALS.status, now),
     readAlertSpans(apis, about.machine, dayBefore, now),
-    adapterStarts(apis, about.machine, dayBefore, now),
   ])
+  // An alert that still stands may have been raised days ago: the starts after it decide whether it does.
+  const starts = await adapterStarts(apis, about.machine, oldestRaise(alerts, dayBefore), now)
   const cause = signals.changeCauseValue.value
   return {
     ...about,
@@ -160,12 +196,12 @@ export async function showStatus(apis: Apis, asked?: string, now = new Date()): 
   }
 }
 
-/** A job order of the Events API as the contract names its fields. */
-function jobOrderOf(entry: JobOrderEntry): JobOrder {
+/** A job order of the Events API as the contract names its fields, with since when it is in its state. */
+function jobOrderOf(entry: JobOrderEntry, stateSince: string | null): JobOrder {
   return {
     JobOrderID: entry.jobOrderId,
     State: entry.state,
-    StateSince: entry.lastChange,
+    StateSince: stateSince,
     JobName: entry.jobName,
     WorkMasterID: entry.workMasterId,
     StartTime: entry.startTime,
@@ -175,9 +211,24 @@ function jobOrderOf(entry: JobOrderEntry): JobOrder {
   }
 }
 
-/** The job order that runs or is interrupted, else the newest one. */
-export function currentJobOrder(entries: ReadonlyArray<JobOrderEntry>): JobOrderEntry | null {
-  return entries.find((one) => one.state === "Running" || one.state === "Interrupted") ?? entries[0] ?? null
+/** Whether a job order is still open: running or interrupted. */
+const open = (entry: JobOrderEntry) => entry.state === "Running" || entry.state === "Interrupted"
+
+/**
+ * Until when a job order ran: its end, else the next start of the adapter after its last change, else `to`.
+ * An adapter that starts again begins with an empty list of job orders: one it left open never ends.
+ */
+export function jobOrderEnd(entry: JobOrderEntry, starts: ReadonlyArray<number>, to: number): number {
+  if (entry.endTime !== null) return Date.parse(entry.endTime)
+  const since = Date.parse(entry.lastChange)
+  return starts.find((start) => start > since) ?? to
+}
+
+/** The job order that runs or is interrupted since the adapter started, else the newest one that ended. */
+export function currentJobOrder(entries: ReadonlyArray<JobOrderEntry>, starts: ReadonlyArray<number>): JobOrderEntry | null {
+  return (
+    entries.find((one) => open(one) && jobOrderEnd(one, starts, Infinity) === Infinity) ?? entries.find((one) => !open(one)) ?? null
+  )
 }
 
 /** JobMonitoring.JobOrders and WorkMasterMonitoring.ProgramExecution now. */
@@ -187,28 +238,29 @@ export async function showJobOrder(apis: Apis, asked?: string, now = new Date())
     readSignals(apis, about.machine, CARD_SIGNALS.jobOrder, now),
     readJobOrderEntries(apis, about.machine),
   ])
-  const current = currentJobOrder(jobs)
-  return { ...about, jobOrder: current && jobOrderOf(current), signals }
+  // A job order left open by an earlier run of the adapter: the starts after its last change say so.
+  const oldest = new Date(Math.min(now.getTime(), ...jobs.filter(open).map((one) => Date.parse(one.lastChange))))
+  const starts = await adapterStarts(apis, about.machine, oldest, now)
+  const current = currentJobOrder(jobs, starts)
+  const stateSince = current && (await readJobOrderStateSince(apis, about.machine, current.jobOrderId))
+  return { ...about, jobOrder: current && jobOrderOf(current, stateSince), signals }
 }
 
-/** The automation devices of a machine, by the topics of their type, in the order of their index. */
+/** How many automation devices the edge component lists, always: HandlingLoad, HandlingUnload, Sorting, Separating, Palletizing. */
+const DEVICES = 5
+
+/** The automation devices of a machine in the order of their index, those it published a type for. */
 async function readDevices(apis: Apis, machine: string, now: Date): Promise<Array<Device>> {
   const base = `machines/${machine}/${DEVICES_PATH}`
-  const types = await readStrings(apis, `${base}/*/Type`, EVER, now)
-  const indices = types
-    .flatMap((one) => {
-      const index = Number(one.topic.slice(base.length + 1).split("/")[0])
-      return Number.isInteger(index) ? [index] : []
-    })
-    .sort((a, b) => a - b)
-  return Promise.all(
-    indices.map(async (index) => {
+  const devices = await Promise.all(
+    Array.from({ length: DEVICES }, async (_, index) => {
       const [type, state, errorCode] = await Promise.all(
         ["Type", "State", "ErrorCode"].map((field) => readSignal(apis, `${base}/${index}/${field}`, "text", now)),
       )
-      return { index, type: type!, state: state!, errorCode: errorCode! }
+      return type!.value === null ? null : { index, type: type!, state: state!, errorCode: errorCode! }
     }),
   )
+  return devices.flatMap((one) => one ?? [])
 }
 
 /** AutomationDeviceRequestStates of the extension now. */
@@ -375,6 +427,7 @@ export function alertLanes(
               { name: "ErrorCode", value: one.errorCode || null },
               { name: "Message", value: one.message || null },
               { name: "SourceName", value: one.sourceName || null },
+              { name: "AlertId", value: one.alertId },
             ],
           },
         ]
@@ -396,18 +449,24 @@ export function alertLanes(
 }
 
 /** The job orders of the window as spans from their start to their end, each called by its id. */
-export function jobOrderLane(entries: ReadonlyArray<JobOrderEntry>, from: number, to: number, topic: string): Lane {
+export function jobOrderLane(
+  entries: ReadonlyArray<JobOrderEntry>,
+  starts: ReadonlyArray<number>,
+  from: number,
+  to: number,
+  topic: string,
+): Lane {
   const spans = entries
     .flatMap((one) => {
       if (one.startTime === null) return []
       const begin = Math.max(from, Date.parse(one.startTime))
-      const end = Math.min(to, one.endTime === null ? to : Date.parse(one.endTime))
+      const end = Math.min(to, jobOrderEnd(one, starts, to))
       if (end <= begin) return []
       return [
         {
           from: new Date(begin).toISOString(),
           to: new Date(end).toISOString(),
-          value: one.endTime === null ? one.state : "Running",
+          value: one.endTime === null && jobOrderEnd(one, starts, Infinity) === Infinity ? one.state : "Running",
           label: one.jobOrderId,
           details: [
             { name: "JobOrderID", value: one.jobOrderId },
@@ -477,12 +536,14 @@ export async function listTimeline(
   const [fromText, toText] = [from.toISOString(), now.toISOString()]
   const [start, end] = [from.getTime(), now.getTime()]
   const topic = (path: string) => `machines/${machine}/${path}`
-  const [sources, alerts, starts, jobs] = await Promise.all([
+  const [sources, alerts, jobs] = await Promise.all([
     sourcesOf(apis, machine, view, now),
     readAlertSpans(apis, machine, from, now),
-    adapterStarts(apis, machine, secondsBefore(from, HORIZON_SECONDS), now),
     view === "jobOrder" ? readJobOrderEntries(apis, machine) : Promise.resolve([]),
   ])
+  // The starts of the adapter back to the oldest alert or job order that may still stand.
+  const oldestJob = Math.min(from.getTime(), ...jobs.flatMap((one) => (one.startTime ? [Date.parse(one.startTime)] : [])))
+  const starts = await adapterStarts(apis, machine, new Date(Math.min(oldestRaise(alerts, from).getTime(), oldestJob)), now)
   const stored = await Promise.all(
     sources.map(async (source): Promise<Lane> => {
       const [samples, details] = await Promise.all([
@@ -507,7 +568,7 @@ export async function listTimeline(
     view === "status"
       ? [...stored, ...alertLanes(alerts, starts, start, end, topic("events/notifications"))]
       : view === "jobOrder"
-        ? [jobOrderLane(jobs, start, end, topic("events/jobs")), ...stored]
+        ? [jobOrderLane(jobs, starts, start, end, topic("events/jobs")), ...stored]
         : stored
   const failures = alerts
     .filter((one) => one.severity === "Failure")
@@ -518,6 +579,9 @@ export async function listTimeline(
     })
   return { machine, view, from: fromText, to: toText, lanes, failures }
 }
+
+/** How many points the chart of a tile has room for: the Timeseries API thins a longer series to that many. */
+const SERIES_POINTS = 600
 
 /** The values of one tile of the condition guide over the last hours, for its chart. */
 export async function listSeries(
@@ -533,7 +597,7 @@ export async function listSeries(
   const from = secondsBefore(now, hours * 3600)
   const [before, [during]] = await Promise.all([
     readNewest(apis, "baseUnitValues", topic, from),
-    readTimelines(apis, "baseUnitValues", topic, from, now),
+    readTimelines(apis, "baseUnitValues", topic, from, now, SERIES_POINTS),
   ])
   const points = [
     ...(before && typeof before.value === "number" ? [{ at: from.toISOString(), value: before.value }] : []),

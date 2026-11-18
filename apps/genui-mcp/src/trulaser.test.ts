@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { AlertSpan, JobOrderEntry } from "./apis.ts"
-import { activeAlertsOf, alertEnd, alertLanes, currentJobOrder, jobOrderLane, laneSpans, thinnedLane } from "./trulaser.ts"
+import { activeAlertsOf, alertEnd, alertLanes, currentJobOrder, jobOrderLane, laneSpans, oldestRaise, thinnedLane } from "./trulaser.ts"
 
 const at = (clock: string) => `2026-11-18T${clock}.000Z`
 const ms = (clock: string) => Date.parse(at(clock))
@@ -77,6 +77,14 @@ test("the active alerts are those that stand since the adapter started, a Failur
   )
 })
 
+test("the starts of the adapter are read back to the oldest alert that may still stand", () => {
+  // Raised 40 hours before, never cleared: the starts since then decide whether it stands.
+  const old = alert("09:00:00", null, "OffSpec", "Machine")
+  const from = new Date(ms("09:00:00") + 40 * 3_600_000)
+  assert.equal(oldestRaise([old], from).toISOString(), at("09:00:00"))
+  assert.equal(oldestRaise([], from).getTime(), from.getTime())
+})
+
 test("the alerts make one lane for each category, in the order of NE 107", () => {
   const lanes = alertLanes(
     [alert("09:10:00", "09:12:00", "OffSpec", "Machine"), alert("09:20:00", "09:21:30", "Failure", "PalletChange")],
@@ -92,6 +100,8 @@ test("the alerts make one lane for each category, in the order of NE 107", () =>
       ["alertsOffSpec", null, [["Machine", at("09:10:00"), at("09:12:00")]]],
     ],
   )
+  // Each span carries the id of its alert, so a clear that comes live closes it.
+  assert.ok(lanes[0]?.spans[0]?.details.some((one) => one.name === "AlertId" && one.value === "PalletChange-09:20:00"))
 })
 
 const job = (id: string, state: string, start: string | null, end: string | null): JobOrderEntry => ({
@@ -106,14 +116,22 @@ const job = (id: string, state: string, start: string | null, end: string | null
   jobResult: end ? "Successful" : "Unknown",
 })
 
-test("the job order of the card is the one that runs, else the newest", () => {
-  assert.equal(currentJobOrder([job("b", "Ended", "09:30:00", "09:40:00"), job("a", "Running", "09:00:00", null)])?.jobOrderId, "a")
-  assert.equal(currentJobOrder([job("b", "Ended", "09:30:00", "09:40:00")])?.jobOrderId, "b")
-  assert.equal(currentJobOrder([]), null)
+test("the job order of the card is the one that runs, else the newest that ended", () => {
+  assert.equal(currentJobOrder([job("b", "Ended", "09:30:00", "09:40:00"), job("a", "Running", "09:00:00", null)], [])?.jobOrderId, "a")
+  assert.equal(currentJobOrder([job("b", "Ended", "09:30:00", "09:40:00")], [])?.jobOrderId, "b")
+  assert.equal(currentJobOrder([], []), null)
+})
+
+test("a job order left open by an earlier run of the adapter is over", () => {
+  // The adapter started again at 09:30; job order a never got its end.
+  const entries = [job("a", "Running", "09:00:00", null), job("z", "Ended", "08:00:00", "08:30:00")]
+  assert.equal(currentJobOrder(entries, [ms("09:30:00")])?.jobOrderId, "z")
+  const lane = jobOrderLane(entries, [ms("09:30:00")], ms("09:00:00"), ms("10:00:00"), "events")
+  assert.deepEqual(lane.spans.map((one) => [one.label, one.value, one.to]), [["a", "Running", at("09:30:00")]])
 })
 
 test("the job orders become spans from their start to their end, each called by its id", () => {
-  const lane = jobOrderLane([job("a", "Ended", "08:50:00", "09:20:00"), job("b", "Running", "09:21:00", null)], ms("09:00:00"), ms("10:00:00"), "events")
+  const lane = jobOrderLane([job("a", "Ended", "08:50:00", "09:20:00"), job("b", "Running", "09:21:00", null)], [], ms("09:00:00"), ms("10:00:00"), "events")
   assert.deepEqual(
     lane.spans.map((one) => [one.label, one.value, one.from, one.to]),
     [

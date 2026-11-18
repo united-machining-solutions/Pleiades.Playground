@@ -266,12 +266,14 @@ export const getTrulaserCockpit = createServerFn({ method: "GET" })
         }
         // The status first: it finds the machine, and says so if there is none.
         const status = need("genui_trulaser_status", await backend.callTool("genui_trulaser_status", input))
+        // The others ask for the machine the status found: all six cards are of one machine.
+        const one = { machine: status.machine }
         const [jobOrder, devices, technology, collision, conditions] = await Promise.all([
-          backend.callTool("genui_trulaser_joborder", input).then((result) => need("genui_trulaser_joborder", result)),
-          backend.callTool("genui_trulaser_devices", input).then((result) => need("genui_trulaser_devices", result)),
-          backend.callTool("genui_trulaser_technology", input).then((result) => need("genui_trulaser_technology", result)),
-          backend.callTool("genui_trulaser_collision", input).then((result) => need("genui_trulaser_collision", result)),
-          backend.callTool("genui_trulaser_conditions", input).then((result) => need("genui_trulaser_conditions", result)),
+          backend.callTool("genui_trulaser_joborder", one).then((result) => need("genui_trulaser_joborder", result)),
+          backend.callTool("genui_trulaser_devices", one).then((result) => need("genui_trulaser_devices", result)),
+          backend.callTool("genui_trulaser_technology", one).then((result) => need("genui_trulaser_technology", result)),
+          backend.callTool("genui_trulaser_collision", one).then((result) => need("genui_trulaser_collision", result)),
+          backend.callTool("genui_trulaser_conditions", one).then((result) => need("genui_trulaser_conditions", result)),
         ])
         return { status, jobOrder, devices, technology, collision, conditions }
       }),

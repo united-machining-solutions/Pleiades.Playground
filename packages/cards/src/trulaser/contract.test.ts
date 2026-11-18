@@ -50,6 +50,10 @@ test("a SignalValue of another shape stands as it is", () => {
   assert.equal(signalValueFields("{}"), null)
   assert.equal(enumText("state", "PRODUCTION_PLAN_STATE_RUNNING"), "Running")
   assert.equal(enumText("deviceDescription", "LiftMaster"), "LiftMaster")
+  // Only an enumeration: ids in capitals stay as they are, so they can be searched for.
+  assert.equal(enumText("programName", "PLL_SHEET_0001"), "PLL_SHEET_0001")
+  assert.equal(enumText("serial", "L1649A"), "L1649A")
+  assert.equal(enumText("state", "RUNNING"), "RUNNING")
 })
 
 const flag = (level: Flag["level"], value: boolean | null): Flag => ({

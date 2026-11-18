@@ -1,4 +1,4 @@
-import { ALERT_SEVERITIES, TRULASER_PREFIX, alertLaneKey, alertSeverity, sequenceOf, statusOf } from "@pleiades/cards/trulaser/contract.ts"
+import { ALERT_SEVERITIES, CONNECTION_PATH, TRULASER_PREFIX, alertLaneKey, alertSeverity, sequenceOf, statusOf } from "@pleiades/cards/trulaser/contract.ts"
 import type { Alert, Cockpit, JobOrder, Lane, LaneSpan, Signal, TrulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
 
 import { AHEAD_MS, valuesOf } from "./messages.ts"
@@ -6,18 +6,20 @@ import type { Value } from "./messages.ts"
 
 // The TruLaser cockpit, live: its cards and the history of the status as they were read, and from then
 // on every value and event the machine publishes, the moment the broker carries it: State.Status and the
-// ProgramExecution of the data model, its alerts and job orders as CloudEvents, and the signals of the
-// extension below oem/Dalle/. The values are read as the backend reads them.
+// ProgramExecution of the data model, its alerts and job orders as CloudEvents, the state of its adapter,
+// and the signals of the extension below oem/Dalle/. The values are read as the backend reads them. The
+// cards and the timelines are kept apart, so a page reads the timelines again for other hours alone.
 
-/** What the page shows: every card, and the history of the status if it could be read. */
-export type TrulaserLive = { cockpit: Cockpit; timeline: TrulaserTimeline | null }
+/** The history of the status, and the newest value of every topic a span takes its details from. */
+export type TimelineLive = { timeline: TrulaserTimeline; recent: Readonly<Record<string, string>> }
 
-/** The topic filters of everything the cards show of one machine. */
+/** The topic filters of everything the cards and the timelines show of one machine. */
 export function trulaserFilters(machine: string): Array<string> {
   return [
     `machines/${machine}/${TRULASER_PREFIX}/#`,
     `machines/${machine}/umati/State/Status`,
     `machines/${machine}/umati/WorkMasterMonitoring/ProgramExecution`,
+    `machines/${machine}/${CONNECTION_PATH}`,
     `machines/${machine}/events/notifications`,
     `machines/${machine}/events/jobs`,
   ]
@@ -86,8 +88,15 @@ export function eventOf(payload: string, now: number): { type: string; at: strin
 
 const text = (value: unknown) => (typeof value === "string" ? value : null)
 
-/** The entry of an alert in an alert event, as Notification.ActiveAlerts lists it. */
-function alertOfData(data: Record<string, unknown>, at: string): Alert | null {
+/**
+ * The events that change Notification.ActiveAlerts: an alert is raised, changes or is cleared. A
+ * Notification.NotificationEvent is a message that does not stay and is never cleared: it is no alert.
+ */
+const ALERT_EVENTS = new Set(["Notification.AlertRaised", "Notification.AlertChanged", "Notification.AlertCleared"])
+
+/** The entry of an alert in an alert event, as Notification.ActiveAlerts lists it. Null for any other event. */
+export function alertOfEvent(type: string, data: Record<string, unknown>, at: string): Alert | null {
+  if (!ALERT_EVENTS.has(type)) return null
   const id = text(data.Id)
   if (id === null || id === "") return null
   const severity = alertSeverity.safeParse(data.Severity)
@@ -115,13 +124,18 @@ export function alertsWith(alerts: ReadonlyArray<Alert>, type: string, alert: Al
   return standing.sort((a, b) => rank(a.Severity) - rank(b.Severity) || b.Time.localeCompare(a.Time))
 }
 
+/** A time of an event as the backend writes it, or null where the event has none that is a time. */
+function instantOrNull(value: unknown): string | null {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value)) ? new Date(value).toISOString() : null
+}
+
 /** The job order of the card after an event of a job order: the one it shows, or a new one that starts. */
 export function jobOrderWith(current: JobOrder | null, type: string, data: Record<string, unknown>, at: string): JobOrder | null {
   const id = text(data.JobOrderID)
   const state = text(data.State)
   if (id === null || state === null || type === "JobMonitoring.JobOrderResultChanged") {
     if (current && id === current.JobOrderID && typeof data.RunsCompleted === "number") {
-      return { ...current, RunsCompleted: data.RunsCompleted, JobResult: text(data.JobResult) ?? current.JobResult, EndTime: text(data.EndTime) }
+      return { ...current, RunsCompleted: data.RunsCompleted, JobResult: text(data.JobResult) ?? current.JobResult, EndTime: instantOrNull(data.EndTime) }
     }
     return current
   }
@@ -131,7 +145,7 @@ export function jobOrderWith(current: JobOrder | null, type: string, data: Recor
   return {
     JobOrderID: id,
     State: state,
-    StateSince: text(data.StateSince) ?? at,
+    StateSince: instantOrNull(data.StateSince) ?? at,
     JobName: text(data.JobName),
     WorkMasterID: text(data.WorkMasterID),
     StartTime: same ? current.StartTime : type === "JobMonitoring.JobOrderStarted" ? at : null,
@@ -141,16 +155,64 @@ export function jobOrderWith(current: JobOrder | null, type: string, data: Recor
   }
 }
 
-/** How long after the start of a span a detail may come and still count as the one it began with. */
+/** Whether a value says that the adapter starts again: it begins a new list of alerts and of job orders. */
+function startsAgain(topic: string, value: Value): boolean {
+  return topic.endsWith(`/${CONNECTION_PATH}`) && value.value === "Initializing"
+}
+
+/**
+ * The cards after a start of the adapter, as the backend reads them after it: no alert of the run before
+ * stands, and a job order it left open is over.
+ */
+function cockpitRestarted(cockpit: Cockpit): Cockpit {
+  const job = cockpit.jobOrder.jobOrder
+  const open = job !== null && (job.State === "Running" || job.State === "Interrupted")
+  return {
+    ...cockpit,
+    status: { ...cockpit.status, activeAlerts: [] },
+    jobOrder: { ...cockpit.jobOrder, jobOrder: open ? null : job },
+  }
+}
+
+/** What a message of the broker does to the cards. */
+export function cockpitMessage(cockpit: Cockpit, topic: string, payload: string, now: number): Cockpit {
+  if (topic.endsWith("/events/notifications")) {
+    const event = eventOf(payload, now)
+    const alert = event && alertOfEvent(event.type, event.data, event.at)
+    if (!event || !alert) return cockpit
+    return { ...cockpit, status: { ...cockpit.status, activeAlerts: alertsWith(cockpit.status.activeAlerts, event.type, alert) } }
+  }
+  if (topic.endsWith("/events/jobs")) {
+    const event = eventOf(payload, now)
+    if (!event) return cockpit
+    return { ...cockpit, jobOrder: { ...cockpit.jobOrder, jobOrder: jobOrderWith(cockpit.jobOrder.jobOrder, event.type, event.data, event.at) } }
+  }
+  return valuesOf(topic, payload, now).reduce(
+    (cards, one) => (startsAgain(one.topic, one.value) ? cockpitRestarted(cards) : cockpitWith(cards, one.topic, one.value)),
+    cockpit,
+  )
+}
+
+/** What the passing of time does to the cards: they are as of now. */
+export function cockpitAt(cockpit: Cockpit, now: string): Cockpit {
+  return Object.fromEntries(Object.entries(cockpit).map(([name, card]) => [name, { ...card, asOf: now }])) as Cockpit
+}
+
+/** How long before or after the start of a span a detail may come and still count as the one it began with. */
 const DETAIL_SLACK_MS = 1000
 
-/** A lane of stored values with one value of the broker added, if it is about the lane or one of its details. */
-function laneWith(lane: Lane, topic: string, value: Value, to: string): Lane {
+/**
+ * A lane of stored values with one value of the broker added. A detail belongs to the span it came with:
+ * one that comes within a moment of the start of the last span is that span's; a later one changes no span,
+ * as the backend reads the details that held when a span began. A new value of the lane starts a span with
+ * the details that hold then.
+ */
+function laneWith(lane: Lane, topic: string, value: Value, to: string, recent: Readonly<Record<string, string>>): Lane {
   if (lane.overlaps) return lane
   const last = lane.spans.at(-1)
   const detail = lane.details.find((one) => one.topic === topic)
-  if (detail && last && Date.parse(value.at) >= Date.parse(last.from) - DETAIL_SLACK_MS) {
-    // A detail that comes with the span, or later while the span lasts: the span says the newest.
+  if (detail) {
+    if (!last || Math.abs(Date.parse(value.at) - Date.parse(last.from)) > DETAIL_SLACK_MS) return lane
     const details = last.details.map((one) => (one.name === detail.name ? { ...one, value: String(value.value) } : one))
     const label = lane.labelFrom === null ? last.label : (details.find((one) => one.name === lane.labelFrom)?.value ?? null)
     return { ...lane, spans: [...lane.spans.slice(0, -1), { ...last, details, label }] }
@@ -159,13 +221,13 @@ function laneWith(lane: Lane, topic: string, value: Value, to: string): Lane {
   if (last && value.at < last.from) return lane
   const shown = value.value === "" ? null : String(value.value)
   if (last?.value === shown) return lane
-  const span = { from: value.at, to: value.at > to ? value.at : to, value: shown, label: last?.label ?? null, details: last?.details ?? [] }
+  const details = lane.details.map((one) => ({
+    name: one.name,
+    value: recent[one.topic] ?? last?.details.find((each) => each.name === one.name)?.value ?? null,
+  }))
+  const label = lane.labelFrom === null ? null : (details.find((one) => one.name === lane.labelFrom)?.value ?? null)
+  const span = { from: value.at, to: value.at > to ? value.at : to, value: shown, label, details }
   return { ...lane, spans: [...lane.spans.slice(0, -1), ...(last ? [{ ...last, to: value.at }] : []), span] }
-}
-
-/** The timelines with one value of the broker added to the lane of its topic. */
-export function timelineWith(timeline: TrulaserTimeline, topic: string, value: Value): TrulaserTimeline {
-  return { ...timeline, lanes: timeline.lanes.map((lane) => laneWith(lane, topic, value, timeline.to)) }
 }
 
 /** The span of an alert in its lane. It lasts until it is cleared; while it stands, it reaches now. */
@@ -207,44 +269,42 @@ export function timelineWithAlert(timeline: TrulaserTimeline, type: string, aler
   return { ...timeline, lanes, failures }
 }
 
-/** What a message of the broker does to the page. */
-export function trulaserWith(live: TrulaserLive, topic: string, payload: string, now: number): TrulaserLive {
-  if (topic.endsWith("/events/notifications")) {
-    const event = eventOf(payload, now)
-    const alert = event && alertOfData(event.data, event.at)
-    if (!event || !alert) return live
-    return {
-      cockpit: { ...live.cockpit, status: { ...live.cockpit.status, activeAlerts: alertsWith(live.cockpit.status.activeAlerts, event.type, alert) } },
-      timeline: live.timeline && timelineWithAlert(live.timeline, event.type, alert, event.at, topic),
-    }
+/** The timelines after a start of the adapter: every alert that stands ends there, as the backend ends it. */
+function timelineRestarted(timeline: TrulaserTimeline, at: string): TrulaserTimeline {
+  const end = <TSpan extends { to: string }>(span: TSpan) => (span.to === timeline.to ? { ...span, to: at } : span)
+  return {
+    ...timeline,
+    lanes: timeline.lanes.map((lane) => (lane.key.startsWith("alerts") ? { ...lane, spans: lane.spans.map(end) } : lane)),
+    failures: timeline.failures.map(end),
   }
-  if (topic.endsWith("/events/jobs")) {
-    const event = eventOf(payload, now)
-    if (!event) return live
-    const jobOrder = jobOrderWith(live.cockpit.jobOrder.jobOrder, event.type, event.data, event.at)
-    return { ...live, cockpit: { ...live.cockpit, jobOrder: { ...live.cockpit.jobOrder, jobOrder } } }
-  }
-  return valuesOf(topic, payload, now).reduce(
-    (state, one) => ({
-      cockpit: cockpitWith(state.cockpit, one.topic, one.value),
-      timeline: state.timeline && timelineWith(state.timeline, one.topic, one.value),
-    }),
-    live,
-  )
 }
 
-/** What the passing of time does: the cards are as of now, and what still lasts reaches now. */
-export function trulaserAt(live: TrulaserLive, now: string): TrulaserLive {
-  const cockpit = Object.fromEntries(
-    Object.entries(live.cockpit).map(([name, card]) => [name, { ...card, asOf: now }]),
-  ) as Cockpit
-  const { timeline } = live
-  if (timeline === null || now <= timeline.to) return { cockpit, timeline }
+/** What a message of the broker does to the timelines. */
+export function timelineMessage(state: TimelineLive, topic: string, payload: string, now: number): TimelineLive {
+  if (topic.endsWith("/events/notifications")) {
+    const event = eventOf(payload, now)
+    const alert = event && alertOfEvent(event.type, event.data, event.at)
+    if (!event || !alert) return state
+    return { ...state, timeline: timelineWithAlert(state.timeline, event.type, alert, event.at, topic) }
+  }
+  if (topic.endsWith("/events/jobs")) return state
+  return valuesOf(topic, payload, now).reduce((current, one) => {
+    if (startsAgain(one.topic, one.value)) return { ...current, timeline: timelineRestarted(current.timeline, one.value.at) }
+    const { timeline } = current
+    const lanes = timeline.lanes.map((lane) => laneWith(lane, one.topic, one.value, timeline.to, current.recent))
+    return { timeline: { ...timeline, lanes }, recent: { ...current.recent, [one.topic]: String(one.value.value) } }
+  }, state)
+}
+
+/** What the passing of time does to the timelines: what still lasts reaches now. */
+export function timelineAt(state: TimelineLive, now: string): TimelineLive {
+  const { timeline } = state
+  if (now <= timeline.to) return state
   const reach = <TSpan extends { to: string }>(span: TSpan) => (span.to === timeline.to ? { ...span, to: now } : span)
   const lanes = timeline.lanes.map((lane) => {
     if (lane.overlaps) return { ...lane, spans: lane.spans.map(reach) }
     const last = lane.spans.at(-1)
     return last ? { ...lane, spans: [...lane.spans.slice(0, -1), { ...last, to: now }] } : lane
   })
-  return { cockpit, timeline: { ...timeline, to: now, lanes, failures: timeline.failures.map(reach) } }
+  return { ...state, timeline: { ...timeline, to: now, lanes, failures: timeline.failures.map(reach) } }
 }

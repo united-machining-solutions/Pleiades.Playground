@@ -593,3 +593,27 @@ export async function readAlertsOf(
     alerts: pairs.map((pair) => ({ ...alertOf(pair), goneAt: pair.clearedAt === null ? null : new Date(pair.clearedAt).toISOString() })),
   }
 }
+
+const jobOrderEventsAnswer = z.object({
+  items: z.array(z.object({ type: z.string(), time: z.string(), data: z.record(z.string(), z.unknown()).nullish() })),
+})
+
+/**
+ * Since when a job order is in its state, as its newest event that carries its entry says (`StateSince`).
+ * The Events API keeps only the time of the last event of any kind with a job order, a change of its result
+ * among them; the entry of the job order says when its state changed. Null if no event says it.
+ */
+export async function readJobOrderStateSince(apis: Apis, machine: string, jobOrderId: string): Promise<string | null> {
+  const url = new URL("/machineEvents", apis.eventsUrl)
+  url.searchParams.set("mId", machine)
+  url.searchParams.set("jobOrderId", jobOrderId)
+  url.searchParams.set("group", "JobMonitoring")
+  url.searchParams.set("Take", "20")
+  url.searchParams.set("Sorting", "Descending")
+  const { items } = await getJson("Events API", url, jobOrderEventsAnswer)
+  for (const one of items) {
+    const since = one.data?.StateSince
+    if (typeof since === "string" && !Number.isNaN(Date.parse(since))) return new Date(since).toISOString()
+  }
+  return null
+}

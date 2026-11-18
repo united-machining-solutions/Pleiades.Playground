@@ -81,6 +81,31 @@ test("the JobOrder in words names the job order and the program execution in it"
   assert.match(trulaserJobOrderInWords(jobOrder), /JobOrder cc7f97c7 Running since 09:30 UTC, 1 runs completed\.\nProgramExecution 2a3b: ActiveWorkMaster PLL_SHEET_0002, State Running, JobOrderID cc7f97c7\./)
 })
 
+test("a job order without a result yet is not told as zero runs", () => {
+  const words = trulaserJobOrderInWords({
+    ...about,
+    jobOrder: {
+      JobOrderID: "cc7f97c7",
+      State: "Running",
+      StateSince: null,
+      JobName: null,
+      WorkMasterID: null,
+      StartTime: null,
+      EndTime: null,
+      RunsCompleted: null,
+      JobResult: null,
+    },
+    signals: {
+      executionId: signal(null),
+      activeWorkMaster: signal(null),
+      executionState: signal(null),
+      executionStartTime: signal(""),
+      executionJobOrderId: signal(null),
+    },
+  })
+  assert.match(words, /JobOrder cc7f97c7 Running, no runs reported yet./)
+})
+
 test("the devices in words say each request, and an error code where there is one", () => {
   const devices: TrulaserDevices = {
     ...about,

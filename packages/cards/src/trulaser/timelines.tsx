@@ -139,14 +139,14 @@ function LaneRow({ lane, from, width, timeline }: { lane: Lane; from: number; wi
           className={`relative h-6 overflow-hidden rounded-sm bg-muted/40 ${lane.group && lane.key !== timeline.lanes[0]?.key ? "mt-2" : ""}`}
           onPointerLeave={() => setHovered(null)}
         >
-          {spans.map((span) => {
+          {spans.map((span, index) => {
             const left = placeOf(span.from, from, width)
             const size = placeOf(span.to, from, width) - left
             const look = lookOf(span.value, categories)
             const text = span.label ?? span.value
             return (
               <div
-                key={span.from}
+                key={`${index}-${span.from}`}
                 className={`absolute inset-y-0 min-w-0.5 overflow-hidden px-1 leading-6 whitespace-nowrap ${look.className}`}
                 style={{ left: `${left}%`, width: `${size}%`, background: look.colour }}
                 onPointerEnter={() => setHovered(span)}
@@ -157,11 +157,11 @@ function LaneRow({ lane, from, width, timeline }: { lane: Lane; from: number; wi
             )
           })}
           {!failures &&
-            timeline.failures.map((one) => {
+            timeline.failures.map((one, index) => {
               const left = placeOf(one.from, from, width)
               return (
                 <div
-                  key={one.from}
+                  key={`${index}-${one.from}`}
                   aria-hidden
                   className="pointer-events-none absolute inset-y-0 min-w-px bg-[var(--state-alarm)] opacity-25"
                   style={{ left: `${left}%`, width: `${placeOf(one.to, from, width) - left}%` }}

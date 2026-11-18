@@ -503,15 +503,18 @@ function pascalOf(snake: string): string {
 
 /**
  * A value of a message as the edge component writes the values of its outputs: an enumeration
- * `DEVICE_REQUEST_STATE_ACTIVE` without the name of its type, as `Active`. The type is the name of the
- * field (`deviceType`: `DEVICE_TYPE_SORTING` is `Sorting`), or the part up to `_STATE_`.
+ * `DEVICE_REQUEST_STATE_ACTIVE` without the name of its type, as `Active`. Only an enumeration: a value
+ * that begins with the name of its field (`deviceType`: `DEVICE_TYPE_SORTING` is `Sorting`), or, in a
+ * field of a state, with a type that ends in `_STATE_`. Any other value, such as a program name
+ * `PLL_SHEET_0001` or a serial number, stays as it is.
  */
 export function enumText(field: string, value: string): string {
   if (!/^[A-Z][A-Z0-9_]*$/.test(value)) return value
   const type = `${field.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase()}_`
+  if (value.startsWith(type) && value.length > type.length) return pascalOf(value.slice(type.length))
   const state = value.indexOf("_STATE_")
-  const rest = value.startsWith(type) ? value.slice(type.length) : state >= 0 ? value.slice(state + "_STATE_".length) : value
-  return pascalOf(rest)
+  if (/state$/i.test(field) && state > 0) return pascalOf(value.slice(state + "_STATE_".length))
+  return value
 }
 
 /**
