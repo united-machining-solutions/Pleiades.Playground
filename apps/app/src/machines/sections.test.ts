@@ -5,7 +5,20 @@ import type { MachineMeasurements, MeasurementSeries } from "@pleiades/cards/mea
 import type { SiteList } from "@pleiades/cards/site/contract.ts"
 import type { EnergyShow, MachineEnergy } from "@pleiades/cards/energy/contract.ts"
 
-import { alertFilter, changesAlerts, energyOf, measurementsOf, oneLine, placeOf, placeWords, powerAndEnergyOf, rangeOfHours } from "./sections.ts"
+import {
+  alertFilter,
+  changesAlerts,
+  energyOf,
+  energyRequest,
+  hasValues,
+  measurementsOf,
+  oneLine,
+  placeOf,
+  placeWords,
+  powerAndEnergyOf,
+  powerRequest,
+  rangeOfHours,
+} from "./sections.ts"
 
 const P04 = "alcyone-machines_AX-400_P-04"
 const P07 = "taygeta-precision_TP-800_P-07"
@@ -34,6 +47,7 @@ const sites = {
     },
   ],
   unplaced: [{ machine: M02, state: "running", now: {} }],
+  sitesError: null,
 } as unknown as SiteList
 
 test("a machine stands on its site and in its hall, or on no site", () => {
@@ -46,6 +60,9 @@ test("a machine stands on its site and in its hall, or on no site", () => {
 
 test("where the sites could not be read, or the machine is in none of them, the page names no place", () => {
   assert.equal(placeWords(placeOf(null, P04)), null)
+  // The Sites API did not answer: every machine is listed on no site, which says nothing of where it stands.
+  const unread = { ...sites, sites: [], unplaced: [{ machine: P04, state: "running", now: {} }], sitesError: "no answer" } as unknown as SiteList
+  assert.equal(placeWords(placeOf(unread, P04)), null)
   assert.equal(placeWords(placeOf(sites, "gone_X_1")), null)
 })
 
@@ -124,4 +141,16 @@ test("the tile of the energy takes the line of the machine and the hours of the 
   assert.deepEqual(energyOf(show, P04), { hours: 8, machine: line(P04) })
   assert.equal(energyOf(show, M02), null)
   assert.equal(energyOf(null, P04), null)
+})
+
+test("a machine that publishes only its connection has no values, and the section says so", () => {
+  assert.equal(hasValues(measured(P04, null, null)), false)
+  assert.equal(hasValues(measured(P04, 5000, null)), true)
+  assert.equal(hasValues(null), false)
+})
+
+test("the section of power and energy asks for the hours of the page, also when it asks again", () => {
+  assert.deepEqual(powerRequest(P04, 24), { lines: [{ machine: P04, signal: "activePower" }], range: "24h" })
+  assert.deepEqual(powerRequest(P04, 1).range, "1h")
+  assert.deepEqual(energyRequest(P04, 24), { machines: [P04], hours: 24 })
 })

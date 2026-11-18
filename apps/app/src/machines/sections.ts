@@ -13,9 +13,12 @@ import type { Hours } from "./switcher.ts"
 /** Where a machine stands: a site and maybe a hall, on no site, or not known when the sites could not be read. */
 export type Place = { site: string; hall: string | null } | "onNoSite" | null
 
-/** The place of a machine in the list of the sites. */
+/**
+ * The place of a machine in the list of the sites. Where the Sites API did not answer (`sitesError`),
+ * every machine is listed on no site; then the place is not known, not "on no site".
+ */
 export function placeOf(sites: SiteList | null, machine: string): Place {
-  if (sites === null) return null
+  if (sites === null || sites.sitesError !== null) return null
   for (const site of sites.sites) {
     for (const hall of site.halls) {
       if (hall.machines.some((one) => one.machine === machine)) return { site: site.name, hall: hall.name }
@@ -39,6 +42,24 @@ export function rangeOfHours(hours: Hours): TimeseriesRange {
 /** What one machine measures now, from the list of every machine. */
 export function measurementsOf(list: MeasurementList | null, machine: string): MachineMeasurements | null {
   return list?.machines.find((one) => one.machine === machine) ?? null
+}
+
+/**
+ * Whether the machine has a value of any quantity, however old. A machine that publishes only its
+ * connection has an entry with every value null: the section says it has no values.
+ */
+export function hasValues(measurements: MachineMeasurements | null): measurements is MachineMeasurements {
+  return measurements !== null && measurements.measurements.some((one) => one.value !== null)
+}
+
+/** What the section of power and energy asks the time series card for: the power of the machine over the hours. */
+export function powerRequest(machine: string, hours: Hours): { lines: Array<{ machine: string; signal: string }>; range: TimeseriesRange } {
+  return { lines: [{ machine, signal: "activePower" }], range: rangeOfHours(hours) }
+}
+
+/** What the section of power and energy asks the energy card for: the energy of the machine over the hours. */
+export function energyRequest(machine: string, hours: Hours): { machines: Array<string>; hours: Hours } {
+  return { machines: [machine], hours }
 }
 
 /** Whether the machine has a value of a quantity, however old. */

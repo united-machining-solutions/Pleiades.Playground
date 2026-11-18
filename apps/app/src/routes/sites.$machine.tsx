@@ -57,14 +57,17 @@ import {
   alertFilter,
   changesAlerts,
   energyOf,
+  energyRequest,
+  hasValues,
   measurementsOf,
   oneLine,
   placeOf,
   placeWords,
   powerAndEnergyOf,
-  rangeOfHours,
+  powerRequest,
 } from "@/machines/sections.ts"
 import { HOURS, choicesOf, chosenHours, hoursOf, matches } from "@/machines/switcher.ts"
+import { debounce, oneAtATime } from "@/machines/pacing.ts"
 import type { Choice, Hours } from "@/machines/switcher.ts"
 
 /** The list of machines of the switcher, kept up to date from the broker as Home keeps its list. */
@@ -129,9 +132,9 @@ async function cardOf(machine: string, hours: Hours) {
   return { hours, answer, spans }
 }
 
-/** What the machine measures now and where it stands: the same whatever hours are chosen. */
-function nowSectionsOf() {
-  const measurements = Promise.all([getMeasurements().catch(failed), getMeasurementSeries().catch(failed)])
+/** What the machine measures now and where it stands: the same whatever hours are chosen. Of this machine only. */
+function nowSectionsOf(machine: string) {
+  const measurements = Promise.all([getMeasurements({ data: { machine } }).catch(failed), getMeasurementSeries({ data: { machine } }).catch(failed)])
   return { measurements, sites: getSites().catch(failed) }
 }
 
@@ -144,8 +147,8 @@ function hourSectionsOf(machine: string, hours: Hours, measurements: ReturnType<
   const power = measurements.then(async ([current]) => {
     const shows = powerAndEnergyOf(measurementsOf(current.values, machine))
     const [energy, timeseries] = await Promise.all([
-      shows.energy ? getEnergy({ data: { machines: [machine], hours } }).catch(failed) : null,
-      shows.power ? getTimeseries({ data: { lines: [{ machine, signal: "activePower" }], range: rangeOfHours(hours) } }).catch(failed) : null,
+      shows.energy ? getEnergy({ data: energyRequest(machine, hours) }).catch(failed) : null,
+      shows.power ? getTimeseries({ data: powerRequest(machine, hours) }).catch(failed) : null,
     ])
     return { energy, timeseries }
   })
@@ -154,7 +157,7 @@ function hourSectionsOf(machine: string, hours: Hours, measurements: ReturnType<
 
 /** The sections of the page of a machine, asked for at once. */
 function sectionsOf(machine: string, hours: Hours) {
-  const now = nowSectionsOf()
+  const now = nowSectionsOf(machine)
   return { ...now, ...hourSectionsOf(machine, hours, now.measurements) }
 }
 
@@ -409,6 +412,9 @@ function Place({ machine, sites }: { machine: string; sites: Promise<Answer<Site
 /** How long a section that got no answer waits before it asks again, as a page does. */
 const RETRY_MS = 10_000
 
+/** How long the alarms wait after the last alert of a burst before they read the list again. */
+const ALERTS_SETTLE_MS = 2_000
+
 /**
  * The answer of one section: what the loader read, until the section reads it again with `read`. A
  * section that got no answer asks again on its own, so the others stand as they are.
@@ -434,11 +440,19 @@ function useAnswer<TValues>(loaded: Answer<TValues>, read: () => Promise<Answer<
       (error: unknown) => mine === asked.current && setAnswer(failed(error)),
     )
   }, [])
+  // A retry waits for the answer to the last one: a slow backend gets no second question meanwhile.
   useEffect(() => {
     if (answer.values !== null) return
-    const timer = setInterval(again, RETRY_MS)
+    const retry = oneAtATime(() => {
+      const mine = ++asked.current
+      return reader.current().then(
+        (next) => mine === asked.current && setAnswer(next),
+        (error: unknown) => mine === asked.current && setAnswer(failed(error)),
+      )
+    })
+    const timer = setInterval(retry, RETRY_MS)
     return () => clearInterval(timer)
-  }, [answer.values, again])
+  }, [answer.values])
   return [answer, again]
 }
 
@@ -478,7 +492,7 @@ function MachineSections({ machine, sections }: { machine: string; sections: Sec
         {(loaded) => <Alarms machine={machine} hours={shown.hours} loaded={loaded} reading={reading} />}
       </Await>
       <Await promise={shown.power} fallback={<Skeleton className="h-96 w-full" />}>
-        {(power) => <PowerAndEnergy machine={machine} energy={power.energy} timeseries={power.timeseries} reading={reading} />}
+        {(power) => <PowerAndEnergy machine={machine} hours={shown.hours} energy={power.energy} timeseries={power.timeseries} reading={reading} />}
       </Await>
     </>
   )
@@ -515,8 +529,8 @@ function LiveValues({
   series: Answer<MeasurementSeries>
   power: Sections["power"]
 }) {
-  const [now] = useAnswer(current, () => getMeasurements().catch(failed))
-  const [graphs] = useAnswer(series, () => getMeasurementSeries().catch(failed))
+  const [now] = useAnswer(current, () => getMeasurements({ data: { machine } }).catch(failed))
+  const [graphs] = useAnswer(series, () => getMeasurementSeries({ data: { machine } }).catch(failed))
   const loaded = useMemo(() => livePageOf(graphs.values, now.values), [graphs, now])
   const live = useMemo((): Live<LivePage> => ({ filters: measurementFilters(machine), message: liveWith, at: liveAt }), [machine])
   const { values: page } = useLive(loaded, live)
@@ -526,7 +540,7 @@ function LiveValues({
     <Section title="Now">
       {now.values === null && graphs.values === null ? (
         <NoAnswer error={now.error ?? graphs.error ?? ""} />
-      ) : measured ? (
+      ) : hasValues(measured) ? (
         <MeasurementTiles machine={measured} series={oneLine(page.series, "activePower", machine)} energy={energy} />
       ) : (
         <Empty>
@@ -546,13 +560,17 @@ function LiveValues({
  */
 function Alarms({ machine, hours, loaded, reading }: { machine: string; hours: Hours; loaded: Answer<NotificationList>; reading: boolean }) {
   const [answer, again] = useAnswer(loaded, () => getNotifications({ data: { machine, hours } }).catch(failed))
-  useEffect(
-    () =>
-      subscribe([alertFilter(machine)], (topic, payload) => {
-        if (changesAlerts(topic, payload, machine, Date.parse(serverNow()))) again()
-      }),
-    [machine, again],
-  )
+  // A machine that raises and clears many alerts in a row is read again once, when they settle.
+  useEffect(() => {
+    const later = debounce(again, ALERTS_SETTLE_MS)
+    const stop = subscribe([alertFilter(machine)], (topic, payload) => {
+      if (changesAlerts(topic, payload, machine, Date.parse(serverNow()))) later.call()
+    })
+    return () => {
+      stop()
+      later.cancel()
+    }
+  }, [machine, again])
   return (
     <Section title="Alarms & warnings" reading={reading}>
       {answer.values ? <NotificationCard {...answer.values} bare /> : <NoAnswer error={answer.error} />}
@@ -568,11 +586,13 @@ function Alarms({ machine, hours, loaded, reading }: { machine: string; hours: H
  */
 function PowerAndEnergy({
   machine,
+  hours,
   energy,
   timeseries,
   reading,
 }: {
   machine: string
+  hours: Hours
   energy: Answer<EnergyShow> | null
   timeseries: Answer<TimeseriesShow> | null
   reading: boolean
@@ -591,23 +611,23 @@ function PowerAndEnergy({
         </Empty>
       ) : (
         <div className="flex flex-col gap-6">
-          {timeseries && <PowerOverTime machine={machine} loaded={timeseries} />}
-          {energy && <Energy machine={machine} loaded={energy} />}
+          {timeseries && <PowerOverTime machine={machine} hours={hours} loaded={timeseries} />}
+          {energy && <Energy machine={machine} hours={hours} loaded={energy} />}
         </div>
       )}
     </Section>
   )
 }
 
-function PowerOverTime({ machine, loaded }: { machine: string; loaded: Answer<TimeseriesShow> }) {
-  const [answer] = useAnswer(loaded, () =>
-    getTimeseries({ data: { lines: [{ machine, signal: "activePower" }], range: loaded.values?.range ?? "8h" } }).catch(failed),
-  )
+/** The power of the machine over the hours of the page; after a failed first read, it asks again for those hours. */
+function PowerOverTime({ machine, hours, loaded }: { machine: string; hours: Hours; loaded: Answer<TimeseriesShow> }) {
+  const [answer] = useAnswer(loaded, () => getTimeseries({ data: powerRequest(machine, hours) }).catch(failed))
   // A new answer for other hours keeps the graph, which reads its line again and draws the old one until then.
   return answer.values ? <ShownTimeseries values={answer.values} bare /> : <NoAnswer error={answer.error} />
 }
 
-function Energy({ machine, loaded }: { machine: string; loaded: Answer<EnergyShow> }) {
-  const [answer] = useAnswer(loaded, () => getEnergy({ data: { machines: [machine], hours: loaded.values?.hours ?? 8 } }).catch(failed))
+/** The energy of the machine over the hours of the page; after a failed first read, it asks again for those hours. */
+function Energy({ machine, hours, loaded }: { machine: string; hours: Hours; loaded: Answer<EnergyShow> }) {
+  const [answer] = useAnswer(loaded, () => getEnergy({ data: energyRequest(machine, hours) }).catch(failed))
   return answer.values ? <EnergyCard {...answer.values} series={null} bare /> : <NoAnswer error={answer.error} />
 }

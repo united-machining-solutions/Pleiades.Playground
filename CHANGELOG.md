@@ -37,8 +37,9 @@ All notable changes are documented here. The format follows
 - Page of a machine: under the title where the machine stands, and below the machine card three sections as the
   mock has them: Now, live tiles of its power, energy, spindle and feed; Alarms & warnings; Power and energy over
   the chosen hours. Other hours read the sections again without loading the page again; a section that gets no
-  answer says so and asks again on its own. The page draws the cards without their feet and topic lines, the
-  chat with them.
+  answer says so and asks again on its own, one question at a time. The page draws the cards without their feet
+  and topic lines, the chat with them. It reads the measurements of its machine only, and the alarms once after a
+  burst of alerts.
 - Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
   each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
   draws them with the notification card.

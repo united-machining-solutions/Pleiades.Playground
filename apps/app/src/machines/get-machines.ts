@@ -111,33 +111,39 @@ export const getSites = createServerFn({ method: "GET" }).handler(
 )
 
 /** The newest physical values of every machine: the values of the measurement cards. */
-export const getMeasurements = createServerFn({ method: "GET" }).handler(
-  (): Promise<Answer<MeasurementList>> =>
-    ask(async (backend) => {
-      const result = await backend.callTool("genui_measurement_list", {})
-      if (result.isError || !result.structuredContent) {
-        throw new Refused(textOf(result) ?? "genui_measurement_list returned no values.")
-      }
-      return result.structuredContent
-    }),
-)
+export const getMeasurements = createServerFn({ method: "GET" })
+  // With a machine, the values of that machine only: the page of one machine reads no others.
+  .validator((request?: { machine?: string }) => request ?? {})
+  .handler(
+    ({ data }): Promise<Answer<MeasurementList>> =>
+      ask(async (backend) => {
+        const result = await backend.callTool("genui_measurement_list", data.machine === undefined ? {} : { machine: data.machine })
+        if (result.isError || !result.structuredContent) {
+          throw new Refused(textOf(result) ?? "genui_measurement_list returned no values.")
+        }
+        return result.structuredContent
+      }),
+  )
 
 /**
  * The values of every quantity over the last minutes, a line for each machine: what the graphs of
  * the measurements draw. They are not among the values of the list, because a language model reads
  * those.
  */
-export const getMeasurementSeries = createServerFn({ method: "GET" }).handler(
-  (): Promise<Answer<MeasurementSeries>> =>
-    ask(async (backend) => {
-      // The name is checked against the tools of the backend: if it changes there, this fails to compile.
-      const result = await backend.callTool(MEASUREMENT_SERIES_TOOL, {})
-      if (result.isError || !result.structuredContent) {
-        throw new Refused(textOf(result) ?? `${MEASUREMENT_SERIES_TOOL} returned no values.`)
-      }
-      return result.structuredContent
-    }),
-)
+export const getMeasurementSeries = createServerFn({ method: "GET" })
+  // With a machine, the lines of that machine only.
+  .validator((request?: { machine?: string }) => request ?? {})
+  .handler(
+    ({ data }): Promise<Answer<MeasurementSeries>> =>
+      ask(async (backend) => {
+        // The name is checked against the tools of the backend: if it changes there, this fails to compile.
+        const result = await backend.callTool(MEASUREMENT_SERIES_TOOL, data.machine === undefined ? {} : { machine: data.machine })
+        if (result.isError || !result.structuredContent) {
+          throw new Refused(textOf(result) ?? `${MEASUREMENT_SERIES_TOOL} returned no values.`)
+        }
+        return result.structuredContent
+      }),
+  )
 
 /** The values of the page Charts: each machine with the sums of its last hours, and its recent spans. */
 export type Charts = {
