@@ -52,9 +52,17 @@ function pages() {
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
       entry.isDirectory() ? walk(join(dir, entry.name)) : [relative(routes, join(dir, entry.name))],
     )
-  for (const file of walk(routes).filter((name) => name.endsWith(".tsx") && name !== "__root.tsx").sort()) {
-    const path = file.replace(/\.tsx$/, "").replace(/\\/g, "/").replace(/\./g, "/").replace(/(^|\/)index$/, "")
-    console.log(`  /${path}`.padEnd(28) + `apps/app/src/routes/${file.replace(/\\/g, "/")}`)
+  // A folder in brackets adds nothing to the address. "(showcases)/<name>.tsx" answers at /<name>, and only
+  // in an app built with its showcases (APP_SHOWCASES).
+  const names = walk(routes).map((file) => file.replace(/\\/g, "/"))
+  for (const name of names.filter((one) => one.endsWith(".tsx") && one !== "__root.tsx").sort()) {
+    const path = name
+      .replace(/\.tsx$/, "")
+      .replace(/\([^/]+\)\//g, "")
+      .replace(/\./g, "/")
+      .replace(/(^|\/)index$/, "")
+    const note = name.startsWith("(showcases)/") ? "  (a showcase: only in an app built with APP_SHOWCASES)" : ""
+    console.log(`  /${path}`.padEnd(28) + `apps/app/src/routes/${name}${note}`)
   }
 }
 
