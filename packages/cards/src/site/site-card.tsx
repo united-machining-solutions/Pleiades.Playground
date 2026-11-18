@@ -17,7 +17,6 @@ import { stateLabel } from "../machine/state.ts"
 import { StateSymbol } from "../machine/state-symbol.tsx"
 import { tell } from "../machine/tell.ts"
 import type { Hall, PlacedMachine, Site, SiteList, StateCount, UnplacedMachine } from "./contract.ts"
-import { labelOf } from "../machine/in-words.ts"
 import { machinesInWords, modelOf, titleOfPlaced } from "./in-words.ts"
 
 /**
@@ -199,8 +198,8 @@ function UnplacedCard({ machines, asOf }: { machines: ReadonlyArray<UnplacedMach
               key={one.machine}
               machine={one.machine}
               state={one.state}
-              title={labelOf(one.machine)}
-              when={one.lastValueAt && one.state === "no-data" ? `last value ${clock(one.lastValueAt)}` : undefined}
+              title={modelOf(one)}
+              when={lastingOf(one, asOf)}
             />
           ))}
         </Rows>

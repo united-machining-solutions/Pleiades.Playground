@@ -111,7 +111,21 @@ test("the machines of a site are grouped by hall, in the order of the site, and 
     { state: "alarm", machines: 1 },
   ])
   // M-07 sends values and stands on no site: the one suggestion.
-  assert.deepEqual(result.unplaced, [{ machine: "M-07", state: "running", lastValueAt: secondsAgo(5) }])
+  assert.deepEqual(
+    result.unplaced.map(({ now: _, ...rest }) => rest),
+    [{ machine: "M-07", state: "running" }],
+  )
+  assert.equal(siteList.safeParse(result).success, true)
+})
+
+test("a machine on no site carries what it does now, with its topics, as a placed one does", () => {
+  const sending = machine("taygeta-precision_TP-800_P-07", { itemState: "Ready" })
+  const result = sitesOf([north], [], list([sending]))
+  const [suggestion] = result.unplaced
+  // The machine as genui_machine_list returns it: a live page hears its topics at the broker.
+  assert.deepEqual(suggestion?.now, sending)
+  assert.equal(suggestion?.now.itemState.topic, "machines/taygeta-precision_TP-800_P-07/umati/State/Status/MachineryItemState")
+  assert.equal(suggestion?.state, "stopped")
   assert.equal(siteList.safeParse(result).success, true)
 })
 
@@ -126,7 +140,12 @@ test("a machine on a site that published nothing in the last 24 hours has no dat
 
 test("a machine that went silent is still a suggestion, without data", () => {
   const result = sitesOf([], [], list([machine("M-05", { silentFor: 3600 })]))
-  assert.deepEqual(result.unplaced, [{ machine: "M-05", state: "no-data", lastValueAt: secondsAgo(3600) }])
+  assert.deepEqual(
+    result.unplaced.map(({ now: _, ...rest }) => rest),
+    [{ machine: "M-05", state: "no-data" }],
+  )
+  // Its last sign of life is that of the machine.
+  assert.equal(result.unplaced[0]?.now.lastValueAt, secondsAgo(3600))
   assert.equal(result.machineCount, 0)
   assert.deepEqual(result.counts, [])
 })

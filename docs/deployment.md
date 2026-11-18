@@ -10,8 +10,8 @@ The deployment is optional and off by default. Whoever only wants to see the dem
 ## How it goes
 
 1. A pull request is merged into `main`.
-2. "Images" builds the service images, including the optional Ultimaker and juice bar services, and tags them
-   `main` and `sha-<commit>`.
+2. "Images" builds the service images, including the cutting simulator and adapter and the optional Ultimaker
+   and juice bar services, and tags them `main` and `sha-<commit>`.
 3. "Deploy" runs after it on a runner of your own, on the computer that runs the stack. It checks out the
    commit, pulls the images tagged `sha-<commit>` and runs `docker compose up -d --no-build --wait`.
 

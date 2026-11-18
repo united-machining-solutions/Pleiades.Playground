@@ -309,7 +309,118 @@ public sealed class MachinePublisherTest
             "without the hook a client has no last will, as before");
     }
 
-    private static MachinePublisher Publisher(RecordingManagedMqttClient client, ManualTimeProvider time)
+    [TestMethod]
+    public async Task AnEvent_WaitsForTheConnectSequence_AndGoesOutInOrderAfterIt()
+    {
+        using var client = new RecordingManagedMqttClient(connected: false);
+        var time = new ManualTimeProvider(Start);
+        using var publisher = Publisher(client, time);
+        await publisher.AttachAsync();
+
+        await publisher.EventAsync(Event(1));
+        await publisher.EventAsync(Event(2));
+        Assert.IsEmpty(client.Take(), "Nothing goes out without a connection.");
+        Assert.AreEqual(2, publisher.PendingEvents);
+
+        await client.ConnectAsync();
+        var messages = client.Take();
+
+        Assert.AreEqual(Machine + "umati/Connection/State", messages[0].Topic, "The connect sequence comes first.");
+        Assert.AreEqual(Machine + "umati/Manifest", messages[1].Topic);
+        CollectionAssert.AreEqual(new[] { "1", "2" }, messages.Where(m => m.Topic == EventTopic).Select(m => m.ConvertPayloadToString()).ToArray());
+        Assert.AreEqual(0, publisher.PendingEvents);
+
+        await publisher.EventAsync(Event(3));
+        Assert.AreEqual("3", client.Take().Single().ConvertPayloadToString(), "After the sequence an event goes out at once.");
+    }
+
+    [TestMethod]
+    public async Task AFullOutbox_DropsTheOldestEvent()
+    {
+        using var client = new RecordingManagedMqttClient(connected: false);
+        using var publisher = new MachinePublisher(client, Identity, Manifest(), new ManualTimeProvider(Start), NullLogger.Instance, outboxCapacity: 2);
+        await publisher.AttachAsync();
+
+        foreach (var number in new[] { 1, 2, 3 })
+        {
+            await publisher.EventAsync(Event(number));
+        }
+
+        await client.ConnectAsync();
+
+        CollectionAssert.AreEqual(new[] { "2", "3" },
+            client.Take().Where(m => m.Topic == EventTopic).Select(m => m.ConvertPayloadToString()).ToArray());
+    }
+
+    [TestMethod]
+    public async Task AnEventTheClientRefuses_IsDropped_AndTheRestGoesOn()
+    {
+        using var client = new RefusingClient(refuse: "2");
+        using var publisher = Publisher(client, new ManualTimeProvider(Start));
+        await publisher.AttachAsync();
+        client.Take();
+
+        foreach (var number in new[] { 1, 2, 3 })
+        {
+            await publisher.EventAsync(Event(number));
+        }
+
+        CollectionAssert.AreEqual(new[] { "1", "3" }, client.Take().Select(m => m.ConvertPayloadToString()).ToArray());
+        Assert.AreEqual(0, publisher.PendingEvents);
+    }
+
+    [TestMethod]
+    public async Task EventsAFailedSendLeftBehind_GoOutWithTheNextHeartbeat()
+    {
+        using var client = new RecordingManagedMqttClient();
+        var time = new ManualTimeProvider(Start);
+        using var publisher = Publisher(client, time);
+        await publisher.AttachAsync();
+        client.Take();
+
+        client.FailAt = 1;
+        await publisher.EventAsync(Event(1));
+        Assert.AreEqual(1, publisher.PendingEvents, "The event waits.");
+
+        await publisher.HeartbeatAsync(time.GetUtcNow());
+        Assert.AreEqual("1", client.Take().Last(m => m.Topic == EventTopic).ConvertPayloadToString());
+        Assert.AreEqual(0, publisher.PendingEvents);
+    }
+
+    /// <summary>A client that refuses one payload as invalid, as MQTTnet does with a topic it cannot send.</summary>
+    private sealed class RefusingClient(string refuse) : IManagedMqttClient
+    {
+        private readonly RecordingManagedMqttClient _inner = new();
+
+        public IMqttClient InternalClient => _inner.InternalClient;
+        public bool IsConnected => _inner.IsConnected;
+        public bool IsStarted => _inner.IsStarted;
+        public int PendingApplicationMessagesCount => 0;
+        public event Func<MqttApplicationMessageReceivedEventArgs, Task> ApplicationMessageReceivedAsync { add => _inner.ApplicationMessageReceivedAsync += value; remove => _inner.ApplicationMessageReceivedAsync -= value; }
+        public event Func<MqttClientConnectedEventArgs, Task> ConnectedAsync { add => _inner.ConnectedAsync += value; remove => _inner.ConnectedAsync -= value; }
+        public event Func<MqttClientDisconnectedEventArgs, Task> DisconnectedAsync { add => _inner.DisconnectedAsync += value; remove => _inner.DisconnectedAsync -= value; }
+        public event Func<ConnectingFailedEventArgs, Task> ConnectingFailedAsync { add => _inner.ConnectingFailedAsync += value; remove => _inner.ConnectingFailedAsync -= value; }
+        public event Func<ApplicationMessageSkippedEventArgs, Task> ApplicationMessageSkippedAsync { add => _inner.ApplicationMessageSkippedAsync += value; remove => _inner.ApplicationMessageSkippedAsync -= value; }
+        public event Func<SubscriptionsChangedEventArgs, Task> SubscriptionsChangedAsync { add => _inner.SubscriptionsChangedAsync += value; remove => _inner.SubscriptionsChangedAsync -= value; }
+
+        public List<MqttApplicationMessage> Take() => _inner.Take();
+        public Task StartAsync(ManagedMqttClientOptions options) => _inner.StartAsync(options);
+        public Task StopAsync(bool cleanDisconnect = true) => _inner.StopAsync(cleanDisconnect);
+        public Task EnqueueAsync(MqttApplicationMessage applicationMessage)
+            => applicationMessage.Topic == EventTopic && applicationMessage.ConvertPayloadToString() == refuse
+                ? throw new ArgumentException("Not a message the client can send.", nameof(applicationMessage))
+                : _inner.EnqueueAsync(applicationMessage);
+        public Task SubscribeAsync(IEnumerable<MQTTnet.Packets.MqttTopicFilter> topicFilters) => _inner.SubscribeAsync(topicFilters);
+        public Task UnsubscribeAsync(IEnumerable<string> topics) => _inner.UnsubscribeAsync(topics);
+        public void Dispose() => _inner.Dispose();
+    }
+
+    private const string EventTopic = Machine + "events/notifications";
+
+    private static MqttApplicationMessage Event(int number)
+        => new MqttApplicationMessageBuilder().WithTopic(EventTopic).WithPayload(number.ToString(System.Globalization.CultureInfo.InvariantCulture)).Build();
+
+    private static MachinePublisher Publisher(IManagedMqttClient client, ManualTimeProvider time)
         => new(client, Identity, Manifest(), time, NullLogger.Instance);
 
     private static JsonObject Manifest(string? extra = null)

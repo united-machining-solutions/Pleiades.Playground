@@ -10,6 +10,7 @@ import {
   CircleCheckIcon,
   LoaderCircleIcon,
   MessageCircleDashedIcon,
+  SlashIcon,
   SquareIcon,
   XIcon,
 } from "lucide-react"
@@ -31,6 +32,7 @@ import {
 } from "@pleiades/ui/components/dropdown-menu"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@pleiades/ui/components/input-group"
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@pleiades/ui/components/item"
 import { Message, MessageContent } from "@pleiades/ui/components/message"
 import {
   MessageScroller,
@@ -51,6 +53,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@pleiades/ui/components/sidebar"
+import { ScrollArea } from "@pleiades/ui/components/scroll-area"
 import {
   Trace,
   TraceCollapsible,
@@ -61,6 +64,8 @@ import {
   TraceTitle,
 } from "@pleiades/ui/components/trace"
 
+import { commandsFor, matching, readTyped, usage } from "@/opcua/commands.ts"
+import type { ChatCommand } from "@/opcua/commands.ts"
 import { keepOfAnswer } from "@/pages/from-answer.ts"
 
 import { Answer } from "./answer.tsx"
@@ -224,14 +229,18 @@ function Start() {
                 <MessageCircleDashedIcon />
               </EmptyMedia>
               <EmptyTitle>No chats yet</EmptyTitle>
-              <EmptyDescription>Ask what the machines do, or begin with one of the questions below.</EmptyDescription>
+              <EmptyDescription>
+                Ask what the machines do, begin with one of the questions below, or type <code>/help</code> for the
+                commands.
+              </EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
       </SidebarContent>
       <Composer
-        placeholder="Ask about the machines"
+        placeholder="Ask about the machines, or type / for commands"
         suggestions={suggestions}
+        commands={commandsFor(chatStatus.opcua)}
         onSend={panel.ask}
         models={chatStatus.models}
         model={model}
@@ -493,7 +502,8 @@ function Conversation({ threadId }: { threadId: string }) {
         </MessageScrollerProvider>
       </div>
       <Composer
-        placeholder={messages.length === 0 ? "Ask about the machines" : "Ask a follow-up"}
+        placeholder={messages.length === 0 ? "Ask about the machines, or type / for commands" : "Ask a follow-up, or type /"}
+        commands={commandsFor(chatStatus.opcua)}
         busy={isLoading}
         onSend={(question) => {
           setStopError(undefined)
@@ -600,6 +610,45 @@ function AnswerBlock({ block, thinking = false }: { block: Block; thinking?: boo
 }
 
 /**
+ * The commands, under the field: all of them after /help, while a name is typed the ones that begin
+ * with it. A command with an argument is put into the field to be completed; one without is sent.
+ */
+function CommandList({
+  commands,
+  title,
+  onPick,
+}: {
+  commands: ReadonlyArray<ChatCommand>
+  title?: string
+  onPick: (command: ChatCommand) => void
+}) {
+  // A ScrollArea of the design system for the scrolling part; its viewport is bounded, so it scrolls. Not a
+  // Combobox: the list is filtered by what is typed into the message field itself, which a Combobox would
+  // double with an input of its own.
+  return (
+    <ScrollArea className="[&>[data-slot=scroll-area-viewport]]:max-h-64">
+      {title && <span className="block px-2 pb-1 text-xs font-medium text-muted-foreground">{title}</span>}
+      <ItemGroup className="gap-0" role="list" aria-label="Commands">
+        {commands.map((command) => (
+          <Item
+            key={command.name}
+            size="sm"
+            role="listitem"
+            render={<button type="button" onClick={() => onPick(command)} />}
+            className="cursor-pointer text-left hover:bg-muted"
+          >
+            <ItemContent>
+              <ItemTitle className="font-mono">{usage(command)}</ItemTitle>
+              <ItemDescription>{command.summary}</ItemDescription>
+            </ItemContent>
+          </Item>
+        ))}
+      </ItemGroup>
+    </ScrollArea>
+  )
+}
+
+/**
  * Where a question is written. Below the text it says which servers give the chat tools and switches
  * them (tools-menu.tsx). With more than one model in the settings it also says which model
  * answers and lets the chat pick another one, after the shadcn pattern "Model Selector". At the
@@ -610,6 +659,7 @@ function AnswerBlock({ block, thinking = false }: { block: Block; thinking?: boo
 function Composer({
   placeholder,
   suggestions: questions = [],
+  commands,
   busy = false,
   onSend,
   onStop,
@@ -623,6 +673,7 @@ function Composer({
 }: {
   placeholder: string
   suggestions?: ReadonlyArray<string>
+  commands: ReadonlyArray<ChatCommand>
   busy?: boolean
   onSend: (question: string) => void
   onStop?: () => void
@@ -635,18 +686,57 @@ function Composer({
   dictation: boolean
 }) {
   const [text, setText] = useState("")
+  const [help, setHelp] = useState(false)
+  const [notice, setNotice] = useState<string>()
   const field = useRef<HTMLTextAreaElement>(null)
+  const prepare = (value: string) => {
+    setText(value)
+    setNotice(undefined)
+    field.current?.focus()
+  }
   // What was said comes after what is written, and the cursor waits behind it.
   const dictated = (words: string) => {
     setText((written) => (written.trim() === "" ? words : `${written.trimEnd()} ${words}`))
+    setNotice(undefined)
     field.current?.focus()
   }
-  const send = () => {
-    const question = text.trim()
-    if (question === "" || busy) return
-    setText("")
-    onSend(question)
+  // What was typed: a question goes out, a command becomes its question, /help shows the commands.
+  const submit = (value: string) => {
+    if (value.trim() === "" || busy) return
+    const typed = readTyped(value, commands)
+    switch (typed.kind) {
+      case "question":
+        setText("")
+        setHelp(false)
+        setNotice(undefined)
+        onSend(typed.text)
+        return
+      case "help":
+        setText("")
+        setHelp(true)
+        return
+      case "incomplete":
+        prepare(`/${typed.command.name} `)
+        setNotice(`${usage(typed.command)}: ${typed.command.summary}`)
+        return
+      case "unknown":
+        setHelp(true)
+        setNotice(`There is no command /${typed.name}.`)
+        return
+    }
   }
+  const send = () => submit(text)
+  const pick = (command: ChatCommand) => {
+    if (!command.question) {
+      setText("")
+      setHelp(true)
+    } else if (command.argument) {
+      prepare(`/${command.name} `)
+    } else {
+      submit(`/${command.name}`)
+    }
+  }
+  const offered = help ? commands : matching(text, commands)
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
     send()
@@ -663,7 +753,11 @@ function Composer({
   const stoppable = busy && onStop !== undefined
   return (
     <SidebarFooter className="border-t">
-      {questions.length > 0 && (
+      {offered.length > 0 && (
+        <CommandList commands={offered} title={help ? "Commands" : undefined} onPick={pick} />
+      )}
+      {notice && <p className="px-2 text-sm text-muted-foreground">{notice}</p>}
+      {questions.length > 0 && offered.length === 0 && (
         <div className="flex scroll-fade-x scrollbar-none gap-2 overflow-x-auto overscroll-x-contain">
           {questions.map((question) => (
             <Button key={question} variant="outline" size="sm" className="shrink-0" onClick={() => onSend(question)}>
@@ -680,13 +774,26 @@ function Composer({
             aria-label="Message"
             placeholder={placeholder}
             value={text}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => {
+              setText(event.target.value)
+              setNotice(undefined)
+              if (event.target.value !== "") setHelp(false)
+            }}
             onKeyDown={onKeyDown}
           />
-          {/* The second line of the field: the tools and, with a choice of models, the model on the
-              left, dictation and send on the right. */}
+          {/* The second line of the field: the tools, the commands and, with a choice of models, the
+              model on the left, dictation and send on the right. */}
           <InputGroupAddon align="block-end">
             <ToolsMenu off={off} settled={settled} onSwitch={onSwitch} />
+            <InputGroupButton
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Commands"
+              aria-pressed={help}
+              onClick={() => setHelp((open) => !open)}
+            >
+              <SlashIcon />
+            </InputGroupButton>
             {choice && (
               <DropdownMenu>
                 <DropdownMenuTrigger render={<InputGroupButton variant="ghost" aria-label={`Model: ${model}`} />}>
