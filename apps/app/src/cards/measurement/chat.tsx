@@ -11,6 +11,7 @@ import { measurementListOf } from "./results.ts"
 export const measurementTools: ReadonlyArray<ChatTool> = [
   {
     name: "genui_measurement_list",
+    part: "What the machines measure now",
     label: {
       running: "Reading the measurements",
       done: "Read the measurements",

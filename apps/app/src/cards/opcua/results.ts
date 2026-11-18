@@ -260,6 +260,20 @@ export function securityOf(endpoint: Pick<Endpoint, "securityMode" | "securityPo
   return endpoint.user ? `${security}, user ${endpoint.user}` : security
 }
 
+/**
+ * What the endpoints card shows: the endpoint the adapter takes, the others the server offers (folded,
+ * since a person cannot choose one there), and whether one of them has no security at all.
+ */
+export function endpointSummary(values: Pick<RankedEndpoints, "endpoints">): {
+  used?: RankedEndpoints["endpoints"][number]
+  others: RankedEndpoints["endpoints"]
+  unsecured: boolean
+} {
+  const used = values.endpoints.find((one) => one.recommended) ?? values.endpoints[0]
+  const others = values.endpoints.filter((one) => one !== used)
+  return { used, others, unsecured: others.some((one) => one.securityMode === "None") }
+}
+
 /** What the endpoints card asks of the person about a user: nothing, to enter one, or that one may be entered. */
 export function userStep(values: Pick<RankedEndpoints, "needsUser" | "acceptsUser" | "user">): "none" | "required" | "optional" {
   if (!values.acceptsUser) return "none"

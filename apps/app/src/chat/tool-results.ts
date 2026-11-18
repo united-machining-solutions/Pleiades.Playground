@@ -1,9 +1,10 @@
 import type { ReactNode } from "react"
 
-// What the app knows about a tool of the generative UI backend: what a call is called in the
-// chat, what the chat draws for its result, and whether a language model gets the tool at all. A
-// card says this for its tools in a module of its own, and cards.tsx lists the cards. This file
-// imports nothing but a type: the chat, its server and the tests all read it.
+// What the app knows about a tool of the generative UI backend, or of the app itself: what a call
+// is called in the chat, what the chat draws for its result, whether a language model gets the tool
+// at all, and whether a page can hold it. A card says this for its tools in a module of its own, and
+// cards.tsx lists the cards. This file imports nothing but a type: the chat, its server and the
+// tests all read it.
 
 export type ToolLabel = { running: string; done: string; failed: string }
 
@@ -18,8 +19,9 @@ export type ChatTool = {
   /**
    * What the chat draws for a result of the tool: a card, a list. Null if the result does not keep
    * the contract. For a tool without it the chat draws nothing, and the answer is the model's.
+   * `call` is the call the result answers, where the chat has it; a page has none.
    */
-  draw?: (content: unknown) => ReactNode | null
+  draw?: (content: unknown, call?: { id: string }) => ReactNode | null
   /**
    * Only a card calls this tool, so the chat keeps it from its language model. The backend marks
    * such a tool (MCP Apps: `visibility`), and a host that shows MCP Apps leaves it out of what
@@ -27,8 +29,18 @@ export type ChatTool = {
    * says it here.
    */
   cardOnly?: boolean
-  /** Whether a drawn result can be replayed as a saved GenUI page. Source references are chat-only. */
+  /**
+   * Whether a drawn result can be replayed as a saved GenUI page. `false`: the chat draws it, and a
+   * page never holds it as a part. Source references are such, the proposal of a page
+   * (pages/proposal.ts), and the cards of a server a page does not ask: a page asks the generative UI
+   * backend alone (pages/call-part.ts).
+   */
   saveAsPage?: boolean
+  /**
+   * What a part of a page with this tool shows, in a few words. The chat names the parts of a page
+   * it proposes with it; a tool without it is named by its name.
+   */
+  part?: string
 }
 
 /** The two tools of the backend itself, with which a language model finds its way. */

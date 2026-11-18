@@ -72,7 +72,7 @@ export function blocksOf(
       // the other, and a result is still the answer of the tool that gave it.
       const call = parts.find((other) => other.type === "tool-call" && other.id === part.toolCallId)
       const tool = call?.type === "tool-call" ? tools.find((one) => one.name === call.name) : undefined
-      const node = tool?.draw?.(part.content)
+      const node = tool?.draw?.(part.content, { id: part.toolCallId })
       if (node !== null && node !== undefined) blocks.push({ kind: "drawn", node })
     } else if (part.type === "text" && part.content.trim() !== "") {
       blocks.push({ kind: "text", text: part.content })
