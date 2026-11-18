@@ -1,26 +1,37 @@
-
-using Pleiades.Playground.Common.DataTransferObjects;
-using Pleiades.Playground.Notification.DataTransferObjects;
+using System.Text.Json.Nodes;
 using Pleiades.Playground.Cutting.Protocol.Model;
 using Pleiades.Playground.Cutting.Protocol.Telegrams;
+using Pleiades.Playground.Mqtt.Extensions.Machines;
 
 namespace Pleiades.Playground.Cutting.Adapter.Test;
 
 [TestClass]
 public sealed class CuttingTranslatorTest
 {
+    internal static readonly MachineIdentity Identity = new("TRUMPF", "https://www.trumpf.com", "Laser2D", "L-01");
+
     private static readonly DateTimeOffset Now = new(2026, 11, 17, 10, 0, 0, TimeSpan.Zero);
 
-    private readonly CuttingTranslator _translator = new(TimeZoneInfo.Utc, new FixedTime(Now));
+    private static readonly string Program = Identity.Signal(Paths.ActiveProgram);
+
+    private readonly CuttingTranslator _translator = new(Identity, TimeZoneInfo.Utc, new FixedTime(Now));
+
+    [TestMethod]
+    public void TheProgram_IsASignalOfTheManufacturer()
+    {
+        Assert.AreEqual("x-trumpf-com.WorkMasterMonitoring.ActiveProgram", _translator.ProgramPath);
+        Assert.AreEqual("machines/trumpf_Laser2D_L-01/oem/WorkMasterMonitoring/ActiveProgram",
+            MachineBinding.Topic(Identity.MachineId, _translator.ProgramPath));
+    }
 
     [TestMethod]
     public void StartNcp_TheChannelIsActiveAndTheProgramIsNamed()
     {
         var result = Translate(CuttingNotifications.StartNcp, "1", "PROG_A", "3", "ORDER", "1", "17.11.2026-09:30:00", "JOB", "0");
 
-        AssertText(result, Paths.ChannelState, "Active");
-        AssertText(result, Paths.ActiveProgram, "PROG_A");
-        Assert.AreEqual(new DateTime(2026, 11, 17, 9, 30, 0, DateTimeKind.Utc), result[0].Timestamp);
+        AssertValue(result, Paths.ChannelState, "Active");
+        AssertValue(result, Program, "PROG_A");
+        Assert.AreEqual(new DateTimeOffset(2026, 11, 17, 9, 30, 0, TimeSpan.Zero), result[0].Timestamp);
     }
 
     [TestMethod]
@@ -30,23 +41,23 @@ public sealed class CuttingTranslatorTest
 
         var result = Translate(CuttingNotifications.EndNcp, "1", "PROG_A");
 
-        AssertText(result, Paths.ChannelState, "Reset");
-        AssertText(result, Paths.ActiveProgram, string.Empty);
+        AssertValue(result, Paths.ChannelState, "Reset");
+        Assert.IsNull(Value(result, Program), "No program runs: null, as the simulators publish it.");
     }
 
     [TestMethod]
     [DataRow(CuttingNotifications.MachineRunning, "", "Executing")]
     [DataRow(CuttingNotifications.MachineStopped, "2", "NotExecuting")]
     [DataRow(CuttingNotifications.MachineStopped, "1", "OutOfService")]
-    public void RunningAndStopped_GiveTheMachineryItemState(string name, string reason, string state)
+    public void RunningAndStopped_GiveTheSnapshotOfTheState(string name, string reason, string state)
     {
         var result = Translate(name, "1", "PROG", "17.11.2026-09:00:00", reason);
 
-        AssertText(result, Paths.ItemState, state);
+        AssertStatus(result, state);
     }
 
     [TestMethod]
-    public void AFault_WhileAProgramRuns_InterruptsTheChannel_AndRunningAgainResumesItAndResetsTheAlarm()
+    public void AFault_WhileAProgramRuns_InterruptsTheChannel_AndRunningAgainResumesItAndClearsTheAlert()
     {
         Translate(CuttingNotifications.StartNcp, "1", "PROG");
 
@@ -55,24 +66,32 @@ public sealed class CuttingTranslatorTest
         var again = Translate(CuttingNotifications.CurrentAlarms, "1", "10001234", "Nozzle damaged", "17.11.2026-09:10:00");
         var running = Translate(CuttingNotifications.MachineRunning, "1", "PROG", "");
 
-        AssertText(fault, Paths.ChannelState, "Interrupted");
-        var raised = (AlarmPublication)alarm.Single();
-        Assert.AreEqual(NotificationAction.Raised, raised.Action);
-        Assert.AreEqual("10001234", raised.NotificationId);
+        AssertValue(fault, Paths.ChannelState, "Interrupted");
+        var raised = alarm.OfType<AlertPublication>().Single();
+        Assert.AreEqual(Paths.AlertRaised, raised.Type);
+        Assert.AreEqual("10001234", (string?)raised.Alert["ErrorCode"]);
+        Assert.AreEqual("Nozzle damaged", (string?)raised.Alert["Message"]);
+        Assert.AreEqual("Failure", (string?)raised.Alert["Severity"]);
+        Assert.AreEqual("2026-11-17T09:10:00.000Z", (string?)raised.Alert["Time"]);
+        var list = Value(alarm, Paths.ActiveAlerts)!.AsArray();
+        Assert.HasCount(1, list);
+        Assert.AreEqual((string?)raised.Alert["Id"], (string?)list[0]!["Id"]);
         Assert.IsEmpty(again, "An alarm the machine repeats is raised once.");
-        var reset = running.OfType<AlarmPublication>().Single();
-        Assert.AreEqual(NotificationAction.Reset, reset.Action);
-        Assert.AreEqual(raised.CorrelationId, reset.CorrelationId, "Raised and reset belong together.");
-        AssertText(running, Paths.ChannelState, "Active");
+
+        var cleared = running.OfType<AlertPublication>().Single();
+        Assert.AreEqual(Paths.AlertCleared, cleared.Type);
+        Assert.AreEqual((string?)raised.Alert["Id"], (string?)cleared.Alert["Id"], "Raised and cleared name the same alert.");
+        Assert.IsEmpty(Value(running, Paths.ActiveAlerts)!.AsArray());
+        AssertValue(running, Paths.ChannelState, "Active");
         Assert.IsEmpty(_translator.ActiveAlarms);
     }
 
     [TestMethod]
-    public void AnAlarmId_IsWhatTheEventsApiStores()
+    public void AnAlertId_IsAUuid()
     {
-        var alarm = (AlarmPublication)Translate(CuttingNotifications.CurrentAlarms, "1", "1", "Text", "").Single();
+        var alarm = Translate(CuttingNotifications.CurrentAlarms, "1", "1", "Text", "").OfType<AlertPublication>().Single();
 
-        Assert.MatchesRegex("^[0-9a-f]{24}$", alarm.CorrelationId);
+        Assert.IsTrue(Guid.TryParse((string?)alarm.Alert["Id"], out _));
     }
 
     [TestMethod]
@@ -80,21 +99,21 @@ public sealed class CuttingTranslatorTest
     {
         var result = Translate(CuttingNotifications.Feedrate, "1", "85", "17.11.2026-09:00:00");
 
-        var feed = (NumberPublication)result.Single();
+        var feed = (ValuePublication)result.Single();
         Assert.AreEqual(Paths.FeedOverride, feed.Path);
-        Assert.AreEqual(0.85, feed.Value, 1e-9);
-        Assert.AreEqual(BaseUnit.One, feed.Unit);
+        Assert.AreEqual(0.85, feed.Value!.GetValue<double>(), 1e-9);
+        Assert.AreEqual("one", feed.Unit);
     }
 
     [TestMethod]
     public void ATimestampOfTheMachine_IsReadInItsTimeZone()
     {
         var berlin = TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin");
-        var translator = new CuttingTranslator(berlin, new FixedTime(Now));
+        var translator = new CuttingTranslator(Identity, berlin, new FixedTime(Now));
 
         var result = translator.Translate(CuttingNotification.Create(CuttingNotifications.MachineRunning, "1", "P", "17.11.2026-09:00:00"));
 
-        Assert.AreEqual(new DateTime(2026, 11, 17, 8, 0, 0, DateTimeKind.Utc), result[^1].Timestamp);
+        Assert.AreEqual(new DateTimeOffset(2026, 11, 17, 8, 0, 0, TimeSpan.Zero), result[^1].Timestamp);
     }
 
     [TestMethod]
@@ -105,7 +124,7 @@ public sealed class CuttingTranslatorTest
     {
         var result = Translate(CuttingNotifications.MachineRunning, "1", "P", timestamp);
 
-        Assert.AreEqual(Now.UtcDateTime, result[^1].Timestamp);
+        Assert.AreEqual(Now, result[^1].Timestamp);
     }
 
     [TestMethod]
@@ -114,51 +133,61 @@ public sealed class CuttingTranslatorTest
         var end = Translate(CuttingNotifications.EndNcp, "1", "PROG_A", "", "", "1", "17.11.2026-09:30:00");
         var start = Translate(CuttingNotifications.StartNcp, "1", "PROG_B", "", "", "1", "17.11.2026-09:30:00");
 
-        var reset = end.OfType<TextPublication>().Single(p => p.Path == Paths.ChannelState);
-        var active = start.OfType<TextPublication>().Single(p => p.Path == Paths.ChannelState);
+        var reset = end.OfType<ValuePublication>().Single(p => p.Path == Paths.ChannelState);
+        var active = start.OfType<ValuePublication>().Single(p => p.Path == Paths.ChannelState);
         Assert.IsGreaterThan(reset.Timestamp, active.Timestamp, "The later value stays the later one.");
         Assert.AreEqual(TimeSpan.FromMilliseconds(1), active.Timestamp - reset.Timestamp);
     }
 
     [TestMethod]
-    public void Repeat_GivesTheLastValueOfEveryTopicAgain_ButNoAlarmAndNoHeartbeat()
-    {
-        _translator.Connected();
-        _translator.Heartbeat(1);
-        Translate(CuttingNotifications.StartNcp, "1", "PROG_A", "", "", "1", "17.11.2026-09:30:00");
-        Translate(CuttingNotifications.MachineRunning, "1", "PROG_A", "17.11.2026-09:30:00");
-        Translate(CuttingNotifications.CurrentAlarms, "1", "1", "Text", "");
-
-        var repeated = _translator.Repeat();
-
-        AssertText(repeated, Paths.ConnectionState, "Connected");
-        AssertText(repeated, Paths.OperationMode, "None");
-        AssertText(repeated, Paths.ChannelState, "Active");
-        AssertText(repeated, Paths.ActiveProgram, "PROG_A");
-        AssertText(repeated, Paths.ItemState, "Executing");
-        Assert.IsFalse(repeated.Any(p => p is AlarmPublication or NumberPublication { Path: Paths.Heartbeat }));
-        Assert.IsTrue(repeated.All(p => p.Timestamp >= Now.UtcDateTime), "A repeated value is observed now.");
-    }
-
-    [TestMethod]
-    public void Connected_SaysConnectedAndThatTheOperationModeIsUnknown()
+    public void Connected_BeforeTheMachineSaidItsState_TheStateIsNotKnown_AndNoAlertStands()
     {
         var result = _translator.Connected();
 
-        AssertText(result, Paths.ConnectionState, "Connected");
-        AssertText(result, Paths.OperationMode, "None");
+        Assert.IsNull(Value(result, Paths.Status));
+        Assert.IsTrue(result.OfType<ValuePublication>().Any(p => p.Path == Paths.Status), "State.Status goes out as null.");
+        Assert.IsEmpty(Value(result, Paths.ActiveAlerts)!.AsArray());
     }
 
     [TestMethod]
-    public void Disconnected_ByTheMachine_IsNotAvailable_BySilence_OnlyDisconnected()
+    public void Connected_BeforeTheMachineSaidThem_TheChannelAndTheProgramAreNotKnown()
+    {
+        var result = _translator.Connected();
+
+        Assert.IsNull(Value(result, Paths.ChannelState));
+        Assert.IsNull(Value(result, Program));
+    }
+
+    [TestMethod]
+    public void Connected_AfterTheMachineSaidItsState_KeepsIt()
+    {
+        Translate(CuttingNotifications.MachineRunning, "1", "P", "");
+
+        var result = _translator.Connected();
+
+        Assert.IsFalse(result.OfType<ValuePublication>().Any(p => p.Path == Paths.Status), "The state the machine said stands.");
+    }
+
+    [TestMethod]
+    public void Disconnected_ByTheMachine_IsNotAvailable_BySilence_NothingOfTheMachine()
     {
         var off = _translator.Disconnected(machineSwitchedOff: true);
         var silent = _translator.Disconnected(machineSwitchedOff: false);
 
-        AssertText(off, Paths.ItemState, "NotAvailable");
-        AssertText(off, Paths.ConnectionState, "Disconnected");
-        Assert.HasCount(1, silent);
-        AssertText(silent, Paths.ConnectionState, "Disconnected");
+        AssertStatus(off, "NotAvailable");
+        Assert.IsEmpty(silent, "Only Connection.State says so: the adapter does not know the state of the machine.");
+    }
+
+    [TestMethod]
+    public void AMachineThatSwitchesOff_ClearsItsAlerts()
+    {
+        Translate(CuttingNotifications.CurrentAlarms, "1", "4711", "Text", "");
+
+        var off = _translator.Disconnected(machineSwitchedOff: true);
+
+        Assert.AreEqual(Paths.AlertCleared, off.OfType<AlertPublication>().Single().Type);
+        Assert.IsEmpty(Value(off, Paths.ActiveAlerts)!.AsArray());
+        Assert.IsEmpty(_translator.ActiveAlarms);
     }
 
     [TestMethod]
@@ -169,9 +198,9 @@ public sealed class CuttingTranslatorTest
         var paused = Translate(CuttingNotifications.MachineStopped, "1", "PROG", "", "2");
         var running = Translate(CuttingNotifications.MachineRunning, "1", "PROG", "");
 
-        AssertText(paused, Paths.ItemState, "NotExecuting");
-        AssertText(paused, Paths.ChannelState, "Interrupted");
-        AssertText(running, Paths.ChannelState, "Active");
+        AssertStatus(paused, "NotExecuting");
+        AssertValue(paused, Paths.ChannelState, "Interrupted");
+        AssertValue(running, Paths.ChannelState, "Active");
     }
 
     [TestMethod]
@@ -197,10 +226,10 @@ public sealed class CuttingTranslatorTest
         var ended = held.Translate(CuttingNotification.Create(end, "1", "PROG", "", "", "1", "17.11.2026-09:30:00"));
 
         Assert.IsEmpty(stop, "The stop waits for what follows.");
-        AssertText(ended, Paths.ItemState, state);
-        Assert.AreEqual(new DateTime(2026, 11, 17, 9, 30, 0, DateTimeKind.Utc), ended[0].Timestamp, "The state keeps its time.");
-        Assert.IsFalse(ended.Any(p => p is TextPublication { Value: "Interrupted" }));
-        AssertText(ended, Paths.ChannelState, "Reset");
+        AssertStatus(ended, state);
+        Assert.AreEqual(new DateTimeOffset(2026, 11, 17, 9, 30, 0, TimeSpan.Zero), ended[0].Timestamp, "The state keeps its time.");
+        Assert.IsFalse(ended.OfType<ValuePublication>().Any(p => p.Path == Paths.ChannelState && (string?)p.Value == "Interrupted"));
+        AssertValue(ended, Paths.ChannelState, "Reset");
     }
 
     [TestMethod]
@@ -212,9 +241,9 @@ public sealed class CuttingTranslatorTest
         var started = held.Translate(CuttingNotification.Create(CuttingNotifications.StartNcp, "1", "PROG", "", "", "1", "17.11.2026-09:30:00"));
 
         Assert.IsEmpty(running);
-        AssertText(started, Paths.ItemState, "Executing");
-        Assert.HasCount(1, started.OfType<TextPublication>().Where(p => p.Path == Paths.ChannelState));
-        AssertText(started, Paths.ChannelState, "Active");
+        AssertStatus(started, "Executing");
+        Assert.HasCount(1, started.OfType<ValuePublication>().Where(p => p.Path == Paths.ChannelState));
+        AssertValue(started, Paths.ChannelState, "Active");
     }
 
     [TestMethod]
@@ -230,22 +259,20 @@ public sealed class CuttingTranslatorTest
         var due = held.Due();
 
         Assert.IsEmpty(early);
-        AssertText(due, Paths.ItemState, "NotExecuting");
-        AssertText(due, Paths.ChannelState, "Interrupted");
+        AssertStatus(due, "NotExecuting");
+        AssertValue(due, Paths.ChannelState, "Interrupted");
         Assert.IsNull(held.HeldUntil);
     }
 
     [TestMethod]
-    public void AHeldStateThatIsDue_ComesWithTheRepetition()
+    public void AHeldState_GoesFirst_WhenTheMachineIsGone()
     {
-        var clock = new FixedTime(Now);
-        var held = Held(clock);
+        var held = Held();
         held.Translate(CuttingNotification.Create(CuttingNotifications.MachineRunning, "1", "PROG"));
-        clock.Advance(TimeSpan.FromSeconds(5));
 
-        var repeated = held.Repeat();
+        var gone = held.Disconnected(machineSwitchedOff: false);
 
-        Assert.IsTrue(repeated.Any(p => p is TextPublication { Path: Paths.ItemState, Value: "Executing" }));
+        AssertStatus(gone, "Executing");
     }
 
     [TestMethod]
@@ -260,7 +287,7 @@ public sealed class CuttingTranslatorTest
     /// <summary>A translator that holds running and stopped states for one second, as the adapter does.</summary>
     private static CuttingTranslator Held(FixedTime? clock = null)
     {
-        return new CuttingTranslator(TimeZoneInfo.Utc, clock ?? new FixedTime(Now), TimeSpan.FromSeconds(1));
+        return new CuttingTranslator(Identity, TimeZoneInfo.Utc, clock ?? new FixedTime(Now), TimeSpan.FromSeconds(1));
     }
 
     private IReadOnlyList<Publication> Translate(string name, params string[] fields)
@@ -268,10 +295,22 @@ public sealed class CuttingTranslatorTest
         return _translator.Translate(CuttingNotification.Create(name, fields));
     }
 
-    private static void AssertText(IReadOnlyList<Publication> publications, string path, string value)
+    private static JsonNode? Value(IReadOnlyList<Publication> publications, string path)
     {
-        var text = publications.OfType<TextPublication>().SingleOrDefault(p => p.Path == path);
-        Assert.IsNotNull(text, $"Nothing published at {path}.");
-        Assert.AreEqual(value, text.Value, path);
+        var value = publications.OfType<ValuePublication>().LastOrDefault(p => p.Path == path);
+        Assert.IsNotNull(value, $"Nothing published at {path}.");
+        return value.Value;
+    }
+
+    private static void AssertValue(IReadOnlyList<Publication> publications, string path, string expected)
+    {
+        Assert.AreEqual(expected, (string?)Value(publications, path), path);
+    }
+
+    private static void AssertStatus(IReadOnlyList<Publication> publications, string itemState)
+    {
+        var status = Value(publications, Paths.Status)!.AsObject();
+        Assert.AreEqual(itemState, (string?)status["MachineryItemState"]);
+        Assert.AreEqual("None", (string?)status["MachineryOperationMode"], "The protocol knows no operation mode.");
     }
 }

@@ -39,7 +39,6 @@ x-simulator: &simulator
 x-cutting-simulator: &cutting-simulator
   <<: *service
   image: ghcr.io/united-machining-solutions/pleiades.playground.cutting.simulator:${PLEIADES_VERSION:-dev}
-  profiles: [cutting]
 
 # An adapter waits for the stores, so that its first values are not lost.
 x-cutting-adapter-depends: &cutting-adapter-depends
@@ -53,7 +52,6 @@ x-cutting-adapter-depends: &cutting-adapter-depends
 x-cutting-adapter: &cutting-adapter
   <<: *service
   image: ghcr.io/united-machining-solutions/pleiades.playground.cutting.adapter:${PLEIADES_VERSION:-dev}
-  profiles: [cutting]
 
 services:
   # Read-only printer observations, independent of the slicer and printer pairing.
@@ -393,8 +391,7 @@ services:
 
   # Cutting simulators: one machine each, speaking the telegram protocol through files in a volume of its own.
   # Its adapter (below) mounts the same volume at /exchange and takes the serial number from here (YAML anchor):
-  # the simulator only shows it, the telegrams do not carry it. Simulators and adapters start only with the profile:
-  # docker compose --profile cutting up -d --build --wait
+  # the simulator only shows it, the telegrams do not carry it. Simulators and adapters start with the stack.
   # As above, only the first one builds or pulls the image.
   cutting-laser-2d:
     <<: *cutting-simulator
@@ -441,7 +438,7 @@ services:
       - cutting-punch-data:/data
 
   # Cutting adapters: one per machine, the host side of the protocol. Each mounts the volume of its machine and
-  # publishes below machines/{SerialNumber}/umati/ and machines/{SerialNumber}/events/notifications.
+  # publishes the binding of machines below machines/trumpf_<Model>_<SerialNumber>/ (umati/, oem/, events/notifications).
   # As above, only the first one builds or pulls the image.
   cutting-adapter-laser-2d:
     <<: *cutting-adapter
@@ -454,6 +451,7 @@ services:
         condition: service_started
     environment:
       Config__SerialNumber: *cutting-laser-2d-serial
+      Config__Model: Laser2D
       Config__MachineNumber: "1"
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: cutting-adapter-l-01
@@ -469,6 +467,7 @@ services:
         condition: service_started
     environment:
       Config__SerialNumber: *cutting-tube-serial
+      Config__Model: Tube
       Config__MachineNumber: "1"
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: cutting-adapter-t-01
@@ -484,6 +483,7 @@ services:
         condition: service_started
     environment:
       Config__SerialNumber: *cutting-punch-serial
+      Config__Model: Punch
       Config__MachineNumber: "1"
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: cutting-adapter-pu-01

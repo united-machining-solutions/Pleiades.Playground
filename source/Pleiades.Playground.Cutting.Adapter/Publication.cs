@@ -1,49 +1,70 @@
-using Pleiades.Playground.Common.DataTransferObjects;
-using Pleiades.Playground.Notification.DataTransferObjects;
+using System.Text.Json.Nodes;
+using Pleiades.Playground.Mqtt.Extensions.Machines;
 
 namespace Pleiades.Playground.Cutting.Adapter;
 
-/// <summary>
-/// One message for the broker, below <c>machines/{SerialNumber}/</c>.
-/// </summary>
-/// <param name="Timestamp">The time of the observation, UTC.</param>
-internal abstract record Publication(DateTime Timestamp);
-
-/// <summary>A text value at <c>umati/&lt;Path&gt;</c>.</summary>
-internal sealed record TextPublication(string Path, string Value, DateTime Timestamp) : Publication(Timestamp);
-
-/// <summary>A number in its SI unit at <c>umati/&lt;Path&gt;</c>.</summary>
-internal sealed record NumberPublication(string Path, double Value, BaseUnit Unit, DateTime Timestamp) : Publication(Timestamp);
-
-/// <summary>An alarm that comes or goes, at <c>events/notifications</c>.</summary>
-/// <param name="NotificationId">The alarm number of the machine.</param>
-/// <param name="Title">The alarm text.</param>
-/// <param name="Action">Raised or reset.</param>
-/// <param name="CorrelationId">The same for the coming and the going of one alarm.</param>
-/// <param name="Timestamp">When.</param>
-internal sealed record AlarmPublication(
-    string NotificationId,
-    string Title,
-    NotificationAction Action,
-    string CorrelationId,
-    DateTime Timestamp) : Publication(Timestamp);
+/// <summary>One thing the machine said, for the broker below <c>machines/{MachineId}/</c>.</summary>
+/// <param name="Timestamp">The time the machine gave it, UTC.</param>
+internal abstract record Publication(DateTimeOffset Timestamp);
 
 /// <summary>
-/// The paths below <c>umati/</c> the adapter publishes, named by the data model and the binding.
+/// A value of an element: a path of the model (<c>State.Status</c>) or of a signal of the manufacturer
+/// (<see cref="Paths.ActiveProgram"/>, below the prefix <c>x-&lt;domain&gt;</c>).
 /// </summary>
+/// <param name="Path">The path, every segment a level of the topic.</param>
+/// <param name="Value">A JSON value, a snapshot, a list, or <see langword="null"/> for not available right now.</param>
+/// <param name="Timestamp">The time the machine gave it, UTC.</param>
+/// <param name="Unit">The name of the unit in the catalogue of the model, with a number.</param>
+internal sealed record ValuePublication(string Path, JsonNode? Value, DateTimeOffset Timestamp, string? Unit = null)
+    : Publication(Timestamp);
+
+/// <summary>An alert event, <c>Notification.AlertRaised</c> or <c>Notification.AlertCleared</c>.</summary>
+/// <param name="Type">The path of the event in the model.</param>
+/// <param name="Alert">The alert, with the fields of an entry of <c>Notification.ActiveAlerts</c>.</param>
+/// <param name="Timestamp">When it came up or went, UTC.</param>
+internal sealed record AlertPublication(string Type, JsonObject Alert, DateTimeOffset Timestamp) : Publication(Timestamp);
+
+/// <summary>The paths the adapter publishes, named by the data model 0.17.1 and the binding.</summary>
 internal static class Paths
 {
-    public const string ConnectionState = "Connection/State";
-    public const string Heartbeat = "Connection/Heartbeat";
-    public const string ItemState = "State/MachineryItemState";
-    public const string OperationMode = "State/MachineryOperationMode";
-    public const string FeedOverride = "State/FeedOverride";
-    public const string ChannelState = "Channel/1/ChannelState";
-    public const string ActiveProgram = "Production/ActiveProgram";
+    /// <summary>The snapshot of <c>MachineryItemState</c> and <c>MachineryOperationMode</c>.</summary>
+    public const string Status = MachineManifest.Status;
+
+    public const string FeedOverride = "State.FeedOverride";
+    public const string ChannelState = "Channel.1.ChannelState";
+    public const string ActiveAlerts = "Notification.ActiveAlerts";
+
+    /// <summary>
+    /// The NC program, a signal of the manufacturer below its prefix, as the simulators publish it: the model has no
+    /// element for it.
+    /// </summary>
+    public const string ActiveProgram = "WorkMasterMonitoring.ActiveProgram";
+
+    public const string AlertRaised = "Notification.AlertRaised";
+    public const string AlertCleared = "Notification.AlertCleared";
 }
 
-/// <summary>Sends publications to the broker.</summary>
+/// <summary>Puts what the machine says on the broker, as the binding of machines says.</summary>
 internal interface IPublisher
 {
-    Task PublishAsync(IReadOnlyList<Publication> publications);
+    /// <summary>Begins: the connect sequence of the binding, once the broker is there.</summary>
+    Task StartAsync();
+
+    /// <summary>The machine answered a request: <c>Running</c>, after <paramref name="publications"/>.</summary>
+    Task ReachedAsync(IReadOnlyList<Publication> publications);
+
+    /// <summary>
+    /// The machine said <paramref name="publications"/>, in this order. While it counts as not reached, the values
+    /// are kept for the next <see cref="ReachedAsync"/>; this never reports it as reached.
+    /// </summary>
+    Task SaidAsync(IReadOnlyList<Publication> publications);
+
+    /// <summary>The machine does not answer: <c>CommunicationFault</c>; the values stand.</summary>
+    Task LostAsync();
+
+    /// <summary>The sign of life of the adapter, whatever the machine does.</summary>
+    Task HeartbeatAsync();
+
+    /// <summary>A clean stop: <c>Shutdown</c>, the last message.</summary>
+    Task ShutdownAsync();
 }

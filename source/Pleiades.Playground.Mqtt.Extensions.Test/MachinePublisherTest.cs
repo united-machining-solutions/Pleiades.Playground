@@ -309,6 +309,54 @@ public sealed class MachinePublisherTest
             "without the hook a client has no last will, as before");
     }
 
+    [TestMethod]
+    public async Task AnEvent_WaitsForTheConnectSequence_AndGoesOutInOrderAfterIt()
+    {
+        using var client = new RecordingManagedMqttClient(connected: false);
+        var time = new ManualTimeProvider(Start);
+        using var publisher = Publisher(client, time);
+        await publisher.AttachAsync();
+
+        await publisher.EventAsync(Event(1));
+        await publisher.EventAsync(Event(2));
+        Assert.IsEmpty(client.Take(), "Nothing goes out without a connection.");
+        Assert.AreEqual(2, publisher.PendingEvents);
+
+        await client.ConnectAsync();
+        var messages = client.Take();
+
+        Assert.AreEqual(Machine + "umati/Connection/State", messages[0].Topic, "The connect sequence comes first.");
+        Assert.AreEqual(Machine + "umati/Manifest", messages[1].Topic);
+        CollectionAssert.AreEqual(new[] { "1", "2" }, messages.Where(m => m.Topic == EventTopic).Select(m => m.ConvertPayloadToString()).ToArray());
+        Assert.AreEqual(0, publisher.PendingEvents);
+
+        await publisher.EventAsync(Event(3));
+        Assert.AreEqual("3", client.Take().Single().ConvertPayloadToString(), "After the sequence an event goes out at once.");
+    }
+
+    [TestMethod]
+    public async Task AFullOutbox_DropsTheOldestEvent()
+    {
+        using var client = new RecordingManagedMqttClient(connected: false);
+        using var publisher = new MachinePublisher(client, Identity, Manifest(), new ManualTimeProvider(Start), NullLogger.Instance, outboxCapacity: 2);
+        await publisher.AttachAsync();
+
+        foreach (var number in new[] { 1, 2, 3 })
+        {
+            await publisher.EventAsync(Event(number));
+        }
+
+        await client.ConnectAsync();
+
+        CollectionAssert.AreEqual(new[] { "2", "3" },
+            client.Take().Where(m => m.Topic == EventTopic).Select(m => m.ConvertPayloadToString()).ToArray());
+    }
+
+    private const string EventTopic = Machine + "events/notifications";
+
+    private static MqttApplicationMessage Event(int number)
+        => new MqttApplicationMessageBuilder().WithTopic(EventTopic).WithPayload(number.ToString(System.Globalization.CultureInfo.InvariantCulture)).Build();
+
     private static MachinePublisher Publisher(RecordingManagedMqttClient client, ManualTimeProvider time)
         => new(client, Identity, Manifest(), time, NullLogger.Instance);
 

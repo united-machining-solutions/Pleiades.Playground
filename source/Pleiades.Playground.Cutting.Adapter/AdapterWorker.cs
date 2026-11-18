@@ -12,11 +12,12 @@ namespace Pleiades.Playground.Cutting.Adapter;
 /// <remarks>
 /// <list type="number">
 /// <item>Send <c>SRC9CONN</c>. Without a reply, wait for <c>$$src9_server_connect$$</c> or the next try.</item>
-/// <item>Connected: publish <c>Connection/State</c> and ask <c>MACHINFO</c>, which makes the machine send its
-/// feed rate (§6.4).</item>
-/// <item>Every heartbeat interval ask <c>SYSTTIME</c>. The protocol has no heartbeat of its own; each reply is one.
-/// After a few unanswered requests the machine counts as disconnected.</item>
-/// <item>On stop, <c>SRC9DISC</c>.</item>
+/// <item>Connected: <c>Connection/State</c> <c>Running</c>, and ask <c>MACHINFO</c>, which makes the machine send
+/// its feed rate (§6.4).</item>
+/// <item>Every heartbeat interval ask <c>SYSTTIME</c>. After a few unanswered requests the machine counts as
+/// disconnected: <c>CommunicationFault</c>. <c>Connection/Heartbeat</c> is the sign of life of the adapter and comes
+/// every heartbeat interval, whether the machine answers or not.</item>
+/// <item>On stop, <c>SRC9DISC</c>, then <c>Shutdown</c>.</item>
 /// </list>
 /// </remarks>
 [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Instantiated by DI")]
@@ -34,7 +35,6 @@ internal sealed partial class AdapterWorker(
     private readonly SemaphoreSlim _machineAnnounced = new(0);
     private volatile bool _connected;
     private int _missed;
-    private long _heartbeat;
     private bool _wrongNumberLogged;
     private CancellationToken _stopping;
 
@@ -53,11 +53,16 @@ internal sealed partial class AdapterWorker(
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         await base.StopAsync(cancellationToken).ConfigureAwait(false);
-        if (!_connected)
+        if (_connected)
         {
-            return;
+            await DisconnectAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        await PublishAsync(p => p.ShutdownAsync()).ConfigureAwait(false);
+    }
+
+    private async Task DisconnectAsync(CancellationToken cancellationToken)
+    {
         // The reading loop has stopped, so the reply is not awaited.
         _connected = false;
         try
@@ -69,7 +74,7 @@ internal sealed partial class AdapterWorker(
             LogDisconnectFailed(ex);
         }
 
-        await PublishAsync(() => translator.Disconnected(machineSwitchedOff: false)).ConfigureAwait(false);
+        await PublishAsync(p => p.SaidAsync(translator.Disconnected(machineSwitchedOff: false))).ConfigureAwait(false);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -88,9 +93,12 @@ internal sealed partial class AdapterWorker(
         session.NotificationReceived = OnNotificationAsync;
         var reading = session.RunAsync(stoppingToken);
 
-        // Until the machine answers, it is not connected.
-        await PublishAsync(() => translator.Disconnected(machineSwitchedOff: false)).ConfigureAwait(false);
+        // Until the machine answers, it is not reached.
+        await PublishAsync(p => p.StartAsync()).ConfigureAwait(false);
+        await PublishAsync(p => p.LostAsync()).ConfigureAwait(false);
 
+        // The sign of life of the adapter keeps its own beat, however long a request to the machine takes.
+        var beating = BeatAsync(stoppingToken);
         try
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -112,6 +120,25 @@ internal sealed partial class AdapterWorker(
         }
 
         await reading.ConfigureAwait(false);
+        await beating.ConfigureAwait(false);
+    }
+
+    /// <summary><c>Connection/Heartbeat</c> every heartbeat interval, the first at once, whether the machine answers or not.</summary>
+    private async Task BeatAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(Config.HeartbeatInterval);
+        try
+        {
+            do
+            {
+                await PublishAsync(p => p.HeartbeatAsync()).ConfigureAwait(false);
+            }
+            while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Stopping.
+        }
     }
 
     private async Task ConnectAsync(CancellationToken cancellationToken)
@@ -129,7 +156,7 @@ internal sealed partial class AdapterWorker(
         _connected = true;
         Interlocked.Exchange(ref _missed, 0);
         LogConnected(Config.SerialNumber, reply[^1].Fields.Count);
-        await PublishAsync(translator.Connected).ConfigureAwait(false);
+        await PublishAsync(p => p.ReachedAsync(translator.Connected())).ConfigureAwait(false);
 
         var info = await session.RequestAsync(CuttingCommands.MachineInfo, [Config.MachineNumber], Config.ReplyTimeout, cancellationToken)
             .ConfigureAwait(false);
@@ -150,8 +177,8 @@ internal sealed partial class AdapterWorker(
         {
             Interlocked.Exchange(ref _missed, 0);
             CheckMachineNumber(reply[^1].Field(2));
-            var count = Interlocked.Increment(ref _heartbeat);
-            await PublishAsync(() => [.. translator.Repeat(), .. translator.Heartbeat(count)]).ConfigureAwait(false);
+            // A held state that is due, should its own timer have missed it.
+            await PublishAsync(p => p.SaidAsync(translator.Due())).ConfigureAwait(false);
             return;
         }
 
@@ -159,7 +186,11 @@ internal sealed partial class AdapterWorker(
         {
             _connected = false;
             LogSilent(Config.SerialNumber, Config.MissedRepliesUntilDisconnected);
-            await PublishAsync(() => translator.Disconnected(machineSwitchedOff: false)).ConfigureAwait(false);
+            await PublishAsync(async p =>
+            {
+                await p.SaidAsync(translator.Disconnected(machineSwitchedOff: false)).ConfigureAwait(false);
+                await p.LostAsync().ConfigureAwait(false);
+            }).ConfigureAwait(false);
         }
     }
 
@@ -171,15 +202,21 @@ internal sealed partial class AdapterWorker(
                 // A machine that starts (again) wants the host to connect anew (§2.5).
                 LogMachineAnnounced(Config.SerialNumber);
                 _connected = false;
+                // Not reached until it answers SRC9CONN again; until then its values are not current.
+                await PublishAsync(p => p.LostAsync()).ConfigureAwait(false);
                 _machineAnnounced.Release();
                 break;
             case CuttingNotifications.ServerDisconnect:
                 LogMachineSwitchedOff(Config.SerialNumber);
                 _connected = false;
-                await PublishAsync(() => translator.Disconnected(machineSwitchedOff: true)).ConfigureAwait(false);
+                await PublishAsync(async p =>
+                {
+                    await p.SaidAsync(translator.Disconnected(machineSwitchedOff: true)).ConfigureAwait(false);
+                    await p.LostAsync().ConfigureAwait(false);
+                }).ConfigureAwait(false);
                 break;
             default:
-                await PublishAsync(() => translator.Translate(notification)).ConfigureAwait(false);
+                await PublishAsync(p => p.SaidAsync(translator.Translate(notification))).ConfigureAwait(false);
                 if (notification.Name is CuttingNotifications.MachineRunning or CuttingNotifications.MachineStopped &&
                     Config.StateHold > TimeSpan.Zero)
                 {
@@ -200,7 +237,7 @@ internal sealed partial class AdapterWorker(
         {
             // A little more than the hold, so that the state is surely due.
             await Task.Delay(Config.StateHold + TimeSpan.FromMilliseconds(20), _stopping).ConfigureAwait(false);
-            await PublishAsync(translator.Due).ConfigureAwait(false);
+            await PublishAsync(p => p.SaidAsync(translator.Due())).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -219,13 +256,13 @@ internal sealed partial class AdapterWorker(
     }
 
     /// <summary>Translates and publishes under one lock, so that values keep the order the machine sent them in.</summary>
-    private async Task PublishAsync(Func<IReadOnlyList<Publication>> translate)
+    private async Task PublishAsync(Func<IPublisher, Task> publish)
     {
         // Not cancelled by stopping: StopAsync still publishes that the machine is disconnected.
         await _gate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
-            await publisher.PublishAsync(translate()).ConfigureAwait(false);
+            await publish(publisher).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

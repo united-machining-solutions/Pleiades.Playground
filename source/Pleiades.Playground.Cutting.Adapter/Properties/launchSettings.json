@@ -18,6 +18,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "Config__SerialNumber": "T-01",
+        "Config__Model": "Tube",
         "Config__ExchangeDirectory": "../../.cutting/exchange-tube"
       }
     },
@@ -28,6 +29,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "Config__SerialNumber": "PU-01",
+        "Config__Model": "Punch",
         "Config__ExchangeDirectory": "../../.cutting/exchange-punch"
       }
     }
