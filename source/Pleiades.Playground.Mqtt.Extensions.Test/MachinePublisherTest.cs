@@ -227,6 +227,73 @@ public sealed class MachinePublisherTest
     }
 
     [TestMethod]
+    public async Task NoHeartbeatGoesOut_BeforeTheConnectSequenceOfTheConnection()
+    {
+        using var client = new RecordingManagedMqttClient();
+        var time = new ManualTimeProvider(Start);
+        using var publisher = Publisher(client, time);
+
+        // Connected, but the handler of the connect has not run yet.
+        await publisher.HeartbeatAsync(time.GetUtcNow());
+        await publisher.ReachedAsync(Values(21.5, "Executing", "J-1"), time.GetUtcNow());
+        Assert.IsEmpty(client.Take());
+
+        await publisher.AttachAsync();
+        await publisher.HeartbeatAsync(time.GetUtcNow());
+        var messages = client.Take();
+        Assert.AreEqual("Initializing", Value(messages[0]));
+        Assert.AreEqual(Machine + "umati/Manifest", messages[1].Topic);
+        Assert.AreEqual("Running", Value(messages[^2]));
+        Assert.AreEqual(Machine + "umati/Connection/Heartbeat", messages[^1].Topic);
+    }
+
+    [TestMethod]
+    public async Task AFailedConnectSequence_IsTriedAgainWithTheNextCall_WithoutASecondInitializing()
+    {
+        using var client = new RecordingManagedMqttClient { FailAt = 3 };
+        var time = new ManualTimeProvider(Start);
+        using var publisher = Publisher(client, time);
+
+        await publisher.AttachAsync();
+        Assert.HasCount(2, client.Take(), "Initializing and the manifest, then the queue refused");
+
+        await publisher.HeartbeatAsync(time.GetUtcNow());
+        var again = client.Take();
+        Assert.IsFalse(again.Any(m => Value(m) as string == "Initializing"));
+        Assert.AreEqual(Machine + "umati/Manifest", again[0].Topic);
+        Assert.IsTrue(again.Any(m => m.Topic == Machine + "umati/Identification/SerialNumber"));
+        Assert.IsFalse(again.Any(m => m.Topic.EndsWith("/Heartbeat", StringComparison.Ordinal)), "the heartbeat waits for the next round");
+
+        await publisher.ReachedAsync(Values(21.5, "Executing", "J-1"), time.GetUtcNow());
+        Assert.AreEqual("Running", Value(client.Take()[^1]));
+        await publisher.HeartbeatAsync(time.GetUtcNow());
+        Assert.AreEqual(Machine + "umati/Connection/Heartbeat", client.Take().Single().Topic);
+    }
+
+    [TestMethod]
+    public async Task AConnectHandlerInFlight_EndsQuietly_WhenThePublisherIsDisposed()
+    {
+        using var client = new RecordingManagedMqttClient();
+        var time = new ManualTimeProvider(Start);
+        var publisher = Publisher(client, time);
+        await publisher.AttachAsync();
+        client.Take();
+
+        // A value holds the gate while the queue waits; a connect comes meanwhile.
+        client.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reached = publisher.ReachedAsync(Values(21.5, "Executing", "J-1"), time.GetUtcNow());
+        var connect = client.ConnectAsync();
+        Assert.IsFalse(connect.IsCompleted);
+
+        publisher.Dispose();
+        await connect.WaitAsync(TimeSpan.FromSeconds(5));
+        client.Hold.SetResult();
+        await reached.WaitAsync(TimeSpan.FromSeconds(5));
+        await publisher.HeartbeatAsync(time.GetUtcNow());
+        Assert.IsFalse(client.Take().Any(m => m.Topic.EndsWith("/Manifest", StringComparison.Ordinal)), "the disposed publisher sends no sequence");
+    }
+
+    [TestMethod]
     public void LastWill_IsCommunicationFault_RetainedWithQos1_OnConnectionState()
     {
         var options = ManagedMqttClientOptions.From(new MqttConfig { ConnectionString = "mqtt://localhost:1883" },

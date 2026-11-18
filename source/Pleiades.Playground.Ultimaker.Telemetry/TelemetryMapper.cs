@@ -25,6 +25,9 @@ internal static partial class TelemetryMapper
     /// </summary>
     internal const string NoOperationMode = "None";
 
+    /// <summary>The state of the model for a printer that answers in a state the model has no word for.</summary>
+    internal const string OutOfService = "OutOfService";
+
     /// <summary>The whole of what the printer says now; a value it does not give is left out.</summary>
     internal static IReadOnlyList<MachineValue> Map(JsonElement printer, JsonElement? job, DateTimeOffset observedAt, MachineIdentity identity)
     {
@@ -73,16 +76,24 @@ internal static partial class TelemetryMapper
             Number(Root + ".Print.TimeElapsed", Find(active, "time_elapsed"), MachineUnit.Second, 1, 0);
             Number(Root + ".Print.TimeTotal", Find(active, "time_total"), MachineUnit.Second, 1, 0);
         }
-        var machineState = jobState switch
+        // The snapshot of the model: the printer has answered, so it always carries a state of the model. A state the
+        // model has no word for is OutOfService, "available but unable to perform any activity (e.g., error)", as
+        // the catalogue of the model says: the printer answers, so it is not switched off (NotAvailable), and it
+        // does not wait for an order either (NotExecuting). Never null here, or the last state would stand.
+        var machineState = status switch
         {
-            "printing" => "Executing",
-            "pausing" or "paused" or "resuming" or "pre_print" or "post_print" or "wait_cleanup" or "wait_user_action" => "NotExecuting",
-            "none" when status == "idle" => "NotExecuting",
-            _ => null,
+            "error" or "maintenance" => OutOfService,
+            "booting" => "NotAvailable",
+            _ => jobState switch
+            {
+                "printing" => "Executing",
+                "pausing" or "paused" or "resuming" or "pre_print" or "post_print" or "wait_cleanup" or "wait_user_action" => "NotExecuting",
+                "none" when status == "idle" => "NotExecuting",
+                _ => OutOfService,
+            },
         };
-        // The snapshot of the model; null while the state of the printer says nothing the model knows.
-        values.Add(new(MachineManifest.Status, machineState is null ? null
-            : new JsonObject { ["MachineryItemState"] = machineState, ["MachineryOperationMode"] = NoOperationMode }, observedAt));
+        values.Add(new(MachineManifest.Status,
+            new JsonObject { ["MachineryItemState"] = machineState, ["MachineryOperationMode"] = NoOperationMode }, observedAt));
         return values;
     }
 

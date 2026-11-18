@@ -72,7 +72,8 @@ public sealed class TelemetryTests
         using var printer = JsonDocument.Parse("""{"status":"future_status","bed":{"temperature":{"current":null}}}""");
         var values = TelemetryMapper.Map(printer.RootElement, null, DateTimeOffset.UtcNow, Identity);
         Assert.IsFalse(values.Any(v => v.Value is JsonValue n && n.GetValueKind() == JsonValueKind.Number));
-        Assert.IsNull(values.Single(v => v.Path == "State.Status").Value, "a state the model does not know is null");
+        Assert.AreEqual("OutOfService", values.Single(v => v.Path == "State.Status").Value!["MachineryItemState"]!.GetValue<string>(),
+            "a printer that answers in a state the model has no word for is out of service, never null");
         Assert.AreEqual("none", values.Single(v => v.Path == "x-ultimaker-com.Ultimaker.Print.State").Value!.GetValue<string>());
         using var job = JsonDocument.Parse("""{"state":"paused","progress":-1,"time_elapsed":null,"time_total":-1}""");
         values = TelemetryMapper.Map(printer.RootElement, job.RootElement, DateTimeOffset.UtcNow, Identity);
@@ -140,6 +141,13 @@ public sealed class TelemetryTests
         var manifest = RecordingManagedMqttClient.Json(messages.Single(m => m.Topic == Machine + "umati/Manifest"));
         ModelSchemas.AssertValuesValid(messages, "ultimaker_UM3_UM3-01", manifest);
 
+        // From printing into an error: the snapshot changes, so the stored field does not stay at Executing.
+        printer.Status = "error";
+        printer.NoJob = true;
+        await UntilAsync(() => mqtt.Messages.Count(m => m.Topic == Machine + "umati/State/Status") == 2).ConfigureAwait(false);
+        var fault = RecordingManagedMqttClient.Json(mqtt.Messages.Last(m => m.Topic == Machine + "umati/State/Status"));
+        Assert.AreEqual("OutOfService", fault["value"]!["MachineryItemState"]!.GetValue<string>());
+
         printer.Fail = true;
         await UntilAsync(() => States(mqtt)[^1] == "CommunicationFault").ConfigureAwait(false);
         printer.Fail = false;
@@ -201,6 +209,8 @@ public sealed class TelemetryTests
     private sealed class FakePrinter : HttpMessageHandler
     {
         public volatile bool Fail;
+        public volatile bool NoJob;
+        public volatile string Status = "printing";
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -209,7 +219,12 @@ public sealed class TelemetryTests
             {
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
             }
-            var body = request.RequestUri!.AbsolutePath.EndsWith("/print_job", StringComparison.Ordinal) ? Job : Snapshot;
+            var job = request.RequestUri!.AbsolutePath.EndsWith("/print_job", StringComparison.Ordinal);
+            if (job && NoJob)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+            }
+            var body = job ? Job : Snapshot.Replace("\"status\":\"printing\"", "\"status\":\"" + Status + "\"", StringComparison.Ordinal);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
         }
     }

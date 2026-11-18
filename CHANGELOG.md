@@ -217,7 +217,8 @@ All notable changes are documented here. The format follows
   machines, not only its tree, as the simulators do: every value retained with QoS 1 in the envelope
   `{timestamp, value, unit}` with the content type `application/json`, a manifest before the values (profile
   `Core`, what the device lacks `"available": false`, their own signals with the prefix `x-ultimaker-com` and
-  `x-trumpf-com`), the snapshot `umati/State/Status` instead of a value on `umati/State/Status/MachineryItemState`,
+  `x-trumpf-com`), the snapshot `umati/State/Status` instead of a value on `umati/State/Status/MachineryItemState` (a printer
+  state the model has no word for is `OutOfService`),
   `Connection/State` `Initializing`, `Running`, `CommunicationFault` and `Shutdown`, a last will with
   `CommunicationFault`, and the identification with `ProductInstanceUri` and `ManufacturerUri` retained at every
   connect instead of every five minutes. A value goes out when it changes. The machine ids stay

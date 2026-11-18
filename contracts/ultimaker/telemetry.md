@@ -39,7 +39,7 @@ live snapshot; they are not reconstructed hardware sampling times, and the manif
 | umati/Connection/Heartbeat | integer | no unit, as the catalogue; a counter from 1 every 10 seconds, also while printer requests are blocked |
 | umati/Identification/{Manufacturer,SerialNumber,ProductInstanceUri,ManufacturerUri,Model} | string | who the printer is; `ProductInstanceUri` is `https://ultimaker.com/UM3/UM3-01` unless set |
 | umati/Identification/{ProductCode,YearOfConstruction}, umati/State/FeedOverride, umati/Notification/ActiveAlerts, umati/OperationCounters/PowerOnDuration | null | `"available": false` |
-| umati/State/Status | snapshot | `MachineryItemState`: Executing for an actively printing job, NotExecuting for known idle/paused/wait states; `MachineryOperationMode`: None. `null` for states the model does not know |
+| umati/State/Status | snapshot | `MachineryItemState`: Executing for an actively printing job; NotExecuting for known idle/paused/wait states; OutOfService for `error`, `maintenance` and every state the model has no word for; NotAvailable while `booting`. `MachineryOperationMode`: None |
 | oem/Ultimaker/PrinterStatus | string | Unmodified manufacturer state |
 | oem/Ultimaker/Bed/Temperature | number | degreeCelsius |
 | oem/Ultimaker/Bed/TargetTemperature | number | degreeCelsius |
@@ -60,8 +60,15 @@ The path of a signal in the manifest is `x-ultimaker-com.` and its topic below `
 
 The MQTT binding uses degreeCelsius rather than kelvin, as the catalogue of the model does; the REST/MCP
 printer API continues to use kelvin.
-`MachineryOperationMode` is `None`: the schema of the snapshot asks for the field, and `None` is the value of
-the model for a machine without operation modes. No power, heater duty, material flow or step-count unit is
+`MachineryOperationMode` is `None`: the schema of the snapshot asks for the field, and the catalogue of the
+model says an adapter reports `None` when it does not know the operation mode.
+A printer that answers always has a `MachineryItemState`, never `null`: values go out when they change, so a
+`null` would leave the last state standing, and a printer that falls from printing into an error would still
+show `Executing`. A state the model has no word for is `OutOfService`, which the catalogue describes as
+"available but unable to perform any activity (e.g., error)": the printer answers, so it is not switched off
+(`NotAvailable`, which the catalogue keeps for a known state such as switched off), and it does not wait for an
+order (`NotExecuting`). Only `booting`, a printer that is not yet available, is `NotAvailable`. The state of the
+manufacturer stays on `oem/Ultimaker/PrinterStatus` and `oem/Ultimaker/Print/State`. No power, heater duty, material flow or step-count unit is
 guessed. The temperature.html diagnostics buffer is not scraped or replayed as live observations.
 No filenames, user names, credentials or printer network configuration are published.
 

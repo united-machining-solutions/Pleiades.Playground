@@ -14,6 +14,9 @@ namespace Pleiades.Playground.Mqtt.Extensions.Machines;
 /// then <c>Running</c> once the device has answered, or <c>CommunicationFault</c> once it has not.</item>
 /// <item>At every later connect: the manifest and every value again, then the state, without a second
 /// <c>Initializing</c>.</item>
+/// <item>Nothing else goes out on a connection before that sequence, not even the heartbeat. When the sequence
+/// fails, the next call of <see cref="ReachedAsync"/>, <see cref="LostAsync"/> or <see cref="HeartbeatAsync"/> tries
+/// it again.</item>
 /// <item>While the device answers (<see cref="ReachedAsync"/>), a value goes out when it changes; one the device no
 /// longer reports goes out once as <c>null</c>, not available right now.</item>
 /// <item>When it stops answering (<see cref="LostAsync"/>): <c>CommunicationFault</c>; the values stand, only the
@@ -30,12 +33,20 @@ public sealed partial class MachinePublisher : IDisposable
     private readonly ILogger _logger;
     private readonly DateTimeOffset _start;
     private readonly IReadOnlyList<MachineValue> _identification;
+
+    // Neither is disposed: a handler of the client in flight may still wait on the gate when the publisher is
+    // disposed. It ends quietly through the cancellation instead. Without a wait handle they hold nothing unmanaged.
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly CancellationTokenSource _disposing = new();
+
+    private readonly Dictionary<string, string> _sent = new(StringComparer.Ordinal);
     private JsonObject _manifest;
     private Dictionary<string, MachineValue> _current = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, string> _sent = new(StringComparer.Ordinal);
     private bool? _reachable;
-    private bool _initialized;
+    private bool _saidInitializing;
+    private volatile bool _synced;
+    private volatile bool _syncFailed;
+    private volatile bool _disposed;
     private bool _attached;
     private DateTimeOffset _lastStateAt = DateTimeOffset.MinValue;
     private long _heartbeats;
@@ -71,13 +82,16 @@ public sealed partial class MachinePublisher : IDisposable
     public bool? Reachable => _reachable;
 
     /// <summary>
-    /// Hears every connect of the client from now on; when it is connected already, publishes the state at once.
+    /// Hears every connect and disconnect of the client from now on; when it is connected already, publishes the
+    /// state at once.
     /// </summary>
     public async Task AttachAsync()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (!_attached)
         {
             _client.ConnectedAsync += OnConnectedAsync;
+            _client.DisconnectedAsync += OnDisconnectedAsync;
             _attached = true;
         }
         if (_client.IsConnected)
@@ -88,33 +102,19 @@ public sealed partial class MachinePublisher : IDisposable
 
     /// <summary>
     /// After a connect: <c>Initializing</c> the first time, the manifest, the identification, the elements the
-    /// machine lacks as <c>null</c>, every value known, and then the state of the device if it is known.
+    /// machine lacks as <c>null</c>, every value known, and then the state of the device if it is known. A failure
+    /// is logged; the next call that would publish tries the sequence again.
     /// </summary>
     public async Task ConnectedAsync(DateTimeOffset now)
     {
-        await _gate.WaitAsync().ConfigureAwait(false);
+        if (!await EnterAsync().ConfigureAwait(false))
+        {
+            return;
+        }
         try
         {
-            if (!_initialized)
-            {
-                await SendStateAsync(MachineBinding.Initializing, now).ConfigureAwait(false);
-            }
-            await _client.EnqueueAsync(MachineBinding.ManifestMessage(MachineId, _manifest)).ConfigureAwait(false);
-            foreach (var value in _identification)
-            {
-                await _client.EnqueueAsync(MachineBinding.ValueMessage(MachineId, value)).ConfigureAwait(false);
-            }
-            foreach (var path in MachineManifest.Unavailable(_manifest))
-            {
-                await _client.EnqueueAsync(MachineBinding.ValueMessage(MachineId, new MachineValue(path, null, _start))).ConfigureAwait(false);
-            }
-            await SendAllAsync().ConfigureAwait(false);
-            if (_reachable is { } reachable)
-            {
-                await SendStateAsync(reachable ? MachineBinding.Running : MachineBinding.CommunicationFault, now).ConfigureAwait(false);
-            }
-            _initialized = true;
-            LogConnected(MachineId, _current.Count);
+            _synced = false;
+            await SyncAsync(now).ConfigureAwait(false);
         }
         finally
         {
@@ -130,7 +130,10 @@ public sealed partial class MachinePublisher : IDisposable
     public async Task ReachedAsync(IEnumerable<MachineValue> values, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(values);
-        await _gate.WaitAsync().ConfigureAwait(false);
+        if (!await EnterAsync().ConfigureAwait(false))
+        {
+            return;
+        }
         try
         {
             var next = new Dictionary<string, MachineValue>(StringComparer.Ordinal);
@@ -148,9 +151,9 @@ public sealed partial class MachinePublisher : IDisposable
             var wasReached = _reachable == true;
             _current = next;
             _reachable = true;
-            if (!_client.IsConnected || !_initialized)
+            if (!await ReadyAsync(now).ConfigureAwait(false))
             {
-                // The next connect publishes everything.
+                // The connect sequence publishes everything, Running included.
                 return;
             }
             if (!wasReached)
@@ -182,19 +185,27 @@ public sealed partial class MachinePublisher : IDisposable
     /// </summary>
     public async Task LostAsync(DateTimeOffset now)
     {
-        await _gate.WaitAsync().ConfigureAwait(false);
+        if (!await EnterAsync().ConfigureAwait(false))
+        {
+            return;
+        }
         try
         {
-            if (_reachable == false)
+            var changed = _reachable != false;
+            _reachable = false;
+            if (changed)
             {
+                LogLost(MachineId);
+            }
+            if (!await ReadyAsync(now).ConfigureAwait(false))
+            {
+                // The connect sequence publishes the state.
                 return;
             }
-            _reachable = false;
-            if (_client.IsConnected && _initialized)
+            if (changed)
             {
                 await SendStateAsync(MachineBinding.CommunicationFault, now).ConfigureAwait(false);
             }
-            LogLost(MachineId);
         }
         finally
         {
@@ -202,13 +213,19 @@ public sealed partial class MachinePublisher : IDisposable
         }
     }
 
-    /// <summary>The sign of life of the adapter: <c>Connection/Heartbeat</c>, a count from 1, while connected.</summary>
+    /// <summary>
+    /// The sign of life of the adapter: <c>Connection/Heartbeat</c>, a count from 1, once the connect sequence of the
+    /// connection has gone out.
+    /// </summary>
     public async Task HeartbeatAsync(DateTimeOffset now)
     {
-        await _gate.WaitAsync().ConfigureAwait(false);
+        if (!await EnterAsync().ConfigureAwait(false))
+        {
+            return;
+        }
         try
         {
-            if (_client.IsConnected)
+            if (await ReadyAsync(now).ConfigureAwait(false))
             {
                 var heartbeat = new MachineValue(MachineBinding.Heartbeat, JsonValue.Create(++_heartbeats), now);
                 await _client.EnqueueAsync(MachineBinding.ValueMessage(MachineId, heartbeat)).ConfigureAwait(false);
@@ -227,7 +244,10 @@ public sealed partial class MachinePublisher : IDisposable
     public async Task UpdateManifestAsync(JsonObject manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
-        await _gate.WaitAsync().ConfigureAwait(false);
+        if (!await EnterAsync().ConfigureAwait(false))
+        {
+            return;
+        }
         try
         {
             if (JsonNode.DeepEquals(manifest, _manifest))
@@ -235,7 +255,7 @@ public sealed partial class MachinePublisher : IDisposable
                 return;
             }
             _manifest = manifest;
-            if (_client.IsConnected && _initialized)
+            if (_client.IsConnected && _synced)
             {
                 await _client.EnqueueAsync(MachineBinding.ManifestMessage(MachineId, _manifest)).ConfigureAwait(false);
             }
@@ -252,7 +272,10 @@ public sealed partial class MachinePublisher : IDisposable
     /// </summary>
     public async Task ShutdownAsync(DateTimeOffset now, TimeSpan drain)
     {
-        await _gate.WaitAsync().ConfigureAwait(false);
+        if (!await EnterAsync().ConfigureAwait(false))
+        {
+            return;
+        }
         try
         {
             if (!_client.IsConnected)
@@ -273,19 +296,112 @@ public sealed partial class MachinePublisher : IDisposable
     }
 
     /// <inheritdoc />
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
+        Justification = "A handler of the client in flight may still wait on the gate; it ends through the cancellation.")]
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+        _disposed = true;
         if (_attached)
         {
             _client.ConnectedAsync -= OnConnectedAsync;
+            _client.DisconnectedAsync -= OnDisconnectedAsync;
             _attached = false;
         }
-        _gate.Dispose();
+        _disposing.Cancel();
+    }
+
+    /// <summary>Takes the gate, or says no once the publisher is disposed: then nothing goes out.</summary>
+    private async Task<bool> EnterAsync()
+    {
+        if (_disposed)
+        {
+            return false;
+        }
+        try
+        {
+            await _gate.WaitAsync(_disposing.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        if (_disposed)
+        {
+            _gate.Release();
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Whether the connection may carry more than the connect sequence: connected, and the sequence has gone out.
+    /// After a failed sequence it is tried again here. Before the handler of a connect has run, nothing goes out.
+    /// </summary>
+    private async Task<bool> ReadyAsync(DateTimeOffset now)
+    {
+        if (!_client.IsConnected)
+        {
+            return false;
+        }
+        if (!_synced && _syncFailed)
+        {
+            await SyncAsync(now).ConfigureAwait(false);
+            // Everything the caller would send is in the sequence.
+            return false;
+        }
+        return _synced;
+    }
+
+    /// <summary>The connect sequence. Holds the gate.</summary>
+    private async Task SyncAsync(DateTimeOffset now)
+    {
+        try
+        {
+            if (!_saidInitializing)
+            {
+                await SendStateAsync(MachineBinding.Initializing, now).ConfigureAwait(false);
+                _saidInitializing = true;
+            }
+            await _client.EnqueueAsync(MachineBinding.ManifestMessage(MachineId, _manifest)).ConfigureAwait(false);
+            foreach (var value in _identification)
+            {
+                await _client.EnqueueAsync(MachineBinding.ValueMessage(MachineId, value)).ConfigureAwait(false);
+            }
+            foreach (var path in MachineManifest.Unavailable(_manifest))
+            {
+                await _client.EnqueueAsync(MachineBinding.ValueMessage(MachineId, new MachineValue(path, null, _start))).ConfigureAwait(false);
+            }
+            await SendAllAsync().ConfigureAwait(false);
+            if (_reachable is { } reachable)
+            {
+                await SendStateAsync(reachable ? MachineBinding.Running : MachineBinding.CommunicationFault, now).ConfigureAwait(false);
+            }
+            _synced = true;
+            _syncFailed = false;
+            LogConnected(MachineId, _current.Count);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _syncFailed = true;
+            LogSyncFailed(MachineId, exception);
+        }
     }
 
     private Task OnConnectedAsync(MqttClientConnectedEventArgs args)
     {
         return ConnectedAsync(_time.GetUtcNow());
+    }
+
+    private Task OnDisconnectedAsync(MqttClientDisconnectedEventArgs args)
+    {
+        // The next connection begins with its connect sequence; until then nothing else goes out.
+        _synced = false;
+        _syncFailed = false;
+        return Task.CompletedTask;
     }
 
     private async Task SendAllAsync()
@@ -309,9 +425,9 @@ public sealed partial class MachinePublisher : IDisposable
         {
             at = _lastStateAt.AddMilliseconds(1);
         }
-        _lastStateAt = at;
         var value = new MachineValue(MachineBinding.ConnectionState, JsonValue.Create(state), at);
         await _client.EnqueueAsync(MachineBinding.ValueMessage(MachineId, value)).ConfigureAwait(false);
+        _lastStateAt = at;
     }
 
     /// <summary>What a value says, without its time: a value that says the same again does not go out.</summary>
@@ -331,4 +447,8 @@ public sealed partial class MachinePublisher : IDisposable
 
     [LoggerMessage(EventId = 202, Level = LogLevel.Warning, Message = "{MachineId} does not answer: CommunicationFault")]
     private partial void LogLost(string machineId);
+
+    [LoggerMessage(EventId = 203, Level = LogLevel.Warning,
+        Message = "The connect sequence of {MachineId} failed; it is tried again with the next value, state or heartbeat")]
+    private partial void LogSyncFailed(string machineId, Exception exception);
 }

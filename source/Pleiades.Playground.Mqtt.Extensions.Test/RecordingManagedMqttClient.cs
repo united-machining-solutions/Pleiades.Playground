@@ -85,10 +85,23 @@ internal sealed class RecordingManagedMqttClient : IManagedMqttClient
         return Task.CompletedTask;
     }
 
-    public Task EnqueueAsync(MqttApplicationMessage applicationMessage)
+    /// <summary>The enqueue with this number from now on (1 is the next one) throws, once.</summary>
+    public int FailAt { get; set; }
+
+    /// <summary>While set, an enqueue waits until it completes.</summary>
+    public TaskCompletionSource? Hold { get; set; }
+
+    public async Task EnqueueAsync(MqttApplicationMessage applicationMessage)
     {
+        if (FailAt > 0 && --FailAt == 0)
+        {
+            throw new InvalidOperationException("The queue refuses the message.");
+        }
+        if (Hold is { } hold)
+        {
+            await hold.Task.ConfigureAwait(false);
+        }
         Messages.Enqueue(applicationMessage);
-        return Task.CompletedTask;
     }
 
     public Task SubscribeAsync(IEnumerable<MqttTopicFilter> topicFilters) => Task.CompletedTask;

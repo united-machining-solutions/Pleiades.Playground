@@ -40,8 +40,9 @@ See the contract table for every topic under `machines/{MachineId}/`.
 Temperatures use `degreeCelsius`, the explicit exception already documented in the MQTT binding.
 Positions and lengths are converted from manufacturer millimetres to metre; fan percentages to
 fractions. Unknown negative material lengths and missing job measurements are omitted, not zeroed.
-Job filenames and user names are not published. Unknown machine states are not fabricated into an
-umati state; the original state of the manufacturer remains available below `oem/`.
+Job filenames and user names are not published. A printer state the model has no word for is
+`OutOfService` in `State/Status` (see the contract); the original state of the manufacturer remains available
+below `oem/`.
 
 UTC timestamps are the adapter's observation time of each live snapshot. No printer clock or
 diagnostics boot-relative timestamp is substituted. Every value is retained and goes out when it changes.
