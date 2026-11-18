@@ -64,7 +64,7 @@ timeseries-persistence   Up 3 minutes (healthy)
 | <http://localhost:5500/> | The Timeseries API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
-| <http://localhost:5611/>, `:5612`, `:5613` | The web pages of the three cutting machines, a 2D laser, a tube laser and a punching machine: their plan, their alarms and every telegram. They answer on this computer only. |
+| <http://localhost:5611/>, `:5612`, `:5613` | The web pages of the three cutting machines, a 2D laser, a tube laser and a punching machine: their plan, their alarms and every telegram. They answer on the network too, like the web UI of the OPC UA simulator. |
 | `localhost:1883` | The MQTT broker the simulators and adapters publish to. |
 | <http://localhost:5560/machines> | The OPC UA adapter: the machines added over OPC UA. It answers on this computer only. |
 | <http://localhost:8090/> | The web UI of the simulated OPC UA machine, A1121O0001. |

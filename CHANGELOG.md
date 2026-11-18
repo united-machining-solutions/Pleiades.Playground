@@ -45,6 +45,8 @@ All notable changes are documented here. The format follows
   room for actions on the right.
 - Energy card: `genui_energy_show` says how much energy machines imported over the last 1 to 24 hours, from
   their meters, with mean and peak power; the card draws their power as a graph (`genui_energy_series`).
+- Time series card: `genui_timeseries_show` draws any signal of any machine over 15 minutes to 24 hours, a line for each
+  pair of a machine and a signal, on two y axes at most; a person changes the range and the lines on the card.
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
@@ -291,6 +293,9 @@ All notable changes are documented here. The format follows
   disagrees with the `EngineeringUnits`, makes the match `Unclear`.
 
 ### Changed
+
+- Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
+  computer, as the web UI of the OPC UA simulator does; in the stack and in the Margo app.
 
 - The Ultimaker telemetry and the juice bar publish the payloads and the delivery of the MQTT binding of
   machines, not only its tree, as the simulators do: every value retained with QoS 1 in the envelope
