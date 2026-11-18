@@ -422,7 +422,7 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   development server opens no second connection. `plugin.ts` is the plugin of Nitro that calls it when the
   server starts and signs the app off when the server closes. The icon is `public/hub-icon.svg`.
 - `src/opcua/`: what the chat and its cards take of the OPC UA adapter. `commands.ts` holds the slash
-  commands and `/help`, `adapter.ts` the server functions behind the buttons that add and remove a machine.
+  commands and `/help`, and turns a tool of an MCP server into a command (`toolCommand`), `adapter.ts` the server functions behind the buttons that add and remove a machine.
   The adapter's tools are a second MCP server of the harness, and its part of the instructions stands in
   `assistant.server.ts`; while the adapter does not answer, the chat offers none of it.
 - The [shadcn/ui](https://ui.shadcn.com) components come from [`packages/ui`](../../packages/ui/README.md),

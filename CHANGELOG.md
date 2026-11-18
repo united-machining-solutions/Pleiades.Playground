@@ -7,6 +7,13 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: the list under the chat field that `/` opens offers the tools of the MCP servers the chat
+  has, after its commands, and works from the keyboard, as in other chats. `/genui_machine_show M-02` asks
+  the model to answer with that tool; it is a request, not a call, so the model still fills in the
+  arguments. A server the chat has switched off under "Tools" gives none, and neither does a tool only a
+  card calls. A part of a name finds the tool too (`/machine`). One entry is marked; the arrow keys move
+  the mark, Tab writes it into the field, Enter takes it and Escape closes the list. The field keeps the
+  focus and points to the marked entry for screen readers.
 - MQTT binding, draft 0.3.0: a third first level, `hub/`, beside `machines` and `sites`. It carries the
   registration of apps at the Pleiades Hub (repository `umati/pleiades-hub`), the page that shows the apps of
   a Pleiades system under one header. The binding only reserves the level and says who owns it: the topics
