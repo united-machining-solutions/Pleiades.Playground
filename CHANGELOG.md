@@ -248,6 +248,10 @@ All notable changes are documented here. The format follows
   stored values and notifications of the machine through those two endpoints (`Config:TimeseriesApi:Uri`,
   `Config:EventsApi:Uri`, set in `compose.yaml`), after `Config:DataSettleTime` (8 s), so that its last
   values are stored first. The answer says how many; the Remove dialog in the chat says so.
+- OPC UA adapter: the scan in the chat reads the descriptions of the nodes. The model reads the `Description`
+  attribute of all candidates in one call and uses it to choose between them, to tell what a node of the maker
+  means, and as the unit of a node without `EngineeringUnits`. A description that contradicts the element, or
+  disagrees with the `EngineeringUnits`, makes the match `Unclear`.
 
 ### Changed
 
