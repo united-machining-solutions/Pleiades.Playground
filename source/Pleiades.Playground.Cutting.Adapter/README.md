@@ -51,6 +51,7 @@ number>`, formed from `Config__ManufacturerUri`, `Config__Model` and `Config__Se
 | `umati/Channel/1/ChannelState` | `Active` | `StartNCP`; `MaschineLaeuft` after a halt |
 | | `Interrupted` | `MaschineSteht`, reason 1 or 2, while a program runs: a halt |
 | | `Reset` | `EndeNCP`, `ResetNCP` |
+| `umati/WorkMasterMonitoring/ActiveWorkMaster` | the NC program, `null` when none runs: the machine has no work master of its own, so its work master is the program, as the catalogue of the model says of most machine tools | `StartNCP` field 2; `EndeNCP`, `ResetNCP` |
 | `oem/WorkMasterMonitoring/ActiveProgram` | the NC program, `null` when none runs; a signal of the manufacturer (`x-trumpf-com.WorkMasterMonitoring.ActiveProgram`), as the simulators publish it | `StartNCP` field 2; `EndeNCP`, `ResetNCP` |
 | `umati/Notification/ActiveAlerts` | the whole list: `Id`, `ErrorCode` (the alarm number), `Message`, `Severity` `Failure`, `Time` | `AktuelleAlarme` |
 | `events/notifications` | CloudEvent `Notification.AlertRaised` | `AktuelleAlarme`, once per alarm number |

@@ -18,13 +18,20 @@ namespace Pleiades.Playground.Cutting.Adapter;
 /// MaschineSteht reason 1         State.Status              MachineryItemState OutOfService
 /// src9_server_disconnect         State.Status              MachineryItemState NotAvailable
 /// StartNCP                       Channel.1.ChannelState    Active      x-&lt;domain&gt;.WorkMasterMonitoring.ActiveProgram  name
+///                                WorkMasterMonitoring.ActiveWorkMaster  name
 /// stop while a program runs      Channel.1.ChannelState    Interrupted
 /// running again                  Channel.1.ChannelState    Active
 /// EndeNCP, ResetNCP              Channel.1.ChannelState    Reset       x-&lt;domain&gt;.WorkMasterMonitoring.ActiveProgram  null
+///                                WorkMasterMonitoring.ActiveWorkMaster  null
 /// Feedrate                       State.FeedOverride        percent / 100, unit one
 /// AktuelleAlarme                 Notification.ActiveAlerts and Notification.AlertRaised; AlertCleared when the
 ///                                machine runs again or stands without a fault
 /// </code>
+/// <para>
+/// The machine has no work master of its own: its work master is the NC program, as the catalogue of the model
+/// says of most machine tools. So <c>WorkMasterMonitoring.ActiveWorkMaster</c> carries the name of the program,
+/// the same value as the signal of the manufacturer.
+/// </para>
 /// <para>
 /// The protocol knows no operation mode; the snapshot <c>State.Status</c> says <c>None</c>, the value of the model
 /// for a machine without operation modes.
@@ -84,7 +91,7 @@ internal sealed partial class CuttingTranslator(
     {
         var now = Now;
         List<Publication> result = [];
-        foreach (var path in new[] { Paths.Status, Paths.ChannelState, _programPath }.Where(p => !_lastTimestamp.ContainsKey(p)))
+        foreach (var path in new[] { Paths.Status, Paths.ChannelState, _programPath, Paths.ActiveWorkMaster }.Where(p => !_lastTimestamp.ContainsKey(p)))
         {
             result.Add(new ValuePublication(path, null, now));
         }
@@ -132,8 +139,14 @@ internal sealed partial class CuttingTranslator(
         _programKnown = false;
         _program = string.Empty;
         return known
-            ? [new ValuePublication(Paths.ChannelState, "Reset", at), new ValuePublication(_programPath, null, at)]
+            ? [new ValuePublication(Paths.ChannelState, "Reset", at), .. Program(null, at)]
             : [];
+    }
+
+    /// <summary>The NC program, as the signal of the manufacturer and as the work master; null when none runs.</summary>
+    private List<Publication> Program(string? program, DateTimeOffset at)
+    {
+        return [new ValuePublication(_programPath, program, at), new ValuePublication(Paths.ActiveWorkMaster, program, at)];
     }
     /// <summary>The held state, once its time has come and no program notification took it; else nothing.</summary>
     public IReadOnlyList<Publication> Due()
@@ -308,7 +321,7 @@ internal sealed partial class CuttingTranslator(
         _programKnown = true;
         _program = program;
         result.Add(new ValuePublication(Paths.ChannelState, "Active", at));
-        result.Add(new ValuePublication(_programPath, program.Length == 0 ? null : program, at));
+        result.AddRange(Program(program.Length == 0 ? null : program, at));
         return result;
     }
 
@@ -326,7 +339,7 @@ internal sealed partial class CuttingTranslator(
         _programKnown = true;
         _program = string.Empty;
         result.Add(new ValuePublication(Paths.ChannelState, "Reset", at));
-        result.Add(new ValuePublication(_programPath, null, at));
+        result.AddRange(Program(null, at));
         return result;
     }
 

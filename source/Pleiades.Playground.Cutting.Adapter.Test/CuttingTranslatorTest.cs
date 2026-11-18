@@ -31,6 +31,7 @@ public sealed class CuttingTranslatorTest
 
         AssertValue(result, Paths.ChannelState, "Active");
         AssertValue(result, Program, "PROG_A");
+        AssertValue(result, Paths.ActiveWorkMaster, "PROG_A");
         Assert.AreEqual(new DateTimeOffset(2026, 11, 17, 9, 30, 0, TimeSpan.Zero), result[0].Timestamp);
     }
 
@@ -43,6 +44,7 @@ public sealed class CuttingTranslatorTest
 
         AssertValue(result, Paths.ChannelState, "Reset");
         Assert.IsNull(Value(result, Program), "No program runs: null, as the simulators publish it.");
+        Assert.IsNull(Value(result, Paths.ActiveWorkMaster));
     }
 
     [TestMethod]
@@ -156,6 +158,7 @@ public sealed class CuttingTranslatorTest
 
         Assert.IsNull(Value(result, Paths.ChannelState));
         Assert.IsNull(Value(result, Program));
+        Assert.IsNull(Value(result, Paths.ActiveWorkMaster));
     }
 
     [TestMethod]
@@ -187,6 +190,7 @@ public sealed class CuttingTranslatorTest
 
         AssertValue(off, Paths.ChannelState, "Reset");
         Assert.IsNull(Value(off, Program));
+        Assert.IsNull(Value(off, Paths.ActiveWorkMaster));
     }
 
     [TestMethod]
@@ -210,6 +214,7 @@ public sealed class CuttingTranslatorTest
 
         AssertValue(restarted, Paths.ChannelState, "Reset");
         Assert.IsNull(Value(restarted, Program));
+        Assert.IsNull(Value(restarted, Paths.ActiveWorkMaster));
         Assert.AreEqual(Paths.AlertCleared, restarted.OfType<AlertPublication>().Single().Type);
         Assert.IsEmpty(_translator.ActiveAlarms);
     }

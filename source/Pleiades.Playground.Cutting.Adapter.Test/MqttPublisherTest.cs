@@ -181,6 +181,7 @@ public sealed class MqttPublisherTest
         var elements = manifest["elements"]!.AsArray().OfType<JsonObject>().ToDictionary(e => (string)e["path"]!);
         Assert.AreEqual("source", (string?)elements[Paths.Status]["timestampSource"]);
         Assert.IsTrue(elements.ContainsKey(Paths.ChannelState));
+        Assert.AreEqual("source", (string?)elements[Paths.ActiveWorkMaster]["timestampSource"]);
         Assert.AreEqual("string", (string?)elements["x-trumpf-com.WorkMasterMonitoring.ActiveProgram"]["type"]);
         Assert.IsFalse((bool)elements["Identification.YearOfConstruction"]["available"]!, "What the protocol does not give is not available.");
         Assert.IsFalse((bool)elements["OperationCounters.PowerOnDuration"]["available"]!);

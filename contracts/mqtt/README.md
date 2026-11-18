@@ -539,7 +539,7 @@ Each delivers of `Core` the identification, the connection and `State/Status`, w
 `None`, the value of the model for a machine without operation modes; `ProductCode`, `YearOfConstruction`
 and `OperationCounters.PowerOnDuration` are `"available": false`. Printer and juice bar do not deliver
 `State.FeedOverride` and `Notification.ActiveAlerts` either, and publish no events. The cutting adapter delivers
-both, besides `Channel/1/ChannelState`; its timestamps are those of the machine (`"timestampSource": "source"`), save a `null` for not known, which carries the time of the connect,
+both, besides `Channel/1/ChannelState` and `WorkMasterMonitoring/ActiveWorkMaster`, which carries the name of the NC program, the same value as its signal: the machine has no work master of its own; its timestamps are those of the machine (`"timestampSource": "source"`), save a `null` for not known, which carries the time of the connect,
 and each alarm of the machine is an entry of `ActiveAlerts` with the events `Notification.AlertRaised` and
 `Notification.AlertCleared` on `events/notifications`.
 
@@ -569,7 +569,7 @@ and each alarm of the machine is an entry of `ActiveAlerts` with the events `Not
   only as a signal of the manufacturer, `oem/WorkMasterMonitoring/ActiveProgram`; the model has no element for the
   program, and its catalogue still says the work master of a machine tool is mostly the name of the NC program.
   Open: whether the model wants an element for the program (for example in `ProgramExecution`), or the work master
-  stays the program name on machines without a work master of their own.
+  stays the program name on machines without a work master of their own. The cutting adapter does the latter.
 - The planned times of a job order. The model asks for `PlannedStartTime` and `PlannedEndTime` and allows `null`;
   the virtual machine knows no plan and sends `null`. `OrderNumbers` is made up (`SO-` and the number of the job
   order).
