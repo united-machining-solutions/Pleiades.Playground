@@ -204,4 +204,32 @@ public sealed class ApiMachineEventTest
         Assert.AreEqual(240, executions!.Items.Single().Duration);
         Assert.IsEmpty(gaps!, "the shift misses no event");
     }
+
+    [TestMethod]
+    public async Task DeleteMachineEvents_ReturnsTheCount()
+    {
+        using var api = new Api();
+        api.Repository.Setup(r => r.DeleteByMachineAsync(Machine, It.IsAny<CancellationToken>())).ReturnsAsync(3);
+
+        var response = await api.Client.DeleteAsync(new Uri($"/machineEvents/machines/{Machine}", UriKind.Relative), TestContext.CancellationToken);
+
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<MachineEventsDeleteResultDtoV1>(Json, TestContext.CancellationToken);
+        Assert.AreEqual(3, result!.EventsCount);
+        api.Repository.Verify(r => r.DeleteByMachineAsync(Machine, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [TestMethod]
+    [DataRow("a+b")]
+    [DataRow("a%23b")]
+    [DataRow("%20")]
+    public async Task DeleteMachineEvents_NotOneLevelOfATopic_ReturnsBadRequest(string mId)
+    {
+        using var api = new Api();
+
+        var response = await api.Client.DeleteAsync(new Uri($"/machineEvents/machines/{mId}", UriKind.Relative), TestContext.CancellationToken);
+
+        Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
+        api.Repository.Verify(r => r.DeleteByMachineAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 }

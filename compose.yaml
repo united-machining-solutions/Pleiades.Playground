@@ -379,6 +379,7 @@ services:
   # OPC UA: machines that speak OPC UA, added in the chat.
   #
   #   opc-simulator ──OPC UA──▶ opcua-adapter ──MQTT──▶ broker
+  #                                   └──REST, delete a removed machine──▶ timeseries-api, events-api
   #
   # The adapter runs every machine that is registered with it, from the registrations in its volume.
   # See source/Pleiades.Playground.OpcUa.Adapter/README.md.
@@ -404,6 +405,9 @@ services:
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: opcua-adapter
       Config__DataDirectory: /data
+      # Removing a machine deletes what it published, through the REST contracts of the stores.
+      Config__TimeseriesApi__Uri: http://timeseries-api:8080
+      Config__EventsApi__Uri: http://events-api:8080
     volumes:
       - opcua_adapter_data:/data
 

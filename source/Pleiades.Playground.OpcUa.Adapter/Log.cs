@@ -59,4 +59,10 @@ internal static partial class Log
 
     [LoggerMessage(20, LogLevel.Warning, "Machine {SerialNumber}: ConditionRefresh failed: {Reason}. New alarms are monitored; alarms that already stand are not caught up.")]
     public static partial void AlertsNotRefreshed(this ILogger logger, string serialNumber, string reason);
+
+    [LoggerMessage(21, LogLevel.Information, "Machine {SerialNumber}: its stored data is deleted, {Values} values and {Events} notifications.")]
+    public static partial void MachineDataDeleted(this ILogger logger, string serialNumber, long values, long events);
+
+    [LoggerMessage(22, LogLevel.Warning, "Machine {SerialNumber}: its stored data is not deleted completely: {Reason}")]
+    public static partial void MachineDataNotDeleted(this ILogger logger, string serialNumber, string reason);
 }

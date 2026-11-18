@@ -63,6 +63,7 @@ internal sealed class MachineSupervisor : BackgroundService
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Usage", "CA2213:Disposable fields should be disposed",
         Justification = "Disposed asynchronously at the end of ExecuteAsync, after every machine left it.")]
     private readonly SessionPool _pool;
+    private readonly MachineDataEraser _eraser;
     private readonly SemaphoreSlim _changes = new(1, 1);
     private readonly RegistrationStore _store;
     private readonly AlertStore _alertStore;
@@ -83,10 +84,12 @@ internal sealed class MachineSupervisor : BackgroundService
         IMachinePublisher publisher,
         DraftStore drafts,
         CredentialStore credentials,
+        MachineDataEraser eraser,
         IOptions<Config> config,
         ILogger<MachineSupervisor> logger)
     {
         _credentials = credentials;
+        _eraser = eraser;
         _store = store;
         _alertStore = alertStore;
         _client = client;
@@ -401,10 +404,11 @@ internal sealed class MachineSupervisor : BackgroundService
     }
 
     /// <summary>
-    /// Removes a machine: closes its session, says <c>Disconnected</c>, resets the alarms that stand
-    /// and deletes its registration. What it published stays stored until the retention ends.
+    /// Removes a machine completely: closes its session, says <c>Disconnected</c>, resets the alarms
+    /// that stand, deletes its registration, and then deletes what it published from the Timeseries
+    /// and the Events API. Returns null if no such machine is added.
     /// </summary>
-    public async Task<bool> RemoveAsync(string serialNumber, CancellationToken cancellationToken)
+    public async Task<DataDeletion?> RemoveAsync(string serialNumber, CancellationToken cancellationToken)
     {
         await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -417,18 +421,31 @@ internal sealed class MachineSupervisor : BackgroundService
             }
 
             _alertStore.Delete(serialNumber);
-            var removed = _store.Delete(serialNumber);
-            if (removed)
+            if (!_store.Delete(serialNumber))
             {
-                _logger.MachineRemoved(serialNumber);
+                return null;
             }
 
-            return removed;
+            _logger.MachineRemoved(serialNumber);
         }
         finally
         {
             _changes.Release();
         }
+
+        // The last values, Disconnected and the resets are on their way to the stores: let them arrive, then delete.
+        await Task.Delay(_config.DataSettleTime, cancellationToken).ConfigureAwait(false);
+        var deletion = await _eraser.DeleteAsync(serialNumber, cancellationToken).ConfigureAwait(false);
+        if (deletion.Problems.Count == 0)
+        {
+            _logger.MachineDataDeleted(serialNumber, deletion.ValuesDeleted ?? 0, deletion.EventsDeleted ?? 0);
+        }
+        else
+        {
+            _logger.MachineDataNotDeleted(serialNumber, string.Join(" ", deletion.Problems));
+        }
+
+        return deletion;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

@@ -174,10 +174,16 @@ internal static class MachineEndpoints
         }
     }
 
+    // The machine is gone either way; a store that could not delete its data makes it a fault of a server.
     private static async Task<IResult> Remove(string serialNumber, MachineSupervisor supervisor, CancellationToken cancellationToken) =>
-        await supervisor.RemoveAsync(serialNumber, cancellationToken).ConfigureAwait(false)
-            ? Results.NoContent()
-            : NotAdded(serialNumber);
+        await supervisor.RemoveAsync(serialNumber, cancellationToken).ConfigureAwait(false) switch
+        {
+            null => NotAdded(serialNumber),
+            { Problems.Count: 0 } deletion => Json(deletion),
+            var deletion => Problem(
+                StatusCodes.Status502BadGateway,
+                [$"{serialNumber} is removed, but not all of its stored data is deleted.", .. deletion.Problems]),
+        };
 
     // A registration that does not fit its server is a conflict with the server, a malformed one a bad request.
     private static IResult Outcome(RegistrationOutcome outcome) =>

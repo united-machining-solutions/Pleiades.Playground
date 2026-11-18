@@ -157,6 +157,7 @@ app.UsePleiadesSwaggerUI($"{serviceInfo.Name} - V {serviceInfo.Version}");
 app.MapGroup("timeseries").MapTimeseries();
 app.MapGroup("topics").MapTopics();
 app.MapGroup("statistics").MapStatistics();
+app.MapGroup("machines").MapMachines();
 
 // MCP tool discovery/queries are reads; the internal API key satisfies the read policy.
 // Non-prod (auth disabled) stays anonymous. The group covers /mcp and GET /skill.

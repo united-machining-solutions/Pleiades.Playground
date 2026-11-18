@@ -31,6 +31,9 @@ internal interface IMachineEventRepository
 
     /// <summary>The events a view is put together from, oldest first, at most <see cref="MaxEventsForViews"/> (the newest).</summary>
     Task<List<MachineEventDao>> FindForViewAsync(MachineEventFilter filter, CancellationToken cancellationToken);
+
+    /// <summary>Deletes every event of one machine, of every group; returns how many.</summary>
+    Task<long> DeleteByMachineAsync(string mId, CancellationToken cancellationToken);
 }
 
 /// <summary>Filter on the events of machines; every part that is null filters nothing.</summary>
@@ -109,6 +112,16 @@ internal sealed class MachineEventRepository(IEventsDbContext dbContext) : IMach
             .ConfigureAwait(false);
         newestFirst.Reverse();
         return newestFirst;
+    }
+
+    /// <inheritdoc />
+    public async Task<long> DeleteByMachineAsync(string mId, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(mId);
+        var result = await dbContext.MachineEvents
+            .DeleteManyAsync(e => e.MId == mId, cancellationToken)
+            .ConfigureAwait(false);
+        return result.DeletedCount;
     }
 
     private static FilterDefinition<MachineEventDao> Build(MachineEventFilter filter)

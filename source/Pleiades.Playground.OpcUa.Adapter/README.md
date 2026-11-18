@@ -143,8 +143,9 @@ adapter (`OPCUA_MCP_URL`).
 | `/mapping <serial number>` | Shows mismatches and unclear mappings of one machine | `opcua_mapping_show` | mapping card, what needs a look first |
 | `/rescan <serial number>` | Scans an added server again and says what would change | as `/discover` | proposal card with the changes, with the button "Replace registration" |
 
-Removal is the Remove button on the server list, behind a confirmation. The model can neither add nor remove a
-machine, and is told never to say that it did.
+Removal is the Remove button on the server list, behind a confirmation. It removes the machine completely, its
+stored values and notifications too ([Restart, removal, a server that changed](#restart-removal-a-server-that-changed)).
+The model can neither add nor remove a machine, and is told never to say that it did.
 
 A machine named without an address gets the default endpoint, its name as host name and the port of OPC UA:
 
@@ -309,7 +310,7 @@ prefix of a gateway; both are open.
 | `GET /machines` | The registered machines with their state, and the machines each shares its session with. |
 | `GET /machines/{SerialNumber}` | One machine: its registration, the last value of every element, the alarms that stand. |
 | `GET /machines/{SerialNumber}/mapping` | The mapping review of one machine, element by element. |
-| `DELETE /machines/{SerialNumber}` | Removes the machine. |
+| `DELETE /machines/{SerialNumber}` | Removes the machine and then deletes its stored values and notifications. Answers how many, `{ "valuesDeleted", "eventsDeleted" }`; `502` with the reasons if a store did not delete, the machine is removed all the same. |
 
 A registration is refused with the reasons, one per line of `problems`: `400` if it is malformed, `409` if it
 does not fit its server or is not the machine it says it is, `502` if the server does not answer.
@@ -424,8 +425,15 @@ After a reconnect, and after a restart of the adapter, the server is asked for t
   them and connects. `docker compose down` keeps the volume; `docker compose down -v` deletes it, and with it
   every registration.
 - **Removal.** The machine leaves its session, `Disconnected` is published, the alarms that stand are reset and
-  the registration is deleted. The session closes with the last machine of its endpoint. What the machine
-  published stays stored until the retention ends.
+  the registration is deleted. The session closes with the last machine of its endpoint. Then the adapter
+  deletes what the machine published, through the REST contracts of the stores: its values with
+  `DELETE /machines/{serialNumber}` of the Timeseries API, its notifications with
+  `DELETE /machineEvents/machines/{serialNumber}` of the Events API (`Config:TimeseriesApi:Uri`,
+  `Config:EventsApi:Uri`). It waits `Config:DataSettleTime`, 8 seconds, before: the timeseries persistence
+  stores in batches of 5 seconds, and the last values and the `Disconnected` are to be stored before they are
+  deleted, or the machine would come back with them. The machine leaves Home and the history. The adapter
+  publishes nothing retained, so the broker brings nothing back. A store that cannot be reached is named in
+  the answer, and its data stays.
 - **A server that changed.** If a registered node is gone, the element says so and the machine has
   `needsRescan: true`. `/rescan` is the discovery again; its proposal says what would change, and the button
   replaces the registration. The subscription is built anew without a restart of the service. That is also how
@@ -462,7 +470,9 @@ What the scan of the TRUMPF simulator found, and what it did not. Another server
 - Restart of the adapter: the machine comes back from the volume in about a second, without the MCP tools.
 - Loss of the server: the machine goes Disconnected and is Connected again a few seconds after the server is back.
 - Removal, also with the button in the app: session closed, Disconnected published, open alarms reset,
-  registration deleted.
+  registration deleted. With the stored data (2026-11-18, simulator `1.4.0-alpha3`, definition `L26` in the
+  namespace `urn:umati2:datamodel:opcua`): 13 topics stored, the removal answered after 9 seconds with 19
+  values deleted, and 12 seconds later no topic of the machine was left.
 - The MCP endpoint of the adapter: an encrypted scan session through the hosted library, a proposal with 2
   derived and 2 unclear elements, a commit that works once and answers 404 the second time.
 - The default endpoint: in the stack the adapter resolves `A1121O0001` and gets the endpoints of

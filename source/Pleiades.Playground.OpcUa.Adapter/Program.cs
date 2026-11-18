@@ -71,6 +71,8 @@ builder.Services.AddSingleton<OpcUaClient>();
 builder.Services.AddSingleton<RegistrationProbe>();
 builder.Services.AddSingleton<IMachinePublisher, MachinePublisher>();
 builder.Services.AddHostedService<OpcUaConfigurationShare>();
+// The values and notifications of a removed machine are deleted through the REST contracts of the stores.
+builder.Services.AddHttpClient<MachineDataEraser>(http => http.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddSingleton<MachineSupervisor>();
 builder.Services.AddHostedService(services => services.GetRequiredService<MachineSupervisor>());
 

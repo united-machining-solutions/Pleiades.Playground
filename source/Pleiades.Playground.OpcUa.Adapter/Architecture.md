@@ -43,7 +43,8 @@ The example has two machines behind a gateway and one machine with an OPC UA ser
 
 | Part | Code | What it does |
 |---|---|---|
-| `MachineSupervisor` | [`MachineSupervisor.cs`](MachineSupervisor.cs) | Loads the registrations at start, adds, replaces and removes machines at run time, checks a registration against its server. |
+| `MachineSupervisor` | [`MachineSupervisor.cs`](MachineSupervisor.cs) | Loads the registrations at start, adds, replaces and removes machines at run time, checks a registration against its server and against the core and the profiles of the data model ([`Mapping/DataModelProfiles.cs`](Mapping/DataModelProfiles.cs)). |
+| `MachineDataEraser` | [`MachineDataEraser.cs`](MachineDataEraser.cs) | Deletes the values and notifications of a removed machine through the REST APIs of the timeseries and the events. |
 | `SessionPool` | [`OpcUa/SharedSession.cs`](OpcUa/SharedSession.cs) | One `SharedSession` per endpoint: the same address (case and a slash at the end do not count), security mode, security policy and server certificate. Opened with the first machine of the endpoint, closed with the last one. |
 | `SharedSession` | [`OpcUa/SharedSession.cs`](OpcUa/SharedSession.cs) | Connects, watches the keep-alive, connects again with a back-off of 2 to 60 seconds. Attaches every machine to the session; a machine that cannot be attached is tried again every 30 seconds while the others go on. |
 | `MachineConnection` | [`OpcUa/MachineConnection.cs`](OpcUa/MachineConnection.cs) | One per registered machine: its own subscription on the session, its own `Connected` or `Disconnected`, its heartbeat and its alarms. Behind a gateway it keeps the alarms whose source or condition lies in one of its namespaces. |

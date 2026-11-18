@@ -18,7 +18,7 @@ namespace Pleiades.Playground.Events.Api.Endpoints;
 /// </summary>
 internal static class MachineEvents
 {
-    /// <summary>Maps <c>/machineEvents</c>: store, read and find gaps.</summary>
+    /// <summary>Maps <c>/machineEvents</c>: store, read, find gaps and delete the events of a machine.</summary>
     internal static RouteGroupBuilder MapMachineEvents(this RouteGroupBuilder group)
     {
         group.MapGet("/", GetMachineEvents)
@@ -39,6 +39,11 @@ internal static class MachineEvents
         group.MapPost("/bulk", BulkPostMachineEvents)
             .WithName("BulkPostMachineEvents")
             .WithSummary("Stores several CloudEvents of machines as they came")
+            .RequireFeatureWrite(EventsFeature.Name);
+
+        group.MapDelete("/machines/{mId}", DeleteMachineEvents)
+            .WithName("DeleteMachineEvents")
+            .WithSummary("Deletes every event of one machine")
             .RequireFeatureWrite(EventsFeature.Name);
 
         return group;
@@ -217,6 +222,28 @@ internal static class MachineEvents
         }
 
         return TypedResults.Created(new Uri("/bulk", UriKind.Relative));
+    }
+
+    /// <summary>
+    /// Deletes every event of one machine, of every group. A machine that still reports has events again with its
+    /// next event.
+    /// </summary>
+    /// <param name="mId">The machine id, as in its topics. Example: alcyone-machines_AX-400_P-04</param>
+    /// <param name="repository">Repository of the events.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>How many events were deleted, zero if the machine had none; 400 for an id that is no level of a topic.</returns>
+    internal static async Task<Results<Ok<MachineEventsDeleteResultDtoV1>, BadRequest<string>>> DeleteMachineEvents(
+        string mId,
+        IMachineEventRepository repository,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(mId) || mId.IndexOfAny(['/', '+', '#']) >= 0)
+        {
+            return TypedResults.BadRequest($"{nameof(mId)} must be one level of a topic: not empty, without '/', '+' or '#'.");
+        }
+
+        var count = await repository.DeleteByMachineAsync(mId, cancellationToken).ConfigureAwait(false);
+        return TypedResults.Ok(new MachineEventsDeleteResultDtoV1 { EventsCount = count });
     }
 
     /// <summary>Retrieves the alerts that stand now: raised and not cleared, in the order they came up.</summary>

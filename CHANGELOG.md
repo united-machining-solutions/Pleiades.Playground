@@ -240,6 +240,14 @@ All notable changes are documented here. The format follows
   is published; the elements of an incomplete one go to `missing`. The adapter names the profiles itself. The
   proposal card and the list of the added servers in the chat show whether the core is fulfilled and which
   profiles are complete, and the answers carry it as `conformance`.
+- The data of a machine can be deleted. `DELETE /machines/{serialNumber}` of the Timeseries API deletes every
+  value below `machines/{serialNumber}/`, `DELETE /machineEvents/machines/{mId}` of the Events API every
+  event of the machine; each says how many, and refuses a serial number with `/`, `+` or `#`. No MCP
+  tool deletes: a language model cannot.
+- OPC UA adapter: removing a machine removes it completely. After the registration, the adapter deletes the
+  stored values and notifications of the machine through those two endpoints (`Config:TimeseriesApi:Uri`,
+  `Config:EventsApi:Uri`, set in `compose.yaml`), after `Config:DataSettleTime` (8 s), so that its last
+  values are stored first. The answer says how many; the Remove dialog in the chat says so.
 
 ### Changed
 
