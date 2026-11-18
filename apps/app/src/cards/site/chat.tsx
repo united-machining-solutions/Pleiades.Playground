@@ -10,6 +10,7 @@ import { siteListOf } from "./results.ts"
 export const siteTools: ReadonlyArray<ChatTool> = [
   {
     name: "genui_site_list",
+    part: "Every site and its machines",
     label: {
       running: "Reading the sites",
       done: "Read the sites",

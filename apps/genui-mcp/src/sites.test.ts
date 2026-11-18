@@ -170,11 +170,12 @@ test("a hall of a placement that the site does not name is shown after the halls
 const apis = { timeseriesUrl: "http://timeseries:8080", eventsUrl: "http://events:8080", sitesUrl: "http://sites:8080" }
 
 /** The three APIs: the Sites API with what it holds, and a stack in which no machine published a value. */
-function serve(sites: unknown, placements: unknown): Array<string> {
+function serve(sites: unknown, placements: unknown, sitesDown = false): Array<string> {
   const requested: Array<string> = []
   mock.method(globalThis, "fetch", async (input: Parameters<typeof fetch>[0]) => {
     const url = new URL(String(input))
     requested.push(`${url.origin}${url.pathname}`)
+    if (sitesDown && url.origin === apis.sitesUrl) throw new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } })
     if (url.origin === apis.sitesUrl && url.pathname === "/sites") return Response.json(sites)
     if (url.origin === apis.sitesUrl && url.pathname === "/placements") return Response.json(placements)
     if (url.pathname === "/topics") return Response.json({ baseUnitTopics: [], stringTopics: [], booleanTopics: [] })
@@ -200,15 +201,42 @@ test("the sites and placements are read from the Sites API, and the result keeps
   assert.equal(siteList.safeParse(result).success, true)
 })
 
-test("an answer of the Sites API in a shape this server does not know fails, and names the API", async () => {
+test("an answer of the Sites API in a shape this server does not know lists no site, says why, and keeps the machines", async () => {
   serve([{ siteId: "north-plant" }], [])
-  await assert.rejects(listSites(apis, new Date(asOf)), /^Error: The Sites API answered in a shape this server does not know/)
+  const result = await listSites(apis, new Date(asOf))
+  assert.match(result.sitesError ?? "", /^The Sites API answered in a shape this server does not know/)
+  assert.deepEqual(result.sites, [])
+  assert.equal(result.machineCount, 0)
+  assert.equal(siteList.safeParse(result).success, true)
 })
 
-test("a server that was not told where the Sites API is says so", async () => {
-  serve([], [])
-  await assert.rejects(
-    listSites({ timeseriesUrl: apis.timeseriesUrl, eventsUrl: apis.eventsUrl }, new Date(asOf)),
-    /SITES_API_URL/,
+test("a Sites API that does not answer lists no site and says why", async () => {
+  serve([], [], true)
+  const result = await listSites(apis, new Date(asOf))
+  assert.match(result.sitesError ?? "", /^The Sites API did not answer: ECONNREFUSED/)
+  assert.deepEqual(result.sites, [])
+  assert.equal(siteList.safeParse(result).success, true)
+})
+
+test("without the sites, every machine that sends stands on no site, with the reason", () => {
+  const result = sitesOf([], [], list([machine("M-05", {})]), "The Sites API did not answer: ECONNREFUSED.")
+  assert.deepEqual(
+    result.unplaced.map((one) => one.machine),
+    [list([machine("M-05", {})]).machines[0]!.machine],
   )
+  assert.equal(result.sitesError, "The Sites API did not answer: ECONNREFUSED.")
+  assert.equal(sitesOf([], [], list([])).sitesError, null)
+})
+
+test("a server that was not told where the Sites API is says so, and lists the machines all the same", async () => {
+  serve([], [])
+  const result = await listSites({ timeseriesUrl: apis.timeseriesUrl, eventsUrl: apis.eventsUrl }, new Date(asOf))
+  assert.match(result.sitesError ?? "", /SITES_API_URL/)
+  assert.deepEqual(result.sites, [])
+  assert.equal(result.sitesError === null, false)
+})
+
+test("a Sites API that answers leaves no reason", async () => {
+  serve([], [])
+  assert.equal((await listSites(apis, new Date(asOf))).sitesError, null)
 })

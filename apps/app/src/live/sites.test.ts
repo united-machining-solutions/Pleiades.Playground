@@ -82,6 +82,7 @@ const list: SiteList = {
     },
   ],
   unplaced: [{ machine: P07, state: "setup", now: p07() }],
+  sitesError: null,
 }
 
 const north = (sites: SiteList) => sites.sites[0]!

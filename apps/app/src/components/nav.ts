@@ -23,8 +23,8 @@ export type NavEntry = {
 /**
  * What a page is called in the breadcrumb of the header, where the title of its entry does not say
  * it: a text, or one made from the parameters of its route, and from its search where the page is
- * named there (a page opened from a link is called by the title in the link). Home is called
- * "Machines" there, and the page of a machine by its machine.
+ * named there (a page opened from a link is called by the title in the link). The page of a
+ * machine is called by its machine.
  */
 export type Crumb = string | ((params: Record<string, string>, search: Record<string, unknown>) => string)
 

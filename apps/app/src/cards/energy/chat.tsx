@@ -10,6 +10,7 @@ import { ShownEnergy } from "./shown-energy.tsx"
 export const energyTools: ReadonlyArray<ChatTool> = [
   {
     name: "genui_energy_show",
+    part: "The energy of the machines over the last hours",
     label: {
       running: "Reading the energy",
       done: "Read the energy",
