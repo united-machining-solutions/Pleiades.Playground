@@ -40,6 +40,15 @@ internal sealed record ProbeResult(
 
     /// <summary>The elements whose node the server does not have.</summary>
     public IReadOnlyList<ProbedElement> NotFound => [.. Elements.Where(element => !element.NodeFound)];
+
+    /// <summary>False if the registration lists its alerts in a variable (<c>alerts.list</c>) the server does not have.</summary>
+    public bool AlertListFound { get; init; } = true;
+
+    /// <summary>
+    /// False if the registration takes its alerts from the events of a type (<c>alerts.eventType</c>) the server
+    /// does not have: its namespace is unknown, or the server has no such node.
+    /// </summary>
+    public bool AlertEventTypeFound { get; init; } = true;
 }
 
 /// <summary>Tries a registration against its server without storing or publishing anything.</summary>
@@ -94,7 +103,58 @@ internal sealed class RegistrationProbe : IRegistrationProbe
                 machines = [];
             }
 
-            return new ProbeResult(thumbprint, namespaces, elements, machines);
+            var listFound = registration.Alerts?.List is not { } list
+                || await FoundAsync(session, list, cancellationToken).ConfigureAwait(false);
+            var eventTypeFound = registration.Alerts?.EventType is not { Length: > 0 } eventType
+                || await TypeFoundAsync(session, eventType, cancellationToken).ConfigureAwait(false);
+            return new ProbeResult(thumbprint, namespaces, elements, machines)
+            {
+                AlertListFound = listFound,
+                AlertEventTypeFound = eventTypeFound,
+            };
+        }
+    }
+
+    /// <summary>Whether the server has a node: a read that answers is enough, whatever the value.</summary>
+    private static async Task<bool> FoundAsync(ManagedSession session, string text, CancellationToken cancellationToken)
+    {
+        if (!MachineConnection.TryResolve(session, text, out var node))
+        {
+            return false;
+        }
+
+        try
+        {
+            await session.ReadValueAsync(node, cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (ServiceResultException exception)
+        {
+            return exception.StatusCode != StatusCodes.BadNodeIdUnknown && exception.StatusCode != StatusCodes.BadNodeIdInvalid;
+        }
+    }
+
+    /// <summary>
+    /// Whether the server has the node of a type: its BrowseName is read, since a type has no value. Only a
+    /// server that says it does not know the node, or a namespace it does not have, counts as not found.
+    /// </summary>
+    private static async Task<bool> TypeFoundAsync(ManagedSession session, string text, CancellationToken cancellationToken)
+    {
+        if (!MachineConnection.TryResolve(session, text, out var node))
+        {
+            return false;
+        }
+
+        try
+        {
+            ArrayOf<ReadValueId> toRead = new[] { new ReadValueId { NodeId = node, AttributeId = Attributes.BrowseName } };
+            var response = await session.ReadAsync(null, 0, TimestampsToReturn.Neither, toRead, cancellationToken).ConfigureAwait(false);
+            var status = response.Results.Count > 0 ? response.Results[0].StatusCode : StatusCodes.Good;
+            return status != StatusCodes.BadNodeIdUnknown && status != StatusCodes.BadNodeIdInvalid;
+        }
+        catch (ServiceResultException exception)
+        {
+            return exception.StatusCode != StatusCodes.BadNodeIdUnknown && exception.StatusCode != StatusCodes.BadNodeIdInvalid;
         }
     }
 

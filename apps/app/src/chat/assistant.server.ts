@@ -6,6 +6,8 @@ import { mcp } from "@tanstack/ai-mcp/harness"
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
 
+import { PROPOSE_PAGE_TOOL } from "@/pages/proposal.ts"
+
 import { chatTools } from "./cards.tsx"
 import { chatSettings } from "./gateway.ts"
 import type { ChatSettings } from "./gateway.ts"
@@ -13,6 +15,7 @@ import { withTimeZone } from "./local-times.ts"
 import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
 import { leftOut, mcpServers, serverSwitch } from "./mcp-servers.ts"
+import { proposePageTool } from "./propose-page.ts"
 import { forModel } from "./tool-results.ts"
 
 // The agent harness of the app. It runs on the server only: the keys of the language models stay
@@ -25,6 +28,17 @@ Then, where a place fits the question, say in one sentence where to ask: the mak
 If none fits, say only that your tools do not show it. Name a maker, a person or an address only when a tool result names one, and say nothing about what they will do or know.
 Answer in a few plain sentences. The app shows the values of a tool call next to your answer, so do not repeat them as a list or a table.
 The tools write every time as the clock of the person you answer shows it. Say a time the way a clock does, for example 09:30: take the hours and minutes as they stand in the result, do not convert them, and name no time zone and no offset.`
+
+// A page is the person's to keep. The model composes one with the tool of the app, and nothing else
+// (pages/proposal.ts, ADR-0020).
+const pageInstructions = `You cannot keep a page yourself. The app keeps a page when the person says so.
+When a person asks for a page, a dashboard or an overview to keep, find out with your tools what there is to show, then propose the page with ${PROPOSE_PAGE_TOOL}: a short title, and the parts in their order, each a tool you called and its arguments.
+Take a machine id from a tool result and never invent one.
+Then say in one sentence what the page shows. If something that was asked for is on no part of the page, say that your tools do not show it.`
+
+// The tool of the app with which the model proposes a page. It reads from the chat's list which
+// tools a page can call.
+const proposePage = proposePageTool(chatTools)
 
 // The OPC UA adapter, if the app has one: it scans OPC UA servers and proposes their registration.
 // Adding and removing a machine are buttons of its cards, not tools (src/cards/opcua).
@@ -130,7 +144,8 @@ function build(settings: ModelSettings | undefined): Handler | null {
       // on, and nothing else.
       expose: { settings: ["model"], config: switches.exposed },
       middleware: [localTimes],
-      systemPrompts: opcuaUrl ? [instructions, opcuaInstructions] : [instructions],
+      systemPrompts: opcuaUrl ? [instructions, pageInstructions, opcuaInstructions] : [instructions, pageInstructions],
+      tools: [proposePage],
       plugins: () => [tools, switchPlugin, modelTools],
     }),
     // The demo has no sign-in: every request runs without a user.

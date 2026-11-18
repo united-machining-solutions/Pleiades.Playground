@@ -7,7 +7,7 @@ its state and can place an order. It never starts the production: a person does 
 
 | Tool | What it does |
 |---|---|
-| `juicebar_drinks_list` | The drinks the machine can mix now, with id, title, description and ingredients. |
+| `juicebar_drinks_list` | The drinks the machine can mix now, with id, title, description, colour, the picture of a glass, and ingredients, each with its colour and whether its bottle runs low. |
 | `juicebar_drink_get` | One drink by its id. |
 | `juicebar_status` | Connection, production state, progress, waiting orders, pumps and low-bottle warnings. |
 | `juicebar_order_create` | Places one drink in the queue of the real machine. |
@@ -20,6 +20,9 @@ its state and can place an order. It never starts the production: a person does 
 3. Tell the person the order number and what comes next: put a glass under the outlet and press the start
    button on the machine.
 4. Follow it with `juicebar_order_get` if the person wants to know.
+
+A host may draw the result of `juicebar_drinks_list` as a card with a button of its own that orders. An order
+placed with that button needs nothing from you: do not order the same drink again.
 
 An order is refused while the machine is not connected or not ready, while the queue is full, or when
 ordering is switched off. Say why, in the words of the refusal. If a call fails without a clear refusal, read

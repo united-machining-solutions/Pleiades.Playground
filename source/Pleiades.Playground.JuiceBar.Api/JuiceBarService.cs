@@ -20,10 +20,42 @@ internal sealed class JuiceBarService(MixerClient mixer, LiveState live, IOption
 
     public void Dispose() => _ordering.Dispose();
 
-    internal Task<IReadOnlyList<Drink>> DrinksAsync(CancellationToken cancellationToken) => mixer.DrinksAsync(cancellationToken);
+    /// <summary>
+    /// The card, each ingredient with whether the bottle of its pump warns. The warnings come over the socket of
+    /// the machine; while none are known, the ingredients say nothing about their bottles.
+    /// </summary>
+    internal async Task<IReadOnlyList<Drink>> DrinksAsync(CancellationToken cancellationToken)
+    {
+        var drinks = await mixer.DrinksAsync(cancellationToken).ConfigureAwait(false);
+        var warnings = live.Snapshot().AmountWarnings;
+        if (warnings.Count == 0)
+        {
+            return drinks;
+        }
 
+        IReadOnlyList<Pump> pumps;
+        try
+        {
+            pumps = await mixer.PumpsAsync(warnings, cancellationToken).ConfigureAwait(false);
+        }
+        catch (JuiceBarUnavailableException)
+        {
+            return drinks;
+        }
+
+        var low = pumps.Where(p => p.ComponentId is not null && p.AmountWarning is not null)
+            .GroupBy(p => p.ComponentId!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Any(p => p.AmountWarning == true), StringComparer.OrdinalIgnoreCase);
+        return [.. drinks.Select(drink => drink with
+        {
+            Components = [.. drink.Components.Select(c => low.TryGetValue(c.Id, out var runsLow) ? c with { RunsLow = runsLow } : c)],
+        })];
+    }
+
+    // The machine answers an unknown id with an error of its marketplace, so the card decides what exists.
     internal async Task<Drink> DrinkAsync(string id, CancellationToken cancellationToken)
-        => await mixer.DrinkAsync(id, cancellationToken).ConfigureAwait(false)
+        => (await DrinksAsync(cancellationToken).ConfigureAwait(false))
+            .FirstOrDefault(d => string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase))
             ?? throw new KeyNotFoundException($"No drink with the id '{id}' is on the card.");
 
     internal async Task<JuiceBarStatus> StatusAsync(CancellationToken cancellationToken)

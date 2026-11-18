@@ -25,7 +25,7 @@ docker compose up -d --build --wait
 
 The command returns when the stack is ready, that is when every container reports healthy: the broker, the
 database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app, one
-simulator per machine, three cutting machines, each a simulator with its adapter, and the OPC UA adapter with a
+simulator per machine, three cutting machines, each a simulator with its adapter, the OPC UA adapter with a
 simulated OPC UA machine. To see the demo without building it, start it from the published images, see
 [Start](../README.md#start).
 
@@ -78,6 +78,11 @@ and alerts as CloudEvents. It is described in
 T-01 and PU-01, are the `cutting-*` services: a simulator that speaks the telegram protocol of the machine through
 files, and an adapter that reads it and publishes the same tree, below `machines/trumpf_Laser2D_L-01/` and the like
 (see [`Cutting.Adapter`](../source/Pleiades.Playground.Cutting.Adapter/README.md)).
+
+The SimpleCAM machine 9042 is optional: `simplecam-adapter-9042` reads the stream of a SimpleCAM backend that runs
+outside of the stack and publishes the same tree for it, below `machines/united-grinding_simplecam_9042/`. It
+starts only with the Compose profile `simplecam`, as it needs that backend (see
+[`simplecam-adapter-9042`](../apps/simplecam-adapter-9042/README.md)).
 
 The OPC UA machine, `opc-simulator`, is not on Home yet: it is added in the chat, see
 [Add a machine that speaks OPC UA](#add-a-machine-that-speaks-opc-ua).
@@ -146,18 +151,17 @@ read once by one server function, `getCharts` in
 [`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts); from then on the page is
 live from the broker, as Home is.
 
-A stack started with `APP_SHOWCASES` set has one more page in the sidebar, "Where is My Job?",
-<http://localhost:5600/where-is-my-job>. It is a showcase, a basis for discussion: how an order could be
-followed across the shop floor. It shows the machines of the stack from above, with their state, utilisation
+The page "Where is My Job?" in the sidebar, <http://localhost:5600/where-is-my-job>, is a basis for
+discussion: how an order could be followed across the shop floor. It shows the machines of the stack from above, with their state, utilisation
 and job orders; a machine with what it did, does and what waits for it; and an order on its way. An order is
 every job order that names the same order number, read from the backend (`genui_job_order_list`) and kept
 live by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines,
 packing after them and the single part on its sheet have no source yet: the page draws them dashed, as the
 gaps to discuss. It has no picture in this tour.
 
-**In the code:** [`apps/app/src/routes/(showcases)/where-is-my-job.tsx`](../apps/app/src/routes/%28showcases%29/where-is-my-job.tsx)
+**In the code:** [`apps/app/src/routes/where-is-my-job.tsx`](../apps/app/src/routes/where-is-my-job.tsx)
 is the page; the map, the panels and `getFloor` live in
-[`apps/app/src/showcases/where-is-my-job/`](../apps/app/src/showcases/where-is-my-job/), and `floor.ts` there
+[`apps/app/src/where-is-my-job/`](../apps/app/src/where-is-my-job/), and `floor.ts` there
 groups the job orders into orders.
 
 ## 3. The page of one machine
@@ -238,7 +242,20 @@ show what holds now. The row under the answer then says "Saved as page" and link
 card, such as one in words only, has no button. The group "Pages" in the sidebar lists the pages of this browser
 that are not pinned, the newest first, and a page that is pinned from its head moves to the top of the sidebar,
 beside Home. "Edit" in its head moves a card up or down and removes one, with no language model; "Undo" in
-the toast puts a removed card back.
+the toast puts a removed card back. "Add a card" at the end of the page adds one by hand: choose what it shows,
+and for one machine which machine and how many hours.
+
+Ask the chat for a page, for example "Make me a page with all machines and P-04", and it proposes one. The model
+reads with its tools what there is to show and composes the page: a title, and the cards in their order, each
+with the machine and the hours it shows. It writes no value and cannot keep the page. The chat shows the
+proposal with its parts in words; "Preview" opens it with the values of now, and "Save to my pages" keeps it in
+this browser. What you asked for that no card shows, the model says in words.
+
+Ask the chat for a page, for example "Make me a page with all machines and P-04", and it proposes one. The model
+reads with its tools what there is to show and composes the page: a title, and the cards in their order, each
+with the machine and the hours it shows. It writes no value and cannot keep the page. The chat shows the
+proposal with its parts in words; "Preview" opens it with the values of now, and "Save to my pages" keeps it in
+this browser. What you asked for that no card shows, the model says in words.
 
 A page is private to the browser that keeps it, and the stack has no sign-in, so "Share" in its head gives a
 link that carries the recipe: which answers, for which machines and hours, and no value. Open it in a private
@@ -298,7 +315,9 @@ at the right of the field.
 **In the code:** [`apps/app/src/chat/`](../apps/app/src/chat). `chat-sidebar.tsx` is the panel with the model
 picker and the head with the way back to the list, `chat-name.ts` what a chat is called,
 `save-as-page.tsx` the row under an answer with "Save as page" (the recipe of an answer is read in
-[`pages/from-answer.ts`](../apps/app/src/pages/from-answer.ts)), `dictate.tsx` the microphone, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
+[`pages/from-answer.ts`](../apps/app/src/pages/from-answer.ts)), `propose-page.ts` the tool with which the model
+proposes a page and `proposed-page.tsx` the proposal (the check is in
+[`pages/proposal.ts`](../apps/app/src/pages/proposal.ts)), `dictate.tsx` the microphone, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
 reads which models the settings name, `cards.tsx` lists what the app draws for which tool, card by card, and
 `suggestions.ts` holds the three questions.
 
@@ -429,7 +448,10 @@ The service publishes the state of the machine to the broker. Its machine id def
 `trumpf_JuiceBar_JUICEBAR-01`, which then appears in the machine list of Home as "JuiceBar JUICEBAR-01", next
 to the simulated machines. With
 `juicebar=http://juicebar-api:8080/mcp` in `APP_MCP_SERVERS`, the chat answers what the bar can mix and
-orders a drink when asked. No tour screenshot was retaken: they show the stack without the profile.
+orders a drink when asked. Asked what the bar has, it draws the drink card: each drink in its glass, one to
+pick, and a button that orders it at once; the glass then fills while the machine mixes. A stack with
+`APP_SHOWCASES` set has the same card as a page of its own, <http://localhost:5600/juice-bar>, for a screen next to
+the machine, without a language model. No tour screenshot was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).
 
 ## Retaking the screenshots

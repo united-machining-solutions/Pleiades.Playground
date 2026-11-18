@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react"
 
+import { cannotAdd } from "./add-part.ts"
 import { recipeSchema, storedPageSchema, titleSchema } from "./recipe.ts"
 import type { Recipe, RecipePart, StoredPage } from "./recipe.ts"
 
@@ -178,12 +179,24 @@ export function createPageStore(backing: () => Backing | undefined) {
 
     /**
      * Puts a removed part back at place `at`, or at the end if the page has fewer parts by now: the
-     * undo of `removePart`. False if the part does not keep the schema, or the page holds as many
-     * parts as a page may.
+     * undo of `removePart`. False if the part does not keep the schema, the page shows the same part
+     * by now or holds as many parts as a page may (`cannotAdd` says which: a card added since the
+     * part was removed can be either), or the storage did not take it.
      */
     putPartBack(id: string, at: number, part: RecipePart): boolean {
       if (!Number.isInteger(at) || at < 0) return false
-      return changeParts(id, (parts) => [...parts.slice(0, at), part, ...parts.slice(at)])
+      return changeParts(id, (parts) =>
+        cannotAdd(parts, part) === null ? [...parts.slice(0, at), part, ...parts.slice(at)] : null,
+      )
+    },
+
+    /**
+     * Puts a new part at the end of a page, a card a person added by hand. False if the part does not
+     * keep the schema, the page shows the same part already or holds as many parts as a page may
+     * (`cannotAdd` says which), or the storage did not take it.
+     */
+    addPart(id: string, part: RecipePart): boolean {
+      return changeParts(id, (parts) => (cannotAdd(parts, part) === null ? [...parts, part] : null))
     },
 
     /** Deletes a page. This browser was the only place that kept it. */
@@ -217,6 +230,7 @@ export const {
   removePart,
   movePart,
   putPartBack,
+  addPart,
   deletePage,
   subscribe,
 } = browser

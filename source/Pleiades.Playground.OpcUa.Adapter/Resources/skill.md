@@ -94,7 +94,9 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
 8. **Alarms.** If the server has an alarm type of its own (a subtype of `AlarmConditionType`, `i=2915`),
    name it in `alerts.eventType`, and the field with the code of the maker in `alerts.codeField`. If you find
    none, leave `alerts` out and say so. On a gateway the adapter keeps to each machine the alarms whose source
-   lies in its namespaces.
+   lies in its namespaces. For a machine in `urn:umati2:datamodel:opcua` the adapter takes the alarms from its
+   list `Notification.ActiveAlerts`, and for a TRUMPF machine (MachineTool instance or TRUMPF interface) it sets
+   `TcMachineAlarmType` itself: leave `alerts` out for both.
 9. **Propose.** `opcua_registration_propose`. If `accepted` is false, read `problems`, correct and propose
    again. After the last machine, `opcua_ua_disconnect` with `name: "scan"`.
 10. **Tell the person** in two sentences what the proposals cover and what needs their attention. They add each
@@ -115,7 +117,12 @@ browsing each from scratch.
 The paths are those of the MQTT binding of this platform. The profiles are those of the data model,
 specification 0.17.1. **Core** is declared whole for every machine: what you do not map is published as not
 available. Required are only `Identification.ManufacturerUri`, `Identification.Model` and
-`Identification.SerialNumber`, the machine id; without them the machine is not added. Of every other profile the adapter publishes the elements only if the profile is complete; a
+`Identification.SerialNumber`, the machine id; without them the machine is not added. A server that has no
+node for `ManufacturerUri` is added if it gives `Identification.Manufacturer`: put `ManufacturerUri` into
+`missing`, and the name without special characters stands in (`TRUMPF SE + Co. KG` gives `TRUMPFSECoKG`); the
+proposal says so in `notices`. A `ManufacturerUri` you map and that has no value yet is waited for, never
+replaced. Map `Identification.Manufacturer` always, and never map another node as `ManufacturerUri` to fill
+the gap. Of every other profile the adapter publishes the elements only if the profile is complete; a
 profile with instances (a channel, a spindle, a measuring point) is published for each complete instance,
 and a measuring point needs `Main`. Map what the server offers; the adapter decides what is complete.
 
@@ -132,7 +139,7 @@ and a measuring point needs `Main`. Map what the server offers; the adapter deci
 | `State.MachineryOperationMode` | Core | Text | | `MachineryOperationMode/CurrentState/Number` (OPC 40001-1): 0 None, 1 Maintenance, 2 Setup, 3 Processing |
 | `State.FeedOverride` | Core | Number | `one` | `Monitoring/MachineTool/FeedOverride`, usually percent: scale 0.01 |
 | `OperationCounters.PowerOnDuration` | Core | Number | `second` | `OperationCounters/PowerOnDuration`, a Duration in milliseconds: scale 0.001 |
-| `Notification.ActiveAlerts` | Core | | | Not an element: the alarm subscription, `alerts`. Without `alerts` the core is not fulfilled |
+| `Notification.ActiveAlerts` | Core | | | Not an element: `alerts`, the alarm subscription or the list the adapter sets. Without `alerts` the core is not fulfilled |
 | `Identification.HardwareRevision` | IdentificationExtended | Text | | `Identification/HardwareRevision` |
 | `Identification.MonthOfConstruction` | IdentificationExtended | Number | no unit | `Identification/MonthOfConstruction`, 1 to 12 |
 | `Identification.InitialOperationDate` | IdentificationExtended | Text | | `Identification/InitialOperationDate` |
@@ -164,7 +171,8 @@ master of the data model, the software revision as a value of the maker.
 having, goes into the area `oem` with a path of your choice in the same form, `Group.Element`.
 
 `Notification.ActiveAlerts` and `Production.JobOrders` are no elements of a registration. The adapter builds the
-list of the alarms, and their events, from `alerts`. Do not map them as elements.
+list of the alarms, and their events, from `alerts`: the events of an alarm type, or the list of
+`urn:umati2:datamodel:opcua`, which it sets itself. Do not map them as elements.
 
 ## What the adapter maps itself
 
@@ -175,10 +183,11 @@ adapter". Do not search for them, and do not tell the person they are unclear.
 | Namespace of the node of `Identification.SerialNumber` | Element | Set to |
 |---|---|---|
 | `http://trumpf.com/UA/MachineTool/` | `Identification.Model` | the node of `Identification.SerialNumber`, `Derived` |
+| `http://trumpf.com/UA/MachineTool/` or `http://trumpf.com/TRUMPF-Interfaces/`, with or without the prefix of a gateway | `alerts`, if you set none | `TcMachineAlarmType` (`i=1006` of the TRUMPF interface, with the same prefix) and its field `AlarmIdentifier` |
 
-The namespace is compared as written. Behind a gateway it carries a prefix, for example
-`urn:A1121O0001:TRUMPF:OpcSimulator/http://trumpf.com/UA/MachineTool/`, and the adapter sets nothing: map
-those elements yourself, or leave them in `missing`.
+The namespace of the model rule is compared as written. Behind a gateway it carries a prefix, for example
+`urn:A1121O0001:TRUMPF:OpcSimulator/http://trumpf.com/UA/MachineTool/`, and the adapter sets no model: map
+it yourself, or leave it in `missing`.
 
 **A machine in `urn:umati2:datamodel:opcua`** (with or without the prefix of a gateway, for example
 `urn:Z0009A0033:TRUMPF:UAInterfaces/urn:umati2:datamodel:opcua`) is the data model itself: its node `s=Machine`
@@ -188,9 +197,9 @@ holds one variable per element, named by the path of the element. The adapter ma
 `State.MachineryItemState` and `State.MachineryOperationMode` (members of the structure `State.Status`),
 `State.FeedOverride` and `OperationCounters.PowerOnDuration`. For such a machine do not browse or read the
 tree. Propose with `machineNode` set to the `node` of `opcua_machine_list`, the `serialNumber` and `elements`
-empty; add only what the adapter does not set. `Notification.ActiveAlerts` of that tree is a list, not an
-element: for the core, find the alarm event type of the server and set `alerts`, or put it in `missing`, and
-the alarms are not available. `Connection.State` and `Connection.Heartbeat` of that
+empty; add only what the adapter does not set. `Notification.ActiveAlerts` of that tree is the list of the
+alarms that stand: the adapter reads it itself (`alerts.list`), whatever `alerts` you propose, so leave `alerts`
+out and do not look for an alarm event type. `Connection.State` and `Connection.Heartbeat` of that
 tree are the connection of the source to the machine, not values of the machine: leave them out. An element
 the server does not fill is moved to `missing` by the adapter.
 
@@ -216,7 +225,11 @@ the server does not fill is moved to `missing` by the adapter.
   this element. Where the description of the node decided the match or gave the unit, quote it briefly.
 - **Missing.** Every element of a profile that the server does not offer goes into `missing` with the reason.
   An element of the core that is neither mapped nor derived is published as not available. Tell the person
-  which ones the core lacks; only without `ManufacturerUri`, `Model` or `SerialNumber` is the machine not added.
+  which ones the core lacks; only without `Model`, `SerialNumber`, or both `ManufacturerUri` and `Manufacturer`
+  is the machine not added. A `Manufacturer` without any letter or digit `A-Z`, `0-9`, such as a name in
+  Japanese, cannot stand in; the refusal says so.
+- **Notices.** The proposal lists in `notices` what the person should know though nothing is wrong, and names
+  the `machineId` it would publish under. Tell the person every notice in your answer, in your own words.
 - **Profiles.** Leave `profiles` out. The adapter names the profiles whose elements are all mapped, and
   publishes no element of a profile that is not complete. The proposal says, profile by profile, what is
   complete and what is lacking (`conformance`); say it to the person.

@@ -178,3 +178,12 @@ test("an empty text is no block, a question is its text", () => {
   assert.deepEqual(blocksOf([text("")], true, tools), [])
   assert.equal(questionOf([text("What needs me?")]), "What needs me?")
 })
+
+test("a card is handed the call its result answers, so that it can tell two calls apart", () => {
+  const handed: Array<string | undefined> = []
+  const noting: ReadonlyArray<ChatTool> = [
+    { name: "app_page_propose", draw: (_content, which) => (handed.push(which?.id), "the proposal") },
+  ]
+  blocksOf([call("a", "app_page_propose"), result("a", "{}"), call("b", "app_page_propose"), result("b", "{}")], false, noting)
+  assert.deepEqual(handed, ["a", "b"])
+})
