@@ -174,8 +174,8 @@ catalogs:
       specifier: 2.0.4
       version: 2.0.4
     '@pleiades/hub-sdk':
-      specifier: file:vendor/pleiades-hub-sdk-0.1.0.tgz
-      version: file:vendor/pleiades-hub-sdk-0.1.0.tgz
+      specifier: file:vendor/pleiades-hub-sdk-0.1.1.tgz
+      version: file:vendor/pleiades-hub-sdk-0.1.1.tgz
     '@shadcn/react':
       specifier: 0.3.1
       version: 0.3.1
@@ -308,7 +308,7 @@ importers:
         version: link:../../packages/cards
       '@pleiades/hub-sdk':
         specifier: 'catalog:'
-        version: file:vendor/pleiades-hub-sdk-0.1.0.tgz
+        version: file:vendor/pleiades-hub-sdk-0.1.1.tgz
       '@pleiades/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -948,9 +948,9 @@ packages:
   '@oxc-project/types@0.156.0':
     resolution: {integrity: sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw==}
 
-  '@pleiades/hub-sdk@file:vendor/pleiades-hub-sdk-0.1.0.tgz':
-    resolution: {integrity: sha512-oyJ4lzqtnatV6n63vzJNTr4Mn+Pp13BrUjm9Cxlft1Opu/4X9AE2/6LHooWtySlzesVgT+YaSe9X1tifSi7yCQ==, tarball: file:vendor/pleiades-hub-sdk-0.1.0.tgz}
-    version: 0.1.0
+  '@pleiades/hub-sdk@file:vendor/pleiades-hub-sdk-0.1.1.tgz':
+    resolution: {integrity: sha512-d+oUbhmIxTwn0Pfj1x3RvekbpEsfkX7TNBokK84fFnOWZO0RXQ9uPHrk6CECMYV3pcT/eOEhvFJDuBZC1XvBfQ==, tarball: file:vendor/pleiades-hub-sdk-0.1.1.tgz}
+    version: 0.1.1
 
   '@reduxjs/toolkit@2.14.0':
     resolution: {integrity: sha512-m/PxMwRe0xLL6XUsAgy0YjInklHcfi9uMwFhJk+QINqjxqPvyc89T5cMjszA5bDmTE0gwGc7zr9LRO4gL+mhaw==}
@@ -3565,7 +3565,7 @@ snapshots:
 
   '@oxc-project/types@0.156.0': {}
 
-  '@pleiades/hub-sdk@file:vendor/pleiades-hub-sdk-0.1.0.tgz':
+  '@pleiades/hub-sdk@file:vendor/pleiades-hub-sdk-0.1.1.tgz':
     dependencies:
       mqtt: 5.16.1
     transitivePeerDependencies:

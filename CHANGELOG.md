@@ -22,7 +22,8 @@ All notable changes are documented here. The format follows
   itself is not part of the stack. The SDK of the hub, `@pleiades/hub-sdk`, is not on npmjs.org: it is
   checked in as a tarball under `vendor/`, and the catalog refers to it with `file:`. ADR-0020 records the
   decision and the deviation from "npmjs.org is the only registry". The settings are in
-  `apps/app/README.md`.
+  `apps/app/README.md`. The tarball is version 0.1.1, which brings the guide `register-an-app.md`, and the
+  skill `register-hub-app`, a copy from the hub's repository, leads an agent to it.
 - Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
   no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
 - Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,

@@ -43,10 +43,11 @@ What stood in the way of the example app taking part:
 - It registers one app, `pleiades-playground`, with a label and a description in English and German and an
   icon. The icon is an SVG drawn for this app, which the server of the app serves, and it is registered as
   a link relative to the address of the app.
-- The SDK is checked in as a tarball, `vendor/pleiades-hub-sdk-0.1.0.tgz`. The catalog in
+- The SDK is checked in as a tarball, `vendor/pleiades-hub-sdk-0.1.1.tgz`. The catalog in
   `pnpm-workspace.yaml` refers to it with `file:`, and `apps/app/package.json` says `"catalog:"`, like
   every other dependency. [`vendor/README.md`](../../vendor/README.md) names its version, its origin and
-  its checksum.
+  its checksum. From version 0.1.1 on the tarball holds the guide `register-an-app.md`, and the repository
+  holds a copy of the hub's skill `register-hub-app` under `.claude/skills/`, which leads an agent to it.
 - `.dockerignore` lets `vendor` through (`!vendor`), so that the install of an image finds the tarball. No
   Dockerfile changed.
 
