@@ -254,6 +254,21 @@ jobs:
           curl -fsS -o /dev/null -w '%{http_code}\n' -H 'Host: pleiades.example.internal' http://127.0.0.1/
           # Any other name gets no app.
           test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: other.example' http://127.0.0.1/)" = 404
+      # The same over HTTPS, with the self-signed certificate Traefik generates: --resolve sends the name as SNI.
+      - name: Traefik serves the app over HTTPS with its own certificate
+        run: |
+          curl -fsSk -o /dev/null -w '%{http_code}\n' --resolve device.example.internal:443:127.0.0.1 https://device.example.internal/
+          curl -fsSk -o /dev/null -w '%{http_code}\n' --resolve pleiades.example.internal:443:127.0.0.1 https://pleiades.example.internal/
+          # curl -k prints no certificate; openssl names its subject.
+          subject="$(openssl s_client -connect 127.0.0.1:443 -servername device.example.internal < /dev/null 2> /dev/null \
+            | openssl x509 -noout -subject)"
+          echo "$subject"
+          case "$subject" in *"TRAEFIK DEFAULT CERT"*) ;; *) exit 1 ;; esac
+          # The broker's WebSocket at /mqtt of the HTTPS port: the handshake is answered with 101. Over HTTP/1.1, as
+          # a browser opens it: curl would take HTTP/2 over TLS, which has no Upgrade.
+          code="$(curl -sk --http1.1 -o /dev/null -w '%{http_code}' --max-time 3             --resolve device.example.internal:443:127.0.0.1             -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13'             -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Sec-WebSocket-Protocol: mqtt'             https://device.example.internal/mqtt || true)"
+          echo "/mqtt: $code"
+          test "$code" = 101
       - name: Logs on failure
         if: failure()
         run: docker compose logs --no-color --tail 200

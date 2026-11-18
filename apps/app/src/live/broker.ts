@@ -3,6 +3,7 @@ import type { MqttClient } from "mqtt"
 
 import { randomId } from "../random-id.ts"
 import { getBrokerAddress } from "./broker-address.ts"
+import { brokerUrl } from "./broker-url.ts"
 import { matches } from "./messages.ts"
 
 // The one connection of the browser to the broker, MQTT over WebSocket. Every page that is live
@@ -42,12 +43,10 @@ export function serverNow(): string {
 
 async function addressOf(): Promise<string> {
   const asked = Date.now()
-  const { url, port, now } = await getBrokerAddress()
+  const { now, ...address } = await getBrokerAddress()
   // The server read its clock about halfway between the question and the answer.
   offset = Date.parse(now) - (asked + Date.now()) / 2
-  if (url) return url
-  const scheme = window.location.protocol === "https:" ? "wss" : "ws"
-  return `${scheme}://${window.location.hostname}:${port}`
+  return brokerUrl(address, window.location)
 }
 
 /** Connects once, the first time a page subscribes. */
