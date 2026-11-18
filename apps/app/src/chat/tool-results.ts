@@ -1,9 +1,10 @@
 import type { ReactNode } from "react"
 
-// What the app knows about a tool of the generative UI backend: what a call is called in the
-// chat, what the chat draws for its result, and whether a language model gets the tool at all. A
-// card says this for its tools in a module of its own, and cards.tsx lists the cards. This file
-// imports nothing but a type: the chat, its server and the tests all read it.
+// What the app knows about a tool of the generative UI backend, or of the app itself: what a call
+// is called in the chat, what the chat draws for its result, whether a language model gets the tool
+// at all, and whether a page can hold it. A card says this for its tools in a module of its own, and
+// cards.tsx lists the cards. This file imports nothing but a type: the chat, its server and the
+// tests all read it.
 
 export type ToolLabel = { running: string; done: string; failed: string }
 
@@ -27,6 +28,16 @@ export type ChatTool = {
    * says it here.
    */
   cardOnly?: boolean
+  /**
+   * Only the chat calls this tool: it is one of the app itself, and a page never holds it as a part,
+   * although the chat draws its result. The proposal of a page is one (pages/proposal.ts).
+   */
+  chatOnly?: boolean
+  /**
+   * What a part of a page with this tool shows, in a few words. The chat names the parts of a page
+   * it proposes with it; a tool without it is named by its name.
+   */
+  part?: string
 }
 
 /** The two tools of the backend itself, with which a language model finds its way. */
