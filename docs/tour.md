@@ -215,6 +215,13 @@ window to see what a colleague sees: the page with the values of now, no chat an
 and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for says so,
 and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
 
+Ask about the alarms of a machine, for example "Which warnings and errors did P-04 have today?", and the chat
+draws the notification card of the tool `genui_notification_list`: each warning and error with when it was
+raised, when it went and how long it stood, and the ones that have not gone first. The card is
+[`packages/cards/src/notification/notification-card.tsx`](../packages/cards/src/notification/notification-card.tsx),
+the tool is in [`apps/genui-mcp/src/notifications.ts`](../apps/genui-mcp/src/notifications.ts). No screenshot
+shows it yet.
+
 The chat needs a language model, and the demo starts without one. Then the panel says "No language model
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
 copy `.env.example` to `.env`, set the address and the key of a LiteLLM gateway, at the hackathon the one of the
