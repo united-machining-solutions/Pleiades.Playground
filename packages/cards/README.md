@@ -16,6 +16,7 @@ generative UI backend. Its contract and its component lie next to each other, so
 | Measurement graph: one quantity of every machine over the last minutes, a line for each machine | `genui_measurement_series`, called by the card file of the measurements below its cards, and by the page `/live` of the example app. The chat draws no graph | `measurementSeries` in `src/measurement/contract.ts` | `MeasurementGraph` in `src/measurement/measurement-graph.tsx` |
 | Shop floor: the plan of the hall with every machine at its place, the running ones greyed out, and over each one that does not run, why | `genui_shopfloor_show` | `shopfloorShow` in `src/shopfloor/contract.ts` | `ShopfloorCard` in `src/shopfloor/shopfloor-card.tsx` |
 | Site: every site with its machines by hall and how many are in each state, and the machines on no site | `genui_site_list` | `siteList` in `src/site/contract.ts` | `SiteCards` in `src/site/site-card.tsx` |
+| Time series: signals a person names, of any machine, over 15 minutes to 24 hours, a line for each pair of a machine and a signal, on two y axes at most | `genui_timeseries_show`, and `genui_timeseries_series` for the lines and `genui_timeseries_signals` for what a person can add, which only a card calls | `timeseriesShow`, `timeseriesSeries` and `timeseriesSignals` in `src/timeseries/contract.ts` | `TimeseriesCard` in `src/timeseries/timeseries-card.tsx` |
 | View: an answer a language model lays out itself from blocks (figures, rankings, frequent faults, the hall, notes, what is missing); every value is computed by the backend | `genui_view_show` | `viewShow` in `src/view/contract.ts` | `ViewCard` in `src/view/view-card.tsx` |
 
 The list of machines, the result of `genui_machine_list`, has a contract here too (`machineList`), but no
@@ -58,6 +59,9 @@ Both import the theme from [`packages/ui`](../ui/README.md), so the card looks t
   - `in-words.ts`: the list and the card in words, for a reader that does not see them. The backend sends
     them as the text of a result, which is what a language model reads.
   - `machine-card.tsx`: the machine card.
+- `src/shared/`: what more than one card draws: the y axis over every line (`scale.ts`), the colour of a line or a
+  machine by its place (`colour.ts`), a machine id that breaks only after `_`, never inside a model or a serial
+  number (`machine-name.tsx`, `machine-id.ts`), and a height that eases when a card grows (`smooth-height.tsx`).
 - The [shadcn/ui](https://ui.shadcn.com) components the cards are built from are in
   [`packages/ui`](../ui/README.md), with every other component of the user interface.
 - `src/dataviz.css`: chart and state colours. `src/styles.css` is what a page imports: the colours, the class

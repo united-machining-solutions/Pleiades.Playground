@@ -3,6 +3,7 @@ import { machineCard } from "./machine.ts"
 import { measurementCard } from "./measurement.ts"
 import { shopfloorCard } from "./shopfloor.ts"
 import { siteCard } from "./site.ts"
+import { timeseriesCard } from "./timeseries.ts"
 import { viewCard } from "./view.ts"
 
 /**
@@ -16,5 +17,6 @@ export const cards = [
   measurementCard,
   shopfloorCard,
   siteCard,
+  timeseriesCard,
   viewCard,
 ] as const

@@ -1,32 +1,22 @@
-import { applyHostFonts, useApp } from "@modelcontextprotocol/ext-apps/react"
-import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps/react"
+import { useApp } from "@modelcontextprotocol/ext-apps/react"
+import type { App } from "@modelcontextprotocol/ext-apps/react"
 import { measurementList, measurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import { MeasurementCards } from "@pleiades/cards/measurement/measurement-card.tsx"
 import { MeasurementGraph } from "@pleiades/cards/measurement/measurement-graph.tsx"
 import { useEffect, useState } from "react"
-import type { ReactNode } from "react"
 import { createRoot } from "react-dom/client"
 
 import { MEASUREMENT_SERIES_TOOL } from "../src/cards/measurement.names.ts"
+import { Note, takeFont } from "./host.tsx"
+import { shownFor } from "./shown.ts"
+import type { Shown } from "./shown.ts"
 import "./styles.css"
 
 // The measurement card as an MCP App: the file a host loads from ui://genui/measurement and shows
 // with a result of genui_measurement_list. The host sends that result. This file checks it against
 // the contract of the card and draws the cards, the same component the example application draws,
 // and below them the graphs of the last minutes, which it asks the server for.
-
-type Shown = { values: MeasurementList } | { note: string }
-
-/** What to draw for a result: the cards, or a sentence if the result holds none. */
-function shownFor(result: { isError?: boolean; content?: ReadonlyArray<unknown>; structuredContent?: unknown }): Shown {
-  const values = measurementList.safeParse(result.structuredContent)
-  if (values.success) return { values: values.data }
-  // A tool that failed says why in its first block of text.
-  const [first] = result.content ?? []
-  const said = typeof first === "object" && first !== null && "text" in first ? first.text : undefined
-  return { note: result.isError && typeof said === "string" ? said : "This result is not a measurement card." }
-}
 
 /**
  * The lines of the graphs. They are not part of the result, because a language model reads that:
@@ -41,14 +31,6 @@ async function seriesOf(app: App): Promise<MeasurementSeries | null> {
   } catch {
     return null
   }
-}
-
-/** The font of the host, so the card reads like the conversation around it. The colours stay the card's own. */
-function takeFont(context: McpUiHostContext | undefined) {
-  const fonts = context?.styles?.css?.fonts
-  if (fonts) applyHostFonts(fonts)
-  const sans = context?.styles?.variables?.["--font-sans"]
-  if (sans) document.documentElement.style.setProperty("--font-sans", sans)
 }
 
 /** A graph for each quantity, with the lines of the machines of the result only. */
@@ -76,7 +58,7 @@ function Graphs({ values, series }: { values: MeasurementList; series: Measureme
 }
 
 function Measurements() {
-  const [shown, setShown] = useState<Shown>()
+  const [shown, setShown] = useState<Shown<MeasurementList>>()
   const [series, setSeries] = useState<MeasurementSeries | null>()
   const { app, isConnected, error } = useApp({
     appInfo: { name: "pleiades-measurement-card", version: "0.1.0" },
@@ -84,7 +66,7 @@ function Measurements() {
     // Before the handshake, so that no result is missed.
     onAppCreated(created) {
       created.addEventListener("toolresult", (result) => {
-        const next = shownFor(result)
+        const next = shownFor(result, measurementList, "a measurement card")
         setShown(next)
         setSeries(undefined)
         if ("values" in next) void seriesOf(created).then(setSeries)
@@ -106,10 +88,6 @@ function Measurements() {
       {series && <Graphs values={shown.values} series={series} />}
     </div>
   )
-}
-
-function Note({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-muted-foreground">{children}</p>
 }
 
 createRoot(document.getElementById("root")!).render(
