@@ -179,7 +179,8 @@ has. The page keeps no number and no sentence of the model, so opening it calls 
 show what holds now. The row under the answer then says "Saved as page" and links to it. An answer without a
 card, such as one in words only, has no button. The group "Pages" in the sidebar lists the pages of this browser
 that are not pinned, the newest first, and a page that is pinned from its head moves to the top of the sidebar,
-beside Home.
+beside Home. "Edit" in its head moves a card up or down and removes one, with no language model; "Undo" in
+the toast puts a removed card back.
 
 A page is private to the browser that keeps it, and the stack has no sign-in, so "Share" in its head gives a
 link that carries the recipe: which answers, for which machines and hours, and no value. Open it in a private

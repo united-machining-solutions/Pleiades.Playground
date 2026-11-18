@@ -24,7 +24,11 @@ harness.
   the chat draws for that tool, so it shows what holds now and needs no language model. It is read once, and
   its head says as of when; only while a part waits for the backend is it read again. A part whose tool
   the app has no card for stays where it is and says so; the rest of the page is whole. A page can be
-  renamed, pinned and deleted from its head. A pinned page stands in the sidebar on the top level, beside
+  renamed, pinned and deleted from its head. "Edit" there shows above each part "Move up", "Move down" and
+  "Remove", by hand and with no language model, and "Done" takes them away again; a change is kept at once,
+  and no part is asked again because another one moved or went. A removed part is kept nowhere else, so the
+  toast that says so has "Undo". The only part of a page stays: "Delete page" is the way to be rid of it.
+  A pinned page stands in the sidebar on the top level, beside
   Home; under it a group "Pages", which folds, lists the pages that are not pinned, the newest first, and
   there is no group where there is nothing to list. `/pages` lists them all and is reached through the
   breadcrumb. Another browser, or a private window, has pages of its own. "Share" in the
@@ -170,8 +174,10 @@ the backend of the running demo stack answers.
 - `src/pages/`: the pages kept from the chat. `recipe.ts` is the recipe and its schema (zod): its shape
   and its size, which is all that is checked, also of a recipe from outside. `store.ts` keeps the pages in
   the `localStorage` of the browser under one key, `pleiades-playground.pages.v1`, and is the only way to
-  them: `listPages`, `getPage`, `savePage`, `renamePage`, `pinPage`, `unpinPage`, `deletePage`, and
-  `usePages` for a component that follows every change. `link.ts` writes a recipe into one search
+  them: `listPages`, `getPage`, `savePage`, `renamePage`, `pinPage`, `unpinPage`, `removePart`, `movePart`,
+  `putPartBack` (the undo of `removePart`), `deletePage`, and `usePages` for a component that follows every
+  change. `part-controls.tsx` is what "Edit" shows above a part, and `shown-parts.ts` gives each part of the
+  recipe as it is now the answer the loader already has for it. `link.ts` writes a recipe into one search
   parameter, `r`, and reads it back (`encodeRecipe`, `decodeRecipe`, `linkOf`): JSON as UTF-8 in base64url,
   at most `MAX_PARAM_LENGTH` (8,000) characters, and what is not exactly a recipe (`recipeOf`) is null.
   `share-page.tsx` is "Share" in the head of a kept page, `column.tsx` the column that a kept page and a page
