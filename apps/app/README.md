@@ -81,7 +81,7 @@ once the broker is back, for what it missed. A page reads on a clock only while 
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app`, the app alone. `pleiades.playground.app.showcases` is the same app built with its showcases, for a demo or a fair; `APP_SHOWCASES` in `.env` takes that one, see `src/showcases/` under [What is where](#what-is-where) |
 | Version | At the bottom of the sidebar: `0.0.142 · 7a83c2f` for an image of the workflow "Images", linked to its commit; `dev` for a build of your own, with the commit of the checkout under `vite dev` |
-| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `MQTT_WS_PORT`, the port the browser reaches the broker's WebSocket on, at the host of the page (9001 if unset); or `MQTT_WS_URL`, the whole address, for a broker behind a proxy (`wss://…`); or `MQTT_WSS_PATH`, for a page over HTTPS only, a path at the origin of the page that the proxy in front of the app forwards to the broker (`/mqtt`, the Margo app). `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); the app draws nothing for their results, the answer says them, and a chat switches each of them off and on under "Tools" in its message field. `OPCUA_MCP_URL` and `OPCUA_ADAPTER_URL`, the MCP endpoint and the API of the [OPC UA adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md); empty, the chat has no OPC UA. The language models of the chat, see below. |
+| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `MQTT_WS_PORT`, the port the browser reaches the broker's WebSocket on, at the host of the page (9001 if unset); or `MQTT_WS_URL`, the whole address, for a broker behind a proxy (`wss://…`); or `MQTT_WSS_PATH`, for a page over HTTPS only, a path at the origin of the page that the proxy in front of the app forwards to the broker (`/mqtt`, the Margo app). `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); a chat switches each of them off and on under "Tools" in its message field. The app draws nothing for their results, the answer says them, except for two names: `docs`, the documentation service, whose sources it draws, and `opcua`, the [OPC UA adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md) (`opcua=http://opcua-adapter:8080/mcp`, what the stack names when the setting is unset), whose cards and commands it has and whose API it calls at the same address without `/mcp`. The language models of the chat, see below. |
 
 ## Language models
 
@@ -280,8 +280,9 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   ([TanStack Markdown](https://tanstack.com/markdown)).
 - `src/opcua/`: what the chat and its cards take of the OPC UA adapter. `commands.ts` holds the slash
   commands and `/help`, `adapter.ts` the server functions behind the buttons that add and remove a machine.
-  The adapter's tools are a second MCP server of the harness, and its part of the instructions stands in
-  `assistant.server.ts`; while the adapter does not answer, the chat offers none of it.
+  The adapter is the further server `opcua` of `APP_MCP_SERVERS`, listed and switched under "Tools" like the
+  others; its part of the instructions stands in `src/chat/mcp-servers.ts` and follows the switch. While the
+  adapter does not answer, or a chat has switched it off, the chat offers none of it.
 - The [shadcn/ui](https://ui.shadcn.com) components come from [`packages/ui`](../../packages/ui/README.md),
   imported as `@pleiades/ui/components/<name>`. `components.json` holds the settings of the preset
   `b5JNecjwG` and tells `shadcn add` to write a new component there. The layout follows the block

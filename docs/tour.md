@@ -279,7 +279,8 @@ With more than one model, the input field offers a choice. The first model answe
 another one, and the choice stays with that chat.
 
 The button "Tools" in the input field lists the servers that give the chat its tools: the generative UI
-backend, and the further ones the setting `APP_MCP_SERVERS` names, such as the optional Ultimaker service.
+backend, and the further ones the setting `APP_MCP_SERVERS` names: the OPC UA adapter of the stack, `opcua`,
+and optional services such as the Ultimaker service.
 It says whether each one answers and names its tools, and marks a tool that can change something. A switch
 takes a further server out of the chat from its next question on: the model then gets none of its tools. The
 choice stays with the chat, as the model does. The two pictures of this stop were taken before the button
@@ -312,7 +313,8 @@ reads which models the settings name, `cards.tsx` lists what the app draws for w
 
 ### Add a machine that speaks OPC UA
 
-Type `/` in the chat field: the list of commands opens, and `/help` explains them. Ask
+Type `/` in the chat field: the list of commands opens, and `/help` explains them. The OPC UA commands are
+there while the adapter answers and the chat has `opcua` on under "Tools". Ask
 `/discover A1121O0001`, and the model scans the OPC UA server of the simulated machine, matches its nodes to
 the data model and shows a proposal: the endpoint with the strongest security, whether the machine fulfils
 the core of the data model and which profiles are complete, every element with its value, and what is

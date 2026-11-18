@@ -159,7 +159,7 @@ parameters:
       - pointer: LLM_API_KEY
         components: ["default"]
   appMcpServers:
-    value: ""
+    value: "opcua=http://opcua-adapter:8080/mcp"
     targets:
       - pointer: APP_MCP_SERVERS
         components: ["default"]
@@ -283,7 +283,9 @@ configuration:
           name: Further MCP servers
           description: >-
             Further MCP servers for the chat, as name=address, separated by commas. Use an address the app
-            reaches from its container. For the documentation app on this device:
+            reaches from its container. The default is the OPC UA adapter of the app,
+            opcua=http://opcua-adapter:8080/mcp: keep it in the list, or the chat has no OPC UA. Add others after
+            a comma. For the documentation app on this device:
             docs=http://host.docker.internal:3202/mcp. Its MCP listener and published port must be reachable
             from this container; a port published only on host loopback may not be reachable on Linux.
           schema: optionalText
