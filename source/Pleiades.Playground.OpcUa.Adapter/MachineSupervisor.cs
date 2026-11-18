@@ -80,7 +80,7 @@ internal sealed class MachineSupervisor : BackgroundService
     private readonly RegistrationStore _store;
     private readonly AlertStore _alertStore;
     private readonly OpcUaClient _client;
-    private readonly RegistrationProbe _probe;
+    private readonly IRegistrationProbe _probe;
     private readonly IMachineOutputFactory _outputs;
     private readonly DraftStore _drafts;
     private readonly CredentialStore _credentials;
@@ -92,7 +92,7 @@ internal sealed class MachineSupervisor : BackgroundService
         RegistrationStore store,
         AlertStore alertStore,
         OpcUaClient client,
-        RegistrationProbe probe,
+        IRegistrationProbe probe,
         IMachineOutputFactory outputs,
         DraftStore drafts,
         CredentialStore credentials,

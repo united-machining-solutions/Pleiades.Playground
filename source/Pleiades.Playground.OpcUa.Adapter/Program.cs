@@ -69,7 +69,7 @@ builder.Services.AddSingleton(services => new CredentialStore(
     dataDirectory, reason => services.GetRequiredService<ILogger<CredentialStore>>().CredentialsUnreadable(reason)));
 builder.Services.AddSingleton<DraftStore>();
 builder.Services.AddSingleton<OpcUaClient>();
-builder.Services.AddSingleton<RegistrationProbe>();
+builder.Services.AddSingleton<IRegistrationProbe, RegistrationProbe>();
 // Every machine has its own connection to the broker, with its own last will (MachineOutput).
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IMachineOutputFactory, MachineOutputFactory>();

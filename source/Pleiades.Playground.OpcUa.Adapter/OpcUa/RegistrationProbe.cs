@@ -42,12 +42,19 @@ internal sealed record ProbeResult(
     public IReadOnlyList<ProbedElement> NotFound => [.. Elements.Where(element => !element.NodeFound)];
 }
 
+/// <summary>Tries a registration against its server without storing or publishing anything.</summary>
+internal interface IRegistrationProbe
+{
+    /// <summary>Connects, reads every node of the registration once and closes the session.</summary>
+    Task<ProbeResult> ProbeAsync(MachineRegistration registration, CancellationToken cancellationToken);
+}
+
 /// <summary>
 /// Tries a registration against its server without storing or publishing anything: connects with
 /// the security it names and reads every node once. This is how a proposed registration is checked
 /// before a person says yes to it.
 /// </summary>
-internal sealed class RegistrationProbe
+internal sealed class RegistrationProbe : IRegistrationProbe
 {
     private readonly OpcUaClient _client;
 
@@ -57,7 +64,7 @@ internal sealed class RegistrationProbe
         _client = client ?? throw new ArgumentNullException(nameof(client));
     }
 
-    /// <summary>Connects, reads every node of the registration once and closes the session.</summary>
+    /// <inheritdoc />
     public async Task<ProbeResult> ProbeAsync(MachineRegistration registration, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(registration);

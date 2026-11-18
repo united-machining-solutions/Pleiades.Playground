@@ -73,6 +73,29 @@ public class MachineOutputTest
     }
 
     [TestMethod]
+    public async Task A_core_the_machine_lacks_a_part_of_is_declared_whole_and_the_part_goes_out_once_as_null()
+    {
+        var full = Registration();
+        var registration = full with { Elements = [.. full.Elements.Where(element => element.Path != "OperationCounters.PowerOnDuration")] };
+
+        var manifest = MachineOutput.Manifest(registration, Identity, TimeSpan.FromSeconds(10));
+        var (output, client) = Output(registration);
+        await output.StartAsync();
+        await output.ReachedAsync();
+        await output.ReachedAsync();
+
+        CollectionAssert.Contains(Strings(manifest["profiles"]), "Core", "The core is declared, although the machine lacks a part of it.");
+        var lacking = manifest["elements"]!.AsArray().Select(element => element!.AsObject())
+            .Single(element => (string)element["path"]! == "OperationCounters.PowerOnDuration");
+        Assert.IsFalse((bool)lacking["available"]!, "What the machine lacks is not available.");
+        var nulls = client.Take().Where(m => m.Topic == $"{Root}/umati/OperationCounters/PowerOnDuration").ToList();
+        Assert.HasCount(1, nulls, "It goes out once, not with every answer of the machine.");
+        var payload = Payload(nulls[0]);
+        Assert.IsTrue(payload.ContainsKey("value") && payload["value"] is null, "Not available right now: value null.");
+        Assert.IsTrue(nulls[0].Retain);
+    }
+
+    [TestMethod]
     public async Task Initializing_the_manifest_and_the_identity_go_out_first_and_Running_after_the_values()
     {
         var (output, client) = Output();
