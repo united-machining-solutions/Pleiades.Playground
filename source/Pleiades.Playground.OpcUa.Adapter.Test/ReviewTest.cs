@@ -199,7 +199,7 @@ public class CertificatePinTest
     }
 
     [TestMethod]
-    public async Task A_rejected_server_certificate_is_told_with_its_reason_not_as_a_timeout()
+    public async Task A_rejected_server_certificate_is_told_with_its_reason()
     {
         using var directory = new TemporaryDirectory();
         var sessions = new Mock<IManagedSessionFactory>(MockBehavior.Strict);
@@ -237,6 +237,89 @@ public class CertificatePinTest
         Assert.Contains("does not trust the certificate of the adapter", rejected.Message);
         Assert.Contains(OpcUaClient.ApplicationName, rejected.Message, "The person finds the certificate by the name the server shows.");
         Assert.Contains("trusted", rejected.Message);
+    }
+
+    [TestMethod]
+    public async Task A_session_without_a_user_ends_at_once_when_the_server_refuses_the_adapter()
+    {
+        using var directory = new TemporaryDirectory();
+        var configure = await ConfigurationOf(new CredentialStore(directory.Path), Endpoint());
+
+        var (refused, tries) = await ConnectToRefusingServer(configure, StatusCodes.BadSecurityChecksFailed);
+
+        Assert.AreEqual(StatusCodes.BadSecurityChecksFailed, refused.StatusCode);
+        Assert.HasCount(1, tries, "The stack does not try again: the reason reaches the person, not a timeout.");
+    }
+
+    [TestMethod]
+    public async Task A_session_with_a_user_ends_at_once_when_the_server_refuses_the_user()
+    {
+        using var directory = new TemporaryDirectory();
+        var credentials = new CredentialStore(directory.Path);
+        credentials.Save(Url, new Credential("operator", "s3cret-pass", Thumbprint));
+        var configure = await ConfigurationOf(credentials, Endpoint(user: "operator"));
+
+        var (refused, tries) = await ConnectToRefusingServer(configure, StatusCodes.BadUserAccessDenied);
+
+        Assert.AreEqual(StatusCodes.BadUserAccessDenied, refused.StatusCode);
+        Assert.HasCount(1, tries, "The stack does not try again: the reason reaches the person, not a timeout.");
+        Assert.AreEqual(UserTokenType.UserName, tries[0]?.TokenType, "The session logs in with the stored user.");
+    }
+
+    /// <summary>The configuration the client gives the session factory of the stack for a connect to <paramref name="endpoint"/>.</summary>
+    private async Task<Action<ManagedSessionBuilder>> ConfigurationOf(CredentialStore credentials, EndpointRegistration endpoint)
+    {
+        Action<ManagedSessionBuilder>? configure = null;
+        var sessions = new Mock<IManagedSessionFactory>(MockBehavior.Strict);
+        sessions
+            .Setup(factory => factory.ConnectAsync(It.IsAny<ConfiguredEndpoint>(), It.IsAny<Action<ManagedSessionBuilder>>(), It.IsAny<CancellationToken>()))
+            .Callback<ConfiguredEndpoint, Action<ManagedSessionBuilder>, CancellationToken>((_, action, _) => configure = action)
+            .ThrowsAsync(new ServiceResultException(StatusCodes.BadNotConnected));
+
+        await Assert.ThrowsExactlyAsync<ServiceResultException>(
+            () => Client(credentials, sessions).ConnectAsync(endpoint, TestContext.CancellationToken));
+
+        Assert.IsNotNull(configure, "The client opens the session through the factory.");
+        return configure;
+    }
+
+    /// <summary>
+    /// Connects a real managed session of the stack, configured by <paramref name="configure"/>, to a server that
+    /// refuses every session with <paramref name="status"/>. Without the reconnect policy of the adapter the stack
+    /// tries again until it is cancelled; the limit only keeps such a test from hanging.
+    /// </summary>
+    /// <returns>The refusal the connect ended with, and the user identity of each try.</returns>
+    private async Task<(ServiceResultException Refused, List<IUserIdentity?> Tries)> ConnectToRefusingServer(
+        Action<ManagedSessionBuilder> configure, StatusCode status)
+    {
+        var telemetry = DefaultTelemetry.Create(_ => { });
+        var tries = new List<IUserIdentity?>();
+        var server = new Mock<ISessionFactory>();
+        server.SetupGet(factory => factory.Telemetry).Returns(telemetry);
+        server
+            .Setup(factory => factory.WithSubscriptionEngine(It.IsAny<ISubscriptionEngineFactory>(), It.IsAny<TimeProvider>()))
+            .Returns(() => server.Object);
+        server
+            .Setup(factory => factory.CreateAsync(
+                It.IsAny<ApplicationConfiguration>(), It.IsAny<ConfiguredEndpoint>(), It.IsAny<bool>(), It.IsAny<bool>(),
+                It.IsAny<string>(), It.IsAny<uint>(), It.IsAny<IUserIdentity>(), It.IsAny<ArrayOf<string>>(), It.IsAny<CancellationToken>()))
+            .Callback((ApplicationConfiguration _, ConfiguredEndpoint _, bool _, bool _, string _, uint _, IUserIdentity? identity, ArrayOf<string> _, CancellationToken _) =>
+                tries.Add(identity))
+            .ThrowsAsync(new ServiceResultException(status));
+        var builder = new ManagedSessionBuilder(new ApplicationConfiguration(), telemetry)
+            .UseEndpoint(new ConfiguredEndpoint(null, new EndpointDescription { EndpointUrl = Url }, null))
+            .UseSessionFactory(server.Object);
+        configure(builder);
+
+        using var limited = CancellationTokenSource.CreateLinkedTokenSource(TestContext.CancellationToken);
+        limited.CancelAfter(TimeSpan.FromSeconds(10));
+        var refused = await Assert.ThrowsExactlyAsync<ServiceResultException>(
+            async () =>
+            {
+                await using var session = await builder.ConnectAsync(limited.Token);
+            },
+            "The connect ends with the refusal of the server, not when it is cancelled.");
+        return (refused, tries);
     }
 
     [TestMethod]
