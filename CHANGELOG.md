@@ -7,10 +7,11 @@ All notable changes are documented here. The format follows
 
 ### Added
 
-- Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
-  shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
-  from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
-  entry in the sidebar.
+- Example app: the page `/where-is-my-job`, "Where is My Job?", in the sidebar, a basis for discussion of how
+  an order is followed across the shop floor. It shows the machines of the stack from above, one machine with
+  its job orders done, running and waiting, and one order on its way: every job order that names the same
+  order number. The values are those of the stack; programming, packing and the single part on its sheet have
+  no source yet and stand on the page as such.
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),

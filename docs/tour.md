@@ -114,6 +114,18 @@ read once by one server function, `getCharts` in
 [`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts); from then on the page is
 live from the broker, as Home is.
 
+The page "Where is My Job?" in the sidebar, <http://localhost:5600/where-is-my-job>, is a basis for
+discussion: how an order could be followed across the shop floor. It shows the machines of the stack from
+above, with their state, utilisation and job orders; a machine with what it did, does and what waits for it;
+and an order on its way. An order is every job order that names the same order number, read from the retained
+lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines, packing after them and
+the single part on its sheet have no source yet: the page draws them dashed, as the gaps to discuss. It has no
+picture in this tour.
+
+**In the code:** [`apps/app/src/routes/where-is-my-job.tsx`](../apps/app/src/routes/where-is-my-job.tsx) is
+the page; the map and the panels live in [`apps/app/src/where-is-my-job/`](../apps/app/src/where-is-my-job/),
+and `floor.ts` there reads the job orders and groups them into orders.
+
 ## 3. The page of one machine
 
 A click on a machine opens its page, here <http://localhost:5600/machines/alcyone-machines_AX-400_P-04>; the
