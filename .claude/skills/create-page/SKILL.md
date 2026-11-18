@@ -47,7 +47,7 @@ Read, in this order:
 ## A page of the stack, or a showcase
 
 Decide before the first file, and say which it is in your hand-over
-([ADR-0016](../../../docs/adr/0016-a-showcase-is-built-in-on-request-and-only-adds.md)).
+([ADR-0017](../../../docs/adr/0017-a-showcase-is-built-in-on-request-and-only-adds.md)).
 
 - A page of the stack shows what the backend answers, for any machine. It is what this recipe builds, and
   nothing below changes for it.

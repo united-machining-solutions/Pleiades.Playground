@@ -4,7 +4,7 @@ status: proposed
 date: 2026-11-18
 ---
 
-# ADR-0016: A showcase is built in on request and only adds
+# ADR-0017: A showcase is built in on request and only adds
 
 ## Context
 

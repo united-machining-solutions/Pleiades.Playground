@@ -1,0 +1,99 @@
+@page "/stock"
+@inherits LiveComponent
+
+<PageTitle>Stock · @State.DisplayName</PageTitle>
+
+<div class="page-head">
+    <h1>Stock</h1>
+    <span class="muted">@Hint</span>
+</div>
+
+<section class="card">
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Place</th>
+                    <th class="num">@(State.Type == CuttingMachineType.Punch ? "Position / height" : "Location")</th>
+                    <th>Goods</th>
+                    <th>Stock</th>
+                    <th class="num">Count</th>
+                    <th>State</th>
+                    <th aria-label="Actions"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var location in State.Locations)
+                {
+                    <tr>
+                        <td>@location.Label</td>
+                        <td class="num">@(location.Location > 0 ? location.Location.ToString(CultureInfo.InvariantCulture) : $"{location.PositionId} / {location.HeightId}")</td>
+                        <td>@GoodsName(location.GoodsType)</td>
+                        <td class="mono">@location.StockId</td>
+                        <td class="num">@location.Count@(location.Capacity > 0 ? $" / {location.Capacity}" : "")</td>
+                        <td>
+                            @if (location.Locked)
+                            {
+                                <span class="badge warn">@(location.IsSupply ? "Empty, reported" : "Full, reported")</span>
+                            }
+                            else
+                            {
+                                <span class="badge neutral">Available</span>
+                            }
+                        </td>
+                        <td class="row-actions">
+                            @if (location.IsSupply || location.Capacity > 1)
+                            {
+                                <button class="btn small" @onclick="() => Do(() => Actions.MakeAvailableAsync(location.Key))">@(location.IsSupply ? "Fill" : "Empty")</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@if (State.Type == CuttingMachineType.Laser2D)
+{
+    <section class="card">
+        <h2>Pallet changer</h2>
+        <p>Position @State.PalletChangerPosition: @(State.PalletChangerPosition >= 7 ? "pallet B is inside, A outside" : "pallet A is inside, B outside").</p>
+        <div class="actions">
+            <button class="btn" disabled="@(!State.Online)" @onclick="() => Do(Actions.SendPalletChangerPositionAsync)">Send PalletChangerPos</button>
+        </div>
+    </section>
+}
+
+@if (State.Type == CuttingMachineType.Punch)
+{
+    <section class="card">
+        <h2>Sheet handler</h2>
+        <p>Preparatory loading (SMLDACKN): @SheetLoadText</p>
+    </section>
+}
+
+@code {
+    private string Hint => State.Type switch
+    {
+        CuttingMachineType.Laser2D => "The host reads it with PALSSHOW; the machine reports changes with PalletSituation",
+        CuttingMachineType.Tube => "The host reads it with PALSSHOW; the machine reports changes with PalletSituation",
+        _ => "An empty or full stack is reported with MaschinenMeldung 2 or 1; the host answers with LOCAVAIL",
+    };
+
+    private string SheetLoadText => State.SheetLoadAcknowledge switch
+    {
+        0 => "0, carry out",
+        1 => "1, suppressed, more orders follow",
+        3 => "3, suppressed, last sheet of the plan",
+        var v => v.ToString(CultureInfo.InvariantCulture),
+    };
+
+    private static string GoodsName(string goods) => goods switch
+    {
+        "BT" => "BT raw sheet",
+        "NCP" => "NCP cut sheet",
+        "PR" => "PR tube",
+        _ => goods,
+    };
+}

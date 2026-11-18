@@ -22,7 +22,7 @@ function checkoutCommit() {
 // under src/showcases/. They are built in only where APP_SHOWCASES is set to anything; the image build sets
 // it from its argument SHOWCASES. Without it the folder holds no routes: the router does not know the
 // pages, nothing imports their code, and the build has none of it. Whoever takes the app as a base gets
-// the app alone. See docs/adr/0016-a-showcase-is-built-in-on-request-and-only-adds.md.
+// the app alone. See docs/adr/0017-a-showcase-is-built-in-on-request-and-only-adds.md.
 const showcases = Boolean(process.env.APP_SHOWCASES)
 /** The name of the folder of their routes, as the router reads the names of files and folders. */
 const SHOWCASE_ROUTES = "^\\(showcases\\)$"

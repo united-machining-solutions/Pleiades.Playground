@@ -10,8 +10,8 @@ The deployment is optional and off by default. Whoever only wants to see the dem
 ## How it goes
 
 1. A pull request is merged into `main`.
-2. "Images" builds the service images, including the optional Ultimaker and juice bar services, and tags them
-   `main` and `sha-<commit>`.
+2. "Images" builds the service images, including the cutting simulator and adapter and the optional Ultimaker
+   and juice bar services, and tags them `main` and `sha-<commit>`.
 3. "Deploy" runs after it on a runner of your own, on the computer that runs the stack. It checks out the
    commit, pulls the images tagged `sha-<commit>` and runs `docker compose up -d --no-build --wait`.
 
@@ -153,7 +153,7 @@ example app sends no token and does not reach the service then. See the
 
 The example app has two images. `pleiades.playground.app` is the app alone. `pleiades.playground.app.showcases`
 is the same app built with its showcases, pages made for one demo or one fair, which may show made-up data
-([ADR-0016](adr/0016-a-showcase-is-built-in-on-request-and-only-adds.md)). The Images workflow publishes both
+([ADR-0017](adr/0017-a-showcase-is-built-in-on-request-and-only-adds.md)). The Images workflow publishes both
 with the same commit tags.
 
 A demo that shows them sets one value in the private `.env` of the deployment computer in DEPLOY_DIR:

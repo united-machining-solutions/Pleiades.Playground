@@ -59,7 +59,7 @@ the language model its tools, and which file says what the app draws for which t
   contracts. No made-up data, no named person, nothing that only one demo needs. What a showcase wants drawn
   for itself, it draws in its own folder of the example app, `apps/app/src/showcases/<name>/`, not in the
   catalogue and not in the backend
-  ([ADR-0016](../../../docs/adr/0016-a-showcase-is-built-in-on-request-and-only-adds.md)). If the idea needs made-up data,
+  ([ADR-0017](../../../docs/adr/0017-a-showcase-is-built-in-on-request-and-only-adds.md)). If the idea needs made-up data,
   stop and say so.
 
 ## You touch

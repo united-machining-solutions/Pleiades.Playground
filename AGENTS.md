@@ -36,7 +36,7 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   image `pleiades.playground.app` has nothing of a showcase in it. A showcase only adds: it changes no shared
   file, nothing outside reads from its folder, and no other page links to one of its pages; a test fails if
   one does. Before you build a page or a card, decide which of the two it is, and say so in the pull request
-  ([ADR-0016](docs/adr/0016-a-showcase-is-built-in-on-request-and-only-adds.md)).
+  ([ADR-0017](docs/adr/0017-a-showcase-is-built-in-on-request-and-only-adds.md)).
 - A service reads and writes data only through a contract under `contracts/`. Change the contract first.
 - Units: a machine below `machines/` keeps the units of the data model (energy in `wattHour`); a place below
   `sites/` uses SI units, energy in joule, fractions in `one`. Never invent or convert units on the wire, in a

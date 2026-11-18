@@ -35,7 +35,7 @@ There is no contributor licence agreement.
 - **Decisions:** a choice that shapes the repository gets a short record under `docs/adr/`.
 - **Showcases:** what is made for one demo or one fair is a showcase: in a folder of its own, in a build only
   where `APP_SHOWCASES` is set, and it changes nothing the base shares, see
-  [ADR-0016](docs/adr/0016-a-showcase-is-built-in-on-request-and-only-adds.md).
+  [ADR-0017](docs/adr/0017-a-showcase-is-built-in-on-request-and-only-adds.md).
 - **Tour:** a change to what the demo shows, how it starts or where its code lives updates the
   [tour](docs/tour.md) in the same pull request: the text, the pointers into the code and the screenshot of
   the stop. One command retakes the screenshots, see
