@@ -11,7 +11,9 @@ internal static class MachineNamespaces
 
     /// <summary>
     /// The namespaces of the nodes of a registration: its elements and its machine node. The event
-    /// type of its alarms is left out: a type is shared by every machine of its kind.
+    /// type of its alarms is left out, as a type is shared by every machine of its kind, except the
+    /// TRUMPF interface (<see cref="Mapping.TrumpfAlarms"/>): the conditions of a TRUMPF machine lie in it,
+    /// and behind a gateway it carries the prefix of this machine.
     /// </summary>
     public static IReadOnlySet<string> Of(MachineRegistration registration)
     {
@@ -23,6 +25,11 @@ internal static class MachineNamespaces
             {
                 namespaces.Add(uri);
             }
+        }
+
+        if (UriOf(registration.Alerts?.EventType) is { } eventType && Mapping.TrumpfAlarms.IsInterfaces(eventType))
+        {
+            namespaces.Add(eventType);
         }
 
         return namespaces;

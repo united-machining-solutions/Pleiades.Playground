@@ -114,7 +114,7 @@ The simulator, its machines and the example registrations are TRUMPF-specific:
 TruMatic `A1121O0001` of definition `K09`, the one in the stack, and
 [`samples/trumpf-trulaser-l26.registration.json`](samples/trumpf-trulaser-l26.registration.json) for the
 TruLaser `A0280O0001` of definition `L26`, the first one scanned. In the image `1.4.0-alpha3` both definitions
-also serve the namespace `urn:umati2:datamodel:opcua`, which has the whole core but the alarms
+also serve the namespace `urn:umati2:datamodel:opcua`, which has the whole core, the list of the alarms included
 ([A machine in `urn:umati2:datamodel:opcua`](#a-machine-in-urnumati2datamodelopcua)). The example of `K09` names
 that machine, `machineNode` `nsu=urn:umati2:datamodel:opcua;s=Machine`: the adapter maps the core from it, with the
 model `TruMatic 1000 fiber` and the web address of TRUMPF, so the machine id is
@@ -207,8 +207,10 @@ machine of its own, with a registration of its own, and every machine on one end
   session closes only with the last machine of its endpoint.
 - **Alarms.** A gateway reports the alarms of all its machines at its Server object. A machine with a
   `machineNode` keeps those whose source or condition lies in one of its namespaces: those of its elements and
-  of its node. That needs a gateway that gives every machine namespaces of its own, as the UaGateway of Unified
-  Automation does with `NamespacePrefixOption` `ServerUri`.
+  of its node, and the TRUMPF interface if its alarm type is `TcMachineAlarmType`. That needs a gateway that
+  gives every machine namespaces of its own, as the UaGateway of Unified Automation does with
+  `NamespacePrefixOption` `ServerUri`. A machine in `urn:umati2:datamodel:opcua` reads its alarms from its own
+  list, `Notification.ActiveAlerts`, and needs no filter.
 
 ### A gateway on the development computer
 
@@ -291,19 +293,34 @@ encoding itself ([`Mapping/KnownStructures.cs`](Mapping/KnownStructures.cs)) and
 the server; the element names the member in `field`. An element of the table that the server does not have is
 moved to `missing` when the registration is tried, instead of refusing it; a missing element of the core
 refuses it all the same ([Core and profiles](#core-and-profiles)). `ManufacturerUri`, `ProductCode` and
-`YearOfConstruction` were not on the gateway of the edge device; the simulator `1.4.0-alpha3` has them. Not
-mapped: `Notification.ActiveAlerts`, a list of `DataType.Alert`, which the adapter does not decode: it builds the
-list from the alarm subscription in `alerts` instead, so such a machine is added only with the alarm event type of
-its server in `alerts`. Not mapped either: `Connection.State` and `Connection.Heartbeat`,
-the connection of the source on the edge device to the machine, not values of the machine. The model of the
-machine is its own `Identification.Model`, so the TRUMPF rule above does not apply.
+`YearOfConstruction` were not on the gateway of the edge device; the simulator `1.4.0-alpha3` has them.
+
+The alarms come from `s=Notification.ActiveAlerts`, the list of the alerts that stand, an array of
+`DataType.Alert`: the rules set `alerts.list` to it, whatever `alerts` the scan proposed. The adapter decodes the
+structure itself, as it decodes `DataType.Status`: `Id`, `ErrorCode`, `Message`, `Severity` (`DataType.AlertSeverity`:
+1 `Failure`, 2 `CheckFunction`, 3 `OffSpec`, 4 `MaintenanceRequired`), `SeverityValue` (UInt16), `Time`,
+`SourceName` and `correlationId`. Every new value of the list is compared with the alerts that stand: one that is
+new is raised, one that left is cleared, and the `Id` of the server is the condition of the alert. The severity of
+the list is the server's, not one the adapter derives. An alarm event type is not needed: the conditions of
+these events lie in the TRUMPF interface, outside the namespace of the machine. A server without the node moves
+`Notification.ActiveAlerts` to `missing` when the registration is tried. Not mapped: `Connection.State` and
+`Connection.Heartbeat`, the connection of the source on the edge device to the machine, not values of the
+machine. The model of the machine is its own `Identification.Model`, so the TRUMPF rule above does not apply.
 
 Such a server may show the same machine twice: in this namespace and by the root of its TRUMPF interface.
 `/endpoints/machines` lists it once, by its node in `urn:umati2:datamodel:opcua`, with the namespaces of both. A
-registration needs nothing but its machine and its alarms:
+registration needs nothing but its machine:
 [`samples/trumpf-trulaser-umati2-gateway.registration.json`](samples/trumpf-trulaser-umati2-gateway.registration.json)
-names the machine only. The alarm event type of that gateway is not known, so the sample does not fulfil the
-core and is refused until `alerts` is set.
+names the machine only, and the rules give it the whole core, its alarms included.
+
+A TRUMPF machine that is not in `urn:umati2:datamodel:opcua`, registered by its MachineTool instance or its
+TRUMPF interface, gets the alarm events of `TcMachineAlarmType` (`i=1006` of
+`http://trumpf.com/TRUMPF-Interfaces/`, a subtype of `AlarmConditionType`), with the code of the maker in its
+field `AlarmIdentifier`, if its registration names no `alerts` of its own
+([`Mapping/TrumpfAlarms.cs`](Mapping/TrumpfAlarms.cs)). Behind a gateway the event type takes the prefix of the
+machine's namespaces. A server without that type, or without it under that prefix, moves
+`Notification.ActiveAlerts` to `missing` when the registration is tried. The namespace of the TRUMPF interface counts as the machine's own, so that its conditions
+(`s=179.BasePlc.5.11.5.4`) pass the filter of a gateway ([Machines behind a gateway](#machines-behind-a-gateway)).
 
 A registration that is stored already keeps its mapping until it is replaced: `/rescan` proposes the change.
 A rule is code with a unit test ([`KnownMappingsTest.cs`](../Pleiades.Playground.OpcUa.Adapter.Test/KnownMappingsTest.cs)).
@@ -389,7 +406,9 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
   - `match` is `Direct`, `Derived` or `Unclear`: how sure the scan is.
   - `evidence` says why this node was matched. It is for the person who reviews the registration.
 - `alerts`: the event type of an alarm and the field with the code of the maker; `notifier`, the object whose
-  events are subscribed, is the Server object if left out. Without `alerts` the core is not fulfilled.
+  events are subscribed, is the Server object if left out. Or, instead of the events, `list`: the variable that
+  lists the alerts that stand, `Notification.ActiveAlerts` of `urn:umati2:datamodel:opcua`, which the adapter
+  sets itself for such a machine. Without `alerts` the core is not fulfilled.
 - `missing`: what the discovery looked for and did not find, with the reason, and the elements of a profile
   that is not complete, which the adapter does not publish.
 
@@ -403,8 +422,8 @@ The adapter checks every registration against the core and the profiles of the d
 - **Core.** Declared whole in every manifest: `Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`,
   `.ManufacturerUri`, `.Model`, `.ProductCode`, `.YearOfConstruction`, `State.MachineryItemState` and
   `State.MachineryOperationMode` (published together as the snapshot `State.Status`), `State.FeedOverride`,
-  `OperationCounters.PowerOnDuration`, and `Notification.ActiveAlerts`, which the adapter builds from the alarm
-  subscription in `alerts`. `Connection.State` and `Connection.Heartbeat` the adapter publishes
+  `OperationCounters.PowerOnDuration`, and `Notification.ActiveAlerts`, which the adapter builds from `alerts`:
+  the alarm events of the server, or its list. `Connection.State` and `Connection.Heartbeat` the adapter publishes
   itself. An element counts if it is mapped, also as `Derived` or `Unclear`; one in `missing` does not. What
   the machine lacks is `"available": false` in the manifest and goes out once as `null`, as with the Ultimaker
   telemetry and the juice bar. A registration is refused only without the parts of the machine id:
@@ -448,14 +467,14 @@ publisher the Ultimaker telemetry and the juice bar use too
 | Every element of the model | `umati/<path>` | Retained, in the envelope `{timestamp, value, unit}`, with the time of the source, when it changes. A bad value is not published, the last good one stands. |
 | `State.Status` | `umati/State/Status` | The snapshot `{MachineryItemState, MachineryOperationMode}` of the two elements. |
 | A signal of the maker | `oem/<path>` | As an element of the model; the manifest names it `x-<domain>.<path>`, the domain that of `ManufacturerUri`. |
-| `Notification.ActiveAlerts` | `umati/Notification/ActiveAlerts` | The alarms that stand, a list of `Id`, `ErrorCode`, `Message`, `Severity`, `SeverityValue`, `Time`; `[]` without one. |
-| Alarms | `events/notifications` | CloudEvents, not retained: `Notification.AlertRaised` when an alarm condition of the server becomes active, `AlertCleared` when it ends, both with the same `Id`. `source` is the `ProductInstanceUri`, `sequence` the start of the adapter and a count. `Severity` is the category of NAMUR NE 107 from the severity of OPC UA: from 667 `Failure`, from 334 `OffSpec`, below `MaintenanceRequired`. |
+| `Notification.ActiveAlerts` | `umati/Notification/ActiveAlerts` | The alarms that stand, a list of `Id`, `ErrorCode`, `Message`, `Severity`, `SeverityValue`, `Time` and `SourceName` if the server names one; `[]` without one. |
+| Alarms | `events/notifications` | CloudEvents, not retained: `Notification.AlertRaised` when an alarm condition of the server becomes active or an alert appears in its list, `AlertCleared` when it ends or leaves the list, both with the same `Id`. `source` is the `ProductInstanceUri`, `sequence` the start of the adapter and a count. `Severity` is the category of NAMUR NE 107: the one of the list of `urn:umati2:datamodel:opcua`, and for an alarm event, from the severity of OPC UA: from 667 `Failure`, from 334 `OffSpec`, below `MaintenanceRequired`. |
 | `Connection.State` | `umati/Connection/State` | `Initializing` at the start, `Running` once the values of a new session are out, `CommunicationFault` while the server does not answer (the values stand), `Shutdown` when the adapter stops or the registration is replaced. The last will says `CommunicationFault`. |
 | `Connection.Heartbeat` | `umati/Connection/Heartbeat` | A count from 1, every ten seconds while the machine is registered, also while it does not answer. |
 
 The job orders are not published. After a reconnect, and after a restart of the adapter, the server is asked for
-the conditions that still stand (`ConditionRefresh`). An alarm that went while nobody listened is cleared then,
-so none stays open for ever. An alarm that stood before a restart of the adapter and still stands is raised once
+the conditions that still stand (`ConditionRefresh`); a machine with a list of alerts gets the list once, as every
+new subscription does. An alarm that went while nobody listened is cleared then, so none stays open for ever. An alarm that stood before a restart of the adapter and still stands is raised once
 more in the new run, with its `Id` and its `Time`: the events of every run name every alarm that stands, so a
 consumer that ends the alarms of an earlier run at the start of the next one does not lose it.
 
@@ -547,6 +566,16 @@ What the scan of the TRUMPF simulator found, and what it did not. Another server
 
 ## What is verified
 
+- The alarms of `Notification.ActiveAlerts` (2026-11-18, the adapter of this branch run on the development
+  computer against the TRUMPF OPC UA simulator of definition `L26`, `opc.tcp://localhost:4842`, and the broker of
+  the stack): the machine, registered by its `machineNode` in `urn:umati2:datamodel:opcua` alone, is added as
+  `trumpf_TruLaser-3030-fiber_A0280O0001` with `Core`, `alerts.list` set by the rules. The two alerts of the
+  simulator (`BasePlc.5.11.5.4` and `.5`, `MaintenanceRequired`, 400) are on
+  `umati/Notification/ActiveAlerts`; when the simulator raised and cleared one, `AlertRaised` and `AlertCleared`
+  went to `events/notifications`, each followed by the list. Registered instead by its MachineTool instance,
+  without `alerts`, the same machine got `TcMachineAlarmType` with `AlarmIdentifier` and listed the same two
+  alerts from the events. The namespace filter behind a gateway with `TcMachineAlarmType` is covered by a unit
+  test only: no gateway with prefixed TRUMPF namespaces was at hand. After removal no retained message was left.
 - After the review (2026-11-18, same stack): the K09 example is added again as
   `trumpf_TruMatic-1000-fiber_A1121O0001`; without its alarm subscription it is added all the same, the manifest
   declares `Core` with `Notification.ActiveAlerts` `"available": false` and the list goes out once as `null`. With

@@ -7,6 +7,17 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: the drink card of the juice bar. For the result of `juicebar_drinks_list` the chat draws the
+  drinks whose bottles do not warn, each in the glass its author chose in the marketplace, filled with its
+  colour; a person picks one, and its button orders it at once, without a question of the language model.
+  The card follows the order and shows the glass waiting for the start button of the machine, filling while
+  the pumps run, and full, with an umbrella. Without motion the glass shows the same, still.
+- Example app: the showcase page `/juice-bar`, the same drink card on a page of its own, for a screen next to
+  the machine at a fair: a guest picks and orders without a language model. It reads the card of the machine
+  every half minute. Only a build with `APP_SHOWCASES` has it.
+- Juice bar API: a drink carries its colour and the picture of a glass its author chose (`color`, `picture`),
+  an ingredient its colour and whether its bottle runs low (`color`, `runsLow`). Colours that are not `#rrggbb`
+  are left out.
 - Example app: "Add a card" at the end of a kept page in "Edit" adds a card by hand, with no language model:
   the cards a page can hold, by what they show, and what the chosen one takes, read from its input schema
   (a machine by its name, the hours of its history). The same card twice or a thirteenth is not added.
@@ -23,6 +34,13 @@ All notable changes are documented here. The format follows
 - Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
   `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
   shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0020).
+- Example app: the page "OSACA cell" (`/osaca`) shows the OSACA demo cell, a robot that feeds a milling machine,
+  as a live 3D model with its key figures, axes, job orders, NC channels, alerts and machine data, from the
+  values the cell publishes over MQTT (`<root>/oem/…` and `<root>/umati/…`), and starts its preconfigured job
+  again after a confirmation. The settings `OSACA_MQTT_URL` and `OSACA_SIM_URL` name the broker and the
+  simulation.
+- Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
+  no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
 - Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
   each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
   draws them with the notification card.
@@ -495,6 +513,15 @@ All notable changes are documented here. The format follows
   the broker. `genui_machine_show` reads the one machine it shows instead of the whole fleet, so Charts, which asks
   for every machine, no longer grows with the square of the machines. A kept page or one opened from a link stands
   at once and draws each part when its answer comes. The server of the app keeps one connection to the backend.
+- OPC UA adapter: the alarms of a machine in `urn:umati2:datamodel:opcua` reach
+  `umati/Notification/ActiveAlerts` and `events/notifications`. The adapter reads the list
+  `Notification.ActiveAlerts` of that namespace, decodes `DataType.Alert` itself and raises and clears an alert
+  as it comes into the list and leaves it, with the severity the server gives (`alerts.list`, set by the rules of
+  the namespace). Before, the list went out once as `null`, and alarm events were dropped because their
+  conditions lie in the TRUMPF interface. A TRUMPF machine outside that namespace gets the events of
+  `TcMachineAlarmType` with `AlarmIdentifier` if its registration names no alarms and its server has that type,
+  and the TRUMPF interface counts as its own namespace. A server without the list or the type moves
+  `Notification.ActiveAlerts` to `missing`. A stored registration takes this on `/rescan` (issue 180).
 - `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page

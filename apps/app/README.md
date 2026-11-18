@@ -89,7 +89,7 @@ once the broker is back, for what it missed. A page reads on a clock only while 
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app`, the app alone. `pleiades.playground.app.showcases` is the same app built with its showcases, for a demo or a fair; `APP_SHOWCASES` in `.env` takes that one, see `src/showcases/` under [What is where](#what-is-where) |
 | Version | At the bottom of the sidebar: `0.0.142 · 7a83c2f` for an image of the workflow "Images", linked to its commit; `dev` for a build of your own, with the commit of the checkout under `vite dev` |
-| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `MQTT_WS_PORT`, the port the browser reaches the broker's WebSocket on, at the host of the page (9001 if unset); or `MQTT_WS_URL`, the whole address, for a broker behind a proxy (`wss://…`); or `MQTT_WSS_PATH`, for a page over HTTPS only, a path at the origin of the page that the proxy in front of the app forwards to the broker (`/mqtt`, the Margo app). `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); the app draws nothing for their results, the answer says them, and a chat switches each of them off and on under "Tools" in its message field. `OPCUA_MCP_URL` and `OPCUA_ADAPTER_URL`, the MCP endpoint and the API of the [OPC UA adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md); empty, the chat has no OPC UA. The language models of the chat, see below. |
+| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `MQTT_WS_PORT`, the port the browser reaches the broker's WebSocket on, at the host of the page (9001 if unset); or `MQTT_WS_URL`, the whole address, for a broker behind a proxy (`wss://…`); or `MQTT_WSS_PATH`, for a page over HTTPS only, a path at the origin of the page that the proxy in front of the app forwards to the broker (`/mqtt`, the Margo app). `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); the app draws nothing for their results but the drink card of `juicebar`, the answer says them, and a chat switches each of them off and on under "Tools" in its message field. `OPCUA_MCP_URL` and `OPCUA_ADAPTER_URL`, the MCP endpoint and the API of the [OPC UA adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md); empty, the chat has no OPC UA. The language models of the chat, see below. |
 
 ## Language models
 
@@ -238,10 +238,12 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   commit this file; here everything that needs it writes it first.
 - `src/showcases/`: what is made for one demo or one fair, and is in a build only where `APP_SHOWCASES` is
   set ([ADR-0018](../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
-  it is a showcase; there is none yet. The pages of the showcases, and their server routes, are the route
-  files under `src/routes/(showcases)/`; the brackets make a folder that adds nothing to an address, so
-  `(showcases)/titan.tsx` answers at `/titan`. A page belongs to the showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and
-  `titan/faces.tsx` are pages of `showcases/titan/`. A build without the setting leaves that folder out
+  it is a showcase: `juice-bar/` is what the page `/juice-bar` reads, the drink card of the chat on a page of
+  its own for a screen next to the machine, without a language model. The pages of the showcases, and their
+  server routes, are the route files under `src/routes/(showcases)/`; the brackets make a folder that adds
+  nothing to an address, so `(showcases)/juice-bar.tsx` answers at `/juice-bar`. A page belongs to the
+  showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and `titan/faces.tsx` are pages of
+  `showcases/titan/`. A build without the setting leaves that folder out
   (`vite.config.ts`): the router does not know the pages, nothing imports the folder of a showcase, and
   `.output` has nothing of one, so neither has the image. There is no switch while the app runs.
   `rule.test.ts` fails when a file of the app reads from a showcase or names the address of one of its pages,
@@ -257,7 +259,11 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   signs and the wording come from [`@pleiades/cards`](../../packages/cards/README.md). `measurement/chat.tsx`
   is the measurement card in the chat: the cards of `genui_measurement_list`, without graphs. `opcua/chat.tsx`
   holds the cards of the OPC UA adapter: the server list, a mapping, a proposal and the endpoints, and
-  `results.ts` checks what its tools give back.
+  `results.ts` checks what its tools give back. `juicebar/chat.tsx` is the drink card of the
+  [juice bar](../../source/Pleiades.Playground.JuiceBar.Api/README.md), for the result of
+  `juicebar_drinks_list`: a drink to pick, its glass (`glass.tsx`, moving by `glass.css`), and a button that
+  orders it at once over the server functions of `src/juicebar/orders.ts`; `follow.ts` reads the order again
+  until it is done, also after a call that did not reach the server of the app.
 - `src/machines/`: what the pages and the chat both take of a machine. `get-machines.ts` holds the server
   functions that call the backend as a typed MCP client, `card-tools.ts` the names of the tools only a card
   calls, `machine-item.tsx` draws a machine as a row or a tile. A card folder imports from here, never the

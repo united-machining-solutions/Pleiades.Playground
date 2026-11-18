@@ -448,7 +448,10 @@ The service publishes the state of the machine to the broker. Its machine id def
 `trumpf_JuiceBar_JUICEBAR-01`, which then appears in the machine list of Home as "JuiceBar JUICEBAR-01", next
 to the simulated machines. With
 `juicebar=http://juicebar-api:8080/mcp` in `APP_MCP_SERVERS`, the chat answers what the bar can mix and
-orders a drink when asked. No tour screenshot was retaken: they show the stack without the profile.
+orders a drink when asked. Asked what the bar has, it draws the drink card: each drink in its glass, one to
+pick, and a button that orders it at once; the glass then fills while the machine mixes. A stack with
+`APP_SHOWCASES` set has the same card as a page of its own, <http://localhost:5600/juice-bar>, for a screen next to
+the machine, without a language model. No tour screenshot was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).
 
 ## Retaking the screenshots
