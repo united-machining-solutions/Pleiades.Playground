@@ -14,7 +14,7 @@ All notable changes are documented here. The format follows
   them, and `APP_SHOWCASES` in `.env` makes the stack take it. A showcase only adds: a test fails when a
   file of the app reads from one or links to one of its pages. `AGENTS.md` and the skills `create-page`,
   `create-card` and `build-your-own` ask whether a thing is base or a showcase
-  ([ADR-0017](docs/adr/0017-a-showcase-is-built-in-on-request-and-only-adds.md)).
+  ([ADR-0018](docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)).
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
   self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
   that live values work over HTTPS. HTTP stays as it is.
@@ -44,6 +44,8 @@ All notable changes are documented here. The format follows
 - Page of a machine: the title switches to another machine, with a search over the serial number and the
   state, and the history of the card covers the last 1, 8 or 24 hours (`?hours=`). The page is wider, with
   room for actions on the right.
+- Energy card: `genui_energy_show` says how much energy machines imported over the last 1 to 24 hours, from
+  their meters, with mean and peak power; the card draws their power as a graph (`genui_energy_series`).
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,

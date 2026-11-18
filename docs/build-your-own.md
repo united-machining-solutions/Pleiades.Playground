@@ -36,7 +36,7 @@ show made-up data, and it is built in only on request. The app alone, and its im
 showcase in them; a stack started with `APP_SHOWCASES=true` in `.env` runs the same app with all of them.
 A showcase lives in a folder of its own and changes nothing the others share, so it never stands in the way
 of whoever takes the stack as a base. The recipes ask which of the two your idea is. Why:
-[ADR-0017](adr/0017-a-showcase-is-built-in-on-request-and-only-adds.md).
+[ADR-0018](adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md).
 
 ## The stack in detail
 

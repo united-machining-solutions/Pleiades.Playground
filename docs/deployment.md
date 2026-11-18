@@ -153,7 +153,7 @@ example app sends no token and does not reach the service then. See the
 
 The example app has two images. `pleiades.playground.app` is the app alone. `pleiades.playground.app.showcases`
 is the same app built with its showcases, pages made for one demo or one fair, which may show made-up data
-([ADR-0017](adr/0017-a-showcase-is-built-in-on-request-and-only-adds.md)). The Images workflow publishes both
+([ADR-0018](adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). The Images workflow publishes both
 with the same commit tags.
 
 A demo that shows them sets one value in the private `.env` of the deployment computer in DEPLOY_DIR:

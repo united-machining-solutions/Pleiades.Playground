@@ -201,7 +201,7 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   (`route-tree.mjs`), and so do the development server and the build. Never edit it. TanStack advises to
   commit this file; here everything that needs it writes it first.
 - `src/showcases/`: what is made for one demo or one fair, and is in a build only where `APP_SHOWCASES` is
-  set ([ADR-0017](../../docs/adr/0017-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
+  set ([ADR-0018](../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
   it is a showcase: `where-is-my-job/` is the made-up shop floor of the page "Where is My Job?". The pages of
   the showcases, and their server routes, are the route files under `src/routes/(showcases)/`; the brackets
   make a folder that adds nothing to an address, so `(showcases)/where-is-my-job.tsx` answers at
