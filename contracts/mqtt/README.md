@@ -541,7 +541,9 @@ and `OperationCounters.PowerOnDuration` are `"available": false`. Printer and ju
 `State.FeedOverride` and `Notification.ActiveAlerts` either, and publish no events. The cutting adapter delivers
 both, besides `Channel/1/ChannelState` and `WorkMasterMonitoring/ActiveWorkMaster`, which carries the name of the NC program, the same value as its signal: the machine has no work master of its own; its timestamps are those of the machine (`"timestampSource": "source"`), save a `null` for not known, which carries the time of the connect,
 and each alarm of the machine is an entry of `ActiveAlerts` with the events `Notification.AlertRaised` and
-`Notification.AlertCleared` on `events/notifications`.
+`Notification.AlertCleared` on `events/notifications`. The protocol of the cutting machines has no request for
+the current alarms, so after a start of the adapter `ActiveAlerts` is `null` until the machine runs, stands
+without a fault or names an alarm; the list goes out before the events that change it.
 
 ### Open for the hackathon
 
@@ -570,6 +572,11 @@ and each alarm of the machine is an entry of `ActiveAlerts` with the events `Not
   program, and its catalogue still says the work master of a machine tool is mostly the name of the NC program.
   Open: whether the model wants an element for the program (for example in `ProgramExecution`), or the work master
   stays the program name on machines without a work master of their own. The cutting adapter does the latter.
+- Programs and jobs of the cutting machines. The model has `WorkMasterMonitoring.ProgramExecution` with the
+  events `ProgramExecutionStarted`, `Ended`, `Aborted`, `Interrupted` and `Resumed`; `StartNCP`, `EndeNCP`,
+  `ResetNCP` and the halts the cutting adapter detects map onto them almost one to one, and the production plan
+  (`PRD_SHOW`) could become `JobMonitoring.JobOrders`. Then the cutting machines would show up in the job and
+  program views of the app like the virtual machine. Open: who builds it.
 - The planned times of a job order. The model asks for `PlannedStartTime` and `PlannedEndTime` and allows `null`;
   the virtual machine knows no plan and sends `null`. `OrderNumbers` is made up (`SO-` and the number of the job
   order).

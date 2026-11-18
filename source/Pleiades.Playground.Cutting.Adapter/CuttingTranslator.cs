@@ -28,6 +28,10 @@ namespace Pleiades.Playground.Cutting.Adapter;
 ///                                machine runs again or stands without a fault
 /// </code>
 /// <para>
+/// The list <c>Notification.ActiveAlerts</c> goes out before the events that change it, so that a consumer who
+/// reads it when an event arrives finds the list the event speaks of.
+/// </para>
+/// <para>
 /// The machine has no work master of its own: its work master is the NC program, as the catalogue of the model
 /// says of most machine tools. So <c>WorkMasterMonitoring.ActiveWorkMaster</c> carries the name of the program,
 /// the same value as the signal of the manufacturer.
@@ -68,6 +72,7 @@ internal sealed partial class CuttingTranslator(
     private readonly Dictionary<string, DateTimeOffset> _lastTimestamp = new(StringComparer.Ordinal);
     private bool _programActive;
     private bool _programKnown;
+    private bool _alertsKnown;
     private string _program = string.Empty;
     private HeldState? _held;
 
@@ -84,8 +89,9 @@ internal sealed partial class CuttingTranslator(
 
     /// <summary>
     /// The machine answered <c>SRC9CONN</c>. What it has not said yet since the adapter started, its state, its
-    /// channel or its program, is <c>null</c>, not known right now: the manifest names them as delivered. The alarms
-    /// are those still raised.
+    /// channel or its program, is <c>null</c>, not known right now: the manifest names them as delivered. So are its
+    /// alarms: the protocol has no request for them, and the machine names an alarm only when it comes up. They are
+    /// known as none once the machine runs or stands without a fault, and as a list once it names an alarm.
     /// </summary>
     public IReadOnlyList<Publication> Connected()
     {
@@ -96,7 +102,7 @@ internal sealed partial class CuttingTranslator(
             result.Add(new ValuePublication(path, null, now));
         }
 
-        result.Add(new ValuePublication(Paths.ActiveAlerts, AlertList(), now));
+        result.Add(new ValuePublication(Paths.ActiveAlerts, _alertsKnown ? AlertList() : null, now));
         return Ordered(result);
     }
 
@@ -363,10 +369,11 @@ internal sealed partial class CuttingTranslator(
             ["Time"] = MachineBinding.Timestamp(at),
         };
         _activeAlarms[number] = alert;
+        _alertsKnown = true;
         return
         [
-            new AlertPublication(Paths.AlertRaised, (JsonObject)alert.DeepClone(), at),
             new ValuePublication(Paths.ActiveAlerts, AlertList(), at),
+            new AlertPublication(Paths.AlertRaised, (JsonObject)alert.DeepClone(), at),
         ];
     }
 
@@ -377,17 +384,25 @@ internal sealed partial class CuttingTranslator(
             : [];
     }
 
+    /// <summary>
+    /// No alarm stands any more: the list, now known to be empty, then <c>AlertCleared</c> for each alarm that stood.
+    /// Nothing when the list is known to be empty already.
+    /// </summary>
     private List<Publication> ClearAlarms(DateTimeOffset at)
     {
-        if (_activeAlarms.Count == 0)
+        if (_alertsKnown && _activeAlarms.Count == 0)
         {
             return [];
         }
 
-        List<Publication> cleared = [.. _activeAlarms.Values.Select(a => (Publication)new AlertPublication(Paths.AlertCleared, a, at))];
+        var alarms = _activeAlarms.Values.ToList();
         _activeAlarms.Clear();
-        cleared.Add(new ValuePublication(Paths.ActiveAlerts, AlertList(), at));
-        return cleared;
+        _alertsKnown = true;
+        return
+        [
+            new ValuePublication(Paths.ActiveAlerts, AlertList(), at),
+            .. alarms.Select(a => (Publication)new AlertPublication(Paths.AlertCleared, a, at)),
+        ];
     }
 
     /// <summary>The whole list of <c>Notification.ActiveAlerts</c>; <c>[]</c> for none.</summary>

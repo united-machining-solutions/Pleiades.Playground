@@ -50,12 +50,15 @@ public sealed class MqttPublisherTest
         Assert.AreEqual("CommunicationFault", (string?)RecordingManagedMqttClient.Json(start[^1])["value"]);
         Assert.IsTrue(start.All(m => m.Retain && m.ContentType == MachineBinding.ContentType));
 
-        Assert.AreEqual(Root + "umati/Connection/State", reached[^2].Topic);
-        Assert.AreEqual("Running", (string?)RecordingManagedMqttClient.Json(reached[^2])["value"], "Running once the values of the machine are out.");
-        var status = RecordingManagedMqttClient.Json(reached[^1]);
-        Assert.AreEqual(Root + "umati/State/Status", reached[^1].Topic, "After Running only what changed.");
+        var running = reached.FindIndex(m => m.Topic == Root + "umati/Connection/State");
+        Assert.AreEqual("Running", (string?)RecordingManagedMqttClient.Json(reached[running])["value"], "Running once the values of the machine are out.");
+        var after = reached[(running + 1)..];
+        Assert.HasCount(2, after, "After Running only what changed: the state, and that no alert stands.");
+        var status = RecordingManagedMqttClient.Json(after.Single(m => m.Topic == Root + "umati/State/Status"));
         Assert.AreEqual("Executing", (string?)status["value"]!["MachineryItemState"]);
         Assert.AreEqual("None", (string?)status["value"]!["MachineryOperationMode"]);
+        var alerts = RecordingManagedMqttClient.Json(after.Single(m => m.Topic == Root + "umati/Notification/ActiveAlerts"));
+        Assert.IsEmpty(alerts["value"]!.AsArray());
     }
 
     [TestMethod]

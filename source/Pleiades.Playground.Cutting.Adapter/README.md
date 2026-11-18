@@ -53,7 +53,7 @@ number>`, formed from `Config__ManufacturerUri`, `Config__Model` and `Config__Se
 | | `Reset` | `EndeNCP`, `ResetNCP` |
 | `umati/WorkMasterMonitoring/ActiveWorkMaster` | the NC program, `null` when none runs: the machine has no work master of its own, so its work master is the program, as the catalogue of the model says of most machine tools | `StartNCP` field 2; `EndeNCP`, `ResetNCP` |
 | `oem/WorkMasterMonitoring/ActiveProgram` | the NC program, `null` when none runs; a signal of the manufacturer (`x-trumpf-com.WorkMasterMonitoring.ActiveProgram`), as the simulators publish it | `StartNCP` field 2; `EndeNCP`, `ResetNCP` |
-| `umati/Notification/ActiveAlerts` | the whole list: `Id`, `ErrorCode` (the alarm number), `Message`, `Severity` `Failure`, `Time` | `AktuelleAlarme` |
+| `umati/Notification/ActiveAlerts` | the whole list: `Id`, `ErrorCode` (the alarm number), `Message`, `Severity` `Failure`, `Time`; `null` until the machine says whether an alarm stands. It goes out before the events that change it | `AktuelleAlarme`; `[]` on `MaschineLaeuft` or `MaschineSteht` reason 2 |
 | `events/notifications` | CloudEvent `Notification.AlertRaised` | `AktuelleAlarme`, once per alarm number |
 | | CloudEvent `Notification.AlertCleared`, the same `Id` | `MaschineLaeuft`, or `MaschineSteht` reason 2 |
 
@@ -62,7 +62,9 @@ number>`, formed from `Config__ManufacturerUri`, `Config__Model` and `Config__Se
 `sequence` that counts from 1 per start of the adapter; while the broker is away they wait in a bounded outbox
 (10 000, the oldest dropped first) and go out after the connect sequence. An alarm still raised when the machine
 switches off or starts anew is cleared with it, and so is its program; one raised when the adapter itself restarts gets no `AlertCleared`: a consumer sees
-the new start by the prefix of `sequence` and reads `ActiveAlerts` again.
+the new start by the prefix of `sequence` and reads `ActiveAlerts` again. The protocol has no request for the
+current alarms, and the machine names an alarm only when it comes up; so after a start of the adapter
+`ActiveAlerts` is `null`, not known, until the machine runs, stands without a fault, or names an alarm.
 
 **Halt or end?** The machine sends `MaschineSteht` whenever a program ends, is aborted or halts, and
 `MaschineLaeuft` whenever one starts or goes on (§5.8, §5.9), often just before `EndeNCP` or `StartNCP`. So

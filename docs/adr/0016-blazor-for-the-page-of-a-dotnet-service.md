@@ -37,6 +37,9 @@ There were three ways:
 - The page does not use the components of the design system. A button there looks like one of the app, but
   it is not the same component. That is acceptable for a tool page and would not be for a product screen.
 - A second page of this kind should share its stylesheet with the first, not copy it.
+- The colours and the radius of the page are copied by value from the theme of `packages/ui`. They drift when
+  that theme changes, and a brand does not reach the page. Whoever changes the theme copies its tokens into
+  `wwwroot/app.css` of the simulator by hand; a page that has to follow a brand is a page of the app instead.
 
 ## Alternatives considered
 
