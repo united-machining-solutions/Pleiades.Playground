@@ -8,6 +8,7 @@ import { fetchChats, getChatStatus } from "@/chat/status.ts"
 import { AppSidebar } from "@/components/app-sidebar.tsx"
 import { AskAnything } from "@/components/ask-anything.tsx"
 import { PageBreadcrumb } from "@/components/page-breadcrumb.tsx"
+import { brandScript } from "@pleiades/ui/brands"
 import { Button } from "@pleiades/ui/components/button"
 import { Separator } from "@pleiades/ui/components/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@pleiades/ui/components/sidebar"
@@ -29,7 +30,10 @@ export const Route = createRootRoute({
       return { chatStatus, chats: chatStatus.configured ? await fetchChats() : [] }
     } catch {
       // The server is away for a moment, for example while it restarts. The next read sets it right.
-      return { chatStatus: { configured: false, models: [], gaps: [] }, chats: [] }
+      return {
+        chatStatus: { configured: false, opcua: false, models: [], gaps: [], dictation: false, servers: [] },
+        chats: [],
+      }
     }
   },
   head: () => ({
@@ -38,7 +42,15 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Pleiades Playground" },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      // The sign of umati, from public/. The ICO is for a browser without SVG icons.
+      { rel: "icon", href: "/favicon.ico", sizes: "32x32" },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+    ],
+    // The brand of the last visit goes on before the first frame, not only once the bundle runs.
+    scripts: [{ children: brandScript }],
   }),
   shellComponent: Document,
   component: Layout,
@@ -47,7 +59,9 @@ export const Route = createRootRoute({
 
 function Document({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // The script in the head puts the brand of the last visit on this element before React takes the
+    // document over (packages/ui/brands), so the attribute is not in what the server sent.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

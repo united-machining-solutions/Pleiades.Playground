@@ -16,7 +16,6 @@
     "@pleiades/hub-sdk": "catalog:",
     "@pleiades/ui": "workspace:*",
     "@tanstack/ai": "catalog:",
-    "@tanstack/ai-anthropic": "catalog:",
     "@tanstack/ai-harness": "catalog:",
     "@tanstack/ai-mcp": "catalog:",
     "@tanstack/ai-openai": "catalog:",
@@ -27,11 +26,15 @@
     "@tanstack/react-start": "catalog:",
     "cn": "catalog:",
     "lucide-react": "catalog:",
+    "mqtt": "catalog:",
+    "pdfjs-dist": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "recharts": "catalog:",
     "shadcn": "catalog:",
     "tailwindcss": "catalog:",
-    "tw-animate-css": "catalog:"
+    "tw-animate-css": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@pleiades/genui-mcp": "workspace:*",

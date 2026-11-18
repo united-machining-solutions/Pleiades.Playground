@@ -28,8 +28,20 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   It needs `pnpm install` first. In one thing this repository differs from the skill of the Router: the
   route tree, `routeTree.gen.ts`, is not committed here. It is written from the route files, see
   [`apps/app`: What is where](apps/app/README.md#what-is-where). Never commit it, and never edit it.
+- What is made for one demo, one fair or one story is a showcase; everything else is base. Base works for
+  any machine that follows the data model, reads only through the contracts, and needs no made-up data, no
+  named person and no special device. `contracts/`, `source/`, `apps/genui-mcp`, `packages/cards` and
+  `packages/ui` take base only. A showcase of the example app lives in `apps/app/src/showcases/<name>/`, its
+  pages under `apps/app/src/routes/(showcases)/`, and it is in a build only where `APP_SHOWCASES` is set: the
+  image `pleiades.playground.app` has nothing of a showcase in it. A showcase only adds: it changes no shared
+  file, nothing outside reads from its folder, and no other page links to one of its pages; a test fails if
+  one does. Before you build a page or a card, decide which of the two it is, and say so in the pull request
+  ([ADR-0018](docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)).
 - A service reads and writes data only through a contract under `contracts/`. Change the contract first.
-- SI units only; energy in joule, fractions in `one`. Never invent or convert units on the wire.
+- Units: a machine below `machines/` keeps the units of the data model (energy in `wattHour`); a place below
+  `sites/` uses SI units, energy in joule, fractions in `one`. Never invent or convert units on the wire, in a
+  store or in an API; a display converts (ADR-0002). The words of a tool result are such a display: they may name
+  a value in the unit people use, next to the values, which keep the unit they came with (ADR-0017).
 - Never commit a secret value. Names go to `.env.example`.
 - Verify before you claim: `dotnet build` and `dotnet test --solution source/Pleiades.Playground.slnx`; for
   TypeScript `pnpm typecheck`, `pnpm test` and `pnpm build`; for the stack
@@ -38,6 +50,12 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
 - Do not commit, push or publish unless asked.
 - When asked: work on a branch, never on `main`; one topic per pull request; sign off every commit
   (`git commit -s`) and add a `Co-Authored-By` trailer that names you; fill in the pull request template.
+  When you push a branch for a person, offer to open its pull request, and open it yourself
+  (`gh pr create --body-file`): GitHub's page knows only the commits and leaves the template empty. Before
+  you open it, merge `origin/main` (`--signoff`, and after a conflict `git commit -s --no-edit`): a pull
+  request with a conflict runs no check. If the person opens it on GitHub, give them the filled-in text.
+  When a pull request is open, or its check "Pull request says what it is" fails, run
+  `node .github/scripts/check-pull-request.mjs <number>` and do what it says, also where a person opened it.
 - Use the GitHub CLI (`gh`) for pull requests, checks and logs. The person signs in; never ask for a token and
   never type a password.
 - Tools and their checks: [docs/development-setup.md](docs/development-setup.md).
@@ -54,6 +72,10 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
 - A person who has just got the repository, or whose stack, example app or chat does not run: follow the
   skill `setup` (`.claude/skills/setup/SKILL.md`). Check each step yourself, say what you found, ask before you
   start or install anything, and where you cannot go on, give the person one sentence to pass on.
+- A person who wants the user interface in the look of a brand: a brand is a folder of
+  [`packages/ui/brands`](packages/ui/brands/README.md), a `DESIGN.md` and a block of theme tokens written
+  from it. Follow the skill `add-brand` (`.claude/skills/add-brand/SKILL.md`). A brand never edits a
+  component and never sets a colour that carries a meaning; a test fails if it does.
 - A person who wants to add a page, a card or a source of data of their own: follow the skill
   `build-your-own` (`.claude/skills/build-your-own/SKILL.md`). Ask what they want to see, look yourself what
   the stack already has, propose the smallest thing that shows it, and on a yes take the recipe of the step

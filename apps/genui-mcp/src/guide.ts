@@ -24,8 +24,8 @@ export const skillGuide = `# genui: skill guide
 ## A result is an answer
 
 - The text of a result says in words what a display shows: what a machine does, since when, with
-  which program, and for one machine how long each state lasted over the last hours. The values
-  next to the text are for a display.
+  which work master and job order, and for one machine how long each state lasted over the last
+  hours. The values next to the text are for a display.
 - A host that shows MCP Apps draws the result of \`genui_machine_show\` as the machine card. The
   person then sees every value. Say what matters in a sentence or two. Do not list the values again,
   and do not draw them again.
@@ -47,6 +47,8 @@ export const skillGuide = `# genui: skill guide
   for more than 30 seconds, it is not, and its values are the last known ones, not the present. Such
   a silence also ends a run, because what the value was in between is not known: \`since\` is then
   the first value after the silence.
-- Units are SI on the wire; a display converts them.
+- A value of a machine is in the unit of the umati data model, as the machine published it: power in
+  watt, energy in watt hours, a temperature in degrees Celsius. Nothing is converted on the way; a
+  display writes the unit out.
 
 ${cards.map((card) => card.guide).join("\n")}`

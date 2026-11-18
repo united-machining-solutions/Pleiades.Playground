@@ -155,7 +155,7 @@ const type = [
   {
     classes: "font-mono text-xs",
     use: "A value in the tooltip of a chart, a topic, code",
-    specimen: "machines/P-04/umati/State/MachineryItemState",
+    specimen: "machines/alcyone-machines_AX-400_P-04/umati/State/Status/MachineryItemState",
   },
 ]
 
@@ -237,7 +237,7 @@ export function Foundations() {
   return (
     <Section
       id="foundations"
-      line="The tokens every component is drawn with. The theme is packages/ui/src/styles/globals.css, the chart and state colours are packages/cards/src/dataviz.css. There is one theme, and it is light."
+      line="The tokens every component is drawn with. The theme is packages/ui/src/styles/globals.css, the chart and state colours are packages/cards/src/dataviz.css. There is one theme, and it is light. A brand, chosen at the top of the page, sets some of its tokens: packages/ui/brands."
     >
       <Topic
         title="Color roles"

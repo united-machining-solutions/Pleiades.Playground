@@ -13,11 +13,16 @@
 @import "@pleiades/ui/globals.css";
 @source "../../../packages/ui/src";
 @import "@pleiades/cards/styles.css";
+/* The brands the choice at the top of the page offers: each a block of tokens over the theme. */
+@import "@pleiades/ui/brands.css";
 /* Pins hover, focus and pressed with data-preview, so the page shows the states side by side. */
 @import "./preview-states.css";
 
-/* The font is the one of the example application. */
-@theme inline {
+/*
+ * The font is the one of the example application. Not "inline", so that a class asks for the
+ * variable and a brand that sets --font-sans changes the font.
+ */
+@theme {
     --font-sans: 'Roboto Variable', sans-serif;
 }
 

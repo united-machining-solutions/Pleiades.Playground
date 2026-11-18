@@ -21,12 +21,24 @@ There is exactly one unit per quantity:
 - the full list is in [`contracts/mqtt`](../../contracts/mqtt/README.md) and in the `BaseUnit` type.
 
 Displays convert to what people are used to (millimetre, 1/min, bar, percent, kWh). Services never do.
+The words of a tool result are such a display, since a language model passes them on to a person: they may
+name a value in the unit people use, next to the values of the result, which keep the unit they came with.
 
 ## Consequences
 
 - No value is ambiguous; statistics and comparisons need no conversion table.
 - Adapters convert once at the source and must know the unit of every signal.
-- The data model referenced in `contracts/datamodel` lists energy in watt hours; the binding documents the deviation.
+- The data model referenced in `contracts/datamodel` lists energy in watt hours.
+
+## Amendment (2026-11-17)
+
+Machines below `machines/` follow the data model exactly, its units included: energy in `wattHour`, and the
+unit named by the catalogue ([ADR-0015](0015-the-binding-of-machines-follows-the-data-model.md)). The services do
+not convert machine data either: the Timeseries and Events stores keep a value of a machine with the unit it came
+with (`wattHour`, `degreeCelsius` …), and the APIs serve it so; converting is the matter of the display. Two
+machines that deliver one quantity in two units would need a conversion in whoever compares them; the catalogue
+of the data model gives one unit per quantity, so they do not. This decision applies only to values about a
+place below `sites/`, which keep their coherent SI units; that services never convert holds without exception.
 
 ## Alternatives considered
 

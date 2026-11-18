@@ -1,7 +1,7 @@
 # Pleiades Playground
 
 An open playground for machine data: adapters publish to an MQTT broker, services persist time series and
-notification events, and every service offers the same data over REST and over the Model Context Protocol (MCP),
+the events of machines, and every service offers the same data over REST and over the Model Context Protocol (MCP),
 so applications and AI agents use one set of tools.
 
 The repository is a monorepo so that the whole demo case starts with one command. What proves itself here moves
@@ -41,21 +41,39 @@ In PowerShell, set the variable first: `$env:PLEIADES_VERSION = "main"`. Or writ
 |---|---|---|
 | Timeseries API | <http://localhost:5500/> | Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp` |
 | Events API | <http://localhost:5510/> | Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp` |
+| Sites API | <http://localhost:5540/> | Where the machines stand: Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp`. It answers on this computer only (`SITES_BIND`) |
 | MQTT broker | `localhost:1883` | Anonymous in the demo network |
 | Generative UI backend | <http://localhost:5520/mcp> | MCP server for displays, see [`apps/genui-mcp`](apps/genui-mcp/README.md) |
 | Example app | <http://localhost:5600/> | What every machine does now, and a chat about it. It answers on this computer only (`APP_BIND`); see [`apps/app`](apps/app/README.md) |
+| Cutting simulators | <http://localhost:5611/>, `:5612`, `:5613` | A 2D laser, a tube laser and a punching machine that take their jobs through telegram files; see [`Cutting.Simulator`](source/Pleiades.Playground.Cutting.Simulator/README.md). One [`Cutting.Adapter`](source/Pleiades.Playground.Cutting.Adapter/README.md) each publishes them to the broker as `trumpf_Laser2D_L-01`, `trumpf_Tube_T-01` and `trumpf_Punch_PU-01` |
+| OPC UA adapter | <http://localhost:5560/machines> | Machines that speak OPC UA, added in the chat; with a simulated one, A1121O0001, web UI at <http://localhost:8090/>. On this computer only (`OPCUA_ADAPTER_BIND`); see [the adapter](source/Pleiades.Playground.OpcUa.Adapter/README.md) |
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
+An optional [Ultimaker 3 service](source/Pleiades.Playground.Ultimaker.Api/README.md) adds CuraEngine,
+REST and MCP slicing, static toolpath validation and explicit printer pairing/start. It is started only
+with the `ultimaker` Compose profile and leaves printing disabled by default.
+The separate [Ultimaker telemetry adapter](source/Pleiades.Playground.Ultimaker.Telemetry/README.md)
+publishes read-only printer observations to the existing broker and time-series persistence.
+For deployment from published images, enable `COMPOSE_PROFILES=ultimaker` and configure the printer
+URL in the server's private .env; see [deployment](docs/deployment.md#enable-the-ultimaker-services).
+An optional [juice bar service](source/Pleiades.Playground.JuiceBar.Api/README.md) puts a machine that mixes
+drinks behind REST and MCP and publishes its state to the broker. It is started only with the `juicebar`
+Compose profile and needs a machine that runs MixerControl; it places orders and never starts the production.
+For a deployment, see [deployment](docs/deployment.md#enable-the-juice-bar-service).
+The example app comes alone. Pages made for one demo or one fair, its showcases, are in a second image of the
+same app, which the stack takes when `APP_SHOWCASES` is set in `.env`; see
+[deployment](docs/deployment.md#show-the-showcases).
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo; only
-the chat of the example app needs the key of a language model:
+the chat of the example app needs a language model, through a LiteLLM gateway:
 
 ```bash
-cp .env.example .env        # then set ANTHROPIC_API_KEY in it, or another block
+cp .env.example .env        # then set LLM_BASE_URL and LLM_API_KEY in it
 docker compose up -d app    # creates the app again with the new settings
 ```
 
-A key alone is enough; the names of the models have defaults. `docker compose restart` does not read `.env`
-again. More in [Language models](apps/app/README.md#language-models).
+Address and key are enough: the chat offers the models the gateway lists. Without a gateway, a key of Anthropic
+or OpenAI and `docker compose --profile gateway up -d` start one of the stack's own. `docker compose restart`
+does not read `.env` again. More in [Language models](apps/app/README.md#language-models).
 
 New here? Take the [tour of the demo](docs/tour.md): six stops with screenshots, from the start to where to
 change what. With a coding agent in the repository, ask it: "give me a tour". To add a page, a card or a
@@ -69,8 +87,8 @@ Four layers, three agreed interfaces. Everything below the solution layer is the
 |---|---|---|
 | Solution | Applications that people use | `apps/` (the example app) |
 | Agentic | A harness that talks to a language model and calls tools | `apps/app` (the chat of the example app), or bring your own (any MCP client) |
-| Tool | Time series, events and cards over REST and MCP | `source/*.Timeseries.Api`, `source/*.Events.Api`, `apps/` (cards) |
-| Data | Adapters, broker, persistence | `source/*.Simulator`, `source/*.Persistence`, broker config in `stacks/` |
+| Tool | Time series, events and cards over REST and MCP | `source/*.Timeseries.Api`, `source/*.Events.Api`, `source/*.Sites.Api`, `apps/` (cards) |
+| Data | Adapters, broker, persistence | `source/*.Simulator`, `source/*.OpcUa.Adapter`, `source/*.Persistence`, broker config in `stacks/` |
 
 | Agreed interface | Contract | Where |
 |---|---|---|
@@ -91,6 +109,7 @@ stacks/       Configuration of third-party containers (broker)
 docs/         Architecture, decisions (ADR) and guides
 .github/      CI workflows and templates
 compose.yaml  The demo stack
+margo/        The demo stack as a Margo app, packaged and published with bart
 ```
 
 Project and image names follow one pattern: `Pleiades.Playground.<Area>.<Part>` in .NET and
@@ -118,9 +137,10 @@ Every tool and how to check it: [development setup](docs/development-setup.md).
 
 ## Units
 
-Every numeric value is in its coherent SI unit. Energy is in joule, ratios and percentages are fractions with the
-unit `one` (1.0 = 100 %). Displays convert, the wire does not. See
-[ADR-0002](docs/adr/0002-si-units-joule-and-one.md).
+A value of a machine below `machines/` carries the unit of the umati data model, energy in watt hours for
+example, and is stored and served in it. A value of a place below `sites/` is in its coherent SI unit: energy in
+joule, ratios and percentages as fractions with the unit `one` (1.0 = 100 %). Displays convert; the wire, the
+stores and the APIs do not. See [ADR-0002](docs/adr/0002-si-units-joule-and-one.md).
 
 ## Contributing, security, licence
 

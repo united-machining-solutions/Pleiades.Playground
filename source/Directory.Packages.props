@@ -24,12 +24,16 @@
     <!-- Transitive pin: stay on a patched Microsoft.OpenApi 2.x. -->
   </ItemGroup>
   <ItemGroup Label="Storage">
-    <PackageVersion Include="MongoDB.Bson" Version="3.13.0" />
-    <PackageVersion Include="MongoDB.Driver" Version="3.13.0" />
+    <PackageVersion Include="MongoDB.Bson" Version="3.14.0" />
+    <PackageVersion Include="MongoDB.Driver" Version="3.14.0" />
   </ItemGroup>
   <ItemGroup Label="Messaging">
     <PackageVersion Include="MQTTnet" Version="5.2.0.1603" />
     <PackageVersion Include="System.Reactive" Version="7.0.0" />
+  </ItemGroup>
+  <ItemGroup Label="OPC UA">
+    <PackageVersion Include="OPCFoundation.NetStandard.Opc.Ua.Client" Version="2.0.2" />
+    <PackageVersion Include="OPCFoundation.NetStandard.Opc.Ua.Mcp.Core" Version="2.0.2" />
   </ItemGroup>
   <ItemGroup Label="Logging">
     <PackageVersion Include="Serilog" Version="4.4.0" />
@@ -45,9 +49,10 @@
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.4.0" />
     <PackageVersion Include="ModelContextProtocol.Core" Version="2.4.0" />
     <PackageVersion Include="Riok.Mapperly" Version="4.3.1" />
-    <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="11.0.0" />
+    <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="11.0.1" />
   </ItemGroup>
   <ItemGroup Label="Test and analysis">
+    <PackageVersion Include="JsonSchema.Net" Version="9.6.0" />
     <PackageVersion Include="Moq" Version="4.21.0" />
     <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.36.0.15337" />
   </ItemGroup>

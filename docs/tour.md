@@ -24,8 +24,9 @@ docker compose up -d --build --wait
 ```
 
 The command returns when the stack is ready, that is when every container reports healthy: the broker, the
-database, the two APIs with their persistence workers, the generative UI backend, the app and one simulator
-per machine. To see the demo without building it, start it from the published images, see
+database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app, one
+simulator per machine, three cutting machines, each a simulator with its adapter, and the OPC UA adapter with a
+simulated OPC UA machine. To see the demo without building it, start it from the published images, see
 [Start](../README.md#start).
 
 ```bash
@@ -36,13 +37,22 @@ docker compose ps --format "table {{.Service}}	{{.Status}}"
 SERVICE                  STATUS
 app                      Up 3 minutes (healthy)
 broker                   Up 3 minutes (healthy)
+cutting-adapter-laser-2d Up 3 minutes (healthy)
+cutting-adapter-punch    Up 3 minutes (healthy)
+cutting-adapter-tube     Up 3 minutes (healthy)
+cutting-laser-2d         Up 3 minutes (healthy)
+cutting-punch            Up 3 minutes (healthy)
+cutting-tube             Up 3 minutes (healthy)
 events-api               Up 3 minutes (healthy)
 events-persistence       Up 3 minutes (healthy)
 genui-mcp                Up 3 minutes (healthy)
 mongodb                  Up 3 minutes (healthy)
+opc-simulator            Up 3 minutes (healthy)
+opcua-adapter            Up 3 minutes (healthy)
 simulator-m-02           Up 3 minutes (healthy)
 simulator-p-04           Up 3 minutes (healthy)
 simulator-p-07           Up 3 minutes (healthy)
+sites-api                Up 3 minutes (healthy)
 timeseries-api           Up 3 minutes (healthy)
 timeseries-persistence   Up 3 minutes (healthy)
 ```
@@ -53,47 +63,125 @@ timeseries-persistence   Up 3 minutes (healthy)
 | <http://localhost:5520/mcp> | The generative UI backend, an MCP server. The app reads every value from it. |
 | <http://localhost:5500/> | The Timeseries API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. |
-| `localhost:1883` | The MQTT broker the simulators publish to. |
+| <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
+| <http://localhost:5611/>, `:5612`, `:5613` | The web pages of the three cutting machines, a 2D laser, a tube laser and a punching machine: their plan, their alarms and every telegram. They answer on the network too, like the web UI of the OPC UA simulator. |
+| `localhost:1883` | The MQTT broker the simulators and adapters publish to. |
+| <http://localhost:5560/machines> | The OPC UA adapter: the machines added over OPC UA. It answers on this computer only. |
+| <http://localhost:8090/> | The web UI of the simulated OPC UA machine, A1121O0001. |
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
 port and setting. The three simulated machines, P-04, P-07 and M-02, are the three `simulator-*` services.
+Each publishes after the umati data model, below `machines/<manufacturer>_<model>_<serial number>/` (for P-04
+`machines/alcyone-machines_AX-400_P-04/`): manifest, values, its stack light, and job orders, program executions
+and alerts as CloudEvents. It is described in
+[`contracts/mqtt`](../contracts/mqtt/README.md#machines-the-binding-of-the-data-model). The cutting machines, L-01,
+T-01 and PU-01, are the `cutting-*` services: a simulator that speaks the telegram protocol of the machine through
+files, and an adapter that reads it and publishes the same tree, below `machines/trumpf_Laser2D_L-01/` and the like
+(see [`Cutting.Adapter`](../source/Pleiades.Playground.Cutting.Adapter/README.md)).
+
+The OPC UA machine, `opc-simulator`, is not on Home yet: it is added in the chat, see
+[Add a machine that speaks OPC UA](#add-a-machine-that-speaks-opc-ua).
+
+The persistence services store the values as they come, in the units of the model, and the CloudEvents as they
+came; the APIs put job orders, program executions and alerts together from them when they are read.
+
+> **For now:** the screenshots of the stops below show the state before the machine id and the work master; they
+> are retaken once the stack runs with this tree.
 
 ## 2. Home
 
 Home asks "what needs you?". It sorts the machines by what they do now: first the ones in alarm, stopped or
-without data, then the ones in setup, then the running ones, and it reads them again every ten seconds.
+without data, then the ones in setup, then the running ones. It is live: the page reads the list once, and
+from then on the browser hears every value at the broker, MQTT over WebSocket on port 9001, the moment a
+machine publishes it.
 
-![Home with the heading Machines. Under "Needs you" are two rows, P-04 and P-07, both stopped, each with a
-button "Ask why". Under "Running" is one tile, M-02.](images/tour/home.png)
+![Home with the heading Machines. Under "Needs you" are two rows, MM-120 M-02 in alarm and AX-400 P-04
+stopped, each with a button "Ask why". Under "Setup" is one row, TP-800 P-07.](images/tour/home.png)
 
-In the picture two machines need you. P-04 is stopped without a recorded reason, P-07 is stopped with the
-warning "Safety door open, machining interrupted", and both say since when. M-02 runs the program
-`SHAFT_4711.MPF`. A row leads to the page of its machine, and "Ask why" starts a chat about it (stop 4). The
+In the picture two machines need you. M-02 is in alarm because its bar feeder is empty, error 5120; P-04 is
+stopped with the warning "Coolant pressure low", 20017; both say since when. P-07 is in setup with the work
+master `WM-HOUSING-0815`. A row leads to the page of its machine, and "Ask why" starts a chat about it (stop 4). The
 field "Ask a question" in the header starts a chat too.
 
 **In the code:** [`apps/app/src/routes/index.tsx`](../apps/app/src/routes/index.tsx) is the page and its
 groups, [`apps/app/src/machines/machine-item.tsx`](../apps/app/src/machines/machine-item.tsx) draws a row and a
 tile. The values are the result of the tool `genui_machine_list`
 ([`apps/genui-mcp/src/machines.ts`](../apps/genui-mcp/src/machines.ts)). Which value is which state is decided
-in one file, [`packages/cards/src/machine/state.ts`](../packages/cards/src/machine/state.ts).
+in one file, [`packages/cards/src/machine/state.ts`](../packages/cards/src/machine/state.ts). What the broker
+sends is laid onto the list in [`apps/app/src/live/`](../apps/app/src/live/), and
+[`apps/app/src/hooks/use-live.ts`](../apps/app/src/hooks/use-live.ts) keeps a page live.
+
+The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
+physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
+a line for each machine. A choice above the graphs shows one machine or all of them. It has no picture in
+this tour.
+
+**In the code:** [`apps/app/src/routes/live.tsx`](../apps/app/src/routes/live.tsx) is the page,
+[`packages/cards/src/measurement/measurement-graph.tsx`](../packages/cards/src/measurement/measurement-graph.tsx)
+a graph. The lines are the result of the tool `genui_measurement_series`
+([`apps/genui-mcp/src/measurements.ts`](../apps/genui-mcp/src/measurements.ts)).
+
+The page "Charts" in the sidebar, <http://localhost:5600/charts>, shows the last hours of every machine as charts:
+one bar per machine with how long it was in each state, and a tile per machine with its state over the last 30
+minutes.
+
+**In the code:** [`apps/app/src/routes/charts.tsx`](../apps/app/src/routes/charts.tsx) is the page,
+[`apps/app/src/charts/state-tiles.tsx`](../apps/app/src/charts/state-tiles.tsx) draws the two charts with the
+chart of shadcn/ui. The values are those of the machine card, from `genui_machine_show` and `genui_span_list`,
+read once by one server function, `getCharts` in
+[`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts); from then on the page is
+live from the broker, as Home is.
+
+**Sites** in the sidebar, <http://localhost:5600/sites>, shows where the machines stand: site by site and hall by
+hall, in rows like those of Home. The head of each site names its company and how many of its machines are in
+each state; it stays at the top while the rows of its site scroll, and a click folds the site. "Needs you" keeps
+the machines in alarm, stopped or without data, each in its site and hall, and the search finds a machine by its
+name, model, serial number, machine id, work master, hall or site. Ten sites make a page; the choice and the page
+are in the address, `?show=needs&page=2`. "On no site" comes last: the machines that sent values in the last
+24 hours and stand on no site yet, live like the others. The sites without a machine are named once, on the last
+page. People enter the sites, their halls and which machine stands where in the
+[Sites API](../source/Pleiades.Playground.Sites.Api/README.md), at <http://localhost:5540/>; a stack that has just
+started has none, and the page says so.
+
+![The page Sites: "3 machines on 2 sites", the search and the buttons All and Needs you, the counts of all
+sites, then North plant of Demo Manufacturing with 1 running and 1 stopped: Lathe 4 stopped in Hall 1, MM-120 M-02
+running in Hall 2, and "Hall 3: no machine"; South plant with AX-400 M-09 without data in Hall A; and at the
+bottom On no site with TP-800 P-07 in alarm.](images/tour/sites.png)
+
+**In the code:** [`apps/app/src/routes/sites.index.tsx`](../apps/app/src/routes/sites.index.tsx) is the page,
+[`apps/app/src/sites/filter.ts`](../apps/app/src/sites/filter.ts) chooses what "Needs you" and the search
+show and cuts the pages, and [`apps/app/src/live/sites.ts`](../apps/app/src/live/sites.ts) keeps the states and counts
+live from the broker. The values are the result of the tool `genui_site_list`
+([`apps/genui-mcp/src/sites.ts`](../apps/genui-mcp/src/sites.ts)), which groups and counts.
 
 ## 3. The page of one machine
 
-A click on a machine opens its page, here <http://localhost:5600/machines/P-04>. It shows the machine card:
-what the machine does now, and what it did over the last eight hours. It needs no language model.
+A click on a machine on Home or on Sites opens its page, here
+<http://localhost:5600/sites/alcyone-machines_AX-400_P-04>; it stands under Sites, and the breadcrumb leads back
+there. An address from before the page moved, `/machines/alcyone-machines_AX-400_P-04`, leads to it with its
+hours. The address carries the machine id, the page is titled with model and serial number, AX-400 P-04. It shows the
+machine card: what the machine does now, with which work master and job order, the alerts that stand, and what
+it did over the last hours. It needs no language model. The title is a switcher: a click on it opens the list
+of every machine with its state, to search by model, serial number, machine id or state, and Enter opens the
+one picked. The buttons 1 h, 8 h and 24 h at the right choose how many hours the card goes back; the choice is
+in the address, `?hours=8`, and stays when you switch to another machine. The page is live like Home: the band
+keeps its length and moves on with the clock.
 
-![The page Machines / P-04 with the machine card. The card says Stopped, no alarm and no reason recorded,
-since 20:36, program SHAFT_4711.MPF. Below is a band of the last 8 hours, the total duration of each state,
-and the MQTT topics the values were read from.](images/tour/machine-page.png)
+![The page of P-04, with the breadcrumb Sites › alcyone-machines_AX-400_P-04 and Sites active in the sidebar.
+The title AX-400 P-04 has an arrow for the switcher, and at the right stand the buttons 1 h, 8 h and 24 h, with
+8 h chosen. Under the title it says "live · now 12:10". The machine card says Stopped, no alarm, no reason
+recorded, since 12:09, work master WM-SHAFT-4711, job order 4720/01, 3 of 12. Below is a band of the last 8
+hours, the total duration of each state, and the MQTT topics the values were read from.](images/tour/machine-page.png)
 
-The card has three parts. On top is the state with its reason, since when it holds, and the active program.
-In the middle is the band: one stripe from eight hours ago until now, coloured by state, and below it the
-total of each state. The hatched part of this band is "No data": the stack of the picture had been running
-for about two hours, and before that nobody published. At the bottom the card names the topics it read, so
-every value can be traced to the broker.
+The card has three parts. On top is the state with its reason, since when it holds, the work master and the job order that runs.
+In the middle is the band: one stripe from the chosen number of hours ago until now, coloured by state, and
+below it the total of each state. The hatched part of this band is "No data": the stack of the picture had been
+running for about three hours, and before that nobody published. At the bottom the card names the topics it
+read, so every value can be traced to the broker.
 
-**In the code:** [`apps/app/src/routes/machines.$machine.tsx`](../apps/app/src/routes/machines.%24machine.tsx)
-is the page. The card is
+**In the code:** [`apps/app/src/routes/sites.$machine.tsx`](../apps/app/src/routes/sites.%24machine.tsx)
+is the page, [`machines.$machine.tsx`](../apps/app/src/routes/machines.%24machine.tsx) leads the old address to it, and the choice of the hours and the list of the switcher are in
+[`apps/app/src/machines/switcher.ts`](../apps/app/src/machines/switcher.ts). The card is
 [`packages/cards/src/machine/machine-card.tsx`](../packages/cards/src/machine/machine-card.tsx), its band
 [`state-band.tsx`](../packages/cards/src/machine/state-band.tsx), and the shape of its values the contract in
 [`contract.ts`](../packages/cards/src/machine/contract.ts). The tool `genui_machine_show` returns the values
@@ -106,28 +194,71 @@ The button at the right end of the header opens the chat. It is a panel beside t
 where it is: you chat about what you see. A language model answers and calls the tools of the generative UI
 backend, and the app draws the values of a tool call itself, with the same card as the page.
 
-![The page of P-04 on the left and the chat panel on the right. The chat shows the machine card of P-04 as
-the result of a tool call, the step "Read the guide of the backend", and below it an answer in words about
-the last 8 hours. The input field at the bottom shows the model gpt-6-luna.](images/tour/chat-answer.png)
+![The page of P-04 on the left and the chat panel on the right. The chat shows the question, the steps "Read
+the guide of the backend" and "Read the machine", the machine card of P-04 as the result of a tool call, and
+below it an answer in words about the last 8 hours. The input field at the bottom shows the model
+spark/qwen3.8-27b and a microphone.](images/tour/chat-answer.png)
 
-The picture shows the end of one chat, with a language model configured. The question was "What did P-04 do
-over the last 8 hours?". The chat lists each step of the model, here "Read the guide of the backend" and,
-further up, "Read the machine". It draws the card from the values of the tool, and the model sums it up in a
-few sentences. The numbers are the tool's and the wording is the model's: it writes 10 minutes of alarm
-where the card says 9. The card on the left is one minute newer than the one in the chat: the page reads
-again, an answer shows what was true when it was given.
+The picture shows one chat, with a language model configured. The question was "What did P-04 do over the
+last 8 hours?". The chat lists each step of the model, "Read the guide of the backend" and "Read the machine";
+a step opens to what its tool gave back. Whenever the answer is coming and nothing in it moves, before the
+first step and after a step until the next one or the text comes, a running line "Thinking" stands there. The
+chat draws the card from the values of the tool, and the model sums it up in a few sentences. The numbers are
+the tool's and the wording is the model's: the card says 6 minutes of running, the model "just under 7
+minutes". The stack had just started, so most of the 8 hours have no data. The card on the left is one minute
+newer than the one in the chat: the page reads again, an answer shows what was true when it was given.
+
+With an external documentation service configured as `docs` in `APP_MCP_SERVERS` and enabled under
+"Tools" in the message field, ask how to operate,
+maintain or program a machine. The chat searches its manuals and shows source references by filename and
+page label, with the physical PDF page also shown when it differs. Select one to open that physical PDF page. Use the page controls, zoom and **Find**
+to explore it; **Next match** moves between matching pages. The **Extracted text** tab shows the evidence
+used by chat. A replaced or unavailable source asks you to search again. Both views read documentation
+through MCP; the app has no direct connection to the documentation REST API.
+Documentation source references stay in the chat and are not cards for "Save as page".
+
+The panel works like a chat app on a phone: a list and a chat, with a way back. The head says what is open. In a
+chat it says the name of the chat, which is its first question, on one line and cut where it is too long; the
+button "All chats" at its left leads back to the list, and the page beside the panel stays where it is. The
+list, headed "Chats", shows the chats so far, and the field at its foot begins a new one, with the questions to
+begin with above it. Close the panel and open it again, and the chat you left is there. The chats are kept in
+the memory of the app's server and are gone when it restarts.
+
+Under an answer that has ended and for which the chat drew a card, the chat offers "Save as page". It keeps all
+the cards of that answer, in their order, as a page titled with your question, and opens the page beside the
+chat, which stays open. No language model is asked: the app reads the tool calls from the answer it already
+has. The page keeps no number and no sentence of the model, so opening it calls the tools again and its cards
+show what holds now. The row under the answer then says "Saved as page" and links to it. An answer without a
+card, such as one in words only, has no button. The group "Pages" in the sidebar lists the pages of this browser
+that are not pinned, the newest first, and a page that is pinned from its head moves to the top of the sidebar,
+beside Home. "Edit" in its head moves a card up or down and removes one, with no language model; "Undo" in
+the toast puts a removed card back.
+
+A page is private to the browser that keeps it, and the stack has no sign-in, so "Share" in its head gives a
+link that carries the recipe: which answers, for which machines and hours, and no value. Open it in a private
+window to see what a colleague sees: the page with the values of now, no chat and no language model needed,
+and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for says so,
+and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
+
+Ask about the alarms of a machine, for example "Which warnings and errors did P-04 have today?", and the chat
+draws the notification card of the tool `genui_notification_list`: each warning and error with when it was
+raised, when it went and how long it stood, and the ones that have not gone first. The card is
+[`packages/cards/src/notification/notification-card.tsx`](../packages/cards/src/notification/notification-card.tsx),
+the tool is in [`apps/genui-mcp/src/notifications.ts`](../apps/genui-mcp/src/notifications.ts). No screenshot
+shows it yet.
 
 The chat needs a language model, and the demo starts without one. Then the panel says "No language model
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
-copy `.env.example` to `.env`, fill one of the three blocks and create the app again with
-`docker compose up -d app`. For Anthropic and OpenAI a key is enough: the names of the models have
-defaults.
+copy `.env.example` to `.env`, set the address and the key of a LiteLLM gateway, at the hackathon the one of the
+hub, and create the app again with `docker compose up -d app`. The chat offers the chat models the gateway
+lists, and dictation takes its speech-to-text model. Without the hub, a key of Anthropic or OpenAI and
+`docker compose --profile gateway up -d` start a gateway of the stack's own, see
+[Language models](../apps/app/README.md#language-models).
 
-| Block | Settings |
+| Setting | What it holds |
 |---|---|
-| Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODELS` |
-| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODELS` |
-| Any endpoint that speaks OpenAI's chat completions, for example a local model server | `LLM_BASE_URL`, `LLM_MODELS`, and `LLM_API_KEY` if it wants one |
+| `LLM_BASE_URL` | The address of the LiteLLM gateway |
+| `LLM_API_KEY` | The key the gateway gave you |
 
 The chat has no sign-in, and whoever reaches the port chats at the cost of the owner of the key. Read
 [Language models](../apps/app/README.md#language-models) before you open the port to a network.
@@ -135,17 +266,49 @@ The chat has no sign-in, and whoever reaches the port chats at the cost of the o
 With more than one model, the input field offers a choice. The first model answers until a chat picks
 another one, and the choice stays with that chat.
 
-![The chat panel before the first question, with three suggested questions. The model picker in the input
-field is open and lists six models: three named gpt and three named claude, the first one
-ticked.](images/tour/chat-model-picker.png)
+The button "Tools" in the input field lists the servers that give the chat its tools: the generative UI
+backend, and the further ones the setting `APP_MCP_SERVERS` names, such as the optional Ultimaker service.
+It says whether each one answers and names its tools, and marks a tool that can change something. A switch
+takes a further server out of the chat from its next question on: the model then gets none of its tools. The
+choice stays with the chat, as the model does. The two pictures of this stop were taken before the button
+was there.
 
-The models in the picture are the ones this stack was configured with; yours are the names in your `.env`.
+![Home on the left and the chat panel on the right, before the first question. The model picker in the input
+field is open and lists seven models: spark/qwen3.8-27b, ticked, then three named openai/gpt and three named
+anthropic/claude.](images/tour/chat-model-picker.png)
+
+The models in the picture are the ones the gateway of the hackathon lists; yours are the ones your gateway
+lists for your key, in its order.
 The three questions above are suggestions to begin with.
 
+While an answer comes, send turns into stop: it ends the answer, what came so far stays, and the next
+question can go.
+
+With a speech-to-text model at the gateway, the field also has a microphone: press it, speak, press it
+again, and what was said stands in the field, to send like a typed question. The gateway decides which model
+writes it down, see [Dictation](../apps/app/README.md#dictation). The picture of the answer shows the microphone
+at the right of the field.
+
 **In the code:** [`apps/app/src/chat/`](../apps/app/src/chat). `chat-sidebar.tsx` is the panel with the model
-picker, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
+picker and the head with the way back to the list, `chat-name.ts` what a chat is called,
+`save-as-page.tsx` the row under an answer with "Save as page" (the recipe of an answer is read in
+[`pages/from-answer.ts`](../apps/app/src/pages/from-answer.ts)), `dictate.tsx` the microphone, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
 reads which models the settings name, `cards.tsx` lists what the app draws for which tool, card by card, and
 `suggestions.ts` holds the three questions.
+
+### Add a machine that speaks OPC UA
+
+Type `/` in the chat field: the list of commands opens, and `/help` explains them. Ask
+`/discover A1121O0001`, and the model scans the OPC UA server of the simulated machine, matches its nodes to
+the data model and shows a proposal: the endpoint with the strongest security, whether the machine fulfils
+the core of the data model and which profiles are complete, every element with its value, and what is
+derived, unclear or missing. What the core lacks is marked as not available. The machine is added when you
+press "Add machine" on the proposal; from then on it is on Home like the others, also after a restart.
+`/opcua` lists the added servers with their core and profiles, and a button that removes a machine together
+with its retained messages on the broker; `/mapping A1121O0001` shows what needs a look.
+
+**In the code:** [`apps/app/src/opcua/`](../apps/app/src/opcua) holds the commands and the cards of the chat,
+and the adapter is [`source/Pleiades.Playground.OpcUa.Adapter`](../source/Pleiades.Playground.OpcUa.Adapter/README.md).
 
 ### The card in another host
 
@@ -168,13 +331,13 @@ docker compose stop simulator-m-02
 
 After 30 seconds without a sign of life, Home moves the machine to "Needs you" with the state "No data".
 
-![Home with M-02 under "Needs you" with the badge "No data" and the text "No data from the adapter, last
-known: Executing at 20:34". Under "Running" are P-04 and P-07; the tile of P-07 shows a
-warning.](images/tour/home-no-data.png)
+![Home with M-02 under "Needs you" with the badge "No data" and the text "No data from the adapter. The
+adapter says Shutdown. Last known: NotExecuting at 12:09". P-04 stands there too, stopped on its own. Under
+"Running" is P-07.](images/tour/home-no-data.png)
 
-The row says what is known: no data from the adapter since 20:34, and the last thing the machine reported
-before it fell silent. The other two machines are not affected. P-07 runs with an open warning, which its
-tile shows. Start the simulator again, and within a few seconds the machine is back with a fresh "since":
+The row says what is known: no data from the adapter since 12:10, and the last thing the machine reported
+before it fell silent. The other two machines are not affected: P-04 had stopped by itself a minute before,
+and P-07 runs on. Start the simulator again, and within a few seconds the machine is back with a fresh "since":
 a silence ends a run, because what happened in between is not known.
 
 ```bash
@@ -198,28 +361,69 @@ Each part has a section "What is where" that maps its files:
 | A tool, its text for a model, or how states and silence are computed | [`apps/genui-mcp`: What is where](../apps/genui-mcp/README.md#what-is-where) |
 | A card, its contract, the wording or the colours of a state | [`packages/cards`: What is where](../packages/cards/README.md#what-is-where), and [A new card](../packages/cards/README.md#a-new-card) |
 | What a machine publishes and how it is stored | [`contracts/`](../contracts/README.md) first, then the .NET services under [`source/`](../source) |
+| Cutting machines that take their jobs through telegram files, and the adapter that brings them onto the broker (they start with the stack; the tour does not visit them) | [`Cutting.Simulator`](../source/Pleiades.Playground.Cutting.Simulator/README.md), [`Cutting.Adapter`](../source/Pleiades.Playground.Cutting.Adapter/README.md) |
+| How a machine that speaks OPC UA is scanned, mapped and run | [OPC UA adapter](../source/Pleiades.Playground.OpcUa.Adapter/README.md) |
 
-Below the app are the two APIs. Each one offers the same queries twice: over REST for applications, with a
-Swagger UI to try them, and over MCP for agents.
+Below the app are the two APIs, and next to them the Sites API, which keeps where the machines stand. Each one
+offers the same queries twice: over REST for applications, with a Swagger UI to try them, and over MCP for
+agents.
 
 ![The Swagger UI of the Timeseries API at localhost:5500, version 0.0.1.0, with the first endpoints of the
 group Timeseries: GET and POST for base unit values, string values and boolean
 values.](images/tour/swagger-ui.png)
 
 The picture shows the Swagger UI of the Timeseries API at <http://localhost:5500/>, in its light mode; the
-lamp at the top right switches it. The Events API has the same page at <http://localhost:5510/>. Open an
+lamp at the top right switches it. The Events API has the same page at <http://localhost:5510/>, with the
+CloudEvents of the machines as they came (`/machineEvents`, and the gaps in their `sequence`), and the views put
+together from them: the alerts (`/alerts/active`, `/alerts/pairs`, `/alerts/statistics`), the job orders
+(`/jobOrders`) and the program executions (`/programExecutions`). Open an
 endpoint and choose "Try it out" to send a request to the running stack.
 
 | API | REST | MCP | Contract |
 |---|---|---|---|
 | Timeseries | <http://localhost:5500/>, OpenAPI at `/openapi/v1.json` | `http://localhost:5500/mcp` | [`contracts/openapi`](../contracts/openapi/README.md), [`contracts/mcp`](../contracts/mcp/README.md) |
 | Events | <http://localhost:5510/>, OpenAPI at `/openapi/v1.json` | `http://localhost:5510/mcp` | the same |
+| Sites | <http://localhost:5540/>, OpenAPI at `/openapi/v1.json` | `http://localhost:5540/mcp` | the same |
 | Generative UI | none: it is an MCP server only | `http://localhost:5520/mcp` | [`contracts/mcp`](../contracts/mcp/README.md), [`packages/cards`](../packages/cards/README.md) |
 
-To use the tools from your own agent, add the three MCP addresses to any MCP client; the entry to copy is in
+To use the tools from your own agent, add the MCP addresses to any MCP client; the entry to copy is in
 [`contracts/mcp`](../contracts/mcp/README.md).
 
 ---
+
+## Optional: a real printer
+
+The physical-printer integration is not part of the six stops. Start only its service with
+`docker compose --profile ultimaker up -d --build --wait ultimaker-api`.
+It exposes MCP at <http://localhost:5530/mcp> and an OpenAPI document at
+<http://localhost:5530/openapi/v1.json>. Printing is disabled by default. The configuration, Cura
+preview workflow and validation limits are in the
+[Ultimaker service guide](../source/Pleiades.Playground.Ultimaker.Api/README.md).
+No tour screenshot changes: this service adds no application screen.
+The optional `ultimaker-telemetry` service publishes live printer observations to the existing broker.
+Its machine id defaults to `ultimaker_UM3_UM3-01`, which then appears in the existing machine list/card.
+See the [adapter guide](../source/Pleiades.Playground.Ultimaker.Telemetry/README.md) for topic names,
+units, timestamps and how to verify persistence. The existing Home screenshot was not retaken;
+it therefore still shows only simulated machines.
+For deployment from published images, enable `COMPOSE_PROFILES=ultimaker` in the server's private
+.env; both services use the same commit tag as the rest of the stack. See
+[deployment](deployment.md#enable-the-ultimaker-services).
+
+## Optional: a juice bar
+
+A machine that mixes drinks is not part of the six stops either. With a machine that runs MixerControl at
+`JUICEBAR_URL`, start its service with
+`docker compose --profile juicebar up -d --build --wait juicebar-api`.
+It exposes MCP at <http://localhost:5550/mcp> and an OpenAPI document at
+<http://localhost:5550/openapi/v1.json>: the card, the state of the machine, and an order. An order joins
+the queue of the real machine; a person then presses its start button. What the service does and never does
+is in the [juice bar service guide](../source/Pleiades.Playground.JuiceBar.Api/README.md).
+The service publishes the state of the machine to the broker. Its machine id defaults to
+`trumpf_JuiceBar_JUICEBAR-01`, which then appears in the machine list of Home as "JuiceBar JUICEBAR-01", next
+to the simulated machines. With
+`juicebar=http://juicebar-api:8080/mcp` in `APP_MCP_SERVERS`, the chat answers what the bar can mix and
+orders a drink when asked. No tour screenshot was retaken: they show the stack without the profile.
+For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).
 
 ## Retaking the screenshots
 

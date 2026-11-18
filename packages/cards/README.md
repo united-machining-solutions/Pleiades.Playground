@@ -10,7 +10,13 @@ generative UI backend. Its contract and its component lie next to each other, so
 
 | Card | Tool | Contract | Component |
 |---|---|---|---|
-| Machine: what one machine does now, since when, with which program, and the states of the last hours | `genui_machine_show` | `machineShow` in `src/machine/contract.ts` | `MachineCard` in `src/machine/machine-card.tsx` |
+| Energy: how much energy machines imported over the last hours, from their meters, with mean and peak power, and the power of each as a graph | `genui_energy_show`, and `genui_energy_series` for the lines of the graph, which only a card calls | `energyShow` and `energySeries` in `src/energy/contract.ts` | `EnergyCard` in `src/energy/energy-card.tsx` |
+| Machine: what one machine does now, since when, with which work master and job order, and the states of the last hours | `genui_machine_show` | `machineShow` in `src/machine/contract.ts` | `MachineCard` in `src/machine/machine-card.tsx` |
+| Measurement: the newest physical values of every machine, each in the unit it was published in | `genui_measurement_list` | `measurementList` in `src/measurement/contract.ts` | `MeasurementCards` in `src/measurement/measurement-card.tsx` |
+| Measurement graph: one quantity of every machine over the last minutes, a line for each machine | `genui_measurement_series`, called by the card file of the measurements below its cards, and by the page `/live` of the example app. The chat draws no graph | `measurementSeries` in `src/measurement/contract.ts` | `MeasurementGraph` in `src/measurement/measurement-graph.tsx` |
+| Notification: the warnings and errors of one machine over the last hours, each with when it was raised, when it went and how long it stood | `genui_notification_list` | `notificationList` in `src/notification/contract.ts` | `NotificationCard` in `src/notification/notification-card.tsx` |
+| Site: every site with its machines by hall and how many are in each state, and the machines on no site | `genui_site_list` | `siteList` in `src/site/contract.ts` | `SiteCards` in `src/site/site-card.tsx` |
+| Time series: signals a person names, of any machine, over 15 minutes to 24 hours, a line for each pair of a machine and a signal, on two y axes at most | `genui_timeseries_show`, and `genui_timeseries_series` for the lines and `genui_timeseries_signals` for what a person can add, which only a card calls | `timeseriesShow`, `timeseriesSeries` and `timeseriesSignals` in `src/timeseries/contract.ts` | `TimeseriesCard` in `src/timeseries/timeseries-card.tsx` |
 
 The list of machines, the result of `genui_machine_list`, has a contract here too (`machineList`), but no
 card: an application draws it with rows of its own and checks what it gets against the contract.
@@ -29,7 +35,7 @@ Nothing is built here. The package is source: an import names the file, for exam
 | Importer | Files | Needs |
 |---|---|---|
 | The backend, in Node.js | `.ts` files only: contracts and rules | `zod` |
-| An application, through its bundler | everything | React, the components of `@pleiades/ui` and a theme: its `globals.css`, or one of its own |
+| An application, through its bundler | everything | React, the components of `@pleiades/ui` and a theme: its `globals.css`, or one of its own; Recharts for the graphs of the measurements |
 | A card file of the backend, through its bundler | everything | the same |
 
 Node.js runs the `.ts` files as they are. So they use no syntax that needs compiling, every import names its
@@ -52,6 +58,14 @@ Both import the theme from [`packages/ui`](../ui/README.md), so the card looks t
   - `in-words.ts`: the list and the card in words, for a reader that does not see them. The backend sends
     them as the text of a result, which is what a language model reads.
   - `machine-card.tsx`: the machine card.
+- `src/shared/`: what more than one card draws: the y axis over every line (`scale.ts`), the colour of a line or a
+  machine by its place (`colour.ts`), a machine id that breaks only after `_`, never inside a model or a serial
+  number (`machine-name.tsx`, `machine-id.ts`), and a height that eases when a card grows (`smooth-height.tsx`).
+- `src/notification/`: what is shown about the notifications of a machine.
+  - `contract.ts`: the notifications, each with its raised and gone times, its duration or why it has none,
+    and the counts of the list.
+  - `words.ts` and `in-words.ts`: the wording of the card and the result in words, for a reader that does not
+    see it. `notification-card.tsx`: the notification card.
 - The [shadcn/ui](https://ui.shadcn.com) components the cards are built from are in
   [`packages/ui`](../ui/README.md), with every other component of the user interface.
 - `src/dataviz.css`: chart and state colours. `src/styles.css` is what a page imports: the colours, the class
@@ -69,7 +83,7 @@ Both import the theme from [`packages/ui`](../ui/README.md), so the card looks t
    [`contracts/mcp`](../../contracts/mcp/README.md).
 3. Write the component with the inferred type as its properties.
 4. In the application, say what the chat draws for a result of the tool: a module for the card, like
-   `src/machines/chat.tsx`, and one line in `src/chat/cards.tsx`.
+   `src/cards/machine/chat.tsx`, and one line in `src/chat/cards.tsx`.
 5. For other hosts, add a page for the card under `apps/genui-mcp/ui/` and link it from the tool. The build
    finds the page by itself.
 6. If the card shows a series, keep it out of the contract of the card: give it a contract and a tool of its

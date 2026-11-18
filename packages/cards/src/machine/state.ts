@@ -12,6 +12,9 @@ export const stateLabel: Record<State, string> = {
   running: "Running",
 }
 
+/** The states that need a person: in alarm, stopped or without data. Home puts them under "Needs you". */
+export const NEEDS_YOU: ReadonlyArray<State> = ["alarm", "stopped", "no-data"]
+
 /** The order in which a display reads the states, for example the sums of a history. */
 export const stateOrder: ReadonlyArray<State> = ["running", "setup", "stopped", "alarm", "no-data"]
 
@@ -33,8 +36,9 @@ export type Known = {
 }
 
 export function stateFrom(known: Known): State {
-  // Without a sign of life the values are the last known ones, not the present.
-  if (!known.live || known.connection !== "Connected") return "no-data"
+  // Without a sign of life the values are the last known ones, not the present. An adapter that is
+  // not Running (it starts, cannot reach the machine or stops) says nothing current about it.
+  if (!known.live || known.connection !== "Running") return "no-data"
   if (known.error) return "alarm"
   if (known.operationMode === "Setup") return "setup"
   if (known.itemState !== "Executing") return "stopped"

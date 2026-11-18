@@ -3,17 +3,17 @@ import { test } from "node:test"
 
 import type { LucideIcon } from "lucide-react"
 
-import { activePage, crumbsOf, navPages } from "./nav.ts"
+import { activePage, crumbsOf, navPages, sidebarPages } from "./nav.ts"
 
 const icon = (() => null) as unknown as LucideIcon
-const route = (fullPath: string, nav?: { title: string; order?: number }) => ({
+const route = (fullPath: string, nav?: { title: string; order?: number; sidebar?: boolean }) => ({
   fullPath,
   options: { staticData: nav ? { nav: { ...nav, icon } } : undefined },
 })
 
 const routes = [
   route("/warnings", { title: "Warnings" }),
-  route("/machines/$machine"),
+  route("/jobs/$job"),
   route("/alarms", { title: "Alarms" }),
   route("/", { title: "Home", order: 0 }),
   route("/health"),
@@ -43,8 +43,8 @@ test("a page with an entry is under its own entry", () => {
   assert.equal(activePage(navPages(routes), "/")?.title, "Home")
 })
 
-test("a page without an entry is under the nearest page above it: the page of a machine under Home", () => {
-  assert.equal(activePage(navPages(routes), "/machines/P-04")?.title, "Home")
+test("a page without an entry is under the nearest page above it: a page of a job under Home", () => {
+  assert.equal(activePage(navPages(routes), "/jobs/4711")?.title, "Home")
   assert.equal(activePage(navPages(routes), "/warnings/open")?.title, "Warnings")
 })
 
@@ -60,7 +60,7 @@ test("without any entry nothing is marked", () => {
 const withCrumbs = [
   { fullPath: "/", options: { staticData: { nav: { title: "Home", icon, order: 0 }, crumb: "Machines" } } },
   route("/warnings", { title: "Warnings" }),
-  route("/machines/$machine"),
+  route("/jobs/$job"),
 ]
 
 test("a page with an entry is called by the title of its entry, or by its crumb", () => {
@@ -80,15 +80,15 @@ test("a page with an entry is called by the title of its entry, or by its crumb"
   )
 })
 
-test("a page without an entry stands behind the entry it is under: the page of a machine behind Machines", () => {
+test("a page without an entry stands behind the entry it is under: a page of a job behind Machines", () => {
   assert.deepEqual(
     crumbsOf(navPages(withCrumbs), {
-      fullPath: "/machines/$machine",
-      pathname: "/machines/P-04",
-      params: { machine: "P-04" },
-      staticData: { crumb: (params) => params.machine ?? "" },
+      fullPath: "/jobs/$job",
+      pathname: "/jobs/4711",
+      params: { job: "4711" },
+      staticData: { crumb: (params) => params.job ?? "" },
     }),
-    [{ title: "Machines", path: "/" }, { title: "P-04" }],
+    [{ title: "Machines", path: "/" }, { title: "4711" }],
   )
 })
 
@@ -144,4 +144,132 @@ test("a page that says nothing about itself shows only where it stands", () => {
     [{ title: "Machines", path: "/" }],
   )
   assert.deepEqual(crumbsOf([], { fullPath: "/about", pathname: "/about", params: {} }), [])
+})
+
+// Pages kept from the chat: a pinned page stands on the top level beside the pages of the routes, by
+// the same rule. "Pages" is the entry the others stand under, in the breadcrumb and in the mark, but it
+// is no row of the sidebar: the pages that are not pinned stand in a group (pages/listed.ts).
+const withPages = [
+  ...withCrumbs,
+  route("/pages/", { title: "Pages", sidebar: false }),
+  { fullPath: "/pages/$page", options: { staticData: { crumb: (params: Record<string, string>) => `Title of ${params.page}` } } },
+]
+const pinned = [
+  { title: "Overnight", icon, path: "/pages/b2" },
+  { title: "Morning round", icon, path: "/pages/a1" },
+]
+
+test("a pinned page stands on the top level, by its title among the pages of the routes, and Pages is no row", () => {
+  const entries = navPages(withPages, pinned)
+  assert.deepEqual(
+    sidebarPages(entries).map((page) => [page.title, page.path]),
+    [
+      ["Home", "/"],
+      ["Morning round", "/pages/a1"],
+      ["Overnight", "/pages/b2"],
+      ["Warnings", "/warnings"],
+    ],
+  )
+  // The entry is still there for what stands under it.
+  assert.deepEqual(entries.filter((page) => page.sidebar === false).map((page) => page.path), ["/pages"])
+})
+
+test("without a page kept the top level is what it was before pages: no entry Pages", () => {
+  assert.deepEqual(
+    sidebarPages(navPages(withPages)).map((page) => page.path),
+    ["/", "/warnings"],
+  )
+})
+
+test("a pinned page is marked while it is open; a page that is not pinned marks no row of the top level", () => {
+  const entries = navPages(withPages, pinned)
+  const rows = sidebarPages(entries)
+  assert.equal(activePage(entries, "/pages/a1")?.title, "Morning round")
+  assert.equal(activePage(entries, "/")?.title, "Home")
+  // Under Pages, which is no row: not Home, and not another row.
+  for (const pathname of ["/pages/c3", "/pages", "/pages/open"]) {
+    const active = activePage(entries, pathname)
+    assert.equal(active?.title, "Pages", pathname)
+    assert.equal(rows.includes(active as never), false, pathname)
+  }
+})
+
+test("a page kept from the chat stands behind Pages in the breadcrumb, pinned or not", () => {
+  for (const page of ["a1", "c3"]) {
+    assert.deepEqual(
+      crumbsOf(navPages(withPages), {
+        fullPath: "/pages/$page",
+        pathname: `/pages/${page}`,
+        params: { page },
+        staticData: { crumb: (params) => `Title of ${params.page}` },
+      }),
+      [{ title: "Pages", path: "/pages" }, { title: `Title of ${page}` }],
+    )
+  }
+})
+
+test("a page this browser does not keep has no title: the breadcrumb says Pages alone", () => {
+  assert.deepEqual(
+    crumbsOf(navPages(withPages), { fullPath: "/pages/$page", pathname: "/pages/zz", params: { page: "zz" }, staticData: { crumb: () => "" } }),
+    [{ title: "Pages", path: "/pages" }],
+  )
+})
+
+test("the list of all pages is called Pages and links nowhere", () => {
+  assert.deepEqual(
+    crumbsOf(navPages(withPages), { fullPath: "/pages/", pathname: "/pages", params: {}, staticData: { nav: { title: "Pages", icon, sidebar: false } } }),
+    [{ title: "Pages" }],
+  )
+})
+
+test("a page opened from a link stands behind Pages, called by what the link says: the crumb reads the search", () => {
+  const pages = navPages([
+    ...withPages,
+    { fullPath: "/pages/open", options: { staticData: { crumb: (_params: Record<string, string>, search: Record<string, unknown>) => String(search.r ?? "") } } },
+  ])
+  assert.equal(activePage(pages, "/pages/open")?.title, "Pages")
+  assert.deepEqual(
+    crumbsOf(pages, {
+      fullPath: "/pages/open",
+      pathname: "/pages/open",
+      params: {},
+      search: { r: "Morning round" },
+      staticData: { crumb: (_params, search) => String(search.r ?? "") },
+    }),
+    [{ title: "Pages", path: "/pages" }, { title: "Morning round" }],
+  )
+})
+
+// Sites and the page of a machine under it, as the example app has them: the list of Sites is the
+// index route "/sites/", the page of a machine "/sites/$machine" names no entry of its own.
+const withSites = [
+  ...withCrumbs,
+  route("/sites/", { title: "Sites" }),
+  { fullPath: "/sites/$machine", options: { staticData: { crumb: (params: Record<string, string>) => params.machine ?? "" } } },
+]
+
+test("the page of a machine is under Sites: Sites is the marked row", () => {
+  const entries = navPages(withSites)
+  assert.equal(activePage(entries, "/sites/alcyone-machines_AX-400_P-04")?.title, "Sites")
+  assert.equal(activePage(entries, "/sites")?.title, "Sites")
+  assert.equal(activePage(entries, "/")?.title, "Home")
+})
+
+test("the page of a machine stands behind Sites in the breadcrumb", () => {
+  assert.deepEqual(
+    crumbsOf(navPages(withSites), {
+      fullPath: "/sites/$machine",
+      pathname: "/sites/alcyone-machines_AX-400_P-04",
+      params: { machine: "alcyone-machines_AX-400_P-04" },
+      staticData: { crumb: (params) => params.machine ?? "" },
+    }),
+    [{ title: "Sites", path: "/sites" }, { title: "alcyone-machines_AX-400_P-04" }],
+  )
+})
+
+test("Sites itself is called Sites and does not link to itself", () => {
+  assert.deepEqual(
+    crumbsOf(navPages(withSites), { fullPath: "/sites/", pathname: "/sites", params: {}, staticData: { nav: { title: "Sites", icon } } }),
+    [{ title: "Sites" }],
+  )
 })

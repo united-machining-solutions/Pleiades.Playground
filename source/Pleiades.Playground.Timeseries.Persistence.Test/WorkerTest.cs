@@ -161,6 +161,72 @@ public class WorkerTest : IDisposable
         Assert.AreEqual(_topic, baseUnitValueModel.Topic);
     }
 
+    private const string MachineTopic = "machines/alcyone-machines_AX-400_P-04/umati";
+
+    private static async Task DeliverModelValue(Mock<IManagedMqttClient> mqtt, string topic, string payload)
+    {
+        var message = new MqttApplicationMessageBuilder()
+            .WithTopic(topic)
+            .WithContentType("application/json")
+            .WithPayload(payload).Build();
+        await mqtt.RaiseAsync(s => s.ApplicationMessageReceivedAsync += null,
+            (object)(new MqttApplicationMessageReceivedEventArgs("", message, new MQTTnet.Packets.MqttPublishPacket(), null))).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    public async Task ModelValue_IsKeptInTheUnitItCameIn_ANumberWithoutOneInOne()
+    {
+        var (worker, mqtt) = SetupWorker();
+        _baseUnitValues.Clear();
+        await worker.StartAsync(CancellationToken.None).ConfigureAwait(false);
+        await Task.Delay(_workerStartupDelay).ConfigureAwait(false);
+
+        await DeliverModelValue(mqtt, $"{MachineTopic}/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp",
+            """{ "timestamp": "2026-11-17T09:15:00.000Z", "value": 81234567.5, "unit": "wattHour" }""").ConfigureAwait(false);
+        await DeliverModelValue(mqtt, $"{MachineTopic}/OperationCounters/PartsProducedInLifetime",
+            """{ "timestamp": "2026-11-17T09:15:00.000Z", "value": 184223, "unit": "piece" }""").ConfigureAwait(false);
+        await DeliverModelValue(mqtt, $"{MachineTopic}/Connection/Heartbeat",
+            """{ "timestamp": "2026-11-17T09:15:00.000Z", "value": 17 }""").ConfigureAwait(false);
+        await Task.Delay(_waitBeforeCheckDelay).ConfigureAwait(false);
+
+        var energy = _baseUnitValues[$"{MachineTopic}/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp"];
+        Assert.AreEqual(BaseUnit.WattHour, energy.Unit, "no conversion to joule");
+        Assert.AreEqual(81234567.5, energy.Value);
+        Assert.AreEqual(BaseUnit.Piece, _baseUnitValues[$"{MachineTopic}/OperationCounters/PartsProducedInLifetime"].Unit);
+        Assert.AreEqual(BaseUnit.One, _baseUnitValues[$"{MachineTopic}/Connection/Heartbeat"].Unit);
+    }
+
+    [TestMethod]
+    public async Task Snapshot_IsKeptFieldByField_AndListsNullAndTheManifestAreNoSeries()
+    {
+        var (worker, mqtt) = SetupWorker();
+        _stringUnitValues.Clear();
+        _baseUnitValues.Clear();
+        _booleanValues.Clear();
+        await worker.StartAsync(CancellationToken.None).ConfigureAwait(false);
+        await Task.Delay(_workerStartupDelay).ConfigureAwait(false);
+
+        await DeliverModelValue(mqtt, $"{MachineTopic}/State/Status",
+            """{ "timestamp": "2026-11-17T09:15:02.123Z", "value": { "MachineryItemState": "Executing", "MachineryOperationMode": "Processing" } }""").ConfigureAwait(false);
+        await DeliverModelValue(mqtt, $"{MachineTopic}/WorkMasterMonitoring/ProgramExecution",
+            """{ "timestamp": "2026-11-17T09:15:02.123Z", "value": { "ExecutionId": "e-1", "State": "Ended", "Duration": 60.5 } }""").ConfigureAwait(false);
+        await DeliverModelValue(mqtt, $"{MachineTopic}/JobMonitoring/JobOrders",
+            """{ "timestamp": "2026-11-17T09:15:02.123Z", "value": [ { "JobOrderID": "4711/01" } ] }""").ConfigureAwait(false);
+        await DeliverModelValue(mqtt, $"{MachineTopic}/Production/ActiveWorkMaster",
+            """{ "timestamp": "2026-11-17T09:15:02.123Z", "value": null }""").ConfigureAwait(false);
+        await DeliverModelValue(mqtt, $"{MachineTopic}/Manifest",
+            """{ "modelVersion": "0.17.1", "machineId": "alcyone-machines_AX-400_P-04", "profiles": ["Core"] }""").ConfigureAwait(false);
+        await Task.Delay(_waitBeforeCheckDelay).ConfigureAwait(false);
+
+        Assert.AreEqual("Executing", _stringUnitValues[$"{MachineTopic}/State/Status/MachineryItemState"].Value);
+        Assert.AreEqual("Processing", _stringUnitValues[$"{MachineTopic}/State/Status/MachineryOperationMode"].Value);
+        Assert.AreEqual(new DateTime(2026, 11, 17, 9, 15, 2, 123, DateTimeKind.Utc), _stringUnitValues[$"{MachineTopic}/State/Status/MachineryItemState"].Timestamp);
+        Assert.AreEqual("Ended", _stringUnitValues[$"{MachineTopic}/WorkMasterMonitoring/ProgramExecution/State"].Value);
+        Assert.IsFalse(_baseUnitValues.ContainsKey($"{MachineTopic}/WorkMasterMonitoring/ProgramExecution/Duration"), "a number of a snapshot has no unit");
+        Assert.IsFalse(_stringUnitValues.Keys.Any(k => k.Contains("JobOrders", StringComparison.Ordinal) || k.Contains("Manifest", StringComparison.Ordinal) || k.Contains("ActiveWorkMaster", StringComparison.Ordinal)));
+        Assert.IsEmpty(_booleanValues);
+    }
+
     [TestMethod]
     public async Task BaseUnitValueNoValueTest()
     {

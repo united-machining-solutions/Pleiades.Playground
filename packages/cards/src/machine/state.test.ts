@@ -15,11 +15,13 @@ function reading(value: string): Reading {
 function machine(changes: Partial<Machine> = {}): Machine {
   return {
     machine: "P-04",
-    connection: reading("Connected"),
+    identity: { manufacturer: null, model: null, serialNumber: null },
+    jobOrder: null,
+    connection: reading("Running"),
     heartbeat: reading("2825"),
     itemState: reading("Executing"),
     operationMode: reading("Processing"),
-    program: reading("SHAFT_4711.MPF"),
+    program: reading("WM-SHAFT-4711"),
     lastValueAt: justNow,
     notifications: [],
     ...changes,
@@ -29,6 +31,7 @@ function machine(changes: Partial<Machine> = {}): Machine {
 const notification = (level: "Warning" | "Error") => ({
   correlationId: "c",
   notificationId: "2130",
+  severity: level === "Error" ? ("Failure" as const) : ("OffSpec" as const),
   level,
   title: "Spindle overtemperature",
   raisedAt: justNow,

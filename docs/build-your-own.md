@@ -24,10 +24,19 @@ missing.
 | A screen people open, made of answers that exist | [`create-page`](../.claude/skills/create-page/SKILL.md) |
 | An answer that does not exist yet, to data that does | [`create-card`](../.claude/skills/create-card/SKILL.md) |
 | Data the stack does not have yet | [`add-source`](../.claude/skills/add-source/SKILL.md) |
+| The look of your own brand: colours, corners, font, logo | [`add-brand`](../.claude/skills/add-brand/SKILL.md) |
 | The data in an agent you already use | Nothing to build: [`contracts/mcp`](../contracts/mcp/README.md) |
 
 Which language model answers in the chat is a setting, also for a model on your own computer:
 [`apps/app`: Language models](../apps/app/README.md#language-models).
+
+What you build is one of two kinds. A page or a card of the stack works for any machine that follows the
+data model, with the values the stack has. A showcase is a page for one demo, one fair or one story: it may
+show made-up data, and it is built in only on request. The app alone, and its image, have nothing of a
+showcase in them; a stack started with `APP_SHOWCASES=true` in `.env` runs the same app with all of them.
+A showcase lives in a folder of its own and changes nothing the others share, so it never stands in the way
+of whoever takes the stack as a base. The recipes ask which of the two your idea is. Why:
+[ADR-0018](adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md).
 
 ## The stack in detail
 

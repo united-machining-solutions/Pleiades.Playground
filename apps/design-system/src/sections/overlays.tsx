@@ -93,11 +93,11 @@ import { Block, Example, Examples, Section } from "@/block.tsx"
 // a panel from the bottom on a phone a Drawer, something small next to its trigger a Popover.
 
 const topics = [
-  "umati/State/MachineryItemState",
-  "umati/State/MachineryOperationMode",
+  "umati/State/Status/MachineryItemState",
+  "umati/State/Status/MachineryOperationMode",
   "umati/Connection/State",
   "umati/Connection/Heartbeat",
-  "umati/Production/ActiveProgram",
+  "umati/WorkMasterMonitoring/ActiveWorkMaster",
 ]
 
 function DeleteChat() {
@@ -222,7 +222,7 @@ export function Overlays() {
             <SheetContent>
               <SheetHeader>
                 <SheetTitle>Topics of P-04</SheetTitle>
-                <SheetDescription>Where the values of its card come from, below machines/P-04/.</SheetDescription>
+                <SheetDescription>Where the values of its card come from, below machines/alcyone-machines_AX-400_P-04/.</SheetDescription>
               </SheetHeader>
               <ul className="flex flex-col gap-2 px-4 font-mono text-xs">
                 {topics.map((topic) => (
@@ -364,7 +364,7 @@ export function Overlays() {
               </ContextMenuGroup>
               <ContextMenuSeparator />
               <ContextMenuGroup>
-                <ContextMenuItem>Copy the serial number</ContextMenuItem>
+                <ContextMenuItem>Copy the machine id</ContextMenuItem>
               </ContextMenuGroup>
             </ContextMenuContent>
           </ContextMenu>
