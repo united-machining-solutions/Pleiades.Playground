@@ -41,6 +41,7 @@ const base = {
   asOf: "2026-11-17T09:30:00.000Z",
   windowSeconds: 1800,
   source: "Sites API /sites and /placements",
+  sitesError: null,
 } as const
 
 test("the site card in words: a line for each site with its halls, an empty one too, and the machines on no site", () => {
@@ -116,6 +117,25 @@ test("without a site, the words say so, and name the machines that could be plac
   assert.equal(
     siteListInWords(list),
     "No site is entered in the Sites API yet.\nSent values in the last 24 hours and stand on no site: TX-9 M-07 (taygeta-tools_TX-9_M-07) no data.\nRead at 09:30 UTC.",
+  )
+})
+
+test("where the sites cannot be read, the words say so, not that none is entered, and name every machine that sends", () => {
+  const list = siteList.parse({
+    ...base,
+    machineCount: 0,
+    counts: [],
+    sites: [],
+    unplaced: [{ machine: "taygeta-tools_TX-9_M-07", state: "running", now: sending("taygeta-tools_TX-9_M-07", "TX-9", "M-07") }],
+    sitesError: "The Sites API did not answer: ECONNREFUSED (http://sites:8080/sites).",
+  })
+  assert.equal(
+    siteListInWords(list),
+    [
+      "The sites cannot be read now: The Sites API did not answer: ECONNREFUSED (http://sites:8080/sites). Every machine that sent values in the last 24 hours is listed as on no site.",
+      "Sent values in the last 24 hours and stand on no site: TX-9 M-07 (taygeta-tools_TX-9_M-07) running.",
+      "Read at 09:30 UTC.",
+    ].join("\n"),
   )
 })
 

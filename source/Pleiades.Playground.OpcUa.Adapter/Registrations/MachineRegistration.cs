@@ -84,6 +84,13 @@ internal sealed record IdentityRegistration
     /// <summary><c>Identification.ManufacturerUri</c>, the web address of the manufacturer.</summary>
     public string ManufacturerUri { get; init; } = string.Empty;
 
+    /// <summary>
+    /// True if the server has no node for <c>Identification.ManufacturerUri</c>: <see cref="ManufacturerUri"/> is then the
+    /// <see cref="Manufacturer"/> without its special characters, so that the machine id has a manufacturer.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ManufacturerUriFromManufacturer { get; init; }
+
     /// <summary><c>Identification.Model</c>.</summary>
     public string Model { get; init; } = string.Empty;
 

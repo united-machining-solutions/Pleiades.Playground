@@ -3,19 +3,23 @@ import { Button, buttonVariants } from "@pleiades/ui/components/button"
 import { Toggle } from "@pleiades/ui/components/toggle"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { toast } from "@pleiades/ui/components/toast"
-import { Link, createFileRoute, notFound, useNavigate, useRouter } from "@tanstack/react-router"
+import { Link, createFileRoute, notFound, useNavigate } from "@tanstack/react-router"
 import { CheckIcon, EllipsisIcon, PencilIcon, PinIcon, SearchXIcon, SquarePenIcon, Trash2Icon } from "lucide-react"
 import { useEffect, useId, useRef, useState } from "react"
 
 import { useRetry } from "@/hooks/use-live.ts"
+import { AddCard } from "@/pages/add-card.tsx"
+import { cannotAdd } from "@/pages/add-part.ts"
 import { Column, PartsLoading } from "@/pages/column.tsx"
 import { DrawnPart, answerParts, waitsForBackend } from "@/pages/drawn-part.tsx"
+import type { AnsweredPart } from "@/pages/drawn-part.tsx"
 import { OnlyPart, PartControls, controlId } from "@/pages/part-controls.tsx"
 import { MAX_TITLE_LENGTH } from "@/pages/recipe.ts"
-import type { StoredPage } from "@/pages/recipe.ts"
+import type { RecipePart, StoredPage } from "@/pages/recipe.ts"
 import { SharePage } from "@/pages/share-page.tsx"
 import { shownParts } from "@/pages/shown-parts.ts"
 import {
+  addPart,
   deletePage,
   getPage,
   movePart,
@@ -83,21 +87,33 @@ function KeptPage() {
 
 /**
  * A kept page: its head, and its parts as the recipe has them now. Each part keeps the answer the
- * loader gave it (`shownParts`), so a part that is removed or moved asks no other part again. Only a
- * part the loader did not answer, one put back after the page was read again, makes it read again.
+ * loader gave it (`shownParts`), so a part that is removed or moved asks no other part again. A part
+ * the loader did not answer, one added or put back after the page was read, is asked alone, and the
+ * others keep what they have.
  *
- * "Edit" in the head shows the controls above each part: move it up or down, remove it. A change is
- * kept at once, as a new title is. A removed part is nowhere else, so a toast offers to put it back.
+ * "Edit" in the head shows the controls above each part: move it up or down, remove it; and at the
+ * end of the page "Add a card". A change is kept at once, as a new title is. A removed part is
+ * nowhere else, so a toast offers to put it back. An added part needs no undo: it stands where the
+ * person pressed, with "Remove" above it, and nothing was lost.
  */
 function ShownPage({ page }: { page: StoredPage }) {
-  const router = useRouter()
   const { parts, readAt } = Route.useLoaderData()
-  const shown = shownParts(page.recipe.parts, parts)
-  const unasked = shown.some(({ answered }) => answered === undefined)
+  // The answers of the parts asked alone, after the loader. Those of the loader come first: when the
+  // page is read again, it has an answer for every part, and a newer one.
+  const [late, setLate] = useState<Array<AnsweredPart>>([])
+  const shown = shownParts(page.recipe.parts, [...parts, ...late])
   useRetry(shown.some(({ answered }) => answered !== undefined && waitsForBackend(answered)))
+  const asking = useRef(new Set<string>())
   useEffect(() => {
-    if (unasked) void router.invalidate()
-  }, [unasked, router])
+    for (const { key, part, answered } of shown) {
+      if (answered !== undefined || asking.current.has(key)) continue
+      asking.current.add(key)
+      void answerParts([part]).then((answers) => {
+        asking.current.delete(key)
+        setLate((before) => [...before, ...answers])
+      })
+    }
+  })
 
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -141,10 +157,20 @@ function ShownPage({ page }: { page: StoredPage }) {
         children: "Undo",
         onClick() {
           toast.close(removed)
-          if (!putPartBack(page.id, at, part)) notKept()
+          if (putPartBack(page.id, at, part)) return
+          // "Add a card" may have filled the page, or put the same card on it, while this toast
+          // stood: then the page says that, as "Add a card" does; else the storage said no.
+          notKept(cannotAdd(getPage(page.id)?.recipe.parts ?? [], part) ?? NOT_KEPT)
         },
       },
     })
+  }
+
+  /** Puts a card a person chose at the end of the page. Null if it is there, or why not. */
+  function add(part: RecipePart): string | null {
+    if (addPart(page.id, part)) return null
+    // Another tab may have changed the page since the dialog checked it; else the storage said no.
+    return cannotAdd(getPage(page.id)?.recipe.parts ?? [], part) ?? NOT_KEPT
   }
 
   return (
@@ -172,16 +198,30 @@ function ShownPage({ page }: { page: StoredPage }) {
           {answered ? <DrawnPart part={answered} /> : <Skeleton className="h-40 w-full" />}
         </div>
       ))}
+      {editing && (
+        <AddCard
+          parts={page.recipe.parts}
+          onAdd={add}
+          // The new part is the last, and on a page of two parts or more every part has "Remove" above it.
+          added={() => document.getElementById(controlId(prefix, (getPage(page.id)?.recipe.parts.length ?? 0) - 1, "remove"))}
+        />
+      )}
     </Column>
   )
 }
 
-/** A change of the parts that the storage did not take: the page is as it was, and says so. */
-function notKept() {
+/** Why a change of the parts was not kept, when the storage did not take it. */
+const NOT_KEPT = "This browser did not keep the change: it blocks its storage, or the storage is full."
+
+/**
+ * A change of the parts that did not happen: the page is as it was, and says why. Without a reason
+ * of its own, the storage did not take the change.
+ */
+function notKept(why: string = NOT_KEPT) {
   toast.add({
     type: "error",
     title: "The page was not changed",
-    description: "This browser did not keep the change: it blocks its storage, or the storage is full.",
+    description: why,
     priority: "high",
   })
 }

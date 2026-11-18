@@ -7,8 +7,22 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: "Add a card" at the end of a kept page in "Edit" adds a card by hand, with no language model:
+  the cards a page can hold, by what they show, and what the chosen one takes, read from its input schema
+  (a machine by its name, the hours of its history). The same card twice or a thirteenth is not added.
 - Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
   no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
+- OPC UA adapter: a server without a node for `Identification.ManufacturerUri` is added if it gives
+  `Identification.Manufacturer`: that name without any character but `A-Z`, `a-z` and `0-9` stands in for the
+  `ManufacturerUri` and forms the machine id (`TRUMPF SE + Co. KG` gives `trumpfsecokg_<model>_<serial number>`).
+  A mapped `ManufacturerUri` without a value yet is still waited for. The MQTT contract describes the rule
+  ([Without a ManufacturerUri](contracts/mqtt/README.md#without-a-manufactureruri)). The proposal in the chat says
+  so under "Good to know" (`notices`, with the `machineId`), and the registration keeps it as
+  `identity.manufacturerUriFromManufacturer`. A `Manufacturer` without any letter or digit `A-Z`, `0-9` is refused
+  with that reason.
+- Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
+  `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
+  shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0020).
 - Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
   each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
   draws them with the notification card.
@@ -29,11 +43,20 @@ All notable changes are documented here. The format follows
   that live values work over HTTPS. HTTP stays as it is.
 - Example app: the setting `MQTT_WSS_PATH` sends a page over HTTPS to the broker at that path of the page's
   origin, for a proxy in front of the app that forwards it to the broker.
-- Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
-  shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
-  from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
-  entry in the sidebar. It is the first showcase: only a stack started with `APP_SHOWCASES` set has the
-  page.
+- SimpleCAM adapter (`simplecam-adapter-9042`): reads the state of the SimpleCAM machine 9042 from the SSE stream
+  of the SimpleCAM backend and publishes it to the broker as `machines/united-grinding_simplecam_9042/umati/...`
+  after the data model 0.17.1, with the job as the active work master and its progress as a signal of the
+  manufacturer, and a change of its list of alerts as events on `events/notifications`. It is optional: it
+  starts with the Compose profile `simplecam`, and the setting `SIMPLECAM_SSE_URL` names the stream. It is not
+  part of the Margo app.
+- Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion of how an order is
+  followed across the shop floor. It shows the machines of the stack from above, one machine with its job
+  orders done, running and waiting, and one order on its way: every job order that names the same order
+  number. The values are those of the stack; programming, packing and the single part on its sheet have no
+  source yet and stand on the page as such. The page reads the job orders from the new tool
+  `genui_job_order_list` of `genui-mcp`, the job orders on the lists of the machines from the Events API, so
+  they stand also after a reload or a reconnect; a job order the planner took back before it ran is left out.
+  It is a page of the app with its entry in the sidebar, not a showcase: it shows only values the stack has.
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
@@ -306,6 +329,8 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Example app: Home (`/`) shows where the machines stand, by site and hall; "Needs you" keeps what it showed first.
+  The tiles of the running machines are gone. `/sites` leads to `/`.
 - Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
   computer, as the web UI of the OPC UA simulator does; in the stack and in the Margo app.
 
@@ -451,9 +476,14 @@ All notable changes are documented here. The format follows
   is the start view, now headed "Chats"; its field begins a new chat. "New chat" is gone from the head of a
   chat, since it led to the same view the way back leads to. Without a language model the head still says
   "Chat". After "All chats" or a chat of the list the focus is on the heading of the view it leads to.
+- OPC UA adapter: the endpoint card of `/discover` shows the endpoint the adapter takes in one line, and says
+  when the server also accepts sessions without security. The other endpoints are folded behind "n more
+  endpoints", since a person cannot choose one there.
 
 ### Removed
 
+- arm64: the workflow "Images" builds every image for `linux/amd64` only, and the Margo app asks for an amd64
+  device. Some images the stack takes, such as the OPC UA simulator of umati, are built for amd64 only.
 - `NotificationEventDtoV1`, its collection, the endpoints `/notificationEvents` and the MCP tools
   `events_notification_*`.
 - The libraries `Pleiades.Playground.Events.Generators` and `Pleiades.Playground.Timeseries.Generators`.

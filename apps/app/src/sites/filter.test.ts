@@ -71,6 +71,7 @@ const list: SiteList = {
     { siteId: "west-plant", company: "Demo Manufacturing", name: "West plant", machineCount: 0, counts: [], halls: [{ name: "Hall W", machines: [] }] },
   ],
   unplaced: [{ machine: P07, state: "alarm", now: sending(P07, "TP-800", "P-07", "HOUSING-0815") }],
+  sitesError: null,
 }
 
 /** Each group as its site, and hall by hall the ids of the machines shown. */
@@ -244,4 +245,11 @@ test("a machine is called what it is by its id where its values do not say it, a
   // The name people entered stays the title, and what it is stands below it.
   const lathe = groups[0]!.halls[0]!.rows[0]!
   assert.deepEqual([lathe.name, lathe.what], ["Lathe 4", "AX-400 P-04"])
+})
+
+test("without sites every machine that sends stands under on no site, and no site is empty", () => {
+  const { groups, emptySites } = groupsOf({ ...list, sites: [], machineCount: 0, counts: [] }, { needs: false, query: "" })
+  assert.deepEqual(names(groups), [[null, [["", [P07]]]]])
+  assert.deepEqual(emptySites, [])
+  assert.equal(pageOf(groups, undefined).sites, 0)
 })

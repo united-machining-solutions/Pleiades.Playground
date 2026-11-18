@@ -49,4 +49,13 @@ A span has one of five states, decided from the values in this order:
 A band has room for a few hundred spans. A history with more is thinned to that many: each slot of
 the band then shows the state that lasted longest in it, and an alarm always keeps a slot, so none
 is thinned away. The sums are not affected: they are added up from every span.
+
+## Job orders
+
+\`genui_job_order_list\` lists the job orders on the lists of the machines whose last event lies in
+the last 24 hours, of every machine or of one (\`machine\`): what is ordered (\`state\`, \`jobName\`,
+\`workMaster\`, \`orderNumbers\`, \`runsPlanned\`) and what came of it from its start (\`start\`, \`end\`,
+\`produced\`, \`good\`, \`result\`). Job orders that name the same order number belong to one order of
+the ERP, also on different machines. A job order without an order number is an order of its own.
+A job order \`Aborted\` without a \`start\` never ran: the planner took it back.
 `

@@ -100,6 +100,10 @@ export type Proposal = {
   rows: Array<MappingRow>
   replaces: boolean
   changes?: Changes
+  /** The machine id it would publish under. Absent if not accepted, or from an older adapter. */
+  machineId?: string
+  /** What the person should know though nothing is wrong. Absent from an older adapter. */
+  notices?: Array<string>
 }
 
 export type RankedEndpoints = {
@@ -258,6 +262,20 @@ export function securityOf(endpoint: Pick<Endpoint, "securityMode" | "securityPo
   const mode = { SignAndEncrypt: "Encrypted", Sign: "Signed only", None: "No security" }[endpoint.securityMode]
   const security = endpoint.securityMode === "None" ? mode : `${mode}, ${endpoint.securityPolicy}`
   return endpoint.user ? `${security}, user ${endpoint.user}` : security
+}
+
+/**
+ * What the endpoints card shows: the endpoint the adapter takes, the others the server offers (folded,
+ * since a person cannot choose one there), and whether one of them has no security at all.
+ */
+export function endpointSummary(values: Pick<RankedEndpoints, "endpoints">): {
+  used?: RankedEndpoints["endpoints"][number]
+  others: RankedEndpoints["endpoints"]
+  unsecured: boolean
+} {
+  const used = values.endpoints.find((one) => one.recommended) ?? values.endpoints[0]
+  const others = values.endpoints.filter((one) => one !== used)
+  return { used, others, unsecured: others.some((one) => one.securityMode === "None") }
 }
 
 /** What the endpoints card asks of the person about a user: nothing, to enter one, or that one may be entered. */

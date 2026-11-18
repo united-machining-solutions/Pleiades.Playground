@@ -4,16 +4,15 @@ The example application: a single-page app on [TanStack Start](https://tanstack.
 the app. The server delivers the document, the server routes and the server functions, and runs the agent
 harness.
 
-- **Home** asks "what needs you?": it lists the machines of the demo stack, first those in alarm, stopped or
-  without data, then those in setup, then the running ones. It is live: see below.
-- **Sites** (`/sites`) shows where the machines stand: site by site and hall by hall, in rows like those of
-  Home, each site under a head with how many of its machines are in each state, and the machines that send values
-  and stand on no site. "Needs you" keeps the machines that need someone, a search finds one; ten sites make a
-  page, and the choice and the page stay in the URL (`?show=needs`, `?page=`). The sites come from the Sites API through `genui_site_list`, and the page is
-  live like Home. It needs no language model.
+- **Home** (`/`) shows where the machines stand: site by site and hall by hall, a row for each machine, each
+  site under a head with how many of its machines are in each state, and the machines that send values and stand
+  on no site. "Needs you" keeps the machines that need someone, what Home used to show first; a search finds one; ten sites make a
+  page, and the choice and the page stay in the URL (`?show=needs`, `?page=`). The sites come from the Sites API through `genui_site_list`; without sites, every machine stands under
+  "On no site". It is live: see below. It needs no language model. The address `/sites`, where the list of the
+  sites stood before, leads to `/`.
 - **A page per machine** (`/sites/alcyone-machines_AX-400_P-04`, by the machine id) shows the machine card of the
   [card catalogue](../../packages/cards/README.md): what the machine does now and what it did over the last
-  hours. It needs no language model. Home and Sites lead to it, and it stands under Sites. An address of before, `/machines/<machine id>`, leads to it with
+  hours. It needs no language model. Home leads to it, and it stands under Home. An address of before, `/machines/<machine id>`, leads to it with
   the hours of its history. For a machine the backend does not know, the page
   says so and does not ask again.
 - **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
@@ -23,8 +22,12 @@ harness.
   of the chat makes one: all the cards of that answer, in their order, titled with the question. It stands
   under an answer that has ended and for which the chat drew a card, and needs no language model: the app
   reads the tool calls from the answer it already has. The page opens beside the chat, which stays open, and
-  the row under the answer then says "Saved as page" and links to it. Nothing is kept unless a person
-  presses it. A page is a recipe: a title
+  the row under the answer then says "Saved as page" and links to it. Asked for a page, a dashboard or an
+  overview, the chat proposes one instead: the model finds out with its tools what there is to show and
+  composes a recipe with the tool of the app `app_page_propose`, which the app checks against the tools a
+  page can call. The chat shows the proposal with its title and its parts in words, "Save to my pages" and
+  "Preview", which opens it as a link opens. Nothing is kept unless a person presses it. Why:
+  [ADR-0020](../../docs/adr/0020-the-language-model-composes-a-page-and-nothing-else.md). A page is a recipe: a title
   and its parts in their order, each part a tool of `genui-mcp` with its arguments. No value is kept and no
   sentence of a language model: opening a page calls the tools again and draws each answer with the card
   the chat draws for that tool, so it shows what holds now and needs no language model. It is read once, and
@@ -34,6 +37,14 @@ harness.
   "Remove", by hand and with no language model, and "Done" takes them away again; a change is kept at once,
   and no part is asked again because another one moved or went. A removed part is kept nowhere else, so the
   toast that says so has "Undo". The only part of a page stays: "Delete page" is the way to be rid of it.
+  "Add a card" at the end of a page that is edited adds one, also by hand: a dialog offers the cards a page
+  can hold, each by what it shows, and asks what the chosen one takes, as the input schema of its tool in the
+  backend says: a machine, chosen by its name from the machines Home lists, and the hours of a history in
+  their range. An optional argument left empty stays out, so the measurements without a machine are every
+  machine; the list of machines the energy card can take has no field, and that card shows every machine.
+  The card goes to the end and shows its values at once; the other parts are not asked again. The same card
+  with the same choices, a thirteenth part or a storage that says no adds nothing, and the dialog says why;
+  without an answer of the backend nothing can be added. An added card is removed like any other.
   A pinned page stands in the sidebar on the top level, beside
   Home; under it a group "Pages", which folds, lists the pages that are not pinned, the newest first, and
   there is no group where there is nothing to list. `/pages` lists them all and is reached through the
@@ -62,7 +73,7 @@ The values come from `genui-mcp`, and what is live comes from the broker. Withou
 which settings are missing; everything else works.
 
 **Live, not read again** ([ADR-0013](../../docs/adr/0013-live-values-from-the-broker.md)). Home, the page of a
-machine, Sites, Live values and Charts read once, in their loader, what `genui-mcp` knows: what held when the page was opened,
+machine, Live values and Charts read once, in their loader, what `genui-mcp` knows: what held when the page was opened,
 and the history before it. From then on the browser subscribes at the broker, MQTT over WebSocket, to the
 topics the page shows, and every value appears the moment a machine publishes it: a state, a work master, the
 job order that runs, an alert that is raised or cleared, a point of a graph. The clock of the page moves on by itself, by the clock of the
@@ -171,9 +182,11 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
-  `index.tsx` is Home, `sites.index.tsx` Sites, `sites.$machine.tsx` the page of a machine and `machines.$machine.tsx`
+  `index.tsx` is Home, `sites.index.tsx` the address the list of the sites had before, which leads there, `sites.$machine.tsx` the page of a machine and `machines.$machine.tsx`
   the old address of it, which leads there, `charts.tsx` the last hours of every
-  machine as charts (drawn by `src/charts/state-tiles.tsx`), `pages.index.tsx` the list of the pages kept
+  machine as charts (drawn by `src/charts/state-tiles.tsx`), `where-is-my-job.tsx` a page for discussion
+  that follows an order across the machines (its map, its panels, the grouping of job orders and `getFloor`,
+  which reads its values, in `src/where-is-my-job/`), `pages.index.tsx` the list of the pages kept
   in this browser, `pages.$page.tsx` one of them and `pages.open.tsx` one opened from a link; `health.ts`,
   `api/harness/$.ts` and
   `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
@@ -190,9 +203,13 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   and its size, which is all that is checked, also of a recipe from outside. `store.ts` keeps the pages in
   the `localStorage` of the browser under one key, `pleiades-playground.pages.v1`, and is the only way to
   them: `listPages`, `getPage`, `savePage`, `renamePage`, `pinPage`, `unpinPage`, `removePart`, `movePart`,
-  `putPartBack` (the undo of `removePart`), `deletePage`, and `usePages` for a component that follows every
-  change. `part-controls.tsx` is what "Edit" shows above a part, and `shown-parts.ts` gives each part of the
-  recipe as it is now the answer the loader already has for it. `link.ts` writes a recipe into one search
+  `putPartBack` (the undo of `removePart`), `addPart`, `deletePage`, and `usePages` for a component that
+  follows every change. `part-controls.tsx` is what "Edit" shows above a part, and `shown-parts.ts` gives each
+  part of the recipe as it is now the answer the loader already has for it. `add-card.tsx` is "Add a card"
+  and its dialog; `card-choices.ts` the server function behind it, which reads the tools of the backend with
+  their input schemas and the machines; `add-part.ts` what the form asks for a card, read from its schema (a
+  machine, a whole number in its range, never the time zone), the part it makes, and why a part is not added
+  (`cannotAdd`). A card with a required argument the form does not know is offered as off, with why. `link.ts` writes a recipe into one search
   parameter, `r`, and reads it back (`encodeRecipe`, `decodeRecipe`, `linkOf`): JSON as UTF-8 in base64url,
   at most `MAX_PARAM_LENGTH` (8,000) characters, and what is not exactly a recipe (`recipeOf`) is null.
   `share-page.tsx` is "Share" in the head of a kept page, `column.tsx` the column that a kept page and a page
@@ -209,16 +226,21 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   calls the chat drew a result for, in their order, without the time zone, the same call once, and the
   question as its title. An answer is everything the model said after one question, in more than one
   message; an answer with more calls than a page holds (12) keeps the first 12, and the row says so.
+  `proposal.ts` checks a page the language model proposes (`proposePage`): only tools a page can call, the
+  schema of a part, no time zone, the same part once, at most 12, and each part left out with a reason the
+  model can act on; it also reads the recipe back from the result for the chat (`proposedRecipe`).
+  `kept-proposals.ts` notes which page a proposal was kept as, by the id of its tool call, under a key of its
+  own, `pleiades-playground.proposals.v1`: so a proposal still says "Saved as page" after a reload and after the
+  page was renamed or its parts changed, and does not offer to keep a second page.
 - `src/routeTree.gen.ts`: written from the route files and not in the repository, so that two branches with
   a page each have nothing to merge in it. `pnpm install` and `pnpm typecheck` write it
   (`route-tree.mjs`), and so do the development server and the build. Never edit it. TanStack advises to
   commit this file; here everything that needs it writes it first.
 - `src/showcases/`: what is made for one demo or one fair, and is in a build only where `APP_SHOWCASES` is
   set ([ADR-0018](../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
-  it is a showcase: `where-is-my-job/` is the made-up shop floor of the page "Where is My Job?". The pages of
-  the showcases, and their server routes, are the route files under `src/routes/(showcases)/`; the brackets
-  make a folder that adds nothing to an address, so `(showcases)/where-is-my-job.tsx` answers at
-  `/where-is-my-job`. A page belongs to the showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and
+  it is a showcase; there is none yet. The pages of the showcases, and their server routes, are the route
+  files under `src/routes/(showcases)/`; the brackets make a folder that adds nothing to an address, so
+  `(showcases)/titan.tsx` answers at `/titan`. A page belongs to the showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and
   `titan/faces.tsx` are pages of `showcases/titan/`. A build without the setting leaves that folder out
   (`vite.config.ts`): the router does not know the pages, nothing imports the folder of a showcase, and
   `.output` has nothing of one, so neither has the image. There is no switch while the app runs.
@@ -227,7 +249,7 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   from `src/` first, so `../other/data.ts` counts as `@/showcases/other/data.ts` does. The typecheck reads
   every route, with the showcases (`route-tree.mjs`). After a build without the setting, the route tree on
   disk has no showcase routes, and the editor or a plain `tsc` reports `TS2345` in the route files of the
-  showcases (`'"/(showcases)/where-is-my-job"' is not assignable to parameter of type 'keyof FileRoutesByPath'`).
+  showcases (`'"/(showcases)/titan"' is not assignable to parameter of type 'keyof FileRoutesByPath'`).
   `pnpm typecheck` or `node route-tree.mjs` writes the whole tree again, and the error is gone.
 - `src/cards/`: a folder for each card, named like the card. `machine/chat.tsx` is the machine card in the
   chat: what a call of each of its tools is called, what the chat draws for a result (`results.ts` checks it
@@ -246,9 +268,9 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   the passing of time, onto what the backend read, by the rules of `genui-mcp`; each has its tests.
   `sites.ts` keeps the machines of the sites live and counts them again by the rules of `genui_site_list`.
   `src/hooks/use-live.ts` puts it together for a route: `useLive(loaded, live)`.
-- `src/sites/`: what the page Sites chooses to show. `filter.ts` groups the values of `genui_site_list` by site
+- `src/sites/`: what Home chooses to show of the sites. `filter.ts` groups the values of `genui_site_list` by site
   and hall, keeps what "Needs you" and a search ask for, cuts the pages, and adds up nothing; `moved.ts` says where an old address of the page of a
-  machine leads.
+  machine or of the list of the sites leads.
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `mcp-servers.ts` reads the servers whose tools the chat has and holds a chat to the ones it left on,
@@ -261,10 +283,12 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   what a chat is called (`chatName`, `nameOfQuestion`), `ask.ts` which chat the panel shows, in the URL
   (`?chat=`: `new` is the list), and where the first question of a new chat waits,
   `save-as-page.tsx` the row under an answer with "Save as page" (chrome of the app, never part of a card),
+  `propose-page.ts` the one tool of the app the model gets, `app_page_propose`, and `proposed-page.tsx` the
+  proposal the chat draws for its result,
   `dictate.tsx` the microphone in its field and `dictation.server.ts` the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for
-  which tool, and its server which tools a language model does not get. `tool-results.ts` says what a card
-  may say about a tool, `blocks.ts` turns an answer into blocks, and `answer.tsx` draws what the model writes
+  which tool, its server which tools a language model does not get, and the proposal of a page which tools a
+  page can call. `tool-results.ts` says what a card may say about a tool, `blocks.ts` turns an answer into blocks, and `answer.tsx` draws what the model writes
   ([TanStack Markdown](https://tanstack.com/markdown)).
 - `src/opcua/`: what the chat and its cards take of the OPC UA adapter. `commands.ts` holds the slash
   commands and `/help`, `adapter.ts` the server functions behind the buttons that add and remove a machine.

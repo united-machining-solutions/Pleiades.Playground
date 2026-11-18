@@ -292,6 +292,43 @@ export async function readRunningJobOrders(apis: Apis): Promise<Array<RunningJob
     }))
 }
 
+const allJobOrdersAnswer = z.object({
+  items: z.array(
+    z.object({
+      mId: z.string(),
+      jobOrderId: z.string(),
+      state: z.string(),
+      lastChange: z.string(),
+      removed: z.boolean().default(false),
+      jobName: z.string().nullish(),
+      workMasterId: z.string().nullish(),
+      orderNumbers: z.array(z.string()).nullish(),
+      runsPlanned: z.number().nullish(),
+      plannedStartTime: z.string().nullish(),
+      plannedEndTime: z.string().nullish(),
+      startTime: z.string().nullish(),
+      endTime: z.string().nullish(),
+      producedQuantity: z.number().nullish(),
+      goodQuantity: z.number().nullish(),
+      jobResult: z.string().nullish(),
+    }),
+  ),
+})
+
+/** A job order with what is ordered and what came of it, as the Events API puts it together from its events. */
+export type StoredJobOrder = z.infer<typeof allJobOrdersAnswer>["items"][number]
+
+/**
+ * Every job order whose last event lies between the two instants, those that left the list of
+ * their machine included, of one machine or of all.
+ */
+export async function readJobOrders(apis: Apis, from: Date, to: Date, machine?: string): Promise<Array<StoredJobOrder>> {
+  const url = between(new URL("/jobOrders", apis.eventsUrl), ["from", "to"], from, to)
+  url.searchParams.set("Take", "1000")
+  if (machine !== undefined) url.searchParams.set("mId", machine)
+  return (await getJson("Events API", url, allJobOrdersAnswer)).items
+}
+
 /** The newest value of one topic: when, what, and in which unit. A yes or no has no unit. */
 export type Newest = { at: string; value: number | boolean; unit: string | null }
 

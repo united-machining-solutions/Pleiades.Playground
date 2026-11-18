@@ -1,9 +1,10 @@
-import { BAND_SLOTS, instant, machineId, machineList, machineShow, spanList } from "@pleiades/cards/machine/contract.ts"
+import { BAND_SLOTS, instant, jobOrderList, machineId, machineList, machineShow, spanList } from "@pleiades/cards/machine/contract.ts"
 import { machineListInWords, machineShowInWords, spanListInWords } from "@pleiades/cards/machine/in-words.ts"
 import { toolDefinition } from "@tanstack/ai"
 import { z } from "zod"
 
 import { card } from "../card.ts"
+import { jobOrderListInWords, listJobOrders } from "../job-orders.ts"
 import { HISTORY_HOURS, MOST_HOURS, listMachines, listSpans, showMachine } from "../machines.ts"
 import { inTimeZoneOf, knownTimeZone } from "../time.ts"
 import { inWords, readOnly, timeZone } from "../tool.ts"
@@ -85,12 +86,29 @@ const spanListTool = toolDefinition({
   return inWords(list, spanListInWords(list))
 })
 
+const jobOrderListTool = toolDefinition({
+  name: "genui_job_order_list",
+  description:
+    "List the job orders on the lists of the machines whose last event lies in the last 24 hours, of every machine or of one with `machine`: state, job name, work master, the order numbers of the ERP, runs planned, and what came of each from its start (start, end, produced and good quantity, result). Job orders that name the same order number belong to one order, also across machines.",
+  inputSchema: z.object({
+    machine: machine.optional().describe("The machine id of one machine. Every machine if omitted."),
+    timeZone,
+  }),
+  outputSchema: jobOrderList,
+  metadata: { title: "List job orders", annotations: readOnly },
+}).server<Context>(async (input, ctx) => {
+  const zone = knownTimeZone(input.timeZone)
+  const list = inTimeZoneOf(await listJobOrders(ctx.context.apis, input.machine), zone)
+  return inWords(list, jobOrderListInWords(list))
+})
+
 export const machineCard = card({
-  tools: [machineListTool, machineShowTool, spanListTool],
+  tools: [machineListTool, machineShowTool, spanListTool, jobOrderListTool],
   describes: [
     "- genui_machine_list: every machine with what it does now.",
     "- genui_machine_show: one machine with what it does now and how long each state lasted over the last hours.",
     "- genui_span_list: the states of one machine as spans, for the band of a card. A card calls it.",
+    "- genui_job_order_list: the job orders on the lists of the machines, with their order numbers and what came of them.",
   ],
   guide: machineGuide,
   file: { name: "machine", uri: MACHINE_CARD_URI },
