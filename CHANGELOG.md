@@ -548,6 +548,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- SimpleCAM adapter: an alert goes out with a `Severity` of NAMUR NE 107 and the field names of the data model. The
+  backend had said `Warning`, which no consumer knows, and one such entry in the Events API left the machine page of
+  the example app without any machine ("No answer from the backend"). `Warning` and every other unknown word now
+  say `MaintenanceRequired`, `Error`, `Fault`, `Alarm` and `Critical` say `Failure`, and `Text`, `Source` and
+  `Timestamp` go out as `Message`, `SourceName` and `Time`, so that the alert has its text on the page.
 - Example app and generative UI backend: the demo stays quick with many machines. Live values draws its graphs
   at most twice a second and only the graphs whose values changed, instead of all of them for every message of
   the broker. `genui_machine_show` reads the one machine it shows instead of the whole fleet, so Charts, which asks
