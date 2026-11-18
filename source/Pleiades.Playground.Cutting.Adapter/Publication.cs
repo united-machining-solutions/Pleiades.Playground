@@ -40,6 +40,12 @@ internal static class Paths
     /// </summary>
     public const string ActiveProgram = "WorkMasterMonitoring.ActiveProgram";
 
+    /// <summary>
+    /// The work master of the model. The machine has none of its own; it is the name of the NC program, the same
+    /// value as <see cref="ActiveProgram"/>.
+    /// </summary>
+    public const string ActiveWorkMaster = "WorkMasterMonitoring.ActiveWorkMaster";
+
     public const string AlertRaised = "Notification.AlertRaised";
     public const string AlertCleared = "Notification.AlertCleared";
 }

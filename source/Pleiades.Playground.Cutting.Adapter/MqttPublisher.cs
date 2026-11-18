@@ -46,7 +46,8 @@ internal sealed class MqttPublisher : IPublisher, IDisposable
 
     /// <summary>
     /// The manifest: the profile Core with the snapshot <c>State.Status</c>, the feed override and the alerts, the
-    /// state of channel 1, the NC program as a signal of the manufacturer, and the two alert events.
+    /// state of channel 1, the NC program as the work master and as a signal of the manufacturer, and the two alert
+    /// events.
     /// </summary>
     internal static JsonObject Manifest(MachineIdentity identity, TimeSpan heartbeatInterval)
     {
@@ -57,6 +58,7 @@ internal sealed class MqttPublisher : IPublisher, IDisposable
             new(Paths.FeedOverride, MachineElement.Source),
             new(Paths.ActiveAlerts, MachineElement.Source),
             new(Paths.ChannelState, MachineElement.Source),
+            new(Paths.ActiveWorkMaster, MachineElement.Source),
             new(identity.Signal(Paths.ActiveProgram), MachineElement.Source,
                 MachineSignal.Text("Name of the NC program that runs in channel 1; null when none runs")),
         ]);

@@ -31,6 +31,7 @@ public sealed class CuttingTranslatorTest
 
         AssertValue(result, Paths.ChannelState, "Active");
         AssertValue(result, Program, "PROG_A");
+        AssertValue(result, Paths.ActiveWorkMaster, "PROG_A");
         Assert.AreEqual(new DateTimeOffset(2026, 11, 17, 9, 30, 0, TimeSpan.Zero), result[0].Timestamp);
     }
 
@@ -43,6 +44,7 @@ public sealed class CuttingTranslatorTest
 
         AssertValue(result, Paths.ChannelState, "Reset");
         Assert.IsNull(Value(result, Program), "No program runs: null, as the simulators publish it.");
+        Assert.IsNull(Value(result, Paths.ActiveWorkMaster));
     }
 
     [TestMethod]
@@ -140,13 +142,53 @@ public sealed class CuttingTranslatorTest
     }
 
     [TestMethod]
-    public void Connected_BeforeTheMachineSaidItsState_TheStateIsNotKnown_AndNoAlertStands()
+    public void Connected_BeforeTheMachineSaidItsState_TheStateAndTheAlertsAreNotKnown()
     {
         var result = _translator.Connected();
 
         Assert.IsNull(Value(result, Paths.Status));
         Assert.IsTrue(result.OfType<ValuePublication>().Any(p => p.Path == Paths.Status), "State.Status goes out as null.");
+        Assert.IsNull(Value(result, Paths.ActiveAlerts), "A machine may stand with an alarm the adapter has not heard of.");
+        Assert.IsTrue(result.OfType<ValuePublication>().Any(p => p.Path == Paths.ActiveAlerts), "ActiveAlerts goes out as null.");
+    }
+
+    [TestMethod]
+    [DataRow(CuttingNotifications.MachineRunning, "")]
+    [DataRow(CuttingNotifications.MachineStopped, "2")]
+    public void RunningOrAStopWithoutFault_SaysThatNoAlertStands(string name, string reason)
+    {
+        _translator.Connected();
+
+        var result = Translate(name, "1", "PROG", "", reason);
+
         Assert.IsEmpty(Value(result, Paths.ActiveAlerts)!.AsArray());
+        Assert.IsEmpty(result.OfType<AlertPublication>(), "No alert was raised, so none is cleared.");
+        Assert.IsEmpty(Translate(name, "1", "PROG", "", reason).OfType<ValuePublication>().Where(p => p.Path == Paths.ActiveAlerts),
+            "Once known as empty, the list goes out again only when it changes.");
+    }
+
+    [TestMethod]
+    public void AStopByAFault_LeavesTheAlertsNotKnown_UntilTheMachineNamesTheAlarm()
+    {
+        var fault = Translate(CuttingNotifications.MachineStopped, "1", "PROG", "", "1");
+        var alarm = Translate(CuttingNotifications.CurrentAlarms, "1", "4711", "Text", "");
+
+        Assert.IsFalse(fault.OfType<ValuePublication>().Any(p => p.Path == Paths.ActiveAlerts));
+        Assert.HasCount(1, Value(alarm, Paths.ActiveAlerts)!.AsArray());
+        Assert.HasCount(1, Value(_translator.Connected(), Paths.ActiveAlerts)!.AsArray(), "Once heard, the list is known.");
+    }
+
+    [TestMethod]
+    public void TheListOfAlerts_GoesOutBeforeTheEventsThatChangeIt()
+    {
+        var raised = Translate(CuttingNotifications.CurrentAlarms, "1", "4711", "Text", "");
+        var cleared = Translate(CuttingNotifications.MachineRunning, "1", "PROG", "").ToList();
+
+        Assert.IsInstanceOfType<ValuePublication>(raised[0]);
+        Assert.IsInstanceOfType<AlertPublication>(raised[1]);
+        var list = cleared.FindIndex(p => p is ValuePublication { Path: Paths.ActiveAlerts });
+        var @event = cleared.FindIndex(p => p is AlertPublication);
+        Assert.IsLessThan(@event, list);
     }
 
     [TestMethod]
@@ -156,6 +198,7 @@ public sealed class CuttingTranslatorTest
 
         Assert.IsNull(Value(result, Paths.ChannelState));
         Assert.IsNull(Value(result, Program));
+        Assert.IsNull(Value(result, Paths.ActiveWorkMaster));
     }
 
     [TestMethod]
@@ -187,6 +230,7 @@ public sealed class CuttingTranslatorTest
 
         AssertValue(off, Paths.ChannelState, "Reset");
         Assert.IsNull(Value(off, Program));
+        Assert.IsNull(Value(off, Paths.ActiveWorkMaster));
     }
 
     [TestMethod]
@@ -210,6 +254,7 @@ public sealed class CuttingTranslatorTest
 
         AssertValue(restarted, Paths.ChannelState, "Reset");
         Assert.IsNull(Value(restarted, Program));
+        Assert.IsNull(Value(restarted, Paths.ActiveWorkMaster));
         Assert.AreEqual(Paths.AlertCleared, restarted.OfType<AlertPublication>().Single().Type);
         Assert.IsEmpty(_translator.ActiveAlarms);
     }

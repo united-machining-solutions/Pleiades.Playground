@@ -75,6 +75,10 @@
     <Project Path="Pleiades.Playground.Cutting.Simulator/Pleiades.Playground.Cutting.Simulator.csproj" />
     <Project Path="Pleiades.Playground.Cutting.Simulator.Test/Pleiades.Playground.Cutting.Simulator.Test.csproj" />
   </Folder>
+  <Folder Name="/OpcUa/">
+    <Project Path="Pleiades.Playground.OpcUa.Adapter/Pleiades.Playground.OpcUa.Adapter.csproj" />
+    <Project Path="Pleiades.Playground.OpcUa.Adapter.Test/Pleiades.Playground.OpcUa.Adapter.Test.csproj" />
+  </Folder>
   <Folder Name="/Ultimaker/">
     <Project Path="Pleiades.Playground.Ultimaker.Api.Test/Pleiades.Playground.Ultimaker.Api.Test.csproj" />
     <Project Path="Pleiades.Playground.Ultimaker.Api/Pleiades.Playground.Ultimaker.Api.csproj" />

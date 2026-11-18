@@ -1,8 +1,8 @@
 # genui-mcp
 
-The generative UI backend: an MCP server whose tools read the Timeseries API and the Events API and return
-what a display needs. Every value names the topic or the notification it comes from, and numbers, order and
-durations are computed here, never by a language model.
+The generative UI backend: an MCP server whose tools read the Timeseries API, the Events API and, for the site
+card, the Sites API, and return what a display needs. Every value names the topic or the notification it comes
+from, and numbers, order and durations are computed here, never by a language model.
 
 | | |
 |---|---|
@@ -10,23 +10,28 @@ durations are computed here, never by a language model.
 | For a desktop host | stdin and stdout, when started with `--stdio` |
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.genui.mcp` |
-| Settings | `TIMESERIES_API_URL`, `EVENTS_API_URL`, `CARD_RESOURCE_DOMAINS` (optional, see the card below) |
+| Settings | `TIMESERIES_API_URL`, `EVENTS_API_URL`, `SITES_API_URL` (the site card), `CARD_RESOURCE_DOMAINS` (optional, see the card below) |
 
 ## Tools
 
 | Tool | What it returns |
 |---|---|
+| `genui_energy_show` | Every machine that published active power or its energy meter, or those in `machines`, over the last hours (`hours`, 8 if omitted, at most 24): the energy it imported, the difference of its meter in the unit the meter published in (watt hours, or joule for values from before the data model 0.17.1), unconverted; the mean power over that time, the energy divided by it; and the peak of its active power in watt, from the statistics of the Timeseries API. Machines in watt hours first, then those in joule, each the one that imported the most first. Its output is the contract of the energy card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_energy_series` | The active power of machines between two instants (`from`, `to`, at most 24 hours), a line for each machine on the same instants (`slots`, 240 if omitted): the graph of the energy card. Each value is the one that held at its instant, the newest of those the Timeseries API keeps when it thins a line to twice the slots; none where the machine was silent, as in the graphs of the measurements. A card calls it after `genui_energy_show`. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_machine_list` | Every machine with what it does now: manufacturer, model and serial number, connection, heartbeat, state and operation mode with the time since when, the active work master and job order, and the alerts of the last 24 hours that have not been cleared. |
 | `genui_machine_show` | One machine (`machine`, the machine id): the same readings, and how long each state lasted in total over the last hours (`hours`, 8 if omitted). Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_span_list` | The states of one machine between two instants (`from`, `to`) as spans without a gap: the band of the machine card. A card calls it after `genui_machine_show`. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_measurement_list` | Every machine, or one (`machine`), with the newest value of each physical quantity: active power, energy imported, spindle bearing temperature, whether the spindle rotates, feed and spindle override, power-on duration. Each in the unit it was published in, and whether it is current: a value holds until the next one, as long as the machine is there (see below). Its output is the contract of the measurement card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_measurement_series` | Every physical quantity over the last minutes (`minutes`, 15 if omitted), a line for each machine on the same instants (`slots`, 180 if omitted): what the graphs of the measurements draw. Each point is the value that held at its instant, also one published before the minutes began; none while the machine is silent, and none after a silence until the next value. The card file of the measurements calls it and draws the graphs below its cards; the page "Live values" of the example app calls it too. A host that shows MCP Apps does not offer it to its language model. |
+| `genui_site_list` | Every site of the [Sites API](../../source/Pleiades.Playground.Sites.Api/README.md) with the machines on it, hall by hall, what each does now and how many on each site are in each state; and the machines that sent values in the last 24 hours and stand on no site. Its output is the contract of the site card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_describe_server`, `genui_get_skill_guide` | The discovery tools every server of this repository has. The guide is also the resource `genui://skill`. A question about a machine needs neither: a result answers it. |
 
 | Resource | What it is |
 |---|---|
 | `genui://skill` | The skill guide, as markdown. |
+| `ui://genui/energy` | The energy card as a file for other hosts: the energy of each machine, and the graph of their power, which it asks `genui_energy_series` for. |
 | `ui://genui/machine` | The machine card as a file for other hosts, see below. |
+| `ui://genui/site` | The site card as a file for other hosts: a card for each site, and one for the machines on no site. |
 | `ui://genui/measurement` | The measurement card as a file for other hosts: the cards, and below them the graphs of the last minutes, which it asks `genui_measurement_series` for, as the machine card asks for its band. |
 
 Every instant of a result is ISO 8601 in UTC. The two machine tools also take a `timeZone`, an IANA name such
@@ -111,6 +116,7 @@ for example as an entry in the configuration file of the Claude desktop app:
         "--network", "pleiades-playground_default",
         "-e", "TIMESERIES_API_URL=http://timeseries-api:8080",
         "-e", "EVENTS_API_URL=http://events-api:8080",
+        "-e", "SITES_API_URL=http://sites-api:8080",
         "-e", "CARD_RESOURCE_DOMAINS=https://assets.claude.ai",
         "ghcr.io/united-machining-solutions/pleiades.playground.genui.mcp:dev",
         "--stdio"
@@ -190,6 +196,7 @@ files and not those.
 - `src/history.ts`: the states of a machine over a stretch of time, as spans, their sums, and the thinning
   for a band. Which values are which state is decided in the card catalogue, for the past as for the present.
 - `src/liveness.ts`: the stretches in which a machine gave no sign of life.
-- `src/apis.ts`: the two APIs over REST. Every answer is checked against the shape this server relies on.
+- `src/sites.ts`: where the machines stand: the sites and placements of the Sites API with what each machine does now, grouped by hall and counted by state.
+- `src/apis.ts`: the APIs over REST. Every answer is checked against the shape this server relies on.
 - `src/time.ts`: the Timeseries API counts microseconds, the Events API writes ISO 8601; from here on an
   instant is ISO 8601 in UTC. A result is written in the time zone of the caller at the very end.

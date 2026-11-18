@@ -182,6 +182,24 @@ jobs:
           # It draws its own frame and says so, and it carries its notices.
           grep -q '"prefersBorder":false' card.txt
           grep -q 'Notices for the software in this file' card.txt
+      - name: The OPC UA adapter answers and reaches the simulated machine
+        run: |
+          curl -fsS http://localhost:5560/healthcheck
+          curl -fsS -X POST http://localhost:5560/mcp \
+            -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | grep -q opcua_registration_propose
+          # The default endpoint of a machine named without an address: its name as host, port 4840.
+          curl -fsS "http://localhost:5560/endpoints?url=opc.tcp://A1121O0001:4840" | tee endpoints.json
+          grep -q 'SignAndEncrypt' endpoints.json
+      - name: The OPC UA machine is stored like a simulated one
+        run: |
+          curl -fsS -X PUT -H 'Content-Type: application/json' \
+            --data-binary @source/Pleiades.Playground.OpcUa.Adapter/samples/trumpf-trumatic-k09.registration.json \
+            http://localhost:5560/machines/A1121O0001
+          sleep 20
+          curl -fsS "http://localhost:5500/topics?startTime=$(date -u -d '-10 minutes' +%FT%TZ)&stopTime=$(date -u +%FT%TZ)" | tee opcua-topics.json
+          # The machine id ends in the serial number: machines/<manufacturer>_<model>_A1121O0001/umati/...
+          grep -q "_A1121O0001/umati/" opcua-topics.json
       - name: The TypeScript images carry the licence and the notices
         run: |
           for service in genui-mcp app; do
@@ -244,7 +262,7 @@ jobs:
             fi
           done
           exit "$missing"
-      # The thirteen containers come up healthy from the images of this pull request, with the configs: entries and
+      # The nineteen containers come up healthy from the images of this pull request, with the configs: entries and
       # the template of Traefik, which bart validate does not run.
       - name: Start the Margo stack
         run: docker compose up -d --wait --wait-timeout 300
@@ -254,6 +272,21 @@ jobs:
           curl -fsS -o /dev/null -w '%{http_code}\n' -H 'Host: pleiades.example.internal' http://127.0.0.1/
           # Any other name gets no app.
           test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: other.example' http://127.0.0.1/)" = 404
+      # The same over HTTPS, with the self-signed certificate Traefik generates: --resolve sends the name as SNI.
+      - name: Traefik serves the app over HTTPS with its own certificate
+        run: |
+          curl -fsSk -o /dev/null -w '%{http_code}\n' --resolve device.example.internal:443:127.0.0.1 https://device.example.internal/
+          curl -fsSk -o /dev/null -w '%{http_code}\n' --resolve pleiades.example.internal:443:127.0.0.1 https://pleiades.example.internal/
+          # curl -k prints no certificate; openssl names its subject.
+          subject="$(openssl s_client -connect 127.0.0.1:443 -servername device.example.internal < /dev/null 2> /dev/null \
+            | openssl x509 -noout -subject)"
+          echo "$subject"
+          case "$subject" in *"TRAEFIK DEFAULT CERT"*) ;; *) exit 1 ;; esac
+          # The broker's WebSocket at /mqtt of the HTTPS port: the handshake is answered with 101. Over HTTP/1.1, as
+          # a browser opens it: curl would take HTTP/2 over TLS, which has no Upgrade.
+          code="$(curl -sk --http1.1 -o /dev/null -w '%{http_code}' --max-time 3             --resolve device.example.internal:443:127.0.0.1             -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13'             -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Sec-WebSocket-Protocol: mqtt'             https://device.example.internal/mqtt || true)"
+          echo "/mqtt: $code"
+          test "$code" = 101
       - name: Logs on failure
         if: failure()
         run: docker compose logs --no-color --tail 200

@@ -13,3 +13,10 @@ export const SPAN_LIST_TOOL = "genui_span_list"
  * language model, see cards/measurement/chat.tsx.
  */
 export const MEASUREMENT_SERIES_TOOL = "genui_measurement_series"
+
+/**
+ * The tool for the lines of the graph of the energy card. Only a card calls it: the chat asks for
+ * the lines itself, see get-machines.ts, and keeps the tool from its language model, see
+ * cards/energy/chat.tsx.
+ */
+export const ENERGY_SERIES_TOOL = "genui_energy_series"

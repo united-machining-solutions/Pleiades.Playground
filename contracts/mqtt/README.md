@@ -125,8 +125,8 @@ to be settled at the umati hackathon. Here everything is as the model says: path
 lists, events, manifest and connection. It is the binding of `machines/`; why: see
 [ADR-0015](../../docs/adr/0015-the-binding-of-machines-follows-the-data-model.md).
 
-In the demo stack every simulator (P-04, P-07, M-02) and the adapters of two real devices, an Ultimaker printer
-and a juice bar, and the adapters of the three cutting machines publish this tree, and the services of the playground read only it (see "How the stack stores
+In the demo stack every simulator (P-04, P-07, M-02), the adapters of two real devices, an Ultimaker printer
+and a juice bar, the adapters of the three cutting machines, the bending adapter and the OPC UA adapter publish this tree, and the services of the playground read only it (see "How the stack stores
 it").
 
 ### Topics
@@ -540,13 +540,37 @@ Each delivers of `Core` the identification, the connection and `State/Status`, w
 `None`, the value of the model for a machine without operation modes; `ProductCode`, `YearOfConstruction`
 and `OperationCounters.PowerOnDuration` are `"available": false`. Printer and juice bar do not deliver
 `State.FeedOverride` and `Notification.ActiveAlerts` either, and publish no events. The cutting adapter delivers
-both, besides `Channel/1/ChannelState`; its timestamps are those of the machine (`"timestampSource": "source"`), save a `null` for not known, which carries the time of the connect,
+both, besides `Channel/1/ChannelState` and `WorkMasterMonitoring/ActiveWorkMaster`, which carries the name of the NC program, the same value as its signal: the machine has no work master of its own; its timestamps are those of the machine (`"timestampSource": "source"`), save a `null` for not known, which carries the time of the connect,
 and each alarm of the machine is an entry of `ActiveAlerts` with the events `Notification.AlertRaised` and
-`Notification.AlertCleared` on `events/notifications`. The
-[bending adapter](../../source/Pleiades.Playground.Bend.Adapter/README.md), one per press brake that reports through RCI
+`Notification.AlertCleared` on `events/notifications`. The protocol of the cutting machines has no request for
+the current alarms, so after a start of the adapter `ActiveAlerts` is `null` until the machine runs, stands
+without a fault or names an alarm; the list goes out before the events that change it.
+
+The [bending adapter](../../source/Pleiades.Playground.Bend.Adapter/README.md), one per press brake that reports through RCI
 telegram files, delivers `ActiveAlerts` with the same two events for a fault of the machine, and an operator message
 or a finished order as `Notification.NotificationEvent`; its timestamps are those of the machine as well, and the RCI
 operating state offline is `CommunicationFault`.
+
+The [OPC UA adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md) brings in every machine a person
+adds in the chat, with the same publisher and one MQTT connection per machine, so that each has its own last
+will (client id `opcua-adapter-<machineId>`). What it publishes follows from the registration of the machine:
+
+- The machine id is formed from `Identification.ManufacturerUri`, `Model` and `SerialNumber` as the server gave
+  them when the machine was added, and kept with the registration.
+- The manifest declares the core whole, what the machine lacks `"available": false`, and the other profiles
+  whose elements the registration maps whole. A value of the maker is a signal of the manufacturer, below
+  `oem/`, with the prefix of the domain of its `ManufacturerUri`.
+- A value goes out when the server reports a change, with the time of the source (`"timestampSource":
+  "source"`), in the unit of the catalogue. `State.Status` is built from the two fields of the state.
+- `Connection/State` is `Running` while the OPC UA session stands and `CommunicationFault` while it does not.
+- The alarms of the server are `Notification.ActiveAlerts` and the events `Notification.AlertRaised` and
+  `Notification.AlertCleared` on `events/notifications`; `Severity` is the category of NE 107 from the severity of
+  OPC UA (from 667 `Failure`, from 334 `OffSpec`, below `MaintenanceRequired`), an assumption of the adapter.
+  `sequence` counts from 1 in every run of the adapter; the outbox holds the events while the broker is away, as
+  the managed client keeps every message. An alarm that stood before a restart of the adapter and still stands is
+  raised once more in the new run, with its `Id` and its `Time`, so that every run names the alarms that stand.
+- When a machine is removed, the adapter takes every retained message of it back with an empty one and ends its
+  connection without its last will. While the broker cannot be reached it does not remove the machine.
 
 ### Open for the hackathon
 
@@ -574,7 +598,12 @@ operating state offline is `CommunicationFault`.
   only as a signal of the manufacturer, `oem/WorkMasterMonitoring/ActiveProgram`; the model has no element for the
   program, and its catalogue still says the work master of a machine tool is mostly the name of the NC program.
   Open: whether the model wants an element for the program (for example in `ProgramExecution`), or the work master
-  stays the program name on machines without a work master of their own.
+  stays the program name on machines without a work master of their own. The cutting adapter does the latter.
+- Programs and jobs of the cutting machines. The model has `WorkMasterMonitoring.ProgramExecution` with the
+  events `ProgramExecutionStarted`, `Ended`, `Aborted`, `Interrupted` and `Resumed`; `StartNCP`, `EndeNCP`,
+  `ResetNCP` and the halts the cutting adapter detects map onto them almost one to one, and the production plan
+  (`PRD_SHOW`) could become `JobMonitoring.JobOrders`. Then the cutting machines would show up in the job and
+  program views of the app like the virtual machine. Open: who builds it.
 - The planned times of a job order. The model asks for `PlannedStartTime` and `PlannedEndTime` and allows `null`;
   the virtual machine knows no plan and sends `null`. `OrderNumbers` is made up (`SO-` and the number of the job
   order).

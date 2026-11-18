@@ -1,10 +1,11 @@
+import type { EnergySeries } from "@pleiades/cards/energy/contract.ts"
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
 import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
-import { MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL } from "./card-tools.ts"
+import { ENERGY_SERIES_TOOL, MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL } from "./card-tools.ts"
 
 // The values come from the generative UI backend. These functions run on the server of the app:
 // the browser never talks to the backend itself.
@@ -176,6 +177,25 @@ export const getSpans = createServerFn({ method: "GET" })
         throw new Refused(textOf(result) ?? `${SPAN_LIST_TOOL} returned no values.`)
       }
       return result.structuredContent.spans
+    })
+    return answer.values
+  })
+
+/**
+ * The lines of the graph of an energy card, for the hours and machines its values are about. They
+ * are not among the values, because a language model reads those. Null if they are not to be had:
+ * the card stands without its graph.
+ */
+export const getEnergySeries = createServerFn({ method: "GET" })
+  .validator((asked: { from: string; to: string; machines: Array<string> }) => asked)
+  .handler(async ({ data }): Promise<EnergySeries | null> => {
+    const answer = await ask(async (backend) => {
+      // The name is checked against the tools of the backend: if it changes there, this fails to compile.
+      const result = await backend.callTool(ENERGY_SERIES_TOOL, data)
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? `${ENERGY_SERIES_TOOL} returned no values.`)
+      }
+      return result.structuredContent
     })
     return answer.values
   })

@@ -31,6 +31,10 @@
     <PackageVersion Include="MQTTnet" Version="5.2.0.1603" />
     <PackageVersion Include="System.Reactive" Version="7.0.0" />
   </ItemGroup>
+  <ItemGroup Label="OPC UA">
+    <PackageVersion Include="OPCFoundation.NetStandard.Opc.Ua.Client" Version="2.0.2" />
+    <PackageVersion Include="OPCFoundation.NetStandard.Opc.Ua.Mcp.Core" Version="2.0.2" />
+  </ItemGroup>
   <ItemGroup Label="Logging">
     <PackageVersion Include="Serilog" Version="4.4.0" />
     <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />

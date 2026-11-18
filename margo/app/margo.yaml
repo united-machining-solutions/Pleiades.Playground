@@ -59,6 +59,11 @@ parameters:
     targets:
       - pointer: HTTP_PORT
         components: ["default"]
+  httpsPort:
+    value: 443
+    targets:
+      - pointer: HTTPS_PORT
+        components: ["default"]
   appBind:
     value: "127.0.0.1"
     targets:
@@ -104,6 +109,36 @@ parameters:
     targets:
       - pointer: GENUI_MCP_PORT
         components: ["default"]
+  cuttingLaser2dPort:
+    value: 5611
+    targets:
+      - pointer: CUTTING_LASER_2D_PORT
+        components: ["default"]
+  cuttingTubePort:
+    value: 5612
+    targets:
+      - pointer: CUTTING_TUBE_PORT
+        components: ["default"]
+  cuttingPunchPort:
+    value: 5613
+    targets:
+      - pointer: CUTTING_PUNCH_PORT
+        components: ["default"]
+  opcuaAdapterBind:
+    value: "127.0.0.1"
+    targets:
+      - pointer: OPCUA_ADAPTER_BIND
+        components: ["default"]
+  opcuaAdapterPort:
+    value: 5560
+    targets:
+      - pointer: OPCUA_ADAPTER_PORT
+        components: ["default"]
+  opcSimulatorUiPort:
+    value: 8090
+    targets:
+      - pointer: OPC_SIMULATOR_UI_PORT
+        components: ["default"]
   dataRetention:
     value: "30.00:00:00"
     targets:
@@ -144,12 +179,18 @@ configuration:
         - parameter: httpBind
           name: Address of Traefik
           description: >-
-            The address Traefik answers on. 127.0.0.1 keeps it on the device; 0.0.0.0 opens the example app to
-            the network under its host names. The chat has no sign-in and spends the key of its language model,
+            The address Traefik answers on, over HTTP and HTTPS. 127.0.0.1 keeps it on the device; 0.0.0.0
+            opens the example app to the network under its host names. The chat has no sign-in and spends the key of its language model,
             so open it only to a network you control.
           schema: bindAddress
         - parameter: httpPort
           name: HTTP port of Traefik
+          schema: port
+        - parameter: httpsPort
+          name: HTTPS port of Traefik
+          description: >-
+            Traefik serves the example app over HTTPS as well, with a self-signed certificate it generates
+            itself: a browser warns until you accept it.
           schema: port
         - parameter: appBind
           name: Address of the example app
@@ -185,6 +226,31 @@ configuration:
           schema: port
         - parameter: genuiMcpPort
           name: Port of the generative UI MCP server
+          schema: port
+        - parameter: cuttingLaser2dPort
+          name: Port of the page of the 2D laser
+          description: The page answers on the device only (127.0.0.1).
+          schema: port
+        - parameter: cuttingTubePort
+          name: Port of the page of the tube laser
+          description: The page answers on the device only (127.0.0.1).
+          schema: port
+        - parameter: cuttingPunchPort
+          name: Port of the page of the punching machine
+          description: The page answers on the device only (127.0.0.1).
+          schema: port
+        - parameter: opcuaAdapterBind
+          name: Address of the OPC UA adapter
+          description: >-
+            The address the management API of the OPC UA adapter answers on. 127.0.0.1 keeps it on the device;
+            0.0.0.0 opens it to the network. Adding and removing a machine needs no sign-in, so open it only to a
+            network you control.
+          schema: bindAddress
+        - parameter: opcuaAdapterPort
+          name: Port of the OPC UA adapter
+          schema: port
+        - parameter: opcSimulatorUiPort
+          name: Port of the web UI of the simulated OPC UA machine
           schema: port
     - name: Data
       settings:
