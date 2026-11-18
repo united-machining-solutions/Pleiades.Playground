@@ -60,6 +60,9 @@ An optional [juice bar service](source/Pleiades.Playground.JuiceBar.Api/README.m
 drinks behind REST and MCP and publishes its state to the broker. It is started only with the `juicebar`
 Compose profile and needs a machine that runs MixerControl; it places orders and never starts the production.
 For a deployment, see [deployment](docs/deployment.md#enable-the-juice-bar-service).
+The example app comes alone. Pages made for one demo or one fair, its showcases, are in a second image of the
+same app, which the stack takes when `APP_SHOWCASES` is set in `.env`; see
+[deployment](docs/deployment.md#show-the-showcases).
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo; only
 the chat of the example app needs a language model, through a LiteLLM gateway:
 

@@ -23,8 +23,8 @@ export type NavEntry = {
 /**
  * What a page is called in the breadcrumb of the header, where the title of its entry does not say
  * it: a text, or one made from the parameters of its route, and from its search where the page is
- * named there (a page opened from a link is called by the title in the link). Home is called
- * "Machines" there, and the page of a machine by its machine.
+ * named there (a page opened from a link is called by the title in the link). The page of a
+ * machine is called by its machine.
  */
 export type Crumb = string | ((params: Record<string, string>, search: Record<string, unknown>) => string)
 
@@ -63,7 +63,7 @@ export function sidebarPages(pages: ReadonlyArray<NavPage>): Array<NavPage> {
 
 /**
  * The entry a person is under: the page itself, or the nearest page above it that has an entry.
- * The page of a machine has none, so it stands under Home. A pinned page is its own entry; one that
+ * The page of a machine has none, so it stands under Sites. A pinned page is its own entry; one that
  * is not pinned stands under "Pages", which is no row of the sidebar, so no row of the top level is
  * marked for it (its row is in the group, pages/listed.ts).
  */
@@ -77,9 +77,9 @@ export type CrumbStep = { title: string; path?: string }
 
 /** The page a person is on, as the router knows it. */
 type ShownPage = {
-  /** The path of its route, with the names of its parameters: "/machines/$machine". */
+  /** The path of its route, with the names of its parameters: "/sites/$machine". */
   fullPath: string
-  /** The path in the address: "/machines/P-04". */
+  /** The path in the address: "/sites/P-04". */
   pathname: string
   params: Record<string, string>
   /** What the address says after the question mark, as the route validated it. */

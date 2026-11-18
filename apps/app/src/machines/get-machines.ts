@@ -1,11 +1,13 @@
 import type { EnergySeries } from "@pleiades/cards/energy/contract.ts"
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
 import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
+import type { SiteList } from "@pleiades/cards/site/contract.ts"
+import type { TimeseriesRange, TimeseriesSeries, TimeseriesSignals } from "@pleiades/cards/timeseries/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
-import { ENERGY_SERIES_TOOL, MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL } from "./card-tools.ts"
+import { ENERGY_SERIES_TOOL, MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL, TIMESERIES_SERIES_TOOL, TIMESERIES_SIGNALS_TOOL } from "./card-tools.ts"
 
 // The values come from the generative UI backend. These functions run on the server of the app:
 // the browser never talks to the backend itself.
@@ -20,13 +22,13 @@ function connect() {
 }
 
 /** A tool that answered, but without values. Its message is the sentence the backend gave as the reason. */
-class Refused extends Error {}
+export class Refused extends Error {}
 
 /**
  * Asks the backend and closes the connection again. If there are no values, the error is a
  * sentence that names who did not answer: the backend names its APIs, this function the backend.
  */
-async function ask<TValues>(
+export async function ask<TValues>(
   read: (backend: Awaited<ReturnType<typeof connect>>) => Promise<TValues>,
 ): Promise<Answer<TValues>> {
   try {
@@ -94,6 +96,18 @@ export const getMachine = createServerFn({ method: "GET" })
         return result.structuredContent
       }),
   )
+
+/** Where the machines stand: every site with its machines, hall by hall, and the machines on no site. */
+export const getSites = createServerFn({ method: "GET" }).handler(
+  (): Promise<Answer<SiteList>> =>
+    ask(async (backend) => {
+      const result = await backend.callTool("genui_site_list", {})
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? "genui_site_list returned no values.")
+      }
+      return result.structuredContent
+    }),
+)
 
 /** The newest physical values of every machine: the values of the measurement cards. */
 export const getMeasurements = createServerFn({ method: "GET" }).handler(
@@ -199,3 +213,33 @@ export const getEnergySeries = createServerFn({ method: "GET" })
     })
     return answer.values
   })
+
+/**
+ * The lines of a time series card, for the lines and range a person chose on it. They are not among the
+ * values, because a language model reads those. Null if they are not to be had: the card says so.
+ */
+export const getTimeseriesSeries = createServerFn({ method: "GET" })
+  .validator((asked: { lines: Array<{ machine: string; signal: string }>; range: TimeseriesRange; to?: string }) => asked)
+  .handler(async ({ data }): Promise<TimeseriesSeries | null> => {
+    const answer = await ask(async (backend) => {
+      // The name is checked against the tools of the backend: if it changes there, this fails to compile.
+      const result = await backend.callTool(TIMESERIES_SERIES_TOOL, data)
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? `${TIMESERIES_SERIES_TOOL} returned no values.`)
+      }
+      return result.structuredContent
+    })
+    return answer.values
+  })
+
+/** What a person can add to a time series card: the signals of each machine. Null if they are not to be had. */
+export const getTimeseriesSignals = createServerFn({ method: "GET" }).handler(async (): Promise<TimeseriesSignals | null> => {
+  const answer = await ask(async (backend) => {
+    const result = await backend.callTool(TIMESERIES_SIGNALS_TOOL, {})
+    if (result.isError || !result.structuredContent) {
+      throw new Refused(textOf(result) ?? `${TIMESERIES_SIGNALS_TOOL} returned no values.`)
+    }
+    return result.structuredContent
+  })
+  return answer.values
+})

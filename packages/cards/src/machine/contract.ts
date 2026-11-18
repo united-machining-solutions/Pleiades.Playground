@@ -194,5 +194,41 @@ export const spanList = z.object({
 })
 export type SpanList = z.infer<typeof spanList>
 
+/**
+ * A job order as the stack knows it from its events: what is ordered (an entry of
+ * `JobMonitoring/JobOrders`) and what came of it from its start (an entry of
+ * `JobMonitoring/JobOrderResults`). Quantities are counts.
+ */
+export const jobOrderEntry = z.object({
+  machine: machineId.describe("The machine id of the machine the job order is on."),
+  jobOrderId: z.string(),
+  state: z
+    .string()
+    .describe("NotAllowedToStart, AllowedToStart, Running, Interrupted, Ended or Aborted (ISA-95); empty if unknown."),
+  changedAt: instant.describe("When its last event happened."),
+  jobName: z.string().nullable(),
+  workMaster: z.string().nullable().describe("The work master it carries out."),
+  orderNumbers: z.array(z.string()).describe("The order numbers of the ERP it belongs to; empty ones are left out."),
+  runsPlanned: z.number().nullable(),
+  plannedStart: instant.nullable(),
+  plannedEnd: instant.nullable(),
+  start: instant.nullable().describe("When it started; null before its start, as every field of its result."),
+  end: instant.nullable().describe("When it ended or was aborted."),
+  produced: z.number().nullable().describe("Parts produced."),
+  good: z.number().nullable().describe("Of those, the good ones."),
+  result: z.string().nullable().describe("Unknown until it ends, then Successful or Unsuccessful."),
+})
+export type JobOrderEntry = z.infer<typeof jobOrderEntry>
+
+/** The job orders on the lists of the machines. */
+export const jobOrderList = z.object({
+  asOf: instant,
+  windowSeconds: z.number().describe("How far back the last event of a job order may lie."),
+  jobOrders: z
+    .array(jobOrderEntry)
+    .describe("Every job order still on the list of its machine, by machine, then the oldest change first."),
+})
+export type JobOrderList = z.infer<typeof jobOrderList>
+
 /** How many spans a band has room for: about one for each pixel of its width. */
 export const BAND_SLOTS = 720
