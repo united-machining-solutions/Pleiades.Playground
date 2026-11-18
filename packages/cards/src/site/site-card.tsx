@@ -17,7 +17,6 @@ import { stateLabel } from "../machine/state.ts"
 import { StateSymbol } from "../machine/state-symbol.tsx"
 import { tell } from "../machine/tell.ts"
 import type { Hall, PlacedMachine, Site, SiteList, StateCount, UnplacedMachine } from "./contract.ts"
-import { labelOf } from "../machine/in-words.ts"
 import { machinesInWords, modelOf, titleOfPlaced } from "./in-words.ts"
 
 /**
@@ -156,16 +155,21 @@ function MachineItem({
   )
 }
 
+/** Since when the state of a machine holds, as the lists of Home say it; nothing without its values. */
+function sinceOf({ now, state }: Pick<PlacedMachine, "now" | "state">): string | undefined {
+  const since = now ? tell(now, state).since : null
+  return since ? `since ${clock(since)}` : undefined
+}
+
 /** A machine of a hall: the name people know it by and what it is, and its state since when. */
 function MachineLine({ placed }: { placed: PlacedMachine }) {
-  const since = placed.now ? tell(placed.now, placed.state).since : null
   return (
     <MachineItem
       machine={placed.machine}
       state={placed.state}
       title={titleOfPlaced(placed)}
       description={placed.displayName ? modelOf(placed) : undefined}
-      when={since ? `since ${clock(since)}` : undefined}
+      when={sinceOf(placed)}
     />
   )
 }
@@ -188,8 +192,8 @@ function UnplacedCard({ machines, asOf }: { machines: ReadonlyArray<UnplacedMach
               key={one.machine}
               machine={one.machine}
               state={one.state}
-              title={labelOf(one.machine)}
-              when={one.lastValueAt && one.state === "no-data" ? `last value ${clock(one.lastValueAt)}` : undefined}
+              title={modelOf(one)}
+              when={sinceOf(one)}
             />
           ))}
         </Rows>

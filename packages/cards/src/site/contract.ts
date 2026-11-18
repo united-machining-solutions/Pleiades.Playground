@@ -57,6 +57,7 @@ export const unplacedMachine = z.object({
   machine: machineId.describe("The machine id."),
   state: state.describe("What the machine does now."),
   lastValueAt: instant.nullable().describe("The newest value of any of its readings: the last sign of life."),
+  now: machine.describe("What the machine does now, as genui_machine_list says it, with the topics a live page hears."),
 })
 export type UnplacedMachine = z.infer<typeof unplacedMachine>
 

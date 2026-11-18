@@ -53,7 +53,7 @@ export function siteListInWords(list: SiteList): string {
           ...list.sites.map(siteInWords),
         ]
   if (list.unplaced.length > 0) {
-    const machines = list.unplaced.map((one) => `${labelOf(one.machine)} (${one.machine}) ${stateLabel[one.state].toLowerCase()}`).join(", ")
+    const machines = list.unplaced.map((one) => `${modelOf(one)} (${one.machine}) ${stateLabel[one.state].toLowerCase()}`).join(", ")
     lines.push(`Sent values in the last 24 hours and stand on no site: ${machines}.`)
   }
   lines.push(`Read at ${written(list.asOf)}.`)
