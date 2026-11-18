@@ -216,6 +216,10 @@ services:
       # The OPC UA adapter. While it does not answer, the chat leaves its tools and commands out.
       OPCUA_MCP_URL: http://opcua-adapter:8080/mcp
       OPCUA_ADAPTER_URL: http://opcua-adapter:8080
+      # The app registers at the Pleiades Hub, at the broker of this stack; an empty HUB_MQTT_URL switches
+      # that off. HUB_APP_URL is the address under which a browser reaches the app.
+      HUB_MQTT_URL: ${HUB_MQTT_URL-mqtt://broker:1883}
+      HUB_APP_URL: ${HUB_APP_URL:-http://localhost:${APP_PORT:-5600}/}
 
   # The reverse proxy in front of the example app, found by its host name. Not in compose.yaml at the root.
   traefik:

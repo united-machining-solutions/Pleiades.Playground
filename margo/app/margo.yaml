@@ -163,6 +163,16 @@ parameters:
     targets:
       - pointer: APP_MCP_SERVERS
         components: ["default"]
+  hubMqttUrl:
+    value: "mqtt://broker:1883"
+    targets:
+      - pointer: HUB_MQTT_URL
+        components: ["default"]
+  hubAppUrl:
+    value: ""
+    targets:
+      - pointer: HUB_APP_URL
+        components: ["default"]
 
 configuration:
   sections:
@@ -286,6 +296,23 @@ configuration:
             reaches from its container. For the documentation app on this device:
             docs=http://host.docker.internal:3202/mcp. Its MCP listener and published port must be reachable
             from this container; a port published only on host loopback may not be reachable on Linux.
+          schema: optionalText
+    - name: Pleiades Hub
+      settings:
+        - parameter: hubMqttUrl
+          name: Broker of the hub
+          description: >-
+            The MQTT broker at which the example app registers at the Pleiades Hub, as the app reaches it from
+            its container. The default is the broker of this app, where the hub on the device looks. Empty: the
+            app does not register.
+          schema: optionalText
+        - parameter: hubAppUrl
+          name: Address of the example app for the hub
+          description: >-
+            The address under which a browser reaches the example app; the hub opens the app there. Empty:
+            http://localhost:<Port of the example app>/, which is right only for a browser on the device. For a
+            browser on another computer, name the device, such as http://device.example.internal:5600/, and
+            open Address of the example app to the network. It should end with a slash.
           schema: optionalText
   schema:
     - name: port

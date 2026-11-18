@@ -84,6 +84,17 @@ service to accept `host.docker.internal` as a Host header and expose it only on 
 Enable `docs` under *Tools* in the chat. The service's contract and source/PDF requirements are in
 [contracts/docs](../contracts/docs/README.md). A gateway or chat model is still required for chat.
 
+## Pleiades Hub
+
+The example app registers at the Pleiades Hub as in `compose.yaml`
+([ADR-0021](../docs/adr/0021-hub-registration.md)). The section *Pleiades Hub* has the two settings:
+*Broker of the hub* (`HUB_MQTT_URL`) is the broker of this app by default, `mqtt://broker:1883`, where the hub
+on the same device looks; empty switches the registration off. *Address of the example app for the hub*
+(`HUB_APP_URL`) is where a browser opens the app; empty is `http://localhost:<Port of the example app>/`, right
+only for a browser on the device. For a browser on another computer, set it to the name of the device and the
+port of the app, such as `http://device.example.internal:5600/`, and open *Address of the example app* to the
+network: the hub loads the app from that address, not through itself.
+
 ## Check
 
 ```bash
