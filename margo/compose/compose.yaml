@@ -323,6 +323,135 @@ services:
       # Small parts, machine id merope-microtec_MM-120_M-02.
       Config__SpecOutput__ScenarioName: small-parts
 
+  # Cutting simulators: one machine each, speaking the telegram protocol through files in a volume of its own.
+  # Its adapter (below) mounts the same volume at /exchange and has the same serial number: the simulator only
+  # shows it, the telegrams do not carry it. The page of a simulator answers on the device only. In endless mode a
+  # machine writes new orders and fills its stacks itself, so it works without anyone at its page.
+  cutting-laser-2d:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.cutting.simulator:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "127.0.0.1:${CUTTING_LASER_2D_PORT:-5611}:8080"
+    environment:
+      Config__MachineType: Laser2D
+      Config__MachineNumber: "1"
+      Config__MachineName: 2D laser
+      Config__SerialNumber: L-01
+      Config__EndlessMode: "true"
+    volumes:
+      - cutting-laser-2d-exchange:/exchange
+      - cutting-laser-2d-data:/data
+
+  cutting-tube:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.cutting.simulator:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "127.0.0.1:${CUTTING_TUBE_PORT:-5612}:8080"
+    environment:
+      Config__MachineType: Tube
+      Config__MachineNumber: "1"
+      Config__MachineName: Tube laser
+      Config__SerialNumber: T-01
+      Config__EndlessMode: "true"
+    volumes:
+      - cutting-tube-exchange:/exchange
+      - cutting-tube-data:/data
+
+  cutting-punch:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.cutting.simulator:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "127.0.0.1:${CUTTING_PUNCH_PORT:-5613}:8080"
+    environment:
+      Config__MachineType: Punch
+      Config__MachineNumber: "1"
+      Config__MachineName: Punching machine
+      Config__SerialNumber: PU-01
+      Config__EndlessMode: "true"
+    volumes:
+      - cutting-punch-exchange:/exchange
+      - cutting-punch-data:/data
+
+  # Cutting adapters: one per machine, the host side of the protocol. Each mounts the volume of its machine and
+  # publishes the binding of machines below machines/trumpf_<Model>_<SerialNumber>/.
+  cutting-adapter-laser-2d:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.cutting.adapter:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      broker:
+        condition: service_healthy
+      # Healthy means the broker has acknowledged the subscriptions: an event sent before is lost for good.
+      timeseries-persistence:
+        condition: service_healthy
+      events-persistence:
+        condition: service_healthy
+      cutting-laser-2d:
+        condition: service_started
+    environment:
+      Config__SerialNumber: L-01
+      Config__Model: Laser2D
+      Config__MachineNumber: "1"
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: cutting-adapter-l-01
+    volumes:
+      - cutting-laser-2d-exchange:/exchange
+
+  cutting-adapter-tube:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.cutting.adapter:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      broker:
+        condition: service_healthy
+      # Healthy means the broker has acknowledged the subscriptions: an event sent before is lost for good.
+      timeseries-persistence:
+        condition: service_healthy
+      events-persistence:
+        condition: service_healthy
+      cutting-tube:
+        condition: service_started
+    environment:
+      Config__SerialNumber: T-01
+      Config__Model: Tube
+      Config__MachineNumber: "1"
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: cutting-adapter-t-01
+    volumes:
+      - cutting-tube-exchange:/exchange
+
+  cutting-adapter-punch:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.cutting.adapter:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      broker:
+        condition: service_healthy
+      # Healthy means the broker has acknowledged the subscriptions: an event sent before is lost for good.
+      timeseries-persistence:
+        condition: service_healthy
+      events-persistence:
+        condition: service_healthy
+      cutting-punch:
+        condition: service_started
+    environment:
+      Config__SerialNumber: PU-01
+      Config__Model: Punch
+      Config__MachineNumber: "1"
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: cutting-adapter-pu-01
+    volumes:
+      - cutting-punch-exchange:/exchange
+
   # The OPC UA adapter: brings in the machines a person adds in the chat, by the binding of machines.
   #   opc-simulator ──OPC UA──▶ opcua-adapter ──MQTT──▶ broker
   opcua-adapter:
@@ -420,5 +549,11 @@ configs:
 
 volumes:
   mongodb_data:
+  cutting-laser-2d-exchange:
+  cutting-laser-2d-data:
+  cutting-tube-exchange:
+  cutting-tube-data:
+  cutting-punch-exchange:
+  cutting-punch-data:
   opcua_adapter_data:
   opc_simulator_pki:
