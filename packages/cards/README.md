@@ -13,6 +13,7 @@ generative UI backend. Its contract and its component lie next to each other, so
 | Machine: what one machine does now, since when, with which work master and job order, and the states of the last hours | `genui_machine_show` | `machineShow` in `src/machine/contract.ts` | `MachineCard` in `src/machine/machine-card.tsx` |
 | Measurement: the newest physical values of every machine, each in the unit it was published in | `genui_measurement_list` | `measurementList` in `src/measurement/contract.ts` | `MeasurementCards` in `src/measurement/measurement-card.tsx` |
 | Measurement graph: one quantity of every machine over the last minutes, a line for each machine | `genui_measurement_series`, called by the card file of the measurements below its cards, and by the page `/live` of the example app. The chat draws no graph | `measurementSeries` in `src/measurement/contract.ts` | `MeasurementGraph` in `src/measurement/measurement-graph.tsx` |
+| Notification: the warnings and errors of one machine over the last hours, each with when it was raised, when it went and how long it stood | `genui_notification_list` | `notificationList` in `src/notification/contract.ts` | `NotificationCard` in `src/notification/notification-card.tsx` |
 | Site: every site with its machines by hall and how many are in each state, and the machines on no site | `genui_site_list` | `siteList` in `src/site/contract.ts` | `SiteCards` in `src/site/site-card.tsx` |
 
 The list of machines, the result of `genui_machine_list`, has a contract here too (`machineList`), but no
@@ -55,6 +56,11 @@ Both import the theme from [`packages/ui`](../ui/README.md), so the card looks t
   - `in-words.ts`: the list and the card in words, for a reader that does not see them. The backend sends
     them as the text of a result, which is what a language model reads.
   - `machine-card.tsx`: the machine card.
+- `src/notification/`: what is shown about the notifications of a machine.
+  - `contract.ts`: the notifications, each with its raised and gone times, its duration or why it has none,
+    and the counts of the list.
+  - `words.ts` and `in-words.ts`: the wording of the card and the result in words, for a reader that does not
+    see it. `notification-card.tsx`: the notification card.
 - The [shadcn/ui](https://ui.shadcn.com) components the cards are built from are in
   [`packages/ui`](../ui/README.md), with every other component of the user interface.
 - `src/dataviz.css`: chart and state colours. `src/styles.css` is what a page imports: the colours, the class

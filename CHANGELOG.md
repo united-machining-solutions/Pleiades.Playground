@@ -7,6 +7,9 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
+  each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
+  draws them with the notification card.
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
   self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
   that live values work over HTTPS. HTTP stays as it is.

@@ -382,3 +382,59 @@ export async function readPlacements(apis: Apis): Promise<Array<Placement>> {
   const placements = await getJson("Sites API", sitesUrlOf(apis, "/placements"), placementsAnswer)
   return placements.map((one) => ({ ...one, placedAt: new Date(one.placedAt).toISOString() }))
 }
+
+/** An alert as the Events API pairs it: when it was raised and when it was cleared, null while it stands. */
+export type AlertStanding = {
+  correlationId: string
+  notificationId: string
+  severity: Severity | null
+  level: NotificationLevel
+  title: string
+  raisedAt: string
+  goneAt: string | null
+}
+
+const alertPageAnswer = z.object({
+  items: z.array(
+    z.object({
+      alertId: z.string(),
+      errorCode: z.string().nullish(),
+      message: z.string().nullish(),
+      severity: severityAnswer.nullish(),
+      raisedAt: z.string(),
+      clearedAt: z.string().nullable(),
+    }),
+  ),
+  hasMore: z.boolean(),
+})
+
+/**
+ * The alerts of one machine that stood at some time between the two instants, newest first, at most
+ * 1000: raised before the end and not cleared before the start, so one that came up before the range
+ * and still stands is among them, with the time it really came. `hasMore` says the API had more than
+ * it returned, the oldest ones.
+ */
+export async function readAlertsOf(
+  apis: Apis,
+  machine: string,
+  from: Date,
+  to: Date,
+): Promise<{ alerts: Array<AlertStanding>; hasMore: boolean }> {
+  const url = between(new URL("/alerts/pairs", apis.eventsUrl), ["from", "to"], from, to)
+  url.searchParams.set("mId", machine)
+  url.searchParams.set("Take", "1000")
+  url.searchParams.set("Sorting", "Descending")
+  const { items, hasMore } = await getJson("Events API", url, alertPageAnswer)
+  return {
+    hasMore,
+    alerts: items.map((item) => ({
+      correlationId: item.alertId,
+      notificationId: item.errorCode ?? "",
+      severity: item.severity ?? null,
+      level: levelOf(item.severity),
+      title: item.message ?? "",
+      raisedAt: new Date(item.raisedAt).toISOString(),
+      goneAt: item.clearedAt === null ? null : new Date(item.clearedAt).toISOString(),
+    })),
+  }
+}

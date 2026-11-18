@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { afterEach, mock, test } from "node:test"
 
-import { inPath, listTopics, readOpenNotifications, readStrings } from "./apis.ts"
+import { inPath, listTopics, readAlertsOf, readOpenNotifications, readStrings } from "./apis.ts"
 
 const apis = { timeseriesUrl: "http://timeseries:8080", eventsUrl: "http://events:8080" }
 const from = new Date("2026-11-16T09:00:00.000Z")
@@ -60,4 +60,38 @@ test("an answer in another shape is named as such, not passed on", async () => {
 
   answering(() => new Response("<html>", { status: 200 }))
   await assert.rejects(listTopics(apis, from, to), /The Timeseries API did not answer/)
+})
+
+test("the alerts of a machine are asked for newest first, with the most the API gives", async () => {
+  const { requested } = answering(() => Response.json({ items: [], hasMore: false }))
+  await readAlertsOf(apis, "alcyone machines_AX-400_P-04", from, to)
+  const [url] = requested
+  assert.equal(url?.pathname, "/alerts/pairs")
+  assert.deepEqual(
+    ["mId", "Take", "Sorting", "from", "to"].map((name) => url?.searchParams.get(name)),
+    ["alcyone machines_AX-400_P-04", "1000", "Descending", from.toISOString(), to.toISOString()],
+  )
+})
+
+test("an alert is read with its error code, message and category, and a failure is an error", async () => {
+  answering(() =>
+    Response.json({
+      items: [
+        { mId: "m", alertId: "a1", errorCode: "2130", message: "Spindle overtemperature", severity: "Failure", raisedAt: "2026-11-16T09:00:00Z", clearedAt: "2026-11-16T09:20:00Z" },
+        { mId: "m", alertId: "a2", errorCode: null, message: null, severity: "OffSpec", raisedAt: "2026-11-16T09:25:00Z", clearedAt: null },
+        { mId: "m", alertId: "a3", raisedAt: "2026-11-16T09:26:00Z", clearedAt: null },
+      ],
+      hasMore: true,
+    }),
+  )
+  const { alerts, hasMore } = await readAlertsOf(apis, "m", from, to)
+  assert.equal(hasMore, true)
+  assert.deepEqual(
+    alerts.map((one) => [one.correlationId, one.notificationId, one.title, one.severity, one.level, one.raisedAt, one.goneAt]),
+    [
+      ["a1", "2130", "Spindle overtemperature", "Failure", "Error", "2026-11-16T09:00:00.000Z", "2026-11-16T09:20:00.000Z"],
+      ["a2", "", "", "OffSpec", "Warning", "2026-11-16T09:25:00.000Z", null],
+      ["a3", "", "", null, "Warning", "2026-11-16T09:26:00.000Z", null],
+    ],
+  )
 })
