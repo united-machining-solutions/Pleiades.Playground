@@ -27,8 +27,10 @@ import { getSites } from "@/machines/get-machines.ts"
 import { MachineRow } from "@/machines/machine-item.tsx"
 import { changed, emptyOf, groupsOf, pageOf, pageOfSearch, showOf, showOfToggle } from "@/sites/filter.ts"
 import type { Group, Row } from "@/sites/filter.ts"
+import { placementsOf } from "@/sites/placing.ts"
+import type { Placement } from "@/sites/placing.ts"
 import { AddMachine, PlacedMenu } from "@/sites/row-actions.tsx"
-import { namesInWords, namesOf, unplacedInWords } from "@/sites/unplaced.ts"
+import { headInWords, unplacedInWords, unreadableInWords } from "@/sites/unplaced.ts"
 
 /** The sites are read once, from the backend; then what every machine on them does comes from the broker. */
 const live: Live<SiteList | null> = {
@@ -98,27 +100,26 @@ function Home() {
     )
   }
   const { groups, emptySites } = groupsOf(list, { needs, query })
+  // Where every machine stands, read once for all rows, not once by each row.
+  const placed = placementsOf(list)
   const shown = pageOf(groups, search.page)
   // What the backend counted: the machines on the sites, how many of them send, how many need someone.
-  const sites = `${list.sites.length} ${list.sites.length === 1 ? "site" : "sites"}`
-  const line = `${machinesInWords(list.machineCount)} at ${sites} · ${list.sending} send data now · ${list.needsYou} ${list.needsYou === 1 ? "needs" : "need"} you · ${liveness(connected, list.asOf)}`
+  const line = `${headInWords(list)} · ${liveness(connected, list.asOf)}`
   if (list.sitesError !== null) {
     // The sites cannot be read: nothing to show by site and nothing to add to one. The line names a few
-    // of the machines that send, so the page does not look as if none did.
+    // of the machines that sent data, so the page does not look as if none did.
     return (
       <Page line={liveness(connected, list.asOf)}>
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <MapPinOffIcon className="size-4 shrink-0" />
-          {list.unplaced.length === 0
-            ? "The sites cannot be read now: the Sites API did not answer."
-            : `The sites cannot be read now: the Sites API did not answer. ${machinesInWords(list.unplaced.length)} send data: ${namesInWords(namesOf(list.unplaced))}.`}
+          {unreadableInWords(list.unplaced)}
         </p>
       </Page>
     )
   }
   return (
     <Page line={list.sites.length === 0 ? liveness(connected, list.asOf) : line} action={<AddMachine list={list}>Add machine</AddMachine>}>
-      {/* The machines that send and stand on no site are no rows: a bar names a few of them, and they
+      {/* The machines that sent data and stand on no site are no rows: a bar names a few of them, and they
           are added to a site from there. */}
       {list.unplaced.length > 0 && <Unplaced list={list} />}
       {list.sites.length > 0 && (
@@ -142,7 +143,7 @@ function Home() {
       ) : (
         <div className="flex flex-col gap-3">
           {shown.groups.map((group) => (
-            <GroupSection key={group.site.siteId} group={group} list={list} />
+            <GroupSection key={group.site.siteId} group={group} list={list} placed={placed} />
           ))}
         </div>
       )}
@@ -160,7 +161,7 @@ function Home() {
 }
 
 /**
- * The machines that send data and stand on no site: how many, a few of them by what they are, and
+ * The machines that sent data in the last 24 hours and stand on no site: how many, a few of them by what they are, and
  * "Review and add", which opens "Add machine" with the first of them chosen.
  */
 function Unplaced({ list }: { list: SiteList }) {
@@ -279,7 +280,7 @@ function Filters({
  * whole site, and a click on it folds the site. Then hall by hall the rows; the halls without a
  * machine share one line. A machine is moved or taken off its site in the menu of its row.
  */
-function GroupSection({ group, list }: { group: Group; list: SiteList }) {
+function GroupSection({ group, list, placed }: { group: Group; list: SiteList; placed: ReadonlyMap<string, Placement> }) {
   const title = group.site.name
   return (
     <Collapsible defaultOpen render={<section aria-label={title} />} className="flex flex-col">
@@ -304,7 +305,13 @@ function GroupSection({ group, list }: { group: Group; list: SiteList }) {
             <Rows
               rows={hall.rows}
               asOf={list.asOf}
-              actions={(row) => <PlacedMenu machine={{ machine: row.machine.machine, title: row.name ?? row.what, what: row.what }} list={list} />}
+              actions={(row) => (
+                <PlacedMenu
+                  machine={{ machine: row.machine.machine, title: row.name ?? row.what, what: row.what }}
+                  shown={placed.get(row.machine.machine)}
+                  list={list}
+                />
+              )}
             />
           </div>
         ))}

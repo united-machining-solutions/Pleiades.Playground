@@ -10,9 +10,9 @@ import type { ComponentProps, ReactNode } from "react"
 import { PlaceDialog } from "./place-dialog.tsx"
 import type { PlaceMode } from "./place-dialog.tsx"
 import { placedInWords } from "./placements.ts"
-import { placeInWords, placementOf } from "./placing.ts"
-import type { PlaceOutcome, PlaceRequest, Placement } from "./placing.ts"
-import { placeMachine, removePlacement } from "./sites-api.ts"
+import { placeInWords } from "./placing.ts"
+import type { PlaceOutcome, PlaceRequest, Placement, UndoRequest } from "./placing.ts"
+import { placeMachine, removePlacement, undoChange } from "./sites-api.ts"
 
 // What a person does on Home: "Add machine", from the head of the page or from the bar of the
 // machines that send and stand on no site, and "Move" or "Remove from site" in the menu of a row.
@@ -35,29 +35,11 @@ function failed(title: string, reason: string) {
 }
 
 /**
- * Puts the machine back where it stood before a change: on no site, or on its site, in its hall,
- * with its name.
+ * The toast after a change, with its undo. `name` is what the machine is called in it. The undo puts
+ * the machine back where the Sites API had it before the change, and only while nothing changed it
+ * since; what the change made goes again while nothing stands on it.
  */
-async function putBack(machine: string, before: Placement | undefined): Promise<string | undefined> {
-  if (before === undefined) {
-    const outcome = await removePlacement({ data: machine })
-    return outcome.ok ? undefined : outcome.reason
-  }
-  const outcome = await placeMachine({
-    data: { machine, site: { siteId: before.siteId }, hall: before.hall, newHall: false, displayName: before.displayName, move: true },
-  })
-  return outcome.ok ? undefined : outcome.reason
-}
-
-/** The toast after a change, with its undo. `name` is what the machine is called in it. */
-function told(
-  machine: string,
-  name: string,
-  title: string,
-  description: string | undefined,
-  before: Placement | undefined,
-  reread: () => Promise<void>,
-) {
+function told(name: string, title: string, description: string | undefined, undone: UndoRequest, reread: () => Promise<void>) {
   const shown = toast.add({
     title,
     description,
@@ -67,7 +49,8 @@ function told(
       onClick() {
         toast.close(shown)
         // A server of the app that does not answer is a reason too, not an error of the page.
-        void putBack(machine, before)
+        void undoChange({ data: undone })
+          .then((outcome) => (outcome.ok ? undefined : outcome.reason))
           .catch((error: unknown) => (error instanceof Error ? error.message : String(error)))
           .then(async (reason) => {
             await reread()
@@ -83,7 +66,7 @@ function told(
  * a change meanwhile leaves the list as it is while the dialog says why: read again at once, the row
  * of the machine, and the dialog with it, could go. It is read again when the dialog closes.
  */
-function usePlace(before: Placement | undefined) {
+function usePlace() {
   const reread = useReread()
   const stale = useRef(false)
   const onPlace = async (request: PlaceRequest, what: string): Promise<PlaceOutcome> => {
@@ -95,7 +78,8 @@ function usePlace(before: Placement | undefined) {
     }
     await reread()
     const name = request.displayName?.trim() || what
-    told(request.machine, name, placedInWords(name, outcome.siteName, outcome.hall, request.move), undefined, before, reread)
+    const undone = { machine: request.machine, now: { siteId: outcome.siteId, hall: outcome.hall }, back: outcome.before, made: outcome.made }
+    told(name, placedInWords(name, outcome.siteName, outcome.hall, request.from !== null), undefined, undone, reread)
     return outcome
   }
   const onClosed = () => {
@@ -128,7 +112,7 @@ export function AddMachine({
   children,
   ...button
 }: { list: SiteList; review?: boolean; children: ReactNode } & Omit<ComponentProps<typeof Button>, "onClick" | "children">) {
-  const { onPlace, onClosed } = usePlace(undefined)
+  const { onPlace, onClosed } = usePlace()
   const [open, setOpen] = useOpen(onClosed)
   const mode: PlaceMode = { kind: "add", first: review ? list.unplaced[0]?.machine : undefined }
   return (
@@ -143,16 +127,16 @@ export function AddMachine({
 }
 
 /** The menu of a machine on a site: "Move…" opens the dialog, "Remove from site" takes it off at once, with an undo. */
-export function PlacedMenu({ machine, list }: { machine: RowMachine; list: SiteList }) {
-  const before = placementOf(list, machine.machine)
-  const { onPlace, onClosed } = usePlace(before)
+export function PlacedMenu({ machine, shown, list }: { machine: RowMachine; shown: Placement | undefined; list: SiteList }) {
+  // `shown` is where Home shows the machine: a change is refused where it stands elsewhere now.
+  const { onPlace, onClosed } = usePlace()
   const [moving, setMoving] = useOpen(onClosed)
   const reread = useReread()
   const takeOff = async () => {
-    const outcome = await removePlacement({ data: machine.machine }).catch((error: unknown) => ({
-      ok: false as const,
-      reason: error instanceof Error ? error.message : String(error),
-    }))
+    if (!shown) return
+    const outcome = await removePlacement({ data: { machine: machine.machine, from: { siteId: shown.siteId, hall: shown.hall } } }).catch(
+      (error: unknown) => ({ ok: false as const, reason: error instanceof Error ? error.message : String(error), stale: false }),
+    )
     await reread()
     if (!outcome.ok) {
       failed(`${machine.title} was not taken off`, outcome.reason)
@@ -163,8 +147,14 @@ export function PlacedMenu({ machine, list }: { machine: RowMachine; list: SiteL
       toast.add({ title: `${machine.title} stood on no site any more`, description: "Someone took it off meanwhile." })
       return
     }
-    const where = before ? placeInWords(before.siteName, before.hall) : "its site"
-    told(machine.machine, machine.title, `${machine.title} taken off ${where}`, "It shows up again among the machines to add while it sends data.", before, reread)
+    const undone = { machine: machine.machine, now: null, back: outcome.before, made: {} }
+    told(
+      machine.title,
+      `${machine.title} taken off ${placeInWords(outcome.siteName, outcome.before.hall)}`,
+      "It shows up again among the machines to add while it sends data.",
+      undone,
+      reread,
+    )
   }
   return (
     <>
@@ -185,11 +175,11 @@ export function PlacedMenu({ machine, list }: { machine: RowMachine; list: SiteL
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
-      {before && (
+      {shown && (
         <PlaceDialog
           open={moving}
           onOpenChange={setMoving}
-          mode={{ kind: "move", machine: machine.machine, title: machine.title, what: machine.what, placed: before }}
+          mode={{ kind: "move", machine: machine.machine, title: machine.title, what: machine.what, placed: shown }}
           list={list}
           onPlace={onPlace}
         />

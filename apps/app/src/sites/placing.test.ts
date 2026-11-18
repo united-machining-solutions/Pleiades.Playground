@@ -7,14 +7,17 @@ import {
   MAX_TEXT,
   companyOf,
   hallsWith,
-  machineIdOf,
   placeInWords,
   placeRequestOf,
   placementOf,
+  placementsOf,
   problemOfId,
   refusalOf,
+  removeRequestOf,
+  sameSpot,
   sentenceOf,
   siteIdOf,
+  undoRequestOf,
 } from "./placing.ts"
 
 const P07 = "taygeta-precision_TP-800_P-07"
@@ -29,24 +32,27 @@ test("a machine id or site id is one level of a topic, as the Sites API wants it
   assert.match(problemOfId(7, "machine id")!, /required/)
 })
 
-test("placing on a site that exists keeps the hall, the name and whether it moves", () => {
-  const request = placeRequestOf({ machine: P07, site: { siteId: "north-plant" }, hall: " Hall 2 ", displayName: "Grinder 7", move: true })
+test("placing on a site that exists keeps the hall as the Sites API keeps it, the name and where Home showed the machine", () => {
+  const from = { siteId: "north-plant", hall: " Hall 1" }
+  const request = placeRequestOf({ machine: P07, site: { siteId: "north-plant" }, hall: " Hall 2 ", displayName: " Grinder 7 ", from })
   assert.deepEqual(request, {
     machine: P07,
     site: { siteId: "north-plant" },
-    hall: "Hall 2",
+    hall: " Hall 2 ",
     newHall: false,
     displayName: "Grinder 7",
-    move: true,
+    from,
   })
 })
 
-test("a blank hall or display name is none, and a new hall needs a name", () => {
-  const request = placeRequestOf({ machine: P07, site: { siteId: "north-plant" }, hall: "  ", newHall: true, displayName: "" })
-  assert.equal(request.hall, null)
-  assert.equal(request.newHall, false)
-  assert.equal(request.displayName, null)
-  assert.equal(request.move, false)
+test("a new hall is a name a person typed: trimmed, and blank is none; a hall that is there is never blank", () => {
+  const typed = placeRequestOf({ machine: P07, site: { siteId: "north-plant" }, hall: " Hall 3 ", newHall: true })
+  assert.deepEqual([typed.hall, typed.newHall], ["Hall 3", true])
+  const blank = placeRequestOf({ machine: P07, site: { siteId: "north-plant" }, hall: "  ", newHall: true, displayName: "" })
+  assert.deepEqual([blank.hall, blank.newHall, blank.displayName, blank.from], [null, false, null, null])
+  assert.throws(() => placeRequestOf({ machine: P07, site: { siteId: "north-plant" }, hall: "  " }), /has a name/)
+  // The hall of a new site is typed too.
+  assert.equal(placeRequestOf({ machine: P07, site: { name: "East", company: "Demo" }, hall: " Hall A " }).hall, "Hall A")
 })
 
 test("a new site needs a name and a company", () => {
@@ -64,8 +70,37 @@ test("what the dialog sends is refused before it goes anywhere", () => {
   assert.throws(() => placeRequestOf({ machine: P07, site: { siteId: "north-plant" }, displayName: "x".repeat(MAX_TEXT + 1) }), /longer than/)
   assert.throws(() => placeRequestOf({ machine: P07, site: { siteId: "north-plant" }, hall: 3 }), /hall is text/)
   assert.throws(() => placeRequestOf(undefined), /machine id is required/)
-  assert.equal(machineIdOf(P07), P07)
-  assert.throws(() => machineIdOf("M+1"), /machine id/)
+  assert.throws(() => placeRequestOf({ machine: P07, site: { siteId: "north-plant" }, from: { siteId: "a/b" } }), /site id/)
+})
+
+test("a removal names the machine and where Home showed it", () => {
+  assert.deepEqual(removeRequestOf({ machine: P07, from: { siteId: "north-plant", hall: null } }), {
+    machine: P07,
+    from: { siteId: "north-plant", hall: null },
+  })
+  assert.throws(() => removeRequestOf({ machine: "M+1", from: { siteId: "north-plant" } }), /machine id/)
+  assert.throws(() => removeRequestOf({ machine: P07 }), /names where/)
+})
+
+test("an undo names where the machine stands now, where it goes back, and what was made", () => {
+  const back = { siteId: "north-plant", hall: "Hall 1", displayName: " Grinder 7 " }
+  assert.deepEqual(undoRequestOf({ machine: P07, now: null, back, made: {} }), {
+    machine: P07,
+    now: null,
+    back: { siteId: "north-plant", hall: "Hall 1", displayName: "Grinder 7" },
+    made: { siteId: undefined, siteEtag: undefined, hall: undefined },
+  })
+  const made = { siteId: "west-plant", siteEtag: "\"3f1c\"", hall: { siteId: "north-plant", hall: "Hall 3" } }
+  assert.deepEqual(undoRequestOf({ machine: P07, now: { siteId: "west-plant", hall: null }, back: null, made }).made, made)
+  assert.throws(() => undoRequestOf({ machine: P07, made: { siteId: "a#b" } }), /site id/)
+  assert.throws(() => undoRequestOf({ machine: P07, made: { siteId: "west-plant", siteEtag: 7 } }), /entity tag/)
+})
+
+test("a machine stands where Home showed it on the same site and in the same hall, or on none", () => {
+  assert.equal(sameSpot(null, null), true)
+  assert.equal(sameSpot({ siteId: "n", hall: "Hall 1" }, { siteId: "n", hall: "Hall 1" }), true)
+  assert.equal(sameSpot({ siteId: "n", hall: "Hall 1" }, { siteId: "n", hall: "Hall 2" }), false)
+  assert.equal(sameSpot({ siteId: "n", hall: null }, null), false)
 })
 
 test("a new site gets its id from its name, and never one that is taken", () => {
@@ -128,6 +163,9 @@ test("where a machine stands is read from the list Home has", () => {
   assert.deepEqual(placementOf(list, "m-02"), { siteId: "north-plant", siteName: "North plant", hall: "Hall 2", displayName: "Mill 2" })
   assert.deepEqual(placementOf(list, "p-04"), { siteId: "north-plant", siteName: "North plant", hall: null, displayName: null })
   assert.equal(placementOf(list, P07), undefined)
+  const all = placementsOf(list)
+  assert.deepEqual([...all.keys()], ["m-02", "p-04"])
+  assert.deepEqual(all.get("m-02"), placementOf(list, "m-02"))
 })
 
 test("a place in words, and the company a new site starts with", () => {

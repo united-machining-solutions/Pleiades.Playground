@@ -7,6 +7,8 @@ import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
+import { reasonOf } from "@/reason.ts"
+
 import { ENERGY_SERIES_TOOL, MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL, TIMESERIES_SERIES_TOOL, TIMESERIES_SIGNALS_TOOL } from "./card-tools.ts"
 
 // The values come from the generative UI backend. These functions run on the server of the app:
@@ -42,17 +44,6 @@ export async function ask<TValues>(
     if (error instanceof Refused) return { values: null, error: error.message }
     return { values: null, error: `The generative UI backend did not answer: ${reasonOf(error)}.` }
   }
-}
-
-/**
- * Why a request got no answer. The client and `fetch` each wrap what the network said, for example
- * ECONNREFUSED, in an error of their own: the innermost cause is the reason.
- */
-export function reasonOf(error: unknown): string {
-  let innermost = error
-  while (innermost instanceof Error && innermost.cause !== undefined) innermost = innermost.cause
-  const { code, message } = (innermost ?? {}) as { code?: unknown; message?: unknown }
-  return String(code ?? message ?? innermost)
 }
 
 /** What a tool wrote as text, which is where it says why it failed. */

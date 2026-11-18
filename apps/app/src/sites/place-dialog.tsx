@@ -1,3 +1,5 @@
+import type { State } from "@pleiades/cards/machine/contract.ts"
+import { stateLabel } from "@pleiades/cards/machine/state.ts"
 import type { SiteList } from "@pleiades/cards/site/contract.ts"
 import { modelOf } from "@pleiades/cards/site/in-words.ts"
 import { Alert, AlertDescription } from "@pleiades/ui/components/alert"
@@ -9,7 +11,7 @@ import { Input } from "@pleiades/ui/components/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@pleiades/ui/components/select"
 import { Spinner } from "@pleiades/ui/components/spinner"
 import { CircleAlertIcon } from "lucide-react"
-import { useId, useState } from "react"
+import { useId, useMemo, useState } from "react"
 import type { FormEvent } from "react"
 
 import { MAX_TEXT, companyOf } from "./placing.ts"
@@ -17,8 +19,8 @@ import type { PlaceOutcome, PlaceRequest, Placement } from "./placing.ts"
 import { typedMachineOf } from "./unplaced.ts"
 
 // The dialog of "Add machine" and "Move": which machine, the site, the hall and the name people know
-// it by. The machines to add are those that send and stand on no site, or one a person names by its
-// id; the sites and their halls are those of the list Home read. A new site or hall is made when the
+// it by. The machines to add are those that sent data in the last 24 hours and stand on no site, or one
+// a person names by its id; the sites and their halls are those of the list Home read. A new site or hall is made when the
 // machine is placed.
 
 /** A site to choose, or the entry that makes a new one. */
@@ -26,10 +28,10 @@ type SiteChoice = { siteId: string; name: string; company: string; halls: Array<
 
 const NEW_SITE: SiteChoice = { siteId: "", name: "New site…", company: "", halls: [] }
 
-/** A machine to add, or the entry where a person types an id. */
-type MachineChoice = { machine: string; what: string }
+/** A machine to add, with what it does now, or the entry where a person types an id. */
+type MachineChoice = { machine: string; what: string; state: State | null }
 
-const ANOTHER: MachineChoice = { machine: "", what: "Another machine…" }
+const ANOTHER: MachineChoice = { machine: "", what: "Another machine…", state: null }
 
 /** The choices of the hall: none, a hall of the site, or a new one. */
 const NO_HALL = "none"
@@ -47,7 +49,7 @@ function siteChoicesOf(list: SiteList): Array<SiteChoice> {
 }
 
 function machineChoicesOf(list: SiteList): Array<MachineChoice> {
-  return [...list.unplaced.map((one) => ({ machine: one.machine, what: modelOf(one) })), ANOTHER]
+  return [...list.unplaced.map((one) => ({ machine: one.machine, what: modelOf(one), state: one.state })), ANOTHER]
 }
 
 /**
@@ -96,8 +98,9 @@ function PlaceForm({
 }) {
   const id = useId()
   const placed = mode.kind === "move" ? mode.placed : undefined
-  const sites = siteChoicesOf(list)
-  const machines = machineChoicesOf(list)
+  // Built when the list changes, not with every key a person presses.
+  const sites = useMemo(() => siteChoicesOf(list), [list])
+  const machines = useMemo(() => machineChoicesOf(list), [list])
   const [machine, setMachine] = useState<MachineChoice | null>(() =>
     mode.kind === "add" ? (machines.find((one) => one !== ANOTHER && one.machine === mode.first) ?? null) : null,
   )
@@ -160,7 +163,7 @@ function PlaceForm({
           hall: chosenHall,
           newHall: isNew || hallChosen === NEW_HALL,
           displayName,
-          move: mode.kind === "move",
+          from: placed ? { siteId: placed.siteId, hall: placed.hall } : null,
         },
         what,
       )
@@ -181,7 +184,7 @@ function PlaceForm({
         <DialogDescription>
           {mode.kind === "move"
             ? "Choose where it stands now. Its values and notifications stay as they are."
-            : "Choose a machine that sends data, or name one by its id, and the site it stands on."}
+            : "Choose a machine that sent data lately, or name one by its id, and the site it stands on."}
         </DialogDescription>
       </DialogHeader>
       <FieldGroup>
@@ -202,17 +205,17 @@ function PlaceForm({
             >
               <ComboboxInput
                 id={`${id}-machine`}
-                placeholder="Find a machine that sends data"
+                placeholder="Find a machine"
                 className="w-full"
                 aria-invalid={(tried && missing.machine && !byHand) || undefined}
               />
               <ComboboxContent>
-                <ComboboxEmpty>No machine of that name sends data.</ComboboxEmpty>
+                <ComboboxEmpty>No machine of that name sent data lately.</ComboboxEmpty>
                 <ComboboxList>
                   {(one: MachineChoice) => (
                     <ComboboxItem key={one.machine || "another"} value={one}>
                       {one.what}
-                      {one !== ANOTHER && <span className="ml-auto text-muted-foreground">sends data</span>}
+                      {one.state && <span className="ml-auto text-muted-foreground">{stateLabel[one.state]}</span>}
                     </ComboboxItem>
                   )}
                 </ComboboxList>
@@ -372,7 +375,7 @@ function TypedHint({ typed, tried, kind }: { typed: string; tried: boolean; kind
     case "placed":
       return <FieldError>It already stands on {kind.siteName}. Move it from its row.</FieldError>
     case "sending":
-      return <FieldDescription>It sends data: {modelOf(kind.machine)}.</FieldDescription>
+      return <FieldDescription>It sent data in the last 24 hours: {modelOf(kind.machine)}.</FieldDescription>
     default:
       return <FieldDescription>No value from it in the last 24 hours. It shows "No data" until it sends.</FieldDescription>
   }

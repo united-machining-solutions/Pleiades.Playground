@@ -4,7 +4,7 @@ import { test } from "node:test"
 import type { SiteList, UnplacedMachine } from "@pleiades/cards/site/contract.ts"
 
 import { unknownMachine } from "../live/machines.ts"
-import { NAMED, namesInWords, namesOf, typedMachineOf, unplacedInWords } from "./unplaced.ts"
+import { NAMED, headInWords, namesInWords, namesOf, typedMachineOf, unplacedInWords, unreadableInWords } from "./unplaced.ts"
 
 const P07 = "taygeta-precision_TP-800_P-07"
 const L01 = "trumpf_Laser2D_L-01"
@@ -49,12 +49,33 @@ test("a machine on no site is named by what it is, as its row would be", () => {
   assert.deepEqual(namesOf([unplaced(P07), unplaced(L01)]), ["TP-800 P-07", "Laser2D L-01"])
 })
 
-test("the bar says how many machines send and stand on no site, and names a few", () => {
-  assert.deepEqual(unplacedInWords([unplaced(P07)]), { title: "1 machine sends data but is not on a site yet:", names: "TP-800 P-07" })
+test("the bar says how many machines sent data and stand on no site, also one that fell silent since, and names a few", () => {
+  assert.deepEqual(unplacedInWords([{ ...unplaced(P07), state: "no-data" }]), {
+    title: "1 machine sent data in the last 24 hours but is not on a site yet:",
+    names: "TP-800 P-07",
+  })
   assert.deepEqual(unplacedInWords([P07, L01, PU01, T01].map(unplaced)), {
-    title: "4 machines send data but are not on a site yet:",
+    title: "4 machines sent data in the last 24 hours but are not on a site yet:",
     names: "TP-800 P-07, Laser2D L-01, Punch PU-01 +1",
   })
+})
+
+test("while the sites cannot be read, one line says so and names a few machines that sent data", () => {
+  assert.equal(unreadableInWords([]), "The sites cannot be read now: the Sites API did not answer.")
+  assert.equal(
+    unreadableInWords([unplaced(P07)]),
+    "The sites cannot be read now: the Sites API did not answer. 1 machine sent data in the last 24 hours: TP-800 P-07.",
+  )
+  assert.equal(
+    unreadableInWords([P07, L01, PU01, T01].map(unplaced)),
+    "The sites cannot be read now: the Sites API did not answer. 4 machines sent data in the last 24 hours: TP-800 P-07, Laser2D L-01, Punch PU-01 +1.",
+  )
+})
+
+test("the line under the title, in the singular where a count is one", () => {
+  const sites = (count: number) => list.sites.concat(list.sites).slice(0, count)
+  assert.equal(headInWords({ machineCount: 1, sites: sites(1), sending: 1, needsYou: 1 }), "1 machine at 1 site · 1 sends data now · 1 needs you")
+  assert.equal(headInWords({ machineCount: 3, sites: sites(2), sending: 2, needsYou: 0 }), "3 machines at 2 sites · 2 send data now · 0 need you")
 })
 
 test("a machine id a person typed: on a site already, sending, unknown, or no id", () => {

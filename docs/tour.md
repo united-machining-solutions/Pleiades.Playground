@@ -105,27 +105,29 @@ page; the choice and the page are in the address, `?show=needs&page=2`. The site
 once, on the last page. Home is live: it reads the list once, and from then on the browser hears every value at the
 broker, MQTT over WebSocket on port 9001, the moment a machine publishes it.
 
-A machine does not show up on Home by itself: people put it on a site. A machine that sends data and stands on
-no site is named in a bar above the list, a few by name and how many more; "Review and add" opens "Add machine"
-with the first of them chosen. "Add machine" at the top of the page opens the same dialog empty: the machine, one
-that sends or one named by its id, which shows "No data" until it sends, then the site, the hall and the name
+A machine does not show up on Home by itself: people put it on a site. A machine that sent data in the last 24
+hours and stands on no site is named in a bar above the list, a few by name and how many more; "Review and add"
+opens "Add machine" with the first of them chosen. "Add machine" at the top of the page opens the same dialog
+empty: the machine, one that sent data or one named by its id, which shows "No data" until it sends, then the site, the hall and the name
 people know it by; a new site or hall is made there too. The menu "⋯" of a row moves the machine ("Move…") or
-takes it off its site ("Remove from site"), and "Undo" in the toast takes back each change. Home writes to the
+takes it off its site ("Remove from site"), and "Undo" in the toast takes back each change, as long as nobody
+changed the machine since, together with a site or hall the change made. Home writes to the
 [Sites API](../source/Pleiades.Playground.Sites.Api/README.md), at <http://localhost:5540/>, which takes the same
 over REST. A stack that has just started has no site: every machine that sends is in the bar. While the Sites API
-does not answer, a line says the sites cannot be read now and names a few of the machines that send; then nothing
-can be added.
+does not answer, a line says the sites cannot be read now and names a few of the machines that sent data; then
+nothing can be added.
 
 ![Home: "3 machines at 2 sites · 2 send data now · 2 need you" and the button Add machine at the right. Below, the
-bar "4 machines send data but are not on a site yet: TP-800 P-07, Laser2D L-01, Punch PU-01 +1" with Review and
-add; the search, All and Needs you, and the counts of all sites. North plant of Demo Manufacturing: Lathe 4 in
-setup in Hall 1, MM-120 M-02 stopped in Hall 2 with the warning "Filter of the coolant clogged", and "Hall 3: no
-machine". South plant with AX-400 M-09 without data in Hall A. Each row has the menu "⋯".](images/tour/home.png)
+bar "4 machines sent data in the last 24 hours but are not on a site yet: TP-800 P-07, Laser2D L-01, Punch PU-01 +1"
+with Review and add; the search, All and Needs you, and the counts of all sites. North plant of Demo Manufacturing:
+Lathe 4 stopped in Hall 1 with the warning "Coolant pressure low", MM-120 M-02 running in Hall 2 with the warning
+"Filter of the coolant clogged", and "Hall 3: no machine". South plant with AX-400 M-09 without data in Hall A. Each
+row has the menu "⋯".](images/tour/home.png)
 
-In the picture M-02 is stopped with the warning "Filter of the coolant clogged", 5340, and says since when; Lathe 4
-is the name entered for P-04; M-09 stands in the South plant but has no simulator, so nothing is known about it
-and its row leads nowhere. P-07 and the three cutting machines send data and stand on no site: the bar names
-them, and "Review and add" puts one on a site. A row leads to the page of its machine, and
+In the picture Lathe 4, the name entered for P-04, is stopped with the warning "Coolant pressure low", 20017, and
+says since when; M-09 stands in the South plant but has no simulator, so nothing is known about it and its row
+leads nowhere. P-07 and the three cutting machines sent data and stand on no site: the bar names them, and
+"Review and add" puts one on a site. A row leads to the page of its machine, and
 "Ask why" starts a chat about it (stop 4). The field "Ask a question" in the header starts a chat too.
 
 **In the code:** [`apps/app/src/routes/index.tsx`](../apps/app/src/routes/index.tsx) is the page,
@@ -331,7 +333,8 @@ Type `/` in the chat field: the list of commands opens, and `/help` explains the
 the data model and shows a proposal: the endpoint with the strongest security, whether the machine fulfils
 the core of the data model and which profiles are complete, every element with its value, and what is
 derived, unclear or missing. What the core lacks is marked as not available. The machine is added when you
-press "Add machine" on the proposal; from then on it is on Home like the others, also after a restart.
+press "Add machine" on the proposal; from then on it sends like the others, also after a restart, and stands in
+the bar of Home until you add it to a site there.
 `/opcua` lists the added servers with their core and profiles, and a button that removes a machine together
 with its retained messages on the broker; `/mapping A1121O0001` shows what needs a look.
 
@@ -357,14 +360,15 @@ A machine that stops publishing is not "stopped": nothing is known about it. Try
 docker compose stop simulator-m-02
 ```
 
+If M-02 stands on no site yet, add it to one on Home first (stop 2): Home lists only the machines on a site.
 After 30 seconds without a sign of life, Home shows the machine with the state "No data" in its site and hall,
 and "Needs you" lists it.
 
 ![Home with MM-120 M-02 in Hall 2 of the North plant: the badge "No data" and the text "No data from the adapter.
-The adapter says Shutdown. Last known: Executing at 20:27", with "Ask why". The line under the title says "1 send
-data now · 3 need you", and the counts of the North plant say 1 alarm and 1 no data](images/tour/home-no-data.png)
+The adapter says Shutdown. Last known: Executing at 21:36", with "Ask why". The line under the title says "1 sends
+data now · 3 need you", and the counts of the North plant say 1 stopped and 1 no data](images/tour/home-no-data.png)
 
-The row says what is known: no data from the adapter since 20:27, and the last thing the machine reported
+The row says what is known: no data from the adapter since 21:36, and the last thing the machine reported
 before it fell silent. It stays in its site and hall, and the counts of the site follow. The other machines are
 not affected. Start the simulator again, and within a few seconds the machine is back with a fresh "since":
 a silence ends a run, because what happened in between is not known.

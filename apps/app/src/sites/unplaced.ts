@@ -3,8 +3,9 @@ import { modelOf } from "@pleiades/cards/site/in-words.ts"
 
 import { placementOf, problemOfId } from "./placing.ts"
 
-// The machines that send values and stand on no site, as Home names them: a few by what they are,
-// then how many more. They are no rows of the list; they come to a site from the bar above it.
+// The machines that sent values in the last 24 hours and stand on no site, as Home names them: a few
+// by what they are, then how many more. They are no rows of the list; they come to a site from the bar
+// above it. Some of them may have fallen silent since, so the words say "sent", not "send".
 
 /** How many machines a bar or a line names before it says how many more there are. */
 export const NAMED = 3
@@ -20,12 +21,34 @@ export function namesOf(unplaced: ReadonlyArray<UnplacedMachine>): Array<string>
   return unplaced.map((one) => modelOf(one))
 }
 
-/** The bar above the list: how many machines send and stand on no site, and a few of them by name. */
+/** The bar above the list: how many machines sent data and stand on no site, and a few of them by name. */
 export function unplacedInWords(unplaced: ReadonlyArray<UnplacedMachine>): { title: string; names: string } {
   const count = unplaced.length
   const title =
-    count === 1 ? "1 machine sends data but is not on a site yet:" : `${count} machines send data but are not on a site yet:`
+    count === 1
+      ? "1 machine sent data in the last 24 hours but is not on a site yet:"
+      : `${count} machines sent data in the last 24 hours but are not on a site yet:`
   return { title, names: namesInWords(namesOf(unplaced)) }
+}
+
+/** The line of Home while the sites cannot be read: why, and a few of the machines that sent data. */
+export function unreadableInWords(unplaced: ReadonlyArray<UnplacedMachine>): string {
+  const why = "The sites cannot be read now: the Sites API did not answer."
+  if (unplaced.length === 0) return why
+  const count = unplaced.length === 1 ? "1 machine" : `${unplaced.length} machines`
+  return `${why} ${count} sent data in the last 24 hours: ${namesInWords(namesOf(unplaced))}.`
+}
+
+/**
+ * The line under the title: the machines on the sites, how many of them send data now and how many
+ * need someone, as the backend counted them.
+ */
+export function headInWords(list: Pick<SiteList, "machineCount" | "sites" | "sending" | "needsYou">): string {
+  const machines = list.machineCount === 1 ? "1 machine" : `${list.machineCount} machines`
+  const sites = list.sites.length === 1 ? "1 site" : `${list.sites.length} sites`
+  const sending = `${list.sending} ${list.sending === 1 ? "sends" : "send"} data now`
+  const needs = `${list.needsYou} ${list.needsYou === 1 ? "needs" : "need"} you`
+  return `${machines} at ${sites} · ${sending} · ${needs}`
 }
 
 /**
