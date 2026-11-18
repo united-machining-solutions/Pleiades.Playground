@@ -125,8 +125,9 @@ to be settled at the umati hackathon. Here everything is as the model says: path
 lists, events, manifest and connection. It is the binding of `machines/`; why: see
 [ADR-0015](../../docs/adr/0015-the-binding-of-machines-follows-the-data-model.md).
 
-In the demo stack every simulator (P-04, P-07, M-02) publishes this tree, and the services of the playground
-read only it (see "How the stack stores it").
+In the demo stack every simulator (P-04, P-07, M-02) and the adapters of two real devices, an Ultimaker printer
+and a juice bar, publish this tree, and the services of the playground read only it (see "How the stack stores
+it").
 
 ### Topics
 
@@ -513,6 +514,27 @@ Each virtual machine works like this:
 
 The tests of the simulator check every message against the JSON schemas of the model when a clone of it lies
 next to this repository, or in the folder named by `UMATI_DATAMODEL_DIR`; without one they are skipped.
+
+### What the adapters of real devices publish
+
+Two adapters bring real devices into the stack with the same binding, each in a Compose profile of its own:
+the [Ultimaker telemetry](../ultimaker/telemetry.md) and the
+[juice bar](../../source/Pleiades.Playground.JuiceBar.Api/README.md). They publish with the same code as the
+simulators (`Pleiades.Playground.Mqtt.Extensions.Machines`): every value retained with QoS 1 in the envelope
+above, the manifest before the values, `Connection/State` `Initializing`, `Running`, `CommunicationFault` while the
+device does not answer and `Shutdown` at a clean stop, every value again after a reconnect or when the device
+answers again, and the last will. Unlike a simulator they see the device only from outside: the time of a value
+is the time the adapter read it (`"timestampSource": "adapter"`), and a value goes out when it changes.
+
+| Adapter | Topics below | `ManufacturerUri` | Prefix of its signals | Profiles |
+|---|---|---|---|---|
+| Ultimaker telemetry | `machines/ultimaker_UM3_UM3-01/` | `https://ultimaker.com` | `x-ultimaker-com`, on `oem/Ultimaker/…` | `Core` |
+| Juice bar | `machines/trumpf_JuiceBar_JUICEBAR-01/` | `https://www.trumpf.com` | `x-trumpf-com`, on `oem/JuiceBar/…` | `Core` |
+
+Each delivers of `Core` the identification, the connection and `State/Status`, with `MachineryOperationMode`
+`None`, the value of the model for a machine without operation modes; `ProductCode`, `YearOfConstruction`,
+`State.FeedOverride`, `Notification.ActiveAlerts` and `OperationCounters.PowerOnDuration` are
+`"available": false`. Neither publishes events yet.
 
 ### Open for the hackathon
 

@@ -177,8 +177,7 @@ internal sealed partial class SpecPublisher : IDisposable
     /// </summary>
     public static (string Topic, byte[] Payload) LastWill(string machineId, DateTimeOffset timestamp)
     {
-        var will = ConnectionState(LastWillState, timestamp);
-        return (SpecWire.Topic(machineId, SpecElements.ConnectionState), Encoding.UTF8.GetBytes(SpecWire.Envelope(will).ToJsonString()));
+        return Pleiades.Playground.Mqtt.Extensions.Machines.MachineBinding.LastWill(machineId, timestamp);
     }
 
     public void Dispose()

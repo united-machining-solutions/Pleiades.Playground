@@ -9,6 +9,9 @@ internal sealed class MqttClientHostBuilder(IServiceCollection services) : IMqtt
 {
     internal ICollection<string> ClientNames { get; } = [];
 
+    /// <summary>What sets further options of a client, by its name, beyond those of its configuration.</summary>
+    internal Dictionary<string, Action<IServiceProvider, MqttClientOptionsBuilder>> Configure { get; } = [];
+
     public IMqttClientHostBuilder AddClient(string name, IConfigurationSection configurationSection)
     {
         if (ClientNames.Contains(name))
@@ -32,6 +35,14 @@ internal sealed class MqttClientHostBuilder(IServiceCollection services) : IMqtt
         const string defaultName = "default";
         AddClient(defaultName, configurationSection);
         services.AddSingleton(provider => provider.GetRequiredKeyedService<IManagedMqttClient>(defaultName));
+        return this;
+    }
+
+    public IMqttClientHostBuilder AddClient(IConfigurationSection configurationSection, Action<IServiceProvider, MqttClientOptionsBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        AddClient(configurationSection);
+        Configure["default"] = configure;
         return this;
     }
 }

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 using System.Diagnostics.CodeAnalysis;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using MQTTnet;
-using MQTTnet.Protocol;
 using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Mqtt.Extensions.Machines;
 
 namespace Pleiades.Playground.Simulator.Spec;
 
@@ -216,14 +215,9 @@ internal sealed partial class VirtualMachineService : BackgroundService
         // The broker publishes the last will when the connection breaks off. Its timestamp is the time of the
         // connect: the binding has no way to put the time of the break into it. The model needs no last will (the
         // heartbeat tells whether the adapter lives); here it tells sooner, with the value closest to it.
-        var (willTopic, willPayload) = SpecPublisher.LastWill(_machineId, start);
         var options = new MqttClientOptionsBuilder()
             .WithConfig(mqtt)
-            .WithWillTopic(willTopic)
-            .WithWillPayload(willPayload)
-            .WithWillRetain(true)
-            .WithWillQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
-            .WithWillContentType(SpecWire.ContentType)
+            .WithMachineLastWill(_machineId, start)
             .Build();
 
         return new ManagedMqttClientOptions

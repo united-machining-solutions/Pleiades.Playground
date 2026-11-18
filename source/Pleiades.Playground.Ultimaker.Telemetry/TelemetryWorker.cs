@@ -1,23 +1,32 @@
 using System.Net;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
-using Pleiades.Playground.Common.DataTransferObjects;
 using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Mqtt.Extensions.Machines;
 
 namespace Pleiades.Playground.Ultimaker.Telemetry;
 
 internal sealed class TelemetryOptions
 {
     public string PrinterBaseUrl { get; set; } = "http://ultimaker.local/";
-    /// <summary>The first part of the machine id, after the domain of the manufacturer.</summary>
-    public string Manufacturer { get; set; } = "ultimaker";
     /// <summary>The name of the manufacturer, as <c>Identification/Manufacturer</c> says it.</summary>
     public string ManufacturerName { get; set; } = "Ultimaker";
+    /// <summary>
+    /// The web address of the manufacturer, <c>Identification/ManufacturerUri</c>. Its domain without the top-level
+    /// domain is the first part of the machine id, and with it the prefix of the signals of the manufacturer.
+    /// </summary>
+    public string ManufacturerUri { get; set; } = "https://ultimaker.com";
     public string Model { get; set; } = "UM3";
     public string SerialNumber { get; set; } = "UM3-01";
-    /// <summary>The machine id of the MQTT binding, <c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>.</summary>
-    public string MachineId => Manufacturer + "_" + Model + "_" + SerialNumber;
+    /// <summary>The globally unique id of the printer; empty for <c>{ManufacturerUri}/{Model}/{SerialNumber}</c>.</summary>
+    public string ProductInstanceUri { get; set; } = string.Empty;
     public int PollIntervalSecond { get; set; } = 2;
+
+    /// <summary>Who the printer is, by the rules of the binding.</summary>
+    public MachineIdentity Identity => new(ManufacturerName, ManufacturerUri, Model, SerialNumber, ProductInstanceUri);
+
+    /// <summary>The machine id of the MQTT binding, <c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>.</summary>
+    public string MachineId => Identity.MachineId;
 }
 
 internal sealed class TelemetryState
@@ -34,24 +43,40 @@ internal sealed class TelemetryState
         && DateTime.UtcNow.Ticks - Interlocked.Read(ref _lastSuccess) < TimeSpan.FromSeconds(30).Ticks;
 }
 
+/// <summary>
+/// Polls the printer and publishes what it says as the MQTT binding of machines says (<see cref="MachinePublisher"/>):
+/// retained, QoS 1, the manifest before the values, <c>Connection/State</c> as the state of the adapter, and a
+/// heartbeat of its own every ten seconds.
+/// </summary>
 internal sealed class TelemetryWorker(IHttpClientFactory clients, IManagedMqttClient mqtt,
-    IOptions<TelemetryOptions> options, TelemetryState state, ILogger<TelemetryWorker> logger) : BackgroundService
+    IOptions<TelemetryOptions> options, TelemetryState state, TimeProvider time, ILogger<TelemetryWorker> logger) : BackgroundService
 {
-    private string Prefix => "machines/" + options.Value.MachineId + "/";
+    /// <summary>How often the heartbeat comes; the manifest names it.</summary>
+    internal static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(10);
+
+    private readonly SortedSet<string> _signals = new(TelemetryMapper.Signals(TelemetryMapper.DefaultExtruders), StringComparer.Ordinal);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        try { await Task.WhenAll(PollAsync(stoppingToken), HeartbeatAsync(stoppingToken)).ConfigureAwait(false); }
+        var identity = options.Value.Identity;
+        using var publisher = new MachinePublisher(mqtt, identity, TelemetryMapper.Manifest(identity, HeartbeatInterval, _signals), time, logger);
+        await publisher.AttachAsync().ConfigureAwait(false);
+        try { await Task.WhenAll(PollAsync(publisher, identity, stoppingToken), HeartbeatAsync(publisher, stoppingToken)).ConfigureAwait(false); }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
-        finally { state.Failure(); }
+        finally
+        {
+            state.Failure();
+            await publisher.ShutdownAsync(time.GetUtcNow(), TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }
     }
 
-    private async Task PollAsync(CancellationToken token)
+    private async Task PollAsync(MachinePublisher publisher, MachineIdentity identity, CancellationToken token)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(options.Value.PollIntervalSecond));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(options.Value.PollIntervalSecond), time);
         var failureLogged = false;
         do
         {
+            IReadOnlyList<MachineValue>? values = null;
             try
             {
                 using var client = clients.CreateClient("printer");
@@ -68,17 +93,9 @@ internal sealed class TelemetryWorker(IHttpClientFactory clients, IManagedMqttCl
                         jobResponse.EnsureSuccessStatusCode();
                         job = JsonDocument.Parse(await jobResponse.Content.ReadAsStringAsync(token).ConfigureAwait(false));
                     }
-                    var samples = TelemetryMapper.Map(printer.RootElement, job?.RootElement, DateTime.UtcNow);
+                    values = TelemetryMapper.Map(printer.RootElement, job?.RootElement, time.GetUtcNow(), identity);
                     state.Success();
                     failureLogged = false;
-                    foreach (var sample in samples)
-                    {
-                        if (!mqtt.IsConnected) break;
-                        if (sample.Message is BaseUnitValueDto number)
-                            await mqtt.Publish(Prefix + sample.Suffix, number).ConfigureAwait(false);
-                        else if (sample.Message is StringValueDto text)
-                            await mqtt.Publish(Prefix + sample.Suffix, text).ConfigureAwait(false);
-                    }
                 }
                 finally { job?.Dispose(); }
             }
@@ -93,40 +110,31 @@ internal sealed class TelemetryWorker(IHttpClientFactory clients, IManagedMqttCl
                     failureLogged = true;
                 }
             }
+
+            if (values is null)
+            {
+                await publisher.LostAsync(time.GetUtcNow()).ConfigureAwait(false);
+                continue;
+            }
+            // A printer with more extruders than the manifest names: the manifest grows before their values go out.
+            var prefix = identity.ExtensionPrefix + ".";
+            var before = _signals.Count;
+            _signals.UnionWith(values.Where(v => v.Path.StartsWith(prefix, StringComparison.Ordinal)).Select(v => v.Path[prefix.Length..]));
+            if (_signals.Count != before)
+            {
+                await publisher.UpdateManifestAsync(TelemetryMapper.Manifest(identity, HeartbeatInterval, _signals)).ConfigureAwait(false);
+            }
+            await publisher.ReachedAsync(values, time.GetUtcNow()).ConfigureAwait(false);
         } while (await timer.WaitForNextTickAsync(token).ConfigureAwait(false));
     }
 
-    private async Task HeartbeatAsync(CancellationToken token)
+    private async Task HeartbeatAsync(MachinePublisher publisher, CancellationToken token)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
-        long count = 0;
+        using var timer = new PeriodicTimer(HeartbeatInterval, time);
         do
         {
-            if (mqtt.IsConnected)
-            {
-                var now = DateTime.UtcNow;
-                // The states of an adapter of the data model: Running while the printer answers, CommunicationFault
-                // while it does not.
-                await mqtt.Publish(Prefix + "umati/Connection/State",
-                    new StringValueDto { Timestamp = now, Value = state.IsFresh ? "Running" : "CommunicationFault" }).ConfigureAwait(false);
-                await mqtt.Publish(Prefix + "umati/Connection/Heartbeat",
-                    new BaseUnitValueDto { Timestamp = now, Value = ++count, Unit = BaseUnit.One }).ConfigureAwait(false);
-                // Who the printer is, so a display can name it; again every five minutes, since nothing is retained.
-                if (count % 30 == 1)
-                {
-                    await PublishIdentificationAsync(now).ConfigureAwait(false);
-                }
-            }
+            await publisher.HeartbeatAsync(time.GetUtcNow()).ConfigureAwait(false);
         } while (await timer.WaitForNextTickAsync(token).ConfigureAwait(false));
-    }
-
-    private async Task PublishIdentificationAsync(DateTime now)
-    {
-        var settings = options.Value;
-        foreach (var (name, value) in new[] { ("Manufacturer", settings.ManufacturerName), ("Model", settings.Model), ("SerialNumber", settings.SerialNumber) })
-        {
-            await mqtt.Publish(Prefix + "umati/Identification/" + name, new StringValueDto { Timestamp = now, Value = value }).ConfigureAwait(false);
-        }
     }
 
     private static async Task<JsonDocument> ReadAsync(HttpClient client, string path, CancellationToken token)

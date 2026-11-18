@@ -5,6 +5,7 @@ using Pleiades.Playground.HealthChecks.AspNetCore;
 using Pleiades.Playground.JuiceBar.Api;
 using Pleiades.Playground.Mcp.Server;
 using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Mqtt.Extensions.Machines;
 
 const string Feature = "juicebar";
 
@@ -14,9 +15,13 @@ builder.Services.AddOptions<JuiceBarOptions>().BindConfiguration("JuiceBar")
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) && string.IsNullOrEmpty(uri.UserInfo),
         "JuiceBar:BaseUrl must be an HTTP(S) URL without credentials.")
     .Validate(o => o.MaximumQueueLength is >= 1 and <= 20, "JuiceBar:MaximumQueueLength must be 1..20.")
-    .Validate(o => new[] { o.Manufacturer, o.Model, o.SerialNumber }.All(part => !string.IsNullOrWhiteSpace(part)
-            && !part.Any(c => char.IsWhiteSpace(c) || "/+#_".Contains(c, StringComparison.Ordinal))),
-        "JuiceBar:Manufacturer, JuiceBar:Model and JuiceBar:SerialNumber must each be nonempty, fit in one MQTT topic segment and hold no '_', which separates them in the machine id.")
+    .Validate(o => new[] { o.ManufacturerName, o.Model, o.SerialNumber }.All(part => !string.IsNullOrWhiteSpace(part)),
+        "JuiceBar:ManufacturerName, JuiceBar:Model and JuiceBar:SerialNumber must each be nonempty.")
+    .Validate(o => Uri.TryCreate(o.ManufacturerUri, UriKind.Absolute, out var uri)
+        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) && !string.IsNullOrEmpty(uri.Host),
+        "JuiceBar:ManufacturerUri must be an HTTP(S) URL; its domain names the manufacturer in the machine id.")
+    .Validate(o => o.ProductInstanceUri.Length <= 255 && o.Identity.EffectiveProductInstanceUri.Length <= 255,
+        "JuiceBar:ProductInstanceUri must have at most 255 characters.")
     .ValidateOnStart();
 builder.Services.AddPleiadesHttpJsonOptions();
 builder.Services.AddPleiadesForwardedHeaders();
@@ -40,7 +45,11 @@ builder.Services.AddHostedService<MixerLiveWorker>();
 var mqtt = builder.Configuration.GetSection("Config:MqttDestination");
 if (!string.IsNullOrWhiteSpace(mqtt["ConnectionString"]))
 {
-    builder.Services.AddMqttClientHost().AddClient(mqtt);
+    // The last will of the binding: Connection/State = CommunicationFault, retained, as the broker publishes it when
+    // the connection of the adapter breaks off.
+    builder.Services.AddMqttClientHost().AddClient(mqtt, (services, client) => client.WithMachineLastWill(
+        services.GetRequiredService<Microsoft.Extensions.Options.IOptions<JuiceBarOptions>>().Value.MachineId,
+        services.GetRequiredService<TimeProvider>().GetUtcNow()));
     builder.Services.AddHostedService<TelemetryWorker>();
 }
 

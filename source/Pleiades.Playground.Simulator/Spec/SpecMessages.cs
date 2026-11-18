@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
+using Pleiades.Playground.Mqtt.Extensions.Machines;
 
 namespace Pleiades.Playground.Simulator.Spec;
 
@@ -39,7 +40,7 @@ internal static class SpecWire
     public const string Root = "machines";
 
     /// <summary>The most characters of one part of a machine id.</summary>
-    public const int MachineIdPartLength = 64;
+    public const int MachineIdPartLength = MachineBinding.MachineIdPartLength;
 
     /// <summary>
     /// The machine id of the spec binding, <c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>, for example
@@ -50,14 +51,7 @@ internal static class SpecWire
     /// </summary>
     public static string MachineId(string manufacturerUri, string model, string serialNumber)
     {
-        ArgumentNullException.ThrowIfNull(manufacturerUri);
-        var manufacturer = SpecOutputConfig.DomainOf(manufacturerUri);
-        var lastDot = manufacturer.LastIndexOf('.');
-        if (lastDot > 0)
-        {
-            manufacturer = manufacturer[..lastDot];
-        }
-        return string.Join('_', MachineIdPart(manufacturer), MachineIdPart(model), MachineIdPart(serialNumber));
+        return MachineBinding.MachineId(manufacturerUri, model, serialNumber);
     }
 
     /// <summary>
@@ -68,35 +62,7 @@ internal static class SpecWire
     /// </summary>
     public static string MachineIdPart(string? text)
     {
-        var written = (text ?? string.Empty)
-            .Replace("ä", "ae", StringComparison.Ordinal).Replace("ö", "oe", StringComparison.Ordinal).Replace("ü", "ue", StringComparison.Ordinal)
-            .Replace("Ä", "Ae", StringComparison.Ordinal).Replace("Ö", "Oe", StringComparison.Ordinal).Replace("Ü", "Ue", StringComparison.Ordinal)
-            .Replace("ß", "ss", StringComparison.Ordinal)
-            .Normalize(NormalizationForm.FormD);
-        var builder = new StringBuilder(written.Length);
-        foreach (var c in written)
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(c) == UnicodeCategory.NonSpacingMark)
-            {
-                continue;
-            }
-            var allowed = char.IsAsciiLetterOrDigit(c) || c == '-';
-            if (allowed || (builder.Length > 0 && builder[^1] != '-'))
-            {
-                builder.Append(allowed ? c : '-');
-            }
-        }
-        var part = builder.ToString();
-        while (part.Contains("--", StringComparison.Ordinal))
-        {
-            part = part.Replace("--", "-", StringComparison.Ordinal);
-        }
-        part = part.Trim('-');
-        if (part.Length > MachineIdPartLength)
-        {
-            part = part[..MachineIdPartLength].TrimEnd('-');
-        }
-        return part.Length == 0 ? "unknown" : part;
+        return MachineBinding.MachineIdPart(text);
     }
 
     /// <summary>The namespace of the elements of the model and of the manifest.</summary>
@@ -106,7 +72,7 @@ internal static class SpecWire
     public const string OemLevel = "oem";
 
     /// <summary>The MQTT 5 content type of a value and of the manifest.</summary>
-    public const string ContentType = "application/json";
+    public const string ContentType = MachineBinding.ContentType;
 
     /// <summary>The MQTT 5 content type of an event: a CloudEvent in structured mode.</summary>
     public const string EventContentType = "application/cloudevents+json; charset=utf-8";
@@ -127,17 +93,7 @@ internal static class SpecWire
     /// <exception cref="ArgumentException">A path with <c>x-</c> has no valid prefix segment.</exception>
     public static string Topic(string machineId, string path)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        if (path.StartsWith("x-", StringComparison.Ordinal))
-        {
-            var dot = path.IndexOf('.', StringComparison.Ordinal);
-            if (dot < 3 || !path[2..dot].All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) || c == '-'))
-            {
-                throw new ArgumentException($"'{path}' has no prefix x-<domain> of the model.", nameof(path));
-            }
-            return $"{Root}/{machineId}/{OemLevel}/{path[(dot + 1)..].Replace('.', '/')}";
-        }
-        return $"{Root}/{machineId}/{ModelLevel}/{path.Replace('.', '/')}";
+        return MachineBinding.Topic(machineId, path);
     }
 
     /// <summary>The level below the machine under which every event lies.</summary>
@@ -183,7 +139,7 @@ internal static class SpecWire
     /// <summary>Source time in UTC, ISO 8601 with milliseconds and <c>Z</c>.</summary>
     public static string Timestamp(DateTimeOffset timestamp)
     {
-        return timestamp.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture);
+        return MachineBinding.Timestamp(timestamp);
     }
 
     /// <summary>The value envelope <c>{timestamp, value, unit?, correlationId?}</c>.</summary>

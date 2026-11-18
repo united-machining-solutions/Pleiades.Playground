@@ -7,8 +7,8 @@ namespace Pleiades.Playground.Simulator.Spec;
 /// </summary>
 internal static class SpecElements
 {
-    public const string ModelVersion = "0.17.1";
-    public const string BindingVersion = "0.1.0-draft";
+    public const string ModelVersion = Pleiades.Playground.Mqtt.Extensions.Machines.MachineBinding.ModelVersion;
+    public const string BindingVersion = Pleiades.Playground.Mqtt.Extensions.Machines.MachineBinding.BindingVersion;
 
     public const string Manufacturer = "Identification.Manufacturer";
     public const string SerialNumber = "Identification.SerialNumber";
@@ -198,10 +198,7 @@ internal static class SpecElements
     /// </summary>
     public static string ExtensionPrefix(string manufacturerDomain)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(manufacturerDomain);
-#pragma warning disable CA1308 // A domain is lower case by convention, as in the machine id.
-        return $"x-{manufacturerDomain.Trim().ToLowerInvariant().Replace('.', '-')}";
-#pragma warning restore CA1308
+        return Pleiades.Playground.Mqtt.Extensions.Machines.MachineBinding.ExtensionPrefix(manufacturerDomain);
     }
 
     /// <summary>The full path of a signal of the manufacturer.</summary>

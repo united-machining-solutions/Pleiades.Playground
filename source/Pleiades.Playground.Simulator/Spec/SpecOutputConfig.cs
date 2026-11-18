@@ -118,12 +118,7 @@ internal sealed class SpecOutputConfig
     /// <summary>The domain of a web address, without a leading <c>www.</c>, in lower case.</summary>
     public static string DomainOf(string uri)
     {
-        ArgumentNullException.ThrowIfNull(uri);
-        var host = Uri.TryCreate(uri, UriKind.Absolute, out var parsed) && !string.IsNullOrEmpty(parsed.Host) ? parsed.Host : uri.Trim();
-#pragma warning disable CA1308 // A domain is lower case by convention.
-        host = host.ToLowerInvariant();
-#pragma warning restore CA1308
-        return host.StartsWith("www.", StringComparison.Ordinal) ? host[4..] : host;
+        return Pleiades.Playground.Mqtt.Extensions.Machines.MachineBinding.DomainOf(uri);
     }
 }
 
