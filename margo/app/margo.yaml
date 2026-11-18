@@ -59,6 +59,11 @@ parameters:
     targets:
       - pointer: HTTP_PORT
         components: ["default"]
+  httpsPort:
+    value: 443
+    targets:
+      - pointer: HTTPS_PORT
+        components: ["default"]
   appBind:
     value: "127.0.0.1"
     targets:
@@ -144,12 +149,18 @@ configuration:
         - parameter: httpBind
           name: Address of Traefik
           description: >-
-            The address Traefik answers on. 127.0.0.1 keeps it on the device; 0.0.0.0 opens the example app to
-            the network under its host names. The chat has no sign-in and spends the key of its language model,
+            The address Traefik answers on, over HTTP and HTTPS. 127.0.0.1 keeps it on the device; 0.0.0.0
+            opens the example app to the network under its host names. The chat has no sign-in and spends the key of its language model,
             so open it only to a network you control.
           schema: bindAddress
         - parameter: httpPort
           name: HTTP port of Traefik
+          schema: port
+        - parameter: httpsPort
+          name: HTTPS port of Traefik
+          description: >-
+            Traefik serves the example app over HTTPS as well, with a self-signed certificate it generates
+            itself: a browser warns until you accept it.
           schema: port
         - parameter: appBind
           name: Address of the example app

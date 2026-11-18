@@ -1,6 +1,7 @@
 import { energyTools } from "@/cards/energy/chat.tsx"
 import { machineTools } from "@/cards/machine/chat.tsx"
 import { measurementTools } from "@/cards/measurement/chat.tsx"
+import { siteTools } from "@/cards/site/chat.tsx"
 import { timeseriesTools } from "@/cards/timeseries/chat.tsx"
 
 import { backendTools } from "./tool-results.ts"
@@ -17,5 +18,6 @@ export const chatTools: ReadonlyArray<ChatTool> = [
   ...energyTools,
   ...machineTools,
   ...measurementTools,
+  ...siteTools,
   ...timeseriesTools,
 ]

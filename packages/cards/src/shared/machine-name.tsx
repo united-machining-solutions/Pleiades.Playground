@@ -9,11 +9,11 @@ import { machineIdPieces } from "./machine-id.ts"
 export function MachineName({ id }: { id: string }) {
   return (
     <span className="min-w-0 whitespace-normal">
-      {machineIdPieces(id).map((part, index) => (
+      {machineIdPieces(id).map((piece, index) => (
         <Fragment key={index}>
           {index > 0 && <wbr />}
           {/* No break at the hyphens inside a part. */}
-          <span className="whitespace-nowrap">{part}</span>
+          <span className="whitespace-nowrap">{piece}</span>
         </Fragment>
       ))}
     </span>

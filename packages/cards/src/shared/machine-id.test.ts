@@ -10,6 +10,8 @@ test("a machine id breaks only after `_`, never inside a model or a serial numbe
 
 test("an id without `_` stays whole, and the parts give the id back", () => {
   assert.deepEqual(machineIdPieces("P-04"), ["P-04"])
+  // Two underscores in a row, or one at the end, give no empty piece.
+  assert.deepEqual(machineIdPieces("a__b_"), ["a_", "_", "b_"])
   const id = "taygeta-precision_TP-800_P-07"
   assert.equal(machineIdPieces(id).join(""), id)
 })
