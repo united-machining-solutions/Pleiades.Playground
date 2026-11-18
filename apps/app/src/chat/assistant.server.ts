@@ -6,8 +6,6 @@ import { mcp } from "@tanstack/ai-mcp/harness"
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
 
-import { isTitan, titanInstructions } from "@/titan/persona.ts"
-
 import { chatTools } from "./cards.tsx"
 import { chatSettings } from "./gateway.ts"
 import type { ChatSettings } from "./gateway.ts"
@@ -15,6 +13,7 @@ import { withTimeZone } from "./local-times.ts"
 import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
 import { leftOut, mcpServers, serverSwitch } from "./mcp-servers.ts"
+import { personaInstructions } from "./personas.server.ts"
 import { forModel } from "./tool-results.ts"
 
 // The agent harness of the app. It runs on the server only: the keys of the language models stay
@@ -82,13 +81,14 @@ const modelTools = definePlugin({
 
 // Every tool that takes a time zone is called with the one of the person who asks. What the
 // browser sent along with the question is the context of the run.
-// A question asked on Titan's screen gets Titan's instructions as well (titan/persona.ts); a chat
-// in the sidebar keeps the shared ones alone.
-const titanPersona = defineChatMiddleware({
-  name: "titan-persona",
+// A question that names a persona gets its instructions as well, after the shared ones
+// (personas.server.ts); every other question keeps the shared ones alone.
+const persona = defineChatMiddleware({
+  name: "persona",
   onConfig(ctx, config) {
-    if (!isTitan(ctx.context)) return
-    return { systemPrompts: [...config.systemPrompts, titanInstructions] }
+    const added = personaInstructions(ctx.context)
+    if (!added) return
+    return { systemPrompts: [...config.systemPrompts, added] }
   },
 })
 
@@ -161,7 +161,7 @@ function build(settings: ModelSettings | undefined): Handler | null {
       // Of a chat's settings the browser may change the model and switch a further server off and
       // on, and nothing else.
       expose: { settings: ["model"], config: switches.exposed },
-      middleware: [titanPersona, localTimes],
+      middleware: [persona, localTimes],
       systemPrompts: opcuaUrl ? [instructions, opcuaInstructions] : [instructions],
       plugins: () => [tools, switchPlugin, modelTools],
     }),

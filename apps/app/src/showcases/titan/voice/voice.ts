@@ -1,4 +1,6 @@
-import { useEffect, useRef, useSyncExternalStore } from "react"
+import { useSyncExternalStore } from "react"
+
+import type { ChatTap, OpenChat } from "@/chat/extensions.ts"
 
 import { withoutList, withoutSaidAdvice } from "./facts.ts"
 import { piperIfReady, sentencesOf } from "./piper.ts"
@@ -339,54 +341,44 @@ function wordsOf(message: ChatMessage): string {
   return withoutSaidAdvice(withoutList(textOf(message)), message.id)
 }
 
+/** The open chat, while Titan's page takes part in it: a question asked by voice goes on in it. */
+let followUp: ((question: string) => void) | undefined
+
 /**
- * For the open chat: the orb thinks while an answer arrives, and the answer is read aloud once it
- * is complete, while voice is on.
+ * For the open chat, while Titan's page takes part in it (chat/extensions.ts): the orb thinks while an
+ * answer arrives, the answer is read aloud as it arrives while voice is on, and a question asked by
+ * voice goes on in this chat.
  */
-export function useSpokenAnswers(messages: ReadonlyArray<ChatMessage>, isLoading: boolean) {
-  // How far the newest answer has been handed to the voice. An answer that was there when the chat
-  // opened has been said already.
-  const said = useRef<{ id?: string; at: number } | undefined>(undefined)
-  useEffect(() => {
-    thinking = isLoading
-    if (state !== "speaking" && state !== "listening") setState(isLoading ? "thinking" : "idle")
-    const last = messages.at(-1)
-    if (said.current === undefined) {
-      said.current = last?.role === "assistant" && !isLoading ? { id: last.id, at: wordsOf(last).length } : { at: 0 }
-      if (said.current.id) return
-    }
-    if (!enabled || !last || last.role !== "assistant") return
-    if (said.current.id !== last.id) said.current = { id: last.id, at: 0 }
-    // While the answer arrives, each complete sentence is said at once; the rest when it is complete.
-    const words = wordsOf(last)
-    const end = isLoading ? sentencesEnd(words, said.current.at) : words.length
-    if (end <= said.current.at) return
-    const piece = forSpeech(words.slice(said.current.at, end))
-    said.current.at = end
-    if (piece) void sayNext(piece)
-  }, [messages, isLoading])
-  useEffect(
-    () => () => {
+export function speakingAnswers(chat: OpenChat): ChatTap {
+  followUp = chat.send
+  // How far the newest answer has been handed to the voice. An answer that was there when the page
+  // came has been said already.
+  let said: { id?: string; at: number } | undefined
+  return {
+    update(messages, isLoading) {
+      thinking = isLoading
+      if (state !== "speaking" && state !== "listening") setState(isLoading ? "thinking" : "idle")
+      const last = messages.at(-1)
+      if (said === undefined) {
+        said = last?.role === "assistant" && !isLoading ? { id: last.id, at: wordsOf(last).length } : { at: 0 }
+        if (said.id) return
+      }
+      if (!enabled || !last || last.role !== "assistant") return
+      if (said.id !== last.id) said = { id: last.id, at: 0 }
+      // While the answer arrives, each complete sentence is said at once; the rest when it is complete.
+      const words = wordsOf(last)
+      const end = isLoading ? sentencesEnd(words, said.at) : words.length
+      if (end <= said.at) return
+      const piece = forSpeech(words.slice(said.at, end))
+      said.at = end
+      if (piece) void sayNext(piece)
+    },
+    detach() {
+      if (followUp === chat.send) followUp = undefined
       thinking = false
       setState("idle")
     },
-    [],
-  )
-}
-
-let followUp: ((question: string) => void) | undefined
-
-/** For the open chat: a question asked by voice on the page goes on in this chat. */
-export function useFollowUps(send: (question: string) => void) {
-  const latest = useRef(send)
-  latest.current = send
-  useEffect(() => {
-    const handler = (question: string) => latest.current(question)
-    followUp = handler
-    return () => {
-      if (followUp === handler) followUp = undefined
-    }
-  }, [])
+  }
 }
 
 /** Asks in the open chat, if one is open. False if none is: then a new chat begins. */

@@ -298,7 +298,9 @@ same in two paragraphs.](images/tour/machine-card-in-host.png)
 
 ## 5. Titan, the assistant you talk to
 
-<http://localhost:5600/assistant>, "Titan" in the sidebar, is Titan: the chat without a keyboard, a black screen
+Titan is a showcase: it is built in only where `APP_SHOWCASES` is set in `.env`, for example
+`APP_SHOWCASES=true`, which starts the image `pleiades.playground.app.showcases`. Then
+<http://localhost:5600/titan>, "Titan" in the sidebar, is Titan: the chat without a keyboard, a black screen
 with a cloud of glowing points that greets, listens and speaks German. A first click or press of the space bar
 starts it. Then say "Hey Titan" and the question, or "Hey Titan" alone and the question after its "Ja?";
 holding the space bar works too. Titan says "Moment." at once, and the question goes to the chat of stop 4.
@@ -306,14 +308,16 @@ The screen is dark, clean and never scrolls: one glance shows only what matters 
 asks to go deeper. In the middle the answer in one sentence, what to do in one line, at most the one card
 that was asked for, made to fit, and quietly the question Titan offers next; the rest Titan only says. A
 new question clears what the one before showed, and the cloud steps back, large and faint behind the
-answer. On the right stands the escalation, computed from the values and not by the model, one line for
-each machine: red what stands, amber what still runs but reports a warning
-([`apps/app/src/titan/escalation.ts`](../apps/app/src/titan/escalation.ts)). A recommendation
+answer. On top stands the escalation, computed from the values and not by the model, one slim line: red
+what stands, amber what still runs but reports a warning
+([`apps/app/src/showcases/titan/escalation.ts`](../apps/app/src/showcases/titan/escalation.ts)). A recommendation
 is said once and then only shown. "Hey Titan, Pause" or the key P pauses it; "Hey Titan" or the space bar wakes it.
 It speaks only once started and while its tab is in front. Escape leaves the screen.
 
 Titan answers first, then adds at most one hint nobody asked for and one suggestion, and says plainly when
-the data cannot answer. Its chats begin with the fastest model the settings name (Haiku at the hub), which
+the data cannot answer. These are Titan's own instructions: its page names Titan's persona with every
+question, and only then does the server add them to the shared ones; the chat in the sidebar answers as it
+always does. Its chats begin with the fastest model the settings name (Haiku at the hub), which
 is asked to answer without thinking first, so that a card stands after about a second.
 
 With a camera, Titan greets whoever steps in front of it: by name when the face is known, and straight away
@@ -339,10 +343,11 @@ Two answers belong to the assistant. `genui_shopfloor_show` draws the hall as a 
 greyed out and over each other one its reason. `genui_view_show` lets the language model lay out a view
 from blocks; it never writes a number, every value is computed by the backend, with its source.
 
-**In the code:** [`apps/app/src/routes/assistant.tsx`](../apps/app/src/routes/assistant.tsx) is the page,
-[`apps/app/src/voice/`](../apps/app/src/voice) the cloud (`cloud.tsx`), listening (`transcribe.ts`, `wake.ts` for
+**In the code:** [`apps/app/src/routes/(showcases)/titan.tsx`](../apps/app/src/routes/%28showcases%29/titan.tsx) is the
+page, [`apps/app/src/showcases/titan/`](../apps/app/src/showcases/titan) the rest: `chat.ts` and `persona.ts`
+how it takes part in the chat, [`voice/`](../apps/app/src/showcases/titan/voice) the cloud (`cloud.tsx`), listening (`transcribe.ts`, `wake.ts` for
 "Hey Titan"), speaking (`voice.ts`, `tom.ts`), the greeting (`greeting.ts`) and the watch over the hall (`faults.ts`);
-[`apps/app/src/titan/faces/`](../apps/app/src/titan/faces) the faces. The plan of the hall is
+[`faces/`](../apps/app/src/showcases/titan/faces) the faces. The plan of the hall is
 [`apps/genui-mcp/src/hall.ts`](../apps/genui-mcp/src/hall.ts), its card
 [`packages/cards/src/shopfloor/`](../packages/cards/src/shopfloor), and the blocks of a view
 [`apps/genui-mcp/src/views.ts`](../apps/genui-mcp/src/views.ts).

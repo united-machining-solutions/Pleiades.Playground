@@ -34,18 +34,18 @@ import { CircleAlertIcon, LockIcon, ScanFaceIcon, Trash2Icon, VideoOffIcon } fro
 import { Fragment, useEffect, useRef, useState } from "react"
 import type { FormEvent } from "react"
 
-import { openCamera } from "@/titan/faces/camera.ts"
-import type { CameraSource } from "@/titan/faces/camera.ts"
-import { captureDescriptors, loadDetector, lookAt } from "@/titan/faces/detector.ts"
-import { bestMatch } from "@/titan/faces/match.ts"
-import { addPerson, deleteAllPeople, deletePerson, listPeople, onPeopleChange } from "@/titan/faces/store.ts"
-import type { EnrolledPerson } from "@/titan/faces/store.ts"
+import { openCamera } from "@/showcases/titan/faces/camera.ts"
+import type { CameraSource } from "@/showcases/titan/faces/camera.ts"
+import { captureDescriptors, loadDetector, lookAt } from "@/showcases/titan/faces/detector.ts"
+import { bestMatch } from "@/showcases/titan/faces/match.ts"
+import { addPerson, deleteAllPeople, deletePerson, listPeople, onPeopleChange } from "@/showcases/titan/faces/store.ts"
+import type { EnrolledPerson } from "@/showcases/titan/faces/store.ts"
 
 /**
  * Enrols the faces Titan recognises, and shows whom it recognises now. Everything happens in this
  * browser: the descriptors of the faces are kept in its IndexedDB and are sent nowhere.
  */
-export const Route = createFileRoute("/titan/faces")({
+export const Route = createFileRoute("/(showcases)/titan/faces")({
   staticData: { nav: { title: "Faces", icon: ScanFaceIcon } },
   component: Faces,
 })

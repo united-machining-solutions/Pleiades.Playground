@@ -1,0 +1,28 @@
+/*
+ * Titan's screen is dark: the tokens of the theme, turned for a dark room, over everything under
+ * the element that has this class, the cards it draws included. The colours of the states and of the
+ * charts stay as they are: they carry a meaning.
+ */
+.titan-night {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.2 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.2 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --border: oklch(1 0 0 / 12%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    color-scheme: dark;
+}
+
+/* On Titan's screen a card shows its values, not where they were read: that line is for the chat. */
+.titan-night [data-slot="card-footer"] {
+    display: none;
+}

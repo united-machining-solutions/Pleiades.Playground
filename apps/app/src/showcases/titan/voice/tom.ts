@@ -22,7 +22,7 @@ let asking: Promise<boolean> | undefined
  * ready, the next call asks again.
  */
 export function tomAvailable(): Promise<boolean> {
-  asking ??= fetch("/api/speak")
+  asking ??= fetch("/titan/api/speak")
     .then(async (answer) => answer.ok && ((await answer.json()) as { available?: boolean }).available === true)
     .catch(() => false)
     .then((available) => {
@@ -36,7 +36,7 @@ export function tomAvailable(): Promise<boolean> {
 export async function speakAsTom(text: string): Promise<Blob> {
   const sentence = speakableText(text)
   if (sentence === undefined) throw new Error("Nothing to say, or more than a sentence")
-  const answer = await fetch("/api/speak", {
+  const answer = await fetch("/titan/api/speak", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text: sentence }),

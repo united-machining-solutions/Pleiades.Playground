@@ -4,6 +4,9 @@ import { SparklesIcon } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import { pickModel, useChatPanel } from "@/chat/ask.ts"
+import { useChatExtension } from "@/chat/extensions.ts"
+import { TITAN_CHAT } from "@/showcases/titan/chat.ts"
+import "@/showcases/titan/titan.css"
 import {
   askFollowUp,
   canListen,
@@ -16,22 +19,22 @@ import {
   stopListening,
   stopSpeaking,
   useVoiceState,
-} from "@/voice/voice.ts"
-import type { VoiceState } from "@/voice/voice.ts"
-import { tom, tomAvailable } from "@/voice/tom.ts"
-import { faultBriefing, faultInWords, useNewFaults } from "@/voice/faults.ts"
-import { useShown } from "@/voice/shown.ts"
-import { loadRecognition } from "@/voice/transcribe.ts"
-import { isPause, useWakeWord } from "@/voice/wake.ts"
-import { greetingFor } from "@/voice/greeting.ts"
-import { keyFactsOf, machinesNamed } from "@/titan/board.ts"
-import type { MachineFacts } from "@/titan/board.ts"
-import { escalationsOf } from "@/titan/escalation.ts"
-import { EscalationView } from "@/titan/escalation-view.tsx"
-import { FocusView } from "@/titan/focus-view.tsx"
-import { asksToSee, unbroken } from "@/titan/words.ts"
-import { usePresence } from "@/titan/faces/presence.ts"
-import { Cloud } from "@/voice/cloud.tsx"
+} from "@/showcases/titan/voice/voice.ts"
+import type { VoiceState } from "@/showcases/titan/voice/voice.ts"
+import { tom, tomAvailable } from "@/showcases/titan/voice/tom.ts"
+import { faultBriefing, faultInWords, useNewFaults } from "@/showcases/titan/voice/faults.ts"
+import { useShown } from "@/showcases/titan/voice/shown.ts"
+import { loadRecognition } from "@/showcases/titan/voice/transcribe.ts"
+import { isPause, useWakeWord } from "@/showcases/titan/voice/wake.ts"
+import { greetingFor } from "@/showcases/titan/voice/greeting.ts"
+import { keyFactsOf, machinesNamed } from "@/showcases/titan/board.ts"
+import type { MachineFacts } from "@/showcases/titan/board.ts"
+import { escalationsOf } from "@/showcases/titan/escalation.ts"
+import { EscalationView } from "@/showcases/titan/escalation-view.tsx"
+import { FocusView } from "@/showcases/titan/focus-view.tsx"
+import { asksToSee, unbroken } from "@/showcases/titan/words.ts"
+import { usePresence } from "@/showcases/titan/faces/presence.ts"
+import { Cloud } from "@/showcases/titan/voice/cloud.tsx"
 
 // Titan: a black screen with a cloud of points that greets, listens and speaks, and nothing else.
 //
@@ -77,7 +80,7 @@ function useTabInFront(): boolean {
 
 const root = getRouteApi("__root__")
 
-export const Route = createFileRoute("/assistant")({
+export const Route = createFileRoute("/(showcases)/titan")({
   staticData: { nav: { title: "Titan", icon: SparklesIcon } },
   component: Assistant,
 })
@@ -92,6 +95,8 @@ const said: Record<VoiceState, string> = {
 
 function Assistant() {
   const panel = useChatPanel()
+  // The page takes part in the open chat: Titan's persona, the voice and the screen (showcases/titan/chat.ts).
+  useChatExtension(TITAN_CHAT)
   const navigate = useNavigate()
   const state = useVoiceState()
   const { cards, briefing, question } = useShown()

@@ -1,6 +1,6 @@
 // Which speech recognition the assistant page takes. With a transcription model at the gateway of
 // the chat, such as the hub of the hackathon, the recording goes to it through the app's server
-// (src/routes/api/voice/transcribe.ts): nothing to download, the key stays on the server. Without
+// (src/routes/(showcases)/titan.api.transcribe.ts): nothing to download, the key stays on the server. Without
 // one, Whisper recognises it in the browser (whisper.ts).
 
 import { loadWhisper, transcribe as transcribeInBrowser } from "./whisper.ts"
@@ -23,7 +23,7 @@ let server: Promise<boolean> | undefined
 
 /** Whether the app's server can transcribe. Asked once; a failed question is asked again. */
 function serverTranscribes(): Promise<boolean> {
-  server ??= fetch("/api/voice/transcribe")
+  server ??= fetch("/titan/api/transcribe")
     .then((answer) => (answer.ok ? answer.json() : { available: false }))
     .then((body: { available?: boolean }) => body.available === true)
   server.catch(() => {
@@ -47,7 +47,7 @@ export async function transcribe(recording: Blob): Promise<string> {
   if (!(await serverTranscribes().catch(() => false))) return transcribeInBrowser(recording)
   // Less than a few kilobytes is a tap of the key, not a question.
   if (recording.size < 2_000) return ""
-  const answer = await fetch("/api/voice/transcribe", {
+  const answer = await fetch("/titan/api/transcribe", {
     method: "POST",
     headers: { "content-type": recording.type || "audio/webm" },
     body: recording,

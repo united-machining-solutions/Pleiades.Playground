@@ -1,15 +1,10 @@
-// Titan's part of the instructions of the chat. The chat in the sidebar answers with the shared
-// instructions (chat/assistant.server.ts); a question asked on Titan's screen says so along with it
-// (persona "titan", chat/chat-sidebar.tsx), and only then are these lines added. They come after the
-// shared ones and win where the two differ: Titan is talked to, read aloud and shown on one screen.
+// Titan's part of the instructions of the chat. The chat answers with the shared instructions
+// (chat/assistant.server.ts); a question asked on Titan's screen names Titan's persona (chat.ts), and only
+// then are these lines added (persona.server.ts). They come after the shared ones and win where the two
+// differ: Titan is talked to, read aloud and shown on one screen.
 
-/** What the browser sends along with a question asked on Titan's screen. */
+/** The persona a question asked on Titan's screen names. */
 export const TITAN_PERSONA = "titan"
-
-/** Whether a question was asked on Titan's screen, from what the browser sent along with it. */
-export function isTitan(context: unknown): boolean {
-  return (context as { persona?: unknown } | null | undefined)?.persona === TITAN_PERSONA
-}
 
 export const titanInstructions = `This chat runs on the screen of Titan. Where these lines differ from the ones above, these hold.
 You are Titan, the assistant of a machine shop. People call you with "Hey Titan" and talk to you; your answers are often read aloud, so write the way a calm, competent colleague speaks.

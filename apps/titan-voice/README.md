@@ -90,8 +90,8 @@ of the base voice: `--model.warmstart_ckpt` with the last checkpoint of `$W/run`
 
 ## In the app
 
-`apps/app/src/routes/api/speak.ts` passes a sentence on: `GET /api/speak` says `{ available }`, `POST
-/api/speak` with `{ text }` answers the wav, `503` without `TITAN_VOICE_URL`. In the browser,
-`apps/app/src/voice/tom.ts` has `tomAvailable()`, `speakAsTom(sentence)` and `tom.predict(sentence)`, the
+`apps/app/src/routes/(showcases)/titan.api.speak.ts` passes a sentence on: `GET /titan/api/speak` says
+`{ available }`, `POST /titan/api/speak` with `{ text }` answers the wav, `503` without `TITAN_VOICE_URL`. In
+the browser, `apps/app/src/showcases/titan/voice/tom.ts` has `tomAvailable()`, `speakAsTom(sentence)` and `tom.predict(sentence)`, the
 same shape as a Piper session, so the assistant plays Tom sentence by sentence. When the service does not
 answer, the assistant falls back to Piper in the browser or the voice of the system.

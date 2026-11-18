@@ -1,8 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router"
 
+// Titan's persona: the chat adds Titan's instructions to the questions asked on its screen.
+import "@/showcases/titan/persona.server.ts"
+
 import { dictationPrompt } from "@/chat/dictation.server.ts"
 import { chatSettings } from "@/chat/gateway.ts"
-import { transcriptionFile } from "@/voice/transcribe.ts"
+import { transcriptionFile } from "@/showcases/titan/voice/transcribe.ts"
 
 // Speech recognition for Titan: the browser sends a short recording, and gets back what was said, in
 // one answer. It takes the model of the dictation in the chat (dictation.server.ts), the first one
@@ -40,7 +43,7 @@ async function transcribe({ request }: { request: Request }) {
   return Response.json({ text: (text ?? "").trim() })
 }
 
-export const Route = createFileRoute("/api/voice/transcribe")({
+export const Route = createFileRoute("/(showcases)/titan/api/transcribe")({
   server: {
     handlers: {
       GET: async () => Response.json({ available: (await chatSettings()).dictation !== undefined }),

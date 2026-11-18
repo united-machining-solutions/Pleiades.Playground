@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router"
 
-import { MAX_SENTENCE, speakableText } from "@/voice/tom.ts"
+// Titan's persona: the chat adds Titan's instructions to the questions asked on its screen.
+import "@/showcases/titan/persona.server.ts"
+
+import { MAX_SENTENCE, speakableText } from "@/showcases/titan/voice/tom.ts"
 
 // The voice of Tom for Titan: a service of the stack (TITAN_VOICE_URL, see apps/titan-voice) turns a
 // sentence into a wav. The browser does not reach it directly; this passes the sentence on.
@@ -43,7 +46,7 @@ async function speak({ request }: { request: Request }) {
   return new Response(answer.body, { headers: { "Content-Type": "audio/wav", "Cache-Control": "no-store" } })
 }
 
-export const Route = createFileRoute("/api/speak")({
+export const Route = createFileRoute("/(showcases)/titan/api/speak")({
   server: {
     handlers: {
       GET: async () => Response.json({ available: await available() }),

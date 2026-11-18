@@ -4,7 +4,7 @@ import { ArrowRightIcon } from "lucide-react"
 import { useLayoutEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
 
-import type { Briefing } from "@/voice/facts.ts"
+import type { Briefing } from "@/showcases/titan/voice/facts.ts"
 
 import { splitHeadline } from "./board.ts"
 import { unbroken } from "./words.ts"

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
 
-import type { VoiceState } from "@/voice/voice.ts"
+import type { VoiceState } from "@/showcases/titan/voice/voice.ts"
 
 // The face of the assistant: a cloud of glowing points that turns slowly in the dark.
 //
