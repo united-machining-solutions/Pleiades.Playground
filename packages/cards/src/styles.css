@@ -13,8 +13,23 @@
  * line here, in the order of the alphabet; styles.test.ts fails if one is missing or left over.
  */
 @source "../../ui/src/components/badge.tsx";
+@source "../../ui/src/components/button.tsx";
 @source "../../ui/src/components/card.tsx";
 @source "../../ui/src/components/chart.tsx";
 @source "../../ui/src/components/item.tsx";
+@source "../../ui/src/components/meter.tsx";
+@source "../../ui/src/components/pagination.tsx";
 @source "../../ui/src/components/separator.tsx";
 @source "../../ui/src/components/skeleton.tsx";
+@source "../../ui/src/components/table.tsx";
+@source "../../ui/src/components/toggle.tsx";
+@source "../../ui/src/components/toggle-group.tsx";
+/* The rows of a card that turns its pages fade in; a page with reduced motion skips it. */
+@theme {
+  --animate-card-fade-in: card-fade-in 160ms ease-out;
+  @keyframes card-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+}

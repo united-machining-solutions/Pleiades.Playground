@@ -1,3 +1,4 @@
+import { energyTools } from "@/cards/energy/chat.tsx"
 import { machineTools } from "@/cards/machine/chat.tsx"
 import { measurementTools } from "@/cards/measurement/chat.tsx"
 import { opcuaTools } from "@/cards/opcua/chat.tsx"
@@ -16,6 +17,7 @@ import type { ChatTool } from "./tool-results.ts"
  */
 export const chatTools: ReadonlyArray<ChatTool> = [
   ...backendTools,
+  ...energyTools,
   ...machineTools,
   ...measurementTools,
   ...opcuaTools,

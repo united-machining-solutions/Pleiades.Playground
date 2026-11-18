@@ -1,3 +1,4 @@
+import { energyCard } from "./energy.ts"
 import { machineCard } from "./machine.ts"
 import { measurementCard } from "./measurement.ts"
 import { siteCard } from "./site.ts"
@@ -8,6 +9,7 @@ import { siteCard } from "./site.ts"
  * file from it, and the description and the guide take their text about the card.
  */
 export const cards = [
+  energyCard,
   machineCard,
   measurementCard,
   siteCard,
