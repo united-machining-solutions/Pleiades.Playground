@@ -26,6 +26,11 @@ function fail(why, error) {
   process.exit(1)
 }
 
+// The whole tree, with the pages of the showcases: an editor and the typecheck read every route file, also
+// those a build without APP_SHOWCASES leaves out (vite.config.ts). The development server and the build
+// write the tree again, as their own setting says.
+process.env.APP_SHOWCASES ||= "true"
+
 await resolveConfig({ root: fileURLToPath(app) }, "build").catch((error) =>
   fail("Vite could not read vite.config.ts.", error),
 )
