@@ -10,6 +10,7 @@ import { ShownTimeseries } from "./shown-timeseries.tsx"
 export const timeseriesTools: ReadonlyArray<ChatTool> = [
   {
     name: "genui_timeseries_show",
+    part: "Signals of machines over a range of time",
     label: {
       running: "Reading the time series",
       done: "Read the time series",

@@ -618,10 +618,14 @@ function Endpoints({ values }: { values: RankedEndpoints }) {
 
 const label = (running: string, done: string, failed: string): ToolLabel => ({ running, done, failed })
 
+// The cards of the OPC UA adapter are for the chat only (`saveAsPage: false`): a page asks the generative UI
+// backend alone (pages/call-part.ts), which has no opcua_* tool, and a scan is no part to run again
+// each time a page opens.
 export const opcuaTools: ReadonlyArray<ChatTool> = [
   {
     name: "opcua_server_list",
     label: label("Reading the OPC UA servers", "Read the OPC UA servers", "Failed to read the OPC UA servers"),
+    saveAsPage: false,
     draw(content) {
       const values = serverListOf(content)
       return values && <Servers values={values} />
@@ -630,6 +634,7 @@ export const opcuaTools: ReadonlyArray<ChatTool> = [
   {
     name: "opcua_machine_list",
     label: label("Looking for the machines of the server", "Looked for the machines of the server", "Failed to look for the machines"),
+    saveAsPage: false,
     draw(content) {
       const values = machineListOf(content)
       return values && <ServedMachines values={values} />
@@ -638,6 +643,7 @@ export const opcuaTools: ReadonlyArray<ChatTool> = [
   {
     name: "opcua_mapping_show",
     label: label("Reading the mapping", "Read the mapping", "Failed to read the mapping"),
+    saveAsPage: false,
     draw(content) {
       const values = mappingOf(content)
       return values && <ShownMapping values={values} />
@@ -646,6 +652,7 @@ export const opcuaTools: ReadonlyArray<ChatTool> = [
   {
     name: "opcua_registration_propose",
     label: label("Trying the registration on the server", "Tried the registration on the server", "Failed to try the registration"),
+    saveAsPage: false,
     draw(content) {
       const values = proposalOf(content)
       return values && <ShownProposal values={values} />
@@ -654,6 +661,7 @@ export const opcuaTools: ReadonlyArray<ChatTool> = [
   {
     name: "opcua_endpoint_rank",
     label: label("Asking the server for its endpoints", "Asked the server for its endpoints", "Failed to reach the server"),
+    saveAsPage: false,
     draw(content) {
       const values = rankedEndpointsOf(content)
       return values && <Endpoints values={values} />

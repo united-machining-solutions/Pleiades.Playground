@@ -28,3 +28,4 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0017](0017-the-words-of-a-tool-result-are-a-display.md) | The words of a tool result may name the unit people use | proposed |
 | [0018](0018-a-showcase-is-built-in-on-request-and-only-adds.md) | A showcase is built in on request and only adds | proposed |
 | [0019](0019-documentation-sources-in-chat.md) | Documentation sources and original PDFs in chat through MCP | proposed |
+| [0020](0020-the-language-model-composes-a-page-and-nothing-else.md) | The language model composes a page, and nothing else | proposed |

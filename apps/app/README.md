@@ -22,8 +22,12 @@ harness.
   of the chat makes one: all the cards of that answer, in their order, titled with the question. It stands
   under an answer that has ended and for which the chat drew a card, and needs no language model: the app
   reads the tool calls from the answer it already has. The page opens beside the chat, which stays open, and
-  the row under the answer then says "Saved as page" and links to it. Nothing is kept unless a person
-  presses it. A page is a recipe: a title
+  the row under the answer then says "Saved as page" and links to it. Asked for a page, a dashboard or an
+  overview, the chat proposes one instead: the model finds out with its tools what there is to show and
+  composes a recipe with the tool of the app `app_page_propose`, which the app checks against the tools a
+  page can call. The chat shows the proposal with its title and its parts in words, "Save to my pages" and
+  "Preview", which opens it as a link opens. Nothing is kept unless a person presses it. Why:
+  [ADR-0020](../../docs/adr/0020-the-language-model-composes-a-page-and-nothing-else.md). A page is a recipe: a title
   and its parts in their order, each part a tool of `genui-mcp` with its arguments. No value is kept and no
   sentence of a language model: opening a page calls the tools again and draws each answer with the card
   the chat draws for that tool, so it shows what holds now and needs no language model. It is read once, and
@@ -208,6 +212,12 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   calls the chat drew a result for, in their order, without the time zone, the same call once, and the
   question as its title. An answer is everything the model said after one question, in more than one
   message; an answer with more calls than a page holds (12) keeps the first 12, and the row says so.
+  `proposal.ts` checks a page the language model proposes (`proposePage`): only tools a page can call, the
+  schema of a part, no time zone, the same part once, at most 12, and each part left out with a reason the
+  model can act on; it also reads the recipe back from the result for the chat (`proposedRecipe`).
+  `kept-proposals.ts` notes which page a proposal was kept as, by the id of its tool call, under a key of its
+  own, `pleiades-playground.proposals.v1`: so a proposal still says "Saved as page" after a reload and after the
+  page was renamed or its parts changed, and does not offer to keep a second page.
 - `src/routeTree.gen.ts`: written from the route files and not in the repository, so that two branches with
   a page each have nothing to merge in it. `pnpm install` and `pnpm typecheck` write it
   (`route-tree.mjs`), and so do the development server and the build. Never edit it. TanStack advises to
@@ -261,10 +271,12 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   what a chat is called (`chatName`, `nameOfQuestion`), `ask.ts` which chat the panel shows, in the URL
   (`?chat=`: `new` is the list), and where the first question of a new chat waits,
   `save-as-page.tsx` the row under an answer with "Save as page" (chrome of the app, never part of a card),
+  `propose-page.ts` the one tool of the app the model gets, `app_page_propose`, and `proposed-page.tsx` the
+  proposal the chat draws for its result,
   `dictate.tsx` the microphone in its field and `dictation.server.ts` the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for
-  which tool, and its server which tools a language model does not get. `tool-results.ts` says what a card
-  may say about a tool, `blocks.ts` turns an answer into blocks, and `answer.tsx` draws what the model writes
+  which tool, its server which tools a language model does not get, and the proposal of a page which tools a
+  page can call. `tool-results.ts` says what a card may say about a tool, `blocks.ts` turns an answer into blocks, and `answer.tsx` draws what the model writes
   ([TanStack Markdown](https://tanstack.com/markdown)).
 - `src/opcua/`: what the chat and its cards take of the OPC UA adapter. `commands.ts` holds the slash
   commands and `/help`, `adapter.ts` the server functions behind the buttons that add and remove a machine.

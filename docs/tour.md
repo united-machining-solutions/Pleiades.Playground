@@ -240,6 +240,12 @@ that are not pinned, the newest first, and a page that is pinned from its head m
 beside Home. "Edit" in its head moves a card up or down and removes one, with no language model; "Undo" in
 the toast puts a removed card back.
 
+Ask the chat for a page, for example "Make me a page with all machines and P-04", and it proposes one. The model
+reads with its tools what there is to show and composes the page: a title, and the cards in their order, each
+with the machine and the hours it shows. It writes no value and cannot keep the page. The chat shows the
+proposal with its parts in words; "Preview" opens it with the values of now, and "Save to my pages" keeps it in
+this browser. What you asked for that no card shows, the model says in words.
+
 A page is private to the browser that keeps it, and the stack has no sign-in, so "Share" in its head gives a
 link that carries the recipe: which answers, for which machines and hours, and no value. Open it in a private
 window to see what a colleague sees: the page with the values of now, no chat and no language model needed,
@@ -298,7 +304,9 @@ at the right of the field.
 **In the code:** [`apps/app/src/chat/`](../apps/app/src/chat). `chat-sidebar.tsx` is the panel with the model
 picker and the head with the way back to the list, `chat-name.ts` what a chat is called,
 `save-as-page.tsx` the row under an answer with "Save as page" (the recipe of an answer is read in
-[`pages/from-answer.ts`](../apps/app/src/pages/from-answer.ts)), `dictate.tsx` the microphone, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
+[`pages/from-answer.ts`](../apps/app/src/pages/from-answer.ts)), `propose-page.ts` the tool with which the model
+proposes a page and `proposed-page.tsx` the proposal (the check is in
+[`pages/proposal.ts`](../apps/app/src/pages/proposal.ts)), `dictate.tsx` the microphone, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
 reads which models the settings name, `cards.tsx` lists what the app draws for which tool, card by card, and
 `suggestions.ts` holds the three questions.
 

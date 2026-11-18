@@ -35,7 +35,7 @@ function Pages() {
             </EmptyMedia>
             <EmptyTitle>No pages yet</EmptyTitle>
             <EmptyDescription>
-              Ask the chat something, and press "Save as page" under its answer. This browser keeps the page.
+              Ask the chat for a page, or press "Save as page" under one of its answers. This browser keeps the page.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
