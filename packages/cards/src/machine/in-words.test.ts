@@ -71,6 +71,20 @@ test("a silent machine has no data, and no program is named", () => {
   )
 })
 
+test("an adapter that says it does not reach its machine has no data since it said so, however often it repeats it", () => {
+  // The adapter lives, its newest value is five seconds old, and it has said CommunicationFault since 10:00.
+  const lost = machine({ connection: reading("CommunicationFault"), itemState: reading("Executing", { at: "2026-11-16T09:59:00.000+01:00" }) })
+  assert.equal(
+    machineInWords(lost, asOf),
+    "P-04: No data since 10:00, 30 min. No data from the adapter (The adapter says CommunicationFault. Last known: Executing at 09:59).",
+  )
+  const starting = machine({ connection: reading("Initializing", { sinceIsLowerBound: true }), itemState: reading("x", { value: null, at: null }) })
+  assert.equal(
+    machineInWords(starting, asOf),
+    "P-04: No data since before 10:00, at least 30 min. No data from the adapter (The adapter says Initializing. Nothing known about this machine).",
+  )
+})
+
 test("the card in words has the sums of the history as the backend added them up", () => {
   const history = {
     from: "2026-11-16T02:30:00.000+01:00",
