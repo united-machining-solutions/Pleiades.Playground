@@ -15,15 +15,45 @@ All notable changes are documented here. The format follows
   so under "Good to know" (`notices`, with the `machineId`), and the registration keeps it as
   `identity.manufacturerUriFromManufacturer`. A `Manufacturer` without any letter or digit `A-Z`, `0-9` is refused
   with that reason.
+- Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
+  `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
+  shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0020).
+- Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
+  no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
+- Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
+  each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
+  draws them with the notification card.
+- Example app: showcases. What is made for one demo or one fair lives in a folder of its own,
+  `apps/app/src/showcases/<name>/`, with its pages under `src/routes/(showcases)/`, and is built in only
+  where `APP_SHOWCASES` is set. The image `pleiades.playground.app` is the app alone, with nothing of a
+  showcase in it; the new image `pleiades.playground.app.showcases` is the same app built with all of
+  them, and `APP_SHOWCASES` in `.env` makes the stack take it. A showcase only adds: a test fails when a
+  file of the app reads from one or links to one of its pages. `AGENTS.md` and the skills `create-page`,
+  `create-card` and `build-your-own` ask whether a thing is base or a showcase
+  ([ADR-0018](docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)).
+- Documentation sources: original PDF viewer with paging, zoom and native/OCR page search, retrieved
+  through bounded MCP binary resources without adding PDFs to model context.
+- Example app: optional documentation MCP tools with clickable, revision-specific manual page sources in chat,
+  showing printed page labels alongside differing physical pages. Margo exposes the additional MCP server setting.
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
   self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
   that live values work over HTTPS. HTTP stays as it is.
 - Example app: the setting `MQTT_WSS_PATH` sends a page over HTTPS to the broker at that path of the page's
   origin, for a proxy in front of the app that forwards it to the broker.
-- Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
-  shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
-  from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
-  entry in the sidebar.
+- SimpleCAM adapter (`simplecam-adapter-9042`): reads the state of the SimpleCAM machine 9042 from the SSE stream
+  of the SimpleCAM backend and publishes it to the broker as `machines/united-grinding_simplecam_9042/umati/...`
+  after the data model 0.17.1, with the job as the active work master and its progress as a signal of the
+  manufacturer, and a change of its list of alerts as events on `events/notifications`. It is optional: it
+  starts with the Compose profile `simplecam`, and the setting `SIMPLECAM_SSE_URL` names the stream. It is not
+  part of the Margo app.
+- Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion of how an order is
+  followed across the shop floor. It shows the machines of the stack from above, one machine with its job
+  orders done, running and waiting, and one order on its way: every job order that names the same order
+  number. The values are those of the stack; programming, packing and the single part on its sheet have no
+  source yet and stand on the page as such. The page reads the job orders from the new tool
+  `genui_job_order_list` of `genui-mcp`, the job orders on the lists of the machines from the Events API, so
+  they stand also after a reload or a reconnect; a job order the planner took back before it ran is left out.
+  It is a page of the app with its entry in the sidebar, not a showcase: it shows only values the stack has.
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
@@ -32,6 +62,8 @@ All notable changes are documented here. The format follows
   the machines that send values and stand on no site. It reads the Sites API at `SITES_API_URL`.
 - Site card: a machine on no site carries what it does now (`now`), as a placed one does, so a page can keep it
   live.
+- Example app: the page Sites (`/sites`) shows where the machines stand, by site and hall. The page of a
+  machine moved under it to `/sites/<machine id>`; `/machines/<machine id>` leads there.
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
 - Example app: the button "Tools" in the message field of the chat lists the servers that give the chat
@@ -43,6 +75,10 @@ All notable changes are documented here. The format follows
 - Page of a machine: the title switches to another machine, with a search over the serial number and the
   state, and the history of the card covers the last 1, 8 or 24 hours (`?hours=`). The page is wider, with
   room for actions on the right.
+- Energy card: `genui_energy_show` says how much energy machines imported over the last 1 to 24 hours, from
+  their meters, with mean and peak power; the card draws their power as a graph (`genui_energy_series`).
+- Time series card: `genui_timeseries_show` draws any signal of any machine over 15 minutes to 24 hours, a line for each
+  pair of a machine and a signal, on two y axes at most; a person changes the range and the lines on the card.
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
@@ -290,6 +326,11 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Example app: Home (`/`) shows where the machines stand, by site and hall; "Needs you" keeps what it showed first.
+  The tiles of the running machines are gone. `/sites` leads to `/`.
+- Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
+  computer, as the web UI of the OPC UA simulator does; in the stack and in the Margo app.
+
 - The Ultimaker telemetry and the juice bar publish the payloads and the delivery of the MQTT binding of
   machines, not only its tree, as the simulators do: every value retained with QoS 1 in the envelope
   `{timestamp, value, unit}` with the content type `application/json`, a manifest before the values (profile
@@ -432,15 +473,21 @@ All notable changes are documented here. The format follows
   is the start view, now headed "Chats"; its field begins a new chat. "New chat" is gone from the head of a
   chat, since it led to the same view the way back leads to. Without a language model the head still says
   "Chat". After "All chats" or a chat of the list the focus is on the heading of the view it leads to.
+- OPC UA adapter: the endpoint card of `/discover` shows the endpoint the adapter takes in one line, and says
+  when the server also accepts sessions without security. The other endpoints are folded behind "n more
+  endpoints", since a person cannot choose one there.
 
 ### Removed
 
+- arm64: the workflow "Images" builds every image for `linux/amd64` only, and the Margo app asks for an amd64
+  device. Some images the stack takes, such as the OPC UA simulator of umati, are built for amd64 only.
 - `NotificationEventDtoV1`, its collection, the endpoints `/notificationEvents` and the MCP tools
   `events_notification_*`.
 - The libraries `Pleiades.Playground.Events.Generators` and `Pleiades.Playground.Timeseries.Generators`.
 
 ### Fixed
 
+- `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page
   never reached the broker ("not live, no connection to the broker"), and a question asked outside the chat did

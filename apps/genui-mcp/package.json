@@ -29,6 +29,7 @@
     "react-dom": "catalog:",
     "recharts": "catalog:",
     "rollup-plugin-license": "catalog:",
+    "shadcn": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

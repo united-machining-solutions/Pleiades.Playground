@@ -26,6 +26,7 @@
     "cn": "catalog:",
     "lucide-react": "catalog:",
     "mqtt": "catalog:",
+    "pdfjs-dist": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "recharts": "catalog:",

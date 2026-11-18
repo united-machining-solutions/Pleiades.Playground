@@ -22,7 +22,7 @@ margo/
 that bart accepts it, and one more, Traefik:
 
 - **No `build:`.** The services take the images that the workflow "Images" publishes to
-  `ghcr.io/united-machining-solutions`, for `linux/amd64` and `linux/arm64`. `bart build` does not fit here: it
+  `ghcr.io/united-machining-solutions`, for `linux/amd64` only. `bart build` does not fit here: it
   builds `src/<service>/Dockerfile` with that folder as the context, and every image of this repository needs
   `source/` or the root as its context.
 - **Literal image references.** bart mirrors each `image:` as it stands and does not interpolate it, so there is
@@ -71,6 +71,18 @@ that bart accepts it, and one more, Traefik:
 A change to the stack in `compose.yaml` belongs here as well, in the same pull request. CI checks that both files
 name the same services (leaving out the ones behind a profile, and Traefik) and that the broker configuration is
 the same; the rest, the variables and the settings, it does not see.
+
+## External MCP servers
+
+The *Further MCP servers* setting in *Language model* maps to `APP_MCP_SERVERS`, using comma-separated
+`name=address` entries. For a documentation app deployed separately on the same device, use
+`docs=http://host.docker.internal:3202/mcp`. The app maps that name to the host gateway on Docker Engine
+on Linux as well as Docker Desktop. The MCP listener and its published port must be reachable from the
+Playground container; a loopback-only host port may not work on Linux. Configure the documentation
+service to accept `host.docker.internal` as a Host header and expose it only on a controlled network.
+
+Enable `docs` under *Tools* in the chat. The service's contract and source/PDF requirements are in
+[contracts/docs](../contracts/docs/README.md). A gateway or chat model is still required for chat.
 
 ## Check
 

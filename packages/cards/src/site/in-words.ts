@@ -49,7 +49,9 @@ function siteInWords(site: Site): string {
 /** The site card in words. */
 export function siteListInWords(list: SiteList): string {
   const lines =
-    list.sites.length === 0
+    list.sitesError !== null
+      ? [`The sites cannot be read now: ${list.sitesError} Every machine that sent values in the last 24 hours is listed as on no site.`]
+      : list.sites.length === 0
       ? ["No site is entered in the Sites API yet."]
       : [
           `${machinesInWords(list.machineCount)} on ${list.sites.length} ${list.sites.length === 1 ? "site" : "sites"}${list.machineCount > 0 ? `: ${countsInWords(list.counts)}` : ""}.`,

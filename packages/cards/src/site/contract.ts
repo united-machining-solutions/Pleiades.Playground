@@ -76,5 +76,11 @@ export const siteList = z.object({
   unplaced: z
     .array(unplacedMachine)
     .describe("The machines that published a value in the last 24 hours and stand on no site, by machine id."),
+  sitesError: z
+    .string()
+    .nullable()
+    .describe(
+      "Why no site is listed although sites may be entered: the Sites API did not answer, or this server was not told where it is. Then `sites` is empty and every machine that published a value in the last 24 hours stands in `unplaced`. Null when the Sites API answered. Required: the example app and genui-mcp are built from the same commit.",
+    ),
 })
 export type SiteList = z.infer<typeof siteList>

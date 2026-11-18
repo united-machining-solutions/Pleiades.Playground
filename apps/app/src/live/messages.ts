@@ -14,7 +14,7 @@ export type Value = {
 }
 
 /** An instant as the backend writes it, to the millisecond in UTC, so two instants compare as text. */
-function instantOf(written: unknown): string | null {
+export function instantOf(written: unknown): string | null {
   if (typeof written !== "string") return null
   const time = Date.parse(written)
   return Number.isNaN(time) ? null : new Date(time).toISOString()

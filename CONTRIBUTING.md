@@ -33,6 +33,9 @@ There is no contributor licence agreement.
 - **Secrets:** never commit a value. Add the name to `.env.example` and document it.
 - **Licence headers:** new files may carry `SPDX-License-Identifier: Apache-2.0`; documentation is CC BY 4.0.
 - **Decisions:** a choice that shapes the repository gets a short record under `docs/adr/`.
+- **Showcases:** what is made for one demo or one fair is a showcase: in a folder of its own, in a build only
+  where `APP_SHOWCASES` is set, and it changes nothing the base shares, see
+  [ADR-0018](docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md).
 - **Tour:** a change to what the demo shows, how it starts or where its code lives updates the
   [tour](docs/tour.md) in the same pull request: the text, the pointers into the code and the screenshot of
   the stop. One command retakes the screenshots, see

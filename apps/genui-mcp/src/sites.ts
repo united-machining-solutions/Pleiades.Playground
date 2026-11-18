@@ -1,7 +1,8 @@
-import type { Machine, MachineList, State } from "@pleiades/cards/machine/contract.ts"
-import { stateOf, stateOrder } from "@pleiades/cards/machine/state.ts"
+import type { Machine, MachineList } from "@pleiades/cards/machine/contract.ts"
+import { stateOf } from "@pleiades/cards/machine/state.ts"
 import { SITES_SOURCE } from "@pleiades/cards/site/contract.ts"
-import type { Hall, PlacedMachine, SiteList, StateCount } from "@pleiades/cards/site/contract.ts"
+import { countsOf } from "@pleiades/cards/site/counts.ts"
+import type { Hall, PlacedMachine, SiteList } from "@pleiades/cards/site/contract.ts"
 
 import { readPlacements, readSites } from "./apis.ts"
 import type { Apis, Placement, StoredSite } from "./apis.ts"
@@ -10,14 +11,6 @@ import { listMachines } from "./machines.ts"
 // Where the machines stand: the sites and placements people entered in the Sites API, put
 // together with what every machine does now. The machines that send values and stand on no site
 // are the suggestions. Groups and counts are made here, a display only draws them.
-
-/** How many machines are in each state, in the order a display reads the states. */
-export function countsOf(states: ReadonlyArray<State>): Array<StateCount> {
-  return stateOrder.flatMap((state) => {
-    const machines = states.filter((one) => one === state).length
-    return machines > 0 ? [{ state, machines }] : []
-  })
-}
 
 const byMachineId = (a: { machine: string }, b: { machine: string }) => a.machine.localeCompare(b.machine)
 
@@ -30,6 +23,7 @@ export function sitesOf(
   sites: ReadonlyArray<StoredSite>,
   placements: ReadonlyArray<Placement>,
   list: MachineList,
+  sitesError: string | null = null,
 ): SiteList {
   const sending = new Map<string, Machine>(list.machines.map((one) => [one.machine, one]))
   const placedOn = (siteId: string) => placements.filter((one) => one.siteId === siteId)
@@ -85,11 +79,23 @@ export function sitesOf(
       .filter((one) => !placed.has(one.machine))
       .map((one) => ({ machine: one.machine, state: stateOf(one, list.asOf), now: one }))
       .sort(byMachineId),
+    sitesError,
   }
 }
 
-/** Every site with its machines, and the machines that send values and stand on no site. */
+/**
+ * Every site with its machines, and the machines that send values and stand on no site. If the
+ * Sites API does not answer, or this server was not told where it is, the machines are there all
+ * the same: every one that sends stands on no site, and `sitesError` says why. Without the values
+ * of the machines there is nothing to show, and that fails.
+ */
 export async function listSites(apis: Apis, now = new Date()): Promise<SiteList> {
-  const [sites, placements, list] = await Promise.all([readSites(apis), readPlacements(apis), listMachines(apis, now)])
-  return sitesOf(sites, placements, list)
+  const [read, list] = await Promise.all([
+    Promise.all([readSites(apis), readPlacements(apis)]).then(
+      ([sites, placements]) => ({ sites, placements, error: null }),
+      (error: unknown) => ({ sites: [], placements: [], error: error instanceof Error ? error.message : String(error) }),
+    ),
+    listMachines(apis, now),
+  ])
+  return sitesOf(read.sites, read.placements, list, read.error)
 }

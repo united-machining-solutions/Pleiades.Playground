@@ -1,6 +1,6 @@
 name: Images
 
-# Builds multi-architecture images and pushes them to the GitHub Container Registry.
+# Builds the images, for linux/amd64 only, and pushes them to the GitHub Container Registry.
 # Every push to main publishes the tags `main` and `sha-<commit>`; a version tag (v1.2.3) publishes `1.2.3`
 # and then pushes the Margo app of that version with the workflow "Margo push".
 on:
@@ -52,13 +52,9 @@ jobs:
           - image: pleiades.playground.ultimaker.api
             context: source
             file: source/Pleiades.Playground.Ultimaker.Api/Dockerfile
-            # The printer services run on the deployment computer only, which is amd64.
-            platforms: linux/amd64
           - image: pleiades.playground.ultimaker.telemetry
             context: source
             file: source/Pleiades.Playground.Ultimaker.Telemetry/Dockerfile
-            # The printer services run on the deployment computer only, which is amd64.
-            platforms: linux/amd64
           - image: pleiades.playground.juicebar.api
             context: source
             file: source/Pleiades.Playground.JuiceBar.Api/Dockerfile
@@ -68,12 +64,20 @@ jobs:
           - image: pleiades.playground.genui.mcp
             context: .
             file: apps/genui-mcp/Dockerfile
+          - image: pleiades.playground.simplecam.adapter
+            context: .
+            file: apps/simplecam-adapter-9042/Dockerfile
           - image: pleiades.playground.app
             context: .
             file: apps/app/Dockerfile
+          # The same app, built with its showcases: pages made for one demo or one fair. The image above has
+          # nothing of them in it (docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md).
+          - image: pleiades.playground.app.showcases
+            context: .
+            file: apps/app/Dockerfile
+            build-args: SHOWCASES=true
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
@@ -101,7 +105,8 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
-          platforms: ${{ matrix.platforms || 'linux/amd64,linux/arm64' }}
+          # amd64 only: some images the stack runs, such as the OPC UA simulator of umati, exist for amd64 only.
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -111,6 +116,7 @@ jobs:
             VERSION=${{ steps.version.outputs.value }}
             REVISION=${{ github.sha }}
             SOURCE=${{ github.server_url }}/${{ github.repository }}
+            ${{ matrix.build-args }}
           sbom: true
           provenance: mode=max
       # GitHub stores attestations for public repositories only (private ones need an enterprise plan).
