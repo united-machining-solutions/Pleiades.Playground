@@ -7,6 +7,13 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: the page `/trulaser`, a cockpit of a TRUMPF laser cutting machine named as the umati data model
+  names it: `State.Status` with `Notification.ActiveAlerts` and its history on one time axis, the `JobOrder`
+  with its `ProgramExecution`, and from the TRUMPF extension (`oem/Dalle/`) the requests of the automation
+  devices, the laser technology, the collision data and the condition guide. Each card says whether it shows
+  the model or the extension, and is a tool of `genui-mcp` of its own (`genui_trulaser_status`,
+  `genui_trulaser_joborder`, `genui_trulaser_devices`, `genui_trulaser_technology`,
+  `genui_trulaser_collision`, `genui_trulaser_conditions`), which the chat shows as a card.
 - Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
   shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
   from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
