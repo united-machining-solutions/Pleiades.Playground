@@ -6,6 +6,7 @@ import { defineConfig } from "vite"
 
 export default defineConfig({
   resolve: { tsconfigPaths: true },
-  // The React plugin must come after the Start plugin. Nitro builds the Node.js server in .output/.
-  plugins: [tailwindcss(), tanstackStart(), nitro(), viteReact()],
+  // The React plugin must come after the Start plugin. Nitro builds the Node.js server in .output/,
+  // and runs its plugin when the server starts: the registration at the Pleiades Hub.
+  plugins: [tailwindcss(), tanstackStart(), nitro({ plugins: ["./src/hub/plugin.ts"] }), viteReact()],
 })

@@ -5,7 +5,7 @@
 #
 # Start:  docker compose up -d --build
 # Every numeric value on the broker is in its coherent SI unit (contracts/mqtt).
-name: pleiades-playground
+name: pleiades-playground 
 
 x-service: &service
   restart: unless-stopped
@@ -194,11 +194,15 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODELS: ${LLM_MODELS:-}
+      # The app registers at the Pleiades Hub, at the broker of this stack; an empty HUB_MQTT_URL switches
+      # that off. HUB_APP_URL is the address under which a browser reaches the app.
+      HUB_MQTT_URL: ${HUB_MQTT_URL-mqtt://broker:1883}
+      HUB_APP_URL: ${HUB_APP_URL:-http://localhost:${APP_PORT:-5600}/}
 
   # One simulator per machine. The serial number is the machine id in every topic.
   # All three run the same image. Only the first one builds it, or pulls it, so that happens once and not
   # three times; the other two take the image that is then on this computer (pull_policy: never).
-  simulator-p-04:
+  simulator-p-04: 
     <<: *simulator
     build:
       <<: *build

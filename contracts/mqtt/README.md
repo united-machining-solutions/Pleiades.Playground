@@ -1,4 +1,4 @@
-# MQTT binding (draft 0.2.0)
+# MQTT binding (draft 0.3.0)
 
 How machine data appears on the broker, and values about a place. This is a working draft for the playground.
 It follows the umati data model referenced in [`../datamodel`](../datamodel/README.md) where that is simple and
@@ -11,6 +11,7 @@ machines/{SerialNumber}/umati/<path>     values named by the data model
 machines/{SerialNumber}/vendor/<path>    manufacturer-specific values
 machines/{SerialNumber}/events/<kind>    events, see "Notifications"
 sites/{SiteId}/{Source}/<path>           values about a place, in the names of one source
+hub/<topic>                              registration of apps at the Pleiades Hub, owned by its contract
 ```
 
 The first two levels of a topic say what a value is about, the third says whose names follow.
@@ -30,7 +31,18 @@ A value that belongs to no machine is about a place:
   below `sites/{SiteId}/{Source}/`. So whether a value is current reads the same for a machine and for a
   place.
 - A new source below `sites/` adds its rows to "Example topics of a source". A new first level beside
-  `machines` and `sites` is a change to this binding.
+  `machines`, `sites` and `hub` is a change to this binding.
+
+The first level `hub/` carries no values. It carries the registration of apps at the Pleiades Hub, the page
+that shows the apps of a Pleiades system under one header:
+
+- Its topics, `hub/discover`, `hub/clients/{ClientId}/announce` and `hub/clients/{ClientId}/offline`, and
+  their payloads are defined by the contract of the hub, `contracts/mqtt/README.md` in the repository
+  `umati/pleiades-hub`, not here. This binding only reserves the level and says who owns it; the decision
+  is [ADR-0010](../../docs/adr/0010-hub-registration.md).
+- What this document says about a value does not apply below `hub/`: the envelope, the units, the content
+  types and `Connection/State`. The messages there are not values. They are JSON, published with QoS 1 and
+  never retained.
 
 ## Value envelope
 
