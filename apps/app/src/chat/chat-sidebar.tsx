@@ -16,7 +16,7 @@ import {
   XIcon,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import type { FormEvent, KeyboardEvent } from "react"
+import type { FormEvent, KeyboardEvent, ReactNode } from "react"
 
 import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
 import { Bubble, BubbleContent } from "@pleiades/ui/components/bubble"
@@ -42,6 +42,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
 } from "@pleiades/ui/components/message-scroller"
 import {
   Sidebar,
@@ -69,7 +70,6 @@ import { commandsFor, matching, readTyped, usage } from "@/opcua/commands.ts"
 import type { ChatCommand } from "@/opcua/commands.ts"
 import { keepOfAnswer } from "@/pages/from-answer.ts"
 
-
 import { Answer } from "./answer.tsx"
 import {
   CHAT_LIST,
@@ -91,7 +91,6 @@ import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { UNNAMED_CHAT, chatName, nameOfQuestion } from "./chat-name.ts"
 import { DictateButton } from "./dictate.tsx"
-import { useChatTaps, useForwardedProps } from "./extensions.ts"
 import { SaveAsPage } from "./save-as-page.tsx"
 import { chooseChatModel, fetchChatSettings, switchChatServer } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
@@ -287,17 +286,14 @@ function Conversation({ threadId }: { threadId: string }) {
   // The first question of a chat begun from the list or from a machine, as long as it waits for this
   // panel: the head can call the chat by it from the first render.
   const [asked] = useState(() => peekFirstQuestion(threadId))
-  const forwardedProps = useForwardedProps(timeZone)
   const { messages, sendMessage, isLoading, error, stop } = useChat({
     threadId,
     connection: fetchServerSentEvents("/api/harness/run"),
     persistence: true,
     // The time zone of this browser goes along with every question, so the answer gives the
-    // times the person's clock shows, and what a page that takes part adds (extensions.ts).
-    forwardedProps,
+    // times the person's clock shows.
+    forwardedProps: { timeZone },
   })
-  // A page that takes part in the chat sees its messages and may ask in it (extensions.ts).
-  useChatTaps(messages, isLoading, (question) => void sendMessage(question))
   const [model, setModel] = useState(() => pickedModel(chatStatus.models))
   const [switchError, setSwitchError] = useState<string>()
   const switchTo = (name: string) =>
@@ -425,9 +421,13 @@ function Conversation({ threadId }: { threadId: string }) {
     <>
       <PanelHead title={chatName(entry, firstQuestion ?? asked)} back add />
       <div className="min-h-0 flex-1">
-        {/* A new question settles near the top and the answer grows under it; a chat from before
-            opens at its last question. */}
-        <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor">
+        {/* A new question settles near the top and the answer grows under it, a long text as a tall
+            card; a chat from before opens at its last question. Without `autoScroll`: with it, the
+            scroller keeps the question at the top only while the answer fits, and then follows its
+            end, so a card taller than the panel, which comes in one piece, took the question out of
+            sight at once. The button at the foot leads to the end as it stands; an alert comes into
+            view by itself (`AlertItem`). */}
+        <MessageScrollerProvider defaultScrollPosition="last-anchor">
           <MessageScroller>
             <MessageScrollerViewport>
               <MessageScrollerContent aria-busy={isLoading} className="gap-6 p-4">
@@ -489,40 +489,40 @@ function Conversation({ threadId }: { threadId: string }) {
                   </MessageScrollerItem>
                 )}
                 {error && (
-                  <MessageScrollerItem messageId="error">
+                  <AlertItem messageId="error">
                     <Alert>
                       <CircleAlertIcon />
                       <AlertTitle>The language model did not answer</AlertTitle>
                       <AlertDescription>{error.message}</AlertDescription>
                     </Alert>
-                  </MessageScrollerItem>
+                  </AlertItem>
                 )}
                 {switchError && (
-                  <MessageScrollerItem messageId="switch-error">
+                  <AlertItem messageId="switch-error">
                     <Alert>
                       <CircleAlertIcon />
                       <AlertTitle>The model was not changed</AlertTitle>
                       <AlertDescription>{switchError}</AlertDescription>
                     </Alert>
-                  </MessageScrollerItem>
+                  </AlertItem>
                 )}
                 {serverError && (
-                  <MessageScrollerItem messageId="server-error">
+                  <AlertItem messageId="server-error">
                     <Alert>
                       <CircleAlertIcon />
                       <AlertTitle>The tools of this chat</AlertTitle>
                       <AlertDescription>{serverError}</AlertDescription>
                     </Alert>
-                  </MessageScrollerItem>
+                  </AlertItem>
                 )}
                 {stopError && (
-                  <MessageScrollerItem messageId="stop-error">
+                  <AlertItem messageId="stop-error">
                     <Alert>
                       <CircleAlertIcon />
                       <AlertTitle>Stopping did not reach the server</AlertTitle>
                       <AlertDescription>{stopError}</AlertDescription>
                     </Alert>
-                  </MessageScrollerItem>
+                  </AlertItem>
                 )}
               </MessageScrollerContent>
             </MessageScrollerViewport>
@@ -588,6 +588,23 @@ function CallLine({ call }: { call: Call }) {
       </TraceCollapsibleContent>
     </TraceCollapsible>
   )
+}
+
+/**
+ * An item of the chat that holds an alert. It comes into view when it appears: a new question stays at
+ * the top of the panel while its answer grows under it, so an alert under a tall answer would stand
+ * below the fold, and the answer would look as if all went well. "nearest" moves the panel only as far
+ * as the alert needs, and not at all when it is in sight; the question no longer holds the top after
+ * that. `useMessageScroller` is the escape hatch the rules of the chat name for what the parts do not
+ * express (`.claude/skills/shadcn/rules/chat.md`).
+ */
+function AlertItem({ messageId, children }: { messageId: string; children: ReactNode }) {
+  const { scrollToMessage } = useMessageScroller()
+  // Once, when the alert appears; `scrollToMessage` stays the same while the chat is open.
+  useEffect(() => {
+    scrollToMessage(messageId, { align: "nearest" })
+  }, [messageId, scrollToMessage])
+  return <MessageScrollerItem messageId={messageId}>{children}</MessageScrollerItem>
 }
 
 /**

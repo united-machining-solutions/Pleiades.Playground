@@ -1,9 +1,9 @@
 import type { MachineList, State } from "@pleiades/cards/machine/contract.ts"
-import { serialOf } from "@pleiades/cards/machine/in-words.ts"
 import { openWarning, stateOf } from "@pleiades/cards/machine/state.ts"
 
 import { boardOf } from "./board.ts"
 import { inGerman } from "./words.ts"
+import { serialOf } from "./words.ts"
 
 // The escalation of Titan: what stands beside every answer, once Titan was started. Two levels and
 // nothing else, so it is read at a glance:

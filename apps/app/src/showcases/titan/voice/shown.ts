@@ -3,15 +3,16 @@ import type { ReactNode } from "react"
 
 import { blocksOf } from "@/chat/blocks.ts"
 import { chatTools } from "@/chat/cards.tsx"
-import type { ChatTap } from "@/chat/extensions.ts"
+import type { UIMessage } from "@tanstack/ai-react"
+
+import type { Listener } from "../conversation.ts"
 
 import { briefingOf } from "./facts.ts"
 import type { Briefing } from "./facts.ts"
 
-// What the newest answer shows, for the assistant page: the chat runs behind its black screen, and
-// the page shows the cards of the answer there, the shop floor for example, and its text taken apart
-// into summary, facts, hint and suggestion (facts.ts). The cards are the same nodes the chat draws,
-// so nothing is drawn twice in two ways.
+// What the newest answer shows, for the assistant page: the cards of the answer, a machine for example,
+// and its text taken apart into summary, facts, hint and suggestion (facts.ts). The cards are the ones
+// the chat of the app draws for the same tools (chat/cards.tsx), so nothing is drawn in two ways.
 //
 // What an answer showed stays until the next question: a card does not vanish while Titan still
 // talks about it.
@@ -50,10 +51,10 @@ export function useShownCards(): ReadonlyArray<ReactNode> {
 }
 
 /**
- * For the open chat, while Titan's page takes part in it (chat/extensions.ts): hands the cards and the
- * briefing of its newest answer to the page. A chat that closes takes what it showed along.
+ * Follows the conversation (conversation.ts): hands the cards and the briefing of its newest answer to
+ * the page. A conversation that ends takes what it showed along.
  */
-export function sharingCards(): ChatTap {
+export function sharingCards(): Listener {
   return {
     update(messages, isLoading) {
       const last = messages.at(-1)
@@ -63,7 +64,8 @@ export function sharingCards(): ChatTap {
       // The list of machines is not shown again: the board of Titan shows the same, from the same values.
       const listCalls = new Set(last.parts.flatMap((part) => (part.type === "tool-call" && part.name === MACHINE_LIST ? [part.id] : [])))
       const parts = last.parts.filter((part) => !(part.type === "tool-result" && listCalls.has(part.toolCallId)))
-      const cards = blocksOf(parts, isLoading, chatTools).flatMap((block) => (block.kind === "drawn" ? [block.node] : []))
+      // The parts have the shape the chat draws (conversation.ts).
+      const cards = blocksOf(parts as unknown as UIMessage["parts"], isLoading, chatTools).flatMap((block) => (block.kind === "drawn" ? [block.node] : []))
       // The text after the last tool call is the answer; a sentence before a call only says what comes.
       const texts = last.parts.flatMap((part) => (part.type === "text" && part.content.trim() !== "" ? [part.content] : []))
       const text = texts.at(-1)

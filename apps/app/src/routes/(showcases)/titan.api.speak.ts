@@ -1,57 +1,43 @@
 import { createFileRoute } from "@tanstack/react-router"
 
-// Titan's persona: the chat adds Titan's instructions to the questions asked on its screen.
-import "@/showcases/titan/persona.server.ts"
+import { titanModels } from "@/showcases/titan/gateway.server.ts"
+import { MAX_SENTENCE, speakableText } from "@/showcases/titan/voice/speech.ts"
 
-import { MAX_SENTENCE, speakableText } from "@/showcases/titan/voice/tom.ts"
-
-// The voice of Tom for Titan: a service of the stack (TITAN_VOICE_URL, see apps/titan-voice) turns a
-// sentence into a wav. The browser does not reach it directly; this passes the sentence on.
+// The voice of Titan: the speech model of the gateway of the chat turns a sentence into sound
+// (POST <LLM_BASE_URL>/audio/speech, the speech endpoint of the OpenAI API). Which model that is, the
+// gateway says: showcases/titan/gateway.server.ts. The key stays on the server.
 //
-// GET says whether it is there and ready; POST takes JSON { text } and answers with audio/wav.
+// GET says whether there is one; POST takes JSON { text } and answers with audio/wav.
 
-function serviceUrl() {
-  const url = process.env.TITAN_VOICE_URL
-  return url ? url.replace(/\/$/, "") : undefined
-}
-
-async function available() {
-  const url = serviceUrl()
-  if (!url) return false
-  // /ready, not /health: the service is healthy also without the voice, and then Titan takes the voice of
-  // the browser.
-  const answer = await fetch(`${url}/ready`, { signal: AbortSignal.timeout(2000) }).catch(() => undefined)
-  return answer?.ok === true
-}
+/** A gateway that offers several voices under one model wants a name; a model with one voice ignores it. */
+const VOICE = "alloy"
 
 async function speak({ request }: { request: Request }) {
-  const url = serviceUrl()
-  if (!url) return Response.json({ error: "No voice of Tom configured (TITAN_VOICE_URL)" }, { status: 503 })
+  const models = await titanModels()
+  if (!models?.speech) return Response.json({ error: "No speech model at the gateway" }, { status: 503 })
   const body = (await request.json().catch(() => undefined)) as { text?: unknown } | undefined
   const text = speakableText(body?.text)
   if (text === undefined) {
     return Response.json({ error: `Send { text }, one sentence of at most ${MAX_SENTENCE} characters` }, { status: 400 })
   }
-  const answer = await fetch(`${url}/speak`, {
+  const answer = await fetch(`${models.baseURL}/audio/speech`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
-    // The service makes one sentence at a time, in a fraction of a second: a sentence may wait behind the
-    // one being made.
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${models.apiKey}` },
+    body: JSON.stringify({ model: models.speech, input: text, voice: VOICE, response_format: "wav" }),
     signal: AbortSignal.timeout(30_000),
   }).catch((error: unknown) => error as Error)
   if (answer instanceof Error) {
     const cause = (answer as { cause?: { code?: string } }).cause?.code
-    return Response.json({ error: `The voice of Tom cannot be reached (${cause ?? answer.message})` }, { status: 502 })
+    return Response.json({ error: `The gateway cannot be reached (${cause ?? answer.name})` }, { status: 502 })
   }
-  if (!answer.ok) return Response.json({ error: `The voice of Tom answered ${answer.status}` }, { status: 502 })
+  if (!answer.ok) return Response.json({ error: `The gateway answered ${answer.status}` }, { status: 502 })
   return new Response(answer.body, { headers: { "Content-Type": "audio/wav", "Cache-Control": "no-store" } })
 }
 
 export const Route = createFileRoute("/(showcases)/titan/api/speak")({
   server: {
     handlers: {
-      GET: async () => Response.json({ available: await available() }),
+      GET: async () => Response.json({ available: (await titanModels())?.speech !== undefined }),
       POST: speak,
     },
   },

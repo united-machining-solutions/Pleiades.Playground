@@ -1,10 +1,10 @@
 import type { Machine, MachineList, State } from "@pleiades/cards/machine/contract.ts"
-import { serialOf } from "@pleiades/cards/machine/in-words.ts"
 import { clock } from "@pleiades/cards/machine/format.ts"
 import { openError, openWarning, stateOf } from "@pleiades/cards/machine/state.ts"
 import { tell } from "@pleiades/cards/machine/tell.ts"
 
 import { inGerman } from "./words.ts"
+import { serialOf } from "./words.ts"
 
 // The board of Titan: what the person who runs the hall needs, in the order of a good brief.
 //

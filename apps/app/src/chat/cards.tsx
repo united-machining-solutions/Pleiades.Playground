@@ -5,10 +5,8 @@ import { machineTools } from "@/cards/machine/chat.tsx"
 import { measurementTools } from "@/cards/measurement/chat.tsx"
 import { notificationTools } from "@/cards/notification/chat.tsx"
 import { opcuaTools } from "@/cards/opcua/chat.tsx"
-import { shopfloorTools } from "@/cards/shopfloor/chat.tsx"
 import { siteTools } from "@/cards/site/chat.tsx"
 import { timeseriesTools } from "@/cards/timeseries/chat.tsx"
-import { viewTools } from "@/cards/view/chat.tsx"
 
 import { proposalTool } from "./proposed-page.tsx"
 import { backendTools } from "./tool-results.ts"
@@ -30,10 +28,8 @@ export const chatTools: ReadonlyArray<ChatTool> = [
   ...measurementTools,
   ...notificationTools,
   ...opcuaTools,
-  ...shopfloorTools,
   ...siteTools,
   ...timeseriesTools,
-  ...viewTools,
   // It reads this list when it draws a proposal, to name the parts of the page.
   proposalTool(() => chatTools),
 ]

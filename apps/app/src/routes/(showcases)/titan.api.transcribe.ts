@@ -1,8 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router"
 
-// Titan's persona: the chat adds Titan's instructions to the questions asked on its screen.
-import "@/showcases/titan/persona.server.ts"
-
 import { dictationPrompt } from "@/chat/dictation.server.ts"
 import { chatSettings } from "@/chat/gateway.ts"
 import { transcriptionFile } from "@/showcases/titan/voice/transcribe.ts"

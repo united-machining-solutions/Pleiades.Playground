@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { existsSync, readFileSync, readdirSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { test } from "node:test"
 
@@ -28,9 +28,7 @@ function namedPackages(): Map<string, string> {
     ...["apps", "packages"].flatMap((folder) =>
       readdirSync(join(repository, folder), { withFileTypes: true })
         .filter((entry) => entry.isDirectory())
-        .map((entry) => `${folder}/${entry.name}/package.json`)
-        // A folder of another language, such as a service in Python, has no packages of this workspace.
-        .filter((file) => existsSync(join(repository, file))),
+        .map((entry) => `${folder}/${entry.name}/package.json`),
     ),
   ]
   for (const file of files) {

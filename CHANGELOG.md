@@ -562,6 +562,12 @@ All notable changes are documented here. The format follows
   `TcMachineAlarmType` with `AlarmIdentifier` if its registration names no alarms and its server has that type,
   and the TRUMPF interface counts as its own namespace. A server without the list or the type moves
   `Notification.ActiveAlerts` to `missing`. A stored registration takes this on `/rescan` (issue 180).
+- `app`: a new question in the chat stays at the top of the panel and its answer grows under it, also when the
+  answer is a card taller than the panel. Until now the chat ran to the end of such an answer at once, so the
+  question and the head of the card were out of sight; with the machines of the stack today, the cards of power
+  and energy or of the measurements of all machines are that tall. A long text no longer pulls the panel along
+  either: it grows under its question too, and the button at the foot leads to its end as it stands. An alert
+  under an answer, such as "The language model did not answer", comes into view by itself.
 - `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page

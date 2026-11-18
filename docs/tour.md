@@ -1,6 +1,6 @@
 # A tour of the demo
 
-Seven stops through the running demo, for someone who has never seen it: what you see, and where it lives in
+Six stops through the running demo, for someone who has never seen it: what you see, and where it lives in
 the code. The screenshots were taken from the demo stack on one computer; your machines will be in other
 states, because the simulator keeps changing them.
 
@@ -11,9 +11,8 @@ through the stops in your running stack, see [`AGENTS.md`](../AGENTS.md).
 2. [Home](#2-home)
 3. [The page of one machine](#3-the-page-of-one-machine)
 4. [The chat beside the page](#4-the-chat-beside-the-page)
-5. [Titan, the assistant you talk to](#5-titan-the-assistant-you-talk-to)
-6. [When a machine goes silent](#6-when-a-machine-goes-silent)
-7. [Where to change what](#7-where-to-change-what)
+5. [When a machine goes silent](#5-when-a-machine-goes-silent)
+6. [Where to change what](#6-where-to-change-what)
 
 ## 1. Start
 
@@ -60,7 +59,7 @@ timeseries-persistence   Up 3 minutes (healthy)
 
 | Address | What answers there |
 |---|---|
-| <http://localhost:5600/> | The example app, the subject of stops 2 to 6. It answers on this computer only. |
+| <http://localhost:5600/> | The example app, the subject of stops 2 to 5. It answers on this computer only. |
 | <http://localhost:5520/mcp> | The generative UI backend, an MCP server. The app reads every value from it. |
 | <http://localhost:5500/> | The Timeseries API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. |
@@ -381,63 +380,7 @@ from the card file of the backend: in alarm since 15:39 with "Spindle overtemper
 program, and the states of the last eight hours as a band with their sums. Below the card the chat says the
 same in two paragraphs.](images/tour/machine-card-in-host.png)
 
-## 5. Titan, the assistant you talk to
-
-Titan is a showcase: it is built in only where `APP_SHOWCASES` is set in `.env`, for example
-`APP_SHOWCASES=true`, which starts the image `pleiades.playground.app.showcases`. Then
-<http://localhost:5600/titan>, "Titan" in the sidebar, is Titan: the chat without a keyboard, a black screen
-with a cloud of glowing points that greets, listens and speaks German. A first click or press of the space bar
-starts it. Then say "Hey Titan" and the question, or "Hey Titan" alone and the question after its "Ja?";
-holding the space bar works too. Titan says "Moment." at once, and the question goes to the chat of stop 4.
-The screen is dark, clean and never scrolls: one glance shows only what matters most, and the person
-asks to go deeper. In the middle the answer in one sentence, what to do in one line, at most the one card
-that was asked for, made to fit, and quietly the question Titan offers next; the rest Titan only says. A
-new question clears what the one before showed, and the cloud steps back, large and faint behind the
-answer. On top stands the escalation, computed from the values and not by the model, one slim line: red
-what stands, amber what still runs but reports a warning
-([`apps/app/src/showcases/titan/escalation.ts`](../apps/app/src/showcases/titan/escalation.ts)). A recommendation
-is said once and then only shown. "Hey Titan, Pause" or the key P pauses it; "Hey Titan" or the space bar wakes it.
-It speaks only once started and while its tab is in front. Escape leaves the screen.
-
-Titan answers first, then adds at most one hint nobody asked for and one suggestion, and says plainly when
-the data cannot answer. These are Titan's own instructions: its page names Titan's persona with every
-question, and only then does the server add them to the shared ones; the chat in the sidebar answers as it
-always does. Its chats begin with the fastest model the settings name (Haiku at the hub), which
-is asked to answer without thinking first, so that a card stands after about a second.
-
-With a camera, Titan greets whoever steps in front of it: by name when the face is known, and straight away
-with the machines that stand still with an error. It checks every few seconds who stands there, and greets
-someone known who steps in. Faces are enrolled at <http://localhost:5600/titan/faces> ("Faces");
-what describes a face stays in that browser, and no photo is kept. Titan speaks with the voice of Tom, who
-agreed to it, made by [`apps/titan-voice`](../apps/titan-voice/README.md) in the stack; when that does not
-answer, with the voice of the system. It falls silent when the page is closed. What Titan knows stands on
-one screen at <http://localhost:5600/hall> ("Hall"): the hall plan and every machine.
-
-The cloud shows what the assistant does: it breathes while it waits, draws together while it listens,
-swirls while it thinks, and waves run through it while it speaks. It also keeps an eye on the hall: a new
-error of a machine turns it red, and the assistant tells you what happened, shows the hall and suggests a
-step.
-
-With the hub of the hackathon as the language model, the transcription model of the hub listens: the app
-sends what you said to it, and nothing needs to be downloaded. Without the hub, Whisper listens in the
-browser: the first time, the browser downloads it from the internet, about 80 MB, and keeps it; a quiet line
-at the bottom says how far it is. From then on it works without a network. An answer needs the language
-model of stop 4.
-
-Two answers belong to the assistant. `genui_shopfloor_show` draws the hall as a plan, the running machines
-greyed out and over each other one its reason. `genui_view_show` lets the language model lay out a view
-from blocks; it never writes a number, every value is computed by the backend, with its source.
-
-**In the code:** [`apps/app/src/routes/(showcases)/titan.tsx`](../apps/app/src/routes/%28showcases%29/titan.tsx) is the
-page, [`apps/app/src/showcases/titan/`](../apps/app/src/showcases/titan) the rest: `chat.ts` and `persona.ts`
-how it takes part in the chat, [`voice/`](../apps/app/src/showcases/titan/voice) the cloud (`cloud.tsx`), listening (`transcribe.ts`, `wake.ts` for
-"Hey Titan"), speaking (`voice.ts`, `tom.ts`), the greeting (`greeting.ts`) and the watch over the hall (`faults.ts`);
-[`faces/`](../apps/app/src/showcases/titan/faces) the faces. The plan of the hall is
-[`apps/genui-mcp/src/hall.ts`](../apps/genui-mcp/src/hall.ts), its card
-[`packages/cards/src/shopfloor/`](../packages/cards/src/shopfloor), and the blocks of a view
-[`apps/genui-mcp/src/views.ts`](../apps/genui-mcp/src/views.ts).
-
-## 6. When a machine goes silent
+## 5. When a machine goes silent
 
 A machine that stops publishing is not "stopped": nothing is known about it. Try it, and stop one simulator.
 
@@ -467,7 +410,7 @@ docker compose start simulator-m-02
 30 seconds are a constant in [`packages/cards/src/machine/contract.ts`](../packages/cards/src/machine/contract.ts).
 The topics that count as a sign of life are in the [MQTT binding](../contracts/mqtt/README.md).
 
-## 7. Where to change what
+## 6. Where to change what
 
 To add something of your own, a page, a card or a source of data, follow [Build your own](build-your-own.md).
 
@@ -559,7 +502,7 @@ node .github/scripts/tour-screenshots.mjs
 
 Take them from a stack on the default ports that has run for a while. On a stack that has just started, the
 band of the machine page is almost all "No data", and with moved ports the picture of the Swagger UI shows
-another port than the text of stop 7. If you started the stack with `-p <name>`, run the script with
+another port than the text of stop 6. If you started the stack with `-p <name>`, run the script with
 `COMPOSE_PROJECT_NAME=<name>`: without it the script looks for the stack of the default name.
 
 To take only some, name them: `node .github/scripts/tour-screenshots.mjs home machine-page`. The names are

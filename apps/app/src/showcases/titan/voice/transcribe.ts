@@ -1,9 +1,7 @@
-// Which speech recognition the assistant page takes. With a transcription model at the gateway of
-// the chat, such as the hub of the hackathon, the recording goes to it through the app's server
-// (src/routes/(showcases)/titan.api.transcribe.ts): nothing to download, the key stays on the server. Without
-// one, Whisper recognises it in the browser (whisper.ts).
-
-import { loadWhisper, transcribe as transcribeInBrowser } from "./whisper.ts"
+// The speech recognition of Titan: the recording goes to the transcription model of the gateway of the
+// chat, through the app's server (src/routes/(showcases)/titan.api.transcribe.ts). Nothing is downloaded
+// and the key stays on the server. Without such a model Titan cannot listen, as the chat field then has
+// no microphone.
 
 /** A name for the recording that tells the endpoint its format: it reads the ending, not the type. */
 export function transcriptionFile(type: string): string {
@@ -32,19 +30,13 @@ function serverTranscribes(): Promise<boolean> {
   return server
 }
 
-/**
- * Gets the recognition ready. "server" when the endpoint transcribes; otherwise it loads Whisper and
- * `onProgress` gets a share between 0 and 1 while its files arrive.
- */
-export async function loadRecognition(onProgress?: (share: number) => void): Promise<"server" | "browser"> {
-  if (await serverTranscribes().catch(() => false)) return "server"
-  await loadWhisper(onProgress)
-  return "browser"
+/** Whether Titan can listen: resolves if the gateway has a transcription model, rejects with why not. */
+export async function loadRecognition(): Promise<void> {
+  if (!(await serverTranscribes().catch(() => false))) throw new Error("Das Gateway hat kein Modell für Spracherkennung.")
 }
 
 /** What was said in a recording, in German. */
 export async function transcribe(recording: Blob): Promise<string> {
-  if (!(await serverTranscribes().catch(() => false))) return transcribeInBrowser(recording)
   // Less than a few kilobytes is a tap of the key, not a question.
   if (recording.size < 2_000) return ""
   const answer = await fetch("/titan/api/transcribe", {

@@ -1,20 +1,18 @@
 import { useSyncExternalStore } from "react"
 
-import type { ChatTap, OpenChat } from "@/chat/extensions.ts"
+import type { Listener, Message } from "../conversation.ts"
 
 import { withoutList, withoutSaidAdvice } from "./facts.ts"
-import { piperIfReady, sentencesOf } from "./piper.ts"
 import { transcribe } from "./transcribe.ts"
 
 // Speech for the assistant page: the browser listens to a question and reads an answer aloud.
 //
 // - Speaking goes sentence by sentence through a queue, so that an answer is read while it still
-//   arrives. A sentence sounds with the voice the page set (setSentenceVoice: Tom's, tom.ts), else
-//   with Piper (piper.ts) once it has loaded, else with the voices of the system (speechSynthesis).
-//   The next sentence is made while one sounds; a sentence a voice cannot make, the system says.
-// - Listening records the microphone while the key is held and recognises the speech (transcribe.ts):
-//   with the transcription model of the language model's endpoint, such as the hub, or else with
-//   Whisper in the browser, which needs no network once its model is loaded.
+//   arrives. A sentence sounds with the voice the page set (setSentenceVoice: the speech model of the
+//   gateway, speech.ts), else with a voice of the system that speaks on this computer (speechSynthesis).
+//   The next sentence is made while one sounds; a sentence the voice cannot make, the system says.
+// - Listening records the microphone while the key is held and recognises the speech with the
+//   transcription model of the gateway (transcribe.ts).
 //
 // Answers are read aloud only while voice is on: the assistant page turns it on while it is open.
 
@@ -65,12 +63,12 @@ export function canSpeak(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window
 }
 
-/** A voice that makes the sound of a sentence: Tom's (tom.ts) or Piper's (piper.ts). */
+/** A voice that makes the sound of a sentence: the speech model of the gateway (speech.ts). */
 export type SentenceVoice = { predict: (sentence: string) => Promise<Blob> }
 
 let sentenceVoice: SentenceVoice | undefined
 
-/** The voice the page has, Tom's for example; none for Piper once it is loaded, else the system. */
+/** The voice the page has; none for the voice of the system. */
 export function setSentenceVoice(voice: SentenceVoice | undefined) {
   sentenceVoice = voice
 }
@@ -96,13 +94,22 @@ export function remembering(voice: SentenceVoice, keep = 50): SentenceVoice {
 }
 
 function currentVoice(): SentenceVoice | undefined {
-  return sentenceVoice ?? piperIfReady()
+  return sentenceVoice
 }
 
-/** A voice of the system in the language, if it has one. Local voices first: they need no network. */
+/** A text in sentences, so that the first one sounds while the next is made. */
+export function sentencesOf(text: string): string[] {
+  return (text.match(/[^.!?…]+[.!?…]*["“”«»)]*\s*/g) ?? [text]).map((one) => one.trim()).filter((one) => one !== "")
+}
+
+/**
+ * A voice of the system in the language that speaks on this computer. A voice the browser computes
+ * elsewhere is not taken: what Titan says would leave the room unasked. Without a local one, the system
+ * says nothing and the answer stands on the screen.
+ */
 function voiceFor(language: string): SpeechSynthesisVoice | undefined {
-  const voices = speechSynthesis.getVoices().filter((one) => one.lang.replace("_", "-").startsWith(language.slice(0, 2)))
-  return voices.find((one) => one.lang === language && one.localService) ?? voices.find((one) => one.localService) ?? voices[0]
+  const voices = speechSynthesis.getVoices().filter((one) => one.localService && one.lang.replace("_", "-").startsWith(language.slice(0, 2)))
+  return voices.find((one) => one.lang === language) ?? voices[0]
 }
 
 /** Counts what was said, so that a sentence of an earlier answer that comes late stays silent. */
@@ -189,11 +196,12 @@ async function sayQueue(mine: number): Promise<void> {
 function speakWithSystem(sentence: string): Promise<void> {
   if (!canSpeak()) return Promise.resolve()
   return new Promise((resolve) => {
+    const voice = voiceFor(VOICE_LANGUAGE)
+    if (!voice) return resolve()
     const utterance = new SpeechSynthesisUtterance(sentence)
     utterance.lang = VOICE_LANGUAGE
     utterance.rate = SPEECH_RATE
-    const voice = voiceFor(VOICE_LANGUAGE)
-    if (voice) utterance.voice = voice
+    utterance.voice = voice
     const done = () => {
       hush = undefined
       resolve()
@@ -325,32 +333,21 @@ function microphoneError(error: unknown): string {
 
 // ---- The chat ----
 
-type Part = { type: string; content?: unknown }
-type ChatMessage = { id: string; role: string; parts: ReadonlyArray<Part> }
-
 /** The text of an answer, without what its cards show. */
-export function textOf(message: ChatMessage): string {
-  return message.parts
-    .filter((part) => part.type === "text" && typeof part.content === "string")
-    .map((part) => part.content as string)
-    .join("\n")
+export function textOf(message: Message): string {
+  return message.parts.flatMap((part) => (part.type === "text" ? [part.content] : [])).join("\n")
 }
 
 /** What of an answer is said: everything but its list of facts, which the screen shows (facts.ts). */
-function wordsOf(message: ChatMessage): string {
+function wordsOf(message: Message): string {
   return withoutSaidAdvice(withoutList(textOf(message)), message.id)
 }
 
-/** The open chat, while Titan's page takes part in it: a question asked by voice goes on in it. */
-let followUp: ((question: string) => void) | undefined
-
 /**
- * For the open chat, while Titan's page takes part in it (chat/extensions.ts): the orb thinks while an
- * answer arrives, the answer is read aloud as it arrives while voice is on, and a question asked by
- * voice goes on in this chat.
+ * Follows the conversation (conversation.ts): the orb thinks while an answer arrives, and the answer is
+ * read aloud as it arrives while voice is on.
  */
-export function speakingAnswers(chat: OpenChat): ChatTap {
-  followUp = chat.send
+export function speakingAnswers(): Listener {
   // How far the newest answer has been handed to the voice. An answer that was there when the page
   // came has been said already.
   let said: { id?: string; at: number } | undefined
@@ -374,16 +371,8 @@ export function speakingAnswers(chat: OpenChat): ChatTap {
       if (piece) void sayNext(piece)
     },
     detach() {
-      if (followUp === chat.send) followUp = undefined
       thinking = false
       setState("idle")
     },
   }
-}
-
-/** Asks in the open chat, if one is open. False if none is: then a new chat begins. */
-export function askFollowUp(question: string): boolean {
-  if (!followUp) return false
-  followUp(question)
-  return true
 }

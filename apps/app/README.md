@@ -416,19 +416,6 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   which tool, its server which tools a language model does not get, and the proposal of a page which tools a
   page can call. `tool-results.ts` says what a card may say about a tool, `blocks.ts` turns an answer into blocks, and `answer.tsx` draws what the model writes
   ([TanStack Markdown](https://tanstack.com/markdown)).
-- `src/chat/extensions.ts`: how a page takes part in the open chat while it is shown: it sees the messages,
-  asks in the chat, and sends something along with every question, such as the name of a persona whose
-  instructions the server adds to the shared ones (`src/chat/personas.server.ts`). The chat knows no such
-  page; a showcase talks through the chat this way and changes nothing shared.
-- `src/showcases/titan/`: Titan, the assistant you talk to, a showcase (built in with `APP_SHOWCASES`); its
-  pages are `src/routes/(showcases)/titan*.ts(x)`. `chat.ts` is how its page takes part in the chat, and
-  `persona.ts` its instructions. `voice/` listens and speaks, all in the browser: `transcribe.ts` sends a
-  recording to the transcription model of the gateway, through `titan.api.transcribe.ts`; without one,
-  `whisper.ts` recognises speech in the browser. `voice.ts` records and reads answers aloud; `tom.ts` speaks
-  in the voice of Tom through `titan.api.speak.ts` and the service [`titan-voice`](../titan-voice/README.md),
-  where `TITAN_VOICE_URL` names it. `cloud.tsx` is the cloud of points, `faults.ts` watches the hall for new
-  errors, `faces/` recognises faces, and `focus-view.tsx` and `escalation-view.tsx` are its screen.
-  `src/shopfloor/` and `src/view/` are the hall plan and the view in the chat, like `src/machines/chat.tsx`.
 - `src/hub/`: the registration at the [Pleiades Hub](#pleiades-hub). `settings.ts` reads the two variables
   and holds the registration; it is pure, and `settings.test.ts` tests it. `registration.server.ts` is
   server-only and starts the client of the SDK exactly once per process: a singleton, so a hot reload of the

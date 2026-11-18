@@ -12,7 +12,6 @@
  * carries no styles of a component it does not show. A card that draws another component adds its
  * line here, in the order of the alphabet; styles.test.ts fails if one is missing or left over.
  */
-@source "../../ui/src/components/alert.tsx";
 @source "../../ui/src/components/badge.tsx";
 @source "../../ui/src/components/button.tsx";
 @source "../../ui/src/components/card.tsx";

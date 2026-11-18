@@ -15,7 +15,6 @@ import { withTimeZone } from "./local-times.ts"
 import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
 import { leftOut, mcpServers, serverSwitch } from "./mcp-servers.ts"
-import { personaInstructions } from "./personas.server.ts"
 import { proposePageTool } from "./propose-page.ts"
 import { forModel } from "./tool-results.ts"
 
@@ -95,17 +94,6 @@ const modelTools = definePlugin({
 
 // Every tool that takes a time zone is called with the one of the person who asks. What the
 // browser sent along with the question is the context of the run.
-// A question that names a persona gets its instructions as well, after the shared ones
-// (personas.server.ts); every other question keeps the shared ones alone.
-const persona = defineChatMiddleware({
-  name: "persona",
-  onConfig(ctx, config) {
-    const added = personaInstructions(ctx.context)
-    if (!added) return
-    return { systemPrompts: [...config.systemPrompts, added] }
-  },
-})
-
 const localTimes = defineChatMiddleware({
   name: "local-times",
   onBeforeToolCall(ctx, call) {
@@ -120,27 +108,7 @@ const localTimes = defineChatMiddleware({
  * first question, with the endpoint's own words.
  */
 function adapterOf(name: string, { baseURL, apiKey }: ModelSettings): AnyTextAdapter {
-  return openaiCompatibleText(name, { baseURL, apiKey, api: "chat-completions", fetch: answeringAtOnce(name) })
-}
-
-/**
- * Haiku answers Titan, and Titan is talked to: at the hub it sometimes thought for twenty seconds
- * before it called a tool, while the person waited in silence. This asks it to answer without
- * thinking first. Other models keep what their endpoint does by default.
- */
-function answeringAtOnce(name: string): typeof fetch | undefined {
-  if (!/haiku/i.test(name)) return undefined
-  return (input, init) => {
-    if (typeof init?.body !== "string") return fetch(input, init)
-    let body: Record<string, unknown>
-    try {
-      body = JSON.parse(init.body) as Record<string, unknown>
-    } catch {
-      return fetch(input, init)
-    }
-    if (body.reasoning_effort !== undefined) return fetch(input, init)
-    return fetch(input, { ...init, body: JSON.stringify({ ...body, reasoning_effort: "none" }) })
-  }
+  return openaiCompatibleText(name, { baseURL, apiKey, api: "chat-completions" })
 }
 
 type Handler = (request: Request) => Promise<Response>
@@ -175,7 +143,7 @@ function build(settings: ModelSettings | undefined): Handler | null {
       // Of a chat's settings the browser may change the model and switch a further server off and
       // on, and nothing else.
       expose: { settings: ["model"], config: switches.exposed },
-      middleware: [persona, localTimes],
+      middleware: [localTimes],
       systemPrompts: opcuaUrl ? [instructions, pageInstructions, opcuaInstructions] : [instructions, pageInstructions],
       tools: [proposePage],
       plugins: () => [tools, switchPlugin, modelTools],

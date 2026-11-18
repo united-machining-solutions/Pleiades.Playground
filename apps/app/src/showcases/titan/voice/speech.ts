@@ -1,8 +1,9 @@
-// The voice of Tom for Titan: a service on this computer speaks German in Tom's voice (apps/titan-voice),
-// reached through the server route /api/speak. Tom agreed to it; his recording stays on that computer.
+// The voice of Titan: the speech model of the gateway speaks a sentence, reached through the server route
+// /titan/api/speak. Which voice that is, the gateway says (showcases/titan/gateway.server.ts): at the
+// hackathon a voice trained for Titan, elsewhere whatever speech model the gateway lists first.
 //
-// It speaks one sentence at a time, like Piper in piper.ts: `tom.predict(sentence)` gives a wav, so the
-// first sentence sounds while the next is made.
+// It speaks one sentence at a time: `gatewayVoice.predict(sentence)` gives a wav, so the first sentence
+// sounds while the next is made.
 
 /** The longest text the service takes at once; a sentence is much shorter. */
 export const MAX_SENTENCE = 1000
@@ -18,10 +19,10 @@ export function speakableText(text: unknown): string | undefined {
 let asking: Promise<boolean> | undefined
 
 /**
- * Whether the voice of Tom is there. Asked once and kept; after a failure, or while the service is not
- * ready, the next call asks again.
+ * Whether the gateway has a voice. Asked once and kept; after a failure, or while there is none,
+ * the next call asks again.
  */
-export function tomAvailable(): Promise<boolean> {
+export function speechAvailable(): Promise<boolean> {
   asking ??= fetch("/titan/api/speak")
     .then(async (answer) => answer.ok && ((await answer.json()) as { available?: boolean }).available === true)
     .catch(() => false)
@@ -32,8 +33,8 @@ export function tomAvailable(): Promise<boolean> {
   return asking
 }
 
-/** One sentence in the voice of Tom, as a wav. */
-export async function speakAsTom(text: string): Promise<Blob> {
+/** One sentence in the voice of the gateway, as a wav. */
+export async function speakSentence(text: string): Promise<Blob> {
   const sentence = speakableText(text)
   if (sentence === undefined) throw new Error("Nothing to say, or more than a sentence")
   const answer = await fetch("/titan/api/speak", {
@@ -44,10 +45,10 @@ export async function speakAsTom(text: string): Promise<Blob> {
   if (!answer.ok) {
     asking = undefined
     const { error } = (await answer.json().catch(() => ({}))) as { error?: string }
-    throw new Error(error ?? `The voice of Tom answered ${answer.status}`)
+    throw new Error(error ?? `The voice answered ${answer.status}`)
   }
   return answer.blob()
 }
 
-/** The shape of a Piper session (`PiperSession` in piper.ts), so voice.ts can play Tom the same way. */
-export const tom: { predict: (sentence: string) => Promise<Blob> } = { predict: speakAsTom }
+/** The voice as voice.ts takes one: a sentence in, its sound out. */
+export const gatewayVoice: { predict: (sentence: string) => Promise<Blob> } = { predict: speakSentence }

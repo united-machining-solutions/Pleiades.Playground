@@ -1,14 +1,12 @@
-import { Outlet, createFileRoute, getRouteApi, useChildMatches, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Kbd } from "@pleiades/ui/components/kbd"
 import { SparklesIcon } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
-import { pickModel, useChatPanel } from "@/chat/ask.ts"
-import { useChatExtension } from "@/chat/extensions.ts"
-import { TITAN_CHAT } from "@/showcases/titan/chat.ts"
+import { openConversation } from "@/showcases/titan/conversation.ts"
+import type { Conversation } from "@/showcases/titan/conversation.ts"
 import "@/showcases/titan/titan.css"
 import {
-  askFollowUp,
   canListen,
   listen,
   remembering,
@@ -16,14 +14,15 @@ import {
   setSentenceVoice,
   setVoiceEnabled,
   speak,
+  speakingAnswers,
   stopListening,
   stopSpeaking,
   useVoiceState,
 } from "@/showcases/titan/voice/voice.ts"
 import type { VoiceState } from "@/showcases/titan/voice/voice.ts"
-import { tom, tomAvailable } from "@/showcases/titan/voice/tom.ts"
+import { gatewayVoice, speechAvailable } from "@/showcases/titan/voice/speech.ts"
 import { faultBriefing, faultInWords, useNewFaults } from "@/showcases/titan/voice/faults.ts"
-import { useShown } from "@/showcases/titan/voice/shown.ts"
+import { sharingCards, useShown } from "@/showcases/titan/voice/shown.ts"
 import { loadRecognition } from "@/showcases/titan/voice/transcribe.ts"
 import { isPause, useWakeWord } from "@/showcases/titan/voice/wake.ts"
 import { greetingFor } from "@/showcases/titan/voice/greeting.ts"
@@ -33,18 +32,20 @@ import { escalationsOf } from "@/showcases/titan/escalation.ts"
 import { EscalationView } from "@/showcases/titan/escalation-view.tsx"
 import { FocusView } from "@/showcases/titan/focus-view.tsx"
 import { asksToSee, unbroken } from "@/showcases/titan/words.ts"
-import { usePresence } from "@/showcases/titan/faces/presence.ts"
 import { Cloud } from "@/showcases/titan/voice/cloud.tsx"
 
 // Titan: a black screen with a cloud of points that greets, listens and speaks, and nothing else.
 //
 // - The first press of the space bar or a click starts Titan and greets: a browser speaks only after
 //   a key or a click.
-// - Then say "Hey Titan" and the question, or hold the space bar, speak, and let go: the question
-//   goes to the chat, which runs behind this screen, and its answer is read aloud. A follow-up goes
-//   on in the same chat.
-// - "Hey Titan, Pause" or the key P: Titan falls silent, greets nobody and says no fault, until
-//   "Hey Titan" or the space bar wakes it again. It still shows a new fault.
+// - Then hold the space bar, speak, and let go, or say "Hey Titan" and the question: the question goes
+//   to Titan's own conversation (showcases/titan/conversation.ts), and its answer is read aloud while
+//   it arrives. A follow-up goes on in the same conversation.
+// - Titan answers at once that it heard ("Moment."), and says that it looks something up when the
+//   answer needs a tool: a spoken conversation bears a wait that is announced, not a silent one.
+// - The space bar also interrupts: Titan falls silent and listens.
+// - "Hey Titan, Pause" or the key P: Titan falls silent and says no fault, until "Hey Titan" or the
+//   space bar wakes it again. It still shows a new fault.
 // - Titan speaks only once it is started and only while its tab is in front: a tab left open in
 //   the background stays silent.
 // - The screen is dark and has one focus: the question asked last and its answer (titan/focus-view.tsx).
@@ -54,15 +55,23 @@ import { Cloud } from "@/showcases/titan/voice/cloud.tsx"
 //   bottom, so no text appears anywhere else.
 // - Escape leaves the screen.
 //
+// Everything Titan hears and says goes through the gateway of the chat and nowhere else: the recording
+// to its transcription model, the conversation to a chat model, the sentences to its speech model.
+//
 // The demo speaks German, so do the words of this page.
 
 /** What Titan says when it is called by its name alone. */
 const AWAKE = "Ja?"
 /**
- * What Titan says as soon as it has understood a question. The answer takes two to three seconds at
- * the hub, one turn to read the machines and one to say it; this fills the silence and is said first.
+ * What Titan says as soon as a question was asked: before it is even recognised when the space bar was
+ * held, so the person hears within a moment that Titan listens. The first sentence of the answer
+ * follows a second or two later.
  */
 const ON_IT = "Moment."
+/** What Titan says when the answer needs a tool and the model said nothing before it called one. */
+const LOOKING = "Ich schaue kurz nach."
+/** The space bar held shorter than this was a tap, not a question: Titan does not answer it. */
+const SHORTEST_QUESTION_MS = 600
 /** What Titan says when it pauses, and when it is back. */
 const PAUSING = "Ich mache Pause."
 const BACK = "Ich bin wieder da."
@@ -78,18 +87,10 @@ function useTabInFront(): boolean {
   return inFront
 }
 
-const root = getRouteApi("__root__")
-
 export const Route = createFileRoute("/(showcases)/titan")({
   staticData: { nav: { title: "Titan", icon: SparklesIcon } },
-  component: TitanPage,
+  component: Assistant,
 })
-
-// The pages below Titan, as /titan/faces, are children of this route: one of them shows instead of Titan.
-function TitanPage() {
-  const below = useChildMatches()
-  return below.length > 0 ? <Outlet /> : <Assistant />
-}
 
 /** For a screen reader: what the cloud shows by moving. */
 const said: Record<VoiceState, string> = {
@@ -100,9 +101,6 @@ const said: Record<VoiceState, string> = {
 }
 
 function Assistant() {
-  const panel = useChatPanel()
-  // The page takes part in the open chat: Titan's persona, the voice and the screen (showcases/titan/chat.ts).
-  useChatExtension(TITAN_CHAT)
   const navigate = useNavigate()
   const state = useVoiceState()
   const { cards, briefing, question } = useShown()
@@ -114,34 +112,52 @@ function Assistant() {
   /** Titan was started by a key or a click: from then on it may speak, and it listens for its name. */
   const [started, setStarted] = useState(false)
   const holding = useRef(false)
+  /** When the space bar went down, to tell a question from a tap. */
+  const heldSince = useRef(0)
   /** Titan pauses: it listens for its name and the space bar, and says nothing. */
   const [paused, setPaused] = useState(false)
   // The handlers of the keys read the newest values without being bound again.
-  const latest = useRef<{ state: VoiceState; panel: typeof panel; alarmed: ReadonlyArray<string>; person?: string; paused: boolean; mayTalk: boolean }>({
+  const latest = useRef<{ state: VoiceState; alarmed: ReadonlyArray<string>; paused: boolean; mayTalk: boolean }>({
     state,
-    panel,
     alarmed: [],
     paused: false,
     mayTalk: false,
   })
   latest.current.state = state
-  latest.current.panel = panel
   latest.current.paused = paused
 
-  // The speech recognition gets ready as the screen opens. With the endpoint of the language model,
-  // the hub, there is nothing to load. Without it, Whisper loads: from the cache of the browser, or
-  // the first time from the internet, and a quiet line at the bottom says how far it is.
-  const [recognition, setRecognition] = useState<string | undefined>("Spracherkennung wird geladen …")
+  // Titan's conversation, for as long as the screen is open: the voice reads its answers aloud, and the
+  // screen shows what they say and draw.
+  const conversation = useRef<Conversation | undefined>(undefined)
+  useEffect(() => {
+    const opened = openConversation({
+      listeners: [speakingAnswers(), sharingCards()],
+      onReading: () => void sayNext(LOOKING),
+      onProblem: setProblem,
+    })
+    conversation.current = opened
+    return () => {
+      conversation.current = undefined
+      opened.close()
+    }
+  }, [])
+  /** Whether the gateway has a model to talk with; without one Titan says a fault itself. */
+  const canAnswer = useRef(false)
+  useEffect(() => {
+    void fetch("/titan/api/turn")
+      .then((answer) => (answer.ok ? (answer.json() as Promise<{ available?: boolean }>) : { available: false }))
+      .then(({ available }) => {
+        canAnswer.current = available === true
+        if (!canAnswer.current) setProblem("Das Gateway hat kein Sprachmodell: Titan zeigt die Halle, antwortet aber nicht.")
+      })
+      .catch(() => undefined)
+  }, [])
+
+  // Titan listens with the transcription model of the gateway. Without one, a line at the bottom says so.
+  const [recognition, setRecognition] = useState<string | undefined>()
   useEffect(() => {
     let open = true
-    loadRecognition((share) => open && setRecognition(`Spracherkennung wird geladen … ${Math.round(share * 100)} %`)).then(
-      () => open && setRecognition(undefined),
-      (error: unknown) =>
-        open &&
-        setRecognition(
-          `Spracherkennung nicht geladen. Einmal mit Internet öffnen, danach geht es offline. (${error instanceof Error ? error.message : String(error)})`,
-        ),
-    )
+    loadRecognition().catch((error: unknown) => open && setRecognition(error instanceof Error ? error.message : String(error)))
     return () => {
       open = false
     }
@@ -171,15 +187,15 @@ function Assistant() {
   const actions = useRef({ pause, resume })
   actions.current = { pause, resume }
 
-  // Titan speaks with the voice of Tom when its service runs (apps/titan-voice), else with the voice of
-  // the system. What Titan says often is made at once and kept, so it sounds without waiting.
+  // Titan speaks with the speech model of the gateway if it has one, else with a voice of this computer.
+  // What Titan says often is made at once and kept, so it sounds without waiting.
   useEffect(() => {
     let open = true
-    void tomAvailable().then(async (available) => {
+    void speechAvailable().then(async (available) => {
       if (!open || !available) return
-      const voice = remembering(tom)
+      const voice = remembering(gatewayVoice)
       setSentenceVoice(voice)
-      for (const sentence of [AWAKE, greetingFor(undefined, [])]) {
+      for (const sentence of [ON_IT, AWAKE, LOOKING, greetingFor(undefined, [])]) {
         if (open) await voice.predict(sentence).catch(() => undefined)
       }
     })
@@ -189,52 +205,23 @@ function Assistant() {
     }
   }, [])
 
-  // The cloud keeps an eye on the hall. A new fault turns it red at once, and the assistant speaks
-  // first: it is told what happened and says it in its own words, with the shop floor. Without a
-  // language model, the page says the fault itself.
-  const { chatStatus } = root.useLoaderData()
-  // Titan talks: the model that answers fastest begins its chats. Haiku took about a second for a
-  // sentence at the hub, the others two to five. Without it, the first model of the settings answers.
-  useEffect(() => {
-    const fastest = chatStatus.models.find((model) => /haiku/i.test(model))
-    if (fastest) pickModel(fastest)
-  }, [chatStatus.models])
-  /** Who stands in front of the camera, by name if the face is known. */
-  const [person, setPerson] = useState<string>()
+  // The cloud keeps an eye on the hall. A new fault turns it red at once, and Titan speaks first: it is
+  // told what happened and says it in its own words. Without a language model, the page says the fault
+  // itself.
   const { alarmed, list } = useNewFaults((fault) => {
     setHeard(undefined)
     setProblem(undefined)
     // Before the start, in a pause or behind another tab, the fault is shown, not said.
     if (!latest.current.mayTalk) return
-    if (!chatStatus.configured) return void speak(faultInWords(fault, latest.current.person))
-    const briefing = faultBriefing(fault, latest.current.person)
-    if (!askFollowUp(briefing)) latest.current.panel.ask(briefing)
+    if (!canAnswer.current || !conversation.current) return void speak(faultInWords(fault, undefined))
+    conversation.current.ask(faultBriefing(fault, undefined))
   })
   latest.current.alarmed = alarmed
-  latest.current.person = person
 
-  // Someone steps in front of the camera: Titan greets them, by name if it knows the face, and says
-  // straight away when machines stand still with an error. It does not talk over itself or a question.
-  const presence = usePresence({
-    enabled: started && !paused && inFront,
-    onArrive: ({ name }) => {
-      setPerson(name)
-      if (latest.current.state !== "idle") return
-      setHeard(undefined)
-      void speak(greetingFor(name, latest.current.alarmed))
-    },
-    // The name is checked again every few seconds. Someone else who is known stepped in without a
-    // pause: Titan greets them too. Someone who is no longer recognised just loses the name.
-    onRename: ({ name }) => {
-      setPerson(name)
-      if (!name || latest.current.state !== "idle") return
-      void speak(greetingFor(name, latest.current.alarmed))
-    },
-  })
-  // Without a camera, Titan greets once when it is started, without a name.
+  // Titan greets once when it is started, and says straight away when machines stand still with an error.
   useEffect(() => {
-    if (started && presence.status === "error") void speak(greetingFor(undefined, latest.current.alarmed))
-  }, [started, presence.status])
+    if (started) void speak(greetingFor(undefined, latest.current.alarmed))
+  }, [started])
 
   // "Hey Titan": listens while Titan is started and does nothing else, so it never hears itself.
   const [wakeReady, setWakeReady] = useState(false)
@@ -261,23 +248,15 @@ function Assistant() {
       setPaused(false)
       setHeard(question)
       void sayNext(ON_IT)
-      if (!askFollowUp(question)) latest.current.panel.ask(question)
+      conversation.current?.ask(question)
     },
     onProblem: setProblem,
   })
 
   useEffect(() => {
-    const ask = (question: string) => {
-      setProblem(undefined)
-      void sayNext(ON_IT)
-      if (!askFollowUp(question)) latest.current.panel.ask(question)
-    }
-
     const start = () => {
       if (greeted.current) return false
       greeted.current = true
-      // Titan says nothing of its own: the camera is open within a second, and its first words are the
-      // greeting, by name. Without a camera it greets at once, without a name.
       setStarted(true)
       return true
     }
@@ -287,7 +266,6 @@ function Assistant() {
     const onDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         stopSpeaking()
-        // The open chat stays open, with the question and the answer.
         void navigate({ to: "/", search: (previous) => previous })
         return
       }
@@ -307,6 +285,9 @@ function Assistant() {
         return
       }
       setHeard(undefined)
+      // The space bar interrupts: an answer that is still arriving is given up, and Titan listens.
+      conversation.current?.stop()
+      heldSince.current = performance.now()
       listen().then(
         (question) => {
           if (!question) {
@@ -314,7 +295,7 @@ function Assistant() {
             return
           }
           setHeard(question)
-          ask(question)
+          conversation.current?.ask(question)
         },
         (error: unknown) => setProblem(error instanceof Error ? error.message : String(error)),
       )
@@ -323,9 +304,12 @@ function Assistant() {
     const onUp = (event: KeyboardEvent) => {
       if (event.code !== "Space") return
       event.preventDefault()
+      const wasHolding = holding.current
       holding.current = false
       // Also before the microphone is ready: the recording then ends as soon as it begins.
       stopListening()
+      // Titan says at once that it heard, while the question is still being recognised.
+      if (wasHolding && latest.current.state === "listening" && performance.now() - heldSince.current >= SHORTEST_QUESTION_MS) void sayNext(ON_IT)
     }
 
     window.addEventListener("keydown", onDown)
@@ -385,7 +369,7 @@ function Assistant() {
           ) : (
             <div className="m-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
               <Cloud state={state} alarm={alarmed.length > 0} className={`size-72 ${paused ? "opacity-30" : ""}`} />
-              <h1 className="text-3xl font-light tracking-wide text-balance">{paused ? "Pause" : unbroken(greetingFor(person, alarmed))}</h1>
+              <h1 className="text-3xl font-light tracking-wide text-balance">{paused ? "Pause" : unbroken(greetingFor(undefined, alarmed))}</h1>
               {!started && (
                 <p className="flex items-center gap-2 text-base text-muted-foreground">
                   <Kbd>Leertaste</Kbd> drücken oder klicken, um Titan zu starten.

@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node face-models.mjs && vite dev --port 3000",
-    "build": "node face-models.mjs && vite build",
+    "dev": "vite dev --port 3000",
+    "build": "vite build",
     "start": "node .output/server/index.mjs",
     "postinstall": "node route-tree.mjs",
     "typecheck": "node route-tree.mjs && tsc",
@@ -12,8 +12,6 @@
   },
   "dependencies": {
     "@fontsource-variable/roboto": "catalog:",
-    "@huggingface/transformers": "catalog:",
-    "@mintplex-labs/piper-tts-web": "catalog:",
     "@pleiades/cards": "workspace:*",
     "@pleiades/hub-sdk": "catalog:",
     "@pleiades/ui": "workspace:*",
@@ -27,7 +25,6 @@
     "@tanstack/markdown": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
-    "@vladmandic/human": "catalog:",
     "cn": "catalog:",
     "lucide-react": "catalog:",
     "mqtt": "catalog:",

@@ -2,7 +2,6 @@ import type { EnergySeries, EnergyShow } from "@pleiades/cards/energy/contract.t
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
 import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import type { NotificationList } from "@pleiades/cards/notification/contract.ts"
-import type { ShopfloorShow } from "@pleiades/cards/shopfloor/contract.ts"
 import type { SiteList } from "@pleiades/cards/site/contract.ts"
 import type { TimeseriesRange, TimeseriesSeries, TimeseriesShow, TimeseriesSignals } from "@pleiades/cards/timeseries/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
@@ -134,18 +133,6 @@ export const getMeasurementSeries = createServerFn({ method: "GET" })
         return result.structuredContent
       }),
   )
-
-/** The hall: every machine at its place, whether it runs, and why not: the values of the shop floor card. */
-export const getShopfloor = createServerFn({ method: "GET" }).handler(
-  (): Promise<Answer<ShopfloorShow>> =>
-    ask(async (backend) => {
-      const result = await backend.callTool("genui_shopfloor_show", {})
-      if (result.isError || !result.structuredContent) {
-        throw new Refused(textOf(result) ?? "genui_shopfloor_show returned no values.")
-      }
-      return result.structuredContent
-    }),
-)
 
 /** The values of the page Charts: each machine with the sums of its last hours, and its recent spans. */
 export type Charts = {

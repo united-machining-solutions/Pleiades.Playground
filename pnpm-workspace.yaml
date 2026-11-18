@@ -7,8 +7,6 @@ packages:
 catalog:
   "@base-ui/react": 1.9.0
   "@fontsource-variable/roboto": 5.3.0
-  '@huggingface/transformers': 4.3.2
-  '@mintplex-labs/piper-tts-web': 1.0.5
   "@modelcontextprotocol/ext-apps": 2.0.4
   # Not on npmjs.org: the SDK of the Pleiades Hub, checked in as a tarball. See vendor/README.md.
   "@pleiades/hub-sdk": file:vendor/pleiades-hub-sdk-0.1.2.tgz
@@ -32,7 +30,6 @@ catalog:
   "@types/react-dom": 19.3.0
   "@types/three": 0.187.0
   "@vitejs/plugin-react": 6.3.0
-  '@vladmandic/human': 3.3.6
   class-variance-authority: 0.7.1
   cn: 0.5.2
   lucide-react: 1.73.0
@@ -63,12 +60,6 @@ catalog:
 # hand is not: that stays a thing to see in a review.
 catalogMode: strict
 savePrefix: ""
-
-# The speech recognition of the assistant page runs in the browser. These two packages come with it
-# and would download native files for Node.js when installed, which nothing here uses.
-allowBuilds:
-  onnxruntime-node: false
-  protobufjs: false
 
 # rollup-plugin-license lists the packages a bundler put into a file. It names Rollup as a peer.
 # The card files are built by Vite on Rolldown, which calls the same hooks, so Rollup stays out.

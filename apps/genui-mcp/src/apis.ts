@@ -412,51 +412,6 @@ export async function readTimelines(
   }))
 }
 
-/** How often each kind of alert was raised between the two instants, and how long it stood in total. */
-export type MessageStat = { notificationId: string; title: string; level: NotificationLevel; count: number; seconds: number }
-
-/** An alert as `/alerts/pairs` gives it, as far as the statistics need it. */
-type CountedPair = { errorCode?: string | null; message?: string | null; severity?: Severity | null; raisedAt: string; clearedAt: string | null }
-
-/**
- * The alerts by kind, the kind being their error code, or their text where they have none: how often
- * each was raised, and how long it stood inside the range. Most often first, then longest.
- */
-export function messageStatsOf(pairs: ReadonlyArray<CountedPair>, from: Date, to: Date): Array<MessageStat> {
-  const kinds = new Map<string, MessageStat>()
-  for (const pair of pairs) {
-    const id = pair.errorCode || pair.message || "?"
-    const kind = kinds.get(id) ?? { notificationId: id, title: pair.message || id, level: levelOf(pair.severity), count: 0, seconds: 0 }
-    const start = Math.max(Date.parse(pair.raisedAt), from.getTime())
-    const end = Math.min(pair.clearedAt === null ? to.getTime() : Date.parse(pair.clearedAt), to.getTime())
-    kind.count += 1
-    kind.seconds += Math.max(0, end - start) / 1000
-    if (pair.severity === "Failure") kind.level = "Error"
-    kinds.set(id, kind)
-  }
-  return [...kinds.values()].sort((a, b) => b.count - a.count || b.seconds - a.seconds)
-}
-
-/** The alerts by kind, for one machine or for all, between the two instants. */
-export async function readMessageStats(apis: Apis, from: Date, to: Date, machine?: string): Promise<Array<MessageStat>> {
-  const { pairs } = await readAlertPairs(apis, from, to, machine)
-  return messageStatsOf(pairs, from, to)
-}
-
-/** The oldest and the newest number of a topic between the two instants, or null if it has none. */
-export async function readFirstAndLast(apis: Apis, topic: string, from: Date, to: Date): Promise<{ first: number; last: number } | null> {
-  const one = async (sorting: "Ascending" | "Descending") => {
-    const url = between(new URL(`/timeseries/baseUnitValues/topics/${inPath(topic)}`, apis.timeseriesUrl), ["startTime", "stopTime"], from, to)
-    url.searchParams.set("limit", "1")
-    url.searchParams.set("sorting", sorting)
-    const { series } = await getJson("Timeseries API", url, numberSeriesAnswer)
-    const value = series[0]?.values.find((each) => each !== null)
-    return value === undefined || value === null ? null : Number(value)
-  }
-  const [first, last] = await Promise.all([one("Ascending"), one("Descending")])
-  return first === null || last === null ? null : { first, last }
-}
-
 /** A site as the Sites API keeps it: a place with a company, a plant and its halls. */
 export type StoredSite = { siteId: string; company: string; name: string; halls: Array<string> }
 /** A machine on a site, as the Sites API keeps it. */

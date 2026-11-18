@@ -1,15 +1,18 @@
-import { serialOf } from "@pleiades/cards/machine/in-words.ts"
 import type { MachineList } from "@pleiades/cards/machine/contract.ts"
 import { openError } from "@pleiades/cards/machine/state.ts"
 import { useEffect, useRef, useState } from "react"
 
 import { getMachines } from "@/machines/get-machines.ts"
+import { serialOf } from "../words.ts"
 
 // The assistant page keeps an eye on the hall: every few seconds it reads the machines, and an error
 // that was not there before is a new fault. The page then lets the assistant speak first.
 
-/** How often the hall is read: often enough that the orb reacts within moments. */
-const LOOK_EVERY_MS = 3_000
+/**
+ * How often the hall is read: often enough that the orb reacts within moments, and no more often, since
+ * every look reads every machine.
+ */
+const LOOK_EVERY_MS = 5_000
 
 /** An error that a machine raised and that has not gone. */
 export type Fault = {
