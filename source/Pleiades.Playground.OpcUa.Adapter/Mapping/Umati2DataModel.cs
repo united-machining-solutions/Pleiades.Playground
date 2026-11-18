@@ -23,6 +23,12 @@ internal static class Umati2DataModel
     /// <summary>The node that holds the item state and the operation mode, as one structure.</summary>
     public const string StatusIdentifier = "s=State.Status";
 
+    /// <summary>The identifier of the binary encoding of <c>DataType.Alert</c>.</summary>
+    public const string AlertEncoding = "s=DataType.Alert.DefaultBinary";
+
+    /// <summary>The node that lists the alerts that stand, an array of <c>DataType.Alert</c>.</summary>
+    public const string ActiveAlertsIdentifier = "s=Notification.ActiveAlerts";
+
     private const string EvidenceStart = "Known mapping of the adapter for " + Namespace + ": ";
 
     private static readonly IReadOnlyDictionary<string, string> ItemStates = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -83,7 +89,9 @@ internal static class Umati2DataModel
     /// <summary>
     /// The registration with every element of <see cref="Rules"/> set to its node in the namespace of
     /// the machine, whatever the scan proposed for it, and none of them missing. Elements no rule
-    /// covers are kept. A registration of another namespace is returned as it is.
+    /// covers are kept. The alerts come from the list <c>Notification.ActiveAlerts</c> of the namespace,
+    /// not from an alarm event type the scan named: the list is the model's own, and the conditions of
+    /// the events lie in a namespace of the maker. A registration of another namespace is returned as it is.
     /// </summary>
     public static MachineRegistration Apply(MachineRegistration registration)
     {
@@ -108,11 +116,35 @@ internal static class Umati2DataModel
             }
         }
 
-        var paths = Rules.Select(rule => rule.Path).ToHashSet(StringComparer.Ordinal);
+        var paths = Rules.Select(rule => rule.Path).Append(Topics.ActiveAlerts).ToHashSet(StringComparer.Ordinal);
         return registration with
         {
             Elements = elements,
+            Alerts = new AlertRegistration { List = $"nsu={uri};{ActiveAlertsIdentifier}" },
             Missing = [.. registration.Missing.Where(entry => !paths.Contains(entry.Path))],
+        };
+    }
+
+    /// <summary>
+    /// The registration without the list of alerts the rules set, moved to <c>missing</c>: the server
+    /// turned out not to have the node <c>Notification.ActiveAlerts</c>. Any other registration is returned as it is.
+    /// </summary>
+    public static MachineRegistration WithoutAlertList(MachineRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        if (registration.Alerts?.List is not { } list || !Holds(list))
+        {
+            return registration;
+        }
+
+        return registration with
+        {
+            Alerts = null,
+            Missing =
+            [
+                .. registration.Missing.Where(entry => entry.Path != Topics.ActiveAlerts),
+                new MissingElement { Path = Topics.ActiveAlerts, Reason = $"The server has no node {ActiveAlertsIdentifier} in {Namespace}." },
+            ],
         };
     }
 

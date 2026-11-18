@@ -243,8 +243,8 @@ function alertOf(pair: AlertPair) {
 }
 
 /** The alerts of every machine that were raised between the two instants and have not been cleared. */
-export async function readOpenNotifications(apis: Apis, from: Date, to: Date): Promise<Array<OpenNotification>> {
-  const { pairs } = await readAlertPairs(apis, from, to)
+export async function readOpenNotifications(apis: Apis, from: Date, to: Date, machine?: string): Promise<Array<OpenNotification>> {
+  const { pairs } = await readAlertPairs(apis, from, to, machine)
   return pairs
     .filter((pair) => pair.clearedAt === null && Date.parse(pair.raisedAt) >= from.getTime())
     .map((pair) => ({ ...alertOf(pair), machine: pair.mId }))
@@ -270,12 +270,13 @@ export async function readRaised(
   }))
 }
 
-/** The job orders that run or are interrupted now, the newest change of each machine first. */
-export async function readRunningJobOrders(apis: Apis): Promise<Array<RunningJobOrder>> {
+/** The job orders that run or are interrupted now, the newest change of each machine first; of one machine, if named. */
+export async function readRunningJobOrders(apis: Apis, machine?: string): Promise<Array<RunningJobOrder>> {
   const items = await Promise.all(
     ["Running", "Interrupted"].map(async (state) => {
       const url = new URL("/jobOrders", apis.eventsUrl)
       url.searchParams.set("state", state)
+      if (machine !== undefined) url.searchParams.set("mId", machine)
       url.searchParams.set("Take", "1000")
       return (await getJson("Events API", url, jobOrdersAnswer)).items
     }),

@@ -41,8 +41,11 @@ const measurementListTool = toolDefinition({
 const measurementSeriesTool = toolDefinition({
   name: MEASUREMENT_SERIES_TOOL,
   description:
-    "List the values of every physical quantity of every machine over the last minutes, a line for each machine: what the graphs of the measurements draw. The measurement card calls it after genui_measurement_list. A language model does not need it to say what a machine measures now: that is genui_measurement_list.",
+    "List the values of every physical quantity of every machine over the last minutes, or of one machine with `machine`, a line for each machine: what the graphs of the measurements draw. The measurement card calls it after genui_measurement_list. A language model does not need it to say what a machine measures now: that is genui_measurement_list.",
   inputSchema: z.object({
+    machine: machineId
+      .optional()
+      .describe("The machine id of one machine, for example alcyone-machines_AX-400_P-04. Every machine if omitted."),
     minutes: z
       .number()
       .int()
@@ -65,7 +68,7 @@ const measurementSeriesTool = toolDefinition({
   // The card file asks for it through its host, the page "Live values" of the example app itself.
   metadata: { title: "List measurement series", annotations: readOnly, _meta: { ui: { visibility: ["app"] } } },
 }).server<Context>(async (input, ctx) => {
-  const series = await listMeasurementSeries(ctx.context.apis, input.minutes, input.slots)
+  const series = await listMeasurementSeries(ctx.context.apis, input.minutes, input.slots, new Date(), input.machine)
   const lines = series.quantities.reduce((sum, one) => sum + one.lines.length, 0)
   return inWords(
     series,

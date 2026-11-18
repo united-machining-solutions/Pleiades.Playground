@@ -9,7 +9,7 @@ namespace Pleiades.Playground.JuiceBar.Api;
 internal sealed class JuiceBarTools(JuiceBarService juiceBar)
 {
     [McpServerTool(Name = "juicebar_drinks_list", ReadOnly = true, Idempotent = true, Destructive = false),
-     Description("List the drinks the juice bar can mix now, each with its id, title, description and ingredients. Only drinks whose ingredients are installed are listed.")]
+     Description("List the drinks the juice bar can mix now, each with its id, title, description, colour, the picture of a glass its author chose, and its ingredients, each with its colour and whether its bottle runs low. Only drinks whose ingredients are installed are listed.")]
     public Task<IReadOnlyList<Drink>> Drinks(CancellationToken cancellationToken)
         => Guard(() => juiceBar.DrinksAsync(cancellationToken));
 

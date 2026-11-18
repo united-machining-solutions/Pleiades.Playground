@@ -307,6 +307,17 @@ internal sealed class MachineSupervisor : BackgroundService
             probe = probe with { Elements = [.. probe.Elements.Where(element => !(element.Area == "umati" && absent.Contains(element.Path)))] };
         }
 
+        // So is the list of alerts it set, and the alarm type of a TRUMPF machine: the alerts are then not available.
+        if (!probe.AlertListFound)
+        {
+            registration = Umati2DataModel.WithoutAlertList(registration);
+        }
+
+        if (!probe.AlertEventTypeFound)
+        {
+            registration = TrumpfAlarms.WithoutEventType(registration);
+        }
+
         // An element that left makes its profile incomplete; the core decides whether the machine is added.
         var before = registration.Elements;
         registration = DataModelProfiles.Apply(registration, out var checks);
@@ -332,12 +343,12 @@ internal sealed class MachineSupervisor : BackgroundService
         }
 
         // The machine id of every topic and the source of every event: from the identification the server gave now.
-        var identity = MachineOutput.IdentityOf(path => probe.ValueOf(path), registration.SerialNumber);
+        var identity = MachineOutput.IdentityOf(path => probe.ValueOf(path), registration);
         if (identity is null)
         {
             return new RegistrationOutcome(
                 null,
-                ["identity: Identification.ManufacturerUri, Model and SerialNumber must each be mapped and give a text: the machine id of the topics, <manufacturer>_<model>_<serial number>, is formed from them."],
+                [MachineOutput.IdentityProblem(path => probe.ValueOf(path), registration)],
                 endpoints,
                 probe) { Tried = registration };
         }
@@ -402,7 +413,9 @@ internal sealed class MachineSupervisor : BackgroundService
             outcome.Probe is null ? null : MappingReview.Summary(rows),
             rows,
             Replaces: stored is not null,
-            stored is null ? null : RegistrationChanges.Between(stored, tried));
+            stored is null ? null : RegistrationChanges.Between(stored, tried),
+            outcome.Registration?.Identity?.MachineId,
+            Views.Notices(outcome.Registration?.Identity));
     }
 
     /// <summary>

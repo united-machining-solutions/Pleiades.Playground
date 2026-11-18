@@ -53,7 +53,19 @@ internal static class RegistrationValidator
 
         if (registration.Alerts is { } alerts)
         {
-            if (!IsPortableNode(alerts.EventType))
+            if (alerts.List is not null)
+            {
+                if (!IsPortableNode(alerts.List))
+                {
+                    problems.Add("alerts.list: must be a node with a namespace URI, 'nsu=<uri>;s=<text>'.");
+                }
+
+                if (!string.IsNullOrEmpty(alerts.EventType))
+                {
+                    problems.Add("alerts: the alerts come from the list or from the events of an alarm type, not from both; leave eventType out with list.");
+                }
+            }
+            else if (!IsPortableNode(alerts.EventType))
             {
                 problems.Add("alerts.eventType: must be a node with a namespace URI, 'nsu=<uri>;i=<number>', or a node of namespace 0.");
             }
@@ -129,7 +141,7 @@ internal static class RegistrationValidator
 
         if (element.Path is Topics.ActiveAlerts)
         {
-            problems.Add($"{name}: the adapter publishes the alerts from the subscription in 'alerts'; it is not an element of a registration.");
+            problems.Add($"{name}: the adapter publishes the alerts from 'alerts', the events of an alarm type or, for a machine in urn:umati2:datamodel:opcua, this list, which it sets itself; it is not an element of a registration.");
         }
 
         if (element.Kind == ValueKind.Number)

@@ -1,9 +1,12 @@
 import { SearchXIcon, ServerOffIcon } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
 
 import { chatTools } from "@/chat/cards.tsx"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 
+import { withAnswer } from "./answers.ts"
+import type { Held } from "./answers.ts"
 import { callPart } from "./call-part.ts"
 import type { PartAnswer } from "./call-part.ts"
 import { drawingTool, noCardFor } from "./parts.ts"
@@ -18,22 +21,54 @@ const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
 /** A part with its answer: what the tool gave now, or why it gave nothing. */
 export type AnsweredPart = RecipePart & { answer: PartAnswer }
 
-/**
- * Asks every part of a recipe at the same time, for a loader. Each part answers for itself: one
- * without an answer leaves the others whole. A tool without a card is not asked, because the
- * server of the app would refuse it too.
- */
-export function answerParts(parts: ReadonlyArray<RecipePart>): Promise<Array<AnsweredPart>> {
-  return Promise.all(
-    parts.map(async (part): Promise<AnsweredPart> => {
-      if (!drawingTool(part.tool, chatTools)) return { ...part, answer: { values: null, error: noCardFor(part.tool) } }
-      // If the server of the app itself is away for a moment, the part says so and the page keeps trying.
-      const answer = await callPart({ data: { tool: part.tool, args: part.args, timeZone } }).catch(
-        (error: unknown): PartAnswer => ({ values: null, error: String(error) }),
-      )
-      return { ...part, answer }
-    }),
+/** A part that has been asked: its answer comes when the tool has given it. `question` counts up. */
+export type AskedPart = RecipePart & { answer: Promise<PartAnswer>; question: number }
+
+/** How many questions this browser has asked: the number of the next one. */
+let questions = 0
+
+/** One part, asked: a tool without a card is not asked, because the server of the app would refuse it too. */
+function askPart(part: RecipePart): Promise<PartAnswer> {
+  if (!drawingTool(part.tool, chatTools)) return Promise.resolve({ values: null, error: noCardFor(part.tool) })
+  // If the server of the app itself is away for a moment, the part says so and the page keeps trying.
+  return callPart({ data: { tool: part.tool, args: part.args, timeZone } }).catch(
+    (error: unknown): PartAnswer => ({ values: null, error: String(error) }),
   )
+}
+
+/**
+ * Asks every part of a recipe at the same time, for a loader, and does not wait for them: the page
+ * stands at once and each part is drawn when its answer comes, so one slow part does not hold back
+ * the others. Each part answers for itself: one without an answer leaves the others whole.
+ */
+export function askParts(parts: ReadonlyArray<RecipePart>): Array<AskedPart> {
+  return parts.map((part) => ({ tool: part.tool, args: part.args, answer: askPart(part), question: ++questions }))
+}
+
+/**
+ * The answers of the parts, as they come: those of the loader, and of each part asked alone with
+ * `ask`. An answer stands until a newer one of the same part comes (`withAnswer`), so a page that
+ * is read again keeps what it drew while it waits.
+ */
+export function useAnswers(asked: ReadonlyArray<AskedPart>): { answers: Array<AnsweredPart>; ask: (part: RecipePart) => void } {
+  const [held, setHeld] = useState<ReadonlyMap<string, Held<AnsweredPart>>>(new Map())
+  const shown = useRef(true)
+  useEffect(() => {
+    shown.current = true
+    return () => {
+      shown.current = false
+    }
+  }, [])
+  const settle = useCallback((one: AskedPart) => {
+    void one.answer.then((answer) => {
+      if (shown.current) setHeld((before) => withAnswer(before, { tool: one.tool, args: one.args, answer }, one.question))
+    })
+  }, [])
+  useEffect(() => {
+    for (const one of asked) settle(one)
+  }, [asked, settle])
+  const ask = useCallback((part: RecipePart) => askParts([part]).forEach(settle), [settle])
+  return { answers: [...held.values()].map((one) => one.answered), ask }
 }
 
 /**

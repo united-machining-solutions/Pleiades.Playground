@@ -170,7 +170,62 @@ test("a part is not put back where it does not keep the schema, or the page is f
   assert.equal(pages.getPage(full)?.recipe.parts.length, MAX_PARTS)
 })
 
-test("a part removed or moved where the storage does not take it leaves the page as it was", () => {
+test("a part is not put back where a card added since shows the same, or filled the page", () => {
+  const pages = createPageStore(stored())
+  // Removed, then added again by hand while the undo was still offered: the page shows it once.
+  const two = pages.savePage({ title: "Two", parts: [list, p04] }) ?? ""
+  assert.equal(pages.removePart(two, 1), true)
+  assert.equal(pages.addPart(two, p04), true)
+  assert.equal(pages.putPartBack(two, 1, p04), false)
+  assert.deepEqual(pages.getPage(two)?.recipe.parts, [list, p04])
+  // The same card with its arguments in another order is the same card.
+  assert.equal(pages.removePart(two, 1), true)
+  assert.equal(pages.addPart(two, { tool: "genui_machine_show", args: { hours: 8, machine: "P-04" } }), true)
+  assert.equal(pages.putPartBack(two, 1, { tool: "genui_machine_show", args: { machine: "P-04", hours: 8 } }), false)
+  assert.equal(pages.getPage(two)?.recipe.parts.length, 2)
+  // A page of twelve, one removed, one added: the removed part has no room any more.
+  const machines = Array.from({ length: MAX_PARTS }, (_, at) => ({ tool: "genui_machine_show", args: { machine: `M-${at}` } }))
+  const full = pages.savePage({ title: "Full", parts: machines }) ?? ""
+  assert.equal(pages.removePart(full, 0), true)
+  assert.equal(pages.addPart(full, list), true)
+  assert.equal(pages.putPartBack(full, 0, machines[0]), false)
+  assert.deepEqual(pages.getPage(full)?.recipe.parts, [...machines.slice(1), list])
+})
+
+test("an added part goes to the end of the page, and the others keep their order", () => {
+  const pages = createPageStore(stored())
+  const id = pages.savePage(three) ?? ""
+  const kept = pages.savePage(other) ?? ""
+  const hours = { tool: "genui_machine_show", args: { machine: "P-04", hours: 24 } }
+  assert.equal(pages.addPart(id, hours), true)
+  assert.deepEqual(pages.getPage(id)?.recipe, { title: "Hall 2", parts: [list, p04, m02, hours] })
+  assert.deepEqual(pages.getPage(kept)?.recipe, other)
+  // The part added last can be moved and removed like any other.
+  assert.equal(pages.movePart(id, 3, 0), true)
+  assert.equal(pages.removePart(id, 0), true)
+  assert.deepEqual(pages.getPage(id)?.recipe, three)
+})
+
+test("a part is not added where the page shows the same already, it is full, or it does not keep the schema", () => {
+  const pages = createPageStore(stored())
+  const id = pages.savePage(three) ?? ""
+  // The same tool with the same arguments, in another order of its keys.
+  const same = pages.savePage({ title: "Same", parts: [{ tool: "genui_machine_show", args: { hours: 8, machine: "P-04" } }] }) ?? ""
+  assert.equal(pages.addPart(same, { tool: "genui_machine_show", args: { machine: "P-04", hours: 8 } }), false)
+  assert.equal(pages.addPart(id, p04), false)
+  assert.equal(pages.addPart(id, { tool: "", args: {} }), false)
+  assert.equal(pages.addPart(id, { tool: "genui_machine_list", args: { timeZone: "Europe/Zurich" } }), false)
+  assert.equal(pages.addPart("nobody", list), false)
+  assert.deepEqual(pages.getPage(id)?.recipe, three)
+  const full = pages.savePage({
+    title: "Full",
+    parts: Array.from({ length: MAX_PARTS }, (_, at) => ({ tool: "genui_machine_show", args: { machine: `M-${at}` } })),
+  }) ?? ""
+  assert.equal(pages.addPart(full, list), false)
+  assert.equal(pages.getPage(full)?.recipe.parts.length, MAX_PARTS)
+})
+
+test("a part removed, moved or added where the storage does not take it leaves the page as it was", () => {
   const storage = memory()
   const pages = createPageStore(() => storage)
   const id = pages.savePage(three) ?? ""
@@ -179,7 +234,9 @@ test("a part removed or moved where the storage does not take it leaves the page
   }
   assert.equal(pages.removePart(id, 0), false)
   assert.equal(pages.movePart(id, 0, 2), false)
-  assert.equal(pages.putPartBack(id, 0, p04), false)
+  // A part the page does not show, so that it is the storage that says no.
+  assert.equal(pages.putPartBack(id, 0, { tool: "genui_machine_show", args: { machine: "P-07" } }), false)
+  assert.equal(pages.addPart(id, { tool: "genui_site_list", args: {} }), false)
   assert.deepEqual(pages.getPage(id)?.recipe, three)
 })
 

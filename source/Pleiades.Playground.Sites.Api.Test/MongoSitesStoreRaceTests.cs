@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
@@ -63,7 +64,7 @@ public sealed class MongoSitesStoreRaceTests : IDisposable
         await GivenSiteAsync();
         var paused = new PausingStore(_store, pauseAt: nameof(ISitesTransaction.ListPlacementsOfSiteAsync));
 
-        var delete = SitesEndpoints.DeleteSite("north-plant", paused, Ct);
+        var delete = SitesEndpoints.DeleteSite("north-plant", null, paused, Ct);
         await paused.Reached.WaitAsync(TimeSpan.FromSeconds(30), Ct);
         var put = await Placements.PutPlacement("M-05", new PlacementRequestV1("north-plant", "Hall 1", null), _store, TimeProvider.System, Ct);
         paused.Release();
@@ -80,7 +81,7 @@ public sealed class MongoSitesStoreRaceTests : IDisposable
         await GivenSiteAsync();
         var paused = new PausingStore(_store, pauseAt: nameof(ISitesTransaction.ListPlacementsOfSiteAsync));
 
-        var change = SitesEndpoints.PutSite("north-plant", NorthPlant with { Halls = ["Hall 1"] }, paused, Ct);
+        var change = PutSiteAsync(NorthPlant with { Halls = ["Hall 1"] }, null, null, paused);
         await paused.Reached.WaitAsync(TimeSpan.FromSeconds(30), Ct);
         var put = await Placements.PutPlacement("M-05", new PlacementRequestV1("north-plant", "Hall 2", null), _store, TimeProvider.System, Ct);
         paused.Release();
@@ -98,7 +99,7 @@ public sealed class MongoSitesStoreRaceTests : IDisposable
 
         var put = Placements.PutPlacement("M-05", new PlacementRequestV1("north-plant", "Hall 1", null), paused, TimeProvider.System, Ct);
         await paused.Reached.WaitAsync(TimeSpan.FromSeconds(30), Ct);
-        var delete = await SitesEndpoints.DeleteSite("north-plant", _store, Ct);
+        var delete = await SitesEndpoints.DeleteSite("north-plant", null, _store, Ct);
         paused.Release();
 
         Assert.IsInstanceOfType<NoContent>(delete.Result);
@@ -107,10 +108,48 @@ public sealed class MongoSitesStoreRaceTests : IDisposable
         Assert.IsEmpty(await _store.ListPlacementsAsync(Ct));
     }
 
-    private async Task GivenSiteAsync()
+    [TestMethod]
+    public async Task PutSite_IfNoneMatch_WhileTheSameSiteIsMade_IsRefused_AndTheFirstStays()
     {
-        var created = await SitesEndpoints.PutSite("north-plant", NorthPlant, _store, Ct);
+        var paused = new PausingStore(_store, pauseAt: nameof(ISitesTransaction.FindSiteAsync));
+
+        var second = PutSiteAsync(NorthPlant with { Company = "Other" }, null, "*", paused);
+        await paused.Reached.WaitAsync(TimeSpan.FromSeconds(30), Ct);
+        var first = await PutSiteAsync(NorthPlant, null, "*", _store);
+        paused.Release();
+
+        Assert.IsInstanceOfType<Created<SiteDtoV1>>(first.Result);
+        Assert.AreEqual(StatusCodes.Status412PreconditionFailed, ((JsonHttpResult<string>)(await second).Result).StatusCode);
+        Assert.AreEqual("Demo Manufacturing", (await _store.ListSitesAsync(Ct)).Single().Company);
+    }
+
+    [TestMethod]
+    public async Task PutSite_IfMatch_WhileAnotherChangeOfTheSameSiteWins_IsRefused_AndTheOtherChangeStays()
+    {
+        var tag = SiteTags.Of((await GivenSiteAsync()).Single());
+        var paused = new PausingStore(_store, pauseAt: nameof(ISitesTransaction.FindSiteAsync));
+
+        var addHall3 = PutSiteAsync(NorthPlant with { Halls = ["Hall 1", "Hall 2", "Hall 3"] }, tag, null, paused);
+        await paused.Reached.WaitAsync(TimeSpan.FromSeconds(30), Ct);
+        var rename = await PutSiteAsync(NorthPlant with { Name = "North plant, renamed" }, tag, null, _store);
+        paused.Release();
+
+        Assert.IsInstanceOfType<Ok<SiteDtoV1>>(rename.Result);
+        Assert.AreEqual(StatusCodes.Status412PreconditionFailed, ((JsonHttpResult<string>)(await addHall3).Result).StatusCode);
+        var site = (await _store.ListSitesAsync(Ct)).Single();
+        Assert.AreEqual("North plant, renamed", site.Name);
+        Assert.AreEqual("Hall 1, Hall 2", string.Join(", ", site.Halls));
+    }
+
+    private Task<Results<Created<SiteDtoV1>, Ok<SiteDtoV1>, BadRequest<string>, Conflict<string>, JsonHttpResult<string>>> PutSiteAsync(
+        SiteRequestV1 site, string? ifMatch, string? ifNoneMatch, ISitesStore store) =>
+        SitesEndpoints.PutSite("north-plant", site, ifMatch, ifNoneMatch, new DefaultHttpContext().Response, store, Ct);
+
+    private async Task<IReadOnlyList<SiteDao>> GivenSiteAsync()
+    {
+        var created = await PutSiteAsync(NorthPlant, null, null, _store);
         Assert.IsInstanceOfType<Created<SiteDtoV1>>(created.Result);
+        return await _store.ListSitesAsync(Ct);
     }
 
     /// <summary>

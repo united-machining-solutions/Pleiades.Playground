@@ -1,4 +1,4 @@
-# MQTT binding (draft 0.2.0)
+# MQTT binding (draft 0.3.0)
 
 How machine data appears on the broker, and values about a place. This is a working draft for the playground.
 
@@ -19,6 +19,7 @@ machines/{MachineId}/umati/<path>        an element of the data model
 machines/{MachineId}/oem/<path>          a signal the machine manufacturer defines
 machines/{MachineId}/events/<group>      CloudEvents: jobs, workmasters, notifications
 sites/{SiteId}/{Source}/<path>           values about a place, in the names of one source
+hub/<topic>                              registration of apps at the Pleiades Hub, owned by its contract
 ```
 
 The first two levels of a topic say what a value is about, the third says whose names follow.
@@ -38,7 +39,18 @@ A value that belongs to no machine is about a place:
 - A source says that it is there: with `Connection/State` and `Connection/Heartbeat` below
   `sites/{SiteId}/{Source}/`.
 - A new source below `sites/` adds its rows to "Example topics of a source". A new first level beside
-  `machines` and `sites` is a change to this binding.
+  `machines`, `sites` and `hub` is a change to this binding.
+
+The first level `hub/` carries no values. It carries the registration of apps at the Pleiades Hub, the page
+that shows the apps of a Pleiades system under one header:
+
+- Its topics, `hub/discover`, `hub/clients/{ClientId}/announce` and `hub/clients/{ClientId}/offline`, and
+  their payloads are defined by the contract of the hub, `contracts/mqtt/README.md` in the repository
+  `umati/pleiades-hub`, not here. This binding only reserves the level and says who owns it; the decision
+  is [ADR-0021](../../docs/adr/0021-hub-registration.md).
+- What this document says about a value does not apply below `hub/`: the envelope, the units, the content
+  types and `Connection/State`. The messages there are not values. They are JSON, published with QoS 1 and
+  never retained.
 
 ### Value envelope of a place
 
@@ -220,6 +232,26 @@ manufacturer as long as its domain does. A subdomain stays a part of the id.
 The domain stays when the company is renamed; the display name of the manufacturer is not used. The id is a
 proposal of this binding, not an element of the model: globally unique stays `ProductInstanceUri`, also as the
 `source` of every event.
+
+#### Without a ManufacturerUri
+
+Some OPC UA servers have no node for `Identification.ManufacturerUri`. For such a machine, and only then, the
+[OPC UA adapter](#what-the-adapters-of-real-devices-publish) takes `Identification.Manufacturer` instead: the name with `ä`, `ö`,
+`ü`, `ß` written out as above, other accents dropped and every character but `A-Z`, `a-z` and `0-9` removed,
+dots included, so that no part of it is taken for a top-level domain. This stand-in is published as
+`umati/Identification/ManufacturerUri`, the manufacturer part of the machine id and the prefix `x-<domain>` are
+formed from it by the rules above, and so is a `ProductInstanceUri` the server does not give
+(`{ManufacturerUri}/{Model}/{SerialNumber}`).
+
+| Manufacturer, Model, SerialNumber | `ManufacturerUri` | Machine id | Prefix |
+|---|---|---|---|
+| `TRUMPF Werkzeugmaschinen SE + Co. KG`, `TruLaser 5030`, `A0280O0001` | `TRUMPFWerkzeugmaschinenSECoKG` | `trumpfwerkzeugmaschinensecokg_TruLaser-5030_A0280O0001` | `x-trumpfwerkzeugmaschinensecokg` |
+
+A consumer should know what it then gets: `ManufacturerUri` is no web address, a formed `ProductInstanceUri`
+(`TRUMPFWerkzeugmaschinenSECoKG/TruLaser%205030/A0280O0001`) is a relative URI reference and no absolute URI,
+and the id changes with the name of the manufacturer, not with its domain. A server that has a node for
+`ManufacturerUri` and gives no value yet gets no stand-in: the machine waits for the value. A name without any
+letter or digit `A-Z`, `0-9`, such as one in Japanese, cannot stand in; such a machine is not added.
 
 A wildcard takes a whole level, so it selects every machine (`machines/+/umati/#`) or one
 (`machines/alcyone-machines_AX-400_P-04/#`); MQTT has no wildcard for a part of a level. Who wants the machines of
@@ -550,16 +582,20 @@ adds in the chat, with the same publisher and one MQTT connection per machine, s
 will (client id `opcua-adapter-<machineId>`). What it publishes follows from the registration of the machine:
 
 - The machine id is formed from `Identification.ManufacturerUri`, `Model` and `SerialNumber` as the server gave
-  them when the machine was added, and kept with the registration.
+  them when the machine was added, and kept with the registration. A server without a node for
+  `ManufacturerUri` gets `Identification.Manufacturer` without its special characters in its place, published
+  as `ManufacturerUri` (see [Without a ManufacturerUri](#without-a-manufactureruri)).
 - The manifest declares the core whole, what the machine lacks `"available": false`, and the other profiles
   whose elements the registration maps whole. A value of the maker is a signal of the manufacturer, below
-  `oem/`, with the prefix of the domain of its `ManufacturerUri`.
+  `oem/`, with the prefix of the domain of its `ManufacturerUri`, or of the stand-in.
 - A value goes out when the server reports a change, with the time of the source (`"timestampSource":
   "source"`), in the unit of the catalogue. `State.Status` is built from the two fields of the state.
 - `Connection/State` is `Running` while the OPC UA session stands and `CommunicationFault` while it does not.
 - The alarms of the server are `Notification.ActiveAlerts` and the events `Notification.AlertRaised` and
-  `Notification.AlertCleared` on `events/notifications`; `Severity` is the category of NE 107 from the severity of
-  OPC UA (from 667 `Failure`, from 334 `OffSpec`, below `MaintenanceRequired`), an assumption of the adapter.
+  `Notification.AlertCleared` on `events/notifications`. A machine in `urn:umati2:datamodel:opcua` gives them as
+  its list `Notification.ActiveAlerts`, with the category of NE 107 in `Severity`, which the adapter keeps. From an
+  alarm event `Severity` is the category from the severity of OPC UA (from 667 `Failure`, from 334 `OffSpec`,
+  below `MaintenanceRequired`), an assumption of the adapter.
   `sequence` counts from 1 in every run of the adapter; the outbox holds the events while the broker is away, as
   the managed client keeps every message. An alarm that stood before a restart of the adapter and still stands is
   raised once more in the new run, with its `Id` and its `Time`, so that every run names the alarms that stand.

@@ -1,14 +1,18 @@
-import type { EnergySeries } from "@pleiades/cards/energy/contract.ts"
+import type { EnergySeries, EnergyShow } from "@pleiades/cards/energy/contract.ts"
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
 import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
+import type { NotificationList } from "@pleiades/cards/notification/contract.ts"
 import type { ShopfloorShow } from "@pleiades/cards/shopfloor/contract.ts"
 import type { SiteList } from "@pleiades/cards/site/contract.ts"
-import type { TimeseriesRange, TimeseriesSeries, TimeseriesSignals } from "@pleiades/cards/timeseries/contract.ts"
+import type { TimeseriesRange, TimeseriesSeries, TimeseriesShow, TimeseriesSignals } from "@pleiades/cards/timeseries/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
+import { reasonOf } from "@/reason.ts"
+
 import { ENERGY_SERIES_TOOL, MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL, TIMESERIES_SERIES_TOOL, TIMESERIES_SIGNALS_TOOL } from "./card-tools.ts"
+import { Refused, keptClient } from "./kept-client.ts"
 
 // The values come from the generative UI backend. These functions run on the server of the app:
 // the browser never talks to the backend itself.
@@ -22,38 +26,24 @@ function connect() {
   return createMCPClient<typeof server>({ transport: { type: "http", url } })
 }
 
-/** A tool that answered, but without values. Its message is the sentence the backend gave as the reason. */
-export class Refused extends Error {}
+export { Refused }
+
+/** The one connection of the server of the app to the backend, kept between questions. */
+const backend = keptClient(connect)
 
 /**
- * Asks the backend and closes the connection again. If there are no values, the error is a
- * sentence that names who did not answer: the backend names its APIs, this function the backend.
+ * Asks the backend on the kept connection. If there are no values, the error is a sentence that
+ * names who did not answer: the backend names its APIs, this function the backend.
  */
 export async function ask<TValues>(
   read: (backend: Awaited<ReturnType<typeof connect>>) => Promise<TValues>,
 ): Promise<Answer<TValues>> {
   try {
-    const backend = await connect()
-    try {
-      return { values: await read(backend), error: null }
-    } finally {
-      await backend.close()
-    }
+    return { values: await backend(read), error: null }
   } catch (error) {
     if (error instanceof Refused) return { values: null, error: error.message }
     return { values: null, error: `The generative UI backend did not answer: ${reasonOf(error)}.` }
   }
-}
-
-/**
- * Why a request got no answer. The client and `fetch` each wrap what the network said, for example
- * ECONNREFUSED, in an error of their own: the innermost cause is the reason.
- */
-export function reasonOf(error: unknown): string {
-  let innermost = error
-  while (innermost instanceof Error && innermost.cause !== undefined) innermost = innermost.cause
-  const { code, message } = (innermost ?? {}) as { code?: unknown; message?: unknown }
-  return String(code ?? message ?? innermost)
 }
 
 /** What a tool wrote as text, which is where it says why it failed. */
@@ -111,33 +101,39 @@ export const getSites = createServerFn({ method: "GET" }).handler(
 )
 
 /** The newest physical values of every machine: the values of the measurement cards. */
-export const getMeasurements = createServerFn({ method: "GET" }).handler(
-  (): Promise<Answer<MeasurementList>> =>
-    ask(async (backend) => {
-      const result = await backend.callTool("genui_measurement_list", {})
-      if (result.isError || !result.structuredContent) {
-        throw new Refused(textOf(result) ?? "genui_measurement_list returned no values.")
-      }
-      return result.structuredContent
-    }),
-)
+export const getMeasurements = createServerFn({ method: "GET" })
+  // With a machine, the values of that machine only: the page of one machine reads no others.
+  .validator((request?: { machine?: string }) => request ?? {})
+  .handler(
+    ({ data }): Promise<Answer<MeasurementList>> =>
+      ask(async (backend) => {
+        const result = await backend.callTool("genui_measurement_list", data.machine === undefined ? {} : { machine: data.machine })
+        if (result.isError || !result.structuredContent) {
+          throw new Refused(textOf(result) ?? "genui_measurement_list returned no values.")
+        }
+        return result.structuredContent
+      }),
+  )
 
 /**
  * The values of every quantity over the last minutes, a line for each machine: what the graphs of
  * the measurements draw. They are not among the values of the list, because a language model reads
  * those.
  */
-export const getMeasurementSeries = createServerFn({ method: "GET" }).handler(
-  (): Promise<Answer<MeasurementSeries>> =>
-    ask(async (backend) => {
-      // The name is checked against the tools of the backend: if it changes there, this fails to compile.
-      const result = await backend.callTool(MEASUREMENT_SERIES_TOOL, {})
-      if (result.isError || !result.structuredContent) {
-        throw new Refused(textOf(result) ?? `${MEASUREMENT_SERIES_TOOL} returned no values.`)
-      }
-      return result.structuredContent
-    }),
-)
+export const getMeasurementSeries = createServerFn({ method: "GET" })
+  // With a machine, the lines of that machine only.
+  .validator((request?: { machine?: string }) => request ?? {})
+  .handler(
+    ({ data }): Promise<Answer<MeasurementSeries>> =>
+      ask(async (backend) => {
+        // The name is checked against the tools of the backend: if it changes there, this fails to compile.
+        const result = await backend.callTool(MEASUREMENT_SERIES_TOOL, data.machine === undefined ? {} : { machine: data.machine })
+        if (result.isError || !result.structuredContent) {
+          throw new Refused(textOf(result) ?? `${MEASUREMENT_SERIES_TOOL} returned no values.`)
+        }
+        return result.structuredContent
+      }),
+  )
 
 /** The hall: every machine at its place, whether it runs, and why not: the values of the shop floor card. */
 export const getShopfloor = createServerFn({ method: "GET" }).handler(
@@ -256,3 +252,45 @@ export const getTimeseriesSignals = createServerFn({ method: "GET" }).handler(as
   })
   return answer.values
 })
+
+/** The warnings and errors of one machine over the last hours: the values of the notification card. */
+export const getNotifications = createServerFn({ method: "GET" })
+  .validator((request: { machine: string; hours: number }) => request)
+  .handler(
+    ({ data }): Promise<Answer<NotificationList>> =>
+      ask(async (backend) => {
+        const result = await backend.callTool("genui_notification_list", data)
+        if (result.isError || !result.structuredContent) {
+          throw new Refused(textOf(result) ?? "genui_notification_list returned no values.")
+        }
+        return result.structuredContent
+      }),
+  )
+
+/** The energy machines imported over the last hours, and their mean and peak power: the values of the energy card. */
+export const getEnergy = createServerFn({ method: "GET" })
+  .validator((request: { machines: Array<string>; hours: number }) => request)
+  .handler(
+    ({ data }): Promise<Answer<EnergyShow>> =>
+      ask(async (backend) => {
+        const result = await backend.callTool("genui_energy_show", data)
+        if (result.isError || !result.structuredContent) {
+          throw new Refused(textOf(result) ?? "genui_energy_show returned no values.")
+        }
+        return result.structuredContent
+      }),
+  )
+
+/** Signals of machines over a range: the values of the time series card, which asks for its lines itself. */
+export const getTimeseries = createServerFn({ method: "GET" })
+  .validator((request: { lines: Array<{ machine: string; signal: string }>; range: TimeseriesRange }) => request)
+  .handler(
+    ({ data }): Promise<Answer<TimeseriesShow>> =>
+      ask(async (backend) => {
+        const result = await backend.callTool("genui_timeseries_show", data)
+        if (result.isError || !result.structuredContent) {
+          throw new Refused(textOf(result) ?? "genui_timeseries_show returned no values.")
+        }
+        return result.structuredContent
+      }),
+  )

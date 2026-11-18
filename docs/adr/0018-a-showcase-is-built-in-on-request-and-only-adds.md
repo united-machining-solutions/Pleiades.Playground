@@ -29,6 +29,9 @@ My Job?" drew it for itself, in a comment: made-up data, so no entry in the side
 - The base layers take base only: `contracts/`, `source/`, `apps/genui-mcp`, `packages/cards` and
   `packages/ui`. A showcase that needs a card or a tool makes it general first, or draws it in its own
   folder.
+- An optional service of the stack, a profile of `compose.yaml` such as `juicebar`, is base with its device.
+  A card for its tools may stand in the example application, and draws nothing where `APP_MCP_SERVERS` does
+  not name that service.
 - A showcase of the example application is a folder `apps/app/src/showcases/<name>/`, and its pages are the
   route files under `apps/app/src/routes/(showcases)/`. The brackets make a folder that adds nothing to an
   address.
@@ -46,7 +49,7 @@ My Job?" drew it for itself, in a comment: made-up data, so no entry in the side
 
 - An image of the application alone has nothing of a showcase in it, and a stack started without the setting
   runs that image. "Where is My Job?" was the first showcase; once it showed only values of the stack, it
-  became a page of the base, so for now there is no showcase.
+  became a page of the base. The page of the juice bar for a fair, `/juice-bar`, is a showcase.
 - The Margo app is always the application alone. bart takes an image reference as it stands, so no setting
   can choose the image there, and a release is base. A device that is to show a showcase runs
   `compose.yaml` with the setting, or would need a Margo app of its own, which this record does not ask for.
