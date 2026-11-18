@@ -5,6 +5,7 @@ import { test } from "node:test"
 import { CARD_MIME_TYPE } from "./card-file.ts"
 import { MACHINE_CARD_URI, SPAN_LIST_TOOL } from "./cards/machine.names.ts"
 import { MEASUREMENT_CARD_URI, MEASUREMENT_SERIES_TOOL } from "./cards/measurement.ts"
+import { NOTIFICATION_CARD_URI } from "./cards/notification.ts"
 import { server } from "./server.ts"
 
 type Listed = {
@@ -49,7 +50,7 @@ test("the spans of a band are for a card: a host does not offer that tool to its
 
 test("the tools that take a machine take every machine id the MQTT binding allows", async () => {
   const { tools = [] } = await ask("tools/list")
-  for (const name of ["genui_machine_show", SPAN_LIST_TOOL, "genui_measurement_list"]) {
+  for (const name of ["genui_machine_show", SPAN_LIST_TOOL, "genui_measurement_list", "genui_notification_list"]) {
     // The rule reaches a caller as a pattern, and the server checks what comes in against it.
     assert.equal(tools.find((tool) => tool.name === name)?.inputSchema?.properties?.machine?.pattern, "^[^/+#]+$")
   }
@@ -60,6 +61,7 @@ test("a tool refuses a time zone it does not know, in words, before it reads any
     ["genui_machine_list", {}],
     ["genui_machine_show", { machine: "P-04" }],
     ["genui_measurement_list", {}],
+    ["genui_notification_list", { machine: "P-04" }],
   ] as const) {
     const result = await ask("tools/call", { name, arguments: { ...more, timeZone: "Mars/Olympus" } })
     assert.equal(result.isError, true)
@@ -74,6 +76,21 @@ test("the list of measurements links the measurement card, a resource a host rea
   assert.equal(resources.find((resource) => resource.uri === MEASUREMENT_CARD_URI)?.mimeType, CARD_MIME_TYPE)
   // The series are for a graph: a host does not offer that tool to its language model.
   assert.deepEqual(tools.find((tool) => tool.name === MEASUREMENT_SERIES_TOOL)?._meta?.ui?.visibility, ["app"])
+})
+
+test("the list of notifications links the notification card, a resource a host reads as an MCP App", async () => {
+  const { tools = [] } = await ask("tools/list")
+  const listed = tools.find((tool) => tool.name === "genui_notification_list")
+  assert.equal(listed?._meta?.ui?.resourceUri, NOTIFICATION_CARD_URI)
+  // Nothing hides it from the language model: the card has no tool of its own that only a card calls.
+  assert.equal(listed?._meta?.ui?.visibility, undefined)
+  const { resources = [] } = await ask("resources/list")
+  assert.equal(resources.find((resource) => resource.uri === NOTIFICATION_CARD_URI)?.mimeType, CARD_MIME_TYPE)
+})
+
+test("the list of notifications refuses a hours value beyond the 24 hours that are read, before it reads anything", async () => {
+  const result = await ask("tools/call", { name: "genui_notification_list", arguments: { machine: "P-04", hours: 48 } })
+  assert.equal(result.isError, true)
 })
 
 test("the machine card is a resource that a host reads as an MCP App", async () => {

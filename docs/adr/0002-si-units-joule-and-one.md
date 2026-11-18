@@ -21,6 +21,8 @@ There is exactly one unit per quantity:
 - the full list is in [`contracts/mqtt`](../../contracts/mqtt/README.md) and in the `BaseUnit` type.
 
 Displays convert to what people are used to (millimetre, 1/min, bar, percent, kWh). Services never do.
+The words of a tool result are such a display, since a language model passes them on to a person: they may
+name a value in the unit people use, next to the values of the result, which keep the unit they came with.
 
 ## Consequences
 

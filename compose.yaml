@@ -323,10 +323,15 @@ services:
   # The example application.
   app:
     <<: *service
-    image: ghcr.io/united-machining-solutions/pleiades.playground.app:${PLEIADES_VERSION:-dev}
+    # With APP_SHOWCASES set to anything this is the image pleiades.playground.app.showcases, the same app
+    # built with the showcases: pages made for one demo or one fair. Without it nothing of a showcase is in
+    # the image, see .env.example.
+    image: ghcr.io/united-machining-solutions/pleiades.playground.app${APP_SHOWCASES:+.showcases}:${PLEIADES_VERSION:-dev}
     build:
       context: .
       dockerfile: apps/app/Dockerfile
+      args:
+        SHOWCASES: ${APP_SHOWCASES:-}
     ports:
       # The chat has no sign-in, and with a key set it spends that key. So the app answers on this
       # computer only, unless APP_BIND opens it to the network.
@@ -428,7 +433,7 @@ services:
       <<: *build
       dockerfile: Pleiades.Playground.Cutting.Simulator/Dockerfile
     ports:
-      - "127.0.0.1:${CUTTING_LASER_2D_PORT:-5611}:8080"
+      - "${CUTTING_LASER_2D_PORT:-5611}:8080"
     environment:
       Config__MachineType: Laser2D
       Config__MachineNumber: "1"
@@ -442,7 +447,7 @@ services:
     <<: *cutting-simulator
     pull_policy: never
     ports:
-      - "127.0.0.1:${CUTTING_TUBE_PORT:-5612}:8080"
+      - "${CUTTING_TUBE_PORT:-5612}:8080"
     environment:
       Config__MachineType: Tube
       Config__MachineNumber: "1"
@@ -456,7 +461,7 @@ services:
     <<: *cutting-simulator
     pull_policy: never
     ports:
-      - "127.0.0.1:${CUTTING_PUNCH_PORT:-5613}:8080"
+      - "${CUTTING_PUNCH_PORT:-5613}:8080"
     environment:
       Config__MachineType: Punch
       Config__MachineNumber: "1"

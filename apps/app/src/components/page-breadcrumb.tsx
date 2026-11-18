@@ -1,6 +1,7 @@
 import { Link, useMatches, useRouter } from "@tanstack/react-router"
 import { Fragment } from "react"
 
+import { chatOf } from "@/chat/ask.ts"
 import { crumbsOf, navPages } from "@/components/nav.ts"
 import { usePages } from "@/pages/store.ts"
 import {
@@ -13,8 +14,8 @@ import {
 } from "@pleiades/ui/components/breadcrumb"
 
 /**
- * Where the page stands, in the header as in the shadcn block sidebar-15: "Machines" on Home,
- * "Machines › P-04" on the page of a machine. It names no page: it reads the routes, as the sidebar
+ * Where the page stands, in the header as in the shadcn block sidebar-15: "Home" on Home,
+ * "Home › P-04" on the page of a machine. It names no page: it reads the routes, as the sidebar
  * does (nav.ts). A page the app does not know has none. A page kept from the chat is called by its
  * title, which a person can change while it is open: the breadcrumb follows the pages of this
  * browser for that.
@@ -41,8 +42,8 @@ export function PageBreadcrumb() {
             {index > 0 && <BreadcrumbSeparator />}
             <BreadcrumbItem>
               {step.path ? (
-                // The chat stays open while the page changes.
-                <BreadcrumbLink render={<Link to={step.path as "/"} search />}>{step.title}</BreadcrumbLink>
+                // The chat stays open while the page changes; what this page chose does not go along.
+                <BreadcrumbLink render={<Link to={step.path as "/"} search={chatOf} />}>{step.title}</BreadcrumbLink>
               ) : (
                 // One line. The block sidebar-15 has `line-clamp-1` here, which lets a long title take
                 // the width of the header, and a title a person gave to a page kept from the chat can
