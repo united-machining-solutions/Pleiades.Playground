@@ -580,8 +580,10 @@ will (client id `opcua-adapter-<machineId>`). What it publishes follows from the
   "source"`), in the unit of the catalogue. `State.Status` is built from the two fields of the state.
 - `Connection/State` is `Running` while the OPC UA session stands and `CommunicationFault` while it does not.
 - The alarms of the server are `Notification.ActiveAlerts` and the events `Notification.AlertRaised` and
-  `Notification.AlertCleared` on `events/notifications`; `Severity` is the category of NE 107 from the severity of
-  OPC UA (from 667 `Failure`, from 334 `OffSpec`, below `MaintenanceRequired`), an assumption of the adapter.
+  `Notification.AlertCleared` on `events/notifications`. A machine in `urn:umati2:datamodel:opcua` gives them as
+  its list `Notification.ActiveAlerts`, with the category of NE 107 in `Severity`, which the adapter keeps. From an
+  alarm event `Severity` is the category from the severity of OPC UA (from 667 `Failure`, from 334 `OffSpec`,
+  below `MaintenanceRequired`), an assumption of the adapter.
   `sequence` counts from 1 in every run of the adapter; the outbox holds the events while the broker is away, as
   the managed client keeps every message. An alarm that stood before a restart of the adapter and still stands is
   raised once more in the new run, with its `Id` and its `Time`, so that every run names the alarms that stand.

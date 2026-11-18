@@ -1,6 +1,6 @@
 import type { Machine, State } from "@pleiades/cards/machine/contract.ts"
 import { NEEDS_YOU, stateLabel } from "@pleiades/cards/machine/state.ts"
-import type { Hall, PlacedMachine, Site, SiteList, StateCount, UnplacedMachine } from "@pleiades/cards/site/contract.ts"
+import type { Hall, PlacedMachine, Site, SiteList, StateCount } from "@pleiades/cards/site/contract.ts"
 import { modelOf } from "@pleiades/cards/site/in-words.ts"
 import { sliceOf } from "@pleiades/cards/shared/paging.ts"
 
@@ -9,7 +9,8 @@ import { sentLately } from "../live/sites.ts"
 
 // What Home shows of the sites the backend gave: every site with its halls, or only the
 // machines that need someone, or those that answer a search, ten sites to a page. It chooses among
-// the values and keeps their order; it adds up nothing.
+// the values and keeps their order; it adds up nothing. The machines on no site are no rows: Home
+// names them in a bar above the list (unplaced.ts), and they come to a site from there.
 
 /** `?show=needs` of the address: only the machines that need someone. Anything else shows all. */
 export function showOf(raw: unknown): "needs" | undefined {
@@ -53,11 +54,6 @@ export function matches(placed: PlacedMachine, hall: Hall, site: Site, query: st
   ])
 }
 
-/** The same for a machine on no site: what it is, its id, its state and its work master. */
-export function matchesUnplaced(one: UnplacedMachine, query: string): boolean {
-  return answers(query, [modelOf(one), one.machine, stateLabel[one.state], one.now.program.value])
-}
-
 function answers(query: string, shown: ReadonlyArray<string | null | undefined>): boolean {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
   const text = shown.filter(Boolean).join(" ").toLowerCase()
@@ -72,22 +68,22 @@ function answers(query: string, shown: ReadonlyArray<string | null | undefined>)
 export type Row = { machine: Machine; state: State; name: string | undefined; what: string; linked: boolean }
 
 /**
- * A group of the list: a site with the halls that hold a machine shown, or the machines on no site
- * (`site` null). `counts` are those the backend gave for the site, over all its machines.
+ * A group of the list: a site with the halls that hold a machine shown. `counts` are those the
+ * backend gave for the site, over all its machines.
  */
 export type Group = {
-  site: Site | null
+  site: Site
   halls: Array<{ name: string; rows: Array<Row> }>
   /** The halls of the site without a machine, named in one line; none while a filter is chosen. */
   emptyHalls: Array<string>
-  counts: ReadonlyArray<StateCount> | null
+  counts: ReadonlyArray<StateCount>
   machines: number
 }
 
 /**
  * The groups of the list, in the order of the backend, and the sites without a machine. A site is a
  * group while it holds a machine that is shown: with "needs", one that needs someone; with a search,
- * one that answers it. The machines on no site come last.
+ * one that answers it.
  */
 export function groupsOf(list: SiteList, { needs, query }: { needs: boolean; query: string }): { groups: Array<Group>; emptySites: Array<Site> } {
   const filtered = needs || query.trim() !== ""
@@ -121,15 +117,10 @@ export function groupsOf(list: SiteList, { needs, query }: { needs: boolean; que
       },
     ]
   })
-  const unplaced = list.unplaced
-    .filter((one) => shown(one.state) && matchesUnplaced(one, query))
-    .map((one): Row => ({ machine: one.now, state: one.state, name: undefined, what: modelOf(one), linked: true }))
-  const noSite: Array<Group> =
-    unplaced.length > 0 ? [{ site: null, halls: [{ name: "", rows: unplaced }], emptyHalls: [], counts: null, machines: unplaced.length }] : []
-  return { groups: [...groups, ...noSite], emptySites: filtered ? [] : list.sites.filter((site) => site.machineCount === 0) }
+  return { groups, emptySites: filtered ? [] : list.sites.filter((site) => site.machineCount === 0) }
 }
 
-/** How many sites a page shows. A site stands whole on one page, the machines on no site count as one. */
+/** How many sites a page shows. A site stands whole on one page. */
 export const SITES_PER_PAGE = 10
 
 /** A page of the groups, and where it lies among all of them. */
@@ -141,17 +132,17 @@ export type SitesPage = { groups: Array<Group>; page: number; pages: number; sit
  */
 export function pageOf(groups: ReadonlyArray<Group>, page: number | undefined): SitesPage {
   const { items, page: current, pages } = sliceOf(groups, SITES_PER_PAGE, page ?? 1)
-  return { groups: items, page: current, pages, sites: groups.filter((group) => group.site !== null).length }
+  return { groups: items, page: current, pages, sites: groups.length }
 }
 
 /**
- * Why the list is empty: no machine stands on a site or sent a value, none needs someone, or none
- * answers the search. Where a filter is chosen, the page offers to show every machine again.
+ * Why the list is empty: no machine stands on a site, none needs someone, or none answers the
+ * search. Where a filter is chosen, the page offers to show every machine again.
  */
 export function emptyOf({ needs, query }: { needs: boolean; query: string }): { title: string; description: string; clearable: boolean } {
   if (query.trim() !== "") return { title: "No machine matches", description: "No machine answers what is chosen.", clearable: true }
   if (needs) return { title: "Nobody is needed", description: "No machine is in alarm, stopped or without data.", clearable: true }
-  return { title: "No machine yet", description: "No machine stands on a site, and none sent a value in the last 24 hours.", clearable: false }
+  return { title: "No machine on a site yet", description: "Add a machine to a site, one that sends data or one by its id.", clearable: false }
 }
 
 

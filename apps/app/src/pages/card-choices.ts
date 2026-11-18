@@ -4,9 +4,10 @@ import { createServerFn } from "@tanstack/react-start"
 
 import { chatTools } from "@/chat/cards.tsx"
 import type { Answer } from "@/machines/get-machines.ts"
-import { listMachines, reasonOf } from "@/machines/get-machines.ts"
+import { listMachines } from "@/machines/get-machines.ts"
 import { choicesOf } from "@/machines/switcher.ts"
 import type { Choice } from "@/machines/switcher.ts"
+import { reasonOf } from "@/reason.ts"
 
 import { cardChoicesOf } from "./add-part.ts"
 import type { CardChoice } from "./add-part.ts"

@@ -20,7 +20,7 @@ namespace Pleiades.Playground.OpcUa.Adapter.Test;
 [TestClass]
 public class MachineIdentityRefusalTest
 {
-    private const string Url = "opc.tcp://machine:4840";
+    internal const string Url = "opc.tcp://machine:4840";
     private const string SerialNumber = "A1121O0001";
 
     public required TestContext TestContext { get; set; }
@@ -104,7 +104,8 @@ public class MachineIdentityRefusalTest
         supervisor.Dispose();
     }
 
-    private static MachineSupervisor Supervisor(string dataDirectory, IMachineOutputFactory outputs, IRegistrationProbe probe)
+    /// <summary>A supervisor whose server offers one endpoint, SignAndEncrypt with Aes256_Sha256_RsaPss, at <see cref="Url"/>.</summary>
+    internal static MachineSupervisor Supervisor(string dataDirectory, IMachineOutputFactory outputs, IRegistrationProbe probe)
     {
         var credentials = new CredentialStore(dataDirectory);
         var discovery = new Mock<IOpcUaDiscoveryService>();

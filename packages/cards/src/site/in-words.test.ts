@@ -53,6 +53,8 @@ test("the site card in words: a line for each site with its halls, an empty one 
       { state: "stopped", machines: 1 },
       { state: "no-data", machines: 1 },
     ],
+    sending: 2,
+    needsYou: 2,
     sites: [
       {
         siteId: "north-plant",
@@ -108,6 +110,8 @@ test("without a site, the words say so, and name the machines that could be plac
     ...base,
     machineCount: 0,
     counts: [],
+    sending: 0,
+    needsYou: 0,
     sites: [],
     unplaced: [
       // A source that sends no identification: the model and serial number come from the id, which is not said twice.
@@ -125,6 +129,8 @@ test("where the sites cannot be read, the words say so, not that none is entered
     ...base,
     machineCount: 0,
     counts: [],
+    sending: 0,
+    needsYou: 0,
     sites: [],
     unplaced: [{ machine: "taygeta-tools_TX-9_M-07", state: "running", now: sending("taygeta-tools_TX-9_M-07", "TX-9", "M-07") }],
     sitesError: "The Sites API did not answer: ECONNREFUSED (http://sites:8080/sites).",
