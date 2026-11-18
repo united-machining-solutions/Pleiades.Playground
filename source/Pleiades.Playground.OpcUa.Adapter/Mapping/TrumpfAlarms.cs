@@ -46,6 +46,33 @@ internal static class TrumpfAlarms
         };
     }
 
+    /// <summary>
+    /// The registration without the alerts of <c>TcMachineAlarmType</c> that <see cref="Apply"/> set, moved to
+    /// <c>missing</c>: the server turned out not to have the type, or not with the prefix of the machine. Any
+    /// other registration is returned as it is.
+    /// </summary>
+    public static MachineRegistration WithoutEventType(MachineRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        if (registration.Alerts is not { List: null, EventType: { } eventType }
+            || KnownMappings.NamespaceOf(eventType) is not { } uri
+            || !IsInterfaces(uri)
+            || !eventType.EndsWith(";" + EventTypeIdentifier, StringComparison.Ordinal))
+        {
+            return registration;
+        }
+
+        return registration with
+        {
+            Alerts = null,
+            Missing =
+            [
+                .. registration.Missing.Where(entry => entry.Path != Topics.ActiveAlerts),
+                new MissingElement { Path = Topics.ActiveAlerts, Reason = $"The server has no TcMachineAlarmType ({EventTypeIdentifier}) in {uri}." },
+            ],
+        };
+    }
+
     /// <summary>Whether a namespace is that of a TRUMPF interface, with or without the prefix of a gateway.</summary>
     public static bool IsInterfaces(string? uri) => KnownMappings.IsNamespace(uri, TrumpfMachines.Interfaces);
 

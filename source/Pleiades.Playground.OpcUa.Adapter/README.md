@@ -318,7 +318,8 @@ TRUMPF interface, gets the alarm events of `TcMachineAlarmType` (`i=1006` of
 `http://trumpf.com/TRUMPF-Interfaces/`, a subtype of `AlarmConditionType`), with the code of the maker in its
 field `AlarmIdentifier`, if its registration names no `alerts` of its own
 ([`Mapping/TrumpfAlarms.cs`](Mapping/TrumpfAlarms.cs)). Behind a gateway the event type takes the prefix of the
-machine's namespaces. The namespace of the TRUMPF interface counts as the machine's own, so that its conditions
+machine's namespaces. A server without that type, or without it under that prefix, moves
+`Notification.ActiveAlerts` to `missing` when the registration is tried. The namespace of the TRUMPF interface counts as the machine's own, so that its conditions
 (`s=179.BasePlc.5.11.5.4`) pass the filter of a gateway ([Machines behind a gateway](#machines-behind-a-gateway)).
 
 A registration that is stored already keeps its mapping until it is replaced: `/rescan` proposes the change.

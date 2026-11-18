@@ -85,6 +85,45 @@ public class AlertListTest
     }
 
     [TestMethod]
+    public void A_bad_or_undecodable_value_of_the_list_keeps_the_alerts_that_stand()
+    {
+        var namespaces = new Opc.Ua.NamespaceTable();
+        var index = (ushort)namespaces.Append(Umati2);
+        Opc.Ua.ExtensionObject Of(string type, string base64) =>
+            new(new Opc.Ua.ExpandedNodeId(new Opc.Ua.NodeId(type, index)), Opc.Ua.ByteString.From(Convert.FromBase64String(base64)));
+        var tracker = new AlertTracker(now: () => Now);
+        var raised = AlertListValue.Take(
+            tracker,
+            new Opc.Ua.DataValue(new Opc.Ua.Variant(new[] { Of("DataType.Alert.DefaultBinary", GasMixOxygen), Of("DataType.Alert.DefaultBinary", FeedHold) })),
+            namespaces,
+            Now,
+            out var notTaken);
+        Assert.IsNull(notTaken);
+        Assert.HasCount(2, raised!);
+
+        var bad = AlertListValue.Take(tracker, Opc.Ua.DataValue.FromStatusCode(Opc.Ua.StatusCodes.BadCommunicationError), namespaces, Now.AddMinutes(1), out notTaken);
+        Assert.IsNull(bad, "A bad value changes nothing.");
+        StringAssert.Contains(notTaken, "BadCommunicationError", StringComparison.Ordinal);
+        Assert.HasCount(2, tracker.Open);
+
+        var other = AlertListValue.Take(
+            tracker,
+            new Opc.Ua.DataValue(new Opc.Ua.Variant(new[] { Of("DataType.Alert.DefaultBinary", GasMixOxygen), Of("DataType.Status.DefaultBinary", "AwAAAAMAAAA=") })),
+            namespaces,
+            Now.AddMinutes(2),
+            out notTaken);
+        Assert.IsNull(other, "A list the adapter cannot decode whole changes nothing, though one of its alerts left.");
+        StringAssert.Contains(notTaken, "DataType.Alert", StringComparison.Ordinal);
+        Assert.HasCount(2, tracker.Open);
+
+        var empty = AlertListValue.Take(tracker, new Opc.Ua.DataValue(new Opc.Ua.Variant(Array.Empty<Opc.Ua.ExtensionObject>())), namespaces, Now.AddMinutes(3), out notTaken);
+        Assert.IsNull(notTaken);
+        Assert.IsTrue(empty!.All(change => change.Action == AlertAction.Cleared), "A good empty list clears every alert.");
+        Assert.HasCount(2, empty!);
+        Assert.IsEmpty(tracker.Open);
+    }
+
+    [TestMethod]
     public void A_new_list_raises_what_is_new_and_clears_what_left()
     {
         var tracker = new AlertTracker(now: () => Now);
@@ -211,6 +250,28 @@ public class AlertListTest
             new[] { $"{Prefix}http://trumpf.com/UA/MachineTool/", $"{Prefix}http://trumpf.com/TRUMPF-Interfaces/" },
             MachineNamespaces.Of(applied).ToArray(),
             "The conditions lie in the TRUMPF interface, which counts as the machine's own.");
+    }
+
+    [TestMethod]
+    public void Without_TcMachineAlarmType_on_the_server_the_alerts_of_the_fallback_are_missing()
+    {
+        const string Prefix = "urn:A0280O0001:TRUMPF:OpcSimulator/";
+        var applied = KnownMappings.Apply(new MachineRegistration
+        {
+            SerialNumber = "A0280O0001",
+            MachineNode = $"nsu={Prefix}http://trumpf.com/UA/MachineTool/;i=3000",
+        });
+
+        var without = TrumpfAlarms.WithoutEventType(applied);
+
+        Assert.IsNull(without.Alerts);
+        var missing = without.Missing.Single();
+        Assert.AreEqual("Notification.ActiveAlerts", missing.Path);
+        StringAssert.Contains(missing.Reason, $"{Prefix}http://trumpf.com/TRUMPF-Interfaces/", StringComparison.Ordinal);
+        var own = applied with { Alerts = new AlertRegistration { EventType = "nsu=http://trumpf.com/UA/Types/;i=42" } };
+        Assert.AreSame(own, TrumpfAlarms.WithoutEventType(own), "An alarm type a person named is not the fallback's.");
+        var list = KnownMappings.Apply(new MachineRegistration { SerialNumber = "A0280O0001", MachineNode = $"nsu={Umati2};s=Machine" });
+        Assert.AreSame(list, TrumpfAlarms.WithoutEventType(list), "A list is no alarm type.");
     }
 
     [TestMethod]

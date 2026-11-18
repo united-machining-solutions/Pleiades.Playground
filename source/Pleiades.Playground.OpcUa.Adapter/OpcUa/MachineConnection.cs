@@ -486,27 +486,21 @@ internal sealed class MachineConnection : ISessionTenant
     /// </summary>
     private void OnAlertList(DataValue value, NamespaceTable namespaces)
     {
-        var node = Registration.Alerts?.List ?? string.Empty;
-        if (StatusCode.IsBad(value.StatusCode))
-        {
-            _logger.AlertListNotTaken(Registration.SerialNumber, node, value.StatusCode.ToString());
-            return;
-        }
-
-        if (RawValues.AlertsOf(value.WrappedValue, namespaces) is not { } list)
-        {
-            _logger.AlertListNotTaken(Registration.SerialNumber, node, "it is not an array of DataType.Alert of " + Umati2DataModel.Namespace + " the adapter can decode");
-            return;
-        }
-
-        IReadOnlyList<AlertChange> changes;
+        IReadOnlyList<AlertChange>? changes;
+        string? notTaken;
         lock (_gate)
         {
-            changes = _alerts.Reconcile(list, DateTime.UtcNow);
-            if (changes.Count > 0)
+            changes = AlertListValue.Take(_alerts, value, namespaces, DateTime.UtcNow, out notTaken);
+            if (changes is { Count: > 0 })
             {
                 _alertStore.Save(Registration.SerialNumber, _alerts.Open);
             }
+        }
+
+        if (changes is null)
+        {
+            _logger.AlertListNotTaken(Registration.SerialNumber, Registration.Alerts?.List ?? string.Empty, notTaken ?? string.Empty);
+            return;
         }
 
         Forget(AlertsAsync(changes));

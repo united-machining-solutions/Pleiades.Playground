@@ -466,8 +466,9 @@ All notable changes are documented here. The format follows
   as it comes into the list and leaves it, with the severity the server gives (`alerts.list`, set by the rules of
   the namespace). Before, the list went out once as `null`, and alarm events were dropped because their
   conditions lie in the TRUMPF interface. A TRUMPF machine outside that namespace gets the events of
-  `TcMachineAlarmType` with `AlarmIdentifier` if its registration names no alarms, and the TRUMPF interface counts
-  as its own namespace. A stored registration takes this on `/rescan` (issue 180).
+  `TcMachineAlarmType` with `AlarmIdentifier` if its registration names no alarms and its server has that type,
+  and the TRUMPF interface counts as its own namespace. A server without the list or the type moves
+  `Notification.ActiveAlerts` to `missing`. A stored registration takes this on `/rescan` (issue 180).
 - `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page
