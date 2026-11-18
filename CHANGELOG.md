@@ -7,6 +7,9 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: "Add a card" at the end of a kept page in "Edit" adds a card by hand, with no language model:
+  the cards a page can hold, by what they show, and what the chosen one takes, read from its input schema
+  (a machine by its name, the hours of its history). The same card twice or a thirteenth is not added.
 - Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
   no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
 - Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
