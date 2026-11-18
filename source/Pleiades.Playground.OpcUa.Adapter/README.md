@@ -20,7 +20,7 @@ A machine with an OPC UA server becomes a machine of the platform like the simul
 
 1. A person names a machine or the address of an OPC UA server in the chat of the example app.
 2. The chat scans the server with the OPC UA MCP tools, finds the endpoint with the best security, and
-   matches its nodes to the data model.
+   matches its nodes to the data model by their browse paths, units, enumerations and descriptions.
 3. The person reviews the proposal, sees whether the machine fulfils the core of the data model, which
    profiles are complete, and what is unclear or derived, and adds the machine with a click. A machine
    without the whole core is not added ([Core and profiles](#core-and-profiles)).

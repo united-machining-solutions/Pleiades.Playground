@@ -62,9 +62,24 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
    `EURange` below the node. For an enumeration, find its values: `opcua_ua_read_node` gives the `dataType`,
    and the `EnumValues` or `EnumStrings` below that data type give the names. Do not guess a unit or an
    enumeration: read it.
+   - **Descriptions.** Read what the server says a candidate is: `opcua_ua_read` with the `nodeIds` of all
+     candidates and `attributeId: "Description"`, in one call (`opcua_ua_read_node` gives it for a single
+     node). A browse name says little where the maker chose it, `Var17` or `PwrOnT`; the description often
+     says what the value is and in which unit. Use it to choose between candidates and to tell what a node of
+     the maker means. Where a node of the maker stays unclear, `opcua_ua_browse` it with `referenceTypeId:
+     "i=17597"`: a `HasDictionaryEntry` reference, if the server has one, points to an IRDI of ECLASS or IEC
+     CDD that names the meaning. `opcua_ua_browse_all` follows only the tree, so it never shows one.
+   - A unit the description names, "Unit: second (SEC)", is read, not guessed: take it if the node has no
+     `EngineeringUnits`, and say in the evidence that it comes from the description. If the description and
+     the `EngineeringUnits` disagree, the match is `Unclear`.
+   - A description that contradicts the element, a setpoint where the element is an actual value or a count
+     per program where it is a lifetime count, rules the node out, or makes the match `Unclear`.
+   - Many servers leave descriptions empty (the read gives `null` with status `Good`) or repeat the browse
+     name: then they tell nothing, go on without.
 7. **What the Companion Specification does not give.** Look in the namespace of the maker for the elements
    that are still open, for example a power-on time or an energy meter. Browse it from its root object; on a
-   gateway, from the root object below the folder of this machine.
+   gateway, from the root object below the folder of this machine. Here no specification fixes the meaning of
+   a name: read the descriptions of the candidates as step 6 says before you match one.
 8. **Alarms.** If the server has an alarm type of its own (a subtype of `AlarmConditionType`, `i=2915`),
    name it in `alerts.eventType`, and the field with the code of the maker in `alerts.codeField`. If you find
    none, leave `alerts` out and say so. On a gateway the adapter keeps to each machine the alarms whose source
@@ -178,7 +193,7 @@ the server does not fill is moved to `missing` by the adapter.
   - `Unclear`: several candidates, a unit you could not read, a meaning you are not sure of. Say what is
     unclear, so the person can decide.
 - **Evidence.** One sentence per element: the browse path of the node, its unit or enumeration, and why it is
-  this element.
+  this element. Where the description of the node decided the match or gave the unit, quote it briefly.
 - **Missing.** Every element of a profile that the server does not offer goes into `missing` with the reason.
   An element of the core that is neither mapped nor derived makes the proposal fail: the machine is not added.
   Tell the person which ones the core lacks.
