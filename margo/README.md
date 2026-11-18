@@ -13,9 +13,7 @@ margo/
 │   ├── license.txt           Copy of LICENSE
 │   └── icon.svg
 └── compose/                  The component: everything here goes into the package
-    ├── compose.yaml          The demo stack, with Traefik in front of the example app
-    ├── broker/mosquitto.conf Copy of stacks/broker/mosquitto.conf
-    └── traefik/dynamic.yaml  The route of Traefik to the example app
+    └── compose.yaml          The demo stack, with Traefik in front of the example app
 ```
 
 ## How it differs from `compose.yaml`
@@ -32,19 +30,22 @@ that bart accepts it, and one more, Traefik:
   [Release](#release).
 - **No YAML anchors.** bart's compose parser does not resolve merge keys (`<<: *service`), so every service
   says everything itself.
-- **The broker configuration is a `configs:` entry** from `compose/broker/`, because a bind mount may not leave
-  `compose/`. The file is a copy; keep it the same as `stacks/broker/mosquitto.conf`:
+- **The configurations are inline `configs:` entries** (`content:`), not files: the Margo client does not mount
+  a file of the package into a container, and a bind mount may not leave `compose/`. Compose interpolates
+  `${VAR}` in `content:`, so a literal dollar sign is written `$$`. The broker configuration is a copy; keep it
+  the same as `stacks/broker/mosquitto.conf`:
 
   ```bash
-  diff <(tail -n +3 margo/compose/broker/mosquitto.conf) stacks/broker/mosquitto.conf
+  diff stacks/broker/mosquitto.conf \
+    <(docker compose -f margo/compose/compose.yaml config --format json | jq -j '.configs.mosquitto.content')
   ```
 
 - **Traefik in front of the example app.** It serves the app on the HTTP port (setting *HTTP port of Traefik*,
   80), on `127.0.0.1` unless the setting *Address of Traefik* opens it to the network, under two host names:
   *Host name of the app*, a CNAME of the device, and *Host name of the device*, its A record. Their defaults, `pleiades.example.internal` and `device.example.internal`, are placeholders: set both
   to the names of your device when you install the app. Traefik reads its route from
-  `compose/traefik/dynamic.yaml`, a `configs:` entry, and not from Docker labels: those need the Docker socket,
-  a bind mount out of `compose/`. The file is a Go template that takes the host names from the environment.
+  the `configs:` entry `traefik`, and not from Docker labels: those need the Docker socket,
+  a bind mount out of `compose/`. The configuration is a Go template that takes the host names from the environment.
   Plain HTTP only; there is no certificate.
 - **Settings, not `.env`.** Every `${VAR}` of the compose file is a parameter in `app/margo.yaml`, and each one
   is a setting the person who installs the app can change: the ports, the address of the example app, the
