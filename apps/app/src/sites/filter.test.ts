@@ -5,7 +5,7 @@ import type { Machine } from "@pleiades/cards/machine/contract.ts"
 import type { PlacedMachine, Site, SiteList } from "@pleiades/cards/site/contract.ts"
 
 import { unknownMachine } from "../live/machines.ts"
-import { SITES_PER_PAGE, changed, groupsOf, matches, pageOf, pageOfSearch, showOf } from "./filter.ts"
+import { SITES_PER_PAGE, changed, emptyOf, groupsOf, matches, pageOf, pageOfSearch, showOf, showOfToggle } from "./filter.ts"
 import type { Group } from "./filter.ts"
 
 const P04 = "alcyone-machines_AX-400_P-04"
@@ -19,6 +19,7 @@ function sending(id: string, model: string, serialNumber: string, program: strin
     ...machine,
     identity: { manufacturer: null, model, serialNumber },
     program: { ...machine.program, value: program, at: "2026-11-18T09:00:00.000Z" },
+    lastValueAt: "2026-11-18T09:29:00.000Z",
   }
 }
 
@@ -194,4 +195,53 @@ test("the address names a page from 2 on and needs you by its word, or nothing",
   for (const raw of [undefined, 1, "1", 0, -2, 2.5, "x", ""]) assert.equal(pageOfSearch(raw), undefined, String(raw))
   assert.equal(showOf("needs"), "needs")
   for (const raw of [undefined, "all", "Needs", 1]) assert.equal(showOf(raw), undefined, String(raw))
+})
+
+test("pressing the chosen item of All or Needs you again keeps what is shown", () => {
+  assert.equal(showOfToggle([]), null)
+  assert.equal(showOfToggle(["needs"]), "needs")
+  assert.equal(showOfToggle(["all"]), undefined)
+})
+
+test("an empty list says why: nothing there, nobody needed, or nothing found; only a filter can be cleared", () => {
+  assert.deepEqual(emptyOf({ needs: false, query: "" }), {
+    title: "No machine yet",
+    description: "No machine stands on a site, and none sent a value in the last 24 hours.",
+    clearable: false,
+  })
+  assert.equal(emptyOf({ needs: true, query: "" }).title, "Nobody is needed")
+  assert.equal(emptyOf({ needs: true, query: "" }).clearable, true)
+  assert.equal(emptyOf({ needs: false, query: "lathe" }).title, "No machine matches")
+  assert.equal(emptyOf({ needs: true, query: "lathe" }).title, "No machine matches")
+})
+
+test("a machine without a value in the last 24 hours does not lead to its page, one that sends does", () => {
+  const { groups } = groupsOf(list, { needs: false, query: "" })
+  const rows = groups.flatMap((group) => group.halls.flatMap((hall) => hall.rows))
+  assert.deepEqual(
+    rows.map((row) => [row.machine.machine, row.linked]),
+    [
+      [P04, true],
+      [M02, true],
+      [M09, false],
+      [P07, true],
+    ],
+  )
+})
+
+test("a machine is called what it is by its id where its values do not say it, also once it sends again", () => {
+  const { groups } = groupsOf(list, { needs: false, query: "" })
+  const m09 = groups[1]!.halls[0]!.rows[0]!
+  assert.equal(m09.what, "AX-400 M-09")
+  // Woken by a message without its identification, as the live list builds it.
+  const woken: Machine = { ...unknownMachine(M09), lastValueAt: "2026-11-18T09:29:30.000Z" }
+  const sites = list.sites.map((site) =>
+    site.siteId !== "south-plant" ? site : { ...site, halls: [{ name: null, machines: [placed(M09, "running", woken)] }] },
+  )
+  const again = groupsOf({ ...list, sites }, { needs: false, query: "" }).groups[1]!.halls[0]!.rows[0]!
+  assert.equal(again.what, "AX-400 M-09")
+  assert.equal(again.name, undefined)
+  // The name people entered stays the title, and what it is stands below it.
+  const lathe = groups[0]!.halls[0]!.rows[0]!
+  assert.deepEqual([lathe.name, lathe.what], ["Lathe 4", "AX-400 P-04"])
 })

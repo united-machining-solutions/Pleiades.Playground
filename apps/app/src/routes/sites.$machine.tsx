@@ -21,6 +21,7 @@ import { SearchXIcon } from "lucide-react"
 import { useMemo } from "react"
 import type { ReactNode } from "react"
 
+import { chatOf } from "@/chat/ask.ts"
 import { NoAnswer } from "@/components/no-answer.tsx"
 import { liveness, useLive, useRetry } from "@/hooks/use-live.ts"
 import type { Live } from "@/hooks/use-live.ts"
@@ -178,7 +179,8 @@ function MachineSwitcher({ machine, title, choices }: { machine: string; title: 
           void navigate({
             to: "/sites/$machine",
             params: { machine: choice.machine },
-            search: (previous) => previous,
+            // The hours chosen and the open chat go along, nothing else.
+            search: (previous) => ({ ...chatOf(previous), hours: previous.hours }),
           })
         }
       }}
@@ -225,7 +227,7 @@ function HistoryHours({ hours }: { hours: Hours }) {
       onValueChange={(chosen) => {
         const next = hoursOf(chosen[0])
         if (next !== undefined && next !== hours) {
-          void navigate({ to: ".", search: (previous) => ({ ...previous, hours: next }) })
+          void navigate({ to: ".", search: (previous) => ({ ...chatOf(previous), hours: next }) })
         }
       }}
     >
@@ -257,7 +259,7 @@ function NoMachine() {
         <EmptyContent>
           {/* A link that looks like a button, as the docs of Button want it: a Button would take
               the role of a link away. The chat stays open while the page changes. */}
-          <Link to="/sites" search className={buttonVariants()}>
+          <Link to="/sites" search={chatOf} className={buttonVariants()}>
             All sites
           </Link>
         </EmptyContent>

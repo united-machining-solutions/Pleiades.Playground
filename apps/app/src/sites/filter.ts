@@ -1,10 +1,11 @@
 import type { Machine, State } from "@pleiades/cards/machine/contract.ts"
-import { labelOf } from "@pleiades/cards/machine/in-words.ts"
-import { stateLabel } from "@pleiades/cards/machine/state.ts"
+import { NEEDS_YOU, stateLabel } from "@pleiades/cards/machine/state.ts"
 import type { Hall, PlacedMachine, Site, SiteList, StateCount, UnplacedMachine } from "@pleiades/cards/site/contract.ts"
 import { modelOf } from "@pleiades/cards/site/in-words.ts"
+import { sliceOf } from "@pleiades/cards/shared/paging.ts"
 
 import { unknownMachine } from "../live/machines.ts"
+import { sentLately } from "../live/sites.ts"
 
 // What the page Sites shows of the sites the backend gave: every site with its halls, or only the
 // machines that need someone, or those that answer a search, ten sites to a page. It chooses among
@@ -21,11 +22,17 @@ export function pageOfSearch(raw: unknown): number | undefined {
   return Number.isInteger(page) && page > 1 ? page : undefined
 }
 
-/** The states that need someone, as Home has them under "Needs you". */
-const NEEDS: ReadonlyArray<State> = ["alarm", "stopped", "no-data"]
+/**
+ * What a press on "All | Needs you" chooses. The toggle group gives an empty choice where a person
+ * presses the chosen item again: that keeps what is shown (null).
+ */
+export function showOfToggle(chosen: ReadonlyArray<string>): "needs" | undefined | null {
+  if (chosen.length === 0) return null
+  return chosen[0] === "needs" ? "needs" : undefined
+}
 
 export function needsSomeone(state: State): boolean {
-  return NEEDS.includes(state)
+  return NEEDS_YOU.includes(state)
 }
 
 /**
@@ -57,8 +64,12 @@ function answers(query: string, shown: ReadonlyArray<string | null | undefined>)
   return words.every((word) => text.includes(word))
 }
 
-/** A machine in the list: its values, its state, and the name people entered for it. */
-export type Row = { machine: Machine; state: State; name: string | undefined }
+/**
+ * A machine in the list: its values, its state, the name people entered for it, and what it is, by
+ * its identification or by its machine id. `linked` where its page has something to show: a machine
+ * that sent no value in the last 24 hours has none.
+ */
+export type Row = { machine: Machine; state: State; name: string | undefined; what: string; linked: boolean }
 
 /**
  * A group of the list: a site with the halls that hold a machine shown, or the machines on no site
@@ -74,21 +85,13 @@ export type Group = {
 }
 
 /**
- * The name of a machine of a site in its row: the name people entered for it; or, for a machine that
- * sent nothing and is known by its id only, its model and serial number from the id.
- */
-function nameOf(placed: PlacedMachine): string | undefined {
-  if (placed.displayName) return placed.displayName
-  return placed.now === null ? labelOf(placed.machine) : undefined
-}
-
-/**
  * The groups of the list, in the order of the backend, and the sites without a machine. A site is a
  * group while it holds a machine that is shown: with "needs", one that needs someone; with a search,
  * one that answers it. The machines on no site come last.
  */
 export function groupsOf(list: SiteList, { needs, query }: { needs: boolean; query: string }): { groups: Array<Group>; emptySites: Array<Site> } {
   const filtered = needs || query.trim() !== ""
+  const asOf = Date.parse(list.asOf)
   const shown = (state: State) => !needs || needsSomeone(state)
   const groups = list.sites.flatMap((site): Array<Group> => {
     const halls = site.halls.map((hall) => ({
@@ -96,7 +99,15 @@ export function groupsOf(list: SiteList, { needs, query }: { needs: boolean; que
       empty: hall.machines.length === 0,
       rows: hall.machines
         .filter((one) => shown(one.state) && matches(one, hall, site, query))
-        .map((one): Row => ({ machine: one.now ?? unknownMachine(one.machine), state: one.state, name: nameOf(one) })),
+        .map(
+          (one): Row => ({
+            machine: one.now ?? unknownMachine(one.machine),
+            state: one.state,
+            name: one.displayName || undefined,
+            what: modelOf(one),
+            linked: sentLately(one.now, asOf),
+          }),
+        ),
     }))
     const machines = halls.reduce((count, hall) => count + hall.rows.length, 0)
     if (machines === 0) return []
@@ -112,7 +123,7 @@ export function groupsOf(list: SiteList, { needs, query }: { needs: boolean; que
   })
   const unplaced = list.unplaced
     .filter((one) => shown(one.state) && matchesUnplaced(one, query))
-    .map((one): Row => ({ machine: one.now, state: one.state, name: undefined }))
+    .map((one): Row => ({ machine: one.now, state: one.state, name: undefined, what: modelOf(one), linked: true }))
   const noSite: Array<Group> =
     unplaced.length > 0 ? [{ site: null, halls: [{ name: "", rows: unplaced }], emptyHalls: [], counts: null, machines: unplaced.length }] : []
   return { groups: [...groups, ...noSite], emptySites: filtered ? [] : list.sites.filter((site) => site.machineCount === 0) }
@@ -129,15 +140,18 @@ export type SitesPage = { groups: Array<Group>; page: number; pages: number; sit
  * first the first, beyond the last the last. Up to ten groups make one page.
  */
 export function pageOf(groups: ReadonlyArray<Group>, page: number | undefined): SitesPage {
-  const pages = Math.max(1, Math.ceil(groups.length / SITES_PER_PAGE))
-  const current = Math.min(Math.max(1, page ?? 1), pages)
-  const start = (current - 1) * SITES_PER_PAGE
-  return {
-    groups: groups.slice(start, start + SITES_PER_PAGE),
-    page: current,
-    pages,
-    sites: groups.filter((group) => group.site !== null).length,
-  }
+  const { items, page: current, pages } = sliceOf(groups, SITES_PER_PAGE, page ?? 1)
+  return { groups: items, page: current, pages, sites: groups.filter((group) => group.site !== null).length }
+}
+
+/**
+ * Why the list is empty: no machine stands on a site or sent a value, none needs someone, or none
+ * answers the search. Where a filter is chosen, the page offers to show every machine again.
+ */
+export function emptyOf({ needs, query }: { needs: boolean; query: string }): { title: string; description: string; clearable: boolean } {
+  if (query.trim() !== "") return { title: "No machine matches", description: "No machine answers what is chosen.", clearable: true }
+  if (needs) return { title: "Nobody is needed", description: "No machine is in alarm, stopped or without data.", clearable: true }
+  return { title: "No machine yet", description: "No machine stands on a site, and none sent a value in the last 24 hours.", clearable: false }
 }
 
 

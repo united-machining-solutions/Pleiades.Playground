@@ -112,10 +112,9 @@ const pictures = [
     name: "sites",
     async show(page, at) {
       await page.goto(`${at.app}/sites`)
-      const tiles = page.getByRole("list", { name: "Sites" })
-      const none = page.getByText("No sites", { exact: true })
-      await tiles.or(none).first().waitFor()
-      if (await none.isVisible()) return "no site is entered in the Sites API"
+      // The search stands on the page with sites and without: it says the page is drawn.
+      await page.getByRole("searchbox", { name: "Find a machine, hall or site" }).waitFor()
+      if (await page.getByText("No sites", { exact: true }).isVisible()) return "no site is entered in the Sites API"
       await page.getByText("· live · now").waitFor()
     },
   },
