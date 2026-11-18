@@ -157,7 +157,10 @@ function ShownPage({ page }: { page: StoredPage }) {
         children: "Undo",
         onClick() {
           toast.close(removed)
-          if (!putPartBack(page.id, at, part)) notKept()
+          if (putPartBack(page.id, at, part)) return
+          // "Add a card" may have filled the page, or put the same card on it, while this toast
+          // stood: then the page says that, as "Add a card" does; else the storage said no.
+          notKept(cannotAdd(getPage(page.id)?.recipe.parts ?? [], part) ?? NOT_KEPT)
         },
       },
     })
@@ -210,12 +213,15 @@ function ShownPage({ page }: { page: StoredPage }) {
 /** Why a change of the parts was not kept, when the storage did not take it. */
 const NOT_KEPT = "This browser did not keep the change: it blocks its storage, or the storage is full."
 
-/** A change of the parts that the storage did not take: the page is as it was, and says so. */
-function notKept() {
+/**
+ * A change of the parts that did not happen: the page is as it was, and says why. Without a reason
+ * of its own, the storage did not take the change.
+ */
+function notKept(why: string = NOT_KEPT) {
   toast.add({
     type: "error",
     title: "The page was not changed",
-    description: NOT_KEPT,
+    description: why,
     priority: "high",
   })
 }
