@@ -109,16 +109,6 @@ const pictures = [
     },
   },
   {
-    name: "sites",
-    async show(page, at) {
-      await page.goto(`${at.app}/sites`)
-      // The search stands on the page with sites and without: it says the page is drawn.
-      await page.getByRole("searchbox", { name: "Find a machine, hall or site" }).waitFor()
-      if (await page.getByText("No sites", { exact: true }).isVisible()) return "no site is entered in the Sites API"
-      await page.getByText("· live · now").waitFor()
-    },
-  },
-  {
     name: "machine-page",
     async show(page, at) {
       await page.goto(`${at.app}/sites/${SHOWN}`)

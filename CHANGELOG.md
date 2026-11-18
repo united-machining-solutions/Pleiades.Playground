@@ -310,6 +310,8 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Example app: Home (`/`) shows where the machines stand, by site and hall; "Needs you" keeps what it showed first.
+  The tiles of the running machines are gone. `/sites` leads to `/`.
 - Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
   computer, as the web UI of the OPC UA simulator does; in the stack and in the Margo app.
 

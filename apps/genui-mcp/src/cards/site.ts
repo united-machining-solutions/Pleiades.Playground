@@ -45,6 +45,9 @@ halls; people enter the sites, and which machine stands where, in the Sites API.
 - \`unplaced\`: the machines that published a value in the last 24 hours and stand on no site, each
   with its \`state\` and, in \`now\`, what it does as \`genui_machine_list\` says it: the values a page
   starts from. They can be put on one; only a person can, in the Sites API, not a tool of this server.
+- \`sitesError\`: null when the Sites API answered. Otherwise it says why the sites cannot be read
+  now; then \`sites\` is empty and every machine that sends stands in \`unplaced\`. Say that the sites
+  cannot be read, not that none is entered.
 
 The counts come from this server. Do not count again, and do not add states up.
 `

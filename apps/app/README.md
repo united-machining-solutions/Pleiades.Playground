@@ -4,16 +4,15 @@ The example application: a single-page app on [TanStack Start](https://tanstack.
 the app. The server delivers the document, the server routes and the server functions, and runs the agent
 harness.
 
-- **Home** asks "what needs you?": it lists the machines of the demo stack, first those in alarm, stopped or
-  without data, then those in setup, then the running ones. It is live: see below.
-- **Sites** (`/sites`) shows where the machines stand: site by site and hall by hall, in rows like those of
-  Home, each site under a head with how many of its machines are in each state, and the machines that send values
-  and stand on no site. "Needs you" keeps the machines that need someone, a search finds one; ten sites make a
-  page, and the choice and the page stay in the URL (`?show=needs`, `?page=`). The sites come from the Sites API through `genui_site_list`, and the page is
-  live like Home. It needs no language model.
+- **Home** (`/`) shows where the machines stand: site by site and hall by hall, a row for each machine, each
+  site under a head with how many of its machines are in each state, and the machines that send values and stand
+  on no site. "Needs you" keeps the machines that need someone, what Home used to show first; a search finds one; ten sites make a
+  page, and the choice and the page stay in the URL (`?show=needs`, `?page=`). The sites come from the Sites API through `genui_site_list`; without sites, every machine stands under
+  "On no site". It is live: see below. It needs no language model. The address `/sites`, where the list of the
+  sites stood before, leads to `/`.
 - **A page per machine** (`/sites/alcyone-machines_AX-400_P-04`, by the machine id) shows the machine card of the
   [card catalogue](../../packages/cards/README.md): what the machine does now and what it did over the last
-  hours. It needs no language model. Home and Sites lead to it, and it stands under Sites. An address of before, `/machines/<machine id>`, leads to it with
+  hours. It needs no language model. Home leads to it, and it stands under Home. An address of before, `/machines/<machine id>`, leads to it with
   the hours of its history. For a machine the backend does not know, the page
   says so and does not ask again.
 - **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
@@ -62,7 +61,7 @@ The values come from `genui-mcp`, and what is live comes from the broker. Withou
 which settings are missing; everything else works.
 
 **Live, not read again** ([ADR-0013](../../docs/adr/0013-live-values-from-the-broker.md)). Home, the page of a
-machine, Sites, Live values and Charts read once, in their loader, what `genui-mcp` knows: what held when the page was opened,
+machine, Live values and Charts read once, in their loader, what `genui-mcp` knows: what held when the page was opened,
 and the history before it. From then on the browser subscribes at the broker, MQTT over WebSocket, to the
 topics the page shows, and every value appears the moment a machine publishes it: a state, a work master, the
 job order that runs, an alert that is raised or cleared, a point of a graph. The clock of the page moves on by itself, by the clock of the
@@ -171,7 +170,7 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
-  `index.tsx` is Home, `sites.index.tsx` Sites, `sites.$machine.tsx` the page of a machine and `machines.$machine.tsx`
+  `index.tsx` is Home, `sites.index.tsx` the address the list of the sites had before, which leads there, `sites.$machine.tsx` the page of a machine and `machines.$machine.tsx`
   the old address of it, which leads there, `charts.tsx` the last hours of every
   machine as charts (drawn by `src/charts/state-tiles.tsx`), `pages.index.tsx` the list of the pages kept
   in this browser, `pages.$page.tsx` one of them and `pages.open.tsx` one opened from a link; `health.ts`,
@@ -247,9 +246,9 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   the passing of time, onto what the backend read, by the rules of `genui-mcp`; each has its tests.
   `sites.ts` keeps the machines of the sites live and counts them again by the rules of `genui_site_list`.
   `src/hooks/use-live.ts` puts it together for a route: `useLive(loaded, live)`.
-- `src/sites/`: what the page Sites chooses to show. `filter.ts` groups the values of `genui_site_list` by site
+- `src/sites/`: what Home chooses to show of the sites. `filter.ts` groups the values of `genui_site_list` by site
   and hall, keeps what "Needs you" and a search ask for, cuts the pages, and adds up nothing; `moved.ts` says where an old address of the page of a
-  machine leads.
+  machine or of the list of the sites leads.
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `mcp-servers.ts` reads the servers whose tools the chat has and holds a chat to the ones it left on,

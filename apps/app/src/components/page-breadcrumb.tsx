@@ -14,8 +14,8 @@ import {
 } from "@pleiades/ui/components/breadcrumb"
 
 /**
- * Where the page stands, in the header as in the shadcn block sidebar-15: "Machines" on Home,
- * "Machines › P-04" on the page of a machine. It names no page: it reads the routes, as the sidebar
+ * Where the page stands, in the header as in the shadcn block sidebar-15: "Home" on Home,
+ * "Home › P-04" on the page of a machine. It names no page: it reads the routes, as the sidebar
  * does (nav.ts). A page the app does not know has none. A page kept from the chat is called by its
  * title, which a person can change while it is open: the breadcrumb follows the pages of this
  * browser for that.
