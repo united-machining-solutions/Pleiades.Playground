@@ -30,7 +30,7 @@ test("a tool only a card calls is not called, even where it would draw", () => {
 })
 
 test("a tool of the app only the chat calls is not called, although the chat draws it: the proposal of a page", () => {
-  const withProposal: ReadonlyArray<ChatTool> = [...tools, { name: "app_page_propose", chatOnly: true, draw: () => "proposal" }]
+  const withProposal: ReadonlyArray<ChatTool> = [...tools, { name: "app_page_propose", saveAsPage: false, draw: () => "proposal" }]
   assert.equal(drawingTool("app_page_propose", withProposal), undefined)
   assert.equal(drawingTool("genui_machine_show", withProposal)?.name, "genui_machine_show")
 })

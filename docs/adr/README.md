@@ -27,3 +27,4 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0016](0016-blazor-for-the-page-of-a-dotnet-service.md) | A .NET service draws its own page with Blazor (an exception for the cutting simulator only) | rejected |
 | [0017](0017-the-words-of-a-tool-result-are-a-display.md) | The words of a tool result may name the unit people use | proposed |
 | [0018](0018-the-language-model-composes-a-page-and-nothing-else.md) | The language model composes a page, and nothing else | proposed |
+| [0019](0019-documentation-sources-in-chat.md) | Documentation sources and original PDFs in chat through MCP | proposed |

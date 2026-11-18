@@ -48,3 +48,5 @@ Rules for tools in this repository:
 - Names are `<area>_<subject>_<action>` in lower case with underscores.
 - Numbers come from the server, never from the model. Every value carries its source.
 - Cards (MCP Apps) are `ui://` resources referenced by `_meta.ui.resourceUri`; they live with the app under `apps/`.
+
+The optional external documentation service has its own [contract](../docs/README.md).

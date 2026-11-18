@@ -3,6 +3,7 @@ import { test } from "node:test"
 
 import type { UIMessage } from "@tanstack/ai-react"
 
+import { blocksOf } from "../chat/blocks.ts"
 import { jsonOf } from "../chat/tool-results.ts"
 import type { ChatTool } from "../chat/tool-results.ts"
 import { callsOfAnswer, keepOfAnswer, recipeOfAnswer } from "./from-answer.ts"
@@ -288,7 +289,7 @@ test("an answer is only what follows its own question", () => {
 })
 
 // The proposal of a page: the chat draws its result, and only the chat calls it (chat/proposed-page.tsx).
-const withProposal: ReadonlyArray<ChatTool> = [...tools, { name: "app_page_propose", chatOnly: true, draw: () => "the proposal" }]
+const withProposal: ReadonlyArray<ChatTool> = [...tools, { name: "app_page_propose", saveAsPage: false, draw: () => "the proposal" }]
 const proposal = (id: string) => [
   call(id, "app_page_propose", { title: "P-04", parts: [{ tool: "genui_machine_show", args: { machine: "P-04" } }] }),
   result(id, '{"recipe":{"title":"P-04","parts":[{"tool":"genui_machine_show","args":{"machine":"P-04"}}]},"leftOut":[]}'),
@@ -313,4 +314,12 @@ test("an answer that proposes a page keeps its cards for 'Save as page', as any 
   })
   // An answer with nothing but the proposal has no card to keep: the proposal is kept on its own.
   assert.equal(keepOfAnswer([asked("A page?"), said("only", [...proposal("p"), text("Here.")])], 1, withProposal, false), null)
+})
+
+test("documentation references stay visible in chat but are not replayed as GenUI saved-page parts", () => {
+  const allTools: ReadonlyArray<ChatTool> = [...tools, { name: "docs_search", draw: () => "documentation source references", saveAsPage: false }]
+  const docs = [call("docs", "docs_search", { query: "CYCLE832" }), result("docs", '{"hits":[]}')]
+  assert.equal(blocksOf(docs, false, allTools).some(block => block.kind === "drawn" && block.node === "documentation source references"), true)
+  assert.equal(recipeOfAnswer("What does the manual say?", docs, allTools), null)
+  assert.deepEqual(callsOfAnswer([...docs, ...oneCard()], allTools), [{ tool: "genui_machine_show", args: { machine: "P-04" } }])
 })

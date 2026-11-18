@@ -252,3 +252,29 @@ the backend of the running demo stack answers.
 - `src/styles.css`: Tailwind and the font. The theme of the preset, light only, comes from `@pleiades/ui`
   and the brands with it, the chart and state colours from `@pleiades/cards`, so a card looks the same
   wherever it is drawn.
+
+## Machine documentation in chat
+
+Run the external documentation API and MCP service, then append an entry to `APP_MCP_SERVERS`:
+
+```dotenv
+# Playground running locally:
+APP_MCP_SERVERS=docs=http://127.0.0.1:3202/mcp
+# Playground in Docker, documentation service on the host:
+# APP_MCP_SERVERS=docs=http://host.docker.internal:3202/mcp
+```
+
+Keep any existing entries, separated by commas. Restart the local app, or recreate the Docker app with
+`docker compose up -d --no-deps app` so it receives the new environment. The external MCP service must
+listen on an address reachable by that runtime and accept its Host header; loopback-only services cannot
+be assumed reachable from another container. The standard demo has no documentation dependency.
+
+Ask about a manual, for example “Which four technological machining operations does CYCLE832 distinguish?”.
+The chat uses `docs_search` and `docs_read_page`, cites the document and page, and shows clickable sources.
+Selecting a PDF source opens its original physical page in a PDF.js viewer, with paging, zoom, download
+and literal search. Search combines native PDF text and indexed OCR page matches; only native text can
+be highlighted. The **Extracted text** tab retains the plain-text evidence. The backend reads metadata and
+bounded binary resources through MCP and serves PDF bytes to the browser, including HTTP ranges.
+Missing, changed or unavailable sources show an error and require a new search.
+See [ADR-0019](../../docs/adr/0019-documentation-sources-in-chat.md) and the [external documentation contract](../../contracts/docs/README.md).
+The Playground never calls the documentation REST API or accesses its database.
