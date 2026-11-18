@@ -260,12 +260,12 @@ Keep any existing entries, separated by commas. Restart the local app, or recrea
 listen on an address reachable by that runtime and accept its Host header; loopback-only services cannot
 be assumed reachable from another container. The standard demo has no documentation dependency.
 
-Ask about a manual, for example “Welche vier technologischen Bearbeitungen unterscheidet CYCLE832?”.
+Ask about a manual, for example “Which four technological machining operations does CYCLE832 distinguish?”.
 The chat uses `docs_search` and `docs_read_page`, cites the document and page, and shows clickable sources.
 Selecting a PDF source opens its original physical page in a PDF.js viewer, with paging, zoom, download
 and literal search. Search combines native PDF text and indexed OCR page matches; only native text can
 be highlighted. The **Extracted text** tab retains the plain-text evidence. The backend reads metadata and
 bounded binary resources through MCP and serves PDF bytes to the browser, including HTTP ranges.
 Missing, changed or unavailable sources show an error and require a new search.
-See [ADR-0018](../../docs/adr/0018-original-pdf-sources-over-mcp.md).
+See [ADR-0019](../../docs/adr/0019-documentation-sources-in-chat.md) and the [external documentation contract](../../contracts/docs/README.md).
 The Playground never calls the documentation REST API or accesses its database.

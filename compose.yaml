@@ -405,7 +405,7 @@ services:
       <<: *build
       dockerfile: Pleiades.Playground.Cutting.Simulator/Dockerfile
     ports:
-      - "127.0.0.1:${CUTTING_LASER_2D_PORT:-5611}:8080"
+      - "${CUTTING_LASER_2D_PORT:-5611}:8080"
     environment:
       Config__MachineType: Laser2D
       Config__MachineNumber: "1"
@@ -419,7 +419,7 @@ services:
     <<: *cutting-simulator
     pull_policy: never
     ports:
-      - "127.0.0.1:${CUTTING_TUBE_PORT:-5612}:8080"
+      - "${CUTTING_TUBE_PORT:-5612}:8080"
     environment:
       Config__MachineType: Tube
       Config__MachineNumber: "1"
@@ -433,7 +433,7 @@ services:
     <<: *cutting-simulator
     pull_policy: never
     ports:
-      - "127.0.0.1:${CUTTING_PUNCH_PORT:-5613}:8080"
+      - "${CUTTING_PUNCH_PORT:-5613}:8080"
     environment:
       Config__MachineType: Punch
       Config__MachineNumber: "1"

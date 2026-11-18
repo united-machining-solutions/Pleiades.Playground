@@ -9,7 +9,7 @@ import { PdfDocumentViewer } from "./pdf-document-viewer.tsx"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@pleiades/ui/components/tabs"
 import { getDocumentPage } from "./get-page.ts"
 import type { PageAnswer } from "./read-page.ts"
-import { sourcesOf } from "./results.ts"
+import { pageDescription, sourcesOf } from "./results.ts"
 import type { DocumentSource } from "./results.ts"
 
 function SourcePage({ source }: { source: DocumentSource }) {
@@ -44,7 +44,7 @@ function SourceLink({ source }: { source: DocumentSource }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<button type="button" title={source.citation} />}>
-        <TraceLine><TraceIcon><FileTextIcon /></TraceIcon><TraceTitle>{source.citation.replace(/, page .+$/, "")}</TraceTitle><TraceDescription>p. {source.resourceUri.split("/").at(-1)}</TraceDescription></TraceLine>
+        <TraceLine><TraceIcon><FileTextIcon /></TraceIcon><TraceTitle>{source.citation.replace(/, page .+$/, "")}</TraceTitle><TraceDescription>{pageDescription(source)}</TraceDescription></TraceLine>
       </DialogTrigger>
       <DialogContent className="max-h-[95vh] overflow-y-auto sm:max-w-[92vw]">
         <DialogHeader><DialogTitle className="break-words pr-6">{source.citation}</DialogTitle><DialogDescription>Original document and extracted text for the cited page.</DialogDescription></DialogHeader>

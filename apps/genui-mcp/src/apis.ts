@@ -382,3 +382,87 @@ export async function readPlacements(apis: Apis): Promise<Array<Placement>> {
   const placements = await getJson("Sites API", sitesUrlOf(apis, "/placements"), placementsAnswer)
   return placements.map((one) => ({ ...one, placedAt: new Date(one.placedAt).toISOString() }))
 }
+
+/** The first value of one topic between two instants, or null if it had none. */
+export async function readOldest(
+  apis: Apis,
+  kind: "baseUnitValues" | "booleanValues",
+  topic: string,
+  from: Date,
+  to: Date,
+): Promise<Newest | null> {
+  const url = between(
+    new URL(`/timeseries/${kind}/topics/${inPath(topic)}`, apis.timeseriesUrl),
+    ["startTime", "stopTime"],
+    from,
+    to,
+  )
+  url.searchParams.set("limit", "1")
+  url.searchParams.set("sorting", "Ascending")
+  const { series } = await getJson("Timeseries API", url, newestAnswer)
+  const found = series.find((one) => one.topic === topic)
+  const value = found?.values[0]
+  const timestamp = found?.timestamps[0]
+  if (value == null || timestamp === undefined) return null
+  return { at: fromMicroseconds(timestamp), value, unit: found?.unit ?? null }
+}
+
+/**
+ * The numbers of a topic between the two instants, thinned by the Timeseries API to at most
+ * `points` for each topic (LTTB), oldest first; all of them where there are fewer. The topic may
+ * contain `*` as a wildcard and then yields one timeline per topic.
+ */
+export async function readThinned(apis: Apis, topic: string, from: Date, to: Date, points: number): Promise<Array<Timeline>> {
+  const url = between(
+    new URL(`/timeseries/baseUnitValues/topics/${inPath(topic)}`, apis.timeseriesUrl),
+    ["startTime", "stopTime"],
+    from,
+    to,
+  )
+  url.searchParams.set("downsample", "true")
+  url.searchParams.set("limit", String(points))
+  const { series } = await getJson("Timeseries API", url, newestAnswer)
+  return series.map((one) => ({
+    topic: one.topic,
+    unit: one.unit ?? null,
+    samples: one.timestamps
+      .flatMap((timestamp, index) => {
+        const value = one.values[index]
+        return value == null ? [] : [{ at: fromMicroseconds(timestamp), value }]
+      })
+      .sort((a, b) => a.at.localeCompare(b.at)),
+  }))
+}
+
+/** What the Timeseries API sums up of the numbers of a topic: their unit, mean, largest and how many. */
+export type Statistics = { unit: string; mean: number; max: number; min: number; count: number }
+
+// A median or deviation it cannot compute comes as the text "NaN": only what is read here is checked.
+const statisticsAnswer = z.record(
+  z.string(),
+  z.object({ unit: z.string(), mean: z.number(), max: z.number(), min: z.number(), count: z.number().int() }),
+)
+
+/**
+ * The statistics of the numbers of a topic between the two instants, one entry for each topic it
+ * matches. The topic may contain `*` as a wildcard. The API takes the topic as one level of the
+ * path, so its slashes are encoded too.
+ */
+export async function readStatistics(apis: Apis, topic: string, from: Date, to: Date): Promise<Map<string, Statistics>> {
+  const url = new URL(`/statistics/baseUnitValues/topics/${encodeURIComponent(topic)}`, apis.timeseriesUrl)
+  const unanswered = (error: unknown): never => {
+    throw failure("Timeseries API", url, `did not answer: ${reasonOf(error)}`, error)
+  }
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify([{ start: from.toISOString(), stop: to.toISOString() }]),
+    signal: AbortSignal.timeout(TIMEOUT_SECONDS * 1000),
+  }).catch(unanswered)
+  if (!response.ok) throw failure("Timeseries API", url, `answered ${response.status}`)
+  const checked = statisticsAnswer.safeParse(await response.json().catch(unanswered))
+  if (!checked.success) {
+    throw failure("Timeseries API", url, `answered in a shape this server does not know: ${z.prettifyError(checked.error)}`)
+  }
+  return new Map(Object.entries(checked.data))
+}

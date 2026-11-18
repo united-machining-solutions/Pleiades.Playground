@@ -1,4 +1,4 @@
-export type DocumentSource = { resourceUri: string; citation: string }
+export type DocumentSource = { resourceUri: string; citation: string; pageLabel?: string }
 
 /** Only a revision-specific documentation page can be opened by this host. */
 export function pageUri(value: unknown): string {
@@ -19,8 +19,17 @@ export function sourcesOf(content: unknown): Array<DocumentSource> {
   if (typeof content !== "object" || content === null) return []
   if ("hits" in content && Array.isArray(content.hits)) return unique(content.hits.flatMap(sourcesOf))
   if (!("resourceUri" in content) || !("citation" in content) || typeof content.citation !== "string") return []
-  try { return [{ resourceUri: pageUri(content.resourceUri), citation: content.citation }] } catch { return [] }
+  const metadata = "source" in content && typeof content.source === "object" && content.source !== null ? content.source : undefined
+  const label = metadata && "pageLabel" in metadata && typeof metadata.pageLabel === "string" ? metadata.pageLabel.trim() : ""
+  try { return [{ resourceUri: pageUri(content.resourceUri), citation: content.citation, ...(label ? { pageLabel: label } : {}) }] } catch { return [] }
 }
 function unique(sources: Array<DocumentSource>) {
   return sources.filter((source, index) => sources.findIndex(other => other.resourceUri === source.resourceUri) === index)
+}
+
+/** Printed labels identify evidence; the URI keeps navigation on the physical PDF page. */
+export function pageDescription(source: DocumentSource): string {
+  const physicalPage = source.resourceUri.split("/").at(-1)!
+  const label = source.pageLabel?.trim()
+  return label && label !== physicalPage ? `p. ${label} (PDF page ${physicalPage})` : `p. ${physicalPage}`
 }

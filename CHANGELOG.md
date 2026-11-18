@@ -5,16 +5,13 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
-### Fixed
-
-- Documentation chat: retain evidence and citation instructions when using the per-chat MCP server switches.
-
 ### Added
 
 - Documentation sources: original PDF viewer with paging, zoom and native/OCR page search, retrieved
   through bounded MCP binary resources without adding PDFs to model context.
 
-- Example app: optional documentation MCP tools with clickable, revision-specific manual page sources in chat.
+- Example app: optional documentation MCP tools with clickable, revision-specific manual page sources in chat,
+  showing printed page labels alongside differing physical pages. Margo exposes the additional MCP server setting.
 
 
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
@@ -45,6 +42,8 @@ All notable changes are documented here. The format follows
 - Page of a machine: the title switches to another machine, with a search over the serial number and the
   state, and the history of the card covers the last 1, 8 or 24 hours (`?hours=`). The page is wider, with
   room for actions on the right.
+- Energy card: `genui_energy_show` says how much energy machines imported over the last 1 to 24 hours, from
+  their meters, with mean and peak power; the card draws their power as a graph (`genui_energy_series`).
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
@@ -291,6 +290,9 @@ All notable changes are documented here. The format follows
   disagrees with the `EngineeringUnits`, makes the match `Unclear`.
 
 ### Changed
+
+- Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
+  computer, as the web UI of the OPC UA simulator does; in the stack and in the Margo app.
 
 - The Ultimaker telemetry and the juice bar publish the payloads and the delivery of the MQTT binding of
   machines, not only its tree, as the simulators do: every value retained with QoS 1 in the envelope

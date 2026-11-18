@@ -16,6 +16,8 @@ from, and numbers, order and durations are computed here, never by a language mo
 
 | Tool | What it returns |
 |---|---|
+| `genui_energy_show` | Every machine that published active power or its energy meter, or those in `machines`, over the last hours (`hours`, 8 if omitted, at most 24): the energy it imported, the difference of its meter in the unit the meter published in (watt hours, or joule for values from before the data model 0.17.1), unconverted; the mean power over that time, the energy divided by it; and the peak of its active power in watt, from the statistics of the Timeseries API. Machines in watt hours first, then those in joule, each the one that imported the most first. Its output is the contract of the energy card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_energy_series` | The active power of machines between two instants (`from`, `to`, at most 24 hours), a line for each machine on the same instants (`slots`, 240 if omitted): the graph of the energy card. Each value is the one that held at its instant, the newest of those the Timeseries API keeps when it thins a line to twice the slots; none where the machine was silent, as in the graphs of the measurements. A card calls it after `genui_energy_show`. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_machine_list` | Every machine with what it does now: manufacturer, model and serial number, connection, heartbeat, state and operation mode with the time since when, the active work master and job order, and the alerts of the last 24 hours that have not been cleared. |
 | `genui_machine_show` | One machine (`machine`, the machine id): the same readings, and how long each state lasted in total over the last hours (`hours`, 8 if omitted). Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_span_list` | The states of one machine between two instants (`from`, `to`) as spans without a gap: the band of the machine card. A card calls it after `genui_machine_show`. A host that shows MCP Apps does not offer it to its language model. |
@@ -27,6 +29,7 @@ from, and numbers, order and durations are computed here, never by a language mo
 | Resource | What it is |
 |---|---|
 | `genui://skill` | The skill guide, as markdown. |
+| `ui://genui/energy` | The energy card as a file for other hosts: the energy of each machine, and the graph of their power, which it asks `genui_energy_series` for. |
 | `ui://genui/machine` | The machine card as a file for other hosts, see below. |
 | `ui://genui/site` | The site card as a file for other hosts: a card for each site, and one for the machines on no site. |
 | `ui://genui/measurement` | The measurement card as a file for other hosts: the cards, and below them the graphs of the last minutes, which it asks `genui_measurement_series` for, as the machine card asks for its band. |
