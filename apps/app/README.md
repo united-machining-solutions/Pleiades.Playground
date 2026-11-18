@@ -36,9 +36,10 @@ harness.
   can hold, each by what it shows, and asks what the chosen one takes, as the input schema of its tool in the
   backend says: a machine, chosen by its name from the machines Home lists, and the hours of a history in
   their range. An optional argument left empty stays out, so the measurements without a machine are every
-  machine. The card goes to the end and shows its values at once; the other parts are not asked again. The
-  same card with the same choices, a thirteenth part or a storage that says no adds nothing, and the dialog
-  says why; without an answer of the backend nothing can be added. An added card is removed like any other.
+  machine; the list of machines the energy card can take has no field, and that card shows every machine.
+  The card goes to the end and shows its values at once; the other parts are not asked again. The same card
+  with the same choices, a thirteenth part or a storage that says no adds nothing, and the dialog says why;
+  without an answer of the backend nothing can be added. An added card is removed like any other.
   A pinned page stands in the sidebar on the top level, beside
   Home; under it a group "Pages", which folds, lists the pages that are not pinned, the newest first, and
   there is no group where there is nothing to list. `/pages` lists them all and is reached through the

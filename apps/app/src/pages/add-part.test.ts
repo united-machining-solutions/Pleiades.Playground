@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { ChatTool } from "../chat/tool-results.ts"
-import { argumentsOf, cannotAdd, cardChoicesOf, labelOf, partOf, whyOff } from "./add-part.ts"
+import { argumentsOf, cannotAdd, cardChoicesOf, hintOf, labelOf, partOf, whyOff } from "./add-part.ts"
 import type { CardChoice } from "./add-part.ts"
 import { MAX_PARTS } from "./recipe.ts"
 
@@ -43,7 +43,7 @@ const show: CardChoice = {
   shows: "One machine and its last hours",
   asks: [
     { name: "machine", kind: "machine", required: true },
-    { name: "hours", kind: "whole", required: false, min: 1, max: 24, description: "How many hours back the history goes. 8 if omitted." },
+    { name: "hours", kind: "whole", required: false, min: 1, max: 24 },
   ],
   cannotAsk: [],
 }
@@ -144,6 +144,39 @@ test("a required argument left empty, or a number out of its range, says why", (
   const days: CardChoice = { tool: "t", shows: "Days", asks: [{ name: "days", kind: "whole", required: true, min: 1 }], cannotAsk: [] }
   assert.deepEqual(partOf(days, {}).problems, { days: "Give a whole number." })
   assert.deepEqual(partOf(days, { days: 0 }).problems, { days: "A whole number, 1 or more." })
+})
+
+test("the energy card is offered with its hours, and without a choice of machines it shows every machine", () => {
+  // As genui-mcp lists genui_energy_show: an optional list of machines, and the hours.
+  const energy = {
+    name: "genui_energy_show",
+    inputSchema: {
+      type: "object",
+      properties: {
+        machines: { type: "array", minItems: 1, items: machine, description: "The machines to compare." },
+        hours: { type: "integer", minimum: 1, maximum: 24, description: "How many hours back. The card offers 1, 8 and 24." },
+        timeZone,
+      },
+      required: [],
+    },
+  }
+  const withEnergy = [{ name: "genui_energy_show", part: "The energy of the machines over the last hours", draw: () => "energy" }, ...tools]
+  const [card] = cardChoicesOf([energy, ...listed], withEnergy)
+  assert.deepEqual(card, {
+    tool: "genui_energy_show",
+    shows: "The energy of the machines over the last hours",
+    asks: [{ name: "hours", kind: "whole", required: false, min: 1, max: 24 }],
+    cannotAsk: [],
+  })
+  assert.equal(whyOff(card, null), null)
+  assert.deepEqual(partOf(card, {}), { part: { tool: "genui_energy_show", args: {} }, problems: null })
+  assert.deepEqual(partOf(card, { hours: 1 }).part, { tool: "genui_energy_show", args: { hours: 1 } })
+})
+
+test("the hint under a number says its range in words, not what the schema tells a language model", () => {
+  assert.equal(hintOf({ name: "hours", kind: "whole", required: false, min: 1, max: 24 }), "A whole number from 1 to 24. Left empty, the card takes its own.")
+  assert.equal(hintOf({ name: "days", kind: "whole", required: true, min: 1 }), "A whole number, 1 or more.")
+  assert.equal(hintOf({ name: "slots", kind: "whole", required: true }), "A whole number.")
 })
 
 test("a field is called by what it asks", () => {

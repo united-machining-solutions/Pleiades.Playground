@@ -40,7 +40,7 @@ import { RadioGroup, RadioGroupItem } from "@pleiades/ui/components/radio-group"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@pleiades/ui/components/select"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 
-import { labelOf, partOf, whyOff } from "./add-part.ts"
+import { hintOf, labelOf, partOf, whyOff } from "./add-part.ts"
 import type { CardArgument, CardChoice, Filled } from "./add-part.ts"
 import { getCardChoices } from "./card-choices.ts"
 import type { CardChoices } from "./card-choices.ts"
@@ -316,8 +316,7 @@ function ArgumentField({
           <NumberFieldIncrement />
         </NumberFieldGroup>
       </NumberField>
-      {/* What the backend says about the argument, as its schema has it. */}
-      {argument.description && <FieldDescription>{argument.description}</FieldDescription>}
+      <FieldDescription>{hintOf(argument)}</FieldDescription>
       {problem && <FieldError>{problem}</FieldError>}
     </Field>
   )

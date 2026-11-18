@@ -8,16 +8,16 @@ import type { RecipePart } from "./recipe.ts"
 // A card a person adds to a kept page by hand, with no language model. What a card takes stands in
 // the input schema of its tool, which the generative UI backend lists: the form reads its fields
 // from there, so a new card that takes the same kind of arguments needs no line in the app. It is no
-// general form builder. It knows the arguments the cards of today take, a machine and a whole number,
-// and leaves an optional argument it does not know to the tool, which then takes its default. A card
-// with a required argument it does not know cannot be added here.
+// general form builder. It knows a machine and a whole number, and leaves an optional argument it does
+// not know to the tool, which then takes its default: the list of machines of the energy card, which
+// then shows every machine. A card with a required argument it does not know cannot be added here.
 
 /** An argument of a card that the form asks for. */
 export type CardArgument =
   /** A machine of the stack, by its id. A person chooses it by its name from the machines the backend lists. */
   | { name: string; kind: "machine"; required: boolean }
-  /** A whole number, from `min` to `max` where the schema gives them, with what the schema says about it. */
-  | { name: string; kind: "whole"; required: boolean; min?: number; max?: number; description?: string }
+  /** A whole number, from `min` to `max` where the schema gives them. */
+  | { name: string; kind: "whole"; required: boolean; min?: number; max?: number }
 
 /**
  * A card a person can add: the tool of a page, what it shows in words (`part` of its entry in the
@@ -45,7 +45,7 @@ function finite(value: unknown): number | undefined {
 /** One property of an input schema as an argument the form asks for, or undefined if it does not know it. */
 function argumentOf(name: string, property: unknown, required: boolean): CardArgument | undefined {
   if (typeof property !== "object" || property === null) return undefined
-  const { type, minimum, maximum, description } = property as Record<string, unknown>
+  const { type, minimum, maximum } = property as Record<string, unknown>
   if (name === MACHINE && type === "string") return { name, kind: "machine", required }
   if (type !== "integer") return undefined
   const min = finite(minimum)
@@ -56,7 +56,6 @@ function argumentOf(name: string, property: unknown, required: boolean): CardArg
     required,
     ...(min !== undefined && { min }),
     ...(max !== undefined && { max }),
-    ...(typeof description === "string" && description.trim() !== "" && { description: description.trim() }),
   }
 }
 
@@ -120,15 +119,32 @@ export function labelOf({ name, kind }: CardArgument): string {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
+/** A whole number in words: "a whole number from 1 to 24". */
+function wholeInWords({ min, max }: { min?: number; max?: number }): string {
+  if (min !== undefined && max !== undefined) return `a whole number from ${min} to ${max}`
+  if (min !== undefined) return `a whole number, ${min} or more`
+  if (max !== undefined) return `a whole number, ${max} or less`
+  return "a whole number"
+}
+
+/**
+ * What the form says under the field of a whole number: its range, and for an optional one that the
+ * card takes its own value when it is left empty. Written here and not taken from the schema, whose
+ * descriptions are written for a language model.
+ */
+export function hintOf(argument: Extract<CardArgument, { kind: "whole" }>): string {
+  const range = wholeInWords(argument)
+  const sentence = `${range.charAt(0).toUpperCase()}${range.slice(1)}.`
+  return argument.required ? sentence : `${sentence} Left empty, the card takes its own.`
+}
+
 /** Why a whole number does not fit an argument, or null if it does. */
 function wholeProblem(argument: Extract<CardArgument, { kind: "whole" }>, value: number): string | null {
   const { min, max } = argument
   const fits = Number.isInteger(value) && (min === undefined || value >= min) && (max === undefined || value <= max)
   if (fits) return null
-  if (min !== undefined && max !== undefined) return `A whole number from ${min} to ${max}.`
-  if (min !== undefined) return `A whole number, ${min} or more.`
-  if (max !== undefined) return `A whole number, ${max} or less.`
-  return "A whole number."
+  const range = wholeInWords(argument)
+  return `${range.charAt(0).toUpperCase()}${range.slice(1)}.`
 }
 
 /**
