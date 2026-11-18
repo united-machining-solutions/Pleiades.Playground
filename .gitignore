@@ -41,3 +41,9 @@ Thumbs.db
 # Manuals that must not be published
 demo/manuals/private/
 artifacts/
+
+# Telegram files and state of the cutting simulator when it runs with dotnet run
+.cutting/
+
+# Local Claude Code settings of each person
+.claude/settings.local.json

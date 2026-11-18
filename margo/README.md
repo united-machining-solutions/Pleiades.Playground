@@ -13,9 +13,7 @@ margo/
 │   ├── license.txt           Copy of LICENSE
 │   └── icon.svg
 └── compose/                  The component: everything here goes into the package
-    ├── compose.yaml          The demo stack, with Traefik in front of the example app
-    ├── broker/mosquitto.conf Copy of stacks/broker/mosquitto.conf
-    └── traefik/dynamic.yaml  The route of Traefik to the example app
+    └── compose.yaml          The demo stack, with Traefik in front of the example app
 ```
 
 ## How it differs from `compose.yaml`
@@ -24,7 +22,7 @@ margo/
 that bart accepts it, and one more, Traefik:
 
 - **No `build:`.** The services take the images that the workflow "Images" publishes to
-  `ghcr.io/united-machining-solutions`, for `linux/amd64` and `linux/arm64`. `bart build` does not fit here: it
+  `ghcr.io/united-machining-solutions`, for `linux/amd64` only. `bart build` does not fit here: it
   builds `src/<service>/Dockerfile` with that folder as the context, and every image of this repository needs
   `source/` or the root as its context.
 - **Literal image references.** bart mirrors each `image:` as it stands and does not interpolate it, so there is
@@ -32,20 +30,39 @@ that bart accepts it, and one more, Traefik:
   [Release](#release).
 - **No YAML anchors.** bart's compose parser does not resolve merge keys (`<<: *service`), so every service
   says everything itself.
-- **The broker configuration is a `configs:` entry** from `compose/broker/`, because a bind mount may not leave
-  `compose/`. The file is a copy; keep it the same as `stacks/broker/mosquitto.conf`:
+- **The configurations are inline `configs:` entries** (`content:`), not files: the Margo client does not mount
+  a file of the package into a container, and a bind mount may not leave `compose/`. Compose interpolates
+  `${VAR}` in `content:`, so a literal dollar sign is written `$$`. The broker configuration is a copy; keep it
+  the same as `stacks/broker/mosquitto.conf`:
 
   ```bash
-  diff <(tail -n +3 margo/compose/broker/mosquitto.conf) stacks/broker/mosquitto.conf
+  diff stacks/broker/mosquitto.conf \
+    <(docker compose -f margo/compose/compose.yaml config --format json | jq -j '.configs.mosquitto.content')
   ```
 
 - **Traefik in front of the example app.** It serves the app on the HTTP port (setting *HTTP port of Traefik*,
-  80), on `127.0.0.1` unless the setting *Address of Traefik* opens it to the network, under two host names:
+  80) and the HTTPS port (*HTTPS port of Traefik*, 443), both on `127.0.0.1` unless the setting *Address of
+  Traefik* opens them to the network, under two host names:
   *Host name of the app*, a CNAME of the device, and *Host name of the device*, its A record. Their defaults, `pleiades.example.internal` and `device.example.internal`, are placeholders: set both
   to the names of your device when you install the app. Traefik reads its route from
-  `compose/traefik/dynamic.yaml`, a `configs:` entry, and not from Docker labels: those need the Docker socket,
-  a bind mount out of `compose/`. The file is a Go template that takes the host names from the environment.
-  Plain HTTP only; there is no certificate.
+  the `configs:` entry `traefik`, and not from Docker labels: those need the Docker socket,
+  a bind mount out of `compose/`. The configuration is a Go template that takes the host names from the environment.
+- **HTTPS with a self-signed certificate.** The host names are internal to the device, so no public CA can
+  sign them and ACME cannot reach them. Traefik is given no certificate and serves the one it generates in
+  memory at start, `TRAEFIK DEFAULT CERT`: no file, no volume, no Docker socket. A browser warns until the
+  person accepts it; a new one comes with every restart of Traefik. The app works over both, so HTTP is not
+  redirected to HTTPS.
+- **Live values over HTTPS through Traefik.** A page over HTTPS may not open `ws://`, and the broker speaks no
+  TLS. So Traefik forwards the path `/mqtt` of its HTTPS port to the broker's WebSocket, and the app's
+  `MQTT_WSS_PATH: /mqtt` sends the browser there, at the origin of the page. Over HTTP the browser reaches the
+  broker at the published port, `MQTT_WS_PORT`, as before.
+
+  ```bash
+  curl -k --resolve device.example.internal:443:127.0.0.1 https://device.example.internal/
+  ```
+
+  `curl -k https://localhost/` gets a 404: the route needs one of the two host names, in the Host header and
+  the SNI.
 - **Settings, not `.env`.** Every `${VAR}` of the compose file is a parameter in `app/margo.yaml`, and each one
   is a setting the person who installs the app can change: the ports, the address of the example app, the
   retention and the language models. The default after `:-` in the compose file is the same as the value of the
@@ -54,6 +71,18 @@ that bart accepts it, and one more, Traefik:
 A change to the stack in `compose.yaml` belongs here as well, in the same pull request. CI checks that both files
 name the same services (leaving out the ones behind a profile, and Traefik) and that the broker configuration is
 the same; the rest, the variables and the settings, it does not see.
+
+## External MCP servers
+
+The *Further MCP servers* setting in *Language model* maps to `APP_MCP_SERVERS`, using comma-separated
+`name=address` entries. For a documentation app deployed separately on the same device, use
+`docs=http://host.docker.internal:3202/mcp`. The app maps that name to the host gateway on Docker Engine
+on Linux as well as Docker Desktop. The MCP listener and its published port must be reachable from the
+Playground container; a loopback-only host port may not work on Linux. Configure the documentation
+service to accept `host.docker.internal` as a Host header and expose it only on a controlled network.
+
+Enable `docs` under *Tools* in the chat. The service's contract and source/PDF requirements are in
+[contracts/docs](../contracts/docs/README.md). A gateway or chat model is still required for chat.
 
 ## Check
 

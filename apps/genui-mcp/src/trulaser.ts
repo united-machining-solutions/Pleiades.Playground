@@ -38,7 +38,7 @@ import type {
   TrulaserTimeline,
 } from "@pleiades/cards/trulaser/contract.ts"
 
-import { EVER, listTopics, readAlertSpans, readJobOrders, readNewest, readStrings, readTimelines } from "./apis.ts"
+import { EVER, listTopics, readAlertSpans, readJobOrderEntries, readNewest, readStrings, readTimelines } from "./apis.ts"
 import type { AlertSpan, Apis, JobOrderEntry, Sample } from "./apis.ts"
 import { HORIZON_SECONDS, machineOf } from "./machines.ts"
 import { secondsBefore } from "./time.ts"
@@ -185,7 +185,7 @@ export async function showJobOrder(apis: Apis, asked?: string, now = new Date())
   const about = await aboutOf(apis, asked, now)
   const [signals, jobs] = await Promise.all([
     readSignals(apis, about.machine, CARD_SIGNALS.jobOrder, now),
-    readJobOrders(apis, about.machine),
+    readJobOrderEntries(apis, about.machine),
   ])
   const current = currentJobOrder(jobs)
   return { ...about, jobOrder: current && jobOrderOf(current), signals }
@@ -481,7 +481,7 @@ export async function listTimeline(
     sourcesOf(apis, machine, view, now),
     readAlertSpans(apis, machine, from, now),
     adapterStarts(apis, machine, secondsBefore(from, HORIZON_SECONDS), now),
-    view === "jobOrder" ? readJobOrders(apis, machine) : Promise.resolve([]),
+    view === "jobOrder" ? readJobOrderEntries(apis, machine) : Promise.resolve([]),
   ])
   const stored = await Promise.all(
     sources.map(async (source): Promise<Lane> => {

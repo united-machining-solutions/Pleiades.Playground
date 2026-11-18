@@ -10,8 +10,8 @@ The deployment is optional and off by default. Whoever only wants to see the dem
 ## How it goes
 
 1. A pull request is merged into `main`.
-2. "Images" builds the service images, including the optional Ultimaker and juice bar services, and tags them
-   `main` and `sha-<commit>`.
+2. "Images" builds the service images, including the cutting simulator and adapter and the optional Ultimaker
+   and juice bar services, and tags them `main` and `sha-<commit>`.
 3. "Deploy" runs after it on a runner of your own, on the computer that runs the stack. It checks out the
    commit, pulls the images tagged `sha-<commit>` and runs `docker compose up -d --no-build --wait`.
 
@@ -148,3 +148,22 @@ The service listens on host loopback port 5550 by default. Before `JUICEBAR_BIND
 switch sign-in on with `JUICEBAR_AUTH_ENABLED=true` and the three `JUICEBAR_AUTH_*` values; the chat of the
 example app sends no token and does not reach the service then. See the
 [service guide](../source/Pleiades.Playground.JuiceBar.Api/README.md).
+
+## Show the showcases
+
+The example app has two images. `pleiades.playground.app` is the app alone. `pleiades.playground.app.showcases`
+is the same app built with its showcases, pages made for one demo or one fair, which may show made-up data
+([ADR-0018](adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). The Images workflow publishes both
+with the same commit tags.
+
+A demo that shows them sets one value in the private `.env` of the deployment computer in DEPLOY_DIR:
+
+```dotenv
+APP_SHOWCASES=true
+```
+
+The stack then runs the second image. Any value switches them on, `false` too; to run the app alone, leave
+the value empty. It is read when the image is pulled, not while the app runs.
+
+The [Margo app](../margo/README.md) has no such setting: it always runs the app alone, since bart takes the
+name of an image as it stands. A device that is to show a showcase runs `compose.yaml` instead.

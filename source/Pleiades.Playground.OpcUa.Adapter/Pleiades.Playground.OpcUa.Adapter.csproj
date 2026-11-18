@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.OpcUa.Adapter</AssemblyName>
+    <RootNamespace>Pleiades.Playground.OpcUa.Adapter</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pleiades.Playground.OpcUa.Adapter.Test" />
+    <!-- Moq builds its fakes of internal interfaces there. -->
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The guide a language model reads before it scans a server: opcua_get_skill_guide. -->
+    <EmbeddedResource Include="Resources\skill.md" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Client" />
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Mcp.Core" />
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.AspNetCore\Pleiades.Playground.Common.AspNetCore.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.DataTransferObjects\Pleiades.Playground.Common.DataTransferObjects.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging\Pleiades.Playground.Common.Logging.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging.Configuration\Pleiades.Playground.Common.Logging.Configuration.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Common.Logging.Loki\Pleiades.Playground.Common.Logging.Loki.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.HealthChecks.AspNetCore\Pleiades.Playground.HealthChecks.AspNetCore.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.HealthChecks.Mqtt\Pleiades.Playground.HealthChecks.Mqtt.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Mcp.Server\Pleiades.Playground.Mcp.Server.csproj" />
+    <ProjectReference Include="..\Pleiades.Playground.Mqtt.Extensions\Pleiades.Playground.Mqtt.Extensions.csproj" />
+  </ItemGroup>
+</Project>
