@@ -40,6 +40,7 @@ events-api               Up 3 minutes (healthy)
 events-persistence       Up 3 minutes (healthy)
 genui-mcp                Up 3 minutes (healthy)
 mongodb                  Up 3 minutes (healthy)
+simplecam-adapter-9042   Up 3 minutes (healthy)
 simulator-m-02           Up 3 minutes (healthy)
 simulator-p-04           Up 3 minutes (healthy)
 simulator-p-07           Up 3 minutes (healthy)
@@ -59,6 +60,8 @@ timeseries-persistence   Up 3 minutes (healthy)
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
 port and setting. The three simulated machines, P-04, P-07 and M-02, are the three `simulator-*` services.
+`simplecam-adapter-9042` is a fourth machine, a real one: it reads the SimpleCAM backend and shows as "No data"
+until that backend runs.
 Each publishes after the umati data model, below `machines/<manufacturer>_<model>_<serial number>/` (for P-04
 `machines/alcyone-machines_AX-400_P-04/`): manifest, values, its stack light, and job orders, program executions
 and alerts as CloudEvents. It is described in

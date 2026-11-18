@@ -1,42 +1,30 @@
-# Build stage: compile TypeScript
-FROM node:22-alpine AS builder
-WORKDIR /workspace
+# Build context: the repository root (docker build -f apps/simplecam-adapter-9042/Dockerfile .).
+# The adapter is not compiled: Node.js runs its TypeScript files as they are. Only the production
+# dependencies are installed, so the build stages serve every target architecture;
+# --platform=$BUILDPLATFORM keeps them native on the build machine.
+FROM --platform=$BUILDPLATFORM node:26.13-alpine3.24 AS workspace
+WORKDIR /repo
+COPY . .
+# pnpm in the version that package.json names as "packageManager".
+RUN npm install --global --ignore-scripts "$(node --print 'require("./package.json").packageManager')"
 
-# Install pnpm
-RUN npm install -g pnpm
+# The production dependencies of this adapter.
+FROM workspace AS build
+RUN pnpm install --frozen-lockfile --prod --filter "@pleiades/simplecam-adapter-9042..."
 
-# Copy workspace files
-COPY pnpm-workspace.yaml pnpm-lock.yaml ./
-
-# Copy adapter package
-COPY apps/simplecam-adapter-9042 apps/simplecam-adapter-9042/
-
-# Install dependencies (frozen lockfile from workspace)
-RUN pnpm install --frozen-lockfile --filter=@pleiades/simplecam-adapter-9042
-
-# Build TypeScript
-WORKDIR /workspace/apps/simplecam-adapter-9042
-RUN pnpm build
-
-# Runtime stage: minimal image with compiled code
-FROM node:22-alpine
+# The Alpine minor is pinned on purpose, as in the images under source/.
+FROM node:26.13-alpine3.24 AS final
 WORKDIR /app
-
-# Install pnpm for runtime
-RUN npm install -g pnpm
-
-# Copy from builder
-COPY --from=builder /workspace/pnpm-workspace.yaml .
-COPY --from=builder /workspace/pnpm-lock.yaml .
-COPY --from=builder /workspace/apps/simplecam-adapter-9042/package.json .
-COPY --from=builder /workspace/apps/simplecam-adapter-9042/dist ./dist
-
-# Install only production dependencies for this filter
-RUN pnpm install --frozen-lockfile --filter=@pleiades/simplecam-adapter-9042 --prod
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3042/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
-
-# Run adapter
-CMD ["node", "dist/index.js"]
+ENV NODE_ENV=production HEALTH_PORT=8080
+EXPOSE 8080
+# The image keeps the layout of the workspace, cut down to this adapter. Node.js runs TypeScript
+# only outside node_modules, and pnpm links a workspace package into node_modules where it lies.
+COPY --from=build /repo/node_modules node_modules
+COPY --from=build /repo/apps/simplecam-adapter-9042 apps/simplecam-adapter-9042
+# The licence and the notices travel with the image. Each package under node_modules keeps its own.
+COPY --from=build /repo/LICENSE /repo/NOTICE ./
+WORKDIR /app/apps/simplecam-adapter-9042
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget -qO /dev/null http://127.0.0.1:8080/health || exit 1
+USER node
+ENTRYPOINT ["node", "src/index.ts"]

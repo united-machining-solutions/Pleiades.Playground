@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * SimpleCAM Adapter for Machine 9042
  * Consumes Server-Sent Events from SimpleCAM backend (/stream/machine-9042/state)
@@ -9,9 +8,9 @@
  * - machines/united-grinding_simplecam_9042/events/* (CloudEvents)
  */
 
+import crypto from "node:crypto";
+import http from "node:http";
 import mqtt from "mqtt";
-import http from "http";
-import crypto from "crypto";
 
 const SIMPLECAM_SSE_URL =
   process.env.SIMPLECAM_SSE_URL || "http://localhost:5450/stream/machine-9042/state";
@@ -66,6 +65,7 @@ async function connectMqtt(): Promise<void> {
  * Send heartbeat every 10 seconds (AG2 requirement)
  */
 function startHeartbeat(): void {
+  clearInterval(heartbeatTimer);
   heartbeatTimer = setInterval(() => {
     if (isConnected) {
       const heartbeat = Math.floor(Date.now() / 1000);
@@ -266,6 +266,15 @@ function startHealthEndpoint(): void {
     console.log(`[Health] Listening on port ${HEALTH_PORT}`);
   });
 }
+
+function shutdown(): void {
+  clearInterval(heartbeatTimer);
+  mqttClient?.end(false, () => process.exit(0));
+  setTimeout(() => process.exit(0), 2000).unref();
+}
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
 
 /**
  * Main

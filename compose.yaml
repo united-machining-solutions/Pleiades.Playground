@@ -333,11 +333,12 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
 
-  # SimpleCAM Adapter: consumes SSE from SimpleCAM backend, publishes to MQTT (AG2 v0.17.1).
-  # SimpleCAM runs externally on localhost:5450; this adapter runs in Docker and forwards data to Pleiades.
-  # Requires SIMPLECAM_SSE_URL to point to the external SimpleCAM backend.
+  # The SimpleCAM adapter: reads the state of the machine 9042 from the SSE stream of the SimpleCAM backend and
+  # publishes it to the broker after the data model, as machines/united-grinding_simplecam_9042/umati/...
+  # It runs without the backend: it keeps trying to connect, and says so by `/health` only while it reaches the broker.
   simplecam-adapter-9042:
     <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.simplecam.adapter:${PLEIADES_VERSION:-dev}
     build:
       context: .
       dockerfile: apps/simplecam-adapter-9042/Dockerfile
@@ -346,19 +347,14 @@ services:
         condition: service_healthy
       timeseries-persistence:
         condition: service_healthy
+    # The backend runs on this computer, outside of Docker: host.docker.internal. Docker Desktop knows the
+    # name; this line gives it to Docker Engine on Linux too.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       SIMPLECAM_SSE_URL: ${SIMPLECAM_SSE_URL:-http://host.docker.internal:5450/stream/machine-9042/state}
-      MQTT_BROKER_URL: ${MQTT_BROKER_URL:-mqtt://broker:1883}
+      MQTT_BROKER_URL: mqtt://broker:1883
       MQTT_CLIENT_ID: simplecam-adapter-9042
-      HEALTH_PORT: "3042"
-    ports:
-      - "3042:3042"
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3042/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
 
   # One simulator per machine. Each publishes after the data model, below machines/{MachineId}/
   # (<manufacturer>_<model>_<serial number>, contracts/mqtt), from a virtual machine of its own with a scenario of

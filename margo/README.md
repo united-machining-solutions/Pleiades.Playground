@@ -18,7 +18,7 @@ margo/
 
 ## How it differs from `compose.yaml`
 
-`compose/compose.yaml` runs the same twelve containers as [`compose.yaml`](../compose.yaml) at the root, written so
+`compose/compose.yaml` runs the same thirteen containers as [`compose.yaml`](../compose.yaml) at the root, written so
 that bart accepts it, and one more, Traefik:
 
 - **No `build:`.** The services take the images that the workflow "Images" publishes to
