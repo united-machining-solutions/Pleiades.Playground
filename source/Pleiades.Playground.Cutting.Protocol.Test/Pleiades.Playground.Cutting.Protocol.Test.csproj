@@ -1,0 +1,21 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Cutting.Protocol.Test</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Cutting.Protocol.Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Cutting.Protocol\Pleiades.Playground.Cutting.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

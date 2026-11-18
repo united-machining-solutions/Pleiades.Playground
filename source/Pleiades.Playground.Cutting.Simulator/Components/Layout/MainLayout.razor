@@ -1,0 +1,36 @@
+@inherits LayoutComponentBase
+
+<div class="shell">
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-mark" aria-hidden="true">CUT</span>
+            <div>
+                <div class="brand-title">@Name</div>
+                <div class="brand-sub">Cutting simulator · @Type.DisplayName()@(Serial.Length > 0 ? $" · serial number {Serial}" : "") · machine number @Number</div>
+            </div>
+        </div>
+        <nav class="tabs" aria-label="Pages">
+            <NavLink class="tab" href="" Match="NavLinkMatch.All">Overview</NavLink>
+            <NavLink class="tab" href="plan">Production plan</NavLink>
+            <NavLink class="tab" href="stock">Stock</NavLink>
+            <NavLink class="tab" href="telegrams">Telegrams</NavLink>
+            <NavLink class="tab" href="notify">Send notification</NavLink>
+        </nav>
+    </header>
+    <main class="content">
+        @Body
+    </main>
+</div>
+
+@code {
+    [Inject]
+    internal CuttingMachine Machine { get; set; } = default!;
+
+    private string Name => Machine.Snapshot().DisplayName;
+
+    private string Serial => Machine.Snapshot().SerialNumber;
+
+    private CuttingMachineType Type => Machine.Type;
+
+    private string Number => Machine.MachineNumber;
+}
