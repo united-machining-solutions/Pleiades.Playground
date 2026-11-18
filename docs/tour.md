@@ -303,11 +303,10 @@ is asked to answer without thinking first, so that a card stands after about a s
 With a camera, Titan greets whoever steps in front of it: by name when the face is known, and straight away
 with the machines that stand still with an error. It checks every few seconds who stands there, and greets
 someone known who steps in. Faces are enrolled at <http://localhost:5600/titan/faces> ("Faces");
-what describes a face stays in that browser, and no photo is kept. Titan speaks with the voice of the
-system, which sounds at once, and falls silent when the page is closed. A voice of Tom, who agreed to it, is
-ready in [`apps/titan-voice`](../apps/titan-voice/README.md), but the page does not use it yet: without a
-graphics card it takes as long to make a sentence as to say it. What Titan knows stands on one screen at
-<http://localhost:5600/hall> ("Hall"): the hall plan and every machine.
+what describes a face stays in that browser, and no photo is kept. Titan speaks with the voice of Tom, who
+agreed to it, made by [`apps/titan-voice`](../apps/titan-voice/README.md) in the stack; when that does not
+answer, with the voice of the system. It falls silent when the page is closed. What Titan knows stands on
+one screen at <http://localhost:5600/hall> ("Hall"): the hall plan and every machine.
 
 The cloud shows what the assistant does: it breathes while it waits, draws together while it listens,
 swirls while it thinks, and waves run through it while it speaks. It also keeps an eye on the hall: a new
