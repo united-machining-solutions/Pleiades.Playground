@@ -7,6 +7,9 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- MongoDB is reachable from the host for a client such as MongoDB Compass, at `MONGODB_PORT` (27017) on this
+  computer only. `MONGODB_BIND` opens it to the network; the database has no sign-in. Connect with
+  `?directConnection=true`.
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
   self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
   that live values work over HTTPS. HTTP stays as it is.
