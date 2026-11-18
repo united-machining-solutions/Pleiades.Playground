@@ -76,7 +76,7 @@ function serve(store: Store): Array<{ url: URL; body?: unknown }> {
 }
 
 /**
- * A meter that counts `perMinute` joule every minute over the last `minutes`, starting at `first`.
+ * A meter that counts `perMinute` every minute, in `unit`, over the last `minutes`, starting at `first`.
  * It publishes half a minute off the full minutes, so no value lies on the border of the hours.
  */
 const meter = (first: number, perMinute: number, minutes: number, unit = "joule") => ({
@@ -104,13 +104,13 @@ test("the energy of a machine is the meter at the end less the meter where the h
   assert.deepEqual(shown.machines.map((one) => one.machine), ["M-02", "P-04"])
   const p04 = shown.machines[1]!
   // The newest value before the hours began, not the first in them.
-  assert.deepEqual(p04.energy.start, { joule: 5_000_000 + 59 * 60_000, at: ago(60.5) })
-  assert.deepEqual(p04.energy.end, { joule: 5_000_000 + 119 * 60_000, at: ago(0.5) })
-  assert.equal(p04.energy.joule, 3_600_000)
+  assert.deepEqual(p04.energy.start, { value: 5_000_000 + 59 * 60_000, unit: "joule", at: ago(60.5) })
+  assert.deepEqual(p04.energy.end, { value: 5_000_000 + 119 * 60_000, unit: "joule", at: ago(0.5) })
+  assert.equal(p04.energy.value, 3_600_000)
   assert.equal(p04.energy.topic, meterOf("P-04"))
   assert.deepEqual(p04.power, { meanWatt: 2000, peakWatt: 3000, values: 60, unit: "watt", topic: powerOf("P-04") })
   assert.equal(p04.energy.unit, "joule")
-  assert.equal(shown.machines[0]!.energy.joule, 7_200_000)
+  assert.equal(shown.machines[0]!.energy.value, 7_200_000)
 })
 
 test("a meter without a value before the hours is counted from its first one in them", async () => {
@@ -118,8 +118,8 @@ test("a meter without a value before the hours is counted from its first one in 
   serve({ [meterOf("P-07")]: meter(0, 60_000, 20), [powerOf("P-07")]: power(20, [3600]) })
   const shown = await showEnergy(apis, 1, undefined, now)
   const p07 = shown.machines[0]!
-  assert.deepEqual(p07.energy.start, { joule: 0, at: ago(19.5) })
-  assert.equal(p07.energy.joule, 19 * 60_000)
+  assert.deepEqual(p07.energy.start, { value: 0, unit: "joule", at: ago(19.5) })
+  assert.equal(p07.energy.value, 19 * 60_000)
 })
 
 test("a meter value from before a gap is not counted: the energy begins with the first value in the hours", async () => {
@@ -131,8 +131,58 @@ test("a meter value from before a gap is not counted: the energy begins with the
     },
   })
   const p04 = (await showEnergy(apis, 1, undefined, now)).machines[0]!
-  assert.deepEqual(p04.energy.start, { joule: 90_000_000, at: ago(19.5) })
-  assert.equal(p04.energy.joule, 19 * 60_000)
+  assert.deepEqual(p04.energy.start, { value: 90_000_000, unit: "joule", at: ago(19.5) })
+  assert.equal(p04.energy.value, 19 * 60_000)
+})
+
+test("a meter in watt hours, as the data model has it, counts in watt hours, and nothing is converted", async () => {
+  const id = "alcyone-machines_AX-400_P-04"
+  serve({
+    [meterOf(id)]: meter(120_000, 1_000, 120, "wattHour"),
+    [powerOf(id)]: power(60, [3000]),
+  })
+  const shown = (await showEnergy(apis, 1, undefined, now)).machines[0]!
+  assert.equal(shown.machine, id)
+  assert.deepEqual(shown.energy.start, { value: 120_000 + 59 * 1_000, unit: "wattHour", at: ago(60.5) })
+  assert.equal(shown.energy.value, 60 * 1_000)
+  assert.equal(shown.energy.unit, "wattHour")
+})
+
+test("machines in two units: those in watt hours first, each unit by its energy, unconverted", async () => {
+  serve({
+    // Values from before the data model 0.17.1, in joule: 1 kWh is 3,600,000 J.
+    [meterOf("P-04")]: meter(0, 60_000, 120),
+    [meterOf("alcyone-machines_AX-400_P-04")]: meter(0, 10, 120, "wattHour"),
+    [meterOf("merope-microtec_MM-120_M-02")]: meter(0, 20, 120, "wattHour"),
+  })
+  const shown = await showEnergy(apis, 1, undefined, now)
+  assert.deepEqual(shown.machines.map((one) => [one.machine, one.energy.value, one.energy.unit]), [
+    ["merope-microtec_MM-120_M-02", 1_200, "wattHour"],
+    ["alcyone-machines_AX-400_P-04", 600, "wattHour"],
+    ["P-04", 3_600_000, "joule"],
+  ])
+})
+
+test("a meter that changed its unit in the hours: its energy is not known", async () => {
+  serve({
+    [meterOf("P-04")]: {
+      unit: "joule",
+      values: [{ at: ago(60.25), value: 8_000_000 }, { at: ago(30), value: 8_100_000 }],
+    },
+  })
+  // The fake keeps one unit for a topic: the newest value comes from a second store with watt hours.
+  const fake = globalThis.fetch
+  globalThis.fetch = (async (input, init) => {
+    const url = new URL(String(input))
+    if (url.searchParams.get("sorting") === "Descending" && url.searchParams.get("stopTime") === now.toISOString()) {
+      return Response.json({ series: [{ topic: meterOf("P-04"), unit: "wattHour", timestamps: [Date.parse(ago(1)) * 1000], values: [2_300] }] })
+    }
+    return fake(input, init)
+  }) as typeof fetch
+  const p04 = (await showEnergy(apis, 1, undefined, now)).machines[0]!
+  assert.equal(p04.energy.value, null)
+  assert.equal(p04.energy.meterWentBack, false)
+  assert.deepEqual([p04.energy.start?.unit, p04.energy.end?.unit], ["joule", "wattHour"])
 })
 
 test("a meter that went back was reset: its energy is not known, and the machine comes last", async () => {
@@ -140,18 +190,18 @@ test("a meter that went back was reset: its energy is not known, and the machine
     // The meter published a quarter of a minute before the hours began, then less.
     [meterOf("P-04")]: { unit: "joule", values: [{ at: ago(60.25), value: 8_000_000 }, { at: ago(30), value: 1_000 }] },
     [meterOf("M-02")]: meter(0, 1_000, 60),
-    // A meter or a power in another unit than the binding's is not read as joule or watt.
-    [meterOf("K-01")]: meter(0, 1, 60, "wattHour"),
+    // A meter or a power in a unit that is not one of energy or power is not read.
+    [meterOf("K-01")]: meter(0, 1, 60, "kilowattHour"),
     [powerOf("K-01")]: { ...power(60, [2]), unit: "kilowatt" },
   })
   const shown = await showEnergy(apis, 1, undefined, now)
-  assert.deepEqual(shown.machines.map((one) => [one.machine, one.energy.joule, one.energy.meterWentBack]), [
+  assert.deepEqual(shown.machines.map((one) => [one.machine, one.energy.value, one.energy.meterWentBack]), [
     ["M-02", 59_000, false],
     ["K-01", null, false],
     ["P-04", null, true],
   ])
   // The unit that was found says why there is no energy and no power.
-  assert.equal(shown.machines[1]!.energy.unit, "wattHour")
+  assert.equal(shown.machines[1]!.energy.unit, "kilowattHour")
   assert.deepEqual(shown.machines[1]!.power, { meanWatt: null, peakWatt: null, values: 0, unit: "kilowatt", topic: powerOf("K-01") })
   // No power was published: neither mean nor peak.
   assert.deepEqual(shown.machines[2]!.power, { meanWatt: null, peakWatt: null, values: 0, unit: null, topic: powerOf("P-04") })

@@ -1,4 +1,4 @@
-import { ENERGY_HOURS, ENERGY_SLOTS, MOST_ENERGY_HOURS } from "@pleiades/cards/energy/contract.ts"
+import { ENERGY_HOURS, ENERGY_SLOTS, ENERGY_UNITS, MOST_ENERGY_HOURS } from "@pleiades/cards/energy/contract.ts"
 import { READING_PATHS, SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
 import type { EnergySeries, EnergyShow, MachineEnergy, MeterReading } from "@pleiades/cards/energy/contract.ts"
 
@@ -10,20 +10,29 @@ import { slotEnds, slotted, sources, topicOf } from "./measurements.ts"
 import { secondsBefore } from "./time.ts"
 
 // How much energy machines imported over the last hours, and how much power they drew. The energy
-// is the difference of the meter, which counts up in joule; the power is in watt. Nothing is
-// converted: kilowatt hours are wording, in the cards package.
+// is the difference of the meter, which counts up in the unit it publishes in: watt hours, as the
+// data model has it, or joule for values from before. The power is in watt. Nothing is converted:
+// kilowatt hours are wording, in the cards package (ADR-0002).
 
-/** A meter value in joule, or null if there is none or it is in another unit. */
-function inJoule(value: Newest | null): MeterReading | null {
-  if (value === null || typeof value.value !== "number" || value.unit !== "joule") return null
-  return { joule: value.value, at: value.at }
+/** Whether a unit is one a meter of energy publishes in. */
+const isEnergyUnit = (unit: string | null): boolean => (ENERGY_UNITS as ReadonlyArray<string | null>).includes(unit)
+
+/** A value of the meter as it was published, or null if there is none. */
+function readingOf(value: Newest | null): MeterReading | null {
+  if (value === null || typeof value.value !== "number") return null
+  return { value: value.value, unit: value.unit, at: value.at }
 }
 
-/** The energy imported between two values of the meter. A meter that went back was reset: then it is not known. */
-export function energyBetween(start: MeterReading | null, end: MeterReading | null): Pick<MachineEnergy["energy"], "joule" | "meterWentBack"> {
-  if (start === null || end === null) return { joule: null, meterWentBack: false }
-  const difference = end.joule - start.joule
-  return difference < 0 ? { joule: null, meterWentBack: true } : { joule: difference, meterWentBack: false }
+/**
+ * The energy imported between two values of the meter, in its unit. It is not known if the meter
+ * publishes in a unit that is not one of energy, changed its unit in between, or went back: then
+ * it was reset.
+ */
+export function energyBetween(start: MeterReading | null, end: MeterReading | null): Pick<MachineEnergy["energy"], "value" | "meterWentBack"> {
+  if (start === null || end === null) return { value: null, meterWentBack: false }
+  if (start.unit !== end.unit || !isEnergyUnit(end.unit)) return { value: null, meterWentBack: false }
+  const difference = end.value - start.value
+  return difference < 0 ? { value: null, meterWentBack: true } : { value: difference, meterWentBack: false }
 }
 
 /** Mean and peak of the active power, from the statistics of its topic. Statistics in another unit than watt are left out. */
@@ -34,13 +43,14 @@ export function powerOf(statistics: Statistics | undefined, topic: string): Mach
   return { meanWatt: statistics.mean, peakWatt: statistics.max, values: statistics.count, unit: statistics.unit, topic }
 }
 
-/** The machine that imported the most first; a machine whose energy is not known last; else by machine id. */
+/**
+ * Machines in watt hours first, then those in joule, each the one that imported the most first; a
+ * machine whose energy is not known last; else by machine id. Two units are not compared.
+ */
 export function byEnergy(a: MachineEnergy, b: MachineEnergy): number {
-  const [ja, jb] = [a.energy.joule, b.energy.joule]
-  if (ja === jb) return a.machine.localeCompare(b.machine)
-  if (ja === null) return 1
-  if (jb === null) return -1
-  return jb - ja
+  const rank = (one: MachineEnergy) =>
+    one.energy.value === null ? ENERGY_UNITS.length : (ENERGY_UNITS as ReadonlyArray<string | null>).indexOf(one.energy.unit)
+  return rank(a) - rank(b) || (b.energy.value ?? 0) - (a.energy.value ?? 0) || a.machine.localeCompare(b.machine)
 }
 
 /**
@@ -87,9 +97,9 @@ export async function showEnergy(
       // then counted from its first value in them, as one that began in them.
       const before = newest !== null && Date.parse(newest.at) >= from.getTime() - SILENT_AFTER_SECONDS * 1000 ? newest : null
       const first = before === null && published.has(meter) ? await readOldest(apis, "baseUnitValues", meter, from, now) : null
-      const start = inJoule(before ?? first)
-      const stop = inJoule(end)
-      const unit = (end ?? before ?? first)?.unit ?? null
+      const start = readingOf(before ?? first)
+      const stop = readingOf(end)
+      const unit = (stop ?? start)?.unit ?? null
       const power = topicOf(machine, "activePower")
       return {
         machine,

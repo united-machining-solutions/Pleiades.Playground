@@ -13,9 +13,9 @@ const shown = {
     {
       machine: "P-04",
       energy: {
-        joule: 7_200_000,
-        start: { joule: 1_000_000, at: "2026-11-17T07:59:55.000Z" },
-        end: { joule: 8_200_000, at: "2026-11-17T15:59:58.000Z" },
+        value: 7_200_000,
+        start: { value: 1_000_000, unit: "joule", at: "2026-11-17T07:59:55.000Z" },
+        end: { value: 8_200_000, unit: "joule", at: "2026-11-17T15:59:58.000Z" },
         meterWentBack: false,
         unit: "joule",
         topic: meter,
@@ -25,15 +25,15 @@ const shown = {
   ],
 }
 
-test("the energy card carries joule and watt, each with the topic it comes from", () => {
+test("the energy card carries the energy in the unit of its meter and the power in watt, each with its topic", () => {
   assert.equal(energyShow.safeParse(shown).success, true)
   // A machine whose energy is not known keeps its place, without a number.
-  const unknown = { ...shown.machines[0]!, energy: { ...shown.machines[0]!.energy, joule: null, start: null } }
+  const unknown = { ...shown.machines[0]!, energy: { ...shown.machines[0]!.energy, value: null, start: null } }
   assert.equal(energyShow.safeParse({ ...shown, machines: [unknown] }).success, true)
   // Kilowatt hours are wording: a value without its topic, or as text, is not the contract.
   const { topic: _, ...withoutTopic } = shown.machines[0]!.energy
   assert.equal(energyShow.safeParse({ ...shown, machines: [{ ...shown.machines[0]!, energy: withoutTopic }] }).success, false)
-  assert.equal(energyShow.safeParse({ ...shown, machines: [{ ...shown.machines[0]!, energy: { ...shown.machines[0]!.energy, joule: "2 kWh" } }] }).success, false)
+  assert.equal(energyShow.safeParse({ ...shown, machines: [{ ...shown.machines[0]!, energy: { ...shown.machines[0]!.energy, value: "2 kWh" } }] }).success, false)
 })
 
 test("the lines of the graph name their instants once, and each line carries only its values", () => {

@@ -6,9 +6,9 @@ import { energyShowOf, machinesKey, machinesOf } from "./results.ts"
 const machine = {
   machine: "P-04",
   energy: {
-    joule: 7_200_000,
-    start: { joule: 1_000_000, at: "2026-11-17T08:00:00.000Z" },
-    end: { joule: 8_200_000, at: "2026-11-17T15:59:58.000Z" },
+    value: 7_200_000,
+    start: { value: 1_000_000, unit: "joule", at: "2026-11-17T08:00:00.000Z" },
+    end: { value: 8_200_000, unit: "joule", at: "2026-11-17T15:59:58.000Z" },
     meterWentBack: false,
     unit: "joule",
     topic: "machines/P-04/umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp",
@@ -20,7 +20,7 @@ test("the JSON of genui_energy_show becomes the energy of every machine", () => 
   const shown = energyShowOf(
     JSON.stringify({ from: "2026-11-17T08:00:00.000Z", to: "2026-11-17T16:00:00.000Z", hours: 8, machines: [machine] }),
   )
-  assert.equal(shown?.machines[0]?.energy.joule, 7_200_000)
+  assert.equal(shown?.machines[0]?.energy.value, 7_200_000)
 })
 
 test("what does not keep the contract of the card is not drawn as one", () => {

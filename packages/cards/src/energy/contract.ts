@@ -3,8 +3,13 @@ import { z } from "zod"
 import { SILENT_AFTER_SECONDS, instant, machineId } from "../machine/contract.ts"
 
 // The contract of the energy card: how much energy each machine imported over the last hours, from
-// its meter, and how much power it drew, from its active power. Every value is in the unit of the
-// MQTT binding, joule and watt, and names the topic it comes from. Kilowatt hours are wording only.
+// its meter, and how much power it drew, from its active power. Every value keeps the unit it was
+// published in, and names the topic it comes from: a machine meters in watt hours, as the data
+// model has it, a value from before in joule (ADR-0002, ADR-0015). Kilowatt hours are wording only.
+
+/** The units a meter of energy may publish in, in the order the card lists machines by unit. */
+export const ENERGY_UNITS = ["wattHour", "joule"] as const
+export type EnergyUnit = (typeof ENERGY_UNITS)[number]
 
 /** How many hours back the card looks if nobody asks for more or less, and at most. */
 export const ENERGY_HOURS = 8
@@ -13,9 +18,10 @@ export const MOST_ENERGY_HOURS = 24
 /** How many values a line of the graph has if nobody asks: one for every few pixels of a card. */
 export const ENERGY_SLOTS = 240
 
-/** A value of the meter: what it counted, and when. */
+/** A value of the meter: what it counted, in which unit, and when. */
 export const meterReading = z.object({
-  joule: z.number().describe("What the meter had counted, in joule."),
+  value: z.number().describe("What the meter had counted, in `unit`."),
+  unit: z.string().nullable().describe("The unit the meter published it in: wattHour, or joule for a value from before the data model 0.17.1."),
   at: instant.describe("When the meter published it."),
 })
 export type MeterReading = z.infer<typeof meterReading>
@@ -23,11 +29,11 @@ export type MeterReading = z.infer<typeof meterReading>
 export const machineEnergy = z.object({
   machine: machineId.describe("The machine id, which identifies the machine in every topic."),
   energy: z.object({
-    joule: z
+    value: z
       .number()
       .nullable()
       .describe(
-        "The energy imported between `start` and `end`: the meter at `end` less the meter at `start`, in joule. Null if it is not known: the meter had no value (`unit` null), published in another unit than joule (`unit`), or went back in between (`meterWentBack`).",
+        "The energy imported between `start` and `end`: the meter at `end` less the meter at `start`, in `unit`, unconverted. Null if it is not known: the meter had no value (`unit` null), published in a unit that is not one of energy (`unit`), changed its unit in between (`start.unit` and `end.unit`), or went back (`meterWentBack`).",
       ),
     start: meterReading
       .nullable()
@@ -36,7 +42,10 @@ export const machineEnergy = z.object({
       ),
     end: meterReading.nullable().describe("The value of the meter the energy is counted to: the newest at or before `to` of the result."),
     meterWentBack: z.boolean().describe("True if the meter at `end` is less than at `start`: it was reset in between."),
-    unit: z.string().nullable().describe("The unit the meter published in: joule, as the MQTT binding wants. Null if it had no value."),
+    unit: z
+      .string()
+      .nullable()
+      .describe("The unit of `value`: the one the meter published in, wattHour or joule. Null if it had no value."),
     topic: z.string().describe("The MQTT topic of the meter."),
   }),
   power: z.object({
@@ -57,7 +66,9 @@ export type MachineEnergy = z.infer<typeof machineEnergy>
 
 /**
  * The energy card: the machines that published active power or their meter between `from` and
- * `to`, the one that imported the most first. Values whose unit is not joule or watt are left out.
+ * `to`. Those in watt hours first, then those in joule, each the one that imported the most first,
+ * and those whose energy is not known last: energies in two units are not compared, since nothing
+ * here converts. A meter in another unit than these, or a power in another than watt, is not read.
  */
 export const energyShow = z.object({
   from: instant,

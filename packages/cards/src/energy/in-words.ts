@@ -1,6 +1,6 @@
 import { written } from "../machine/format.ts"
 import type { EnergyShow, MachineEnergy } from "./contract.ts"
-import { kilowattHours, kilowatts, lastHours } from "./words.ts"
+import { inKilowattHours, kilowattHours, kilowatts, lastHours } from "./words.ts"
 
 // The energy card in words, for a reader that does not see it: a language model reads these lines
 // as the result of the tool, and a host without cards shows them.
@@ -8,14 +8,16 @@ import { kilowattHours, kilowatts, lastHours } from "./words.ts"
 /** The energy of one machine, in a line. */
 export function machineEnergyInWords({ machine, energy, power }: MachineEnergy, from: string): string {
   let said: string
-  if (energy.joule !== null) {
+  if (energy.value !== null) {
     // A meter counted from its first value in the hours says so: it had none just before them.
     const late = energy.start && Date.parse(energy.start.at) > Date.parse(from) ? ` (counted from ${written(energy.start.at)}, its first value)` : ""
-    said = `${machine}: ${kilowattHours(energy.joule)}${late}`
+    said = `${machine}: ${kilowattHours(energy.value, energy.unit)}${late}`
   } else if (energy.meterWentBack) {
     said = `${machine}: energy not known, its meter went back in this time`
-  } else if (energy.unit !== null && energy.unit !== "joule") {
-    said = `${machine}: energy not known, its meter publishes in ${energy.unit}, not joule`
+  } else if (energy.start && energy.end && energy.start.unit !== energy.end.unit) {
+    said = `${machine}: energy not known, its meter changed from ${energy.start.unit} to ${energy.end.unit} in this time`
+  } else if (energy.unit !== null && inKilowattHours(0, energy.unit) === null) {
+    said = `${machine}: energy not known, its meter publishes in ${energy.unit}, not in watt hours or joule`
   } else {
     said = `${machine}: energy not known, its meter published no value`
   }

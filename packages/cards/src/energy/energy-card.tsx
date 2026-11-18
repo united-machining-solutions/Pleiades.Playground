@@ -1,3 +1,4 @@
+import { Fragment } from "react"
 import type { CSSProperties } from "react"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
 
@@ -9,7 +10,7 @@ import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@pleiades/ui/components/table"
 import { clock } from "../machine/format.ts"
 import type { EnergySeries, EnergyShow, MachineEnergy } from "./contract.ts"
-import { axisKilowatts, kilowattHours, kilowatts } from "./words.ts"
+import { axisKilowatts, inKilowattHours, kilowattHours, kilowatts } from "./words.ts"
 
 /** How many machines the categorical colours of the theme name, `--chart-1` and on. */
 const COLOURS = 14
@@ -25,7 +26,7 @@ export type Lines = EnergySeries | null | undefined
  * mean and peak power, and above it the power of each machine as a graph. It draws the result of
  * `genui_energy_show`, and of `genui_energy_series` for the graph, which whoever draws the card
  * asks for and hands in as `series`. It computes nothing but the wording; on the wire energy is in
- * joule and power in watt, and the card writes kilowatt hours and kilowatts.
+ * the unit of the meter and power in watt, and the card writes kilowatt hours and kilowatts.
  */
 export function EnergyCard({ from, to, hours, machines, series }: EnergyShow & { series?: Lines }) {
   const colours = new Map(machines.map((one, index) => [one.machine, colourOf(index)]))
@@ -53,65 +54,111 @@ export function EnergyCard({ from, to, hours, machines, series }: EnergyShow & {
   )
 }
 
-/** The machines with their energy as a meter against the one that imported the most, and mean and peak power. */
-function EnergyTable({ machines, colours }: { machines: ReadonlyArray<MachineEnergy>; colours: Map<string, string> }) {
-  const most = Math.max(0, ...machines.map((one) => one.energy.joule ?? 0))
+/**
+ * A machine id that breaks only after `_` and `-`, never inside a word:
+ * alcyone-machines_AX-400_P-04 becomes alcyone-|machines_|AX-|400_|P-04 where the cell is narrow.
+ */
+function MachineName({ id }: { id: string }) {
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Machine</TableHead>
-          <TableHead className="text-right">Energy</TableHead>
-          <TableHead className="text-right">Power</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {machines.map(({ machine, energy, power }) => (
-          <TableRow key={machine}>
-            <TableCell className="w-full">
-              <div className="flex items-center gap-2 font-medium">
-                <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: colours.get(machine) }} />
-                {machine}
-              </div>
-              {energy.joule !== null && most > 0 && (
-                <Meter
-                  aria-label={`Energy of ${machine} against the most`}
-                  value={energy.joule}
-                  min={0}
-                  max={most}
-                  className="mt-1.5 [&_[data-slot=meter-indicator]]:bg-(--machine)"
-                  style={{ "--machine": colours.get(machine) } as CSSProperties}
-                />
-              )}
-            </TableCell>
-            <TableCell className="text-right tabular-nums">
-              {energy.joule !== null ? (
-                kilowattHours(energy.joule)
-              ) : (
-                <span className="text-muted-foreground">{meterNote(energy)}</span>
-              )}
-            </TableCell>
-            <TableCell className="text-right tabular-nums">
-              {power.meanWatt !== null && power.peakWatt !== null ? (
-                <>
-                  <span className="text-muted-foreground">mean</span> {kilowatts(power.meanWatt)}
-                  <span className="block text-xs text-muted-foreground">peak {kilowatts(power.peakWatt)}</span>
-                </>
-              ) : (
-                <span className="text-muted-foreground">{power.unit !== null && power.unit !== "watt" ? `in ${power.unit}` : "no value"}</span>
-              )}
-            </TableCell>
+    <span className="min-w-0 whitespace-normal">
+      {id.split(/(?<=[_-])/).map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 && <wbr />}
+          {part}
+        </Fragment>
+      ))}
+    </span>
+  )
+}
+
+/** The energy of a machine in kilowatt hours, or why it is not known. */
+function EnergyValue({ energy }: { energy: MachineEnergy["energy"] }) {
+  if (energy.value !== null) return <>{kilowattHours(energy.value, energy.unit)}</>
+  return <span className="text-muted-foreground">{meterNote(energy)}</span>
+}
+
+/** Mean and peak power of a machine, or why there are none. */
+function PowerValue({ power }: { power: MachineEnergy["power"] }) {
+  if (power.meanWatt !== null && power.peakWatt !== null) {
+    return (
+      <>
+        <span className="text-muted-foreground">mean</span> {kilowatts(power.meanWatt)}
+        <span className="block text-xs text-muted-foreground">peak {kilowatts(power.peakWatt)}</span>
+      </>
+    )
+  }
+  return <span className="text-muted-foreground">{power.unit !== null && power.unit !== "watt" ? `in ${power.unit}` : "no value"}</span>
+}
+
+/**
+ * The machines with their energy as a meter against the one that imported the most, and mean and
+ * peak power. Energy and power stand in columns of their own where the card is wide, and under the
+ * name where it is narrow. The meters compare kilowatt hours: the display converts, so machines in
+ * two units of energy still compare.
+ */
+function EnergyTable({ machines, colours }: { machines: ReadonlyArray<MachineEnergy>; colours: Map<string, string> }) {
+  const kilowattHoursOf = (one: MachineEnergy) => (one.energy.value === null ? null : inKilowattHours(one.energy.value, one.energy.unit))
+  const most = Math.max(0, ...machines.map((one) => kilowattHoursOf(one) ?? 0))
+  return (
+    <div className="@container/energy">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Machine</TableHead>
+            <TableHead className="hidden text-right @sm/energy:table-cell">Energy</TableHead>
+            <TableHead className="hidden text-right @sm/energy:table-cell">Power</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {machines.map((one) => {
+            const { machine, energy, power } = one
+            const kwh = kilowattHoursOf(one)
+            return (
+              <TableRow key={machine}>
+                <TableCell className="w-full whitespace-normal">
+                  <div className="flex gap-2 font-medium">
+                    <span aria-hidden className="mt-1.5 size-2.5 shrink-0 self-start rounded-full" style={{ background: colours.get(machine) }} />
+                    <MachineName id={machine} />
+                  </div>
+                  {kwh !== null && most > 0 && (
+                    <Meter
+                      aria-label={`Energy of ${machine} against the most`}
+                      value={kwh}
+                      min={0}
+                      max={most}
+                      className="mt-1.5 [&_[data-slot=meter-indicator]]:bg-(--machine)"
+                      style={{ "--machine": colours.get(machine) } as CSSProperties}
+                    />
+                  )}
+                  <div className="mt-1.5 flex items-start justify-between gap-4 tabular-nums @sm/energy:hidden">
+                    <span className="whitespace-nowrap">
+                      <EnergyValue energy={energy} />
+                    </span>
+                    <span className="text-right whitespace-nowrap">
+                      <PowerValue power={power} />
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell className="hidden text-right tabular-nums @sm/energy:table-cell">
+                  <EnergyValue energy={energy} />
+                </TableCell>
+                <TableCell className="hidden text-right tabular-nums @sm/energy:table-cell">
+                  <PowerValue power={power} />
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
+    </div>
   )
 }
 
 /** Why the energy of a machine is not known, in a few words. */
 function meterNote(energy: MachineEnergy["energy"]): string {
   if (energy.meterWentBack) return "meter reset"
-  if (energy.unit !== null && energy.unit !== "joule") return `meter in ${energy.unit}`
+  if (energy.start && energy.end && energy.start.unit !== energy.end.unit) return "meter changed unit"
+  if (energy.unit !== null && inKilowattHours(0, energy.unit) === null) return `meter in ${energy.unit}`
   return "no meter"
 }
 

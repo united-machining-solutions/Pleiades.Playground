@@ -29,7 +29,7 @@ const machines = z
 const energyShowTool = toolDefinition({
   name: "genui_energy_show",
   description:
-    "Show how much energy machines imported over the last hours, from the meter of each machine, with the mean and the peak of their active power. Every machine, or those named in `machines`; the one that imported the most first. Use it to compare machines or for the energy of one. The result says it in a line for each machine, in kilowatt hours, and carries the values of the energy card in joule and watt.",
+    "Show how much energy machines imported over the last hours, from the meter of each machine, with the mean and the peak of their active power. Every machine, or those named in `machines`; the one that imported the most first. Use it to compare machines or for the energy of one. The result says it in a line for each machine, in kilowatt hours, and carries the values of the energy card in the unit of each meter and in watt.",
   inputSchema: z.object({
     machines: machines.describe("The machines to compare. Every machine that published active power or its meter if omitted."),
     hours: z
@@ -81,21 +81,25 @@ const energySeriesTool = toolDefinition({
 const energyGuide = `## Energy
 
 \`genui_energy_show\` says how much energy machines imported over the last hours (\`hours\`, ${ENERGY_HOURS} if
-omitted, at most ${MOST_ENERGY_HOURS}), every machine or those in \`machines\`, the one that imported the most
-first. Pass the \`timeZone\` of the person you answer, if you know it.
+omitted, at most ${MOST_ENERGY_HOURS}), every machine or those in \`machines\`. Machines in watt hours come first,
+then those in joule, each the one that imported the most first. Pass the \`timeZone\` of the person you answer,
+if you know it.
 
-- \`energy.joule\`: the meter \`umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp\` at \`end\` less
-  at \`start\`, in joule. Null if it is not known, and the result says why: the meter had no value (\`unit\`
-  null), published in another unit than joule (\`unit\`), or went back (\`meterWentBack\`, a reset). A value of
-  the meter from before a gap is not counted: then it counts from its first value in these hours.
+- \`energy.value\` in \`energy.unit\`: the meter \`umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp\`
+  at \`end\` less at \`start\`, in the unit the meter published in, unconverted: \`wattHour\`, as the data model
+  has it, or \`joule\` for values from before it. Null if it is not known, and the result says why: the meter
+  had no value (\`unit\` null), published in a unit that is not one of energy (\`unit\`), changed its unit
+  (\`start.unit\`, \`end.unit\`), or went back (\`meterWentBack\`, a reset). A value of the meter from before a gap
+  is not counted: then it counts from its first value in these hours.
 - \`power.meanWatt\`, \`power.peakWatt\`: mean and largest value of
   \`umati/Consumption/Electricity/Main/AcActivePowerTotal\` in these hours, in watt, while the machine published.
   Null if there was no value, or if it was published in another unit than watt (\`power.unit\`).
 
-On the wire energy is in joule. Say it to a person in kilowatt hours, as the text of the result does:
-3,600,000 J are 1 kWh. Compare the machines with these numbers; do not add or divide them yourself.
-That holds for the energy over these hours: a value of the meter itself, as \`genui_measurement_list\` gives
-it, stays in joule, as the section on measurements says.
+On the wire the energy keeps the unit of the meter. Say it to a person in kilowatt hours, as the text of
+the result does; it has converted them for you. Compare the machines with the words of the result; do not
+add, divide or convert the numbers yourself. That holds for the energy over these hours: a value of the meter
+itself, as \`genui_measurement_list\` gives it, stays in the unit it was published in, as the section on
+measurements says.
 
 The power over these hours, a line for each machine, is what the graph of the card draws. It grows
 with time, so it is not in that result: the card asks \`genui_energy_series\` for it itself. You do not
