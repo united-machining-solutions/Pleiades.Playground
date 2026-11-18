@@ -44,6 +44,28 @@ Read, in this order:
    page. With `.md` at the end of its address it comes whole, with its examples. Use the CLI this workspace
    pins, as here, also where the skill of shadcn/ui writes `shadcn@latest`.
 
+## A page of the stack, or a showcase
+
+Decide before the first file, and say which it is in your hand-over
+([ADR-0018](../../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)).
+
+- A page of the stack shows what the backend answers, for any machine. It is what this recipe builds, and
+  nothing below changes for it.
+- A showcase is a page for one demo, one fair or one story: made-up data, a named person, a camera or a
+  microphone, the wording of one customer. It is in a build only where `APP_SHOWCASES` is set: the app
+  alone, and its image, have nothing of it. Its route file is
+  `apps/app/src/routes/(showcases)/<name>.tsx`, written as `createFileRoute("/(showcases)/<name>")`; the
+  brackets add nothing to the address, so the page answers at `/<name>`. A page belongs to the showcase
+  its name begins with: a second page is `<name>.<more>.tsx` or stands below `<name>/`. A server route of
+  a showcase stands in the same folder. Everything else it needs lives in `apps/app/src/showcases/<name>/`. It
+  changes no shared file, no file outside reads from its folder, and no other page links to it:
+  `pnpm --filter @pleiades/app test` fails if one does. To see the page, start the development server
+  with the showcases: `APP_SHOWCASES=true` in the shell that runs `pnpm --filter @pleiades/app dev`. In
+  the stack it is `APP_SHOWCASES=true` in `.env`, then `docker compose up -d --build --wait --no-deps app`.
+
+If you cannot tell, it is a showcase. A showcase can become a page of the stack later; the other way round
+takes a page away from everyone.
+
 ## You touch
 
 - `apps/app/src/routes/<name>.tsx`: new, the page. It names its own entry in the sidebar, see step 6. No

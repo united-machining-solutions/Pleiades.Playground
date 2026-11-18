@@ -18,6 +18,15 @@ function checkoutCommit() {
   }
 }
 
+// The showcases: pages made for one demo or one fair, under src/routes/(showcases)/, with what they need
+// under src/showcases/. They are built in only where APP_SHOWCASES is set to anything; the image build sets
+// it from its argument SHOWCASES. Without it the folder holds no routes: the router does not know the
+// pages, nothing imports their code, and the build has none of it. Whoever takes the app as a base gets
+// the app alone. See docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md.
+const showcases = Boolean(process.env.APP_SHOWCASES)
+/** The name of the folder of their routes, as the router reads the names of files and folders. */
+const SHOWCASE_ROUTES = "^\\(showcases\\)$"
+
 export default defineConfig({
   resolve: { tsconfigPaths: true },
   // The build the sidebar names. The image build sets APP_VERSION, APP_REVISION and APP_SOURCE from its
@@ -30,5 +39,5 @@ export default defineConfig({
     "import.meta.env.APP_SOURCE": JSON.stringify(process.env.APP_SOURCE || ""),
   },
   // The React plugin must come after the Start plugin. Nitro builds the Node.js server in .output/.
-  plugins: [tailwindcss(), tanstackStart(), nitro(), viteReact()],
+  plugins: [tailwindcss(), tanstackStart({ router: { routeFileIgnorePattern: showcases ? undefined : SHOWCASE_ROUTES } }), nitro(), viteReact()],
 })
