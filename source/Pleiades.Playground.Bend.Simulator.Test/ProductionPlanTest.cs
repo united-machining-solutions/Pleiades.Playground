@@ -104,6 +104,21 @@ public sealed class ProductionPlanTest
     }
 
     [TestMethod]
+    public async Task A_kit_to_be_made_twice_stays_in_the_plan_until_its_second_run()
+    {
+        _harness.ProductionPlan.AddProductionPackage(Request("PKG-1", 2, ("FA-1", "Winkel-1", 1)));
+
+        _harness.Processing.StartPackageProcessing("PKG-1", "Bediener1");
+        await _harness.WaitForProcessingEndAsync();
+        var afterFirstRun = _harness.ProductionPlan.GetProductionPlan();
+        _harness.Processing.StartPackageProcessing("PKG-1", "Bediener1");
+        await _harness.WaitForProcessingEndAsync();
+
+        Assert.HasCount(1, afterFirstRun, "the kit is to be made once more");
+        Assert.IsEmpty(_harness.ProductionPlan.GetProductionPlan(), "made as often as desired, it leaves the plan");
+    }
+
+    [TestMethod]
     public async Task A_package_with_an_open_position_stays_in_the_plan()
     {
         _harness.ProductionPlan.AddProductionPackage(Request("PKG-1", 1, ("FA-1", "Winkel-1", 2), ("FA-2", "Winkel-2", 1)));

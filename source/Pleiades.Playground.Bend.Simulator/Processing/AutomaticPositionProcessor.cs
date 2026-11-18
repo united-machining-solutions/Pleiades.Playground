@@ -10,7 +10,16 @@ internal enum PositionProcessingOutcome
     /// <summary>Position processed; other positions of the package are still open.</summary>
     Processed,
 
-    /// <summary>Position processed and every position of the package finished: the package was counted up.</summary>
+    /// <summary>
+    /// Position processed and every position of the package finished: the package was counted up, but is to be made
+    /// again; its positions start from 0.
+    /// </summary>
+    KitCompleted,
+
+    /// <summary>
+    /// Position processed and every position of the package finished: the package was counted up and is made as often
+    /// as desired.
+    /// </summary>
     PackageCompleted,
 
     /// <summary>The desired number of parts was reached already: nothing was sent.</summary>
@@ -40,9 +49,9 @@ internal sealed record AutomaticPositionProcessingContext(
 /// imitated; the operating states and the end of the processing frame them, so a host sees when the machine runs
 /// and when it no longer runs a program:
 /// 1. <c>OperatingStateFeedback</c> 1 (running),
-/// 2. <c>ProductionPackageFeedback</c> (processed quantity 0, reported by the operator),
+/// 2. <c>ProductionPackageFeedback</c> (the processed quantity so far, reported by the operator),
 /// 3. <c>ProcessingStarted</c> (status active, type 1),
-/// 4. one <c>ManufacturingOrderFeedback</c> per part (processed parts 1..n, status active),
+/// 4. one <c>ManufacturingOrderFeedback</c> per part still open (processed parts counted on, status active),
 /// 5. <c>ProcessingStopped</c> (status finished, type 1),
 /// 6. <c>ProductionPackageFeedback</c> (processed quantity + 1, reported by nobody), once every position is complete,
 /// 7. <c>OperatingStateFeedback</c> 0 (idle).
@@ -77,7 +86,7 @@ internal static class AutomaticPositionProcessor
 
         var telegrams = context.Telegrams;
         telegrams.SendOperatingState(RciOperatingState.Running);
-        package.ProcessedQuantity = 0;
+        package.ProcessedQuantity = Math.Max(package.ProcessedQuantity, 0);
         telegrams.SendProductionPackageFeedback(package, context.ReportedBy);
 
         var order = context.ProductionPlan
@@ -94,7 +103,9 @@ internal static class AutomaticPositionProcessor
         // The bending program is always that of the part, also for an order of a plan saved before.
         order.ProgramName = DummyProductionDataFactory.ProgramNameFor(order.PartNo);
         telegrams.SendProcessingStarted(package, order, RciProcessingTimeType.GrossProgramTime);
-        for (var processed = 1; processed <= context.Position.DesiredNumberOfParts; processed++)
+
+        // A position that was cancelled goes on from the parts it has, not from 1.
+        for (var processed = Math.Max(order.ProcessedParts, 0) + 1; processed <= context.Position.DesiredNumberOfParts; processed++)
         {
             order.ProcessedParts = processed;
             telegrams.SendManufacturingOrderFeedback(package, order);
@@ -109,9 +120,9 @@ internal static class AutomaticPositionProcessor
         }
 
         StopProcessing(telegrams, package, order, RciOrderStatus.FERTIG);
-        var packageCompleted = CountUpPackageIfComplete(telegrams, package);
+        var outcome = CountUpPackageIfComplete(telegrams, package);
         telegrams.SendOperatingState(RciOperatingState.Idle);
-        return packageCompleted ? PositionProcessingOutcome.PackageCompleted : PositionProcessingOutcome.Processed;
+        return outcome;
     }
 
     /// <summary>Ends the processing of the order: finished or paused. The machine then runs no program of it.</summary>
@@ -121,28 +132,29 @@ internal static class AutomaticPositionProcessor
         telegrams.SendProcessingStopped(package, order, RciProcessingTimeType.GrossProgramTime);
     }
 
-    /// <returns>true when every position was finished and the package was counted up.</returns>
-    private static bool CountUpPackageIfComplete(RciTelegramWriter telegrams, ProductionPackage package)
+    /// <summary>Counts the package up once every position is finished; a kit that is to be made again starts its positions from 0.</summary>
+    private static PositionProcessingOutcome CountUpPackageIfComplete(RciTelegramWriter telegrams, ProductionPackage package)
     {
         if (!package.ManufacturingOrders.All(order => order.ProcessedParts == order.DesiredNumberOfParts))
         {
-            return false;
+            return PositionProcessingOutcome.Processed;
         }
 
         package.ProcessedQuantity++;
         telegrams.SendProductionPackageFeedback(package, string.Empty);
 
-        // A kit that is to be made again starts its positions from 0.
-        if (package.ProcessedQuantity != package.DesiredQuantity)
+        if (package.ProcessedQuantity >= package.DesiredQuantity)
         {
-            foreach (var order in package.ManufacturingOrders)
-            {
-                order.ProcessedParts = 0;
-                order.Status = RciOrderStatus.GUELTIG;
-            }
+            return PositionProcessingOutcome.PackageCompleted;
         }
 
-        return true;
+        foreach (var order in package.ManufacturingOrders)
+        {
+            order.ProcessedParts = 0;
+            order.Status = RciOrderStatus.GUELTIG;
+        }
+
+        return PositionProcessingOutcome.KitCompleted;
     }
 
     /// <returns>false when cancelled.</returns>

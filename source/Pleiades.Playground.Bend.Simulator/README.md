@@ -27,10 +27,12 @@ The web page: <http://localhost:5614> (`BENDING_PRESS_PORT` in `.env`). Without 
   adapter shares.
 - **Production plan**: the packages with the status and progress of every position.
 - **Automatic processing**: one position or a whole package. For each position it sends `OperatingStateFeedback` 1
-  (running), `ProductionPackageFeedback` (processed quantity 0), `ProcessingStarted` (status 7, active), one
-  `ManufacturingOrderFeedback` per part, `ProcessingStopped` (status 14, finished), `ProductionPackageFeedback` (+1) once every position of the package is
-  finished, and `OperatingStateFeedback` 0 (idle); then a finished package leaves the plan. Cancelled, a position ends
-  with `ProcessingStopped` (status 12, paused) and `OperatingStateFeedback` 0. After `ProcessingStopped` the adapter
+  (running), `ProductionPackageFeedback` (the processed quantity so far), `ProcessingStarted` (status 7, active), one
+  `ManufacturingOrderFeedback` per part still open, `ProcessingStopped` (status 14, finished),
+  `ProductionPackageFeedback` (+1) once every position of the package is finished, and `OperatingStateFeedback` 0
+  (idle). A package that is made as often as desired leaves the plan; a kit that is to be made again stays, its
+  positions from 0. Cancelled, a position ends with `ProcessingStopped` (status 12, paused) and
+  `OperatingStateFeedback` 0, and goes on from its parts at the next start. After `ProcessingStopped` the adapter
   shows no program.
 - **MDE**: report the operating state by hand: running, idle, maintenance, fault with error number and text.
 - **Test data**: a package by hand or a generated dataset. Test data stays local; no telegram is sent.
@@ -48,7 +50,7 @@ there (YAML anchors). Only the port of the web page comes from `.env`.
 |---|---|---|---|
 | `SerialNumber` | empty | `AE325085TB46` | The serial number, as the adapter publishes it |
 | `Manufacturer` | `Manufacturer_A` | `Trumpf` | The manufacturer |
-| `ManufacturerUri` | `https://www.trumpf.com` | `https://www.trumpf.example` | The web address of the manufacturer, as the adapter publishes it |
+| `ManufacturerUri` | `https://www.trumpf.com` | `https://www.trumpf.com` | The web address of the manufacturer, as the adapter publishes it |
 | `Model` | empty | `5085` | The model |
 | `ProductInstanceUri` | empty | | The ProductInstanceUri, as the adapter publishes it; empty: `{ManufacturerUri}/{Model}/{SerialNumber}` |
 | `ExchangeDirectory` | `/exchange` | volume `bending-press-exchange` mounted there | The folder of the telegram files |

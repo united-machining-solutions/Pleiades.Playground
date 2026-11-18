@@ -136,6 +136,15 @@ internal sealed partial class AutomaticProcessingService(
                         $"Paket '{package.ProductionPackageName}' fertig und aus dem Produktionsplan entfernt.");
                     return;
                 }
+
+                if (outcome == PositionProcessingOutcome.KitCompleted)
+                {
+                    // The package is to be made again: it stays in the plan with its positions from 0.
+                    job.ReportFinished(AutomaticProcessingState.Completed,
+                        $"Paket '{package.ProductionPackageName}' {package.ProcessedQuantity} von {package.DesiredQuantity} gefertigt, " +
+                        "der nächste Durchlauf ist offen.");
+                    return;
+                }
             }
 
             job.ReportFinished(AutomaticProcessingState.Completed, "Position(en) abgearbeitet, Paket hat noch offene Positionen.");

@@ -115,7 +115,7 @@ number, manufacturer and model come from the simulator `bending-press` (YAML anc
 |---|---|---|---|
 | `SerialNumber` | (required) | `AE325085TB46` | `Identification.SerialNumber`, the last part of the machine id |
 | `Manufacturer` | `TRUMPF` | `Trumpf` | `Identification.Manufacturer` |
-| `ManufacturerUri` | `https://www.trumpf.com` | `https://www.trumpf.example` | `Identification.ManufacturerUri`; its domain is the first part of the machine id and, with dashes, the prefix of the signals |
+| `ManufacturerUri` | `https://www.trumpf.com` | `https://www.trumpf.com` | `Identification.ManufacturerUri`; its domain is the first part of the machine id and, with dashes, the prefix of the signals |
 | `Model` | `Bend5130` | `5085` | `Identification.Model`, the middle part of the machine id |
 | `ProductInstanceUri` | empty: `{ManufacturerUri}/{Model}/{SerialNumber}` | | The globally unique id of the machine, `source` of every event |
 | `ExchangeDirectory` | `/exchange` | volume `bending-press-exchange`, read only | The folder of the telegram files, read only |

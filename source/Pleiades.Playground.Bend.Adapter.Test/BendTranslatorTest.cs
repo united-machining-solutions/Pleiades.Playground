@@ -175,6 +175,18 @@ public sealed class BendTranslatorTest
     }
 
     [TestMethod]
+    public void Any_other_message_after_offline_shows_the_machine_is_reached_again()
+    {
+        var translator = Translator();
+        translator.Translate(new OperatingStateObserved(Fallback, 3, string.Empty, string.Empty));
+        var order = (OrderObserved)Parser().Parse(PartFeedback, Fallback).Single();
+
+        translator.Translate(order with { Timestamp = Fallback.AddSeconds(1) });
+
+        Assert.IsFalse(translator.Offline, "an order feedback comes from a machine that is reached");
+    }
+
+    [TestMethod]
     public void What_the_machine_has_not_said_yet_is_null_and_the_alerts_are_an_empty_list()
     {
         var publications = Translator().Current();

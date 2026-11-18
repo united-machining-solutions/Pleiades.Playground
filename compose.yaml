@@ -527,7 +527,7 @@ services:
     environment:
       Config__SerialNumber: &bending-press-serial AE325085TB46
       Config__Manufacturer: &bending-press-manufacturer Trumpf
-      Config__ManufacturerUri: &bending-press-manufacturer-uri https://www.trumpf.example
+      Config__ManufacturerUri: &bending-press-manufacturer-uri https://www.trumpf.com
       Config__Model: &bending-press-model 5085
       Config__ExchangeDirectorySource: bending-press-exchange
     volumes:

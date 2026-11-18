@@ -49,7 +49,10 @@ internal sealed class BendTranslator
         _newId = newId ?? (() => Guid.NewGuid().ToString());
     }
 
-    /// <summary>Whether the last operating state said the machine is offline (3).</summary>
+    /// <summary>
+    /// Whether the machine said it is offline (3) and has said nothing else since: any other message of it, an
+    /// operating state, an order, a package or an operator message, shows it is reached again.
+    /// </summary>
     public bool Offline { get; private set; }
 
     /// <summary>The alert that stands, or null.</summary>
@@ -121,6 +124,12 @@ internal sealed class BendTranslator
     {
         ArgumentNullException.ThrowIfNull(observation);
         var at = Time(observation.Timestamp);
+        if (observation is not OperatingStateObserved)
+        {
+            // A machine that sends anything is reached; only an operating state says offline again.
+            Offline = false;
+        }
+
         var publications = observation switch
         {
             OperatingStateObserved state => TranslateOperatingState(state, at),

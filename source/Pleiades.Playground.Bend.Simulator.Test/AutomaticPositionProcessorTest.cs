@@ -7,7 +7,7 @@ namespace Pleiades.Playground.Bend.Simulator.Test;
 /// <summary>
 /// The telegram sequence of one position:
 /// 1. OperatingStateFeedback 1 (running)
-/// 2. ProductionPackageFeedback (processed quantity 0, reported by the operator)
+/// 2. ProductionPackageFeedback (the processed quantity so far, reported by the operator)
 /// 3. ProcessingStarted (status active, type 1)
 /// 4. one ManufacturingOrderFeedback per part (processed parts 1..n, status active)
 /// 5. ProcessingStopped (status finished; paused when cancelled; type 1)
@@ -89,12 +89,48 @@ public sealed class AutomaticPositionProcessorTest
         var position = Position("FA-1", 2);
         var package = Package("PKG-1", 3, position);
 
-        await ProcessAsync(package, position);
+        var outcome = await ProcessAsync(package, position);
 
+        Assert.AreEqual(PositionProcessingOutcome.KitCompleted, outcome, "the package is to be made twice more");
         Assert.AreEqual(1, package.ProcessedQuantity);
         Assert.AreEqual(0, position.ProcessedParts);
         Assert.AreEqual(RciOrderStatus.GUELTIG, position.Status);
         Assert.HasCount(1, _harness.TelegramsInOrder()[^2].ProductionPackageFeedbacks!);
+    }
+
+    [TestMethod]
+    public async Task The_package_counts_on_from_run_to_run_until_it_is_made_as_often_as_desired()
+    {
+        var position = Position("FA-1", 1);
+        var package = Package("PKG-1", 2, position);
+
+        var first = await ProcessAsync(package, position);
+        var second = await ProcessAsync(package, position);
+
+        Assert.AreEqual(PositionProcessingOutcome.KitCompleted, first);
+        Assert.AreEqual(PositionProcessingOutcome.PackageCompleted, second);
+        Assert.AreEqual(2, package.ProcessedQuantity);
+        var packageFeedbacks = _harness.TelegramsInOrder()
+            .Where(t => t.ProductionPackageFeedbacks is not null)
+            .Select(t => t.ProductionPackageFeedbacks!.Single().ProductionPackages!.Single().ProcessedQuantity)
+            .ToArray();
+        CollectionAssert.AreEqual(new[] { 0, 1, 1, 2 }, packageFeedbacks, "the start of a run reports the quantity so far");
+    }
+
+    [TestMethod]
+    public async Task A_cancelled_position_goes_on_from_its_parts()
+    {
+        var position = Position("FA-1", 4);
+        position.ProcessedParts = 2;
+        var package = Package("PKG-1", 1, position);
+
+        await ProcessAsync(package, position);
+
+        var parts = _harness.TelegramsInOrder()
+            .Where(t => t.ManufacturingOrderFeedbacks is not null)
+            .Select(t => t.ManufacturingOrderFeedbacks!.Single().ManufacturingOrders!.Single().ProcessedParts)
+            .ToArray();
+        CollectionAssert.AreEqual(new[] { 3, 4 }, parts);
     }
 
     [TestMethod]

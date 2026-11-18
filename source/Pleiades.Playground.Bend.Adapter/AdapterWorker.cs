@@ -138,7 +138,10 @@ internal sealed partial class AdapterWorker(
         }
     }
 
-    /// <summary>Reads one file and marks it read; a file that is not complete yet is read at the next look.</summary>
+    /// <summary>
+    /// Reads one file and marks it read; a file that is not complete yet is read at the next look. A file the adapter
+    /// may not read is read again at the next look too, and the files after it are read meanwhile.
+    /// </summary>
     private IReadOnlyList<RciObservation> Read(MessageFile file)
     {
         var name = Path.GetFileName(file.Path);
@@ -152,6 +155,11 @@ internal sealed partial class AdapterWorker(
         catch (Exception exception) when (exception is XmlException or IOException)
         {
             LogFileIncomplete(name, exception.Message);
+            return [];
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            LogFileNotReadable(name, exception.Message);
             return [];
         }
     }
@@ -183,6 +191,9 @@ internal sealed partial class AdapterWorker(
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "{File} is not complete yet, read again at the next look: {Reason}")]
     private partial void LogFileIncomplete(string file, string reason);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "{File} may not be read, read again at the next look: {Reason}")]
+    private partial void LogFileNotReadable(string file, string reason);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "A step of the adapter failed; it is tried again at the next tick")]
     private partial void LogFailed(Exception exception);
