@@ -1,10 +1,11 @@
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
 import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
+import type { ConditionKey, TrulaserSeries, TrulaserShow, TrulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
-import { MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL } from "./card-tools.ts"
+import { MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL, TRULASER_SERIES_TOOL, TRULASER_TIMELINE_TOOL } from "./card-tools.ts"
 
 // The values come from the generative UI backend. These functions run on the server of the app:
 // the browser never talks to the backend itself.
@@ -176,6 +177,52 @@ export const getSpans = createServerFn({ method: "GET" })
         throw new Refused(textOf(result) ?? `${SPAN_LIST_TOOL} returned no values.`)
       }
       return result.structuredContent.spans
+    })
+    return answer.values
+  })
+
+/** What a TruLaser does now: the values of the TruLaser card. Without `machine`, the first TruLaser. */
+export const getTrulaser = createServerFn({ method: "GET" })
+  .validator((request: { machine?: string }) => request)
+  .handler(
+    ({ data: { machine } }): Promise<Answer<TrulaserShow>> =>
+      ask(async (backend) => {
+        const result = await backend.callTool("genui_trulaser_show", machine === undefined ? {} : { machine })
+        if (result.isError || !result.structuredContent) {
+          throw new Refused(textOf(result) ?? "genui_trulaser_show returned no values.")
+        }
+        return result.structuredContent
+      }),
+  )
+
+/**
+ * The timelines of the TruLaser card over the last hours. They are not among its values, because a
+ * language model reads those. Null if they are not to be had: the card stands without them.
+ */
+export const getTrulaserTimeline = createServerFn({ method: "GET" })
+  .validator((request: { machine: string; hours: number }) => request)
+  .handler(async ({ data }): Promise<TrulaserTimeline | null> => {
+    const answer = await ask(async (backend) => {
+      // The name is checked against the tools of the backend: if it changes there, this fails to compile.
+      const result = await backend.callTool(TRULASER_TIMELINE_TOOL, data)
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? `${TRULASER_TIMELINE_TOOL} returned no values.`)
+      }
+      return result.structuredContent
+    })
+    return answer.values
+  })
+
+/** The values of one tile of the condition guide over the last hours, for its chart. Null if they are not to be had. */
+export const getTrulaserSeries = createServerFn({ method: "GET" })
+  .validator((request: { machine: string; key: ConditionKey; hours: number }) => request)
+  .handler(async ({ data }): Promise<TrulaserSeries | null> => {
+    const answer = await ask(async (backend) => {
+      const result = await backend.callTool(TRULASER_SERIES_TOOL, data)
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? `${TRULASER_SERIES_TOOL} returned no values.`)
+      }
+      return result.structuredContent
     })
     return answer.values
   })

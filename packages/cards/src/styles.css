@@ -13,6 +13,13 @@
  * line here, in the order of the alphabet; styles.test.ts fails if one is missing or left over.
  */
 @source "../../ui/src/components/badge.tsx";
+@source "../../ui/src/components/button.tsx";
 @source "../../ui/src/components/card.tsx";
 @source "../../ui/src/components/chart.tsx";
+@source "../../ui/src/components/dialog.tsx";
+@source "../../ui/src/components/item.tsx";
+@source "../../ui/src/components/separator.tsx";
 @source "../../ui/src/components/skeleton.tsx";
+@source "../../ui/src/components/table.tsx";
+@source "../../ui/src/components/toggle.tsx";
+@source "../../ui/src/components/toggle-group.tsx";
