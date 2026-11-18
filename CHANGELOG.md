@@ -7,6 +7,9 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
+  `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
+  shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0018).
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
   self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
   that live values work over HTTPS. HTTP stays as it is.
