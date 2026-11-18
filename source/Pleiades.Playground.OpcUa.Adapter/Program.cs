@@ -69,9 +69,11 @@ builder.Services.AddSingleton(new CredentialStore(dataDirectory));
 builder.Services.AddSingleton<DraftStore>();
 builder.Services.AddSingleton<OpcUaClient>();
 builder.Services.AddSingleton<RegistrationProbe>();
-builder.Services.AddSingleton<IMachinePublisher, MachinePublisher>();
+// Every machine has its own connection to the broker, with its own last will (MachineOutput).
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IMachineOutputFactory, MachineOutputFactory>();
 builder.Services.AddHostedService<OpcUaConfigurationShare>();
-// The values and notifications of a removed machine are deleted through the REST contracts of the stores.
+// The values and events of a removed machine are deleted through the REST contracts of the stores.
 builder.Services.AddHttpClient<MachineDataEraser>(http => http.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddSingleton<MachineSupervisor>();
 builder.Services.AddHostedService(services => services.GetRequiredService<MachineSupervisor>());

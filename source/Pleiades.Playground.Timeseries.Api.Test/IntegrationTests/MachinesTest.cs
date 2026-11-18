@@ -11,7 +11,7 @@ using Pleiades.Playground.Timeseries.DataTransferObjects;
 namespace Pleiades.Playground.Timeseries.Api.Test.IntegrationTests;
 
 /// <summary>
-/// <c>DELETE /machines/{serialNumber}</c> deletes the topics below <c>machines/{serialNumber}/</c>, and
+/// <c>DELETE /machines/{machineId}</c> deletes the topics below <c>machines/{machineId}/</c>, and
 /// refuses a serial number that is not one level of a topic. Against a running API, the machine is one
 /// that never reported, so nothing of value is deleted.
 /// </summary>
@@ -74,11 +74,11 @@ public class MachinesTest : IntegrationTestBase
     [DataRow("a+b")]
     [DataRow("a%23b")]
     [DataRow("%20")]
-    public async Task RefusesASerialNumberThatIsNotOneLevelOfATopic(string serialNumber)
+    public async Task RefusesASerialNumberThatIsNotOneLevelOfATopic(string machineId)
     {
         var (appFactory, client, serviceMock) = GetAppFactory();
 
-        var response = await client.DeleteAsync(new Uri(BaseUrl + $"machines/{serialNumber}"), TestContext.CancellationToken);
+        var response = await client.DeleteAsync(new Uri(BaseUrl + $"machines/{machineId}"), TestContext.CancellationToken);
 
         Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         serviceMock?.Verify(s => s.DeleteByTopicPrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);

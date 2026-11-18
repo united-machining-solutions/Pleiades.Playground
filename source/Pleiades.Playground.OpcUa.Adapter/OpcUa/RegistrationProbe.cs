@@ -6,9 +6,8 @@ using Pleiades.Playground.OpcUa.Adapter.Registrations;
 namespace Pleiades.Playground.OpcUa.Adapter.OpcUa;
 
 /// <summary>What one element of a registration gave when its node was read once.</summary>
-/// <param name="Area"><c>umati</c> or <c>vendor</c>.</param>
+/// <param name="Area"><c>umati</c> or <c>oem</c>.</param>
 /// <param name="Path">The path of the element.</param>
-/// <param name="Topic">The topic it would be published on.</param>
 /// <param name="Node">The node.</param>
 /// <param name="Status"><c>Good</c>, or what is wrong.</param>
 /// <param name="NodeFound">False if the server has no such node: the registration does not fit this server.</param>
@@ -16,7 +15,7 @@ namespace Pleiades.Playground.OpcUa.Adapter.OpcUa;
 /// <param name="Value">The value that would be published.</param>
 /// <param name="Unit">The unit of a number.</param>
 internal sealed record ProbedElement(
-    string Area, string Path, string Topic, string Node, string Status, bool NodeFound, string? Raw, object? Value, string? Unit);
+    string Area, string Path, string Node, string Status, bool NodeFound, string? Raw, object? Value, string? Unit);
 
 /// <summary>The result of trying a registration against its server.</summary>
 /// <param name="ServerCertificateThumbprint">The certificate the server presented.</param>
@@ -32,6 +31,12 @@ internal sealed record ProbeResult(
     /// <summary>The value of the element <c>Identification.SerialNumber</c>, if it was read.</summary>
     public string? SerialNumber =>
         Elements.FirstOrDefault(element => element.Area == "umati" && element.Path == MachineChecks.SerialNumberPath)?.Raw;
+
+    /// <summary>The value an element of the model gave, as text, or null if it gave none.</summary>
+    public string? ValueOf(string path) =>
+        Elements.FirstOrDefault(element => element.Area == Topics.ModelArea && element.Path == path && element.Value is not null) is { } found
+            ? ValueConverter.KeyOf(found.Value!)
+            : null;
 
     /// <summary>The elements whose node the server does not have.</summary>
     public IReadOnlyList<ProbedElement> NotFound => [.. Elements.Where(element => !element.NodeFound)];
@@ -62,7 +67,7 @@ internal sealed class RegistrationProbe
             var elements = new List<ProbedElement>();
             foreach (var element in registration.Elements)
             {
-                elements.Add(await ReadAsync(session, registration.SerialNumber, element, cancellationToken).ConfigureAwait(false));
+                elements.Add(await ReadAsync(session, element, cancellationToken).ConfigureAwait(false));
             }
 
             var namespaces = new List<string>();
@@ -87,11 +92,10 @@ internal sealed class RegistrationProbe
     }
 
     private static async Task<ProbedElement> ReadAsync(
-        ISession session, string serialNumber, ElementRegistration element, CancellationToken cancellationToken)
+        ISession session, ElementRegistration element, CancellationToken cancellationToken)
     {
-        var topic = Topics.Value(serialNumber, element.Area, element.Path);
         ProbedElement Result(string status, bool found, object? raw = null, ConvertedValue? value = null) =>
-            new(element.Area, element.Path, topic, element.Node, status, found, raw is null ? null : ValueConverter.KeyOf(raw), value?.Boxed, element.Unit);
+            new(element.Area, element.Path, element.Node, status, found, raw is null ? null : ValueConverter.KeyOf(raw), value?.Boxed, element.Unit);
 
         if (!MachineConnection.TryResolve(session, element.Node, out var node))
         {

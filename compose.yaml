@@ -392,7 +392,7 @@ services:
     ports:
       # Whoever reaches this port can add and remove machines: it has no sign-in. So it answers on
       # this computer only, unless OPCUA_ADAPTER_BIND opens it to the network.
-      - "${OPCUA_ADAPTER_BIND:-127.0.0.1}:${OPCUA_ADAPTER_PORT:-5530}:8080"
+      - "${OPCUA_ADAPTER_BIND:-127.0.0.1}:${OPCUA_ADAPTER_PORT:-5560}:8080"
     depends_on:
       broker:
         condition: service_healthy

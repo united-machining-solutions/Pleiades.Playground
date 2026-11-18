@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Text.Json;
-using Pleiades.Playground.Common.DataTransferObjects;
 using Pleiades.Playground.OpcUa.Adapter.Registrations;
 
 namespace Pleiades.Playground.OpcUa.Adapter.Mapping;
@@ -44,26 +42,6 @@ internal static class ValueConverter
             ValueKind.Boolean => Flag(element, raw),
             _ => Text(element, raw),
         };
-    }
-
-    /// <summary>The unit of the MQTT binding with this name, for example <c>second</c>.</summary>
-    public static bool TryParseUnit(string? name, out BaseUnit unit)
-    {
-        unit = default;
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return false;
-        }
-
-        try
-        {
-            unit = JsonSerializer.Deserialize<BaseUnit>(JsonSerializer.Serialize(name));
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
     }
 
     /// <summary>The key a raw value has in a map: its invariant text, a boolean in lower case.</summary>

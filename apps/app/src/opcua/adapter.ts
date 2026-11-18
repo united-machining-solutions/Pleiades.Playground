@@ -40,7 +40,7 @@ export const commitProposal = createServerFn({ method: "POST" })
   })
   .handler(({ data: draftId }) => send(`/drafts/${draftId}/commit`, "POST"))
 
-/** Removes a machine: the adapter closes its session, deletes its registration and then its stored values and notifications. */
+/** Removes a machine: the adapter closes its session, deletes its registration and then its stored values and events. */
 export const removeMachine = createServerFn({ method: "POST" })
   .validator((serialNumber: string) => {
     if (!/^[^/+#\s]+$/.test(serialNumber)) throw new Error("A serial number is one word without /, + or #.")

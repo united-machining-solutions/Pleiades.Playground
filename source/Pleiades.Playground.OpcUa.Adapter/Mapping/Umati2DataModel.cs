@@ -185,10 +185,9 @@ internal static class Umati2DataModel
     {
         Path = path,
         Kind = ValueKind.Number,
-        Unit = "one",
         Node = "s=" + path,
         Match = MatchKind.Direct,
-        Evidence = EvidenceStart + $"the node s={path} is the element, a year of four digits.",
+        Evidence = EvidenceStart + $"the node s={path} is the element, a year of four digits, without a unit.",
     };
 
     private static ElementRegistration Status(string path, string field, IReadOnlyDictionary<string, string> map) => new()

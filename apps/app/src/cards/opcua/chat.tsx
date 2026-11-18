@@ -179,7 +179,7 @@ function Rows({ rows }: { rows: ReadonlyArray<MappingRow> }) {
               <Badge variant={stateBadge[row.state]}>{row.state}</Badge>
             </TableCell>
             <TableCell className="align-top whitespace-normal">
-              <span className="font-medium">{row.area === "vendor" ? `vendor/${row.path}` : row.path}</span>
+              <span className="font-medium">{row.area === "oem" ? `oem/${row.path}` : row.path}</span>
               {row.detail && <span className="block text-muted-foreground">{row.detail}</span>}
             </TableCell>
             <TableCell className="align-top tabular-nums">{shownValue(row)}</TableCell>
@@ -251,7 +251,7 @@ function RemoveServer({ server, onRemoved }: { server: Server; onRemoved: (outco
             {shared.length > 0
               ? `The adapter takes it off the session to ${server.endpoint.url}, which stays open for ${shared.join(", ")}, and forgets the registration.`
               : `The adapter closes its session to ${server.endpoint.url} and forgets the registration.`}{" "}
-            Then it deletes the values and notifications the machine sent: the machine leaves Home and the
+            Then it deletes the values and events the machine sent: the machine leaves Home and the
             history. This cannot be undone. To add it again, scan the server again.
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -289,7 +289,7 @@ function ServerRow({ server }: { server: Server }) {
       <ItemActions>{removed?.ok ? null : <RemoveServer server={server} onRemoved={setRemoved} />}</ItemActions>
       {removed && (
         <div className="basis-full">
-          <Done outcome={removed} done={`${server.serialNumber} is removed, with its stored values and notifications.`} />
+          <Done outcome={removed} done={`${server.serialNumber} is removed, with its stored values and events.`} />
         </div>
       )}
     </Item>

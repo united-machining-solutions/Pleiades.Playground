@@ -5,14 +5,14 @@ namespace Pleiades.Playground.OpcUa.Adapter;
 
 /// <summary>What became of the stored data of a removed machine.</summary>
 /// <param name="ValuesDeleted">How many values the Timeseries API deleted, or null if it did not.</param>
-/// <param name="EventsDeleted">How many notifications the Events API deleted, or null if it did not.</param>
+/// <param name="EventsDeleted">How many events the Events API deleted, or null if it did not.</param>
 /// <param name="Problems">Why a part of the data stays stored, one reason each. Empty if all of it is gone.</param>
 internal sealed record DataDeletion(long? ValuesDeleted, long? EventsDeleted, IReadOnlyList<string> Problems);
 
 /// <summary>
-/// Deletes what a machine published from the stores of the stack, through their REST contracts: its
-/// values (<c>DELETE /machines/{serialNumber}</c> of the Timeseries API) and its notifications
-/// (<c>DELETE /machineEvents/machines/{serialNumber}</c> of the Events API). The adapter never
+/// Deletes what a machine published from the stores of the stack, through their REST contracts, by the
+/// machine id of its topics: its values (<c>DELETE /machines/{machineId}</c> of the Timeseries API) and its
+/// events (<c>DELETE /machineEvents/machines/{machineId}</c> of the Events API). The adapter never
 /// writes to a database itself.
 /// </summary>
 internal sealed class MachineDataEraser
@@ -28,16 +28,16 @@ internal sealed class MachineDataEraser
         _config = config.Value;
     }
 
-    /// <summary>Deletes the values and the notifications of a machine. A store that fails is named in the problems; the other is deleted all the same.</summary>
-    public async Task<DataDeletion> DeleteAsync(string serialNumber, CancellationToken cancellationToken)
+    /// <summary>Deletes the values and the events of a machine. A store that fails is named in the problems; the other is deleted all the same.</summary>
+    public async Task<DataDeletion> DeleteAsync(string machineId, CancellationToken cancellationToken)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(serialNumber);
-        var machine = Uri.EscapeDataString(serialNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(machineId);
+        var machine = Uri.EscapeDataString(machineId);
         var problems = new List<string>();
         var values = await DeleteAsync(
             _config.TimeseriesApi?.Uri, $"machines/{machine}", "valuesCount", "Timeseries API", "Config:TimeseriesApi:Uri", "values", problems, cancellationToken).ConfigureAwait(false);
         var events = await DeleteAsync(
-            _config.EventsApi?.Uri, $"machineEvents/machines/{machine}", "eventsCount", "Events API", "Config:EventsApi:Uri", "notifications", problems, cancellationToken).ConfigureAwait(false);
+            _config.EventsApi?.Uri, $"machineEvents/machines/{machine}", "eventsCount", "Events API", "Config:EventsApi:Uri", "events", problems, cancellationToken).ConfigureAwait(false);
         return new DataDeletion(values, events, problems);
     }
 

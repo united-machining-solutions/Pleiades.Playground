@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "serialNumber": "A0280O0001",
   "displayName": "Sample: TRUMPF TruLaser in the namespace urn:umati2:datamodel:opcua behind the gateway of an edge device",
   "modelVersion": "0.8.0",

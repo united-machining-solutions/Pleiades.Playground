@@ -150,7 +150,7 @@ adapter names the profiles ([Core and profiles](README.md#core-and-profiles)). T
 [`GatewayTest.cs`](../Pleiades.Playground.OpcUa.Adapter.Test/GatewayTest.cs) and
 [`RegistrationTest.cs`](../Pleiades.Playground.OpcUa.Adapter.Test/RegistrationTest.cs)): every element and Core
 from `machineNode` alone; the units without scale; the two members of `State.Status`; a guess of the scan
-replaced, a `vendor` element kept, `missing` cleared; the namespace from the serial number; another namespace left
+replaced, an `oem` element kept, `missing` cleared; the namespace from the serial number; another namespace left
 alone; applying twice; an absent element moved to `missing`, an absent mandatory one failing Core; the match
 behind a prefix; the decoder with the bytes of the server, another structure and a short body; an
 `ExtensionObject` of the stack decoded by `RawValues`; the converter taking a member; the machine list merging
@@ -170,7 +170,7 @@ StrictRule(
   Path         [(namespaceUri, name), ...]           browse names by URI, never by index
   DataType     the data type expected, by URI       (MachineTool;i=64, i=11, i=290 ...)
   Field?       the member of a structure            (TsMachineState.ItemState)
-  Area         umati, or vendor for a value of the maker
+  Area         umati, or oem for a value of the maker
   Kind, Unit, Scale, Offset
   UnitCheck    EngineeringUnits accepted, each with its scale, or "asserted by the specification"
   Map, MapDefault
@@ -370,12 +370,12 @@ The model documents the severity: 800 for an error, 400 for a warning, 200 for a
 667 and above as an error and 334 and above as a warning, so the three fall into the three levels as they are.
 `AuxParameters` (`TI;i=6044`, a list of strings) is not published.
 
-#### Values of the maker, in the area `vendor`
+#### Values of the maker, in the area `oem`
 
 The data model has no element for them; a rule gives each a fixed path, so a scan names them the same every time.
 The paths are a proposal (open question 5).
 
-| `vendor` path | Path below `TI:Machine/` (ID) | Data type, unit of the model | Conversion | Simulator |
+| `oem` path | Path below `TI:Machine/` (ID) | Data type, unit of the model | Conversion | Simulator |
 |---|---|---|---|---|
 | `ActivityMeters.DrivesOnDuration` | `TI:ActivityMeters/TI:DrivesOnTime` (336) | Double, h | scale 3600, `second` | read; in the example registrations already |
 | `ActivityMeters.LaserBeamOnDuration` | `TI:ActivityMeters/TI:LaserBeamOnTime` (337) | Double, h | scale 3600, `second` | there |
@@ -401,7 +401,7 @@ Not a rule:
 - **Structures and lists** other than the machine state: `ProgramStateAndOrderData`, `MessageList`,
   `WorkUnitStates`, `PartitionInformation`. The binding publishes no lists.
 - **The values of a technology**: laser, punching, bending, additive manufacturing, axes, lubrication,
-  inspection. They depend on the machine and are left to the model, in the area `vendor`, if a person wants them.
+  inspection. They depend on the machine and are left to the model, in the area `oem`, if a person wants them.
 
 The units on the wire are those of the [MQTT binding](../../contracts/mqtt/README.md): SI only, energy in joule,
 fractions in `one`.
@@ -462,7 +462,7 @@ sample and the changelog are changed already. For the rest of the plan:
 | 1 | The information model of the TRUMPF interface documents h, kW, kWh, V, A, Hz, m³, l/min, bar and °C. Is it the reference for real machines too, so that these rules are `Direct`? | Yes. The example registrations mark power and energy `Unclear` today; with the rules they become `Direct`. |
 | 2 | Does `%/100` (UnitId 4733235) with EURange 0..100 count as percent, beside UNECE `P1`? | Yes. |
 | 3 | Are the derivations of `MachineryItemState` and `MachineryOperationMode` from OPC 40501-1 rules of the adapter, `Derived`, after OPC 40001-1 and the TRUMPF machine state? | Yes: the registration of a TRUMPF machine is then the same on every scan, also without `BDE` V04.00.00. |
-| 4 | Refuse a conflict, rather than overwrite it as the known rule does today? Refuse a strictly mapped node under another `umati` path too? | Refuse both; allow it under `vendor`. |
+| 4 | Refuse a conflict, rather than overwrite it as the known rule does today? Refuse a strictly mapped node under another `umati` path too? | Refuse both; allow it under `oem`. |
 | 5 | How are channels and spindles numbered? Are the values of the maker strict `vendor` rules, with the paths of the table? | Channels and spindles by the order of their browse names; `NumberInList` is the alternative. The `vendor` rules yes, with the paths proposed. |
 | 6 | A tool of its own, `opcua_strict_mapping`, or a field of `opcua_machine_list`, whose card would change? | A tool of its own. |
 | 7 | The machine state is a structure. A decoder of the adapter for `TsMachineState`, or the complex types of the OPC UA stack, which read the data type definitions from the server and need a package more? | The decoder of the adapter: strict, small, and nothing to read at run time. |

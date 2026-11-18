@@ -10,13 +10,13 @@ The example has two machines behind a gateway and one machine with an OPC UA ser
 ```text
   ┌────────────────────────────────────────────────────┐   ┌────────────────────┐
   │ MQTT broker                                        ├──▶│ timeseries         │
-  │  machines/{serial}/umati/<Group>/<Element>         │   │ values, connection │
-  │  machines/{serial}/vendor/<Group>/<Element>        │   └────────────────────┘
-  │  machines/{serial}/umati/Connection/State          │   ┌────────────────────┐
-  │  machines/{serial}/umati/Connection/Heartbeat      ├──▶│ events             │
-  │  machines/{serial}/events/notifications            │   │ alarms             │
+  │  machines/{machineId}/umati/Manifest               │   │ values, connection │
+  │  machines/{machineId}/umati/<Group>/<Element>      │   └────────────────────┘
+  │  machines/{machineId}/oem/<Group>/<Element>        │   ┌────────────────────┐
+  │  machines/{machineId}/umati/Connection/State       ├──▶│ events             │
+  │  machines/{machineId}/events/notifications         │   │ alarms             │
   └─────────────────────┬──────────────────────────────┘   └────────────────────┘
-                        ▲ publish by the MQTT binding
+                        ▲ one MQTT connection per machine, binding of machines
   ┌─────────────────────┴───────────────────────────────────────────────────────┐
   │ opcua-adapter           MachineSupervisor, SessionPool                      │
   │  ┌─────────────────────────────────────────────┐   ┌──────────────────────┐ │
@@ -25,7 +25,7 @@ The example has two machines behind a gateway and one machine with an OPC UA ser
   │  │  │ MachineConnection │ │ MachineConnection ││   │  │MachineConnection│ │ │
   │  │  │ A0280O0001        │ │ A1121O0001        ││   │  │ M3              │ │ │
   │  │  │ own subscription  │ │ own subscription  ││   │  │ own subscription│ │ │
-  │  │  │ heartbeat, alarms │ │ heartbeat, alarms ││   │  │heartbeat, alarms│ │ │
+  │  │  │ MachineOutput     │ │ MachineOutput     ││   │  │ MachineOutput   │ │ │
   │  │  └───────────────────┘ └───────────────────┘│   │  └─────────────────┘ │ │
   │  └──────────────────┬──────────────────────────┘   └─────────┬────────────┘ │
   │                     │                                        │              │
@@ -42,33 +42,38 @@ The example has two machines behind a gateway and one machine with an OPC UA ser
 ```
 
 Not drawn: when a machine is removed, the adapter calls the REST APIs of the timeseries and of the events
-directly, `DELETE /machines/{serial}` and `DELETE /notificationEvents/machines/{serial}`, to delete what the
+directly, `DELETE /machines/{machineId}` and `DELETE /machineEvents/machines/{machineId}`, to delete what the
 machine published.
 
 | Part | Code | What it does |
 |---|---|---|
 | `MachineSupervisor` | [`MachineSupervisor.cs`](MachineSupervisor.cs) | Loads the registrations at start, adds, replaces and removes machines at run time, checks a registration against its server and against the core and the profiles of the data model ([`Mapping/DataModelProfiles.cs`](Mapping/DataModelProfiles.cs)). |
-| `MachineDataEraser` | [`MachineDataEraser.cs`](MachineDataEraser.cs) | Deletes the values and notifications of a removed machine through the REST APIs of the timeseries and the events. |
+| `MachineDataEraser` | [`MachineDataEraser.cs`](MachineDataEraser.cs) | Deletes the values and events of a removed machine, by its machine id, through the REST APIs of the timeseries and the events. |
 | `SessionPool` | [`OpcUa/SharedSession.cs`](OpcUa/SharedSession.cs) | One `SharedSession` per endpoint: the same address (case and a slash at the end do not count), security mode, security policy and server certificate. Opened with the first machine of the endpoint, closed with the last one. |
 | `SharedSession` | [`OpcUa/SharedSession.cs`](OpcUa/SharedSession.cs) | Connects, watches the keep-alive, connects again with a back-off of 2 to 60 seconds. Attaches every machine to the session; a machine that cannot be attached is tried again every 30 seconds while the others go on. |
-| `MachineConnection` | [`OpcUa/MachineConnection.cs`](OpcUa/MachineConnection.cs) | One per registered machine: its own subscription on the session, its own `Connected` or `Disconnected`, its heartbeat and its alarms. Behind a gateway it keeps the alarms whose source or condition lies in one of its namespaces. |
+| `MachineConnection` | [`OpcUa/MachineConnection.cs`](OpcUa/MachineConnection.cs) | One per registered machine: its own subscription on the session, its heartbeat and its alarms, and whether it answers. Behind a gateway it keeps the alarms whose source or condition lies in one of its namespaces. |
+| `MachineOutput` | [`Mapping/MachineOutput.cs`](Mapping/MachineOutput.cs) | One per registered machine: its own MQTT connection, with the client id `opcua-adapter-<machineId>` and its own last will, and the publisher of the binding the other adapters share. Turns the paths of the registration into those of the binding ([`Mapping/Topics.cs`](Mapping/Topics.cs)), builds the manifest, `State.Status`, `Notification.ActiveAlerts` and the alert events. |
 | `MachineFinder`, `TrumpfMachines` | [`OpcUa/MachineFinder.cs`](OpcUa/MachineFinder.cs), [`OpcUa/TrumpfMachines.cs`](OpcUa/TrumpfMachines.cs) | Lists the machines of an endpoint for `opcua_machine_list`: every object with an `Identification` and a `SerialNumber`, and a TRUMPF machine by the root of its interface and its MachineTool instance `i=3000`. |
 | `MachineChecks` | [`Registrations/MachineChecks.cs`](Registrations/MachineChecks.cs) | Refuses a registration that names no `machineNode` on a server of several machines, whose serial number is not the one read on the server, or that takes a node of another machine. |
 
 ### Topics
 
-Every machine publishes under its serial number, after the [MQTT binding](../../contracts/mqtt/README.md):
+Every machine publishes under its machine id, `<manufacturer>_<model>_<serial number>`, after the
+[binding of machines](../../contracts/mqtt/README.md#machines-the-binding-of-the-data-model):
 
-| Topic below `machines/{serial}/` | What | When |
+| Topic below `machines/{machineId}/` | What | When |
 |---|---|---|
-| `umati/<Group>/<Element>` | An element of the data model, for example `umati/State/MachineryItemState`, `umati/Channel/1/ChannelState` | On a change, with the time of the source |
-| `vendor/<Group>/<Element>` | A value of the maker, for example `vendor/ActivityMeters/DrivesOnDuration` | On a change |
-| `umati/Connection/State` | `Connected` or `Disconnected` of this machine | When the machine is attached to its session or leaves it, or the session is lost |
-| `umati/Connection/Heartbeat` | A counter | Every ten seconds while the machine is registered, also while it does not answer |
-| `events/notifications` | An alarm `Raised` or `Reset` | When an alarm condition becomes active or ends |
+| `umati/Manifest` | Profiles, elements, signals of the maker, alert events | At every connect to the broker, before the values |
+| `umati/<Group>/<Element>` | An element of the data model, for example `umati/State/Status`, `umati/Channel/1/ChannelState` | On a change, with the time of the source |
+| `oem/<Group>/<Element>` | A signal of the maker, for example `oem/ActivityMeters/DrivesOnDuration` (`x-trumpf-com.ActivityMeters.DrivesOnDuration` in the manifest) | On a change |
+| `umati/Notification/ActiveAlerts` | The alarms that stand | When an alarm comes or goes |
+| `umati/Connection/State` | `Initializing`, `Running`, `CommunicationFault` or `Shutdown` of this machine; `CommunicationFault` is also its last will | At the start, when the machine answers or stops answering, when the adapter stops |
+| `umati/Connection/Heartbeat` | A count from 1 | Every ten seconds while the machine is registered, also while it does not answer |
+| `events/notifications` | CloudEvents `Notification.AlertRaised` and `AlertCleared` | When an alarm condition becomes active or ends |
 
-Two machines on one session publish under two serial numbers; nothing on the broker says that they share a
-session. The timeseries persistence stores the values and the connection, the events persistence the alarms.
+Two machines on one session publish under two machine ids, on two MQTT connections; nothing on the broker says
+that they share a session. The timeseries persistence stores the values and the connection, the events
+persistence the alarms.
 
 ## Where the configuration is kept
 
@@ -95,18 +100,19 @@ and the certificate of the adapter.
 | Endpoint of a machine: `url`, `securityMode`, `securityPolicy`, `allowWeaker`, `user` | `machines/<serial>.json`, `endpoint` | [`RegistrationStore`](Registrations/RegistrationStore.cs), when a registration is added or replaced | At start and when the machine is added |
 | Password of the user of a server | `secrets/credentials.json`, one entry per server address, readable by the adapter only (the folder `0700`, the file `0600`) | [`CredentialStore`](Registrations/CredentialStore.cs), when a person enters a user on the card in the chat (`PUT /users`) and the server accepted it | On every connect with that user, by the running machines and by a scan; never sent back |
 | Certificate of the server, pinned | `machines/<serial>.json`, `endpoint.serverCertificateThumbprint` (SHA-1) | The adapter, from the certificate the server presented at the registration | On every connect: another certificate is refused, the machine says why in `lastError` |
+| Identity of a machine: manufacturer, its web address, model, product instance URI, and the machine id of the topics | `machines/<serial>.json`, `identity` | The adapter, from the values read when the machine is added; for an older registration from its first values | At start: the topics, the last will and the source of the events |
 | Machine on a server of several machines | `machines/<serial>.json`, `machineNode` | The registration | By the checks of a new registration, and by the alarm filter |
 | Nodes, units, conversions, alarm type | `machines/<serial>.json`, `elements`, `alerts` | The registration, with the elements of the known mappings the adapter adds | When the machine is attached to its session |
 | Profiles delivered, and the elements of profiles that are not complete | `machines/<serial>.json`, `profiles`, `missing` | The adapter, from the check of the core and the profiles, when it stores the registration | Checked again for the server list and the mapping review |
 | Namespaces of the server at the scan | `machines/<serial>.json`, `discovery.namespaces` | The adapter, when it stores the registration | By a person who compares a rescan |
-| Alarms that stand | `alerts/<serial>.json` | [`AlertStore`](Registrations/AlertStore.cs), on every change | At start, so an alarm that ended while the adapter was down is reset |
+| Alarms that stand | `alerts/<serial>.json` | [`AlertStore`](Registrations/AlertStore.cs), on every change | At start, so an alarm that ended while the adapter was down is cleared |
 | Certificate of the adapter, the client certificate of every session | `pki/certs`, `pki/private`, one RSA certificate and ECC ones (NistP256, NistP384, BrainpoolP256r1, BrainpoolP384r1) | The OPC UA stack, at the first start, if there is none | On every connect and every scan |
 | Application name and URI of the adapter | Not a file: `Pleiades Playground OPC UA Adapter` and `Config:ApplicationUri` (`urn:pleiades:playground:opcua:adapter`) | [`Program.cs`](Program.cs), at every start | They are in the certificate the stack creates |
 
 The file name of a machine is its serial number, escaped as a URI. The registration is the
 [sample](samples/trumpf-trumatic-k09.registration.json) in form, with the thumbprint, the namespaces, the
 profiles and the elements of the known mappings the adapter added. Removing a machine deletes its file, its
-standing alarms, and through the REST APIs its stored values and notifications.
+standing alarms, its retained messages on the broker, and through the REST APIs its stored values and events.
 
 What is not kept:
 
@@ -130,7 +136,7 @@ docker run --rm -v pleiades-playground_opcua_adapter_data:/data alpine find /dat
 ```
 
 ```bash
-curl http://localhost:5530/machines/A1121O0001
+curl http://localhost:5560/machines/A1121O0001
 ```
 
 The second one gives the stored registration of a machine together with what it does now.

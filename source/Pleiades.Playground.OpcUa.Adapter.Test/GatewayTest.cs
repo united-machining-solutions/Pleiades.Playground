@@ -515,7 +515,7 @@ public class MachineChecksTest
         SerialNumber = serialNumber,
         MachineNode = machineNode,
         Endpoint = new EndpointRegistration { Url = "opc.tcp://opcgateway:11878" },
-        Elements = [.. nodes.Select((node, index) => new ElementRegistration { Path = $"Vendor.Value{index}", Area = "vendor", Kind = ValueKind.Text, Node = node })],
+        Elements = [.. nodes.Select((node, index) => new ElementRegistration { Path = $"Vendor.Value{index}", Area = "oem", Kind = ValueKind.Text, Node = node })],
     };
 
     [TestMethod]

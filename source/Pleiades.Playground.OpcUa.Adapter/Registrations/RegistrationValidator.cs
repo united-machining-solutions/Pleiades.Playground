@@ -98,9 +98,9 @@ internal static class RegistrationValidator
     private static void Check(ElementRegistration element, HashSet<string> seen, List<string> problems)
     {
         var name = $"elements[{element.Area}/{element.Path}]";
-        if (element.Area is not ("umati" or "vendor"))
+        if (element.Area is not (Topics.ModelArea or Topics.OemArea))
         {
-            problems.Add($"{name}: area must be 'umati' or 'vendor'.");
+            problems.Add($"{name}: area must be 'umati' or 'oem'.");
         }
 
         if (!Topics.IsPath(element.Path))
@@ -127,11 +127,28 @@ internal static class RegistrationValidator
             problems.Add($"{name}: field names the member of a structure; leave it out for a node that is the element itself.");
         }
 
+        if (element.Path is Topics.ActiveAlerts)
+        {
+            problems.Add($"{name}: the adapter publishes the alerts from the subscription in 'alerts'; it is not an element of a registration.");
+        }
+
         if (element.Kind == ValueKind.Number)
         {
-            if (!ValueConverter.TryParseUnit(element.Unit, out _))
+            var catalogue = element.Area == Topics.ModelArea ? CatalogueUnits.Of(element.Path) : null;
+            if (element.Area == Topics.ModelArea && CatalogueUnits.WithoutUnit.Contains(element.Path))
             {
-                problems.Add($"{name}: a number needs a unit of the MQTT binding, for example 'one' or 'second'.");
+                if (element.Unit is not null)
+                {
+                    problems.Add($"{name}: this element of the data model has no unit; leave unit out.");
+                }
+            }
+            else if (catalogue is not null && element.Unit != catalogue)
+            {
+                problems.Add($"{name}: the data model gives this element the unit '{catalogue}'; set unit '{catalogue}' and convert with scale (for example 1000 from kilowatt hours to wattHour).");
+            }
+            else if (catalogue is null && !CatalogueUnits.IsKnown(element.Unit))
+            {
+                problems.Add($"{name}: a number needs a unit of the catalogue of the data model: {string.Join(", ", CatalogueUnits.Known.Keys)}.");
             }
 
             if (element.Map is not null)

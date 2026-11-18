@@ -16,7 +16,8 @@ namespace Pleiades.Playground.OpcUa.Adapter.Api;
 internal sealed record EndpointView(string Url, SecurityMode SecurityMode, string SecurityPolicy, string? CertificateThumbprint, string? User = null);
 
 /// <summary>An OPC UA server that is added to the platform.</summary>
-/// <param name="SerialNumber">The machine id in every topic.</param>
+/// <param name="SerialNumber">The serial number: how the adapter names the machine.</param>
+/// <param name="MachineId">The machine id of its topics, <c>machines/{machineId}/</c>, or null while it is not identified.</param>
 /// <param name="DisplayName">A name for people.</param>
 /// <param name="Endpoint">Where it is and how the session is secured.</param>
 /// <param name="State"><c>Connecting</c>, <c>Connected</c> or <c>Disconnected</c>.</param>
@@ -30,6 +31,7 @@ internal sealed record EndpointView(string Url, SecurityMode SecurityMode, strin
 /// <param name="SessionSharedWith">The other machines on the same session, behind the same endpoint. Empty for a server of one machine.</param>
 internal sealed record ServerView(
     string SerialNumber,
+    string? MachineId,
     string? DisplayName,
     EndpointView Endpoint,
     string State,
@@ -165,6 +167,7 @@ internal static class Views
         var conformance = DataModelProfiles.Check(registration);
         var server = new ServerView(
             registration.SerialNumber,
+            status.MachineId ?? registration.Identity?.MachineId,
             registration.DisplayName,
             Endpoint(registration.Endpoint),
             status.State,

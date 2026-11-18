@@ -12,10 +12,19 @@ namespace Pleiades.Playground.OpcUa.Adapter.Registrations;
 internal sealed record MachineRegistration
 {
     /// <summary>Version of this document, for later migrations.</summary>
-    public int SchemaVersion { get; init; } = 1;
+    public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
-    /// <summary>The machine id in every topic: <c>machines/{SerialNumber}/...</c>.</summary>
-    [Description("The value of Identification.SerialNumber of the machine. It is the machine id in every topic: one word without /, +, # or white space.")]
+    /// <summary>
+    /// The version this adapter writes. 2: numbers in the units of the catalogue of the data model (energy in
+    /// <c>wattHour</c>, no longer <c>joule</c>), and the identity of the machine.
+    /// </summary>
+    public const int CurrentSchemaVersion = 2;
+
+    /// <summary>
+    /// The value of <c>Identification.SerialNumber</c>: how the adapter and its API name the machine. On the broker
+    /// the machine is named by its machine id (<see cref="Identity"/>), of which the serial number is a part.
+    /// </summary>
+    [Description("The value of Identification.SerialNumber of the machine: one word without /, +, # or white space.")]
     public string SerialNumber { get; init; } = string.Empty;
 
     /// <summary>A name for people, shown in lists.</summary>
@@ -42,6 +51,13 @@ internal sealed record MachineRegistration
     [Description("The object of the machine on the server, as opcua_machine_list names it (node). Required if the server serves several machines; leave it out for a server of one machine.")]
     public string? MachineNode { get; init; }
 
+    /// <summary>
+    /// Who the machine is, as the values of its identification said when it was added: the machine id of every
+    /// topic and the source of every event follow from it. The adapter fills it in, from the nodes it read.
+    /// </summary>
+    [Description("Leave out. The adapter fills it in from the values of the identification when the machine is added.")]
+    public IdentityRegistration? Identity { get; init; }
+
     /// <summary>One entry per value the adapter publishes.</summary>
     public IReadOnlyList<ElementRegistration> Elements { get; init; } = [];
 
@@ -53,6 +69,29 @@ internal sealed record MachineRegistration
 
     /// <summary>Who matched the nodes, and when.</summary>
     public DiscoveryRecord? Discovery { get; init; }
+}
+
+/// <summary>
+/// The identification of a machine as it was read: what the binding forms the machine id from
+/// (<c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>) and what every event names as its source. Kept, so
+/// that the machine keeps its topics whatever its server says later, and can be deleted when it does not answer.
+/// </summary>
+internal sealed record IdentityRegistration
+{
+    /// <summary><c>Identification.Manufacturer</c>, the name of the manufacturer.</summary>
+    public string Manufacturer { get; init; } = string.Empty;
+
+    /// <summary><c>Identification.ManufacturerUri</c>, the web address of the manufacturer.</summary>
+    public string ManufacturerUri { get; init; } = string.Empty;
+
+    /// <summary><c>Identification.Model</c>.</summary>
+    public string Model { get; init; } = string.Empty;
+
+    /// <summary><c>Identification.ProductInstanceUri</c>, the globally unique id of the machine.</summary>
+    public string ProductInstanceUri { get; init; } = string.Empty;
+
+    /// <summary>The machine id of the binding, the level below <c>machines/</c> of every topic. Written for people; read from the other fields.</summary>
+    public string? MachineId { get; init; }
 }
 
 /// <summary>The endpoint of the server and the security the adapter connects with.</summary>
@@ -119,7 +158,7 @@ internal enum MatchKind
 /// <summary>What kind of value an element is on the broker.</summary>
 internal enum ValueKind
 {
-    /// <summary>A number with an SI unit.</summary>
+    /// <summary>A number, with the unit of the catalogue of the data model.</summary>
     Number = 0,
 
     /// <summary>A text, such as a state.</summary>
@@ -139,15 +178,18 @@ internal sealed record ElementRegistration
     [Description("Path of the element as the MQTT binding names it: State.MachineryItemState, Channel[1].ChannelState, Consumption.Electricity[Main].AcActivePowerTotal.")]
     public string Path { get; init; } = string.Empty;
 
-    /// <summary><c>umati</c> for a value the data model names, <c>vendor</c> for one of the maker.</summary>
-    [Description("umati for an element of the data model, vendor for a value of the maker.")]
+    /// <summary><c>umati</c> for a value the data model names, <c>oem</c> for a signal of the maker.</summary>
+    [Description("umati for an element of the data model, oem for a value of the maker (a signal of the manufacturer).")]
     public string Area { get; init; } = "umati";
 
     /// <summary>The kind of value that is published.</summary>
     public ValueKind Kind { get; init; }
 
-    /// <summary>The SI unit of a number, by the names of the MQTT binding, for example <c>second</c>.</summary>
-    [Description("For a number: the SI unit of the MQTT binding, for example one, second, watt, joule, pascal, degreeCelsius.")]
+    /// <summary>
+    /// The unit of a number, by the names of the catalogue of the data model, for example <c>second</c>. An element
+    /// of the model has the unit of its catalogue: energy in <c>wattHour</c>, a percentage as a fraction in <c>one</c>.
+    /// </summary>
+    [Description("For a number: the unit of the catalogue of the data model. An element of the model has its own: one for a ratio or a percentage, second, piece, watt, wattHour for energy. A value of the maker takes one of one, second, piece, metre, kilogram, watt, wattHour, volt, ampere, hertz, pascal, newton, degreeCelsius, metrePerSecond.")]
     public string? Unit { get; init; }
 
     /// <summary>
@@ -166,7 +208,7 @@ internal sealed record ElementRegistration
     public string? Field { get; init; }
 
     /// <summary>A number is multiplied by this before it is published, for example 0.01 for percent.</summary>
-    [Description("A number is multiplied by this to reach the SI unit: 0.01 for percent, 3600 for hours, 1000 for kilowatt, 3600000 for kilowatt hours to joule.")]
+    [Description("A number is multiplied by this to reach its unit: 0.01 for percent, 3600 for hours, 0.001 for milliseconds, 1000 for kilowatt to watt, 1000 for kilowatt hours to wattHour.")]
     public double? Scale { get; init; }
 
     /// <summary>Added to a number after scaling.</summary>

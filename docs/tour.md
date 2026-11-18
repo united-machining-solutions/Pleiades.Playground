@@ -59,7 +59,7 @@ timeseries-persistence   Up 3 minutes (healthy)
 | <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
 | `localhost:1883` | The MQTT broker the simulators publish to. |
-| <http://localhost:5530/machines> | The OPC UA adapter: the machines added over OPC UA. It answers on this computer only. |
+| <http://localhost:5560/machines> | The OPC UA adapter: the machines added over OPC UA. It answers on this computer only. |
 | <http://localhost:8090/> | The web UI of the simulated OPC UA machine, A1121O0001. |
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
@@ -253,7 +253,7 @@ the core of the data model and which profiles are complete, every element with i
 derived, unclear or missing. A machine without the whole core cannot be added. Otherwise it is added when you
 press "Add machine" on the proposal; from then on it is on Home like the others, also after a restart.
 `/opcua` lists the added servers with their core and profiles, and a button that removes a machine together
-with its stored values and notifications; `/mapping A1121O0001` shows what needs a look.
+with its stored values and events; `/mapping A1121O0001` shows what needs a look.
 
 **In the code:** [`apps/app/src/opcua/`](../apps/app/src/opcua) holds the commands and the cards of the chat,
 and the adapter is [`source/Pleiades.Playground.OpcUa.Adapter`](../source/Pleiades.Playground.OpcUa.Adapter/README.md).

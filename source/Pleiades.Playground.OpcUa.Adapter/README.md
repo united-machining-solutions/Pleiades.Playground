@@ -37,8 +37,11 @@ A machine with an OPC UA server becomes a machine of the platform like the simul
 | How a person starts a discovery, lists servers, reviews a mapping | In the chat only, no new page. Slash commands with `/help` guide the person |
 | Who adds and removes a machine | A person, with a button on a card in the chat. No tool of the MCP server adds or removes one |
 | How a machine is added and removed | The management API of the adapter; the registrations live in its volume |
-| Core and profiles | Those of the data model, specification 0.17.0, on the paths of the MQTT binding of today. The whole core or no machine; of another profile only a complete one is published |
-| Lists (`Notification.ActiveAlerts`, `Production.JobOrders`) | By the MQTT binding: alarms as notification events, job orders not published |
+| Core and profiles | Those of the data model, specification 0.17.0. The whole core or no machine; of another profile only a complete one is published |
+| What goes to the broker | The [binding of machines](../../contracts/mqtt/README.md#machines-the-binding-of-the-data-model) of the data model 0.17.1, with the publisher every adapter of the stack shares: manifest, values in the units of the catalogue, `Connection/State`, last will |
+| How a machine is named on the broker | By its machine id, `<manufacturer>_<model>_<serial number>`, formed from the identification read when it is added and kept with its registration |
+| One MQTT connection per machine | Yes: the binding wants a last will per machine, and a connection has one |
+| Alarms | As the list `Notification.ActiveAlerts` and as the events `Notification.AlertRaised` and `AlertCleared`; job orders are not published |
 | Test server | The TRUMPF OPC UA simulator: in the stack definition `K09`, machine `A1121O0001`; first tried with definition `L26`, machine `A0280O0001` |
 | Optional or not | Part of the stack, locally, in CI and in the deployment: no compose profile |
 
@@ -88,7 +91,7 @@ the request below.
 
 | | |
 |---|---|
-| Management API | <http://localhost:5530/machines>, on this computer only (`OPCUA_ADAPTER_BIND`) |
+| Management API | <http://localhost:5560/machines>, on this computer only (`OPCUA_ADAPTER_BIND`) |
 | MCP endpoint | `http://opcua-adapter:8080/mcp` in the network of the stack; the app finds it by `OPCUA_MCP_URL` |
 | Web UI of the simulator | <http://localhost:8090/> |
 | Liveness | `/healthcheck`, healthy while the adapter is connected to the broker |
@@ -98,7 +101,7 @@ Register the simulated machine without the chat, with the registration that ship
 ```bash
 curl -X PUT -H "content-type: application/json" \
   --data-binary @source/Pleiades.Playground.OpcUa.Adapter/samples/trumpf-trumatic-k09.registration.json \
-  http://localhost:5530/machines/A1121O0001
+  http://localhost:5560/machines/A1121O0001
 ```
 
 The machine `A1121O0001` then appears in the example app, <http://localhost:5600/>, beside the simulated ones.
@@ -109,11 +112,15 @@ The simulator, its machines and the example registrations are TRUMPF-specific:
 [`samples/trumpf-trumatic-k09.registration.json`](samples/trumpf-trumatic-k09.registration.json) for the
 TruMatic `A1121O0001` of definition `K09`, the one in the stack, and
 [`samples/trumpf-trulaser-l26.registration.json`](samples/trumpf-trulaser-l26.registration.json) for the
-TruLaser `A0280O0001` of definition `L26`, the first one scanned. The two differ in the machine and in the
-identification: the MachineTool instance of `K09` has `ManufacturerUri`, `ProductCode` and
-`YearOfConstruction`, the one of `L26` has not, so the example of `L26` does not fulfil the core and is refused.
-In the image `1.4.0-alpha3` both definitions also serve the namespace `urn:umati2:datamodel:opcua`, which has
-the whole core but the alarms ([A machine in `urn:umati2:datamodel:opcua`](#a-machine-in-urnumati2datamodelopcua)). The simulator serves the address space of a TRUMPF machine:
+TruLaser `A0280O0001` of definition `L26`, the first one scanned. In the image `1.4.0-alpha3` both definitions
+also serve the namespace `urn:umati2:datamodel:opcua`, which has the whole core but the alarms
+([A machine in `urn:umati2:datamodel:opcua`](#a-machine-in-urnumati2datamodelopcua)). The example of `K09` names
+that machine, `machineNode` `nsu=urn:umati2:datamodel:opcua;s=Machine`: the adapter maps the core from it, with the
+model `TruMatic 1000 fiber` and the web address of TRUMPF, so the machine id is
+`trumpf_TruMatic-1000-fiber_A1121O0001`. The example adds what the data model does not have, from the TRUMPF
+interface and the MachineTool instance: the active program, power and energy, and the drive time as a signal of
+the maker. The example of `L26` maps the MachineTool instance only, which has no `ManufacturerUri`,
+`ProductCode` and `YearOfConstruction`: it does not fulfil the core and is refused. The simulator serves the address space of a TRUMPF machine:
 a MachineTool instance after
 OPC 40501-1 in the namespace `http://trumpf.com/UA/MachineTool/`, and beside it the TRUMPF interface
 `http://trumpf.com/TRUMPF-Interfaces/` with the power-on time, the energy meter and the alarm type
@@ -145,7 +152,8 @@ adapter (`OPCUA_MCP_URL`).
 | `/rescan <serial number>` | Scans an added server again and says what would change | as `/discover` | proposal card with the changes, with the button "Replace the registration" |
 
 Removal is the Remove button on the server list, behind a confirmation. It removes the machine completely, its
-stored values and notifications too ([Restart, removal, a server that changed](#restart-removal-a-server-that-changed)).
+retained messages on the broker and its stored values and events too
+([Restart, removal, a server that changed](#restart-removal-a-server-that-changed)).
 The model can neither add nor remove a machine, and is told never to say that it did.
 
 A machine named without an address gets the default endpoint, its name as host name and the port of OPC UA:
@@ -191,10 +199,11 @@ machine of its own, with a registration of its own, and every machine on one end
   `Identification.SerialNumber` reads.
 - **One session per endpoint.** Machines with the same address (case and a slash at the end do not count), the
   same security and the same server certificate share one session. Each machine keeps a subscription of its own
-  on it, says `Connected` and `Disconnected` itself, and is tried again on its own if its nodes fail, while the
-  session and the other machines go on. A lost session makes every machine on it `Disconnected`.
-- **Removal.** The machine leaves the session: its subscription is deleted, it says `Disconnected` and its alarms
-  are reset. The session closes only with the last machine of its endpoint.
+  on it and its own connection to the broker, says `Running` and `CommunicationFault` itself, and is tried again
+  on its own if its nodes fail, while the session and the other machines go on. A lost session makes every
+  machine on it `CommunicationFault`.
+- **Removal.** The machine leaves the session: its subscription is deleted and its alarms are cleared. The
+  session closes only with the last machine of its endpoint.
 - **Alarms.** A gateway reports the alarms of all its machines at its Server object. A machine with a
   `machineNode` keeps those whose source or condition lies in one of its namespaces: those of its elements and
   of its node. That needs a gateway that gives every machine namespaces of its own, as the UaGateway of Unified
@@ -245,8 +254,12 @@ Besides mapping a machine in `urn:umati2:datamodel:opcua` whole (below), there i
 
 A rule compares the namespace as written, without a prefix. That has three consequences:
 
-- **On the server of a TRUMPF machine** the rule applies. The K09 simulator of the stack registers
-  `Identification.Model` from the node of its serial number, `i=3005`, with the value `A1121O0001`.
+- **On the server of a TRUMPF machine** the rule applies to a registration that maps the MachineTool instance:
+  `Identification.Model` from the node of its serial number, `i=3005`, with the value `A1121O0001`. The model is
+  a part of the machine id, so such a machine is named `<manufacturer>_A1121O0001_A1121O0001`. Where the server
+  has the namespace `urn:umati2:datamodel:opcua`, as the simulator `1.4.0-alpha3` has, register that machine
+  instead: its `Identification.Model` is the model, and the rule does not apply, since the serial number is not
+  in the MachineTool namespace. The example of `K09` does so.
 - **Behind a gateway** the namespace carries the prefix of the gateway, for example
   `urn:A1121O0001:TRUMPF:OpcSimulator/http://trumpf.com/UA/MachineTool/`, and the rule does not apply: the
   registration has the model only if the scan mapped it.
@@ -278,9 +291,9 @@ the server; the element names the member in `field`. An element of the table tha
 moved to `missing` when the registration is tried, instead of refusing it; a missing element of the core
 refuses it all the same ([Core and profiles](#core-and-profiles)). `ManufacturerUri`, `ProductCode` and
 `YearOfConstruction` were not on the gateway of the edge device; the simulator `1.4.0-alpha3` has them. Not
-mapped: `Notification.ActiveAlerts`, a list of `DataType.Alert`, which the binding does not publish: the core
-takes the alarms from `alerts` instead, so such a machine is added only with the alarm event type of its server
-in `alerts`. Not mapped either: `Connection.State` and `Connection.Heartbeat`,
+mapped: `Notification.ActiveAlerts`, a list of `DataType.Alert`, which the adapter does not decode: it builds the
+list from the alarm subscription in `alerts` instead, so such a machine is added only with the alarm event type of
+its server in `alerts`. Not mapped either: `Connection.State` and `Connection.Heartbeat`,
 the connection of the source on the edge device to the machine, not values of the machine. The model of the
 machine is its own `Identification.Model`, so the TRUMPF rule above does not apply.
 
@@ -311,7 +324,7 @@ prefix of a gateway; both are open.
 | `GET /machines` | The registered machines with their state, and the machines each shares its session with. |
 | `GET /machines/{SerialNumber}` | One machine: its registration, the last value of every element, the alarms that stand. |
 | `GET /machines/{SerialNumber}/mapping` | The mapping review of one machine, element by element. |
-| `DELETE /machines/{SerialNumber}` | Removes the machine and then deletes its stored values and notifications. Answers how many, `{ "valuesDeleted", "eventsDeleted", "problems": [] }`; `404` if no such machine is added; `502` with the reasons if a store did not delete or the adapter knows no `Config:TimeseriesApi:Uri` or `Config:EventsApi:Uri`. The machine is removed all the same. |
+| `DELETE /machines/{SerialNumber}` | Removes the machine, takes its retained messages back from the broker and then deletes its stored values and events, by its machine id. Answers how many, `{ "valuesDeleted", "eventsDeleted", "problems": [] }`; `404` if no such machine is added; `502` with the reasons if a store did not delete or the adapter knows no `Config:TimeseriesApi:Uri` or `Config:EventsApi:Uri`. The machine is removed all the same. |
 
 A registration is refused with the reasons, one per line of `problems`: `400` if it is malformed, `409` if it
 does not fit its server, is not the machine it says it is or does not fulfil the core (checked once the server
@@ -324,7 +337,16 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
 
 [`samples/trumpf-trumatic-k09.registration.json`](samples/trumpf-trumatic-k09.registration.json) is a complete one. Its parts:
 
-- `serialNumber`: the machine id in every topic. It is the value of `Identification.SerialNumber`.
+- `schemaVersion`: 2. A registration of version 1, with numbers in coherent SI units, is moved over when it is
+  read: an energy in `joule` becomes `wattHour` (scale divided by 3600), a count in `one` becomes `piece`, a year
+  loses its unit.
+- `serialNumber`: the value of `Identification.SerialNumber`, how the adapter and its API name the machine.
+- `identity`: `manufacturer`, `manufacturerUri`, `model` and `productInstanceUri` as the server gave them when
+  the machine was added, and the `machineId` formed from them, the level below `machines/` of every topic. The
+  adapter fills it in; a registration without it learns it from the values of the machine. It needs
+  `Manufacturer` and `ProductInstanceUri`; a `ManufacturerUri` or `Model` the server has no value for makes its
+  part of the machine id `unknown`, as the binding says. It stays, so the machine keeps its topics whatever its
+  server says later.
 - `profiles`: the profiles of the data model the elements deliver whole. The adapter sets it from the
   elements; what a proposal names is replaced ([Core and profiles](#core-and-profiles)).
 - `endpoint`: the URL, `securityMode` and `securityPolicy`. `serverCertificateThumbprint` is filled in by
@@ -333,11 +355,17 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
   machines; left out on a server of one.
 - `elements`: one per value.
   - `path` and `area` give the topic: `Channel[1].ChannelState` in the area `umati` is
-    `machines/{SerialNumber}/umati/Channel/1/ChannelState`; the area `vendor` is for a value of the maker.
-  - `kind` is `Number`, `Text` or `Boolean`. A number has a `unit` of the binding.
+    `machines/{machineId}/umati/Channel/1/ChannelState`. The area `oem` is for a value of the maker: a signal of
+    the manufacturer, `x-<domain>.<path>` in the manifest and `machines/{machineId}/oem/<path>` on the broker. A
+    registration that still says `vendor`, the earlier name, is moved over.
+    `State.MachineryItemState` and `State.MachineryOperationMode` go out together as the snapshot `State.Status`.
+  - `kind` is `Number`, `Text` or `Boolean`. A number has a `unit` of the catalogue of the data model: an element
+    of the model the one its catalogue gives, energy in `wattHour` ([`Mapping/CatalogueUnits.cs`](Mapping/CatalogueUnits.cs));
+    a year has none.
   - `node` carries its namespace as a URI, `nsu=http://example.com/;i=42`. An index, `ns=2;i=42`, is refused:
     it may change when the server restarts.
-  - `scale` and `offset` convert a number once, to the SI unit: 0.01 for percent, 3600 for hours.
+  - `scale` and `offset` convert a number once, to its unit: 0.01 for percent, 3600 for hours, 1000 for kilowatt
+    hours to `wattHour`.
   - `field` names the member of a structure the adapter decodes, for example `MachineryItemState` of
     `State.Status`. The adapter sets it; a scan leaves it out.
   - `map` turns a raw value into a text, for an enumeration or a state that is derived; `mapDefault` is the
@@ -352,16 +380,15 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
 ## Core and profiles
 
 The adapter checks every registration against the core and the profiles of the data model, specification
-0.17.0 (§5 and §6 of `spec/spec.md` of the data model), on the paths the MQTT binding uses today
-([`Mapping/DataModelProfiles.cs`](Mapping/DataModelProfiles.cs)). The binding still follows the data model
-0.8.0 ([`contracts/datamodel`](../../contracts/datamodel/README.md)); its topics change in a pull request of
-their own.
+0.17.0 (§5 and §6 of `spec/spec.md` of the data model), on the paths of its registrations
+([`Mapping/DataModelProfiles.cs`](Mapping/DataModelProfiles.cs)), and publishes by the binding of the data model
+0.17.1 ([`contracts/datamodel`](../../contracts/datamodel/README.md)).
 
 - **Core.** Mandatory, every element: `Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`,
   `.ManufacturerUri`, `.Model`, `.ProductCode`, `.YearOfConstruction`, `State.MachineryItemState` and
-  `State.MachineryOperationMode` (the snapshot `State.Status` of the specification), `State.FeedOverride`,
-  `OperationCounters.PowerOnDuration`, and `Notification.ActiveAlerts`, which the binding carries as the alarm
-  events of the subscription in `alerts`. `Connection.State` and `Connection.Heartbeat` the adapter publishes
+  `State.MachineryOperationMode` (published together as the snapshot `State.Status`), `State.FeedOverride`,
+  `OperationCounters.PowerOnDuration`, and `Notification.ActiveAlerts`, which the adapter builds from the alarm
+  subscription in `alerts`. `Connection.State` and `Connection.Heartbeat` the adapter publishes
   itself. An element counts if it is mapped, also as `Derived` or `Unclear`; one in `missing` does not. A
   registration without the whole core is refused with what it lacks.
 - **Profiles.** `IdentificationExtended`, `MonitoringExtended`, `ChannelMonitoring`, `Spindle` and
@@ -369,11 +396,16 @@ their own.
   to `missing` with the reason, and nothing of it reaches the broker. Of a profile with instances, a channel, a
   spindle or a measuring point, each complete instance is published; `EnergyElectricity` needs the measuring
   point `Main`.
-- **Not checked.** The profiles of lists and events the binding cannot carry: `Components`, `Stacklight`,
-  `JobMonitoring`, `WorkMasterMonitoring` and `AlertsEvents`; and `EnergyCompressedAir`, whose
-  `MassFlowRate` is in kilogram per second, a unit the binding does not have.
-- **Elements of no profile**, `Production.ActiveProgram`, `Identification.SoftwareRevision` and every value
-  in the area `vendor`, are published as they are.
+- **Not checked.** The profiles of lists and events the adapter does not build: `Components`, `Stacklight`,
+  `JobMonitoring`, `WorkMasterMonitoring` and `AlertsEvents` (of which it publishes `AlertRaised` and
+  `AlertCleared`, not `AlertChanged` and `NotificationEvent`); and `EnergyCompressedAir`, whose `MassFlowRate`
+  is in kilogram per second, a unit the adapter does not know yet.
+- **Elements of no profile** are published as they are: every value in the area `oem`, and
+  `Production.ActiveProgram` as `WorkMasterMonitoring.ActiveWorkMaster`, the active work master, which on a
+  machine without work masters of its own is the name of its program. `Identification.SoftwareRevision` is no
+  element of the model 0.17.1 (it lists the software in `Components.Software`) and goes out as a signal of the
+  manufacturer, below `oem/`. The manifest declares only the complete profiles; an element
+  of the core the machine lacks cannot occur, since such a machine is not added.
 
 The proposal card in the chat and the list of the added servers show it: `Core fulfilled` or `Core not
 fulfilled`, a badge per complete profile, and what an incomplete one lacks. The answers carry it as
@@ -385,17 +417,27 @@ why it cannot.
 
 ## What the adapter publishes
 
-| What | Topic below `machines/{SerialNumber}/` | How |
+Every machine has a connection of its own to the broker, with the client id `opcua-adapter-<machineId>` and a last
+will. What goes out follows the
+[binding of machines](../../contracts/mqtt/README.md#machines-the-binding-of-the-data-model), through the
+publisher the Ultimaker telemetry and the juice bar use too
+([`Mapping/MachineOutput.cs`](Mapping/MachineOutput.cs)):
+
+| What | Topic below `machines/{machineId}/` | How |
 |---|---|---|
-| Every element | `umati/<path>` or `vendor/<path>` | On a change, with the time of the source. A bad value is not published. |
-| `Connection.State` | `umati/Connection/State` | `Connected` once the values of a new session are out, `Disconnected` when the session is lost, the machine is removed or the adapter stops. |
-| `Connection.Heartbeat` | `umati/Connection/Heartbeat` | Every ten seconds while the machine is registered, also while it does not answer. |
-| Alarms | `events/notifications` | An alarm condition of the server that becomes active is `Raised`, one that ends is `Reset`, both with the same correlation id. Severity 667 and above is an error, 334 and above a warning. |
+| The manifest | `umati/Manifest` | Retained, before the values, at every connect to the broker: the complete profiles, every element on its path, the signals of the maker with type, unit and description, and the alert events. |
+| The identification | `umati/Identification/Manufacturer`, `SerialNumber`, `ProductInstanceUri`, `ManufacturerUri`, `Model` | From the `identity` of the registration, at every connect. |
+| Every element of the model | `umati/<path>` | Retained, in the envelope `{timestamp, value, unit}`, with the time of the source, when it changes. A bad value is not published, the last good one stands. |
+| `State.Status` | `umati/State/Status` | The snapshot `{MachineryItemState, MachineryOperationMode}` of the two elements. |
+| A signal of the maker | `oem/<path>` | As an element of the model; the manifest names it `x-<domain>.<path>`, the domain that of `ManufacturerUri`. |
+| `Notification.ActiveAlerts` | `umati/Notification/ActiveAlerts` | The alarms that stand, a list of `Id`, `ErrorCode`, `Message`, `Severity`, `SeverityValue`, `Time`; `[]` without one. |
+| Alarms | `events/notifications` | CloudEvents, not retained: `Notification.AlertRaised` when an alarm condition of the server becomes active, `AlertCleared` when it ends, both with the same `Id`. `source` is the `ProductInstanceUri`, `sequence` the start of the adapter and a count. `Severity` is the category of NAMUR NE 107 from the severity of OPC UA: from 667 `Failure`, from 334 `OffSpec`, below `MaintenanceRequired`. |
+| `Connection.State` | `umati/Connection/State` | `Initializing` at the start, `Running` once the values of a new session are out, `CommunicationFault` while the server does not answer (the values stand), `Shutdown` when the adapter stops or the registration is replaced. The last will says `CommunicationFault`. |
+| `Connection.Heartbeat` | `umati/Connection/Heartbeat` | A count from 1, every ten seconds while the machine is registered, also while it does not answer. |
 
-The lists `Notification.ActiveAlerts` and `Production.JobOrders` are no values in the binding. The alarms travel as notification events; the job orders are not published.
-
-After a reconnect, and after a restart of the adapter, the server is asked for the conditions that still stand
-(`ConditionRefresh`). An alarm that went while nobody listened is reset then, so none stays open for ever.
+The job orders are not published. After a reconnect, and after a restart of the adapter, the server is asked for
+the conditions that still stand (`ConditionRefresh`). An alarm that went while nobody listened is cleared then,
+so none stays open for ever.
 
 ## Security
 
@@ -430,16 +472,16 @@ After a reconnect, and after a restart of the adapter, the server is asked for t
 - **Restart.** The registrations are files in `/data/machines`, one per machine. At start the adapter reads
   them and connects. `docker compose down` keeps the volume; `docker compose down -v` deletes it, and with it
   every registration.
-- **Removal.** The machine leaves its session, `Disconnected` is published, the alarms that stand are reset and
-  the registration is deleted. The session closes with the last machine of its endpoint. Then the adapter
-  deletes what the machine published, through the REST contracts of the stores: its values with
-  `DELETE /machines/{serialNumber}` of the Timeseries API, its notifications with
-  `DELETE /machineEvents/machines/{serialNumber}` of the Events API (`Config:TimeseriesApi:Uri`,
+- **Removal.** The machine leaves its session, the alarms that stand are cleared, every retained message of the
+  machine is taken back from the broker with an empty one, its connection to the broker ends without its last
+  will, and the registration is deleted. The session closes with the last machine of its endpoint. Then the
+  adapter deletes what the machine published, through the REST contracts of the stores, by its machine id: its
+  values with `DELETE /machines/{machineId}` of the Timeseries API, its events with
+  `DELETE /machineEvents/machines/{machineId}` of the Events API (`Config:TimeseriesApi:Uri`,
   `Config:EventsApi:Uri`). It waits `Config:DataSettleTime`, 8 seconds, before: the timeseries persistence
-  stores in batches of 5 seconds, and the last values and the `Disconnected` are to be stored before they are
-  deleted, or the machine would come back with them. The machine leaves Home and the history. The adapter
-  publishes nothing retained, so the broker brings nothing back. A store that cannot be reached is named in
-  the answer, and its data stays.
+  stores in batches of 5 seconds, and the last values and events are to be stored before they are deleted, or
+  the machine would come back with them. The machine leaves Home and the history, and the broker brings nothing
+  of it back. A store that cannot be reached is named in the answer, and its data stays.
 - **A server that changed.** If a registered node is gone, the element says so and the machine has
   `needsRescan: true`. `/rescan` is the discovery again; its proposal says what would change, and the button
   replaces the registration. The subscription is built anew without a restart of the service. That is also how
@@ -469,6 +511,18 @@ What the scan of the TRUMPF simulator found, and what it did not. Another server
 
 ## What is verified
 
+- The binding of machines (2026-11-18, the stack of `main` with this branch, simulator `1.4.0-alpha3`, definition
+  `K09`): the example registration, on the machine in `urn:umati2:datamodel:opcua`, is added as
+  `trumpf_TruMatic-1000-fiber_A1121O0001`. The broker holds the manifest (profiles `Core` and
+  `EnergyElectricity`), the whole identification with model, web address, product code and year,
+  `State.Status`, the numbers with `one`, `second`, `watt` and `wattHour`, `WorkMasterMonitoring/ActiveWorkMaster`,
+  `oem/ActivityMeters/DrivesOnDuration`, `Notification.ActiveAlerts`, the heartbeat and `Running`, all retained;
+  the alarms of the simulator are stored as `AlertRaised` and `AlertCleared`, and Home shows "TruMatic 1000 fiber
+  A1121O0001" with its alarm and its program. Removal answered after 9 seconds with 149 values and 12 events
+  deleted; no retained message of the machine was left on the broker, and 15 seconds later nothing of it was
+  stored. The earlier example, on the MachineTool instance, was added as `unknown_A1121O0001_A1121O0001`: there
+  `ManufacturerUri`, `ProductCode` and `YearOfConstruction` answer `BadWaitingForInitialData`, and the known
+  mapping gives the serial number as the model. The points below were tried with the earlier binding.
 - The adapter connects to the simulator with SignAndEncrypt and `Aes256_Sha256_RsaPss`, the strongest of seven
   endpoints. A weaker endpoint is refused with 409, an unknown node too.
 - Before the core was checked, all 15 elements of the example registration then read Good and were stored with

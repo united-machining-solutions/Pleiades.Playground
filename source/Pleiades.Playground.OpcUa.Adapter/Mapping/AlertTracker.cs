@@ -1,28 +1,63 @@
-using System.Security.Cryptography;
-using Pleiades.Playground.Common.DataTransferObjects;
-using Pleiades.Playground.Notification.DataTransferObjects;
+using System.Text.Json.Nodes;
+using Pleiades.Playground.Mqtt.Extensions.Machines;
 
 namespace Pleiades.Playground.OpcUa.Adapter.Mapping;
 
-/// <summary>An alarm that stands: raised and not yet reset.</summary>
-/// <param name="ConditionId">The condition of the server the alarm belongs to.</param>
-/// <param name="CorrelationId">Joins the raising and the resetting of this one occurrence.</param>
-/// <param name="Code">The code of the maker.</param>
-/// <param name="Title">The text for the operator.</param>
-/// <param name="Level">Error, warning or information.</param>
-/// <param name="Since">When it was raised.</param>
-internal sealed record OpenAlert(string ConditionId, string CorrelationId, string Code, string Title, EventLevel Level, DateTime Since);
+/// <summary>What happened to an alert: it came up, or it went.</summary>
+internal enum AlertAction
+{
+    /// <summary>The alert came up: <c>Notification.AlertRaised</c>.</summary>
+    Raised = 0,
 
-/// <summary>What has to be published about an alarm.</summary>
-/// <param name="Action">Raised or reset.</param>
-/// <param name="Alert">The alarm.</param>
+    /// <summary>The alert went: <c>Notification.AlertCleared</c>.</summary>
+    Cleared = 1,
+}
+
+/// <summary>An alert that stands: raised and not yet cleared.</summary>
+/// <param name="ConditionId">The condition of the server the alert belongs to.</param>
+/// <param name="Id">The id of this one occurrence, the same in its raising and its clearing.</param>
+/// <param name="Code">The code of the maker, <c>ErrorCode</c>.</param>
+/// <param name="Message">The text for the operator.</param>
+/// <param name="SeverityValue">The severity of OPC UA, 1 to 1000.</param>
+/// <param name="Since">When it was raised.</param>
+/// <param name="SourceName">The part of the machine it came from, as the server names it.</param>
+internal sealed record OpenAlert(
+    string ConditionId, string Id, string Code, string Message, int SeverityValue, DateTime Since, string? SourceName = null)
+{
+    /// <summary>The category after NAMUR NE 107 (<see cref="AlertTracker.CategoryOf"/>).</summary>
+    public string Severity => AlertTracker.CategoryOf(SeverityValue);
+
+    /// <summary>The alert as the model lists it, in <c>Notification.ActiveAlerts</c> and in every alert event.</summary>
+    public JsonObject ToJson()
+    {
+        var json = new JsonObject
+        {
+            [nameof(Id)] = Id,
+            ["ErrorCode"] = Code,
+            [nameof(Message)] = Message,
+            [nameof(Severity)] = Severity,
+            [nameof(SeverityValue)] = SeverityValue,
+            ["Time"] = MachineBinding.Timestamp(new DateTimeOffset(DateTime.SpecifyKind(Since, DateTimeKind.Utc))),
+        };
+        if (!string.IsNullOrEmpty(SourceName))
+        {
+            json[nameof(SourceName)] = SourceName;
+        }
+
+        return json;
+    }
+}
+
+/// <summary>What has to be published about an alert.</summary>
+/// <param name="Action">Raised or cleared.</param>
+/// <param name="Alert">The alert.</param>
 /// <param name="At">When it happened.</param>
-internal sealed record AlertChange(NotificationAction Action, OpenAlert Alert, DateTime At);
+internal sealed record AlertChange(AlertAction Action, OpenAlert Alert, DateTime At);
 
 /// <summary>
-/// Follows the alarms of one machine, so that each is raised once and reset once, also across a
+/// Follows the alarms of one machine, so that each is raised once and cleared once, also across a
 /// lost connection: after a reconnect the server lists what still stands, and what is not in that
-/// list any more is reset.
+/// list any more is cleared.
 /// </summary>
 internal sealed class AlertTracker
 {
@@ -38,28 +73,29 @@ internal sealed class AlertTracker
         }
     }
 
-    /// <summary>The alarms that stand.</summary>
-    public IReadOnlyCollection<OpenAlert> Open => _open.Values;
+    /// <summary>The alarms that stand, the oldest first.</summary>
+    public IReadOnlyList<OpenAlert> Open => [.. _open.Values.OrderBy(alert => alert.Since)];
 
     /// <summary>
-    /// The level of a severity by OPC 40501-1: 667 and above is an error, 334 and above a warning,
-    /// everything below a message.
+    /// The category of an alert after NAMUR NE 107, from the severity of OPC UA. The model has no rule for it;
+    /// this one follows the levels of OPC 40501-1: from 667 a failure, from 334 out of specification, below a
+    /// maintenance that is due.
     /// </summary>
-    public static EventLevel LevelOf(int severity) => severity switch
+    public static string CategoryOf(int severity) => severity switch
     {
-        >= 667 => EventLevel.Error,
-        >= 334 => EventLevel.Warning,
-        _ => EventLevel.Information,
+        >= 667 => "Failure",
+        >= 334 => "OffSpec",
+        _ => "MaintenanceRequired",
     };
 
-    /// <summary>An identifier in the form the Events API stores: 24 hexadecimal digits.</summary>
-    public static string NewId() => Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(12));
+    /// <summary>A new id of an occurrence: a UUID.</summary>
+    public static string NewId() => Guid.NewGuid().ToString();
 
     /// <summary>
     /// Takes one event of a condition. Returns what to publish, or null if the event changes
     /// nothing: an alarm that already stands, or the end of one that was never raised here.
     /// </summary>
-    public AlertChange? Observe(string conditionId, bool active, string code, string title, int severity, DateTime at)
+    public AlertChange? Observe(string conditionId, bool active, string code, string message, int severity, DateTime at, string? sourceName = null)
     {
         ArgumentNullException.ThrowIfNull(conditionId);
         if (active)
@@ -70,12 +106,12 @@ internal sealed class AlertTracker
                 return null;
             }
 
-            var raised = new OpenAlert(conditionId, NewId(), code, title, LevelOf(severity), at);
+            var raised = new OpenAlert(conditionId, NewId(), code, message, Math.Clamp(severity, 1, 1000), at, sourceName);
             _open[conditionId] = raised;
-            return new AlertChange(NotificationAction.Raised, raised, at);
+            return new AlertChange(AlertAction.Raised, raised, at);
         }
 
-        return _open.Remove(conditionId, out var open) ? new AlertChange(NotificationAction.Reset, open, at) : null;
+        return _open.Remove(conditionId, out var open) ? new AlertChange(AlertAction.Cleared, open, at) : null;
     }
 
     /// <summary>The server begins to list the conditions that still stand.</summary>
@@ -83,7 +119,7 @@ internal sealed class AlertTracker
 
     /// <summary>
     /// The list is complete: every alarm that stood here and was not in it has gone while nobody
-    /// listened. Each is reset now.
+    /// listened. Each is cleared now.
     /// </summary>
     public IReadOnlyList<AlertChange> EndRefresh(DateTime now)
     {
@@ -99,6 +135,6 @@ internal sealed class AlertTracker
         }
 
         _seenInRefresh = null;
-        return [.. gone.Select(alert => new AlertChange(NotificationAction.Reset, alert, now))];
+        return [.. gone.Select(alert => new AlertChange(AlertAction.Cleared, alert, now))];
     }
 }

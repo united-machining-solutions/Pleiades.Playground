@@ -97,7 +97,13 @@ public class RegistrationValidatorTest
         var applied = DataModelProfiles.Apply(KnownMappings.Apply(sample), out var checks);
         Assert.IsNull(DataModelProfiles.CoreProblem(checks));
         CollectionAssert.AreEqual(sample.Profiles.ToArray(), applied.Profiles.ToArray(), "The sample names the profiles the adapter finds.");
-        Assert.HasCount(sample.Elements.Count + 1, applied.Elements, "Only the model, by the known mapping, is added.");
+        Assert.AreEqual("nsu=urn:umati2:datamodel:opcua;s=Machine", sample.MachineNode);
+        Assert.HasCount(sample.Elements.Count + Umati2DataModel.Rules.Count, applied.Elements,
+            "The adapter maps the core from the data model on the server; the sample adds what the model does not have.");
+        Assert.AreEqual(
+            "nsu=urn:umati2:datamodel:opcua;s=Identification.Model",
+            applied.Elements.Single(element => element.Path == "Identification.Model").Node,
+            "The model is the one of the data model, not the serial number of the known mapping of the MachineTool instance.");
     }
 
     [TestMethod]
@@ -134,10 +140,10 @@ public class RegistrationValidatorTest
     [TestMethod]
     public void Core_without_one_of_its_mandatory_elements_is_refused()
     {
-        var sample = Sample();
-        var without = sample with { Elements = [.. sample.Elements.Where(element => element.Path != "OperationCounters.PowerOnDuration")] };
+        var applied = KnownMappings.Apply(Sample());
+        var without = applied with { Elements = [.. applied.Elements.Where(element => element.Path != "OperationCounters.PowerOnDuration")] };
 
-        var problem = DataModelProfiles.CoreProblem(DataModelProfiles.Check(KnownMappings.Apply(without)));
+        var problem = DataModelProfiles.CoreProblem(DataModelProfiles.Check(without));
 
         Assert.IsNotNull(problem);
         StringAssert.Contains(problem, "OperationCounters.PowerOnDuration", StringComparison.Ordinal);
@@ -177,7 +183,7 @@ public class RegistrationValidatorTest
         StringAssert.Contains(problems, "serialNumber:", StringComparison.Ordinal);
         StringAssert.Contains(problems, "endpoint.url:", StringComparison.Ordinal);
         StringAssert.Contains(problems, "not an index", StringComparison.Ordinal);
-        StringAssert.Contains(problems, "needs a unit", StringComparison.Ordinal);
+        StringAssert.Contains(problems, "gives this element the unit 'one'", StringComparison.Ordinal);
         StringAssert.Contains(problems, "is named twice", StringComparison.Ordinal);
         StringAssert.Contains(problems, "belong to a number only", StringComparison.Ordinal);
         StringAssert.Contains(problems, "publishes the connection itself", StringComparison.Ordinal);

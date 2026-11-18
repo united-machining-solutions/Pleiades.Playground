@@ -110,20 +110,20 @@ and a measuring point needs `Main`. Map what the server offers; the adapter deci
 | `Identification.ManufacturerUri` | Core | Text | | `Identification/ManufacturerUri` |
 | `Identification.Model` | Core | Text | | `Identification/Model` |
 | `Identification.ProductCode` | Core | Text | | `Identification/ProductCode` |
-| `Identification.YearOfConstruction` | Core | Number | `one` | `Identification/YearOfConstruction`, a UInt16 year |
+| `Identification.YearOfConstruction` | Core | Number | no unit | `Identification/YearOfConstruction`, a UInt16 year |
 | `State.MachineryItemState` | Core | Text | | `MachineryItemState/CurrentState/Number` (OPC 40001-1): 0 NotAvailable, 1 OutOfService, 2 NotExecuting, 3 Executing |
 | `State.MachineryOperationMode` | Core | Text | | `MachineryOperationMode/CurrentState/Number` (OPC 40001-1): 0 None, 1 Maintenance, 2 Setup, 3 Processing |
 | `State.FeedOverride` | Core | Number | `one` | `Monitoring/MachineTool/FeedOverride`, usually percent: scale 0.01 |
 | `OperationCounters.PowerOnDuration` | Core | Number | `second` | `OperationCounters/PowerOnDuration`, a Duration in milliseconds: scale 0.001 |
 | `Notification.ActiveAlerts` | Core | | | Not an element: the alarm subscription, `alerts`. Without `alerts` the core is not fulfilled |
 | `Identification.HardwareRevision` | IdentificationExtended | Text | | `Identification/HardwareRevision` |
-| `Identification.MonthOfConstruction` | IdentificationExtended | Number | `one` | `Identification/MonthOfConstruction`, 1 to 12 |
+| `Identification.MonthOfConstruction` | IdentificationExtended | Number | no unit | `Identification/MonthOfConstruction`, 1 to 12 |
 | `Identification.InitialOperationDate` | IdentificationExtended | Text | | `Identification/InitialOperationDate` |
 | `Identification.DeviceClass` | IdentificationExtended | Text | | `Identification/DeviceClass` |
 | `Identification.AssetId` | IdentificationExtended | Text | | `Identification/AssetId` |
 | `Identification.ComponentName` | IdentificationExtended | Text | | `Identification/ComponentName` |
 | `Identification.Location` | IdentificationExtended | Text | | `Identification/Location` |
-| `OperationCounters.PartsProducedInLifetime` | MonitoringExtended | Number | `one` | `OperationCounters/PartsProducedInLifetime` |
+| `OperationCounters.PartsProducedInLifetime` | MonitoringExtended | Number | `piece` | `OperationCounters/PartsProducedInLifetime` |
 | `OperationCounters.OperationDuration` | MonitoringExtended | Number | `second` | `OperationCounters/OperationDuration` |
 | `State.IsWarmUp` | MonitoringExtended | Boolean | | `Monitoring/MachineTool/IsWarmUp` |
 | `Channel[n].ChannelState` | ChannelMonitoring | Text | | `Monitoring/<channel>/ChannelState`: 0 Active, 1 Interrupted, 2 Reset |
@@ -136,17 +136,18 @@ and a measuring point needs `Main`. Map what the server offers; the adapter deci
 | `Spindle[n].IsUsedAsAxis` | Spindle | Boolean | | `Monitoring/<spindle>/IsUsedAsAxis` |
 | `Spindle[n].Name` | Spindle | Text | | `Monitoring/<spindle>/Name` |
 | `Consumption.Electricity[Main].AcActivePowerTotal` | EnergyElectricity | Number | `watt` | the energy meter of the machine |
-| `Consumption.Electricity[Main].AcActiveEnergyTotalImportHp` | EnergyElectricity | Number | `joule` | the energy meter: watt hours times 3600 |
+| `Consumption.Electricity[Main].AcActiveEnergyTotalImportHp` | EnergyElectricity | Number | `wattHour` | the energy meter: kilowatt hours times 1000 |
 | `Production.ActiveProgram` | none | Text | | `Production/ActiveProgram/Name` |
 | `Identification.SoftwareRevision` | none | Text | | `Identification/SoftwareRevision` |
 
-An element of no profile, the last two above, is published as it is.
+An element of no profile, the last two above, is published as well: the active program as the active work
+master of the data model, the software revision as a value of the maker.
 
 `n` is the number of the channel or the spindle, from 1. A value the table does not name, and that is worth
-having, goes into the area `vendor` with a path of your choice in the same form, `Group.Element`.
+having, goes into the area `oem` with a path of your choice in the same form, `Group.Element`.
 
-`Notification.ActiveAlerts` and `Production.JobOrders` are no values here. Alarms travel as events, see
-`alerts`. Do not map them as elements.
+`Notification.ActiveAlerts` and `Production.JobOrders` are no elements of a registration. The adapter builds the
+list of the alarms, and their events, from `alerts`. Do not map them as elements.
 
 ## What the adapter maps itself
 
@@ -180,10 +181,12 @@ the server does not fill is moved to `missing` by the adapter.
 
 - **Node.** With the namespace as a URI: `nsu=http://example.com/;i=3003`. A browse gives `ns=7;i=3003`: take
   the URI at position 7 of the namespace array. An index is refused.
-- **Unit.** One SI unit per quantity: `one` for a ratio, a count or a percentage (1.0 is 100 %), `second`,
-  `watt`, `joule`, `pascal`, `degreeCelsius`, `metre`, `kilogram`, `ampere`, `volt`, `hertz`. Convert with
-  `scale`: 0.01 for percent, 3600 for hours, 0.001 for milliseconds, 1000 for kilowatt, 3600000 for kilowatt
-  hours.
+- **Unit.** The units of the catalogue of the data model. An element of the table has the unit the table gives,
+  and no other: a ratio or a percentage in `one` (1.0 is 100 %), a duration in `second`, parts in `piece`, power
+  in `watt`, energy in `wattHour`; a year or a month has none. A value of the maker takes one of `one`,
+  `second`, `piece`, `metre`, `kilogram`, `watt`, `wattHour`, `volt`, `ampere`, `hertz`, `pascal`, `newton`,
+  `degreeCelsius`, `metrePerSecond`. Convert with `scale`: 0.01 for percent, 3600 for hours, 0.001 for
+  milliseconds, 1000 for kilowatt to watt and for kilowatt hours to `wattHour`.
 - **Enumeration.** `kind: Text` with a `map` from the raw value to the name, `{"0": "Active", "1":
   "Interrupted"}`. Publish the names of the data model, as the table gives them.
 - **Match.** Be honest about how sure a match is:
@@ -225,7 +228,7 @@ This example is the TRUMPF simulator. Its shape is the same for every server; it
 {
   "serialNumber": "A0280O0001",
   "displayName": "TruLaser, hall 2",
-  "modelVersion": "0.8.0",
+  "modelVersion": "0.17.1",
   "endpoint": { "url": "opc.tcp://192.168.1.20:4840", "securityMode": "SignAndEncrypt", "securityPolicy": "Aes256_Sha256_RsaPss" },
   "elements": [
     { "path": "Identification.Manufacturer", "kind": "Text", "match": "Direct",

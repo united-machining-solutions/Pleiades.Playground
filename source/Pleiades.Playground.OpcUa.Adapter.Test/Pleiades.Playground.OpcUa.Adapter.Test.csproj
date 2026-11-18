@@ -19,6 +19,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- A managed MQTT client without a broker that records what goes out, shared with the other adapters. -->
+    <Compile Include="../Pleiades.Playground.Mqtt.Extensions.Test/RecordingManagedMqttClient.cs" Link="Shared/RecordingManagedMqttClient.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- The registration the adapter ships as an example is checked like one a person sends. -->
     <None Include="..\Pleiades.Playground.OpcUa.Adapter\samples\trumpf-trulaser-l26.registration.json" Link="trumpf-trulaser-l26.registration.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Pleiades.Playground.OpcUa.Adapter\samples\trumpf-trumatic-k09.registration.json" Link="trumpf-trumatic-k09.registration.json" CopyToOutputDirectory="PreserveNewest" />

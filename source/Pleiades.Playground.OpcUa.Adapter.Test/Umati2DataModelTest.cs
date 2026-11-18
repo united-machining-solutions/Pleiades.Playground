@@ -82,7 +82,7 @@ public class Umati2DataModelTest
         var vendor = new ElementRegistration
         {
             Path = "Identification.ProductCode",
-            Area = "vendor",
+            Area = "oem",
             Kind = ValueKind.Text,
             Node = $"nsu={Uri};s=Identification.ProductCode",
         };
@@ -141,7 +141,7 @@ public class Umati2DataModelTest
     {
         var applied = KnownMappings.Apply(Registration());
 
-        var without = Umati2DataModel.WithoutAbsent(applied, [("umati", "Identification.SoftwareRevision"), ("vendor", "Other.Value")], out var removed);
+        var without = Umati2DataModel.WithoutAbsent(applied, [("umati", "Identification.SoftwareRevision"), ("oem", "Other.Value")], out var removed);
 
         CollectionAssert.AreEqual(new[] { "Identification.SoftwareRevision" }, removed.ToArray());
         Assert.HasCount(applied.Elements.Count - 1, without.Elements);

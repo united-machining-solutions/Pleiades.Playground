@@ -116,7 +116,7 @@ public class DataModelProfilesTest
     public void Elements_of_no_profile_and_of_the_maker_are_kept()
     {
         var core = Registration([.. CorePaths, "Production.ActiveProgram"]);
-        var registration = core with { Elements = [.. core.Elements, Element("ActivityMeters.DrivesOnDuration", "vendor")] };
+        var registration = core with { Elements = [.. core.Elements, Element("ActivityMeters.DrivesOnDuration", "oem")] };
 
         var applied = DataModelProfiles.Apply(registration, out _);
 

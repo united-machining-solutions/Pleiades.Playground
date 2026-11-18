@@ -6,9 +6,8 @@ using Pleiades.Playground.OpcUa.Adapter.Registrations;
 namespace Pleiades.Playground.OpcUa.Adapter.OpcUa;
 
 /// <summary>One element of a running machine: what was last read and what was made of it.</summary>
-/// <param name="Area"><c>umati</c> or <c>vendor</c>.</param>
+/// <param name="Area"><c>umati</c> or <c>oem</c>.</param>
 /// <param name="Path">The path of the element.</param>
-/// <param name="Topic">The topic it is published on.</param>
 /// <param name="Node">The node it comes from.</param>
 /// <param name="Status"><c>Good</c>, <c>Pending</c>, or what is wrong with the node or its value.</param>
 /// <param name="Raw">The value of the node as text.</param>
@@ -16,9 +15,10 @@ namespace Pleiades.Playground.OpcUa.Adapter.OpcUa;
 /// <param name="Unit">The unit of a number.</param>
 /// <param name="Timestamp">When the value was observed at the source.</param>
 internal sealed record ElementStatus(
-    string Area, string Path, string Topic, string Node, string Status, string? Raw, object? Value, string? Unit, DateTime? Timestamp);
+    string Area, string Path, string Node, string Status, string? Raw, object? Value, string? Unit, DateTime? Timestamp);
 
 /// <summary>What a machine does right now, as the adapter sees it.</summary>
+/// <param name="MachineId">The machine id of its topics, or null while the machine is not identified.</param>
 /// <param name="State"><c>Connecting</c>, <c>Connected</c> or <c>Disconnected</c>.</param>
 /// <param name="LastError">Why the last connect failed or the connection was lost.</param>
 /// <param name="ConnectedSince">Since when the session stands.</param>
@@ -26,6 +26,7 @@ internal sealed record ElementStatus(
 /// <param name="Elements">Every element with its last value.</param>
 /// <param name="OpenAlerts">The alarms that stand.</param>
 internal sealed record MachineStatus(
+    string? MachineId,
     string State,
     string? LastError,
     DateTime? ConnectedSince,
@@ -35,7 +36,7 @@ internal sealed record MachineStatus(
 
 /// <summary>
 /// Runs one registered machine on the session of its endpoint: subscribes to the nodes of the
-/// registration and publishes what they report. The session belongs to <see cref="SharedSession"/>,
+/// registration and puts what they report on the broker, through its <see cref="IMachineOutput"/>. The session belongs to <see cref="SharedSession"/>,
 /// which several machines behind one aggregation server share. A machine needs nothing but the
 /// registration, so it starts the same way after every restart.
 /// </summary>
@@ -44,7 +45,6 @@ internal sealed class MachineConnection : ISessionTenant
     private const string Pending = "Pending";
     private const string Good = "Good";
 
-    private readonly IMachinePublisher _publisher;
     private readonly AlertStore _alertStore;
     private readonly TimeSpan _heartbeatInterval;
     private readonly TimeSpan _samplingInterval;
@@ -59,26 +59,35 @@ internal sealed class MachineConnection : ISessionTenant
     private DateTime? _connectedSince;
     private Subscription? _subscription;
     private Subscription? _alertSubscription;
+    private Task _alertTail = Task.CompletedTask;
 
     /// <summary>Creates the connection. Nothing happens before <see cref="RunAsync"/> and a session.</summary>
     public MachineConnection(
         MachineRegistration registration,
-        IMachinePublisher publisher,
+        IMachineOutputFactory outputs,
         AlertStore alertStore,
         TimeSpan heartbeatInterval,
         TimeSpan samplingInterval,
-        ILogger logger)
+        ILogger logger,
+        Action<IdentityRegistration>? identified = null)
     {
+        ArgumentNullException.ThrowIfNull(outputs);
         Registration = registration ?? throw new ArgumentNullException(nameof(registration));
-        _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
+        _identified = identified;
         _alertStore = alertStore ?? throw new ArgumentNullException(nameof(alertStore));
         _heartbeatInterval = heartbeatInterval;
         _samplingInterval = samplingInterval;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _elements = [.. registration.Elements.Select(element => new ElementRuntime(element, Topics.Value(registration.SerialNumber, element.Area, element.Path)))];
+        _elements = [.. registration.Elements.Select(element => new ElementRuntime(element))];
         _alerts = new AlertTracker(alertStore.Load(registration.SerialNumber));
         _namespaces = MachineNamespaces.Of(registration);
+        Output = outputs.Create(registration, _alerts.Open);
     }
+
+    private readonly Action<IdentityRegistration>? _identified;
+
+    /// <summary>What this machine puts on the broker.</summary>
+    public IMachineOutput Output { get; }
 
     /// <summary>The registration this connection runs.</summary>
     public MachineRegistration Registration { get; }
@@ -97,23 +106,24 @@ internal sealed class MachineConnection : ISessionTenant
             lock (_gate)
             {
                 return new MachineStatus(
+                    Output.MachineId,
                     _state,
                     _lastError,
                     _connectedSince,
                     _elements.Any(element => element.Status is not (Good or Pending or "NotConvertible")),
                     [.. _elements.Select(element => element.Snapshot())],
-                    [.. _alerts.Open.OrderBy(alert => alert.Since)]);
+                    _alerts.Open);
             }
         }
     }
 
     /// <summary>
-    /// Says <c>Disconnected</c> once, then the heartbeat until cancelled. The values come from the
-    /// session of the endpoint, once it attaches this machine.
+    /// Connects the output to the broker (<c>Initializing</c> and the manifest), then the heartbeat until
+    /// cancelled. The values come from the session of the endpoint, once it attaches this machine.
     /// </summary>
     public async Task RunAsync(CancellationToken cancellationToken)
     {
-        await _publisher.PublishConnectionAsync(Registration.SerialNumber, connected: false).ConfigureAwait(false);
+        await Output.StartAsync().ConfigureAwait(false);
         try
         {
             await HeartbeatAsync(cancellationToken).ConfigureAwait(false);
@@ -125,7 +135,7 @@ internal sealed class MachineConnection : ISessionTenant
     }
 
     /// <summary>
-    /// Resets every alarm that stands. For a machine that is removed: nobody watches it from here on,
+    /// Clears every alarm that stands. For a machine that is removed: nobody watches it from here on,
     /// so an alarm the adapter raised would stay open for ever. Call it after the machine left its session.
     /// </summary>
     public async Task ResetOpenAlertsAsync()
@@ -137,10 +147,7 @@ internal sealed class MachineConnection : ISessionTenant
             resets = [.. _alerts.EndRefresh(DateTime.UtcNow)];
         }
 
-        foreach (var reset in resets)
-        {
-            await _publisher.PublishAlertAsync(Registration.SerialNumber, reset).ConfigureAwait(false);
-        }
+        await AlertsAsync(resets).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -169,10 +176,13 @@ internal sealed class MachineConnection : ISessionTenant
         {
             await RemoveSubscriptionAsync(session).ConfigureAwait(false);
             SetState("Disconnected", exception.Message);
+            await Output.LostAsync().ConfigureAwait(false);
             throw;
         }
 
-        await _publisher.PublishConnectionAsync(Registration.SerialNumber, connected: true).ConfigureAwait(false);
+        // A registration without its identity learns it from the first values.
+        await IdentifyAsync().ConfigureAwait(false);
+        await Output.ReachedAsync().ConfigureAwait(false);
         SetState("Connected", null);
         _logger.MachineConnected(Registration.SerialNumber, Registration.Endpoint.Url, Registration.Endpoint.SecurityMode.ToString(), Registration.Endpoint.SecurityPolicy);
     }
@@ -182,7 +192,11 @@ internal sealed class MachineConnection : ISessionTenant
     {
         ArgumentNullException.ThrowIfNull(session);
         await RemoveSubscriptionAsync(session).ConfigureAwait(false);
-        await SessionDownAsync(null).ConfigureAwait(false);
+
+        // The machine leaves on purpose: it is stopped or removed, and its output says so itself.
+        _subscription = null;
+        _alertSubscription = null;
+        SetState("Disconnected", null);
     }
 
     /// <inheritdoc />
@@ -198,27 +212,22 @@ internal sealed class MachineConnection : ISessionTenant
         }
 
         SetState("Disconnected", reason);
-        if (wasConnected)
+
+        // Also when the first connect fails: the machine is not reached, CommunicationFault. The output says it once.
+        await Output.LostAsync().ConfigureAwait(false);
+        if (wasConnected && reason is not null)
         {
-            await _publisher.PublishConnectionAsync(Registration.SerialNumber, connected: false).ConfigureAwait(false);
-            if (reason is not null)
-            {
-                _logger.MachineSessionLost(Registration.SerialNumber);
-            }
+            _logger.MachineSessionLost(Registration.SerialNumber);
         }
     }
 
     /// <summary>The adapter says that it is there for this machine, whether the machine answers or not.</summary>
     private async Task HeartbeatAsync(CancellationToken cancellationToken)
     {
-        var seconds = Math.Max(1, (long)_heartbeatInterval.TotalSeconds);
         using var timer = new PeriodicTimer(_heartbeatInterval);
         do
         {
-            // Counting in intervals since 1970 keeps the counter rising across a restart without a file.
-            await _publisher
-                .PublishHeartbeatAsync(Registration.SerialNumber, DateTimeOffset.UtcNow.ToUnixTimeSeconds() / seconds)
-                .ConfigureAwait(false);
+            await Output.HeartbeatAsync().ConfigureAwait(false);
         }
         while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false));
     }
@@ -273,7 +282,7 @@ internal sealed class MachineConnection : ISessionTenant
                 AttributeId = Attributes.Value,
                 SamplingInterval = interval,
                 QueueSize = 10,
-                DisplayName = runtime.Topic,
+                DisplayName = runtime.Element.Path,
             };
             item.Notification += (_, e) =>
             {
@@ -448,7 +457,13 @@ internal sealed class MachineConnection : ISessionTenant
             return;
         }
 
-        Forget(_publisher.PublishValueAsync(Registration.SerialNumber, runtime.Element, converted!, timestamp));
+        Forget(Output.ValueAsync(runtime.Element, converted!, timestamp));
+
+        // A value of the identification that comes late, after an initial Bad, may complete the identity.
+        if (Output.MachineId is null && runtime.Element.Area == Topics.ModelArea && Topics.Identity.Contains(runtime.Element.Path))
+        {
+            Forget(IdentifyAsync());
+        }
     }
 
     private void OnEvent(EventFieldList list, NodeId alarmType, NamespaceTable namespaces)
@@ -483,10 +498,10 @@ internal sealed class MachineConnection : ISessionTenant
                     DateTimeUtc time => time.ToDateTime(),
                     _ => DateTime.UtcNow,
                 };
-                var title = TextOf(fields[2].AsBoxedObject(Variant.BoxingBehavior.Legacy)) ?? string.Empty;
+                var message = TextOf(fields[2].AsBoxedObject(Variant.BoxingBehavior.Legacy)) ?? string.Empty;
                 var severity = fields[3].AsBoxedObject(Variant.BoxingBehavior.Legacy) is IConvertible number ? number.ToInt32(System.Globalization.CultureInfo.InvariantCulture) : 0;
                 var code = (fields.Count > 8 ? TextOf(fields[8].AsBoxedObject(Variant.BoxingBehavior.Legacy)) : null) ?? TextOf(fields[5].AsBoxedObject(Variant.BoxingBehavior.Legacy)) ?? condition.ToString();
-                var change = _alerts.Observe(condition.ToString(), active, code, title, severity, at > DateTime.UtcNow ? DateTime.UtcNow : at);
+                var change = _alerts.Observe(condition.ToString(), active, code, message, severity, at > DateTime.UtcNow ? DateTime.UtcNow : at);
                 changes = change is null ? [] : [change];
             }
             else
@@ -500,11 +515,73 @@ internal sealed class MachineConnection : ISessionTenant
             }
         }
 
-        foreach (var change in changes)
+        Forget(AlertsAsync(changes));
+    }
+
+    /// <summary>
+    /// Puts alert changes on the broker one after the other, in the order they came: each with the list of the
+    /// alerts that stood after it. A change that comes while others still go out waits for them.
+    /// </summary>
+    private Task AlertsAsync(IReadOnlyList<AlertChange> changes)
+    {
+        if (changes.Count == 0)
         {
-            Forget(_publisher.PublishAlertAsync(Registration.SerialNumber, change));
+            return Task.CompletedTask;
+        }
+
+        lock (_gate)
+        {
+            // The list after each change, taken now: it goes back from the list that stands after the last one.
+            var steps = new List<(AlertChange Change, IReadOnlyList<OpenAlert> Open)>();
+            var open = _alerts.Open.ToList();
+            for (var i = changes.Count - 1; i >= 0; i--)
+            {
+                steps.Insert(0, (changes[i], [.. open.OrderBy(alert => alert.Since)]));
+                var conditionId = changes[i].Alert.ConditionId;
+                if (changes[i].Action == AlertAction.Raised)
+                {
+                    open.RemoveAll(alert => alert.ConditionId == conditionId);
+                }
+                else
+                {
+                    open.Add(changes[i].Alert);
+                }
+            }
+
+            _alertTail = _alertTail.ContinueWith(
+                async _ =>
+                {
+                    foreach (var (change, after) in steps)
+                    {
+                        await Output.AlertAsync(change, after).ConfigureAwait(false);
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default).Unwrap();
+            return _alertTail;
         }
     }
+
+    /// <summary>Identifies the machine from the values of its identification, once they are there, and keeps the identity.</summary>
+    private async Task IdentifyAsync()
+    {
+        if (Output.MachineId is null
+            && MachineOutput.IdentityOf(ValueOf, Registration.SerialNumber) is { } identity)
+        {
+            await Output.IdentifyAsync(identity).ConfigureAwait(false);
+            if (Output.MachineId is not null && Interlocked.Exchange(ref _identifiedOnce, 1) == 0)
+            {
+                _identified?.Invoke(identity);
+            }
+        }
+    }
+
+    private int _identifiedOnce;
+
+    /// <summary>The value an element of the model has now, as text, or null.</summary>
+    private string? ValueOf(string path) =>
+        _elements.FirstOrDefault(element => element.Element.Area == Topics.ModelArea && element.Element.Path == path)?.Text;
 
     /// <summary>
     /// A new subscription reports every node once. Waiting for that keeps the order of the binding:
@@ -610,7 +687,7 @@ internal sealed class MachineConnection : ISessionTenant
         return source.Year < 2000 || source > now ? now : DateTime.SpecifyKind(source, DateTimeKind.Utc);
     }
 
-    private sealed class ElementRuntime(ElementRegistration element, string topic)
+    private sealed class ElementRuntime(ElementRegistration element)
     {
         private readonly Lock _gate = new();
         private string? _raw;
@@ -619,7 +696,17 @@ internal sealed class MachineConnection : ISessionTenant
 
         public ElementRegistration Element { get; } = element;
 
-        public string Topic { get; } = topic;
+        /// <summary>The published value as text, or null before the first one.</summary>
+        public string? Text
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _value is null ? null : ValueConverter.KeyOf(_value);
+                }
+            }
+        }
 
         public string Status { get; private set; } = Pending;
 
@@ -655,7 +742,7 @@ internal sealed class MachineConnection : ISessionTenant
         {
             lock (_gate)
             {
-                return new ElementStatus(Element.Area, Element.Path, Topic, Element.Node, Status, _raw, _value, Element.Unit, _timestamp);
+                return new ElementStatus(Element.Area, Element.Path, Element.Node, Status, _raw, _value, Element.Unit, _timestamp);
             }
         }
     }

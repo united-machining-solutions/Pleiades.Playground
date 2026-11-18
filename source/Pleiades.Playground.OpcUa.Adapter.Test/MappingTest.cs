@@ -1,5 +1,3 @@
-using Pleiades.Playground.Common.DataTransferObjects;
-using Pleiades.Playground.Notification.DataTransferObjects;
 using Pleiades.Playground.OpcUa.Adapter.Mapping;
 using Pleiades.Playground.OpcUa.Adapter.Registrations;
 
@@ -9,12 +7,18 @@ namespace Pleiades.Playground.OpcUa.Adapter.Test;
 public class TopicsTest
 {
     [TestMethod]
-    [DataRow("State.MachineryItemState", "machines/P-04/umati/State/MachineryItemState")]
-    [DataRow("Channel[1].ChannelState", "machines/P-04/umati/Channel/1/ChannelState")]
-    [DataRow("Consumption.Electricity[Main].AcActivePowerTotal", "machines/P-04/umati/Consumption/Electricity/Main/AcActivePowerTotal")]
-    public void A_path_becomes_one_topic_level_per_dot_and_instance_key(string path, string expected)
+    [DataRow("umati", "Channel[1].ChannelState", "Channel.1.ChannelState")]
+    [DataRow("umati", "Consumption.Electricity[Main].AcActivePowerTotal", "Consumption.Electricity.Main.AcActivePowerTotal")]
+    [DataRow("umati", "OperationCounters.PowerOnDuration", "OperationCounters.PowerOnDuration")]
+    [DataRow("umati", "State.MachineryItemState", "State.Status")]
+    [DataRow("umati", "State.MachineryOperationMode", "State.Status")]
+    [DataRow("umati", "Production.ActiveProgram", "WorkMasterMonitoring.ActiveWorkMaster")]
+    [DataRow("umati", "Identification.SoftwareRevision", "x-trumpf-com.Identification.SoftwareRevision")]
+    [DataRow("oem", "Laser[1].Power", "x-trumpf-com.Laser.1.Power")]
+    [DataRow("vendor", "Laser[1].Power", "x-trumpf-com.Laser.1.Power")]
+    public void A_path_of_a_registration_becomes_the_path_of_the_binding(string area, string path, string expected)
     {
-        Assert.AreEqual(expected, Topics.Value("P-04", "umati", path));
+        Assert.AreEqual(expected, Topics.BindingPath(area, path, "x-trumpf-com"));
     }
 
     [TestMethod]
@@ -139,12 +143,37 @@ public class ValueConverterTest
     }
 
     [TestMethod]
-    public void A_unit_is_one_of_the_binding()
+    public void Kilowatt_hours_become_watt_hours()
     {
-        Assert.IsTrue(ValueConverter.TryParseUnit("joule", out var unit));
-        Assert.AreEqual(BaseUnit.Joule, unit);
-        Assert.IsFalse(ValueConverter.TryParseUnit("wattHour", out _));
-        Assert.IsFalse(ValueConverter.TryParseUnit(null, out _));
+        var element = new ElementRegistration { Kind = ValueKind.Number, Unit = "wattHour", Scale = 1000 };
+
+        Assert.AreEqual(1850500.0, ValueConverter.Convert(element, 1850.5)!.Number);
+    }
+}
+
+[TestClass]
+public class CatalogueUnitsTest
+{
+    [TestMethod]
+    [DataRow("Consumption.Electricity[Main].AcActiveEnergyTotalImportHp", "wattHour")]
+    [DataRow("Consumption.Electricity[Main].AcActivePowerTotal", "watt")]
+    [DataRow("Channel[1].FeedOverride", "one")]
+    [DataRow("Spindle[S1].Override", "one")]
+    [DataRow("OperationCounters.PartsProducedInLifetime", "piece")]
+    [DataRow("OperationCounters.PowerOnDuration", "second")]
+    public void An_element_of_the_model_has_the_unit_of_its_catalogue(string path, string expected)
+    {
+        Assert.AreEqual(expected, CatalogueUnits.Of(path));
+    }
+
+    [TestMethod]
+    public void A_year_has_no_unit_and_joule_is_not_a_unit_of_a_machine()
+    {
+        Assert.IsNull(CatalogueUnits.Of("Identification.YearOfConstruction"));
+        Assert.Contains("Identification.YearOfConstruction", CatalogueUnits.WithoutUnit);
+        Assert.IsTrue(CatalogueUnits.IsKnown("wattHour"));
+        Assert.IsFalse(CatalogueUnits.IsKnown("joule"), "A machine carries energy in wattHour, as the catalogue does.");
+        Assert.IsFalse(CatalogueUnits.IsKnown(null));
     }
 }
 
@@ -154,19 +183,19 @@ public class AlertTrackerTest
     private static readonly DateTime Start = new(2026, 11, 16, 9, 0, 0, DateTimeKind.Utc);
 
     [TestMethod]
-    [DataRow(1000, EventLevel.Error)]
-    [DataRow(667, EventLevel.Error)]
-    [DataRow(666, EventLevel.Warning)]
-    [DataRow(334, EventLevel.Warning)]
-    [DataRow(333, EventLevel.Information)]
-    [DataRow(1, EventLevel.Information)]
-    public void The_severity_gives_the_level(int severity, EventLevel expected)
+    [DataRow(1000, "Failure")]
+    [DataRow(667, "Failure")]
+    [DataRow(666, "OffSpec")]
+    [DataRow(334, "OffSpec")]
+    [DataRow(333, "MaintenanceRequired")]
+    [DataRow(1, "MaintenanceRequired")]
+    public void The_severity_gives_the_category_of_NE_107(int severity, string expected)
     {
-        Assert.AreEqual(expected, AlertTracker.LevelOf(severity));
+        Assert.AreEqual(expected, AlertTracker.CategoryOf(severity));
     }
 
     [TestMethod]
-    public void An_alarm_is_raised_once_and_reset_once_with_the_same_correlation()
+    public void An_alarm_is_raised_once_and_cleared_once_with_the_same_id()
     {
         var tracker = new AlertTracker();
 
@@ -175,11 +204,11 @@ public class AlertTrackerTest
         var reset = tracker.Observe("c1", active: false, "4711", "Coolant low", 400, Start.AddSeconds(9));
         var resetAgain = tracker.Observe("c1", active: false, "4711", "Coolant low", 400, Start.AddSeconds(10));
 
-        Assert.AreEqual(NotificationAction.Raised, raised!.Action);
-        Assert.AreEqual(EventLevel.Warning, raised.Alert.Level);
+        Assert.AreEqual(AlertAction.Raised, raised!.Action);
+        Assert.AreEqual("OffSpec", raised.Alert.Severity);
         Assert.IsNull(again, "An alarm that stands is not raised a second time.");
-        Assert.AreEqual(NotificationAction.Reset, reset!.Action);
-        Assert.AreEqual(raised.Alert.CorrelationId, reset.Alert.CorrelationId);
+        Assert.AreEqual(AlertAction.Cleared, reset!.Action);
+        Assert.AreEqual(raised.Alert.Id, reset.Alert.Id);
         Assert.IsNull(resetAgain);
         Assert.IsEmpty(tracker.Open);
     }
@@ -197,30 +226,43 @@ public class AlertTrackerTest
         var caughtUp = tracker.EndRefresh(Start.AddMinutes(2));
 
         Assert.IsNull(still);
-        Assert.AreEqual(NotificationAction.Raised, fresh!.Action);
+        Assert.AreEqual(AlertAction.Raised, fresh!.Action);
         Assert.HasCount(1, caughtUp);
         Assert.AreEqual("gone", caughtUp[0].Alert.ConditionId);
-        Assert.AreEqual(NotificationAction.Reset, caughtUp[0].Action);
+        Assert.AreEqual(AlertAction.Cleared, caughtUp[0].Action);
         CollectionAssert.AreEquivalent(new[] { "stays", "new" }, tracker.Open.Select(alert => alert.ConditionId).ToArray());
     }
 
     [TestMethod]
     public void The_alarms_of_the_last_run_are_known_at_the_start()
     {
-        var before = new OpenAlert("c1", "aaaaaaaaaaaaaaaaaaaaaaaa", "4711", "Coolant low", EventLevel.Warning, Start);
+        var before = new OpenAlert("c1", "6f1c1d3e-8f5a-4b5e-9d55-0c1b8a7e2f10", "4711", "Coolant low", 400, Start);
         var tracker = new AlertTracker([before]);
 
         var reset = tracker.Observe("c1", active: false, "4711", "Coolant low", 400, Start.AddHours(1));
 
-        Assert.AreEqual("aaaaaaaaaaaaaaaaaaaaaaaa", reset!.Alert.CorrelationId);
+        Assert.AreEqual("6f1c1d3e-8f5a-4b5e-9d55-0c1b8a7e2f10", reset!.Alert.Id);
     }
 
     [TestMethod]
-    public void An_identifier_has_the_form_the_events_api_stores()
+    public void An_alert_has_the_fields_of_the_model()
     {
-        var id = AlertTracker.NewId();
+        var alert = new OpenAlert("c1", "6f1c1d3e-8f5a-4b5e-9d55-0c1b8a7e2f10", "4711", "Coolant low", 400, Start, "Coolant");
 
-        Assert.AreEqual(24, id.Length);
-        Assert.IsTrue(id.All(Uri.IsHexDigit));
+        var json = alert.ToJson();
+
+        Assert.AreEqual("6f1c1d3e-8f5a-4b5e-9d55-0c1b8a7e2f10", (string?)json["Id"]);
+        Assert.AreEqual("4711", (string?)json["ErrorCode"]);
+        Assert.AreEqual("Coolant low", (string?)json["Message"]);
+        Assert.AreEqual("OffSpec", (string?)json["Severity"]);
+        Assert.AreEqual(400, (int?)json["SeverityValue"]);
+        Assert.AreEqual("2026-11-16T09:00:00.000Z", (string?)json["Time"]);
+        Assert.AreEqual("Coolant", (string?)json["SourceName"]);
+    }
+
+    [TestMethod]
+    public void An_id_is_a_uuid()
+    {
+        Assert.IsTrue(Guid.TryParse(AlertTracker.NewId(), out _));
     }
 }

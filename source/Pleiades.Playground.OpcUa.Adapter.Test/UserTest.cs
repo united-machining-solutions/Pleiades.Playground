@@ -109,7 +109,7 @@ public class UserSessionTest
         {
             SerialNumber = "A1121O0001",
             Endpoint = new EndpointRegistration { Url = "opc.tcp://gateway:11878", SecurityMode = SecurityMode.Sign, User = "operator" },
-            Elements = [new ElementRegistration { Path = "Vendor.Value", Area = "vendor", Kind = ValueKind.Text, Node = "nsu=urn:a;i=1" }],
+            Elements = [new ElementRegistration { Path = "Vendor.Value", Area = "oem", Kind = ValueKind.Text, Node = "nsu=urn:a;i=1" }],
         };
 
         Assert.IsTrue(RegistrationValidator.Validate(registration).Any(problem => problem.StartsWith("endpoint.user:", StringComparison.Ordinal)));

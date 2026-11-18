@@ -69,7 +69,7 @@ internal sealed class MachineSupervisor : BackgroundService
     private readonly AlertStore _alertStore;
     private readonly OpcUaClient _client;
     private readonly RegistrationProbe _probe;
-    private readonly IMachinePublisher _publisher;
+    private readonly IMachineOutputFactory _outputs;
     private readonly DraftStore _drafts;
     private readonly CredentialStore _credentials;
     private readonly Config _config;
@@ -81,7 +81,7 @@ internal sealed class MachineSupervisor : BackgroundService
         AlertStore alertStore,
         OpcUaClient client,
         RegistrationProbe probe,
-        IMachinePublisher publisher,
+        IMachineOutputFactory outputs,
         DraftStore drafts,
         CredentialStore credentials,
         MachineDataEraser eraser,
@@ -94,7 +94,7 @@ internal sealed class MachineSupervisor : BackgroundService
         _alertStore = alertStore;
         _client = client;
         _probe = probe;
-        _publisher = publisher;
+        _outputs = outputs;
         _drafts = drafts;
         _config = config.Value;
         _logger = logger;
@@ -243,6 +243,7 @@ internal sealed class MachineSupervisor : BackgroundService
     public async Task<RegistrationOutcome> RegisterAsync(MachineRegistration registration, bool dryRun, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(registration);
+        registration = RegistrationStore.Migrate(registration);
         registration = registration with { Endpoint = registration.Endpoint with { Url = EndpointKey.Trim(registration.Endpoint.Url) } };
 
         // The user a person stored for the server is the user of the session; the password stays in the store.
@@ -322,6 +323,17 @@ internal sealed class MachineSupervisor : BackgroundService
             return new RegistrationOutcome(null, mismatch, endpoints, probe) { Tried = registration };
         }
 
+        // The machine id of every topic and the source of every event: from the identification the server gave now.
+        var identity = MachineOutput.IdentityOf(path => probe.ValueOf(path), registration.SerialNumber);
+        if (identity is null)
+        {
+            return new RegistrationOutcome(
+                null,
+                ["identity: Identification.Manufacturer and ProductInstanceUri must each give a text: the machine id of the topics and the source of the events are formed from them."],
+                endpoints,
+                probe) { Tried = registration };
+        }
+
         // The certificate the server presents now is the one this machine is known by from here on.
         var stored = registration with
         {
@@ -330,6 +342,8 @@ internal sealed class MachineSupervisor : BackgroundService
                 ServerCertificateThumbprint = registration.Endpoint.ServerCertificateThumbprint ?? probe.ServerCertificateThumbprint,
             },
             Discovery = (registration.Discovery ?? new DiscoveryRecord()) with { Namespaces = probe.Namespaces },
+            Identity = identity,
+            SchemaVersion = MachineRegistration.CurrentSchemaVersion,
         };
         if (dryRun)
         {
@@ -339,7 +353,7 @@ internal sealed class MachineSupervisor : BackgroundService
         await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await StopAsync(stored.SerialNumber).ConfigureAwait(false);
+            await StopAsync(stored.SerialNumber, removed: false).ConfigureAwait(false);
             _store.Save(stored);
             await StartAsync(stored).ConfigureAwait(false);
         }
@@ -348,7 +362,7 @@ internal sealed class MachineSupervisor : BackgroundService
             _changes.Release();
         }
 
-        _logger.MachineRegistered(stored.SerialNumber, stored.Elements.Count, string.Join(", ", stored.Profiles));
+        _logger.MachineRegistered(stored.SerialNumber, identity.MachineId ?? stored.SerialNumber, stored.Elements.Count, string.Join(", ", stored.Profiles));
         return new RegistrationOutcome(stored, [], endpoints, probe);
     }
 
@@ -404,22 +418,19 @@ internal sealed class MachineSupervisor : BackgroundService
     }
 
     /// <summary>
-    /// Removes a machine completely: closes its session, says <c>Disconnected</c>, resets the alarms
-    /// that stand, deletes its registration, and then deletes what it published from the Timeseries
-    /// and the Events API. Returns null if no such machine is added.
+    /// Removes a machine completely: closes its session, clears the alarms that stand, takes its retained
+    /// messages back from the broker, deletes its registration, and then deletes what it published from the
+    /// Timeseries and the Events API, by its machine id. Returns null if no such machine is added.
     /// </summary>
     public async Task<DataDeletion?> RemoveAsync(string serialNumber, CancellationToken cancellationToken)
     {
+        string? machineId;
         await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var connection = Find(serialNumber);
-            await StopAsync(serialNumber).ConfigureAwait(false);
-            if (connection is not null)
-            {
-                await connection.ResetOpenAlertsAsync().ConfigureAwait(false);
-            }
-
+            machineId = Find(serialNumber)?.Output.MachineId
+                ?? _store.LoadAll().FirstOrDefault(stored => stored.SerialNumber == serialNumber)?.Identity?.MachineId;
+            await StopAsync(serialNumber, removed: true).ConfigureAwait(false);
             _alertStore.Delete(serialNumber);
             if (!_store.Delete(serialNumber))
             {
@@ -433,9 +444,15 @@ internal sealed class MachineSupervisor : BackgroundService
             _changes.Release();
         }
 
-        // The last values, Disconnected and the resets are on their way to the stores: let them arrive, then delete.
+        if (machineId is null)
+        {
+            // Never identified: nothing of it went to the broker, so nothing of it is stored.
+            return new DataDeletion(0, 0, []);
+        }
+
+        // The last values and the clearing of the alerts are on their way to the stores: let them arrive, then delete.
         await Task.Delay(_config.DataSettleTime, cancellationToken).ConfigureAwait(false);
-        var deletion = await _eraser.DeleteAsync(serialNumber, cancellationToken).ConfigureAwait(false);
+        var deletion = await _eraser.DeleteAsync(machineId, cancellationToken).ConfigureAwait(false);
         if (deletion.Problems.Count == 0)
         {
             _logger.MachineDataDeleted(serialNumber, deletion.ValuesDeleted ?? 0, deletion.EventsDeleted ?? 0);
@@ -464,12 +481,12 @@ internal sealed class MachineSupervisor : BackgroundService
         }
         catch (OperationCanceledException)
         {
-            // The service stops: every machine says Disconnected before the broker connection goes.
+            // The service stops: every machine says Shutdown before its broker connection goes.
         }
 
         foreach (var serialNumber in _machines.Keys.ToList())
         {
-            await StopAsync(serialNumber).ConfigureAwait(false);
+            await StopAsync(serialNumber, removed: false).ConfigureAwait(false);
         }
 
         await _pool.DisposeAsync().ConfigureAwait(false);
@@ -484,7 +501,7 @@ internal sealed class MachineSupervisor : BackgroundService
     private async Task StartAsync(MachineRegistration registration)
     {
         var connection = new MachineConnection(
-            registration, _publisher, _alertStore, _config.HeartbeatInterval, _config.SamplingInterval, _logger);
+            registration, _outputs, _alertStore, _config.HeartbeatInterval, _config.SamplingInterval, _logger, identity => Remember(registration, identity));
 #pragma warning disable CA2000 // Disposed in StopAsync, when the machine is stopped.
         var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_stopping);
 #pragma warning restore CA2000
@@ -511,9 +528,10 @@ internal sealed class MachineSupervisor : BackgroundService
 
     /// <summary>
     /// Stops a machine: it leaves the session of its endpoint, which closes only with the last
-    /// machine on it, and its heartbeat ends.
+    /// machine on it, and its heartbeat ends. Its output says <c>Shutdown</c>; a machine that is
+    /// removed clears its alarms first and takes its retained messages back instead.
     /// </summary>
-    private async Task StopAsync(string serialNumber)
+    private async Task StopAsync(string serialNumber, bool removed)
     {
         if (!_machines.TryRemove(serialNumber, out var running))
         {
@@ -524,6 +542,30 @@ internal sealed class MachineSupervisor : BackgroundService
         await running.Cancellation.CancelAsync().ConfigureAwait(false);
         await running.Task.ConfigureAwait(false);
         running.Cancellation.Dispose();
+        if (removed)
+        {
+            await running.Connection.ResetOpenAlertsAsync().ConfigureAwait(false);
+        }
+
+        await running.Connection.Output.StopAsync(removed).ConfigureAwait(false);
+        await running.Connection.Output.DisposeAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Keeps the identity a machine learned from its first values with its registration, so that it keeps its
+    /// machine id after a restart, also while it does not answer.
+    /// </summary>
+    private void Remember(MachineRegistration registration, IdentityRegistration identity)
+    {
+        try
+        {
+            _store.Save(registration with { Identity = identity, SchemaVersion = MachineRegistration.CurrentSchemaVersion });
+            _logger.MachineIdentified(registration.SerialNumber, identity.MachineId ?? string.Empty);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            _logger.RegistrationUnreadable(registration.SerialNumber, exception.Message);
+        }
     }
 
     private sealed record Running(MachineConnection Connection, CancellationTokenSource Cancellation, Task Task);

@@ -23,7 +23,7 @@ internal enum MappingState
 
 /// <summary>One line of a mapping review.</summary>
 /// <param name="Path">The element.</param>
-/// <param name="Area"><c>umati</c> or <c>vendor</c>.</param>
+/// <param name="Area"><c>umati</c> or <c>oem</c>.</param>
 /// <param name="State">How well it is served.</param>
 /// <param name="Node">The node, if one is mapped.</param>
 /// <param name="Detail">Why: the evidence of the match, the reason it is missing, or what is wrong.</param>

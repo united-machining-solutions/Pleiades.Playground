@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "serialNumber": "A0280O0001",
   "displayName": "Sample: TRUMPF TruLaser of the TRUMPF OPC UA simulator, definition L26",
   "modelVersion": "0.8.0",
@@ -95,15 +95,15 @@
     {
       "path": "Consumption.Electricity[Main].AcActiveEnergyTotalImportHp",
       "kind": "Number",
-      "unit": "joule",
+      "unit": "wattHour",
       "node": "nsu=http://trumpf.com/TRUMPF-Interfaces/;s=202",
-      "scale": 3600000,
+      "scale": 1000,
       "match": "Unclear",
-      "evidence": "TRUMPF interface, Machine/EnergyMetering/MeterReadings/Energy/ReceivedEnergy. The node has no EngineeringUnits; the simulator documents kilowatt hours; times 3.6e6 for joule, the unit of the MQTT binding. Unclear until a person confirms the unit of the real meter."
+      "evidence": "TRUMPF interface, Machine/EnergyMetering/MeterReadings/Energy/ReceivedEnergy. The node has no EngineeringUnits; the simulator documents kilowatt hours; times 1000 for wattHour, the unit of the catalogue of the data model. Unclear until a person confirms the unit of the real meter."
     },
     {
       "path": "ActivityMeters.DrivesOnDuration",
-      "area": "vendor",
+      "area": "oem",
       "kind": "Number",
       "unit": "second",
       "node": "nsu=http://trumpf.com/TRUMPF-Interfaces/;s=336",

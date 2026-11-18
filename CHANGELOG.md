@@ -210,10 +210,10 @@ All notable changes are documented here. The format follows
   the last hours, as stacked bars, and its state over the last 30 minutes, as a step line per machine. One
   server function, `getCharts`, reads the values over one connection, the spans of the last 30 minutes only.
   The charts are the chart of shadcn/ui; `recharts` is new in the app.
-- OPC UA adapter `opcua-adapter` in the demo stack on port 5530, a proof of concept, with the TRUMPF OPC UA
+- OPC UA adapter `opcua-adapter` in the demo stack on port 5560, a proof of concept, with the TRUMPF OPC UA
   simulator as a machine to try it with (`ghcr.io/umati/trumpf/edge/opc-simulator`). It runs every registered
-  OPC UA machine from its registration in the volume `/data` and publishes its values and alarms by the MQTT
-  binding, also after a restart. It hosts the read-only tools of the OPC UA MCP library of the OPC Foundation.
+  OPC UA machine from its registration in the volume `/data` and publishes its values and alarms by the binding
+  of machines of the data model 0.17.1, also after a restart. It hosts the read-only tools of the OPC UA MCP library of the OPC Foundation.
   In the chat of the example app, `/discover` scans a server and proposes its registration, which a person
   adds with a button; `/opcua`, `/mapping`, `/rescan` and `/help` list servers, show mismatched and unclear
   mappings and scan again. Machines behind an OPC UA aggregation server (a gateway) are listed by
@@ -232,22 +232,37 @@ All notable changes are documented here. The format follows
   item state and the operation mode as the members of the structure `State.Status`, which the adapter
   decodes. An element the server does not fill is moved to `missing`. A machine a server shows twice, in that
   namespace and by the root of its TRUMPF interface, is listed once.
-- OPC UA adapter: the core and the profiles of the data model, specification 0.17.0, on the paths of today's
-  MQTT binding. A machine is added only if it fulfils the core whole: 13 elements, among them
+- OPC UA adapter: the core and the profiles of the data model, specification 0.17.0. A machine is added only if it fulfils the core whole: 13 elements, among them
   `Identification.ManufacturerUri`, `.Model`, `.ProductCode`, `.YearOfConstruction`, `State.FeedOverride` and
   the alarms, which come from `alerts`. Of `IdentificationExtended`, `MonitoringExtended`, `ChannelMonitoring`,
   `Spindle` and `EnergyElectricity` only a complete profile, or a complete channel, spindle or measuring point,
   is published; the elements of an incomplete one go to `missing`. The adapter names the profiles itself. The
   proposal card and the list of the added servers in the chat show whether the core is fulfilled and which
   profiles are complete, and the answers carry it as `conformance`.
-- The data of a machine can be deleted. `DELETE /machines/{serialNumber}` of the Timeseries API deletes every
-  value below `machines/{serialNumber}/`, `DELETE /machineEvents/machines/{mId}` of the Events API every
-  event of the machine; each says how many, and refuses a serial number with `/`, `+` or `#`. No MCP
+- The data of a machine can be deleted. `DELETE /machines/{machineId}` of the Timeseries API deletes every
+  value below `machines/{machineId}/`, `DELETE /machineEvents/machines/{mId}` of the Events API every
+  event of the machine; each says how many, and refuses a machine id with `/`, `+` or `#`. No MCP
   tool deletes: a language model cannot.
-- OPC UA adapter: removing a machine removes it completely. After the registration, the adapter deletes the
-  stored values and notifications of the machine through those two endpoints (`Config:TimeseriesApi:Uri`,
-  `Config:EventsApi:Uri`, set in `compose.yaml`), after `Config:DataSettleTime` (8 s), so that its last
-  values are stored first. The answer says how many; the Remove dialog in the chat says so.
+- OPC UA adapter: removing a machine removes it completely. It takes the retained messages of the machine back
+  from the broker, and after the registration deletes its stored values and events through those two endpoints,
+  by its machine id (`Config:TimeseriesApi:Uri`, `Config:EventsApi:Uri`, set in `compose.yaml`), after
+  `Config:DataSettleTime` (8 s), so that its last values are stored first. The answer says how many; the Remove
+  dialog in the chat says so.
+- OPC UA adapter: it publishes by the binding of machines, with the publisher the Ultimaker telemetry and the
+  juice bar use, and one MQTT connection per machine, each with its own last will. A machine is named by its
+  machine id, `<manufacturer>_<model>_<serial number>`, formed from the identification its server gave when it
+  was added and kept with its registration as `identity`; a registration from before learns it from the first
+  values. The manifest declares the complete profiles; `State.Status` is the snapshot of the item state and the
+  operation mode; a value of the maker is a signal of the manufacturer below `oem/`; `Connection/State` says
+  `Initializing`, `Running`, `CommunicationFault` and `Shutdown`. Numbers are in the units of the catalogue,
+  energy in `wattHour`: a registration of version 1 is moved over when it is read (`joule` to `wattHour`, a
+  count to `piece`, a year without a unit), and the examples are version 2. The alarms are the list
+  `Notification.ActiveAlerts` and the CloudEvents `Notification.AlertRaised` and `AlertCleared`, with the
+  category of NE 107 from the severity of OPC UA. A value of the maker is in the area `oem` of a registration, as
+  the namespace level of the binding; a registration that says `vendor` is moved over. `Production.ActiveProgram`
+  goes out as `WorkMasterMonitoring.ActiveWorkMaster`, and `Identification.SoftwareRevision`, no element of the
+  model 0.17.1, as a signal of the manufacturer. The adapter answers on port 5560 (`OPCUA_ADAPTER_PORT`), since
+  5530 is the Ultimaker API; the Margo app has the adapter and the simulator too.
 - OPC UA adapter: the scan in the chat reads the descriptions of the nodes. The model reads the `Description`
   attribute of all candidates in one call and uses it to choose between them, to tell what a node of the maker
   means, and as the unit of a node without `EngineeringUnits`. A description that contradicts the element, or
@@ -342,9 +357,11 @@ All notable changes are documented here. The format follows
   `A1121O0001`. That image is built for amd64 only; on arm64, `OPC_SIMULATOR_IMAGE` names another one.
 - OPC UA adapter: a registration that names the profiles `Core` without the 13 elements of the core of the
   specification 0.17.0 is refused; a machine added before keeps running and the list says what it lacks. The
-  example registration of `K09` maps `ManufacturerUri`, `ProductCode` and `YearOfConstruction` and fulfils
-  the core. Its channel values are no longer published: the simulator has no `RapidOverride`, so
-  `ChannelMonitoring` is not complete. The example of `L26` does not fulfil the core.
+  example registration of `K09` names the machine in `urn:umati2:datamodel:opcua` and fulfils the core from it,
+  with the model `TruMatic 1000 fiber` instead of the serial number the known mapping of the MachineTool instance
+  gives; it adds the active program, power, energy and the drive time from the TRUMPF interface. Its channel
+  values are no longer published: the simulator has no `RapidOverride`, so `ChannelMonitoring` is not complete.
+  The example of `L26` does not fulfil the core.
 - `README.md` starts the stack with `--wait` and shows the two lines that enable the chat. The development
   setup has three more known issues: a download that breaks off, `pnpm` through the path, and a key that
   `docker compose restart` does not pick up.
