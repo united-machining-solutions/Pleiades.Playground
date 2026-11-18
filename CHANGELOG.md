@@ -15,6 +15,8 @@ All notable changes are documented here. The format follows
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
   as every other API does.
+- Site card: `genui_site_list` in `genui-mcp` lists every site with its machines by hall and state, counted, and
+  the machines that send values and stand on no site. It reads the Sites API at `SITES_API_URL`.
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
 - Example app: the button "Tools" in the message field of the chat lists the servers that give the chat

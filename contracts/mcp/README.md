@@ -11,11 +11,11 @@ the server is the source of truth for tool names and parameters.
 | Timeseries | `http://localhost:5500/mcp` | `timeseries_topics_query`, `timeseries_baseunit_query`, `timeseries_string_query`, `timeseries_boolean_query`, `timeseries_statistics_query` |
 | Events | `http://localhost:5510/mcp` | `events_machine_events_query`, `events_sequence_gaps_query`, `events_active_alerts_query`, `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query`, `events_program_executions_query` |
 | Sites | `http://localhost:5540/mcp` | `sites_site_list`, `sites_placement_list`, read-only: placing a machine is REST only |
-| Generative UI | `http://localhost:5520/mcp` | `genui_machine_list`, `genui_machine_show`, `genui_measurement_list`, and for cards `genui_span_list` and `genui_measurement_series` |
+| Generative UI | `http://localhost:5520/mcp` | `genui_machine_list`, `genui_machine_show`, `genui_measurement_list`, `genui_site_list`, and for cards `genui_span_list` and `genui_measurement_series` |
 | Ultimaker (optional) | `http://localhost:5530/mcp` | Profile selection, STL storage, slicing, validation, artifacts and explicit printer pairing/start; see [contract](../ultimaker/README.md) |
 | Juice bar (optional) | `http://localhost:5550/mcp` | `juicebar_drinks_list`, `juicebar_drink_get`, `juicebar_status`, `juicebar_order_get`, `juicebar_order_create`; see the [service guide](../../source/Pleiades.Playground.JuiceBar.Api/README.md) |
 
-The generative UI server is not an API of its own: it reads the two servers above over REST and returns what
+The generative UI server is not an API of its own: it reads the three servers above over REST and returns what
 a display needs, each value with the topic or notification it comes from. Its results are answers, not raw
 data: the text of a result says in words what the values are, so its tools need no call before them.
 `genui_machine_show` links the machine card, the resource `ui://genui/machine`: a host that shows MCP Apps
