@@ -83,9 +83,9 @@ process.on("exit", startAgain)
 process.once("SIGINT", () => process.exit(130))
 process.once("SIGTERM", () => process.exit(143))
 
-/** Opens a page with the chat panel at its start. Answers why the chat cannot be shown, if it cannot. */
+/** Opens a page with the chat panel at its list. Answers why the chat cannot be shown, if it cannot. */
 async function openChat(page, url) {
-  await page.goto(`${url}?chat=new`)
+  await page.goto(`${url}?chat=all`)
   const field = page.getByRole("textbox", { name: "Message" })
   const none = page.getByText("No language model configured")
   await field.or(none).first().waitFor()

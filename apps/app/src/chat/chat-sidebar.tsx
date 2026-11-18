@@ -252,8 +252,7 @@ function Start({ fresh = false }: { fresh?: boolean }) {
               <EmptyMedia variant="icon">
                 <MessageCircleDashedIcon />
               </EmptyMedia>
-              {/* In a new chat the head says what it is. */}
-              {!fresh && <EmptyTitle>No chats yet</EmptyTitle>}
+              <EmptyTitle>{fresh ? "No question yet" : "No chats yet"}</EmptyTitle>
               <EmptyDescription>
                 Ask what the machines do, begin with one of the questions below, or type <code>/help</code> for the
                 commands.
