@@ -6,15 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@plei
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@pleiades/ui/components/chart"
 import type { ChartConfig } from "@pleiades/ui/components/chart"
 import { Meter } from "@pleiades/ui/components/meter"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@pleiades/ui/components/pagination"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@pleiades/ui/components/table"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
@@ -24,7 +15,8 @@ import { MachineName } from "../shared/machine-name.tsx"
 import { axisScale } from "../shared/scale.ts"
 import { SmoothHeight } from "../shared/smooth-height.tsx"
 import type { EnergySeries, EnergyShow, MachineEnergy } from "./contract.ts"
-import { ENERGY_ORDERS, pageLinks, pageOf } from "./order.ts"
+import { Pages } from "../shared/pages.tsx"
+import { ENERGY_ORDERS, pageOf } from "./order.ts"
 import type { EnergyOrder, EnergyPage } from "./order.ts"
 import { axisKilowatts, cardRange, inKilowattHours, kilowattHours, kilowatts } from "./words.ts"
 
@@ -134,64 +126,12 @@ function OrderChoice({ order, onChange }: { order: EnergyOrder; onChange: (order
 
 /** Where the page lies among all machines, and the way to the others. The card does not navigate. */
 function EnergyPages({ view, onPage }: { view: EnergyPage; onPage: (page: number) => void }) {
-  const go = (page: number) => (event: { preventDefault: () => void }) => {
-    event.preventDefault()
-    if (page >= 1 && page <= view.pages && page !== view.page) onPage(page)
-  }
-  const off = (disabled: boolean) => (disabled ? { "aria-disabled": true, tabIndex: -1, className: "pointer-events-none opacity-50" } : {})
   return (
-    <div className="@container/pages flex flex-wrap items-center justify-between gap-2">
+    <Pages page={view.page} pages={view.pages} onPage={onPage}>
       <p className="text-xs text-muted-foreground tabular-nums">
         {view.first}–{view.last} of {view.total}
       </p>
-      {/* Where the card is narrow, the links leave out the neighbours of the current page. */}
-      <Pagination className="mx-0 w-auto hidden @sm/pages:flex">
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious href="#" onClick={go(view.page - 1)} {...off(view.page === 1)} />
-          </PaginationItem>
-          {pageLinks(view.page, view.pages, 1).map((one, index) =>
-            one === "gap" ? (
-              <PaginationItem key={`gap-${index}`}>
-                <PaginationEllipsis />
-              </PaginationItem>
-            ) : (
-              <PaginationItem key={one}>
-                <PaginationLink href="#" isActive={one === view.page} onClick={go(one)}>
-                  {one}
-                </PaginationLink>
-              </PaginationItem>
-            ),
-          )}
-          <PaginationItem>
-            <PaginationNext href="#" onClick={go(view.page + 1)} {...off(view.page === view.pages)} />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
-      <Pagination className="mx-0 w-auto @sm/pages:hidden">
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious href="#" onClick={go(view.page - 1)} {...off(view.page === 1)} />
-          </PaginationItem>
-          {pageLinks(view.page, view.pages, 0).map((one, index) =>
-            one === "gap" ? (
-              <PaginationItem key={`gap-${index}`}>
-                <PaginationEllipsis />
-              </PaginationItem>
-            ) : (
-              <PaginationItem key={one}>
-                <PaginationLink href="#" isActive={one === view.page} onClick={go(one)}>
-                  {one}
-                </PaginationLink>
-              </PaginationItem>
-            ),
-          )}
-          <PaginationItem>
-            <PaginationNext href="#" onClick={go(view.page + 1)} {...off(view.page === view.pages)} />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
-    </div>
+    </Pages>
   )
 }
 

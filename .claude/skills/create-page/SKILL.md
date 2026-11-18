@@ -132,7 +132,7 @@ tour.
    The breadcrumb of the header comes from the same place and needs no file of yours. A page with an entry
    is called by the title of its entry there. A page without one stands behind the entry it is under, and
    says what it is called with `staticData: { crumb }`: a text, or a function of the parameters of the
-   route, as `src/routes/machines.$machine.tsx` does it.
+   route, as `src/routes/sites.$machine.tsx` does it.
 
 The page looks like the pages that are there: the same title, the same spacing, the light theme.
 

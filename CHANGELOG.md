@@ -48,6 +48,8 @@ All notable changes are documented here. The format follows
   the machines that send values and stand on no site. It reads the Sites API at `SITES_API_URL`.
 - Site card: a machine on no site carries what it does now (`now`), as a placed one does, so a page can keep it
   live.
+- Example app: the page Sites (`/sites`) shows where the machines stand, by site and hall. The page of a
+  machine moved under it to `/sites/<machine id>`; `/machines/<machine id>` leads there.
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
 - Example app: the button "Tools" in the message field of the chat lists the servers that give the chat

@@ -1,5 +1,5 @@
 import type { MachineList, State } from "@pleiades/cards/machine/contract.ts"
-import { stateOf } from "@pleiades/cards/machine/state.ts"
+import { NEEDS_YOU, stateOf } from "@pleiades/cards/machine/state.ts"
 import { Badge } from "@pleiades/ui/components/badge"
 import { Card } from "@pleiades/ui/components/card"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
@@ -27,7 +27,7 @@ const live: Live<MachineList | null> = {
 
 /** Home asks "what needs you?": first the machines that do, then the rest. */
 const groups: ReadonlyArray<{ title: string; states: ReadonlyArray<State> }> = [
-  { title: "Needs you", states: ["alarm", "stopped", "no-data"] },
+  { title: "Needs you", states: NEEDS_YOU },
   { title: "Setup", states: ["setup"] },
   { title: "Running", states: ["running"] },
 ]
