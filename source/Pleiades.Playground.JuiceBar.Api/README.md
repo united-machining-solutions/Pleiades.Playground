@@ -89,8 +89,9 @@ SI units, in the answers of REST and MCP and on the broker.
 
 With a broker configured, the service publishes every ten seconds below `machines/{MachineId}/`, in the tree of
 the [MQTT binding](../../contracts/mqtt/README.md). The machine id is `<manufacturer>_<model>_<serial number>`,
-`unknown_JuiceBar_JUICEBAR-01` by default: this repository names no manufacturer of the machine, and `unknown` is
-what the binding puts for a part that is not known. The machine is not in the umati data model, so its own values
+`trumpf_JuiceBar_JUICEBAR-01` by default: the juice bar of the demo was built by TRUMPF. For a machine of
+another maker, set `JUICEBAR_MANUFACTURER` and `JUICEBAR_MANUFACTURER_NAME`; `unknown` is what the binding puts
+for a part that is not known. The machine is not in the umati data model, so its own values
 lie in the namespace `oem`, below `oem/JuiceBar/`.
 
 As the [Ultimaker telemetry](../../contracts/ultimaker/telemetry.md), it follows the tree of the binding and not
@@ -102,7 +103,7 @@ Timeseries store keeps that field on.
 |---|---|---|
 | `umati/Connection/State` | string | – |
 | `umati/Connection/Heartbeat` | number | `one` |
-| `umati/Identification/Model`, `umati/Identification/SerialNumber`, and `umati/Identification/Manufacturer` when `JUICEBAR_MANUFACTURER_NAME` is set | string, at the start and every five minutes | – |
+| `umati/Identification/Manufacturer`, `umati/Identification/Model`, `umati/Identification/SerialNumber`; the manufacturer only while `JUICEBAR_MANUFACTURER_NAME` is not empty | string, at the start and every five minutes | – |
 | `umati/State/Status/MachineryItemState` | string (`Executing` while it mixes, else `NotExecuting`) | – |
 | `oem/JuiceBar/Production/State` | string | – |
 | `oem/JuiceBar/Production/QueueLength` | number | `one` |
@@ -124,8 +125,8 @@ published. The machine card and the list of machines show a machine whose adapte
 | `JUICEBAR_BIND` | `127.0.0.1` | The address the port is published on. |
 | `JUICEBAR_API_PORT` | `5550` | |
 | `JUICEBAR_SERIAL_NUMBER` | `JUICEBAR-01` | The serial number, the last part of the machine id in the topics. It was `JUICEBAR_MACHINE_ID` before; an existing `.env` no longer applies. |
-| `JUICEBAR_MANUFACTURER` | `unknown` | The first part of the machine id: the domain of the manufacturer without its ending. |
-| `JUICEBAR_MANUFACTURER_NAME` | empty | The name of the manufacturer a display shows; not published while empty. |
+| `JUICEBAR_MANUFACTURER` | `trumpf` | The first part of the machine id: the domain of the manufacturer without its ending. |
+| `JUICEBAR_MANUFACTURER_NAME` | `TRUMPF` | The name of the manufacturer a display shows; not published while empty. |
 | `JUICEBAR_MODEL` | `JuiceBar` | The model, the second part of the machine id. |
 | `JUICEBAR_LANGUAGE` | `en` | `en` or `de`, for the names of drinks and ingredients. |
 | `JUICEBAR_AUTH_ENABLED` | `false` | `true` switches sign-in on; it needs `JUICEBAR_AUTH_METADATA_ADDRESS`, `JUICEBAR_AUTH_VALID_ISSUER` and `JUICEBAR_AUTH_AUDIENCE`. |

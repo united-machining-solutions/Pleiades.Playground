@@ -36,7 +36,7 @@ All notable changes are documented here. The format follows
   deployment with COMPOSE_PROFILES=ultimaker.
 - Optional juice bar service `juicebar-api` (Compose profile `juicebar`, port 5550): the card and the state of
   a machine that runs MixerControl over REST and MCP, an order on request, and its state on the broker below
-  `machines/{MachineId}/`, `unknown_JuiceBar_JUICEBAR-01` by default, with its own values below `oem/JuiceBar/`.
+  `machines/{MachineId}/`, `trumpf_JuiceBar_JUICEBAR-01` by default, with its own values below `oem/JuiceBar/`.
   It never starts the production; `JUICEBAR_ENABLE_ORDERING=false` makes it read-only. `JUICEBAR_SERIAL_NUMBER`
   names its serial number, `JUICEBAR_MANUFACTURER`, `JUICEBAR_MANUFACTURER_NAME` and `JUICEBAR_MODEL` the rest
   of its machine id and its name on the screen.
@@ -262,7 +262,7 @@ All notable changes are documented here. The format follows
   that runs from the retained lists of job orders, and the identification. Values are retained now, so a
   machine a page has not heard of joins only with a sign of life of the last 24 hours, as the backend lists it.
 - The juice bar and the Margo app follow this tree. The juice bar publishes below
-  `machines/unknown_JuiceBar_JUICEBAR-01/` (`JUICEBAR_SERIAL_NUMBER` instead of `JUICEBAR_MACHINE_ID`; an
+  `machines/trumpf_JuiceBar_JUICEBAR-01/` (`JUICEBAR_SERIAL_NUMBER` instead of `JUICEBAR_MACHINE_ID`; an
   existing `.env` no longer applies), its own values below `oem/JuiceBar/`, and the adapter states `Running` and
   `CommunicationFault`. The Margo app runs `sites-api` with two settings for its address and port, stores
   `machines/+/oem/#`, and gives each simulator its scenario.

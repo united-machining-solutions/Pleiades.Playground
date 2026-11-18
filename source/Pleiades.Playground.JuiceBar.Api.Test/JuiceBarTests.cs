@@ -49,11 +49,18 @@ public sealed class JuiceBarTests
     public void TheMachineIdIsManufacturerModelAndSerialNumberAndTheIdentificationNamesWhatIsKnown()
     {
         var options = new JuiceBarOptions();
-        Assert.AreEqual("unknown_JuiceBar_JUICEBAR-01", options.MachineId);
-        // No manufacturer is named by default, so none is published.
+        // The juice bar of the demo, by default.
+        Assert.AreEqual("trumpf_JuiceBar_JUICEBAR-01", options.MachineId);
+        CollectionAssert.AreEqual(
+            new[] { ("Manufacturer", "TRUMPF"), ("Model", "JuiceBar"), ("SerialNumber", "JUICEBAR-01") },
+            TelemetryMapper.Identification(options).ToArray());
+
+        // A manufacturer without a name is not published: nothing is said that is not known.
+        var unnamed = new JuiceBarOptions { Manufacturer = "unknown", ManufacturerName = string.Empty };
+        Assert.AreEqual("unknown_JuiceBar_JUICEBAR-01", unnamed.MachineId);
         CollectionAssert.AreEqual(
             new[] { ("Model", "JuiceBar"), ("SerialNumber", "JUICEBAR-01") },
-            TelemetryMapper.Identification(options).ToArray());
+            TelemetryMapper.Identification(unnamed).ToArray());
 
         var named = new JuiceBarOptions { Manufacturer = "example-mixers", ManufacturerName = "Example Mixers", Model = "JB-8", SerialNumber = "0042" };
         Assert.AreEqual("example-mixers_JB-8_0042", named.MachineId);

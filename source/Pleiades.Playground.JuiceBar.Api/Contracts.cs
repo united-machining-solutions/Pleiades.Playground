@@ -31,10 +31,10 @@ internal sealed class JuiceBarOptions
     public int MaximumQueueLength { get; set; } = 3;
 
     /// <summary>The first part of the machine id: the manufacturer, as the domain of its address without its ending.</summary>
-    public string Manufacturer { get; set; } = "unknown";
+    public string Manufacturer { get; set; } = "trumpf";
 
     /// <summary>The name of the manufacturer, as <c>Identification/Manufacturer</c> says it; not published while empty.</summary>
-    public string ManufacturerName { get; set; } = string.Empty;
+    public string ManufacturerName { get; set; } = "TRUMPF";
 
     /// <summary>The model of the machine, the second part of the machine id.</summary>
     public string Model { get; set; } = "JuiceBar";

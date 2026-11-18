@@ -293,9 +293,9 @@ services:
       JuiceBar__EnableOrdering: ${JUICEBAR_ENABLE_ORDERING:-true}
       JuiceBar__MaximumQueueLength: ${JUICEBAR_MAX_QUEUE_LENGTH:-3}
       # The machine id in every topic is <manufacturer>_<model>_<serial number>, by default
-      # unknown_JuiceBar_JUICEBAR-01.
-      JuiceBar__Manufacturer: ${JUICEBAR_MANUFACTURER:-unknown}
-      JuiceBar__ManufacturerName: ${JUICEBAR_MANUFACTURER_NAME:-}
+      # trumpf_JuiceBar_JUICEBAR-01: the juice bar of the demo was built by TRUMPF.
+      JuiceBar__Manufacturer: ${JUICEBAR_MANUFACTURER:-trumpf}
+      JuiceBar__ManufacturerName: ${JUICEBAR_MANUFACTURER_NAME:-TRUMPF}
       JuiceBar__Model: ${JUICEBAR_MODEL:-JuiceBar}
       JuiceBar__SerialNumber: ${JUICEBAR_SERIAL_NUMBER:-JUICEBAR-01}
       JuiceBar__Language: ${JUICEBAR_LANGUAGE:-en}
