@@ -7,6 +7,14 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: the drink card of the juice bar. For the result of `juicebar_drinks_list` the chat draws the
+  drinks whose bottles do not warn, each in the glass its author chose in the marketplace, filled with its
+  colour; a person picks one, and its button orders it at once, without a question of the language model.
+  The card follows the order and shows the glass waiting for the start button of the machine, filling while
+  the pumps run, and full, with an umbrella. Without motion the glass shows the same, still.
+- Juice bar API: a drink carries its colour and the picture of a glass its author chose (`color`, `picture`),
+  an ingredient its colour and whether its bottle runs low (`color`, `runsLow`). Colours that are not `#rrggbb`
+  are left out.
 - Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
   no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
 - Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
