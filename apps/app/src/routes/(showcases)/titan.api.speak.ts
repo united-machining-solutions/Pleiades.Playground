@@ -18,7 +18,9 @@ function serviceUrl() {
 async function available() {
   const url = serviceUrl()
   if (!url) return false
-  const answer = await fetch(`${url}/health`, { signal: AbortSignal.timeout(2000) }).catch(() => undefined)
+  // /ready, not /health: the service is healthy also without the voice, and then Titan takes the voice of
+  // the browser.
+  const answer = await fetch(`${url}/ready`, { signal: AbortSignal.timeout(2000) }).catch(() => undefined)
   return answer?.ok === true
 }
 

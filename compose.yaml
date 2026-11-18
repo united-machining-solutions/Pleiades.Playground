@@ -365,8 +365,9 @@ services:
 
   # The voice of Tom for Titan, the assistant of the app: a German sentence in, a wav out, by Piper on the
   # CPU. The voice is in the image; the app reaches it inside the stack, no port is published.
-  # Titan speaks with it wherever the stack runs. The voice is in Git LFS: a checkout needs it before the
-  # image is built (git lfs pull), and the build stops with a message without it.
+  # Titan speaks with it wherever the stack runs. The voice is in Git LFS; a checkout without it has only its
+  # pointer, and then the build fetches the voice itself (lfs.py). The service is healthy also without the
+  # voice, and Titan then speaks with the voice of the browser.
   titan-voice:
     <<: *service
     image: ghcr.io/united-machining-solutions/pleiades.playground.titan.voice:${PLEIADES_VERSION:-dev}

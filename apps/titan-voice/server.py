@@ -1,7 +1,10 @@
 """HTTP for the voice of Titan.
 
-GET  /health  200 "Healthy" once the voice of Tom is loaded and warm, 503 before.
-POST /speak   JSON {"text": "..."}, one sentence at a time, answers audio/wav (mono, 16 bit, 22050 Hz).
+GET  /health  200 while the service runs, with the voice of Tom or without it: the stack starts healthy
+              wherever it runs. The text says whether the voice is there, loading, or missing and why.
+GET  /ready   200 once the voice of Tom is loaded and warm, 503 before or without it. The app asks this.
+POST /speak   JSON {"text": "..."}, one sentence at a time, answers audio/wav (mono, 16 bit, 22050 Hz),
+              503 without the voice: the app then speaks with the voice of the browser.
 """
 
 from __future__ import annotations
@@ -59,20 +62,24 @@ class Handler(BaseHTTPRequestHandler):
         self._send(status, text.encode(), "text/plain; charset=utf-8")
 
     def do_GET(self) -> None:  # noqa: N802
-        if self.path != "/health":
-            return self._text(HTTPStatus.NOT_FOUND, "Not found")
-        if state["voice"] is not None:
-            return self._text(HTTPStatus.OK, "Healthy")
-        if state["error"] is not None:
-            return self._text(HTTPStatus.SERVICE_UNAVAILABLE, f"Unhealthy: {state['error']}")
-        return self._text(HTTPStatus.SERVICE_UNAVAILABLE, "Loading")
+        if self.path == "/health":
+            if state["voice"] is not None:
+                return self._text(HTTPStatus.OK, "Healthy")
+            if state["error"] is not None:
+                return self._text(HTTPStatus.OK, f"Healthy, without the voice of Tom: {state['error']}")
+            return self._text(HTTPStatus.OK, "Healthy, loading the voice of Tom")
+        if self.path == "/ready":
+            if state["voice"] is not None:
+                return self._text(HTTPStatus.OK, "Ready")
+            return self._text(HTTPStatus.SERVICE_UNAVAILABLE, f"Without the voice of Tom: {state['error']}" if state["error"] else "Loading")
+        return self._text(HTTPStatus.NOT_FOUND, "Not found")
 
     def do_POST(self) -> None:  # noqa: N802
         if self.path != "/speak":
             return self._text(HTTPStatus.NOT_FOUND, "Not found")
         voice = state["voice"]
         if voice is None:
-            return self._text(HTTPStatus.SERVICE_UNAVAILABLE, "Loading")
+            return self._text(HTTPStatus.SERVICE_UNAVAILABLE, f"Without the voice of Tom: {state['error']}" if state["error"] else "Loading")
         length = int(self.headers.get("Content-Length") or 0)
         if length <= 0 or length > MAX_BODY:
             return self._text(HTTPStatus.BAD_REQUEST, "Send JSON {\"text\": \"...\"}")

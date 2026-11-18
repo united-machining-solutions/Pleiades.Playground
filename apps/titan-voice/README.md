@@ -38,12 +38,15 @@ the service reports `Unhealthy`. After a clone without it: `git lfs pull`.
 
 ## Run it
 
-It starts with the stack. Its voice is in Git LFS: a clone needs `git lfs pull` before the image is built,
-and the build stops with a message if the voice is only the pointer of Git LFS:
+It starts with the stack. Its voice is in Git LFS. A checkout without it has only the pointer of Git LFS,
+and then the build fetches the voice itself (`lfs.py`), checked against the pointer, and once more when the
+service starts. It never fails for that: `/health` answers 200 while the service runs, with the voice or
+without it, and `/ready` only once the voice is loaded. The app asks `/ready`, and without the voice Titan
+speaks with the voice of the browser.
 
 ```bash
 docker compose up -d
-docker compose ps titan-voice    # healthy once the voice is loaded and has spoken a first sentence
+docker compose exec titan-voice curl -s localhost:8080/ready    # "Ready" once the voice is loaded and warm
 ```
 
 To hear it without the app:

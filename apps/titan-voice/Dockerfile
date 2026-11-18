@@ -17,11 +17,12 @@ RUN pip install "piper-tts==${PIPER_VERSION}"
 
 RUN useradd --create-home --uid 10001 titan
 WORKDIR /app
-COPY server.py voice.py ./
+COPY server.py voice.py lfs.py ./
 COPY voice/ ./voice/
-# The voice is in Git LFS. A checkout without it has a small pointer file here instead, and the service
-# would only fail later, as unhealthy. So the build stops here and says what to do.
-RUN python -c "import sys; head = open('voice/de_DE-tom-medium.onnx', 'rb').read(64); sys.exit('The voice of Tom is a pointer of Git LFS, not the voice: run git lfs pull before the build.') if head.startswith(b'version https://git-lfs') else None"
+# The voice is in Git LFS. A checkout without it has only the pointer here: then the build fetches the voice
+# from Git LFS itself (lfs.py). Without a network that fails quietly, the build goes on, and the service
+# starts healthy all the same and tries once more.
+RUN python lfs.py voice/de_DE-tom-medium.onnx
 
 ENV DATA_DIR=/app/voice \
     VOICE=de_DE-tom-medium.onnx \
