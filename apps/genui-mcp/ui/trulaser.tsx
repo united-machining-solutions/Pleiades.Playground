@@ -1,5 +1,5 @@
-import { applyHostFonts, useApp } from "@modelcontextprotocol/ext-apps/react"
-import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps/react"
+import { useApp } from "@modelcontextprotocol/ext-apps/react"
+import type { App } from "@modelcontextprotocol/ext-apps/react"
 import {
   trulaserCollision,
   trulaserConditions,
@@ -22,37 +22,34 @@ import {
   TechnologyCard,
 } from "@pleiades/cards/trulaser/trulaser-cards.tsx"
 import { useCallback, useEffect, useState } from "react"
-import type { ReactNode } from "react"
 import { createRoot } from "react-dom/client"
 
 import { TRULASER_SERIES_TOOL, TRULASER_TIMELINE_TOOL } from "../src/cards/trulaser.names.ts"
+import { Note, takeFont } from "./host.tsx"
+import { shownFor as shownOf } from "./shown.ts"
+import type { Result } from "./shown.ts"
 import "./styles.css"
 
 // The TruLaser cards as an MCP App: the file a host loads from ui://genui/trulaser and shows with a
 // result of any of the six tools of the cards. The host sends that result. This file finds the card
 // whose contract it keeps and draws it, the same component the example application draws.
 
-type Result = { isError?: boolean; content?: ReadonlyArray<unknown>; structuredContent?: unknown }
-
-/** The card a result keeps the contract of, or a sentence if it keeps none. */
+/** The card a result keeps the contract of, or the sentence of `shownFor` if it keeps none. */
 function shownFor(result: Result) {
-  const values = result.structuredContent
-  const status = trulaserStatus.safeParse(values)
-  if (status.success) return { card: "status" as const, values: status.data }
-  const jobOrder = trulaserJobOrder.safeParse(values)
-  if (jobOrder.success) return { card: "jobOrder" as const, values: jobOrder.data }
-  const devices = trulaserDevices.safeParse(values)
-  if (devices.success) return { card: "devices" as const, values: devices.data }
-  const technology = trulaserTechnology.safeParse(values)
-  if (technology.success) return { card: "technology" as const, values: technology.data }
-  const collision = trulaserCollision.safeParse(values)
-  if (collision.success) return { card: "collision" as const, values: collision.data }
-  const conditions = trulaserConditions.safeParse(values)
-  if (conditions.success) return { card: "conditions" as const, values: conditions.data }
-  // A tool that failed says why in its first block of text.
-  const [first] = result.content ?? []
-  const said = typeof first === "object" && first !== null && "text" in first ? first.text : undefined
-  return { card: "note" as const, note: result.isError && typeof said === "string" ? said : "This result is not a TruLaser card." }
+  const card = "a TruLaser card"
+  const status = shownOf(result, trulaserStatus, card)
+  if ("values" in status) return { card: "status" as const, values: status.values }
+  const jobOrder = shownOf(result, trulaserJobOrder, card)
+  if ("values" in jobOrder) return { card: "jobOrder" as const, values: jobOrder.values }
+  const devices = shownOf(result, trulaserDevices, card)
+  if ("values" in devices) return { card: "devices" as const, values: devices.values }
+  const technology = shownOf(result, trulaserTechnology, card)
+  if ("values" in technology) return { card: "technology" as const, values: technology.values }
+  const collision = shownOf(result, trulaserCollision, card)
+  if ("values" in collision) return { card: "collision" as const, values: collision.values }
+  const conditions = shownOf(result, trulaserConditions, card)
+  if ("values" in conditions) return { card: "conditions" as const, values: conditions.values }
+  return { card: "note" as const, note: conditions.note }
 }
 type Shown = ReturnType<typeof shownFor>
 
@@ -79,14 +76,6 @@ async function seriesOf(app: App, machine: string, key: ConditionKey): Promise<T
   } catch {
     return null
   }
-}
-
-/** The font of the host, so the card reads like the conversation around it. The colours stay the card's own. */
-function takeFont(context: McpUiHostContext | undefined) {
-  const fonts = context?.styles?.css?.fonts
-  if (fonts) applyHostFonts(fonts)
-  const sans = context?.styles?.variables?.["--font-sans"]
-  if (sans) document.documentElement.style.setProperty("--font-sans", sans)
 }
 
 function Trulaser() {
@@ -150,10 +139,6 @@ function Trulaser() {
     case "note":
       return <Note>{shown.note}</Note>
   }
-}
-
-function Note({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-muted-foreground">{children}</p>
 }
 
 createRoot(document.getElementById("root")!).render(

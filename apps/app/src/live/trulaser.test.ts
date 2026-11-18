@@ -27,7 +27,7 @@ const signals = <TNames extends ReadonlyArray<SignalName>>(names: TNames) =>
 
 const about = { asOf: at("09:00:00"), machine: M, serialNumber: "L1649A-STARLINER" }
 const cockpit: Cockpit = {
-  status: { ...about, signals: signals(CARD_SIGNALS.status), sequence: null, activeAlerts: [] },
+  status: { ...about, signals: signals(CARD_SIGNALS.status), sequence: null, activeAlerts: [], alertsComplete: true },
   jobOrder: { ...about, jobOrder: null, signals: signals(CARD_SIGNALS.jobOrder) },
   devices: { ...about, signals: signals(CARD_SIGNALS.devices), devices: [] },
   technology: { ...about, signals: signals(CARD_SIGNALS.technology) },
@@ -59,6 +59,7 @@ const timeline: TrulaserTimeline = {
   to: at("09:01:00"),
   lanes: [lane("itemState", "MachineryItemState", itemState, "Executing", "09:00:00"), lane("operationMode", "MachineryOperationMode", operationMode, "Processing", "07:00:00")],
   failures: [],
+  alertsComplete: true,
 }
 const history: TimelineLive = { timeline, recent: {} }
 

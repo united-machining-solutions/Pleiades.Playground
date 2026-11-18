@@ -1,4 +1,14 @@
-import { ALERT_SEVERITIES, CONNECTION_PATH, TRULASER_PREFIX, alertLaneKey, alertSeverity, sequenceOf, statusOf } from "@pleiades/cards/trulaser/contract.ts"
+import {
+  CONNECTION_PATH,
+  DETAIL_SLACK_MS,
+  TRULASER_PREFIX,
+  alertLaneKey,
+  alertSeverity,
+  alertSpanOf,
+  byUrgency,
+  sequenceOf,
+  statusOf,
+} from "@pleiades/cards/trulaser/contract.ts"
 import type { Alert, Cockpit, JobOrder, Lane, LaneSpan, Signal, TrulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
 
 import { AHEAD_MS, valuesOf } from "./messages.ts"
@@ -112,16 +122,11 @@ export function alertOfEvent(type: string, data: Record<string, unknown>, at: st
   }
 }
 
-const rank = (severity: string | null) => {
-  const index = ALERT_SEVERITIES.indexOf((severity ?? "") as (typeof ALERT_SEVERITIES)[number])
-  return index < 0 ? ALERT_SEVERITIES.length : index
-}
-
 /** The alerts that stand after an alert event: raised or changed in, cleared out, the most urgent first. */
 export function alertsWith(alerts: ReadonlyArray<Alert>, type: string, alert: Alert): Array<Alert> {
   const others = alerts.filter((one) => one.Id !== alert.Id)
   const standing = type === "Notification.AlertCleared" ? others : [...others, alert]
-  return standing.sort((a, b) => rank(a.Severity) - rank(b.Severity) || b.Time.localeCompare(a.Time))
+  return standing.sort(byUrgency)
 }
 
 /** A time of an event as the backend writes it, or null where the event has none that is a time. */
@@ -198,9 +203,6 @@ export function cockpitAt(cockpit: Cockpit, now: string): Cockpit {
   return Object.fromEntries(Object.entries(cockpit).map(([name, card]) => [name, { ...card, asOf: now }])) as Cockpit
 }
 
-/** How long before or after the start of a span a detail may come and still count as the one it began with. */
-const DETAIL_SLACK_MS = 1000
-
 /**
  * A lane of stored values with one value of the broker added. A detail belongs to the span it came with:
  * one that comes within a moment of the start of the last span is that span's; a later one changes no span,
@@ -230,22 +232,6 @@ function laneWith(lane: Lane, topic: string, value: Value, to: string, recent: R
   return { ...lane, spans: [...lane.spans.slice(0, -1), ...(last ? [{ ...last, to: value.at }] : []), span] }
 }
 
-/** The span of an alert in its lane. It lasts until it is cleared; while it stands, it reaches now. */
-function alertSpan(alert: Alert, from: string, to: string): LaneSpan {
-  return {
-    from,
-    to,
-    value: alert.Severity,
-    label: alert.SourceName || null,
-    details: [
-      { name: "ErrorCode", value: alert.ErrorCode || null },
-      { name: "Message", value: alert.Message || null },
-      { name: "SourceName", value: alert.SourceName || null },
-      { name: "AlertId", value: alert.Id },
-    ],
-  }
-}
-
 /** The timelines after an alert event: a raised alert opens a span in the lane of its category, a cleared one closes it. */
 export function timelineWithAlert(timeline: TrulaserTimeline, type: string, alert: Alert, at: string, topic: string): TrulaserTimeline {
   if (timeline.view !== "status" || alert.Severity === null) return timeline
@@ -258,7 +244,7 @@ export function timelineWithAlert(timeline: TrulaserTimeline, type: string, aler
   lanes = lanes.map((lane) => {
     if (lane.key !== key) return lane
     if (type === "Notification.AlertCleared") return { ...lane, spans: lane.spans.map((span) => (open(span) ? { ...span, to: at } : span)) }
-    if (type === "Notification.AlertRaised") return { ...lane, spans: [...lane.spans, alertSpan(alert, at, at > timeline.to ? at : timeline.to)] }
+    if (type === "Notification.AlertRaised") return { ...lane, spans: [...lane.spans, alertSpanOf(alert, at, at > timeline.to ? at : timeline.to)] }
     return lane
   })
   let { failures } = timeline

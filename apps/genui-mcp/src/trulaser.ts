@@ -1,6 +1,9 @@
 import {
   ALERT_SEVERITIES,
   CARD_SIGNALS,
+  DETAIL_SLACK_MS,
+  alertSpanOf,
+  byUrgency,
   CONDITION_GUIDE,
   CONDITION_GUIDE_PATH,
   CONNECTION_PATH,
@@ -156,32 +159,32 @@ export function alertEnd(alert: Pick<AlertSpan, "raisedAt" | "clearedAt">, start
   return starts.find((start) => start > raised) ?? to
 }
 
-const severityRank = (severity: string | null) => {
-  const rank = ALERT_SEVERITIES.indexOf((severity ?? "") as (typeof ALERT_SEVERITIES)[number])
-  return rank < 0 ? ALERT_SEVERITIES.length : rank
+/** An alert of the Events API as Notification.ActiveAlerts names its fields. */
+function alertOfSpan(one: AlertSpan): Alert {
+  return {
+    Id: one.alertId,
+    ErrorCode: one.errorCode,
+    Message: one.message,
+    Severity: one.severity,
+    SeverityValue: one.severityValue,
+    SourceName: one.sourceName,
+    Time: one.raisedAt,
+  }
 }
 
 /** The alerts that stand now, the most urgent first and the newest first within a category. */
 export function activeAlertsOf(alerts: ReadonlyArray<AlertSpan>, starts: ReadonlyArray<number>, now: number): Array<Alert> {
   return alerts
     .filter((one) => alertEnd(one, starts, Infinity) === Infinity && Date.parse(one.raisedAt) <= now)
-    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || b.raisedAt.localeCompare(a.raisedAt))
-    .map((one) => ({
-      Id: one.alertId,
-      ErrorCode: one.errorCode,
-      Message: one.message,
-      Severity: one.severity,
-      SeverityValue: one.severityValue,
-      SourceName: one.sourceName,
-      Time: one.raisedAt,
-    }))
+    .map((one) => alertOfSpan(one))
+    .sort(byUrgency)
 }
 
 /** State.Status and Notification.ActiveAlerts now. */
 export async function showStatus(apis: Apis, asked?: string, now = new Date()): Promise<TrulaserStatus> {
   const about = await aboutOf(apis, asked, now)
   const dayBefore = secondsBefore(now, HORIZON_SECONDS)
-  const [signals, alerts] = await Promise.all([
+  const [signals, { spans: alerts, hasMore }] = await Promise.all([
     readSignals(apis, about.machine, CARD_SIGNALS.status, now),
     readAlertSpans(apis, about.machine, dayBefore, now),
   ])
@@ -193,6 +196,7 @@ export async function showStatus(apis: Apis, asked?: string, now = new Date()): 
     signals,
     sequence: sequenceOf(typeof cause === "string" ? cause : null),
     activeAlerts: activeAlertsOf(alerts, starts, now.getTime()),
+    alertsComplete: !hasMore,
   }
 }
 
@@ -226,8 +230,9 @@ export function jobOrderEnd(entry: JobOrderEntry, starts: ReadonlyArray<number>,
 
 /** The job order that runs or is interrupted since the adapter started, else the newest one that ended. */
 export function currentJobOrder(entries: ReadonlyArray<JobOrderEntry>, starts: ReadonlyArray<number>): JobOrderEntry | null {
+  const listed = entries.filter((one) => !one.removed)
   return (
-    entries.find((one) => open(one) && jobOrderEnd(one, starts, Infinity) === Infinity) ?? entries.find((one) => !open(one)) ?? null
+    listed.find((one) => open(one) && jobOrderEnd(one, starts, Infinity) === Infinity) ?? listed.find((one) => !open(one)) ?? null
   )
 }
 
@@ -236,7 +241,7 @@ export async function showJobOrder(apis: Apis, asked?: string, now = new Date())
   const about = await aboutOf(apis, asked, now)
   const [signals, jobs] = await Promise.all([
     readSignals(apis, about.machine, CARD_SIGNALS.jobOrder, now),
-    readJobOrderEntries(apis, about.machine),
+    readJobOrderEntries(apis, about.machine, now),
   ])
   // A job order left open by an earlier run of the adapter: the starts after its last change say so.
   const oldest = new Date(Math.min(now.getTime(), ...jobs.filter(open).map((one) => Date.parse(one.lastChange))))
@@ -306,9 +311,6 @@ export async function showConditions(apis: Apis, asked?: string, now = new Date(
   const about = await aboutOf(apis, asked, now)
   return { ...about, tiles: await Promise.all(CONDITION_GUIDE.map((tile) => readTile(apis, about.machine, tile, now))) }
 }
-
-/** How long after the start of a span a detail may come and still count as the one it began with. */
-const DETAIL_SLACK_MS = 1000
 
 /**
  * The values of a topic as spans without a gap between `from` and `to`. A value holds until the next
@@ -417,20 +419,7 @@ export function alertLanes(
         const begin = Math.max(from, Date.parse(one.raisedAt))
         const end = Math.min(to, alertEnd(one, starts, to))
         if (end <= begin) return []
-        return [
-          {
-            from: new Date(begin).toISOString(),
-            to: new Date(end).toISOString(),
-            value: severity,
-            label: one.sourceName || null,
-            details: [
-              { name: "ErrorCode", value: one.errorCode || null },
-              { name: "Message", value: one.message || null },
-              { name: "SourceName", value: one.sourceName || null },
-              { name: "AlertId", value: one.alertId },
-            ],
-          },
-        ]
+        return [alertSpanOf(alertOfSpan(one), new Date(begin).toISOString(), new Date(end).toISOString())]
       })
       .sort((a, b) => a.from.localeCompare(b.from))
     if (spans.length === 0) continue
@@ -536,10 +525,10 @@ export async function listTimeline(
   const [fromText, toText] = [from.toISOString(), now.toISOString()]
   const [start, end] = [from.getTime(), now.getTime()]
   const topic = (path: string) => `machines/${machine}/${path}`
-  const [sources, alerts, jobs] = await Promise.all([
+  const [sources, { spans: alerts, hasMore }, jobs] = await Promise.all([
     sourcesOf(apis, machine, view, now),
     readAlertSpans(apis, machine, from, now),
-    view === "jobOrder" ? readJobOrderEntries(apis, machine) : Promise.resolve([]),
+    view === "jobOrder" ? readJobOrderEntries(apis, machine, now) : Promise.resolve([]),
   ])
   // The starts of the adapter back to the oldest alert or job order that may still stand.
   const oldestJob = Math.min(from.getTime(), ...jobs.flatMap((one) => (one.startTime ? [Date.parse(one.startTime)] : [])))
@@ -577,7 +566,7 @@ export async function listTimeline(
       const stop = Math.min(end, alertEnd(one, starts, end))
       return stop > begin ? [{ from: new Date(begin).toISOString(), to: new Date(stop).toISOString(), source: one.sourceName }] : []
     })
-  return { machine, view, from: fromText, to: toText, lanes, failures }
+  return { machine, view, from: fromText, to: toText, lanes, failures, alertsComplete: !hasMore }
 }
 
 /** How many points the chart of a tile has room for: the Timeseries API thins a longer series to that many. */

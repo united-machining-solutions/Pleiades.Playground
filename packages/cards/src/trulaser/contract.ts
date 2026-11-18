@@ -273,6 +273,17 @@ export const alert = z.object({
 })
 export type Alert = z.infer<typeof alert>
 
+/** Where a category stands in the order a display reads them, after NE 107: Failure first, none last. */
+export function severityRank(severity: string | null): number {
+  const rank = ALERT_SEVERITIES.indexOf((severity ?? "") as (typeof ALERT_SEVERITIES)[number])
+  return rank < 0 ? ALERT_SEVERITIES.length : rank
+}
+
+/** The alerts in the order a display reads them: the most urgent first, the newest first within a category. */
+export function byUrgency(a: Pick<Alert, "Severity" | "Time">, b: Pick<Alert, "Severity" | "Time">): number {
+  return severityRank(a.Severity) - severityRank(b.Severity) || b.Time.localeCompare(a.Time)
+}
+
 /** An entry of JobMonitoring.JobOrders with what came of it so far (JobMonitoring.JobOrderResults). */
 export const jobOrder = z.object({
   JobOrderID: z.string(),
@@ -308,6 +319,9 @@ export const trulaserStatus = z.object({
   activeAlerts: z
     .array(alert)
     .describe("Notification.ActiveAlerts since the adapter started, the most urgent first: what the events of the alerts say stands."),
+  alertsComplete: z
+    .boolean()
+    .describe("False if the Events API had more alerts than it returned: then the list may miss some."),
 })
 export type TrulaserStatus = z.infer<typeof trulaserStatus>
 
@@ -400,6 +414,9 @@ export const trulaserTimeline = z.object({
   failures: z
     .array(z.object({ from: instant, to: instant, source: z.string() }))
     .describe("When an alert of the category Failure stood, and its SourceName. Never thinned."),
+  alertsComplete: z
+    .boolean()
+    .describe("False if the Events API had more alerts than it returned: then the lanes of the alerts may miss some."),
 })
 export type TrulaserTimeline = z.infer<typeof trulaserTimeline>
 
@@ -483,6 +500,31 @@ export function deviceLane(index: number, type: string | null, group: string | n
 
 /** The key of the lane of the alerts of one category. */
 export const alertLaneKey = (severity: string) => `alerts${severity}`
+
+/**
+ * How long before or after the start of a span a detail may come and still count as the one it began
+ * with: the fields of one change come in messages a few milliseconds apart.
+ */
+export const DETAIL_SLACK_MS = 1000
+
+/**
+ * An alert as a span of the lane of its category, from `from` to `to`, called by its source. It carries its
+ * id, so whoever keeps the timeline live closes the span when the alert is cleared.
+ */
+export function alertSpanOf(alert: Pick<Alert, "Id" | "ErrorCode" | "Message" | "Severity" | "SourceName">, from: string, to: string): LaneSpan {
+  return {
+    from,
+    to,
+    value: alert.Severity,
+    label: alert.SourceName || null,
+    details: [
+      { name: "ErrorCode", value: alert.ErrorCode || null },
+      { name: "Message", value: alert.Message || null },
+      { name: "SourceName", value: alert.SourceName || null },
+      { name: "AlertId", value: alert.Id },
+    ],
+  }
+}
 
 /** A detail as a person reads it: a SignalValue of a change cause as its SequenceState and BlockingCause. */
 export function detailText(detail: SpanDetail): string | null {

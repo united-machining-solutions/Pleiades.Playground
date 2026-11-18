@@ -451,6 +451,34 @@ to the simulated machines. With
 orders a drink when asked. No tour screenshot was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).
 
+## Optional: a TruLaser
+
+A TRUMPF laser cutting machine is not part of the six stops either: none of the simulators of the stack is
+one. The entry "TruLaser" in the sidebar opens <http://localhost:5600/trulaser>, which shows such a machine
+once one publishes to the broker, a machine whose edge component (DALLE) publishes the signals of its
+extension below `machines/{MachineId}/oem/Dalle/`. Without one the page says that no TruLaser published.
+
+With one, look at how the page names what it shows: each card says whether it reads an element of the data
+model (`umati 0.17.1`) or the extension of TRUMPF.
+
+- **State.Status**: `MachineryItemState` and `MachineryOperationMode`, the `ChangeCause` of the extension
+  that put the machine there, and `Notification.ActiveAlerts`; a unit in malfunction is an alert of the
+  category Failure, with the unit as `SourceName`.
+- **History**: the state, the requests of the automation devices and the alerts on one time axis. Hover a
+  span for its `ChangeCause`, an error code or the source of an alert; a Failure crosses every lane.
+- **JobOrder**: the entry of `JobMonitoring.JobOrders` that runs and the
+  `WorkMasterMonitoring.ProgramExecution` in it. "Open over time" shows the job orders and their program
+  executions, each called by its work master.
+- **AutomationDeviceRequestStates**, **LaserTechnology**, **CollisionData** and **ConditionGuide**: the
+  extension. A tile of the ConditionGuide opens a chart of its value.
+
+Each card is a tool of the generative UI backend (`genui_trulaser_status`, `genui_trulaser_joborder` and
+four more), so the chat shows a card when asked, for example "What does the TruLaser do?". The cards are
+in [`packages/cards/src/trulaser`](../packages/cards/src/trulaser/contract.ts), their tools in
+[`apps/genui-mcp/src/trulaser.ts`](../apps/genui-mcp/src/trulaser.ts) and the page in
+[`apps/app/src/routes/trulaser.tsx`](../apps/app/src/routes/trulaser.tsx). No tour screenshot shows the
+page: the stack the screenshots are taken from has no TruLaser.
+
 ## Retaking the screenshots
 
 One command takes the screenshots from the running stack and writes them under

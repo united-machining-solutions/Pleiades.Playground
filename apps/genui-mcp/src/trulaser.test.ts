@@ -108,6 +108,7 @@ const job = (id: string, state: string, start: string | null, end: string | null
   jobOrderId: id,
   state,
   lastChange: at(end ?? start ?? "09:00:00"),
+  removed: false,
   jobName: `ProductionPlanRun ${id}`,
   workMasterId: "PLL_SHEET_0001",
   startTime: start && at(start),
@@ -120,6 +121,11 @@ test("the job order of the card is the one that runs, else the newest that ended
   assert.equal(currentJobOrder([job("b", "Ended", "09:30:00", "09:40:00"), job("a", "Running", "09:00:00", null)], [])?.jobOrderId, "a")
   assert.equal(currentJobOrder([job("b", "Ended", "09:30:00", "09:40:00")], [])?.jobOrderId, "b")
   assert.equal(currentJobOrder([], []), null)
+})
+
+test("a job order the machine removed from its list is not its job order", () => {
+  const removed = { ...job("a", "Running", "09:00:00", null), removed: true }
+  assert.equal(currentJobOrder([removed, job("z", "Ended", "08:00:00", "08:30:00")], [])?.jobOrderId, "z")
 })
 
 test("a job order left open by an earlier run of the adapter is over", () => {

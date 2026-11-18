@@ -110,6 +110,7 @@ export function Timelines({ timeline }: { timeline: Timeline }) {
           {timeline.failures.length > 0 && ` (${timeline.failures.length}×)`}
         </span>
         <span>
+          {!timeline.alertsComplete && "Some alerts may be missing: the Events API had more than it returned. "}
           {clock(timeline.from)} to {clock(timeline.to)}
         </span>
       </p>

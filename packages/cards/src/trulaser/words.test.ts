@@ -32,6 +32,7 @@ test("State.Status in words names the state, the ChangeCause and the ActiveAlert
       changeCauseValue: signal("SequenceStateAndBlockingCause { SequenceState = Active, BlockingCause = InternalMalfunction }"),
     },
     sequence: { sequenceState: "Active", blockingCause: "InternalMalfunction" },
+    alertsComplete: true,
     activeAlerts: [
       {
         Id: "a1",

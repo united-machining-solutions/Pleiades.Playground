@@ -182,6 +182,11 @@ export function StatusCard({ status }: { status: TrulaserStatus }) {
           </Field>
         </div>
         <Field label="Notification.ActiveAlerts">
+          {!status.alertsComplete && (
+            <span className="text-xs text-muted-foreground">
+              The Events API had more alerts than it returned: some may be missing.
+            </span>
+          )}
           {activeAlerts.length === 0 ? (
             <span className="text-muted-foreground">No alert stands.</span>
           ) : (
