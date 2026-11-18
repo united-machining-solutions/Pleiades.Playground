@@ -24,9 +24,9 @@ docker compose up -d --build --wait
 ```
 
 The command returns when the stack is ready, that is when every container reports healthy: the broker, the
-database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app, one
-simulator per machine, and the OPC UA adapter with a simulated OPC UA machine. To see the demo without building
-it, start it from the published images, see
+database, the two APIs with their persistence workers, the gateway in front of the two APIs, the Sites API, the
+generative UI backend, the app, one simulator per machine, and the OPC UA adapter with a simulated OPC UA
+machine. To see the demo without building it, start it from the published images, see
 [Start](../README.md#start).
 
 ```bash
@@ -39,6 +39,7 @@ app                      Up 3 minutes (healthy)
 broker                   Up 3 minutes (healthy)
 events-api               Up 3 minutes (healthy)
 events-persistence       Up 3 minutes (healthy)
+gateway                  Up 3 minutes (healthy)
 genui-mcp                Up 3 minutes (healthy)
 mongodb                  Up 3 minutes (healthy)
 opc-simulator            Up 3 minutes (healthy)
@@ -55,8 +56,9 @@ timeseries-persistence   Up 3 minutes (healthy)
 |---|---|
 | <http://localhost:5600/> | The example app, the subject of stops 2 to 5. It answers on this computer only. |
 | <http://localhost:5520/mcp> | The generative UI backend, an MCP server. The app reads every value from it. |
-| <http://localhost:5500/> | The Timeseries API: Swagger UI, and MCP at `/mcp`. |
-| <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. |
+| <http://localhost:5500/> | The Timeseries API: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
+| <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
+| `http://<host>:5590/` | The gateway, the one entry for clients on other computers: below `/timeseries` and `/events` the reading endpoints of the two APIs, and nothing else. They are described at `/timeseries/docs/` and `/events/docs/`. |
 | <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
 | `localhost:1883` | The MQTT broker the simulators publish to. |
 | <http://localhost:5560/machines> | The OPC UA adapter: the machines added over OPC UA. It answers on this computer only. |

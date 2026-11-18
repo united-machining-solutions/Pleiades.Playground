@@ -18,7 +18,7 @@ margo/
 
 ## How it differs from `compose.yaml`
 
-`compose/compose.yaml` runs the same twelve containers as [`compose.yaml`](../compose.yaml) at the root, written so
+`compose/compose.yaml` runs the same thirteen containers as [`compose.yaml`](../compose.yaml) at the root, written so
 that bart accepts it, and one more, Traefik:
 
 - **No `build:`.** The services take the images that the workflow "Images" publishes to
@@ -47,6 +47,12 @@ that bart accepts it, and one more, Traefik:
   to the names of your device when you install the app. Traefik reads its route from
   the `configs:` entry `traefik`, and not from Docker labels: those need the Docker socket,
   a bind mount out of `compose/`. The configuration is a Go template that takes the host names from the environment.
+- **The gateway is the same as at the root.** The service `gateway`, a second Traefik, is the one entry for
+  clients on other computers and passes only the reading endpoints of the time series and events APIs (setting
+  *Address of the gateway*, `0.0.0.0`, and *Port of the gateway*, 5590), see
+  [ADR-0017](../docs/adr/0017-a-read-only-gateway-for-outside-clients.md). Its routes are the `configs:` entry
+  `gateway`, a copy of the one in `compose.yaml`; CI checks that both are the same. The two APIs answer on the
+  device only (*Address of the time series API*, *Address of the events API*).
 - **HTTPS with a self-signed certificate.** The host names are internal to the device, so no public CA can
   sign them and ACME cannot reach them. Traefik is given no certificate and serves the one it generates in
   memory at start, `TRAEFIK DEFAULT CERT`: no file, no volume, no Docker socket. A browser warns until the
@@ -69,8 +75,8 @@ that bart accepts it, and one more, Traefik:
   parameter.
 
 A change to the stack in `compose.yaml` belongs here as well, in the same pull request. CI checks that both files
-name the same services (leaving out the ones behind a profile, and Traefik) and that the broker configuration is
-the same; the rest, the variables and the settings, it does not see.
+name the same services (leaving out the ones behind a profile, and Traefik) and that the configurations of the
+broker and of the gateway are the same; the rest, the variables and the settings, it does not see.
 
 ## Check
 

@@ -41,6 +41,13 @@ open from other computers, the browser has to reach it:
   the broker" and show what held when they were opened. The broker takes anonymous clients, to publish as well:
   give the route to no wider network than the port has.
 
+Clients on other computers that read machine data over REST, such as the Oseon WorkstationConnector, reach the
+Timeseries and Events APIs through the gateway, port 5590 (`GATEWAY_PORT`), below `/timeseries` and `/events`. It
+passes the reading endpoints and nothing else, and it answers on every address of the computer (`GATEWAY_BIND`);
+the two APIs themselves answer on `127.0.0.1` only. It has no sign-in: give it no wider network than the one whose
+people may read the data. What it passes is described at `http://<host>:5590/timeseries/docs/` and
+`http://<host>:5590/events/docs/`. See [ADR-0017](adr/0017-a-read-only-gateway-for-outside-clients.md).
+
 ## What the repository needs
 
 | Setting | Value |
