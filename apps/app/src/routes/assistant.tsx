@@ -75,7 +75,7 @@ function useTabInFront(): boolean {
 const root = getRouteApi("__root__")
 
 export const Route = createFileRoute("/assistant")({
-  staticData: { nav: { title: "Titan", icon: SparklesIcon, order: 1 } },
+  staticData: { nav: { title: "Titan", icon: SparklesIcon } },
   component: Assistant,
 })
 

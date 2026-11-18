@@ -38,7 +38,7 @@ export function FocusView({ briefing, cards, machines, asked, thinking }: Focus)
   const card = asked ? cards.at(-1) : undefined
   return (
     <article
-      className={`mx-auto flex h-full w-full max-w-4xl flex-col gap-8 motion-safe:animate-in motion-safe:fade-in ${card ? "" : "justify-center"}`}
+      className={`mx-auto flex h-full w-full max-w-5xl flex-col gap-8 motion-safe:animate-in motion-safe:fade-in ${card ? "" : "justify-center"}`}
     >
       {headline ? (
         <h1 className="text-5xl leading-tight font-semibold tracking-tight text-balance">{unbroken(headline)}</h1>

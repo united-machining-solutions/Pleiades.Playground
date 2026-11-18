@@ -45,8 +45,8 @@ import type { EnrolledPerson } from "@/titan/faces/store.ts"
  * Enrols the faces Titan recognises, and shows whom it recognises now. Everything happens in this
  * browser: the descriptors of the faces are kept in its IndexedDB and are sent nowhere.
  */
-export const Route = createFileRoute("/titan/gesichter")({
-  staticData: { nav: { title: "Gesichter", icon: ScanFaceIcon, order: 2 } },
+export const Route = createFileRoute("/titan/faces")({
+  staticData: { nav: { title: "Faces", icon: ScanFaceIcon } },
   component: Faces,
 })
 
@@ -157,7 +157,7 @@ function Faces() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold">Gesichter</h1>
+        <h1 className="text-2xl font-semibold">Faces</h1>
         <p className="text-sm text-muted-foreground">Wen Titan erkennt, wenn jemand vor die Kamera tritt.</p>
       </div>
 

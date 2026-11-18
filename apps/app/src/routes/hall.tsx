@@ -21,7 +21,7 @@ import { getMachines, getShopfloor } from "@/machines/get-machines.ts"
 import { MachineRow } from "@/machines/machine-item.tsx"
 
 /**
- * Das Lagebild: what the assistant tells about the hall, black on white on one screen. Top to bottom
+ * The hall: what the assistant tells about the hall, black on white on one screen. Top to bottom
  * the shop floor card and the machines with their state, program, open warnings and errors, in the
  * order the backend returns them. The page asks and draws; it computes nothing.
  */
@@ -35,8 +35,8 @@ const live: Live<MachineList | null> = {
 /** How often the plan of the hall is read again. */
 const PLAN_MS = 10_000
 
-export const Route = createFileRoute("/lagebild")({
-  staticData: { nav: { title: "Lagebild", icon: ClipboardListIcon } },
+export const Route = createFileRoute("/hall")({
+  staticData: { nav: { title: "Hall", icon: ClipboardListIcon } },
   // Each answer on its own: if one is missing, the other still stands, and the page keeps trying.
   loader: async () => {
     const [shopfloor, machines] = await Promise.all([
@@ -45,11 +45,11 @@ export const Route = createFileRoute("/lagebild")({
     ])
     return { shopfloor, machines }
   },
-  component: Lagebild,
+  component: Hall,
   pendingComponent: Loading,
 })
 
-function Lagebild() {
+function Hall() {
   const { shopfloor, machines } = Route.useLoaderData()
   const { ask } = useChatPanel()
   // The machines stay live from the broker, as on Home. The plan of the hall is computed by the
@@ -114,7 +114,7 @@ function Page({ line, children }: { line?: string; children: ReactNode }) {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold">Lagebild</h1>
+        <h1 className="text-2xl font-semibold">Hall</h1>
         {line && <p className="text-sm text-muted-foreground">{line}</p>}
       </div>
       {children}

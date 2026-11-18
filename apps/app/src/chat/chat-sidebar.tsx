@@ -1,6 +1,6 @@
 import { createHarnessClient } from "@tanstack/ai-harness/client"
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react"
-import { Link, getRouteApi, useRouter } from "@tanstack/react-router"
+import { Link, getRouteApi, useRouter, useRouterState } from "@tanstack/react-router"
 import {
   ArrowUpIcon,
   BotOffIcon,
@@ -14,7 +14,7 @@ import {
   SquareIcon,
   XIcon,
 } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { FormEvent, KeyboardEvent } from "react"
 
 import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
@@ -68,6 +68,7 @@ import { commandsFor, matching, readTyped, usage } from "@/opcua/commands.ts"
 import type { ChatCommand } from "@/opcua/commands.ts"
 import { keepOfAnswer } from "@/pages/from-answer.ts"
 
+import { TITAN_PERSONA } from "@/titan/persona.ts"
 import { useShareCards } from "@/voice/shown.ts"
 import { useFollowUps, useSpokenAnswers } from "@/voice/voice.ts"
 
@@ -264,13 +265,16 @@ function Conversation({ threadId }: { threadId: string }) {
   // The first question of a chat begun from the list or from a machine, as long as it waits for this
   // panel: the head can call the chat by it from the first render.
   const [asked] = useState(() => peekFirstQuestion(threadId))
+  const onTitan = useRouterState({ select: (state) => state.location.pathname === "/assistant" })
+  const forwardedProps = useMemo(() => (onTitan ? { timeZone, persona: TITAN_PERSONA } : { timeZone }), [onTitan])
   const { messages, sendMessage, isLoading, error, stop } = useChat({
     threadId,
     connection: fetchServerSentEvents("/api/harness/run"),
     persistence: true,
     // The time zone of this browser goes along with every question, so the answer gives the
-    // times the person's clock shows.
-    forwardedProps: { timeZone },
+    // times the person's clock shows. On Titan's screen the question says so too, and the answer
+    // follows Titan's instructions (titan/persona.ts).
+    forwardedProps,
   })
   // On the assistant page an answer is read aloud, and a question asked by voice goes on in this chat.
   useSpokenAnswers(messages, isLoading)
