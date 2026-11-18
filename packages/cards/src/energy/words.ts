@@ -38,3 +38,11 @@ export function axisKilowatts(watt: number): string {
 export function lastHours(hours: number): string {
   return hours === 1 ? "the last hour" : `the last ${hours} hours`
 }
+
+/**
+ * The pieces of a machine id between which a line may break where the card is narrow:
+ * alcyone-machines_AX-400_P-04 breaks as alcyone-machines_|AX-400_|P-04.
+ */
+export function machineIdPieces(id: string): Array<string> {
+  return id.split(/(?<=_)/)
+}

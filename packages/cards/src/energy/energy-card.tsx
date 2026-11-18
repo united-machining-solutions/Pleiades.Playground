@@ -22,7 +22,7 @@ import type { EnergySeries, EnergyShow, MachineEnergy } from "./contract.ts"
 import { ENERGY_ORDERS, pageOf } from "./order.ts"
 import { powerScale } from "./scale.ts"
 import type { EnergyOrder, EnergyPage } from "./order.ts"
-import { axisKilowatts, inKilowattHours, kilowattHours, kilowatts } from "./words.ts"
+import { axisKilowatts, inKilowattHours, kilowattHours, kilowatts, machineIdPieces } from "./words.ts"
 
 /** How many machines the categorical colours of the theme name, `--chart-1` and on. */
 const COLOURS = 14
@@ -170,16 +170,16 @@ function kilowattHoursOf(one: MachineEnergy): number | null {
 }
 
 /**
- * A machine id that breaks only after `_` and `-`, never inside a word:
- * alcyone-machines_AX-400_P-04 becomes alcyone-|machines_|AX-|400_|P-04 where the cell is narrow.
+ * A machine id that breaks only after `_`, never inside a model or a serial number: a browser
+ * would break after a hyphen by itself, so each piece holds together.
  */
 function MachineName({ id }: { id: string }) {
   return (
     <span className="min-w-0 whitespace-normal">
-      {id.split(/(?<=[_-])/).map((part, index) => (
+      {machineIdPieces(id).map((piece, index) => (
         <Fragment key={index}>
           {index > 0 && <wbr />}
-          {part}
+          <span className="whitespace-nowrap">{piece}</span>
         </Fragment>
       ))}
     </span>
