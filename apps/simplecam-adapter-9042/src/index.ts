@@ -10,10 +10,12 @@ import {
   CONNECTION_STATE,
   EVENT_CONTENT_TYPE,
   HEARTBEAT,
+  activityReadings,
   alertChanges,
   buildManifest,
   cloudEvent,
   envelope,
+  extensionPrefix,
   isAlert,
   machineId,
   manifestTopic,
@@ -44,6 +46,7 @@ const RETRY_MS = 5000
 const SILENCE_MS = 35_000
 
 const MACHINE_ID = machineId(MANUFACTURER_URI, MODEL, SERIAL_NUMBER)
+const SIGNAL_PREFIX = extensionPrefix(MANUFACTURER_URI)
 const STATE_TOPIC = topicOf(MACHINE_ID, CONNECTION_STATE)
 const STARTED_AT = new Date().toISOString()
 const JSON_TYPE = { contentType: "application/json" }
@@ -94,7 +97,7 @@ function putState(state: string): void {
 }
 
 function putReading(reading: Reading): void {
-  put(topicOf(MACHINE_ID, reading.path), envelope(reading.value, reading.timestamp ?? STARTED_AT))
+  put(topicOf(MACHINE_ID, reading.path), envelope(reading.value, reading.timestamp ?? STARTED_AT, reading.unit))
   sent.set(reading.path, JSON.stringify(reading.value))
 }
 
@@ -223,7 +226,11 @@ function handle(event: string, text: string): void {
     lost()
     return
   }
-  const own = readings.filter((reading) => !ADAPTER_OWNED.has(reading.path))
+  // The job and its progress come beside State.Status and are no elements of the model: the job is the active work
+  // master, the rest signals of the manufacturer.
+  const own = readings
+    .filter((reading) => !ADAPTER_OWNED.has(reading.path))
+    .flatMap((reading) => (reading.path === "State.Status" ? [reading, ...activityReadings(reading, SIGNAL_PREFIX)] : [reading]))
   if (own.length > 0) reached(own)
 }
 

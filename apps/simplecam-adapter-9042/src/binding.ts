@@ -43,12 +43,20 @@ export interface Reading {
   path: string
   value: unknown
   timestamp?: string
+  /** The catalogue unit of a number (`one`, `watt` ...), where the element has one. */
+  unit?: string
+  /** What the backend says beside `State.Status`: the job and its progress. It is no element of the model. */
+  activity?: Record<string, unknown>
 }
 
 export interface ManifestElement {
   path: string
   timestampSource?: "adapter" | "source"
   available?: false
+  /** A signal of the manufacturer says what it is: its type, its unit and a description. */
+  type?: string
+  unit?: { code: string; name: string }
+  description?: string
 }
 
 export interface Manifest {
@@ -127,7 +135,56 @@ function isRecord(node: unknown): node is Record<string, unknown> {
 
 function leaf(node: Record<string, unknown>): Reading | undefined {
   if (typeof node.path !== "string" || !("value" in node)) return undefined
-  return { path: node.path, value: node.value, timestamp: typeof node.timestamp === "string" ? node.timestamp : undefined }
+  const reading: Reading = { path: node.path, value: node.value, timestamp: typeof node.timestamp === "string" ? node.timestamp : undefined }
+  if (isRecord(node.activity)) reading.activity = node.activity
+  return reading
+}
+
+/** The prefix of a signal of the manufacturer: `x-` and its domain, every dot a `-` (`united-grinding.com` gives `x-united-grinding-com`). */
+export function extensionPrefix(manufacturerUri: string): string {
+  return `x-${domainOf(manufacturerUri).trim().replaceAll(".", "-")}`
+}
+
+type Signal = Pick<ManifestElement, "type" | "unit" | "description">
+
+// The signals of the manufacturer this adapter delivers, by their path without the prefix.
+const SIGNALS: Readonly<Record<string, Signal>> = {
+  "Activity.Context": {
+    type: "string",
+    description: "What the machine does now, as the backend says it, for example printing; null when it says none",
+  },
+  "Activity.Progress": {
+    type: "number",
+    unit: { code: "C62", name: "one" },
+    description: "Progress of the current job as a fraction, 1.0 = done; null when no job runs",
+  },
+}
+
+function signalOf(path: string): Signal | undefined {
+  const match = /^x-[a-z0-9-]+\.(.+)$/.exec(path)
+  return match ? SIGNALS[match[1]] : undefined
+}
+
+/**
+ * What the backend says about the job beside `State.Status`, as elements. The job is the active work master, the
+ * model's name for what the machine works on; what it does and how far it is are signals of the manufacturer. Where
+ * the backend says no job, all three are `null`: not available right now.
+ */
+export function activityReadings(status: Reading, prefix: string): Reading[] {
+  const activity = status.activity
+  const text = (value: unknown): string | null => (typeof value === "string" && value.length > 0 ? value : null)
+  const percent = typeof activity?.progressPercent === "number" && Number.isFinite(activity.progressPercent) ? activity.progressPercent : null
+  const timestamp = status.timestamp
+  return [
+    { path: "WorkMasterMonitoring.ActiveWorkMaster", value: text(activity?.jobName), timestamp },
+    { path: `${prefix}.Activity.Context`, value: text(activity?.context), timestamp },
+    {
+      path: `${prefix}.Activity.Progress`,
+      value: percent === null ? null : Math.min(1, Math.max(0, percent / 100)),
+      timestamp,
+      unit: "one",
+    },
+  ]
 }
 
 /**
@@ -165,6 +222,7 @@ export function buildManifest(id: string, productInstanceUri: string, readings: 
   const element = (path: string): ManifestElement => ({
     path,
     timestampSource: delivered.get(path)?.timestamp === undefined ? "adapter" : "source",
+    ...signalOf(path),
   })
   for (const path of CORE) {
     if (delivered.has(path) || ALWAYS.has(path)) elements.push(element(path))

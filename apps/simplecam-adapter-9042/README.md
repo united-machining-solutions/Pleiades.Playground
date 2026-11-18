@@ -27,7 +27,17 @@ The machine id is `<manufacturer>_<model>_<serial number>`: `united-grinding_sim
 | `Identification/ManufacturerUri`, `Model` | settings | They form the machine id; the stream says neither |
 | `State/Status` | the stream | `MachineryItemState` and `MachineryOperationMode`, goes out when it changes |
 | `Notification/ActiveAlerts` | the stream | The list of alerts |
+| `WorkMasterMonitoring/ActiveWorkMaster` | `activity.jobName` of the stream | The job, the model's name for what the machine works on; `null` when none runs |
+| `../oem/Activity/Context` | `activity.context` | What the machine does now, for example `printing` |
+| `../oem/Activity/Progress` | `activity.progressPercent` | How far the job is, as a fraction of 1 with the unit `one` (6 % is `0.06`) |
 | `Identification/ProductCode`, `YearOfConstruction`, `State/FeedOverride`, `OperationCounters/PowerOnDuration` | – | The machine has none: `"available": false` in the manifest, `null` on the topic |
+
+The stream says the job beside `State.Status`, as `activity`. The data model has no element for how far a job is
+or for a layer; its `ProgramExecution` and `JobOrders` count whole runs and parts. So the progress and the context
+are signals of the manufacturer: they lie below `oem/` (the prefix `x-united-grinding-com` stands only in the
+manifest, with their type, unit and a description), and a consumer that knows only the model ignores them. The
+stack stores them; the machine page of the example app shows the work master but not these two. The backend sends
+no layer.
 
 The backend's own `Connection.State` and `Connection.Heartbeat` are not forwarded: `Connection/State` and
 `Connection/Heartbeat` tell whether this adapter lives. The adapter says `Running` while the stream answers with

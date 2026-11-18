@@ -1,6 +1,18 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { alertChanges, buildManifest, cloudEvent, isAlert, machineId, readingsOf, sequenceOf, topicOf, unavailablePaths } from "./binding.ts"
+import {
+  activityReadings,
+  alertChanges,
+  buildManifest,
+  cloudEvent,
+  extensionPrefix,
+  isAlert,
+  machineId,
+  readingsOf,
+  sequenceOf,
+  topicOf,
+  unavailablePaths,
+} from "./binding.ts"
 
 test("the machine id is formed as the binding says", () => {
   assert.equal(machineId("https://www.united-grinding.com", "simplecam", "9042"), "united-grinding_simplecam_9042")
@@ -140,4 +152,54 @@ test("an event is a CloudEvent 1.0 with the schema of the model version", () => 
     dataschema: "urn:umati2:datamodel:0.17.1:event.schema.json",
     data: overheat,
   })
+})
+
+const PREFIX = "x-united-grinding-com"
+const status = (activity: unknown) => ({ path: "State.Status", timestamp: "2026-11-18T14:21:45.671Z", value: { MachineryItemState: "Executing" }, activity })
+
+test("the prefix of the signals is the domain of the manufacturer", () => {
+  assert.equal(extensionPrefix("https://www.united-grinding.com"), PREFIX)
+  assert.equal(topicOf("united-grinding_simplecam_9042", `${PREFIX}.Activity.Progress`), "machines/united-grinding_simplecam_9042/oem/Activity/Progress")
+})
+
+test("the status keeps what the backend says beside it", () => {
+  const [reading] = readingsOf(status({ context: "printing", jobName: "spirographBase", progressPercent: 6 }))
+  assert.deepEqual(reading.activity, { context: "printing", jobName: "spirographBase", progressPercent: 6 })
+  assert.equal(readingsOf(status(undefined))[0].activity, undefined)
+})
+
+test("the job is the active work master, how far it is a fraction of one", () => {
+  const [reading] = readingsOf(status({ context: "printing", jobName: "spirographBase", progressPercent: 6 }))
+  assert.deepEqual(activityReadings(reading, PREFIX), [
+    { path: "WorkMasterMonitoring.ActiveWorkMaster", value: "spirographBase", timestamp: "2026-11-18T14:21:45.671Z" },
+    { path: `${PREFIX}.Activity.Context`, value: "printing", timestamp: "2026-11-18T14:21:45.671Z" },
+    { path: `${PREFIX}.Activity.Progress`, value: 0.06, timestamp: "2026-11-18T14:21:45.671Z", unit: "one" },
+  ])
+})
+
+test("where the backend says no job, the three are null; progress stays between 0 and 1", () => {
+  const [idle] = readingsOf(status(undefined))
+  assert.deepEqual(activityReadings(idle, PREFIX).map((reading) => reading.value), [null, null, null])
+  const [odd] = readingsOf(status({ jobName: "", progressPercent: "6" }))
+  assert.deepEqual(activityReadings(odd, PREFIX).map((reading) => reading.value), [null, null, null])
+  const [over] = readingsOf(status({ jobName: "x", progressPercent: 140 }))
+  assert.equal(activityReadings(over, PREFIX)[2].value, 1)
+  const [under] = readingsOf(status({ jobName: "x", progressPercent: -3 }))
+  assert.equal(activityReadings(under, PREFIX)[2].value, 0)
+})
+
+test("the manifest says what a signal of the manufacturer is", () => {
+  const [reading] = readingsOf(status({ context: "printing", jobName: "spirographBase", progressPercent: 6 }))
+  const manifest = buildManifest("united-grinding_simplecam_9042", "urn:united-grinding:simplecam:9042", [reading, ...activityReadings(reading, PREFIX)], 10)
+  const element = (path: string) => manifest.elements.find((one) => one.path === path)
+  assert.equal(element("WorkMasterMonitoring.ActiveWorkMaster")?.timestampSource, "source")
+  assert.deepEqual(element(`${PREFIX}.Activity.Progress`), {
+    path: `${PREFIX}.Activity.Progress`,
+    timestampSource: "source",
+    type: "number",
+    unit: { code: "C62", name: "one" },
+    description: "Progress of the current job as a fraction, 1.0 = done; null when no job runs",
+  })
+  assert.equal(element(`${PREFIX}.Activity.Context`)?.type, "string")
+  assert.equal(element(`${PREFIX}.Activity.Context`)?.unit, undefined)
 })
