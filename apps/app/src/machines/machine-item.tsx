@@ -1,5 +1,6 @@
 import type { Machine, State } from "@pleiades/cards/machine/contract.ts"
 import { clock, duration } from "@pleiades/cards/machine/format.ts"
+import { titleOf } from "@pleiades/cards/machine/in-words.ts"
 import { stateLabel } from "@pleiades/cards/machine/state.ts"
 import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
 import { tell } from "@pleiades/cards/machine/tell.ts"
@@ -58,7 +59,7 @@ export function MachineRow({
       </ItemMedia>
       <ItemContent>
         <ItemTitle>
-          {machine.machine}
+          {titleOf(machine)}
           <Badge variant="outline">{stateLabel[state]}</Badge>
         </ItemTitle>
         <ItemDescription>
@@ -81,7 +82,7 @@ export function MachineRow({
           params={{ machine: machine.machine }}
           search
           className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-          aria-label={`Open ${machine.machine}`}
+          aria-label={`Open ${titleOf(machine)}`}
         >
           <ChevronRightIcon />
         </Link>
@@ -111,7 +112,7 @@ export function MachineTile({ machine, asOf }: { machine: Machine; asOf: string 
           <StateSymbol state={warned ? "warning" : "running"} label={warned ? "Warning" : stateLabel.running} />
         </ItemMedia>
         <ItemContent>
-          <ItemTitle>{machine.machine}</ItemTitle>
+          <ItemTitle>{titleOf(machine)}</ItemTitle>
           <ItemDescription>{warned ? told.detail : told.message}</ItemDescription>
         </ItemContent>
         <Since told={told} asOf={asOf} />

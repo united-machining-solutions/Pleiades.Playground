@@ -7,7 +7,7 @@ import { silences } from "./liveness.ts"
 import { currentRun, listMachines, machineOf, showMachine } from "./machines.ts"
 import { fromMicroseconds } from "./time.ts"
 
-const topic = "machines/P-04/umati/State/MachineryItemState"
+const topic = "machines/P-04/umati/State/Status/MachineryItemState"
 const windowStart = "2026-11-16T09:00:00.000Z"
 /** An instant that many seconds after the start of the window. */
 const at = (seconds: number) => new Date(Date.parse(windowStart) + seconds * 1000).toISOString()
@@ -117,26 +117,29 @@ type Published = Record<string, ReadonlyArray<{ at: string; value: string | numb
 /**
  * The two APIs with what a test published, oldest first. They answer as the real ones do: only
  * with what lies between the two instants of a request, and with the newest values if it names
- * a limit. `raised` says when the machine P-04 raised an error that has not gone.
+ * a limit. `raised` says when the machine P-04 raised a failure that has not been cleared.
  */
 function publishing(published: Published, raised: ReadonlyArray<string> = []) {
   mock.method(globalThis, "fetch", async (input: Parameters<typeof fetch>[0]) => {
     const url = new URL(String(input))
-    if (url.pathname === "/notificationEvents/correlationPairs") {
-      const from = Date.parse(url.searchParams.get("from") ?? "")
+    if (url.pathname === "/alerts/pairs") {
+      // The alerts that stood in the range: raised before its end and not cleared before its start.
       const to = Date.parse(url.searchParams.get("to") ?? "")
-      const items = (url.searchParams.get("level") === "Error" ? raised : [])
-        .filter((at) => from <= Date.parse(at) && Date.parse(at) <= to)
+      const severity = url.searchParams.get("severity")
+      const items = (severity === null || severity === "Failure" ? raised : [])
+        .filter((at) => Date.parse(at) <= to)
         .map((at, index) => ({
-          correlationId: `c-${index}`,
           mId: "P-04",
-          notificationId: "E-1",
-          title: "Coolant pressure low",
-          timestampRaised: at,
-          timestampGone: null,
+          alertId: `a-${index}`,
+          errorCode: "E-1",
+          message: "Coolant pressure low",
+          severity: "Failure",
+          raisedAt: at,
+          clearedAt: null,
         }))
       return Response.json({ items })
     }
+    if (url.pathname === "/jobOrders") return Response.json({ items: [] })
     const start = Date.parse(url.searchParams.get("startTime") ?? "")
     const stop = Date.parse(url.searchParams.get("stopTime") ?? "")
     const between = (topic: string) =>
@@ -187,16 +190,16 @@ const heartbeats = (hours: number) =>
 test("a state that was reported more than a day ago holds, as long as the machine gives signs of life", async () => {
   // A machine that has run for 25 hours: it said once that it is connected and what it does.
   publishing({
-    "machines/P-04/umati/Connection/State": [{ at: hoursAgo(25), value: "Connected" }],
-    "machines/P-04/umati/State/MachineryItemState": [{ at: hoursAgo(25), value: "Executing" }],
-    "machines/P-04/umati/State/MachineryOperationMode": [{ at: hoursAgo(25), value: "Automatic" }],
+    "machines/P-04/umati/Connection/State": [{ at: hoursAgo(25), value: "Running" }],
+    "machines/P-04/umati/State/Status/MachineryItemState": [{ at: hoursAgo(25), value: "Executing" }],
+    "machines/P-04/umati/State/Status/MachineryOperationMode": [{ at: hoursAgo(25), value: "Automatic" }],
     "machines/P-04/umati/Connection/Heartbeat": heartbeats(9),
   })
 
   const list = await listMachines(apis, now)
   const [machine] = list.machines
   assert.equal(list.machines.length, 1)
-  assert.equal(machine?.connection.value, "Connected")
+  assert.equal(machine?.connection.value, "Running")
   assert.equal(machine?.itemState.since, hoursAgo(25))
   assert.equal(machine && stateOf(machine, list.asOf), "running")
 
@@ -205,14 +208,14 @@ test("a state that was reported more than a day ago holds, as long as the machin
   assert.deepEqual(shown.history.totals, [{ state: "running", seconds: 8 * 3600 }])
 })
 
-test("a serial number is what the MQTT binding allows, so a machine that is listed can be shown", async () => {
+test("a machine id is what the MQTT binding allows, so a machine that is listed can be shown", async () => {
   assert.equal(machineOf("machines/Line 2/umati/Connection/State"), "Line 2")
   // What the binding forbids names no machine.
   assert.equal(machineOf("machines/a+b/umati/Connection/State"), undefined)
   assert.equal(machineOf("machines/a#b/umati/Connection/State"), undefined)
 
   publishing({
-    "machines/Line 2/umati/Connection/State": [{ at: hoursAgo(1), value: "Connected" }],
+    "machines/Line 2/umati/Connection/State": [{ at: hoursAgo(1), value: "Running" }],
     "machines/Line 2/umati/Connection/Heartbeat": heartbeats(1),
   })
   const list = await listMachines(apis, now)
@@ -221,13 +224,13 @@ test("a serial number is what the MQTT binding allows, so a machine that is list
     ["Line 2"],
   )
   const shown = await showMachine(apis, "Line 2", 1, now)
-  assert.equal(shown.machine.connection.value, "Connected")
+  assert.equal(shown.machine.connection.value, "Running")
 })
 
 test("the state of a machine and the end of its history say the same about an error that stands", async () => {
   const running = {
-    "machines/P-04/umati/Connection/State": [{ at: hoursAgo(30), value: "Connected" }],
-    "machines/P-04/umati/State/MachineryItemState": [{ at: hoursAgo(30), value: "Executing" }],
+    "machines/P-04/umati/Connection/State": [{ at: hoursAgo(30), value: "Running" }],
+    "machines/P-04/umati/State/Status/MachineryItemState": [{ at: hoursAgo(30), value: "Executing" }],
     "machines/P-04/umati/Connection/Heartbeat": heartbeats(9),
   }
   const stateAndHistory = async () => {
@@ -247,13 +250,13 @@ test("the state of a machine and the end of its history say the same about an er
 
 test("a machine whose heartbeat stopped has no data, whatever it reported before", async () => {
   publishing({
-    "machines/P-04/umati/Connection/State": [{ at: hoursAgo(25), value: "Connected" }],
-    "machines/P-04/umati/State/MachineryItemState": [{ at: hoursAgo(25), value: "Executing" }],
+    "machines/P-04/umati/Connection/State": [{ at: hoursAgo(25), value: "Running" }],
+    "machines/P-04/umati/State/Status/MachineryItemState": [{ at: hoursAgo(25), value: "Executing" }],
     // The last sign of life is an hour old.
     "machines/P-04/umati/Connection/Heartbeat": [{ at: hoursAgo(1), value: 1 }],
   })
   const list = await listMachines(apis, now)
   const [machine] = list.machines
-  assert.equal(machine?.connection.value, "Connected")
+  assert.equal(machine?.connection.value, "Running")
   assert.equal(machine && stateOf(machine, list.asOf), "no-data")
 })

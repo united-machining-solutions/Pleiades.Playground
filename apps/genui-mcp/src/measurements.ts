@@ -1,5 +1,5 @@
 import { SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
-import { QUANTITIES, SERIES_SLOTS } from "@pleiades/cards/measurement/contract.ts"
+import { QUANTITIES, QUANTITY_PATHS, SERIES_SLOTS } from "@pleiades/cards/measurement/contract.ts"
 import type { LineValue, Measurement, MeasurementList, MeasurementSeries, Quantity } from "@pleiades/cards/measurement/contract.ts"
 
 import { listTopics, readNewest, readTimelines } from "./apis.ts"
@@ -12,15 +12,15 @@ import { secondsBefore } from "./time.ts"
 // What every machine measures now: the newest value of each physical quantity, in the unit it was
 // published in. Nothing is converted and nothing is added up.
 
-/** Where a quantity is published below `machines/{SerialNumber}/`, and whether it is a number or a yes or no. */
+/** Where a quantity is published below `machines/{machineId}/`, and whether it is a number or a yes or no. */
 export const sources: Record<Quantity, { path: string; kind: "baseUnitValues" | "booleanValues" }> = {
-  activePower: { path: "umati/Consumption/Electricity/Main/AcActivePowerTotal", kind: "baseUnitValues" },
-  energyImported: { path: "umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp", kind: "baseUnitValues" },
-  bearingTemperature: { path: "vendor/Spindle/1/BearingTemperature", kind: "baseUnitValues" },
-  spindleRotating: { path: "umati/Spindle/1/IsRotating", kind: "booleanValues" },
-  feedOverride: { path: "umati/State/FeedOverride", kind: "baseUnitValues" },
-  spindleOverride: { path: "umati/Spindle/1/Override", kind: "baseUnitValues" },
-  powerOnDuration: { path: "umati/OperationCounters/PowerOnDuration", kind: "baseUnitValues" },
+  activePower: { path: QUANTITY_PATHS.activePower, kind: "baseUnitValues" },
+  energyImported: { path: QUANTITY_PATHS.energyImported, kind: "baseUnitValues" },
+  bearingTemperature: { path: QUANTITY_PATHS.bearingTemperature, kind: "baseUnitValues" },
+  spindleRotating: { path: QUANTITY_PATHS.spindleRotating, kind: "booleanValues" },
+  feedOverride: { path: QUANTITY_PATHS.feedOverride, kind: "baseUnitValues" },
+  spindleOverride: { path: QUANTITY_PATHS.spindleOverride, kind: "baseUnitValues" },
+  powerOnDuration: { path: QUANTITY_PATHS.powerOnDuration, kind: "baseUnitValues" },
 }
 
 export function topicOf(machine: string, quantity: Quantity): string {
@@ -59,19 +59,19 @@ export async function listMeasurements(apis: Apis, now = new Date(), machine?: s
   if (machine !== undefined && !known.includes(machine)) {
     throw new Error(`No machine "${machine}" published a value in the last 24 hours. Machines that did: ${known.join(", ") || "none"}.`)
   }
-  const serialNumbers = machine === undefined ? known : [machine]
+  const machineIds = machine === undefined ? known : [machine]
   const machines = await Promise.all(
-    serialNumbers.map(async (serialNumber) => {
+    machineIds.map(async (machineId) => {
       const newest = await Promise.all(
-        QUANTITIES.map((quantity) => readNewest(apis, sources[quantity].kind, topicOf(serialNumber, quantity), now)),
+        QUANTITIES.map((quantity) => readNewest(apis, sources[quantity].kind, topicOf(machineId, quantity), now)),
       )
       // Every value is a sign of life, the newest of each quantity too.
-      const lifeSigns = [...(signs.get(serialNumber) ?? []), ...newest.flatMap((one) => (one ? [one.at] : []))]
+      const lifeSigns = [...(signs.get(machineId) ?? []), ...newest.flatMap((one) => (one ? [one.at] : []))]
       const silent = silences(lifeSigns, windowStart.toISOString(), now.toISOString())
       return {
-        machine: serialNumber,
+        machine: machineId,
         measurements: QUANTITIES.map((quantity, index) =>
-          measurementOf(topicOf(serialNumber, quantity), quantity, newest[index] ?? null, silent, now),
+          measurementOf(topicOf(machineId, quantity), quantity, newest[index] ?? null, silent, now),
         ),
       }
     }),
@@ -132,19 +132,19 @@ export async function listMeasurementSeries(
   ])
   const samplesOf = (quantity: Quantity, machine: string) =>
     timelines[QUANTITIES.indexOf(quantity)]?.find((one) => one.topic === topicOf(machine, quantity))?.samples ?? []
-  const serialNumbers = [
+  const machineIds = [
     ...new Set([...signs.keys(), ...timelines.flat().flatMap((one) => machineOf(one.topic) ?? [])]),
   ].sort()
 
   // The value that held where the lines begin, for each machine and quantity.
   const held = await Promise.all(
-    serialNumbers.map((machine) =>
+    machineIds.map((machine) =>
       Promise.all(QUANTITIES.map((quantity) => readNewest(apis, sources[quantity].kind, topicOf(machine, quantity), from))),
     ),
   )
   // Every value is a sign of life.
   const silent = new Map(
-    serialNumbers.map((machine) => {
+    machineIds.map((machine) => {
       const values = QUANTITIES.flatMap((quantity) => samplesOf(quantity, machine).map((sample) => sample.at))
       return [machine, silences([...(signs.get(machine) ?? []), ...values], from.toISOString(), now.toISOString())]
     }),
@@ -152,7 +152,7 @@ export async function listMeasurementSeries(
 
   const instants = slotEnds(from, now, slots)
   const quantities = QUANTITIES.map((quantity, index) => {
-    const lines = serialNumbers.flatMap((machine, row) => {
+    const lines = machineIds.flatMap((machine, row) => {
       const before = held[row]?.[index]
       const measured = [...(before ? [{ at: before.at, value: before.value }] : []), ...samplesOf(quantity, machine)]
       if (measured.length === 0) return []

@@ -1,6 +1,11 @@
 <Project Sdk="MSTest.Sdk">
   <ItemGroup>
-    <PackageReference Include="Moq" />
+    <PackageReference Include="JsonSchema.Net" />
     <ProjectReference Include="../Pleiades.Playground.Ultimaker.Telemetry/Pleiades.Playground.Ultimaker.Telemetry.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- A broker without a broker, and the schemas of the data model: shared with the tests of the MQTT extensions. -->
+    <Compile Include="../Pleiades.Playground.Mqtt.Extensions.Test/RecordingManagedMqttClient.cs" Link="Shared/RecordingManagedMqttClient.cs" />
+    <Compile Include="../Pleiades.Playground.Mqtt.Extensions.Test/ModelSchemas.cs" Link="Shared/ModelSchemas.cs" />
   </ItemGroup>
 </Project>

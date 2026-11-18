@@ -1,4 +1,4 @@
-import { serialNumber } from "@pleiades/cards/machine/contract.ts"
+import { machineId } from "@pleiades/cards/machine/contract.ts"
 import { SERIES_SLOTS, measurementList, measurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import { measurementListInWords } from "@pleiades/cards/measurement/in-words.ts"
 import { toolDefinition } from "@tanstack/ai"
@@ -25,9 +25,9 @@ const measurementListTool = toolDefinition({
   description:
     "List what every machine measures now, or one machine with `machine`: active power, energy imported, spindle bearing temperature, whether the spindle rotates, feed and spindle override, and power-on duration. Each is the newest value of its topic, in the unit it was published in, and says whether it is current. The result says it in a line for each machine and carries the values of the measurement card. For a question about one machine, name it.",
   inputSchema: z.object({
-    machine: serialNumber
+    machine: machineId
       .optional()
-      .describe("The serial number of one machine, for example P-04. Every machine if omitted."),
+      .describe("The machine id of one machine, for example alcyone-machines_AX-400_P-04. Every machine if omitted."),
     timeZone,
   }),
   outputSchema: measurementList,
@@ -79,9 +79,9 @@ const measurementGuide = `## Measurements
 newest value of each physical quantity. Pass the \`timeZone\` of the person you answer, if you know it.
 
 - \`activePower\`: \`umati/Consumption/Electricity/Main/AcActivePowerTotal\`, in watt.
-- \`energyImported\`: \`umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp\`, a meter in joule
+- \`energyImported\`: \`umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp\`, a meter in watt hours
   that counts up.
-- \`bearingTemperature\`: \`vendor/Spindle/1/BearingTemperature\`, a value of the manufacturer.
+- \`bearingTemperature\`: \`oem/Spindle/1/BearingTemperature\`, a value of the manufacturer.
 - \`spindleRotating\`: \`umati/Spindle/1/IsRotating\`, yes or no.
 - \`feedOverride\`, \`spindleOverride\`: \`umati/State/FeedOverride\`, \`umati/Spindle/1/Override\`, a
   fraction in \`one\`: 1 is 100 percent.

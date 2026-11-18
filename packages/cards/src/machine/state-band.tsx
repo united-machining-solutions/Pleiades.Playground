@@ -8,7 +8,7 @@ import { StateSymbol } from "./state-symbol.tsx"
  * How a state looks as a band on a time axis. Never colour alone: an alarm and missing data are
  * hatched, a stop and setup carry an edge.
  */
-const band: Record<State, string> = {
+export const stateBand: Record<State, string> = {
   running: "bg-state-running",
   alarm: "band-alarm",
   stopped: "bg-state-stopped shadow-[inset_0_0_0_1px_var(--state-stopped-edge)]",
@@ -44,7 +44,7 @@ export function StateBand({ history, spans }: { history: MachineShow["history"];
           {spans.map((span) => (
             <div
               key={span.from}
-              className={band[span.state]}
+              className={stateBand[span.state]}
               style={{ flexGrow: Date.parse(span.to) - Date.parse(span.from), flexBasis: 0 }}
             />
           ))}

@@ -24,7 +24,10 @@ public static class MqttClientBuilderExtensions
             var logger = provider.GetRequiredService<ILogger<MqttClientHost>>();
             var clients = builder.ClientNames.ToImmutableDictionary(name => name, name => provider.GetRequiredKeyedService<IManagedMqttClient>(name));
 
-            return new MqttClientHost(clients, config, logger);
+            var configure = builder.Configure.ToImmutableDictionary(
+                entry => entry.Key, entry => (Action<MQTTnet.MqttClientOptionsBuilder>)(options => entry.Value(provider, options)));
+
+            return new MqttClientHost(clients, config, logger, configure);
         });
         return builder;
     }

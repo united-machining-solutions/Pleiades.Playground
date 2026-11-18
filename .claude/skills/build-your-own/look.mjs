@@ -82,17 +82,18 @@ async function values() {
     }
   }
   console.log(`  ${paths.size} different topics in the last ${minutes} minutes. Machines: ${[...machines].sort().join(", ") || "none"}`)
-  console.log("  Below machines/{SerialNumber}/, or in full where a topic is not about a machine:")
+  console.log("  Below machines/{MachineId}/, or in full where a topic is not about a machine:")
   for (const [path, kind] of [...paths].sort()) console.log(`    ${path.padEnd(64)} ${kind}`)
 }
 
-async function notifications() {
+async function alerts() {
   const to = new Date()
   const from = new Date(to.getTime() - 24 * 60 * 60 * 1000)
-  const url = `${at.events}/notificationEvents/statistics/levelDistribution?from=${from.toISOString()}&to=${to.toISOString()}`
-  const levels = await (await get(url)).json()
-  console.log(`  in the last 24 hours: ${levels.map((one) => `${one.count} ${one.level}`).join(", ") || "none"}`)
-  console.log(`  Each of them: GET ${at.events}/notificationEvents with from, to, level and mId (the machine).`)
+  const url = `${at.events}/alerts/statistics?from=${from.toISOString()}&to=${to.toISOString()}`
+  const severities = await (await get(url)).json()
+  const raised = severities.map((one) => `${one.raised} ${one.severity} (${one.active} still active)`)
+  console.log(`  alerts raised in the last 24 hours, by NE 107 severity: ${raised.join(", ") || "none"}`)
+  console.log(`  Each of them: GET ${at.events}/alerts/pairs with from, to, severity and mId (the machine id).`)
 }
 
 async function chat() {
@@ -134,6 +135,6 @@ if (mode === "call" && tool) {
   await part(`Pages of the example app, at ${at.app}`, "apps/app/src/routes", pages)
   await part("Answers: the tools of the generative UI backend", at.genui, answers)
   await part("Stored values", at.timeseries, values)
-  await part("Notifications", at.events, notifications)
+  await part("Alerts", at.events, alerts)
   await part("Chat", at.app, chat)
 }

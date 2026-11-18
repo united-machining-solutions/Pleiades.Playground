@@ -5,11 +5,11 @@ import {
   ArrowUpIcon,
   BotOffIcon,
   ChevronDownIcon,
+  ChevronLeftIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   LoaderCircleIcon,
   MessageCircleDashedIcon,
-  PlusIcon,
   SquareIcon,
   XIcon,
 } from "lucide-react"
@@ -45,7 +45,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
+  SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -61,30 +61,49 @@ import {
   TraceTitle,
 } from "@pleiades/ui/components/trace"
 
+import { keepOfAnswer } from "@/pages/from-answer.ts"
+
 import { Answer } from "./answer.tsx"
-import { NEW_CHAT, pickModel, pickedModel, rememberThread, takeFirstQuestion, useChatPanel } from "./ask.ts"
+import {
+  NEW_CHAT,
+  afterSwitch,
+  markPress,
+  peekFirstQuestion,
+  pickModel,
+  pickSwitchedOff,
+  pickedModel,
+  pickedSwitchedOff,
+  rememberThread,
+  takeFirstQuestion,
+  takePress,
+  useChatPanel,
+} from "./ask.ts"
 import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
 import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
+import { chatName, nameOfQuestion } from "./chat-name.ts"
 import { DictateButton } from "./dictate.tsx"
-import { chooseChatModel, fetchChatModel } from "./status.ts"
+import { SaveAsPage } from "./save-as-page.tsx"
+import { chooseChatModel, fetchChatSettings, switchChatServer } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
 import { toolLabel } from "./tool-results.ts"
+import { ToolsMenu } from "./tools-menu.tsx"
 
 const root = getRouteApi("__root__")
 const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
 
 /**
  * Everything about the chat lives in this panel on the right, after the shadcn block sidebar-15:
- * the chat itself, "New chat" and the chats so far. Without it the app is complete; it only loses
- * the chat.
+ * the list of the chats and the chat itself. It works like a chat app on a phone, a list and a
+ * chat with a way back: in a chat the head says what the chat is called and leads back to the list,
+ * and the list is where a new chat begins. Without the panel the app is complete; it only loses the
+ * chat.
  *
  * It never covers the page. It stands next to it, and where the two do not fit side by side it
  * takes the lower half of the screen.
  */
 export function ChatSidebar({ chat }: { chat: string }) {
   const { chatStatus } = root.useLoaderData()
-  const panel = useChatPanel()
   return (
     <Sidebar
       side="right"
@@ -92,20 +111,6 @@ export function ChatSidebar({ chat }: { chat: string }) {
       aria-label="Chat"
       className="sticky top-0 h-svh w-[clamp(20rem,36vw,28rem)] shrink-0 border-l max-lg:top-auto max-lg:bottom-0 max-lg:h-[50svh] max-lg:w-full max-lg:border-t max-lg:border-l-0"
     >
-      <SidebarHeader className="h-14 flex-row items-center justify-between border-b">
-        <span className="px-2 font-medium">Chat</span>
-        <div className="flex items-center gap-1">
-          {chatStatus.configured && chat !== NEW_CHAT && (
-            <Button variant="ghost" size="sm" onClick={panel.startNew}>
-              <PlusIcon data-icon="inline-start" />
-              New chat
-            </Button>
-          )}
-          <Button variant="ghost" size="icon-sm" aria-label="Close the chat" onClick={panel.close}>
-            <XIcon />
-          </Button>
-        </div>
-      </SidebarHeader>
       {!chatStatus.configured ? (
         <NoLanguageModel />
       ) : chat === NEW_CHAT ? (
@@ -118,27 +123,66 @@ export function ChatSidebar({ chat }: { chat: string }) {
   )
 }
 
-function NoLanguageModel() {
-  const { chatStatus } = root.useLoaderData()
+/**
+ * The head of the panel. In a chat (`back`) a button leads back to the list, then comes the name of
+ * the chat; elsewhere there is only the title of the view. The name takes the room that is left and
+ * is cut where it is too long: the buttons never give way.
+ *
+ * "All chats" and the link of a chat go away with the view they stand in. After such a press the
+ * heading of the new view takes the focus, so it does not fall to the page and a screen reader says
+ * where it is. On a page load the focus stays where it was.
+ */
+function PanelHead({ title, back = false }: { title: string; back?: boolean }) {
+  const panel = useChatPanel()
+  const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (takePress()) heading.current?.focus()
+  }, [])
   return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <BotOffIcon />
-        </EmptyMedia>
-        <EmptyTitle>No language model configured</EmptyTitle>
-        <EmptyDescription>
-          {/* What is missing first, by the names of the settings. */}
-          {chatStatus.gaps.map((gap) => `${gap}. `)}
-          Set <code>LLM_BASE_URL</code> and <code>LLM_API_KEY</code> of a LiteLLM gateway in <code>.env</code>{" "}
-          and start the app again with <code>docker compose up -d app</code>. Home needs no language model.
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <SidebarHeader className="h-14 flex-row items-center gap-1 border-b">
+      {back && (
+        <Button variant="ghost" size="icon-sm" aria-label="All chats" onClick={panel.showList}>
+          <ChevronLeftIcon />
+        </Button>
+      )}
+      <h2 ref={heading} tabIndex={-1} className="min-w-0 flex-1 truncate px-2 font-medium outline-none">
+        {title}
+      </h2>
+      <Button variant="ghost" size="icon-sm" aria-label="Close the chat" onClick={panel.close}>
+        <XIcon />
+      </Button>
+    </SidebarHeader>
   )
 }
 
-/** The panel before a chat: the chats so far, and questions to begin with above the field. */
+function NoLanguageModel() {
+  const { chatStatus } = root.useLoaderData()
+  return (
+    <>
+      <PanelHead title="Chat" />
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <BotOffIcon />
+          </EmptyMedia>
+          <EmptyTitle>No language model configured</EmptyTitle>
+          <EmptyDescription>
+            {/* What is missing first, by the names of the settings. */}
+            {chatStatus.gaps.map((gap) => `${gap}. `)}
+            Set <code>LLM_BASE_URL</code> and <code>LLM_API_KEY</code> of a LiteLLM gateway in <code>.env</code>{" "}
+            and start the app again with <code>docker compose up -d app</code>. Home needs no language model.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    </>
+  )
+}
+
+/**
+ * The list of the chats, where a chat leads back to: the chats so far, and below them the field that
+ * begins a new chat, with questions to begin with above it. The head says "Chats", so the group has no
+ * label of its own.
+ */
 function Start() {
   const { chats, chatStatus } = root.useLoaderData()
   const panel = useChatPanel()
@@ -148,21 +192,30 @@ function Start() {
     pickModel(name)
     setModel(name)
   }
+  // And without the tools of the servers switched off here.
+  const [off, setOff] = useState(() => pickedSwitchedOff(chatStatus.servers))
+  const switchServer = (name: string, on: boolean) => {
+    const next = afterSwitch(off, name, on)
+    pickSwitchedOff(next)
+    setOff(next)
+  }
   return (
     <>
+      <PanelHead title="Chats" />
       <SidebarContent>
         {chats.length > 0 ? (
           <SidebarGroup>
-            <SidebarGroupLabel>Chats</SidebarGroupLabel>
-            <SidebarMenu>
-              {chats.map((entry) => (
-                <SidebarMenuItem key={entry.threadId}>
-                  <SidebarMenuButton render={<Link to="." search={{ chat: entry.threadId }} />}>
-                    <span>{entry.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {chats.map((entry) => (
+                  <SidebarMenuItem key={entry.threadId}>
+                    <SidebarMenuButton render={<Link to="." search={{ chat: entry.threadId }} onClick={markPress} />}>
+                      <span>{entry.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
           </SidebarGroup>
         ) : (
           <Empty className="h-full">
@@ -183,6 +236,8 @@ function Start() {
         models={chatStatus.models}
         model={model}
         onModel={choose}
+        off={off}
+        onSwitch={switchServer}
         dictation={chatStatus.dictation}
       />
     </>
@@ -192,7 +247,11 @@ function Start() {
 function Conversation({ threadId }: { threadId: string }) {
   const router = useRouter()
   const { chats, chatStatus } = root.useLoaderData()
-  const titled = chats.some((entry) => entry.threadId === threadId && entry.titled)
+  const entry = chats.find((chat) => chat.threadId === threadId)
+  const titled = entry?.titled ?? false
+  // The first question of a chat begun from the list or from a machine, as long as it waits for this
+  // panel: the head can call the chat by it from the first render.
+  const [asked] = useState(() => peekFirstQuestion(threadId))
   const { messages, sendMessage, isLoading, error, stop } = useChat({
     threadId,
     connection: fetchServerSentEvents("/api/harness/run"),
@@ -212,6 +271,35 @@ function Conversation({ threadId }: { threadId: string }) {
     pickModel(name)
     setModel(name)
     void switchTo(name)
+  }
+  // The further servers this chat has switched off. The harness keeps them with the chat, as it keeps
+  // the model, and the server of the app gives the model no tool of a server that is off.
+  // A switch shows what the harness holds: it moves once the harness has taken it, and stays where it
+  // was when the harness did not. Until the chat has opened, the panel does not know what the harness
+  // holds: the switches wait (`settled`), and they keep waiting when the harness did not say.
+  const [off, setOff] = useState<Array<string>>([])
+  const offNow = useRef(off)
+  const [settled, setSettled] = useState(false)
+  const hold = (next: Array<string>) => {
+    offNow.current = next
+    setOff(next)
+  }
+  const [serverError, setServerError] = useState<string>()
+  /** Tells the harness, and says whether it took the switch. */
+  const tell = (name: string, on: boolean) =>
+    switchChatServer(threadId, name, on).then(
+      () => true,
+      (problem: unknown) => {
+        setServerError(problem instanceof Error ? problem.message : String(problem))
+        return false
+      },
+    )
+  const switchServer = async (name: string, on: boolean) => {
+    if (!(await tell(name, on))) return
+    setServerError(undefined)
+    hold(afterSwitch(offNow.current, name, on))
+    // The next chat begins as this one was left.
+    pickSwitchedOff(offNow.current)
   }
   // Stop ends the answer twice: `stop` of the chat stops reading it, and the harness cancels the turn
   // on the server. Without that the model goes on writing, the server keeps the whole answer, and the
@@ -244,10 +332,32 @@ function Conversation({ threadId }: { threadId: string }) {
         // A question asked anywhere in the app opens this chat and is its first message. The chat
         // begins with the model picked last; the first model answers without being picked.
         if (model !== undefined && model !== chatStatus.models[0]) await switchTo(model)
-        void sendMessage(first)
+        // And without the servers switched off last. The question goes out only once the harness has
+        // taken every one of them: a model must not get the tools of a server the person switched off.
+        // A switch shows off only once the harness has taken it.
+        let taken = true
+        for (const name of pickedSwitchedOff(chatStatus.servers)) {
+          if (await tell(name, false)) hold(afterSwitch(offNow.current, name, false))
+          else taken = false
+        }
+        setSettled(true)
+        if (taken) void sendMessage(first)
+        else setServerError((reason) => `${reason ?? "A server could not be switched off."} The question was not sent: ask it again.`)
       } else {
-        // A chat from before keeps the model it picked.
-        setModel((await fetchChatModel(threadId)) ?? chatStatus.models[0])
+        // A chat from before keeps the model it picked, and the servers it switched off. When the
+        // harness does not say, the chat says so and its switches stay locked: they would show the
+        // switches of another chat.
+        try {
+          const picked = await fetchChatSettings(threadId)
+          setModel(picked.model ?? chatStatus.models[0])
+          hold(picked.off)
+          setSettled(true)
+        } catch (problem) {
+          setModel(chatStatus.models[0])
+          setServerError(
+            `The chat did not say what it has switched off (${problem instanceof Error ? problem.message : String(problem)}). Its tools cannot be switched until it does: open the chat again.`,
+          )
+        }
       }
     })()
     return () => {
@@ -266,7 +376,7 @@ function Conversation({ threadId }: { threadId: string }) {
     void fetch("/api/harness/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ op: "rename", threadId, title: firstQuestion.slice(0, 80) }),
+      body: JSON.stringify({ op: "rename", threadId, title: nameOfQuestion(firstQuestion) }),
     }).then(() => router.invalidate())
   }, [isLoading, firstQuestion, titled, threadId, router])
 
@@ -275,6 +385,7 @@ function Conversation({ threadId }: { threadId: string }) {
 
   return (
     <>
+      <PanelHead title={chatName(entry, firstQuestion ?? asked)} back />
       <div className="min-h-0 flex-1">
         {/* A new question settles near the top and the answer grows under it; a chat from before
             opens at its last question. */}
@@ -282,7 +393,7 @@ function Conversation({ threadId }: { threadId: string }) {
           <MessageScroller>
             <MessageScrollerViewport>
               <MessageScrollerContent aria-busy={isLoading} className="gap-6 p-4">
-                {messages.map((message) => {
+                {messages.map((message, position) => {
                   if (message.role === "user") {
                     return (
                       <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor>
@@ -296,9 +407,14 @@ function Conversation({ threadId }: { threadId: string }) {
                       </MessageScrollerItem>
                     )
                   }
-                  const blocks = blocksOf(message.parts, isLoading && message === messages.at(-1), chatTools)
+                  const live = isLoading && message === messages.at(-1)
+                  const blocks = blocksOf(message.parts, live, chatTools)
                   // An answer that has nothing to show yet takes no room.
                   if (blocks.length === 0) return null
+                  // An answer that has ended, and for which the chat drew a card, can be saved as a
+                  // page: its cards, titled with the question it answers (pages/from-answer.ts). The
+                  // answer is more than this message: the button stands under its last one.
+                  const keep = keepOfAnswer(messages, position, chatTools, isLoading)
                   return (
                     // An item paints nothing outside its box, and a card draws its edge as a ring
                     // around itself: one pixel of room keeps that edge.
@@ -314,6 +430,7 @@ function Conversation({ threadId }: { threadId: string }) {
                               }
                             />
                           ))}
+                          {keep && <SaveAsPage answer={`${threadId}/${message.id}`} recipe={keep.recipe} left={keep.left} />}
                         </MessageContent>
                       </Message>
                     </MessageScrollerItem>
@@ -351,6 +468,15 @@ function Conversation({ threadId }: { threadId: string }) {
                     </Alert>
                   </MessageScrollerItem>
                 )}
+                {serverError && (
+                  <MessageScrollerItem messageId="server-error">
+                    <Alert>
+                      <CircleAlertIcon />
+                      <AlertTitle>The tools of this chat</AlertTitle>
+                      <AlertDescription>{serverError}</AlertDescription>
+                    </Alert>
+                  </MessageScrollerItem>
+                )}
                 {stopError && (
                   <MessageScrollerItem messageId="stop-error">
                     <Alert>
@@ -377,6 +503,9 @@ function Conversation({ threadId }: { threadId: string }) {
         models={chatStatus.models}
         model={model}
         onModel={choose}
+        off={off}
+        settled={settled}
+        onSwitch={(name, on) => void switchServer(name, on)}
         dictation={chatStatus.dictation}
       />
     </>
@@ -471,7 +600,8 @@ function AnswerBlock({ block, thinking = false }: { block: Block; thinking?: boo
 }
 
 /**
- * Where a question is written. With more than one model in the settings it also says which model
+ * Where a question is written. Below the text it says which servers give the chat tools and switches
+ * them (tools-menu.tsx). With more than one model in the settings it also says which model
  * answers and lets the chat pick another one, after the shadcn pattern "Model Selector". At the
  * start of the panel the questions to begin with stand above it, after the pattern "Suggestion".
  * With a model for speech in the settings, a question can also be spoken into it (dictate.tsx).
@@ -486,6 +616,9 @@ function Composer({
   models,
   model,
   onModel,
+  off,
+  settled = true,
+  onSwitch,
   dictation,
 }: {
   placeholder: string
@@ -496,6 +629,9 @@ function Composer({
   models: ReadonlyArray<string>
   model: string | undefined
   onModel: (name: string) => void
+  off: ReadonlyArray<string>
+  settled?: boolean
+  onSwitch: (name: string, on: boolean) => void
   dictation: boolean
 }) {
   const [text, setText] = useState("")
@@ -547,9 +683,10 @@ function Composer({
             onChange={(event) => setText(event.target.value)}
             onKeyDown={onKeyDown}
           />
-          {/* With a choice of models the field gets a second line: the model on the left, dictation
-              and send on the right. */}
-          <InputGroupAddon align={choice ? "block-end" : "inline-end"}>
+          {/* The second line of the field: the tools and, with a choice of models, the model on the
+              left, dictation and send on the right. */}
+          <InputGroupAddon align="block-end">
+            <ToolsMenu off={off} settled={settled} onSwitch={onSwitch} />
             {choice && (
               <DropdownMenu>
                 <DropdownMenuTrigger render={<InputGroupButton variant="ghost" aria-label={`Model: ${model}`} />}>
@@ -570,12 +707,12 @@ function Composer({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            {dictation && <DictateButton className={choice ? "ml-auto" : undefined} onText={dictated} />}
+            {dictation && <DictateButton className="ml-auto" onText={dictated} />}
             <InputGroupButton
               type={stoppable ? "button" : "submit"}
               variant="default"
               size="icon-sm"
-              className={choice && !dictation ? "ml-auto" : undefined}
+              className={dictation ? undefined : "ml-auto"}
               aria-label={stoppable ? "Stop" : "Send"}
               disabled={busy && !stoppable}
               onClick={stoppable ? onStop : undefined}
