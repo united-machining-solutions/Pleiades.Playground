@@ -15,17 +15,14 @@ import { useMemo, useState } from "react"
 import { NoAnswer } from "@/components/no-answer.tsx"
 import { liveness, useLive, useRetry } from "@/hooks/use-live.ts"
 import type { Live } from "@/hooks/use-live.ts"
-import { getCharts } from "@/machines/get-machines.ts"
+import { getFloor } from "@/machines/get-machines.ts"
 import { floorAt, floorFilters, floorOf, floorWith, ordersOf } from "@/where-is-my-job/floor.ts"
-import type { FloorPage } from "@/where-is-my-job/floor.ts"
+import type { FloorPage, Order } from "@/where-is-my-job/floor.ts"
 import { FloorMap } from "@/where-is-my-job/floor-map.tsx"
 import type { Lens } from "@/where-is-my-job/floor-map.tsx"
 import { FloorPanel, MachinePanel, OrderPanel, OrdersTable } from "@/where-is-my-job/panels.tsx"
 
-/** The bands of the machines cover their whole history, as the machine card's band does. */
-const BAND_MS = 24 * 60 * 60_000
-
-/** Read once from the backend; then every value, the job orders among them, comes from the broker. */
+/** Read once from the backend, the job orders among them; then every value comes from the broker. */
 const live: Live<FloorPage | null> = {
   filters: floorFilters,
   message: (page, topic, payload, now) => page && floorWith(page, topic, payload, now),
@@ -41,7 +38,7 @@ const live: Live<FloorPage | null> = {
  */
 export const Route = createFileRoute("/where-is-my-job")({
   staticData: { nav: { title: "Where is My Job?", icon: PackageSearchIcon } },
-  loader: () => getCharts({ data: BAND_MS }).catch((error: unknown) => ({ values: null, error: String(error) })),
+  loader: () => getFloor().catch((error: unknown) => ({ values: null, error: String(error) })),
   component: WhereIsMyJob,
 })
 
@@ -49,18 +46,28 @@ type View = "floor" | "machine" | "order"
 
 const legendStates: ReadonlyArray<State> = ["running", "setup", "stopped", "alarm", "no-data"]
 
+/** Whether an order passes a machine. */
+const passes = (order: Order | null, machine: string) => order !== null && order.steps.some((step) => step.machine === machine)
+
 function WhereIsMyJob() {
   const answer = Route.useLoaderData()
   // One object per read, so the page is not reset on every render.
-  const loaded = useMemo(() => (answer.values ? floorOf(answer.values) : null), [answer.values])
+  const loaded = useMemo(() => (answer.values ? floorOf(answer.values, answer.values.jobOrders) : null), [answer.values])
   const { values: page, connected } = useLive<FloorPage | null>(loaded, live)
   useRetry(answer.values === null)
 
   const [lens, setLens] = useState<Lens>("load")
   const [machine, setMachine] = useState<string | null>(null)
-  const [orderNumber, setOrderNumber] = useState<string | null>(null)
-  // The order a person came from when they opened a machine from its path.
+  // The chosen order, by its key (`Order.key`).
+  const [orderKey, setOrderKey] = useState<string | null>(null)
+  // The order a person came from when they opened a machine on its path.
   const [backTo, setBackTo] = useState<string | null>(null)
+
+  // The page renders on every message and every second; the orders change only with the job orders
+  // and the machines, of which only the ids count.
+  const jobs = page?.jobs
+  const ids = page?.machines.map((one) => one.show.machine.machine).join("\n") ?? ""
+  const orders = useMemo(() => (jobs ? ordersOf(ids.split("\n"), jobs) : []), [jobs, ids])
 
   if (answer.values === null || page === null) {
     return (
@@ -85,25 +92,27 @@ function WhereIsMyJob() {
     )
   }
 
-  const order = ordersOf(page).find((one) => one.number === orderNumber) ?? null
+  const order = orders.find((one) => one.key === orderKey) ?? null
+  const backOrder = orders.find((one) => one.key === backTo) ?? null
   const shown = page.machines.find((one) => one.show.machine.machine === machine) ?? null
   const view: View = order ? "order" : shown ? "machine" : "floor"
 
-  const openMachine = (id: string, from: string | null = null) => {
+  // The way back to an order stays only for a machine on its path.
+  const openMachine = (id: string, from: Order | null = null) => {
     setMachine(id)
-    setOrderNumber(null)
-    setBackTo(from)
+    setOrderKey(null)
+    setBackTo(passes(from, id) ? from!.key : null)
   }
   // An order keeps the open machine only when it was opened from that machine, so tab 2 always
   // names a machine that belongs to the order.
-  const openOrder = (number: string, fromMachine = false) => {
+  const openOrder = (key: string, fromMachine = false) => {
     if (!fromMachine) setMachine(null)
-    setOrderNumber(number)
+    setOrderKey(key)
     setBackTo(null)
   }
   const openFloor = () => {
     setMachine(null)
-    setOrderNumber(null)
+    setOrderKey(null)
     setBackTo(null)
   }
 
@@ -125,8 +134,8 @@ function WhereIsMyJob() {
           if (value === "floor") openFloor()
           // From an order to its machine: the way back to the order stays.
           if (value === "machine") {
-            setBackTo(orderNumber)
-            setOrderNumber(null)
+            setBackTo(shown && passes(order, shown.show.machine.machine) ? order!.key : null)
+            setOrderKey(null)
           }
         }}
         className="gap-6"
@@ -137,7 +146,7 @@ function WhereIsMyJob() {
             2 · {shown ? titleOf(shown.show.machine) : "Machine"}
           </TabsTrigger>
           <TabsTrigger value="order" disabled={!order}>
-            3 · {order ? order.number : "Order"}
+            3 · {order ? order.label : "Order"}
           </TabsTrigger>
         </TabsList>
 
@@ -165,11 +174,12 @@ function WhereIsMyJob() {
               <CardContent>
                 <FloorMap
                   page={page}
+                  orders={orders}
                   lens={lens}
                   machine={machine}
                   order={order}
-                  onMachine={(id) => openMachine(id, order?.number ?? null)}
-                  onOrder={(number) => openOrder(number)}
+                  onMachine={(id) => openMachine(id, order)}
+                  onOrder={(key) => openOrder(key)}
                 />
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-2 text-xs text-muted-foreground">
                   {legendStates.map((state) => (
@@ -198,12 +208,10 @@ function WhereIsMyJob() {
             <Card size="sm" className="min-w-0">
               <CardHeader>
                 <CardTitle>Orders on the shop floor</CardTitle>
-                <CardDescription>
-                  {ordersOf(page).length} orders from the job orders of the machines · held up ones first
-                </CardDescription>
+                <CardDescription>{orders.length} orders from the job orders of the machines · held up ones first</CardDescription>
               </CardHeader>
               <CardContent>
-                <OrdersTable page={page} chosen={orderNumber} onOrder={(number) => openOrder(number)} />
+                <OrdersTable page={page} orders={orders} chosen={orderKey} onOrder={(key) => openOrder(key)} />
               </CardContent>
             </Card>
           </div>
@@ -216,7 +224,7 @@ function WhereIsMyJob() {
                 <CardDescription>What needs someone now.</CardDescription>
               </CardHeader>
               <CardContent>
-                <FloorPanel page={page} onMachine={(id) => openMachine(id)} onOrder={(number) => openOrder(number)} />
+                <FloorPanel page={page} orders={orders} onMachine={(id) => openMachine(id)} onOrder={(key) => openOrder(key)} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -229,11 +237,14 @@ function WhereIsMyJob() {
               <CardContent>
                 {shown && (
                   <MachinePanel
+                    // A machine of its own reads its band of its own.
+                    key={shown.show.machine.machine}
                     page={page}
+                    orders={orders}
                     machine={shown.show.machine.machine}
-                    backTo={backTo}
-                    onBack={() => backTo && openOrder(backTo, true)}
-                    onOrder={(number) => openOrder(number, true)}
+                    backTo={backOrder}
+                    onBack={() => backOrder && openOrder(backOrder.key, true)}
+                    onOrder={(key) => openOrder(key, true)}
                   />
                 )}
               </CardContent>
@@ -246,7 +257,7 @@ function WhereIsMyJob() {
                 <CardDescription>Where it has been, where it is, where it goes.</CardDescription>
               </CardHeader>
               <CardContent>
-                {order && <OrderPanel page={page} order={order} onMachine={(id) => openMachine(id, order.number)} />}
+                {order && <OrderPanel page={page} order={order} onMachine={(id) => openMachine(id, order)} />}
               </CardContent>
             </Card>
           </TabsContent>

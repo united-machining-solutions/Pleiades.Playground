@@ -1,7 +1,8 @@
-import type { Span, State } from "@pleiades/cards/machine/contract.ts"
+import type { MachineShow, State } from "@pleiades/cards/machine/contract.ts"
 import { clock } from "@pleiades/cards/machine/format.ts"
 import { titleOf } from "@pleiades/cards/machine/in-words.ts"
 import { StateBand } from "@pleiades/cards/machine/state-band.tsx"
+import type { Spans } from "@pleiades/cards/machine/state-band.tsx"
 import { stateLabel, stateOf } from "@pleiades/cards/machine/state.ts"
 import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
 import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
@@ -25,9 +26,11 @@ import {
   SearchXIcon,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import { Fragment, useState } from "react"
+import { Fragment, useEffect, useMemo, useState } from "react"
 
-import { conceptStations, finished, ordersOf, utilisation, waiting } from "./floor.ts"
+import { getSpans } from "@/machines/get-machines.ts"
+
+import { conceptStations, finished, utilisation, waiting, workingOn } from "./floor.ts"
 import type { FloorPage, Job, Order, OrderState, Step } from "./floor.ts"
 
 const heading = "text-xs font-medium tracking-wide text-muted-foreground uppercase"
@@ -40,13 +43,17 @@ const orderTag: Record<OrderState, { label: string; variant: "secondary" | "defa
   aborted: { label: "Aborted", variant: "destructive" },
 }
 
-/** How far an order is with one step: through it, at it, held up at it, or still to come. */
-type StepLook = "done" | "current" | "blocked" | "planned"
+/**
+ * How far an order is with one step: through it, at it, held up at it (it may go on), aborted
+ * there (it will not), or still to come. A state the page does not know is still to come.
+ */
+type StepLook = "done" | "current" | "blocked" | "aborted" | "planned"
 
 function lookOf(job: Job): StepLook {
   if (job.state === "Ended") return "done"
   if (job.state === "Running") return "current"
-  if (job.state === "Interrupted" || job.state === "Aborted") return "blocked"
+  if (job.state === "Interrupted") return "blocked"
+  if (job.state === "Aborted") return "aborted"
   return "planned"
 }
 
@@ -54,6 +61,7 @@ const stepTag: Record<StepLook, { label: string; variant: "secondary" | "default
   done: { label: "Done", variant: "secondary" },
   current: { label: "In progress", variant: "default" },
   blocked: { label: "Held up", variant: "destructive" },
+  aborted: { label: "Aborted", variant: "destructive" },
   planned: { label: "Waiting", variant: "outline" },
 }
 
@@ -70,12 +78,14 @@ function quantity(step: Pick<Step, "job" | "result">) {
 /** Perspective 1: what needs a person on the shop floor now. */
 export function FloorPanel({
   page,
+  orders,
   onMachine,
   onOrder,
 }: {
   page: FloorPage
+  orders: ReadonlyArray<Order>
   onMachine: (id: string) => void
-  onOrder: (number: string) => void
+  onOrder: (key: string) => void
 }) {
   const needs: Array<{ key: string; state: State | "warning"; title: string; detail: string; open: () => void }> = []
   for (const { show } of page.machines) {
@@ -100,13 +110,14 @@ export function FloorPanel({
       })
     }
   }
-  for (const order of ordersOf(page).filter((one) => one.state === "interrupted" || one.state === "aborted")) {
+  // A job order the planner took back before it ran is not among the orders: nobody waits for it.
+  for (const order of orders.filter((one) => one.state === "interrupted" || one.state === "aborted")) {
     needs.push({
-      key: order.number,
+      key: order.key,
       state: order.state === "aborted" ? "alarm" : "warning",
-      title: `Order ${order.number} ${order.state === "aborted" ? "aborted" : "held up"}`,
+      title: `Order ${order.label} ${order.state === "aborted" ? "aborted" : "held up"}`,
       detail: `${order.at.job.jobOrderId} at ${machineName(page, order.at.machine)} · ${quantity(order.at)}`,
-      open: () => onOrder(order.number),
+      open: () => onOrder(order.key),
     })
   }
 
@@ -154,35 +165,44 @@ export function FloorPanel({
 /** Perspective 2: one machine, what it did, does and will do. */
 export function MachinePanel({
   page,
+  orders,
   machine: id,
   backTo,
   onBack,
   onOrder,
 }: {
   page: FloorPage
+  orders: ReadonlyArray<Order>
   machine: string
-  backTo: string | null
+  backTo: Order | null
   onBack: () => void
-  onOrder: (number: string) => void
+  onOrder: (key: string) => void
 }) {
   const entry = page.machines.find((one) => one.show.machine.machine === id)
   if (!entry) return null
-  const { show, spans } = entry
+  const { show } = entry
   const { machine } = show
   const state = stateOf(machine, page.asOf)
   const jobs = page.jobs[id]
   const queue = waiting(jobs)
   const done = finished(jobs)
-  const running = jobs?.orders?.find((one) => one.state === "Running" || one.state === "Interrupted")
+  // The job order the tile names, so the two do not differ.
+  const running = workingOn(jobs, machine.jobOrder?.jobOrderId ?? null)
   const runningResult = running && jobs?.results?.find((one) => one.jobOrderId === running.jobOrderId)
-  const orderOf = (job: Job) => job.orderNumbers[0] ?? job.jobOrderId
+  const orderOf = (job: Job) =>
+    orders.find((one) => one.steps.some((step) => step.machine === id && step.job.jobOrderId === job.jobOrderId)) ?? null
+  const openOrderOf = (job: Job) => {
+    const order = orderOf(job)
+    if (order) onOrder(order.key)
+  }
+  const runningOrder = running ? orderOf(running) : null
 
   return (
     <div className="flex flex-col gap-5">
       {backTo && (
         <Button variant="outline" size="sm" className="self-start" onClick={onBack}>
           <ChevronRightIcon data-icon="inline-start" className="rotate-180" />
-          Back to order {backTo}
+          Back to order {backTo.label}
         </Button>
       )}
       <Item variant="muted" size="sm">
@@ -225,7 +245,7 @@ export function MachinePanel({
           </ItemContent>
         </Item>
       </ItemGroup>
-      <StateBand history={show.history} spans={spans as Array<Span> | null} />
+      <MachineBand show={show} />
       <section className="flex flex-col gap-1.5">
         <h3 className={heading}>Now {clock(page.asOf)}</h3>
         {running ? (
@@ -244,10 +264,12 @@ export function MachinePanel({
               </ProgressLabel>
               <ProgressValue className="text-xs" />
             </Progress>
-            <Button variant="outline" size="sm" className="self-start rounded-full" onClick={() => onOrder(orderOf(running))}>
-              Order {orderOf(running)}
-              <ChevronRightIcon data-icon="inline-end" />
-            </Button>
+            {runningOrder && (
+              <Button variant="outline" size="sm" className="self-start rounded-full" onClick={() => onOrder(runningOrder.key)}>
+                Order {runningOrder.label}
+                <ChevronRightIcon data-icon="inline-end" />
+              </Button>
+            )}
           </>
         ) : (
           <p className="text-sm text-muted-foreground">
@@ -260,19 +282,22 @@ export function MachinePanel({
         {done.length === 0 ? (
           <p className="text-sm text-muted-foreground">No job order ended in the shift the machine keeps.</p>
         ) : (
-          done.map(({ job, result }) => (
-            <button
-              key={job.jobOrderId}
-              type="button"
-              onClick={() => onOrder(orderOf(job))}
-              className="flex gap-3 text-left text-sm hover:underline"
-            >
-              <span className="w-12 shrink-0 text-muted-foreground tabular-nums">{result?.end ? clock(result.end) : "–"}</span>
-              <span>
-                {job.jobOrderId} · {result?.produced ?? 0} made{job.state === "Aborted" ? " · aborted" : ""}
-              </span>
-            </button>
-          ))
+          <ItemGroup className="gap-1.5">
+            {done.map(({ job, result }) => (
+              <Item
+                key={job.jobOrderId}
+                variant="outline"
+                size="xs"
+                render={<button type="button" onClick={() => openOrderOf(job)} />}
+                className="cursor-pointer text-left hover:bg-muted/50"
+              >
+                <ItemContent className="flex-row gap-3">
+                  <span className="w-12 shrink-0 text-muted-foreground tabular-nums">{result?.end ? clock(result.end) : "–"}</span>
+                  {job.jobOrderId} · {result?.produced ?? 0} made{job.state === "Aborted" ? " · aborted" : ""}
+                </ItemContent>
+              </Item>
+            ))}
+          </ItemGroup>
         )}
       </section>
       <section className="flex flex-col gap-1.5">
@@ -286,7 +311,7 @@ export function MachinePanel({
                 key={job.jobOrderId}
                 variant="outline"
                 size="xs"
-                render={<button type="button" onClick={() => onOrder(orderOf(job))} />}
+                render={<button type="button" onClick={() => openOrderOf(job)} />}
                 className="cursor-pointer border-dashed text-left hover:bg-muted/50"
               >
                 <ItemContent className="flex-row gap-3">
@@ -310,7 +335,7 @@ export function MachinePanel({
 /** What the order is known by, and whether the stack has it. */
 function knownAs(order: Order): Array<{ label: string; value: string | null }> {
   return [
-    { label: "Order number", value: order.at.job.orderNumbers[0] ?? null },
+    { label: "Order number", value: order.number },
     { label: "Job order", value: order.steps.map((one) => one.job.jobOrderId).join(", ") },
     { label: "Work master", value: order.at.job.workMaster },
     { label: "Sheet · position", value: null },
@@ -356,7 +381,7 @@ export function OrderPanel({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-0.5">
-        <span className="text-lg font-semibold">{order.number}</span>
+        <span className="text-lg font-semibold">{order.label}</span>
         <span className="text-sm text-muted-foreground">
           {order.jobName ?? "Job order"} · {order.steps.length} {order.steps.length === 1 ? "machine" : "machines"}
         </span>
@@ -405,7 +430,7 @@ export function OrderPanel({
         {order.steps.map((step) => {
           const look = lookOf(step.job)
           return (
-            <li key={`${step.machine}-${step.job.jobOrderId}`} className="flex gap-3">
+            <li key={`${step.machine}:${step.job.jobOrderId}`} className="flex gap-3">
               <div className="flex w-4 shrink-0 flex-col items-center">
                 <span
                   aria-hidden
@@ -414,6 +439,7 @@ export function OrderPanel({
                     look === "done" && "bg-primary",
                     look === "current" && "border-4 border-primary bg-background ring-3 ring-primary/20",
                     look === "blocked" && "border-4 border-destructive bg-background ring-3 ring-destructive/20",
+                    look === "aborted" && "bg-destructive",
                     look === "planned" && "border-2 border-dashed border-muted-foreground bg-background",
                   )}
                 />
@@ -454,8 +480,11 @@ export function OrderPanel({
       </ol>
       {order.steps.length === 1 && (
         <p className="text-xs text-muted-foreground">
-          The order passes one machine: no other job order names {order.number}. Once the ERP gives the job orders of
-          several machines the same order number, its path runs across them by itself.
+          {order.number === null
+            ? "The job order names no order number, so it is an order of its own."
+            : `The order passes one machine: no other job order names ${order.number}.`}{" "}
+          Once the ERP gives the job orders of several machines the same order number, its path runs across them by
+          itself.
         </p>
       )}
     </div>
@@ -465,18 +494,23 @@ export function OrderPanel({
 /** Every order in one list, held-up ones first, with its path as a row of signs. */
 export function OrdersTable({
   page,
+  orders,
   chosen,
   onOrder,
 }: {
   page: FloorPage
+  orders: ReadonlyArray<Order>
   chosen: string | null
-  onOrder: (number: string) => void
+  onOrder: (key: string) => void
 }) {
   const [query, setQuery] = useState("")
   const words = query.trim().toLowerCase()
-  const orders = ordersOf(page)
+  // The names of the machines, once for all rows. Each tick gives new machines with the same names.
+  const named = page.machines.map((one) => `${one.show.machine.machine}\t${titleOf(one.show.machine)}`).join("\n")
+  const names = useMemo(() => new Map(named.split("\n").map((line) => line.split("\t") as [string, string])), [named])
+  const nameOf = (id: string) => names.get(id) ?? id
   const rows = orders.filter((one) =>
-    `${one.number} ${one.jobName ?? ""} ${one.steps.map((step) => `${step.job.jobOrderId} ${machineName(page, step.machine)}`).join(" ")}`
+    `${one.label} ${one.jobName ?? ""} ${one.steps.map((step) => `${step.job.jobOrderId} ${nameOf(step.machine)}`).join(" ")}`
       .toLowerCase()
       .includes(words),
   )
@@ -488,10 +522,10 @@ export function OrdersTable({
           <EmptyMedia variant="icon">
             <SearchXIcon />
           </EmptyMedia>
-          <EmptyTitle>No job orders heard yet</EmptyTitle>
+          <EmptyTitle>No job orders</EmptyTitle>
           <EmptyDescription>
-            The job orders come from the broker, retained in JobMonitoring/JobOrders of each machine. Until a machine
-            publishes them, no order stands here.
+            No machine has a job order on its list in the last 24 hours. A new one appears here as its machine
+            publishes it.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -535,10 +569,10 @@ export function OrdersTable({
           <TableBody>
             {rows.map((order) => (
               <TableRow
-                key={order.number}
-                data-state={chosen === order.number ? "selected" : undefined}
+                key={order.key}
+                data-state={chosen === order.key ? "selected" : undefined}
                 className="cursor-pointer"
-                onClick={() => onOrder(order.number)}
+                onClick={() => onOrder(order.key)}
               >
                 <TableCell>
                   <Button
@@ -547,10 +581,10 @@ export function OrdersTable({
                     className="h-auto px-0 font-semibold"
                     onClick={(event) => {
                       event.stopPropagation()
-                      onOrder(order.number)
+                      onOrder(order.key)
                     }}
                   >
-                    {order.number}
+                    {order.label}
                   </Button>
                   <div className="text-xs text-muted-foreground">{order.jobName ?? ""}</div>
                 </TableCell>
@@ -561,9 +595,9 @@ export function OrdersTable({
                     {order.steps.map((step) => {
                       const look = lookOf(step.job)
                       return (
-                        <Fragment key={`${step.machine}-${step.job.jobOrderId}`}>
+                        <Fragment key={`${step.machine}:${step.job.jobOrderId}`}>
                           <span aria-hidden className={cn("w-2 border-t-2", look === "planned" ? "border-dashed border-border" : "border-primary")} />
-                          <PathSign icon={FactoryIcon} look={look} title={`${machineName(page, step.machine)} · ${step.job.jobOrderId}`} />
+                          <PathSign icon={FactoryIcon} look={look} title={`${nameOf(step.machine)} · ${step.job.jobOrderId} · ${stepTag[look].label}`} />
                         </Fragment>
                       )
                     })}
@@ -574,7 +608,7 @@ export function OrdersTable({
                 <TableCell>
                   <span className="flex items-center gap-2">
                     <Badge variant={orderTag[order.state].variant}>{orderTag[order.state].label}</Badge>
-                    {machineName(page, order.at.machine)}
+                    {nameOf(order.at.machine)}
                   </span>
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{quantity(order.at)}</TableCell>
@@ -596,6 +630,7 @@ function PathSign({ icon: Icon, look, title }: { icon: LucideIcon; look: StepLoo
         look === "done" && "bg-primary text-primary-foreground",
         look === "current" && "border-2 border-primary text-primary",
         look === "blocked" && "border-2 border-destructive text-destructive",
+        look === "aborted" && "bg-destructive text-background",
         look === "planned" && "border border-dashed border-muted-foreground text-muted-foreground",
         look === "concept" && "border border-dotted border-muted-foreground text-muted-foreground",
       )}
@@ -603,4 +638,25 @@ function PathSign({ icon: Icon, look, title }: { icon: LucideIcon; look: StepLoo
       <Icon className="size-3.5" />
     </span>
   )
+}
+
+/**
+ * The band of the machine that is open, read when it opens: the page reads no band for the
+ * machines it does not show. It stays with the hours it was read for.
+ */
+function MachineBand({ show }: { show: MachineShow }) {
+  const [history] = useState(show.history)
+  const [spans, setSpans] = useState<Spans>()
+  const { machine } = show.machine
+  useEffect(() => {
+    let wanted = true
+    getSpans({ data: { machine, from: history.from, to: history.to } }).then(
+      (read) => wanted && setSpans(read),
+      () => wanted && setSpans(null),
+    )
+    return () => {
+      wanted = false
+    }
+  }, [machine, history])
+  return <StateBand history={history} spans={spans} />
 }

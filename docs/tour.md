@@ -117,8 +117,8 @@ live from the broker, as Home is.
 The page "Where is My Job?" in the sidebar, <http://localhost:5600/where-is-my-job>, is a basis for
 discussion: how an order could be followed across the shop floor. It shows the machines of the stack from
 above, with their state, utilisation and job orders; a machine with what it did, does and what waits for it;
-and an order on its way. An order is every job order that names the same order number, read from the retained
-lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines, packing after them and
+and an order on its way. An order is every job order that names the same order number, read from the backend
+(`genui_job_order_list`) and kept live by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines, packing after them and
 the single part on its sheet have no source yet: the page draws them dashed, as the gaps to discuss. It has no
 picture in this tour.
 

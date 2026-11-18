@@ -11,8 +11,8 @@ import { cn } from "cn"
 import { CodeXmlIcon, FactoryIcon, PackageIcon } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
-import { TILE_HEIGHT, TILE_WIDTH, conceptStations, connector, layout, ordersOf, pathOf, utilisation, waiting } from "./floor.ts"
-import type { FloorPage, Order, Place } from "./floor.ts"
+import { TILE_HEIGHT, TILE_WIDTH, conceptStations, connector, layout, pathOf, utilisation, waiting } from "./floor.ts"
+import type { FloorPage, Order, OrderState, Place } from "./floor.ts"
 
 /** The edge of a tile in the colour of its state, so the floor reads from afar. */
 const stripe: Record<State, string> = {
@@ -24,6 +24,15 @@ const stripe: Record<State, string> = {
 }
 
 export type Lens = "load" | "queue"
+
+/** The marker on the tile where the chosen order stands, by its state. */
+const orderBadge: Record<OrderState, { label: string; variant: "default" | "destructive" | "secondary" }> = {
+  running: { label: "Order is here", variant: "default" },
+  waiting: { label: "Order waits here", variant: "default" },
+  interrupted: { label: "Order held up here", variant: "destructive" },
+  aborted: { label: "Order aborted here", variant: "destructive" },
+  ended: { label: "Order done here", variant: "secondary" },
+}
 
 /** A share as a whole percentage. */
 export function percent(share: number | null): string {
@@ -38,6 +47,7 @@ export function percent(share: number | null): string {
  */
 export function FloorMap({
   page,
+  orders,
   lens,
   machine,
   order,
@@ -45,15 +55,15 @@ export function FloorMap({
   onOrder,
 }: {
   page: FloorPage
+  orders: ReadonlyArray<Order>
   lens: Lens
   machine: string | null
   order: Order | null
   onMachine: (id: string) => void
-  onOrder: (number: string) => void
+  onOrder: (key: string) => void
 }) {
   const { places, width, height } = layout(page.machines.map((one) => one.show.machine.machine))
   const placeOf = Object.fromEntries(places.map((one) => [one.id, one])) as Record<string, Place>
-  const orders = ordersOf(page)
   const path = order ? pathOf(order) : []
   const reached = order ? order.steps.filter((step) => step.result !== null).length : 0
 
@@ -71,7 +81,7 @@ export function FloorMap({
           const look = concept ? "concept" : index < reached ? "done" : "plan"
           return connector(placeOf[from]!, placeOf[to]!).map(([axis, a, b, c], segment) => (
             <span
-              key={`${from}>${to}-${segment}`}
+              key={`${index}-${segment}`}
               aria-hidden
               className={cn(
                 "absolute border-primary",
@@ -112,7 +122,7 @@ export function FloorMap({
               orderHere={order?.at.machine === place.id ? order : null}
               dim={order !== null && !path.includes(place.id)}
               here={here}
-              chosen={order?.number ?? null}
+              chosen={order?.key ?? null}
               onOpen={() => onMachine(place.id)}
               onOrder={onOrder}
             />
@@ -177,7 +187,7 @@ function MachineTile({
   here: ReadonlyArray<Order>
   chosen: string | null
   onOpen: () => void
-  onOrder: (number: string) => void
+  onOrder: (key: string) => void
 }) {
   const { machine } = show
   const state = stateOf(machine, asOf)
@@ -186,16 +196,18 @@ function MachineTile({
   const bigLabel = lens === "load" ? "producing" : "job orders waiting"
   const job = machine.jobOrder
   const small = job ? `${job.jobOrderId} · ${job.producedQuantity ?? "?"} of ${job.runsPlanned ?? "?"}` : "No job order"
-  const blocked = orderHere?.state === "interrupted"
+  const badge = orderHere ? orderBadge[orderHere.state] : null
+  // The ring stands where the order is or waits; one that is through or held up keeps its badge only.
+  const ring = selected || orderHere?.state === "running" || orderHere?.state === "waiting"
   // One order as a marker, the chosen one if it is here; the rest as "+N".
-  const shown = here.find((one) => one.number === chosen) ?? here[0]
+  const shown = here.find((one) => one.key === chosen) ?? here[0]
   const more = Math.max(0, here.length - (shown ? 1 : 0)) + (queue ?? 0)
 
   return (
     <div className="absolute flex flex-col gap-1.5" style={{ left: place.x, top: place.y, width: TILE_WIDTH }}>
-      {orderHere && (
-        <Badge variant={blocked ? "destructive" : "default"} className="absolute -top-2.5 right-2 z-10">
-          {blocked ? "Order held up here" : orderHere.state === "waiting" ? "Order waits here" : "Order is here"}
+      {badge && (
+        <Badge variant={badge.variant} className="absolute -top-2.5 right-2 z-10">
+          {badge.label}
         </Badge>
       )}
       <Item
@@ -206,7 +218,7 @@ function MachineTile({
           "cursor-pointer content-start gap-1.5 bg-card pl-4 text-left hover:bg-muted/50",
           stripe[state],
           state === "alarm" && "border-destructive",
-          (selected || (orderHere && !blocked)) && "border-primary ring-3 ring-primary/20",
+          ring && "border-primary ring-3 ring-primary/20",
           dim && "opacity-30",
         )}
         style={{ height: TILE_HEIGHT }}
@@ -235,18 +247,18 @@ function MachineTile({
       <div className="flex gap-1">
         {shown && (
           <Button
-            variant={chosen === shown.number ? "default" : "outline"}
+            variant={chosen === shown.key ? "default" : "outline"}
             size="xs"
             className={cn(
               "max-w-24 truncate rounded-full",
-              shown.state === "interrupted" && chosen !== shown.number && "border-destructive/50 text-destructive",
-              chosen && chosen !== shown.number && "opacity-45",
+              shown.state === "interrupted" && chosen !== shown.key && "border-destructive/50 text-destructive",
+              chosen && chosen !== shown.key && "opacity-45",
             )}
-            title={`${shown.number} · ${shown.jobName ?? ""}`}
-            aria-label={`Open order ${shown.number}`}
-            onClick={() => onOrder(shown.number)}
+            title={`${shown.label} · ${shown.jobName ?? ""}`}
+            aria-label={`Open order ${shown.label}`}
+            onClick={() => onOrder(shown.key)}
           >
-            {shown.number}
+            {shown.label}
           </Button>
         )}
         {more > 0 && (
