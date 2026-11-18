@@ -37,7 +37,9 @@ All notable changes are documented here. The format follows
 - Optional juice bar service `juicebar-api` (Compose profile `juicebar`, port 5550): the card and the state of
   a machine that runs MixerControl over REST and MCP, an order on request, and its state on the broker below
   `machines/{MachineId}/`, `unknown_JuiceBar_JUICEBAR-01` by default, with its own values below `oem/JuiceBar/`.
-  It never starts the production; `JUICEBAR_ENABLE_ORDERING=false` makes it read-only.
+  It never starts the production; `JUICEBAR_ENABLE_ORDERING=false` makes it read-only. `JUICEBAR_SERIAL_NUMBER`
+  names its serial number, `JUICEBAR_MANUFACTURER`, `JUICEBAR_MANUFACTURER_NAME` and `JUICEBAR_MODEL` the rest
+  of its machine id and its name on the screen.
 
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
@@ -243,9 +245,10 @@ All notable changes are documented here. The format follows
   `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query` and
   `events_program_executions_query`.
 - The machine card shows the work master instead of the program, the job order that runs, and alerts with their
-  NE 107 severity; a machine whose adapter is not `Running` has no data.
-- The measurement card and the Ultimaker telemetry follow this tree: the card names a machine by its machine id
-  and reads the bearing temperature below `oem/` (energy shows in `Wh`); the telemetry publishes below
+  NE 107 severity; a machine whose adapter is not `Running` has no data, since the adapter said so.
+- The measurement card and the Ultimaker telemetry follow this tree: the card takes a machine by its machine id,
+  labels it with its model and serial number, and reads the bearing temperature below `oem/` (energy shows in
+  `Wh`); the telemetry publishes below
   `machines/ultimaker_UM3_UM3-01/` (`ULTIMAKER_SERIAL_NUMBER` instead of `ULTIMAKER_MACHINE_ID`), its signals
   below `oem/Ultimaker/`, `State/Status/MachineryItemState`, the adapter states `Running` and
   `CommunicationFault`, and its identification.
@@ -254,7 +257,18 @@ All notable changes are documented here. The format follows
   published, instead of reading everything again every ten seconds. The browser must reach the broker's
   WebSocket: `MQTT_WS_PORT` at the host of the page, or `MQTT_WS_URL` behind a proxy. The topics of the
   machine card and the measurement card are in their contracts in `@pleiades/cards` (`READING_PATHS`,
-  `NOTIFICATIONS_PATH`, `QUANTITY_PATHS`), and `genui-mcp` reads the same ones.
+  `NOTIFICATIONS_PATH`, `QUANTITY_PATHS`), and `genui-mcp` reads the same ones. They hear the tree of the data
+  model: the snapshot `State/Status` field by field, as the store keeps it, alerts as CloudEvents, the job order
+  that runs from the retained lists of job orders, and the identification. Values are retained now, so a
+  machine a page has not heard of joins only with a sign of life of the last 24 hours, as the backend lists it.
+- The juice bar and the Margo app follow this tree. The juice bar publishes below
+  `machines/unknown_JuiceBar_JUICEBAR-01/` (`JUICEBAR_SERIAL_NUMBER` instead of `JUICEBAR_MACHINE_ID`; an
+  existing `.env` no longer applies), its own values below `oem/JuiceBar/`, and the adapter states `Running` and
+  `CommunicationFault`. The Margo app runs `sites-api` with two settings for its address and port, stores
+  `machines/+/oem/#`, and gives each simulator its scenario.
+- Simulator: the first events of a start, the first entries of the list of job orders, go out with the first
+  connect, so the count of a group begins at 1; a simulator starts once both persistence services have their
+  subscriptions.
 - `app`, for those who run `main`: the chat takes its models from a LiteLLM gateway, with two settings,
   `LLM_BASE_URL` and `LLM_API_KEY`. The settings `ANTHROPIC_*`, `OPENAI_*`, `OPENAI_TRANSCRIPTION_MODEL`,
   `LLM_MODELS` and `LLM_TRANSCRIPTION_MODEL` and the package `@tanstack/ai-anthropic` are gone. A `.env` that
