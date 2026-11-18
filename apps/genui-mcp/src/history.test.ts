@@ -13,7 +13,7 @@ const every5s = (from: number, to: number, value: string): Array<Sample> =>
 
 /** A machine that is connected and in production the whole time, with this item state. */
 const producing = (itemState: Array<Sample>, to: number) => ({
-  connection: every5s(-5, to, "Connected"),
+  connection: every5s(-5, to, "Running"),
   operationMode: every5s(-5, to, "Processing"),
   itemState,
   heartbeat: [],
@@ -25,7 +25,7 @@ const producing = (itemState: Array<Sample>, to: number) => ({
  * The heartbeat counts up, every five seconds.
  */
 const toldOnce = (heartbeatTo: number) => ({
-  connection: [{ at: at(-3600), value: "Connected" }],
+  connection: [{ at: at(-3600), value: "Running" }],
   operationMode: [{ at: at(-3600), value: "Processing" }],
   itemState: [{ at: at(-3600), value: "Executing" }],
   heartbeat: every5s(-5, heartbeatTo, "beat").map((sample, index) => ({ ...sample, value: String(index) })),
@@ -81,7 +81,7 @@ test("setup is setup, whatever executes", () => {
 test("a silence is no data from 30 seconds after the last value until the next one", () => {
   const silentBetween = (value: string) => [...every5s(-5, 60, value), ...every5s(200, 300, value)]
   const past = {
-    connection: silentBetween("Connected"),
+    connection: silentBetween("Running"),
     operationMode: silentBetween("Processing"),
     itemState: silentBetween("Executing"),
     heartbeat: [],

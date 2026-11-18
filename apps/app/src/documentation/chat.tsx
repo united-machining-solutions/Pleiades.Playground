@@ -46,6 +46,6 @@ function drawSources(content: unknown) {
 }
 export const documentationTools: ReadonlyArray<ChatTool> = [
   { name: "docs_get_guide", label: { running: "Reading the documentation guide", done: "Read the documentation guide", failed: "Could not read the documentation guide" } },
-  { name: "docs_search", label: { running: "Searching the manuals", done: "Searched the manuals", failed: "Could not search the manuals" }, draw: drawSources },
-  { name: "docs_read_page", label: { running: "Reading a manual page", done: "Read a manual page", failed: "Could not read the manual page" }, draw: drawSources },
+  { name: "docs_search", label: { running: "Searching the manuals", done: "Searched the manuals", failed: "Could not search the manuals" }, draw: drawSources, saveAsPage: false },
+  { name: "docs_read_page", label: { running: "Reading a manual page", done: "Read a manual page", failed: "Could not read the manual page" }, draw: drawSources, saveAsPage: false },
 ]

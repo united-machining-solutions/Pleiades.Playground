@@ -28,8 +28,8 @@ namespace Pleiades.Playground.Timeseries.Persistence.Test;
 [TestClass]
 public sealed class WorkerSubscriptionReadinessTest
 {
-    private const string Values = "machines/+/timeseries/#";
-    private const string Status = "machines/+/status/#";
+    private const string Umati = "machines/+/umati/#";
+    private const string Oem = "machines/+/oem/#";
 
     public TestContext TestContext { get; set; } = null!;
 
@@ -44,8 +44,8 @@ public sealed class WorkerSubscriptionReadinessTest
         var entry = await CheckAsync(services);
 
         Assert.AreEqual(HealthStatus.Unhealthy, entry.Status, "SubscribeAsync returned, the broker has not answered");
-        Assert.Contains($"'{Values}' (no SUBACK)", entry.Description ?? string.Empty);
-        Assert.Contains($"'{Status}' (no SUBACK)", entry.Description ?? string.Empty);
+        Assert.Contains($"'{Umati}' (no SUBACK)", entry.Description ?? string.Empty);
+        Assert.Contains($"'{Oem}' (no SUBACK)", entry.Description ?? string.Empty);
         client.Verify(c => c.SubscribeAsync(It.IsAny<IEnumerable<MqttTopicFilter>>()), Times.Exactly(2));
 
         await worker.StopAsync(TestContext.CancellationToken);
@@ -62,13 +62,13 @@ public sealed class WorkerSubscriptionReadinessTest
         var before = await CheckAsync(services);
         Assert.AreEqual(HealthStatus.Unhealthy, before.Status, "no SUBACK yet");
 
-        await RaiseSubackAsync(client, (Values, MqttClientSubscribeResultCode.GrantedQoS1));
+        await RaiseSubackAsync(client, (Umati, MqttClientSubscribeResultCode.GrantedQoS1));
         var partly = await CheckAsync(services);
-        await RaiseSubackAsync(client, (Status, MqttClientSubscribeResultCode.GrantedQoS1));
+        await RaiseSubackAsync(client, (Oem, MqttClientSubscribeResultCode.GrantedQoS1));
         var granted = await CheckAsync(services);
 
         Assert.AreEqual(HealthStatus.Unhealthy, partly.Status, "one filter granted is not all of them");
-        Assert.Contains($"'{Status}' (no SUBACK)", partly.Description ?? string.Empty);
+        Assert.Contains($"'{Oem}' (no SUBACK)", partly.Description ?? string.Empty);
         Assert.AreEqual(HealthStatus.Healthy, granted.Status, granted.Description);
 
         await worker.StopAsync(TestContext.CancellationToken);
@@ -91,8 +91,8 @@ public sealed class WorkerSubscriptionReadinessTest
             .GetSection("Config")
             .Get<Config>() ?? throw new InvalidOperationException("Missing or invalid configuration.");
         config.Topics.Clear();
-        config.Topics.Add(Values);
-        config.Topics.Add(Status);
+        config.Topics.Add(Umati);
+        config.Topics.Add(Oem);
 
         var worker = new Worker(
             Options.Create(config),

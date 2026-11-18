@@ -20,12 +20,14 @@ const shown = {
   asOf: "2026-11-16T09:30:00.000Z",
   windowSeconds: 1800,
   machine: {
-    machine: "P-04",
+    machine: "alcyone-machines_AX-400_P-04",
+    identity: { manufacturer: "Alcyone Machines", model: "AX-400", serialNumber: "P-04" },
     connection: reading,
     heartbeat: reading,
     itemState: reading,
     operationMode: reading,
     program: reading,
+    jobOrder: null,
     lastValueAt: reading.at,
     notifications: [],
   },
@@ -45,7 +47,7 @@ test("a list whose machines do not keep the contract is not drawn", () => {
 })
 
 test("the JSON of genui_machine_show becomes the values of the machine card", () => {
-  assert.equal(machineShowOf(JSON.stringify(shown))?.machine.machine, "P-04")
+  assert.equal(machineShowOf(JSON.stringify(shown))?.machine.machine, "alcyone-machines_AX-400_P-04")
 })
 
 test("what does not keep the contract of the card is not drawn as one", () => {

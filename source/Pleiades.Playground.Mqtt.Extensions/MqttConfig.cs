@@ -54,6 +54,13 @@ public class MqttConfig
     public bool CleanSession { get; set; } = true;
 
     /// <summary>
+    /// How long the broker keeps the session of a client that is gone (MQTT 5 Session Expiry Interval), with its
+    /// subscriptions and its QoS 1 messages. Null for the default of the broker. With <see cref="CleanSession"/>
+    /// false and a fixed <see cref="ClientId"/> a consumer misses nothing while it restarts.
+    /// </summary>
+    public TimeSpan? SessionExpiry { get; set; }
+
+    /// <summary>
     /// Optional maximum number of queued outgoing messages. When exceeded, the oldest message is dropped and a warning
     /// is logged. Default is <c>null</c>: the queue is unbounded.
     /// </summary>

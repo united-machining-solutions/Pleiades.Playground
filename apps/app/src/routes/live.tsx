@@ -1,17 +1,25 @@
 import { clock } from "@pleiades/cards/machine/format.ts"
+import { labelOf } from "@pleiades/cards/machine/in-words.ts"
 import { MeasurementGraph } from "@pleiades/cards/measurement/measurement-graph.tsx"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { createFileRoute } from "@tanstack/react-router"
 import { GaugeIcon } from "lucide-react"
+import { useMemo } from "react"
 import type { ReactNode } from "react"
 
 import { NoAnswer } from "@/components/no-answer.tsx"
-import { useLive } from "@/hooks/use-live.ts"
+import { useLive, useRetry } from "@/hooks/use-live.ts"
+import type { Live } from "@/hooks/use-live.ts"
+import { liveAt, livePageOf, liveWith, measurementFilters } from "@/live/measurements.ts"
+import type { LivePage } from "@/live/measurements.ts"
 import { getMeasurementSeries, getMeasurements } from "@/machines/get-machines.ts"
 
-/** What every machine measured over the last minutes, a graph for each value, read again every ten seconds. */
+/** The graphs are read once, from the backend; then every value comes from the broker, and the graphs move on with the clock. */
+const live: Live<LivePage> = { filters: measurementFilters(), message: liveWith, at: liveAt }
+
+/** What every machine measured over the last minutes, a graph for each value, live from the broker. */
 export const Route = createFileRoute("/live")({
   staticData: { nav: { title: "Live values", icon: GaugeIcon } },
   // The machine whose lines the graphs show, in the address, so that a link keeps it. Without one, all.
@@ -34,24 +42,28 @@ export const Route = createFileRoute("/live")({
 const ALL = "all"
 
 function LiveValues() {
-  const { series, current } = Route.useLoaderData()
+  const loaded = Route.useLoaderData()
   const { machine: chosen } = Route.useSearch()
   const navigate = Route.useNavigate()
-  useLive()
+  // What the backend read when the page was opened: the graphs of the last minutes and the values of then.
+  const page = useMemo(() => livePageOf(loaded.series.values, loaded.current.values), [loaded])
+  const { values, connected } = useLive(page, live)
+  useRetry(loaded.series.values === null)
+  const { series, current } = values
 
-  if (series.values === null) {
+  if (series === null) {
     return (
       <Page>
-        <NoAnswer error={series.error} />
+        <NoAnswer error={loaded.series.error ?? ""} />
       </Page>
     )
   }
 
   // The values of now stand next to the titles. Without them the graphs still stand.
-  const now = current.values?.machines ?? []
+  const now = current?.machines ?? []
   // Every machine of the page in one order, so that it keeps its colour in every graph.
   const machines = [
-    ...new Set([...now.map((one) => one.machine), ...series.values.quantities.flatMap((one) => one.lines.map((line) => line.machine))]),
+    ...new Set([...now.map((one) => one.machine), ...series.quantities.flatMap((one) => one.lines.map((line) => line.machine))]),
   ].sort()
 
   if (machines.length === 0) {
@@ -70,7 +82,7 @@ function LiveValues() {
     )
   }
 
-  const { from, to, instants, quantities } = series.values
+  const { from, to, instants, quantities } = series
   // A machine that is no longer there, from an old link, shows as none: the choice says so.
   const shown = chosen === undefined ? machines : machines.filter((one) => one === chosen)
   const choose = (machine: string | undefined) =>
@@ -78,7 +90,7 @@ function LiveValues() {
 
   return (
     <Page
-      line={`${shown.length} of ${machines.length} ${machines.length === 1 ? "machine" : "machines"} · live · ${clock(from)} to ${clock(to)}`}
+      line={`${shown.length} of ${machines.length} ${machines.length === 1 ? "machine" : "machines"} · ${connected ? "live" : "not live, no connection to the broker"} · ${clock(from)} to ${clock(to)}`}
     >
       <ToggleGroup
         variant="outline"
@@ -93,13 +105,13 @@ function LiveValues() {
       >
         <ToggleGroupItem value={ALL}>All machines</ToggleGroupItem>
         {machines.map((machine) => (
-          <ToggleGroupItem key={machine} value={machine}>
-            {machine}
+          <ToggleGroupItem key={machine} value={machine} aria-label={machine}>
+            {labelOf(machine)}
           </ToggleGroupItem>
         ))}
         {chosen !== undefined && !machines.includes(chosen) && (
           <ToggleGroupItem value={chosen} disabled>
-            {chosen}, no data
+            {labelOf(chosen)}, no data
           </ToggleGroupItem>
         )}
       </ToggleGroup>

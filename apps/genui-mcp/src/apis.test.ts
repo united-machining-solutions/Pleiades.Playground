@@ -48,8 +48,8 @@ test("an API that is not there is named, with the reason, and logged", async () 
 test("an API that answers with an error is named, with the status", async () => {
   answering(() => new Response("no", { status: 503 }))
   await assert.rejects(
-    readOpenNotifications(apis, "Error", from, to),
-    /^Error: The Events API answered 503 \(http:\/\/events:8080\/notificationEvents\/correlationPairs\)\.$/,
+    readOpenNotifications(apis, from, to),
+    /^Error: The Events API answered 503 \(http:\/\/events:8080\/alerts\/pairs\)\.$/,
   )
 })
 

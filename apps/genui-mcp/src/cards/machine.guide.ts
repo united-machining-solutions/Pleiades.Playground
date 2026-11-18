@@ -3,26 +3,32 @@
 export const machineGuide = `## Machines
 
 \`genui_machine_list\` lists every machine that published a value in the last 24 hours. Pass the
-\`timeZone\` of the person you answer, if you know it.
+\`timeZone\` of the person you answer, if you know it. A machine is named by its id (\`machine\`),
+\`<manufacturer>_<model>_<serial number>\`, the level after \`machines/\` in every topic; name it to a
+person by its \`identity\`: manufacturer, model and serial number.
 
-- \`connection\`: \`umati/Connection/State\`. Anything but \`Connected\` means the other readings are the
-  last known ones, not the present.
+- \`connection\`: \`umati/Connection/State\`, the state of the adapter. Anything but \`Running\`
+  (\`Initializing\`, \`CommunicationFault\`, \`Shutdown\`) means the other readings are the last known
+  ones, not the present.
 - \`heartbeat\`: \`umati/Connection/Heartbeat\`, the sign of life. Its value counts up and says nothing
   else; its \`at\` is what matters.
 - \`lastValueAt\`: the newest \`at\` of all readings, so the last sign of life. More than 30 seconds
   before \`asOf\`, the machine is silent.
-- \`itemState\`: \`umati/State/MachineryItemState\`, for example \`Executing\` or \`NotExecuting\`.
-- \`operationMode\`: \`umati/State/MachineryOperationMode\`, for example \`Processing\` or \`Setup\`.
-- \`program\`: \`umati/Production/ActiveProgram\`.
-- \`notifications\`: warnings and errors that were raised in the last 24 hours and have not gone,
-  newest first. One that has stood for longer is not among them, so an empty list does not rule it out.
+- \`itemState\`: \`umati/State/Status/MachineryItemState\`, for example \`Executing\` or \`NotExecuting\`.
+- \`operationMode\`: \`umati/State/Status/MachineryOperationMode\`, for example \`Processing\` or \`Setup\`.
+- \`program\`: \`umati/WorkMasterMonitoring/ActiveWorkMaster\`, the work master the machine carries out.
+- \`jobOrder\`: the job order that runs or is interrupted, with its produced quantity and the runs planned.
+- \`notifications\`: alerts that were raised in the last 24 hours and have not been cleared, newest
+  first, with their category after NAMUR NE 107 (\`severity\`); a \`Failure\` is an error (\`level\`), every
+  other category a warning. One that has stood for longer is not among them, so an empty list does not
+  rule it out.
 
 Do not derive a reason for a stop that the data does not give: a machine that stands without an open
-notification stands for a reason nobody recorded.
+alert stands for a reason nobody recorded.
 
 ## One machine
 
-\`genui_machine_show\` takes the serial number (\`machine\`) and returns the same readings for that
+\`genui_machine_show\` takes the machine id (\`machine\`) and returns the same readings for that
 machine, and its \`history\`: how long each state lasted in total between \`from\` and \`to\`
 (\`totals\`, in seconds). \`hours\` says how far back the history goes, 8 if omitted, 24 at most.
 The sums are added up here. Take them from there, and do not count states yourself.
@@ -34,8 +40,8 @@ Ask for the spans only to say when something happened.
 
 A span has one of five states, decided from the values in this order:
 
-- \`no-data\`: no sign of life for more than 30 seconds, or the connection is not \`Connected\`.
-- \`alarm\`: an error was raised and has not gone.
+- \`no-data\`: no sign of life for more than 30 seconds, or the connection is not \`Running\`.
+- \`alarm\`: an alert \`Failure\` was raised and has not been cleared.
 - \`setup\`: the operation mode is \`Setup\`.
 - \`stopped\`: the item state is anything but \`Executing\`.
 - \`running\`: everything else.

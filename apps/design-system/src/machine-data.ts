@@ -1,7 +1,7 @@
-import type { Machine, MachineShow, Notification, Reading, Span } from "@pleiades/cards/machine/contract.ts"
+import type { Identity, JobOrder, Machine, MachineShow, Notification, Reading, Span } from "@pleiades/cards/machine/contract.ts"
 
 // Fixed values for the examples of the design system page, in the shape of the contract of the card
-// catalogue. They are the machines, programs and notifications of the demo stack at one instant, so
+// catalogue. They are the machines, work masters and alerts of the demo stack at one instant, so
 // an example reads like the app and stays the same whatever the simulators do. Nothing here is read
 // from the backend.
 
@@ -21,14 +21,16 @@ const justNow = at("09:29", 55)
 const paths = {
   connection: "umati/Connection/State",
   heartbeat: "umati/Connection/Heartbeat",
-  itemState: "umati/State/MachineryItemState",
-  operationMode: "umati/State/MachineryOperationMode",
-  program: "umati/Production/ActiveProgram",
+  itemState: "umati/State/Status/MachineryItemState",
+  operationMode: "umati/State/Status/MachineryOperationMode",
+  program: "umati/WorkMasterMonitoring/ActiveWorkMaster",
 } as const
 
 function machine(
-  serialNumber: string,
-  values: { itemState: string; operationMode: string; program: string; since: string },
+  /** The machine id of the MQTT binding: <manufacturer>_<model>_<serial number>. */
+  id: string,
+  identity: { manufacturer: string; model: string; serialNumber: string },
+  values: { itemState: string; operationMode: string; program: string; since: string; jobOrder: JobOrder | null },
   notifications: ReadonlyArray<Omit<Notification, "correlationId" | "topic">> = [],
   /** The last sign of life: a moment ago, unless the machine went silent. */
   lastValueAt: string = justNow,
@@ -38,42 +40,75 @@ function machine(
     at: lastValueAt,
     since: at(since),
     sinceIsLowerBound: false,
-    topic: `machines/${serialNumber}/${paths[name]}`,
+    topic: `machines/${id}/${paths[name]}`,
   })
   return {
-    machine: serialNumber,
-    connection: reading("connection", "Connected", "01:30"),
+    machine: id,
+    identity: identity satisfies Identity,
+    connection: reading("connection", "Running", "01:30"),
     heartbeat: reading("heartbeat", "2825", "09:29"),
     itemState: reading("itemState", values.itemState, values.since),
     operationMode: reading("operationMode", values.operationMode, values.since),
     program: reading("program", values.program, "08:42"),
+    jobOrder: values.jobOrder,
     lastValueAt,
     notifications: notifications.map((one) => ({
       ...one,
-      correlationId: `${serialNumber}-${one.notificationId}`,
-      topic: `machines/${serialNumber}/events/notifications`,
+      correlationId: `${identity.serialNumber}-${one.notificationId}`,
+      topic: `machines/${id}/events/notifications`,
     })),
   }
 }
 
-/** In alarm: an error was raised and has not gone. */
+/** In alarm: a failure was raised and has not been cleared. */
 export const p04 = machine(
-  "P-04",
-  { itemState: "NotExecuting", operationMode: "Processing", program: "SHAFT_4711.MPF", since: "09:02" },
-  [{ notificationId: "2130", level: "Error", title: "Spindle overtemperature, machine stopped", raisedAt: at("09:02") }],
+  "alcyone-machines_AX-400_P-04",
+  { manufacturer: "Alcyone Machine Works", model: "AX-400", serialNumber: "P-04" },
+  {
+    itemState: "NotExecuting",
+    operationMode: "Processing",
+    program: "WM-SHAFT-4711",
+    since: "09:02",
+    jobOrder: { jobOrderId: "4711/01", state: "Interrupted", producedQuantity: 7, runsPlanned: 12 },
+  },
+  [
+    {
+      notificationId: "2130",
+      severity: "Failure",
+      level: "Error",
+      title: "Spindle overtemperature, machine stopped",
+      raisedAt: at("09:02"),
+    },
+  ],
 )
 
 /** Running, with an open warning: the machine keeps running. */
 export const p07 = machine(
-  "P-07",
-  { itemState: "Executing", operationMode: "Processing", program: "HOUSING_0815.MPF", since: "07:15" },
-  [{ notificationId: "3310", level: "Warning", title: "Coolant pressure below minimum", raisedAt: at("09:11") }],
+  "taygeta-precision_TP-800_P-07",
+  { manufacturer: "Taygeta Precision", model: "TP-800", serialNumber: "P-07" },
+  {
+    itemState: "Executing",
+    operationMode: "Processing",
+    program: "WM-HOUSING-0815",
+    since: "07:15",
+    jobOrder: { jobOrderId: "0815/03", state: "Running", producedQuantity: 4, runsPlanned: 6 },
+  },
+  [
+    {
+      notificationId: "3310",
+      severity: "OffSpec",
+      level: "Warning",
+      title: "Coolant pressure below minimum",
+      raisedAt: at("09:11"),
+    },
+  ],
 )
 
 /** In setup since 08:48, and silent for the last ten minutes: its values are the last known ones. */
 export const m02 = machine(
-  "M-02",
-  { itemState: "NotExecuting", operationMode: "Setup", program: "SHAFT_4711.MPF", since: "08:48" },
+  "merope-microtec_MM-120_M-02",
+  { manufacturer: "Merope Microtec", model: "MM-120", serialNumber: "M-02" },
+  { itemState: "NotExecuting", operationMode: "Setup", program: "WM-PIN-0042", since: "08:48", jobOrder: null },
   [],
   at("09:20"),
 )

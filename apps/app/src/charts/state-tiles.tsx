@@ -1,5 +1,6 @@
 import type { MachineShow, Span, State } from "@pleiades/cards/machine/contract.ts"
 import { clock, lasting } from "@pleiades/cards/machine/format.ts"
+import { titleOf } from "@pleiades/cards/machine/in-words.ts"
 import { stateLabel, stateOrder } from "@pleiades/cards/machine/state.ts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import {
@@ -25,8 +26,9 @@ export function StateTotalsTile({ shows }: { shows: ReadonlyArray<MachineShow> }
   const first = shows[0]
   if (!first) return null
   // Seconds, as the backend gives them: the axis and the tooltip write them as hours and minutes.
+  // A bar is named as the page of its machine is titled: by model and serial number.
   const rows = shows.map((show) => ({
-    machine: show.machine.machine,
+    machine: titleOf(show.machine),
     ...Object.fromEntries(show.history.totals.map((total) => [total.state, total.seconds])),
   }))
   const hours = Math.round((Date.parse(first.history.to) - Date.parse(first.history.from)) / 3_600_000)
@@ -50,7 +52,8 @@ export function StateTotalsTile({ shows }: { shows: ReadonlyArray<MachineShow> }
               tickLine={false}
               axisLine={false}
             />
-            <YAxis type="category" dataKey="machine" width={48} tickLine={false} axisLine={false} />
+            {/* As wide as the longest title of a machine. */}
+            <YAxis type="category" dataKey="machine" width="auto" tickLine={false} axisLine={false} />
             <ChartTooltip
               cursor={false}
               content={
@@ -96,7 +99,7 @@ export const HISTORY_MS = 30 * 60_000
 
 const historyConfig = { level: { label: "State", color: "var(--chart-single)" } } satisfies ChartConfig
 
-/** History: the state of one machine over the last 30 minutes, as a step line. */
+/** History: the state of one machine over the last 30 minutes, as a step line. `machine` is its title. */
 export function StateHistoryTile({
   machine,
   from,

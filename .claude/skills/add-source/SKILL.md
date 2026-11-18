@@ -28,14 +28,16 @@ What the value is about decides its topic.
 
 | The value belongs to | Topic | Agreed |
 |---|---|---|
-| A machine, and the data model names it | `machines/{SerialNumber}/umati/<path>` | Yes, by the binding |
-| A machine, and it is specific to its maker | `machines/{SerialNumber}/vendor/<path>` | Yes, by the binding |
+| A machine, and the data model names it | `machines/{MachineId}/umati/<path>` | Yes, by the binding |
+| A machine, and it is specific to its maker | `machines/{MachineId}/oem/<path>` | Yes, by the binding |
 | A place, a line, anything that is not a machine | `sites/{SiteId}/{Source}/<path>` | Yes, by the binding |
 
 - Ask the person only what you cannot look up: where the values come from, whether that needs a key, and
   whose they are. Assume the rest, and say what you assumed.
-- One value per topic. One SI unit from the table of the binding: convert once, in the adapter. The time of
-  the observation, in UTC.
+- One value per topic, with the time of the observation, in UTC. The unit depends on the tree: a value of a
+  machine keeps the unit of the data model (power in `watt`, energy in `wattHour`, a temperature in
+  `degreeCelsius`), a value of a place is in one SI unit from the table of the binding. Convert once, in the
+  adapter, where the source measures in another unit.
 - `{SiteId}` and `{Source}` have no list. Choose short names, the source in lower case as the binding asks,
   for example `weather`, and say in the issue that they are part of the proposal.
 - A topic the binding does not have, and every new service, needs an issue first
@@ -59,12 +61,15 @@ By [Adding a service](../../../CONTRIBUTING.md#adding-a-service):
   the pnpm workspace: its versions go into the catalog of `pnpm-workspace.yaml`, an MQTT client among them if
   the catalog has none, and `pnpm install` writes the lockfile that the images and CI install from. For any
   other language the repository has no place yet: propose one in the issue.
-- It fetches, converts once to the SI unit, and publishes the value envelope of the binding, each value with
-  the time it was observed.
+- It fetches, converts once to the unit its tree asks for, and publishes the value envelope of the binding,
+  each value with the time it was observed.
 - It says that it is there the way a machine does: `Connection/State` and `Connection/Heartbeat` below its own
-  topic. The binding names them, the settings of the simulator show them
-  (`source/Pleiades.Playground.Simulator/appsettings.json`): the state is `Connected`, the heartbeat counts
-  up in the unit `one` every ten seconds. Send the heartbeat on a timer of its own, not with each value: a
+  topic. The binding names them. For a machine the state is the state of the adapter: `Running` while it
+  reaches the machine, `CommunicationFault` while it does not; the machine card shows any other state as "No
+  data". The Ultimaker telemetry shows the pattern
+  (`source/Pleiades.Playground.Ultimaker.Telemetry/TelemetryWorker.cs`), with the identification values that
+  give a machine its name on the screen. For a place the state is `Connected`. The heartbeat counts up every
+  ten seconds. Send the heartbeat on a timer of its own, not with each value: a
   reader takes a source as silent after 30 seconds without a sign of life.
 - A liveness endpoint like the one of `apps/genui-mcp`: `/health` answers while the adapter is connected to
   the broker, and the `Dockerfile` checks it.

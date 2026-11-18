@@ -37,6 +37,9 @@ jobs:
           - image: pleiades.playground.events.persistence
             context: source
             file: source/Pleiades.Playground.Events.Persistence/Dockerfile
+          - image: pleiades.playground.sites.api
+            context: source
+            file: source/Pleiades.Playground.Sites.Api/Dockerfile
           - image: pleiades.playground.simulator
             context: source
             file: source/Pleiades.Playground.Simulator/Dockerfile

@@ -98,12 +98,12 @@ const notifications = [
 ]
 
 const cardTopics = [
-  "machines/P-04/umati/State/MachineryItemState",
-  "machines/P-04/umati/State/MachineryOperationMode",
-  "machines/P-04/umati/Connection/State",
-  "machines/P-04/umati/Connection/Heartbeat",
-  "machines/P-04/umati/Production/ActiveProgram",
-  "machines/P-04/events/notifications",
+  "machines/alcyone-machines_AX-400_P-04/umati/State/Status/MachineryItemState",
+  "machines/alcyone-machines_AX-400_P-04/umati/State/Status/MachineryOperationMode",
+  "machines/alcyone-machines_AX-400_P-04/umati/Connection/State",
+  "machines/alcyone-machines_AX-400_P-04/umati/Connection/Heartbeat",
+  "machines/alcyone-machines_AX-400_P-04/umati/WorkMasterMonitoring/ActiveWorkMaster",
+  "machines/alcyone-machines_AX-400_P-04/events/notifications",
 ]
 
 /** A picture for an avatar that needs no request: a person, drawn on a ground of the given grey. */

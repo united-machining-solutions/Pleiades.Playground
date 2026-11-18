@@ -33,6 +33,9 @@ export async function dictationAdapter() {
 export async function dictationPrompt(): Promise<string | undefined> {
   const late = new Promise<undefined>((resolve) => setTimeout(resolve, 2000))
   const list = await Promise.race([listMachines(), late])
-  const names = list?.values?.machines.map((entry) => entry.machine) ?? []
-  return names.length > 0 ? names.join(", ") : undefined
+  // What a person says of a machine is its serial number or its model; the machine id carries both, and is
+  // what the tools take.
+  const names = list?.values?.machines.flatMap((entry) => [entry.identity.serialNumber, entry.identity.model, entry.machine]) ?? []
+  const spoken = [...new Set(names.filter((name): name is string => Boolean(name)))]
+  return spoken.length > 0 ? spoken.join(", ") : undefined
 }
