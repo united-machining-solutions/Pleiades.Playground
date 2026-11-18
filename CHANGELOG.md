@@ -284,6 +284,9 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
+  computer, as the web UI of the OPC UA simulator does; in the stack and in the Margo app.
+
 - The Ultimaker telemetry and the juice bar publish the payloads and the delivery of the MQTT binding of
   machines, not only its tree, as the simulators do: every value retained with QoS 1 in the envelope
   `{timestamp, value, unit}` with the content type `application/json`, a manifest before the values (profile
