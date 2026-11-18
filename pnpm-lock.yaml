@@ -501,6 +501,9 @@ importers:
       rollup-plugin-license:
         specifier: 'catalog:'
         version: 3.7.2(picomatch@4.0.7)
+      shadcn:
+        specifier: 'catalog:'
+        version: 4.23.0
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.5

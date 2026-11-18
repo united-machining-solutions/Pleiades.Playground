@@ -187,7 +187,7 @@ function serve(sites: unknown, placements: unknown): Array<string> {
     if (url.origin === apis.sitesUrl && url.pathname === "/placements") return Response.json(placements)
     if (url.pathname === "/topics") return Response.json({ baseUnitTopics: [], stringTopics: [], booleanTopics: [] })
     // The Events API: no alert and no job order.
-    if (url.origin === apis.eventsUrl) return Response.json({ items: [] })
+    if (url.origin === apis.eventsUrl) return Response.json({ items: [], hasMore: false })
     return Response.json({ series: [] })
   })
   return requested
