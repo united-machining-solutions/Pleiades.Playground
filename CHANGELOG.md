@@ -40,6 +40,13 @@ All notable changes are documented here. The format follows
 - Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
   `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
   shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0020).
+- Example app: the page "OSACA cell" (`/osaca`) shows the OSACA demo cell, a robot that feeds a milling machine,
+  as a live 3D model with its key figures, axes, job orders, NC channels, alerts and machine data, from the
+  values the cell publishes over MQTT (`<root>/oem/…` and `<root>/umati/…`), and starts its preconfigured job
+  again after a confirmation. The settings `OSACA_MQTT_URL` and `OSACA_SIM_URL` name the broker and the
+  simulation.
+- Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
+  no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
 - Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
   each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
   draws them with the notification card.
