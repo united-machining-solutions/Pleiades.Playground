@@ -1,7 +1,10 @@
 import type { Machine, MachineList, State } from "@pleiades/cards/machine/contract.ts"
 import { serialOf } from "@pleiades/cards/machine/in-words.ts"
+import { clock } from "@pleiades/cards/machine/format.ts"
 import { openError, openWarning, stateOf } from "@pleiades/cards/machine/state.ts"
 import { tell } from "@pleiades/cards/machine/tell.ts"
+
+import { inGerman } from "./words.ts"
 
 // The board of Titan: what the person who runs the hall needs, in the order of a good brief.
 //
@@ -78,7 +81,7 @@ function codeOf(machine: Machine, state: State): string | null {
 
 const reported: Record<State, (machine: Machine, told: string) => string> = {
   alarm: (_, told) => told,
-  stopped: (machine, told) => (openWarning(machine) ? told : "Steht ohne Meldung, kein Grund erfasst"),
+  stopped: (machine, told) => (openWarning(machine) ? told : "Kein Grund erfasst"),
   "no-data": () => "Keine Daten vom Adapter",
   setup: () => "Wird eingerichtet",
   running: () => "Produziert",
@@ -143,4 +146,71 @@ export function sinceInWords(since: string | null, asOf: string): string | null 
   const hours = Math.floor(minutes / 60)
   const rest = minutes % 60
   return rest ? `${hours} h ${rest} min` : `${hours} h`
+}
+
+/** The first sentence of the answer is its headline; what follows explains it, smaller. */
+export function splitHeadline(summary: string): [string, string] {
+  // A sentence ends at its mark; a colon also ends the headline: what follows it explains.
+  const end = /[.!?…](?=\s+\p{Lu})|:(?=\s+\p{L})/u.exec(summary)
+  if (!end) return [summary.trim(), ""]
+  const headline = summary.slice(0, end.index).trim() + (end[0] === ":" ? "." : end[0])
+  return [headline, summary.slice(end.index + 1).trim()]
+}
+
+/** The states in words, as an operator says them. */
+export const stateWord: Record<State, string> = {
+  alarm: "Störung",
+  stopped: "Steht",
+  "no-data": "Keine Daten",
+  setup: "Wird eingerichtet",
+  running: "Produziert",
+}
+
+/** One fact of a machine, as the focus shows it: a label, the value, and a quieter line. */
+export type KeyFact = { label: string; value: string; detail?: string }
+
+/** The few facts of one machine that an answer about it needs, from the values. */
+export type MachineFacts = { name: string; state: State; facts: Array<KeyFact> }
+
+/**
+ * The key facts of a machine, by its serial number: its state and since when, the error or warning
+ * it reports, and the job order it works on. Undefined for a machine the list does not have.
+ */
+export function keyFactsOf(list: MachineList, name: string): MachineFacts | undefined {
+  const machine = list.machines.find((one) => serialOf(one.machine) === name)
+  if (!machine) return undefined
+  const state = stateOf(machine, list.asOf)
+  const told = tell(machine, state)
+  const facts: Array<KeyFact> = []
+  const lasting = sinceInWords(told.since, list.asOf)
+  facts.push({
+    label: "Zustand",
+    value: stateWord[state],
+    detail: told.since ? `seit ${clock(told.since)}${lasting ? ` · ${lasting}` : ""}` : undefined,
+  })
+  // What the person needs is the cause in words and how far the job got; a code and a number of a
+  // job order only identify them, so they stand small beneath.
+  const error = openError(machine)
+  const warning = openWarning(machine)
+  const cause = state === "running" || state === "setup" ? "Warnung" : "Ursache"
+  if (error) facts.push({ label: cause, value: inGerman(error.title), detail: `Fehler ${error.notificationId}` })
+  else if (warning) facts.push({ label: cause, value: inGerman(warning.title), detail: `Warnung ${warning.notificationId}` })
+  else if (state === "stopped") facts.push({ label: cause, value: "Nicht erfasst", detail: "Die Maschine meldet keinen Grund" })
+  const { jobOrder } = machine
+  if (jobOrder) {
+    const progress =
+      jobOrder.producedQuantity === null
+        ? undefined
+        : jobOrder.runsPlanned
+          ? `${jobOrder.producedQuantity} von ${jobOrder.runsPlanned} Teilen`
+          : `${jobOrder.producedQuantity} Teile`
+    const detail = [`Auftrag ${jobOrder.jobOrderId}`, jobOrder.state === "Interrupted" ? "unterbrochen" : undefined].filter(Boolean).join(" · ")
+    facts.push({ label: "Auftrag", value: progress ?? jobOrder.jobOrderId, detail: progress ? detail : undefined })
+  }
+  return { name, state, facts }
+}
+
+/** The serial numbers an answer names, in the order it names them: P-04, M-02. */
+export function machinesNamed(text: string): Array<string> {
+  return [...new Set([...text.matchAll(/\b([A-Z]{1,4})[-‑](\d{1,4})\b/g)].map((match) => `${match[1]}-${match[2]}`))]
 }

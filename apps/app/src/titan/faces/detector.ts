@@ -80,6 +80,26 @@ export function loadDetector(): Promise<Human> {
   return human
 }
 
+let prepared: Promise<void> | undefined
+
+/**
+ * Loads the models and runs them once on an empty picture, so that the first real look is fast: the
+ * first run of a model compiles it for the graphics card and takes seconds. Titan calls it as its page
+ * opens, before anyone starts it. A failure is left to the first real look to report.
+ */
+export function prepareDetector(): Promise<void> {
+  prepared ??= (async () => {
+    const instance = await loadDetector()
+    const canvas = document.createElement("canvas")
+    canvas.width = 128
+    canvas.height = 128
+    await instance.detect(canvas, look)
+  })().catch(() => {
+    prepared = undefined
+  })
+  return prepared
+}
+
 function sizeOf(frame: CameraFrame): { width: number; height: number } {
   if (frame instanceof HTMLVideoElement) return { width: frame.videoWidth, height: frame.videoHeight }
   return { width: frame.width, height: frame.height }

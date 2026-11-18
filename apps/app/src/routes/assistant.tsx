@@ -1,4 +1,5 @@
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router"
+import { Kbd } from "@pleiades/ui/components/kbd"
 import { SparklesIcon } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
@@ -16,14 +17,16 @@ import {
 } from "@/voice/voice.ts"
 import type { VoiceState } from "@/voice/voice.ts"
 import { faultBriefing, faultInWords, useNewFaults } from "@/voice/faults.ts"
-import type { Fault } from "@/voice/faults.ts"
 import { useShown } from "@/voice/shown.ts"
 import { loadRecognition } from "@/voice/transcribe.ts"
 import { isPause, useWakeWord } from "@/voice/wake.ts"
 import { greetingFor } from "@/voice/greeting.ts"
-import { boardOf } from "@/titan/board.ts"
-import type { Advice } from "@/titan/board.ts"
-import { BoardView } from "@/titan/board-view.tsx"
+import { keyFactsOf, machinesNamed } from "@/titan/board.ts"
+import type { MachineFacts } from "@/titan/board.ts"
+import { escalationsOf } from "@/titan/escalation.ts"
+import { EscalationView } from "@/titan/escalation-view.tsx"
+import { FocusView } from "@/titan/focus-view.tsx"
+import { asksToSee, unbroken } from "@/titan/words.ts"
 import { usePresence } from "@/titan/faces/presence.ts"
 import { Cloud } from "@/voice/cloud.tsx"
 
@@ -38,17 +41,17 @@ import { Cloud } from "@/voice/cloud.tsx"
 //   "Hey Titan" or the space bar wakes it again. It still shows a new fault.
 // - Titan speaks only once it is started and only while its tab is in front: a tab left open in
 //   the background stays silent.
-// - With an answer, the screen splits: Titan on the left with what it says, the headline and the
-//   recommendation; on the right, black on white, the board: the state of the hall from the values,
-//   where to act with the problem, what it costs and the next step, and what runs as planned.
+// - The screen is dark and has one focus: the question asked last and its answer (titan/focus-view.tsx).
+//   A new question clears what the one before showed. Beside it, once Titan was started, stands the
+//   escalation (titan/escalation-view.tsx): red what stands, amber what to do before a machine fails.
+//   Everything that comes and goes, what Titan heard, a problem, the pause, is one quiet line at the
+//   bottom, so no text appears anywhere else.
 // - Escape leaves the screen.
 //
 // The demo speaks German, so do the words of this page.
 
 /** What Titan says when it is called by its name alone. */
 const AWAKE = "Ja?"
-/** What Titan says when it is started. */
-const READY = "Titan ist bereit."
 /**
  * What Titan says as soon as it has understood a question. The answer takes two to three seconds at
  * the hub, one turn to read the machines and one to say it; this fills the silence and is said first.
@@ -57,11 +60,6 @@ const ON_IT = "Moment."
 /** What Titan says when it pauses, and when it is back. */
 const PAUSING = "Ich mache Pause."
 const BACK = "Ich bin wieder da."
-
-/** A machine name such as M-02 is not broken at its hyphen: it takes one that does not break. */
-function unbroken(text: string): string {
-  return text.replace(/\b([A-Z]{1,4})-(\d)/g, "$1‑$2")
-}
 
 /** Whether the tab is in front, and so whether Titan may speak. */
 function useTabInFront(): boolean {
@@ -93,9 +91,7 @@ function Assistant() {
   const panel = useChatPanel()
   const navigate = useNavigate()
   const state = useVoiceState()
-  const { cards, briefing } = useShown()
-  /** With an answer, the screen splits. */
-  const split = cards.length > 0 || Boolean(briefing?.summary)
+  const { cards, briefing, question } = useShown()
   const inFront = useTabInFront()
   const [problem, setProblem] = useState<string>()
   /** What the speech recognition heard last, so the person sees what was asked. */
@@ -175,11 +171,9 @@ function Assistant() {
     const fastest = chatStatus.models.find((model) => /haiku/i.test(model))
     if (fastest) pickModel(fastest)
   }, [chatStatus.models])
-  const [alert, setAlert] = useState<Fault>()
   /** Who stands in front of the camera, by name if the face is known. */
   const [person, setPerson] = useState<string>()
   const { alarmed, list } = useNewFaults((fault) => {
-    setAlert(fault)
     setHeard(undefined)
     setProblem(undefined)
     // Before the start, in a pause or behind another tab, the fault is shown, not said.
@@ -213,10 +207,6 @@ function Assistant() {
   useEffect(() => {
     if (started && presence.status === "error") void speak(greetingFor(undefined, latest.current.alarmed))
   }, [started, presence.status])
-  // The fault is over once its machine has no open error any more.
-  useEffect(() => {
-    if (alert && !alarmed.includes(alert.machine)) setAlert(undefined)
-  }, [alert, alarmed])
 
   // "Hey Titan": listens while Titan is started and does nothing else, so it never hears itself.
   const [wakeReady, setWakeReady] = useState(false)
@@ -258,9 +248,9 @@ function Assistant() {
     const start = () => {
       if (greeted.current) return false
       greeted.current = true
-      // The camera greets whoever stands in front of it; until then a short sound says Titan is there.
+      // Titan says nothing of its own: the camera is open within a second, and its first words are the
+      // greeting, by name. Without a camera it greets at once, without a name.
       setStarted(true)
-      void speak(READY)
       return true
     }
 
@@ -320,73 +310,70 @@ function Assistant() {
     }
   }, [navigate])
 
+  const escalations = useMemo(() => list && escalationsOf(list), [list])
+
+  // The key facts of the machines the answer names, two at most, in the order it names them.
+  const named = useMemo(() => {
+    if (!list || !briefing) return []
+    const text = [briefing.summary, briefing.recommendation ?? "", ...briefing.facts.map((fact) => fact.title ?? "")].join(" ")
+    return machinesNamed(text)
+      .flatMap((name) => keyFactsOf(list, name) ?? [])
+      .slice(0, 2) as Array<MachineFacts>
+  }, [list, briefing])
+
+  /** The one thing in focus: the question asked last and what its answer says and shows. */
+  const focused = Boolean(heard) || cards.length > 0 || Boolean(briefing?.summary)
+
+  // Everything that comes and goes stands in one line at the bottom, the most important first.
   const line =
     problem ??
     recognition ??
     (paused ? "Pause · „Hey Titan“ sagen oder die Leertaste drücken, um weiterzumachen." : undefined) ??
     (overheard && `Gehört: „${overheard}“`) ??
-    (wakeReady ? "Ich höre auf „Hey Titan“. „Hey Titan, Pause“ oder P pausiert." : undefined)
-
-  const board = useMemo(() => {
-    if (!list) return undefined
-    const advice = new Map<string, Advice>()
-    for (const fact of briefing?.facts ?? []) if (fact.title) advice.set(fact.title, { problem: fact.text, step: fact.step })
-    return boardOf(list, advice)
-  }, [list, briefing])
+    (wakeReady ? "„Hey Titan“ sagen, oder die Leertaste halten und sprechen. P pausiert." : undefined)
 
   return (
-    // The whole screen, over the app: black, with the cloud and the greeting. With an answer it
-    // splits. On the left Titan, and under it what it says: the headline, the recommendation, the
-    // question. On the right, black on white, the board (titan/board-view.tsx): the state of the hall
-    // from the values, where to act, what runs as planned, and what the answer drew.
-    <div className="fixed inset-0 z-50 flex flex-col bg-black md:flex-row">
-      <div
-        className={`relative flex min-h-0 shrink-0 flex-col items-center justify-center gap-8 px-8 py-10 text-center transition-all duration-500 ${split ? "md:w-2/5" : "flex-1"}`}
-      >
-        <div className={`flex items-center justify-center transition-all duration-500 ${paused ? "opacity-30" : ""} ${split ? "h-40 scale-[0.6]" : "h-72"}`}>
-          <Cloud state={state} alarm={alarmed.length > 0} />
-        </div>
-        <div className="flex max-w-xl flex-col gap-6">
-          {alert && (
-            <p className="text-2xl font-light text-balance text-state-alarm" role="alert">
-              {alert.machine} · {alert.title}
-            </p>
-          )}
-          {split && briefing?.summary ? (
-            <p className="text-3xl leading-snug font-light text-balance text-white">{unbroken(briefing.summary)}</p>
+    // The whole screen, over the app, dark. Before the start, and between questions, the cloud and the
+    // greeting. Once started, the escalation in one slim line on top. With a question: the focus below
+    // it, the cloud large and faint behind it, and at the bottom one line for what comes and goes.
+    <div className="titan-night fixed inset-0 z-50 flex flex-col bg-black text-foreground">
+      {started && escalations && <EscalationView escalations={escalations} />}
+      <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-w-0 flex-1">
+        {/* With something in focus, the cloud steps back: large, faint and pulsing behind it, so
+            Titan is still there and still shows whether it listens, thinks or speaks. */}
+        {started && focused && (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-50 motion-safe:duration-700">
+            <Cloud
+              state={state}
+              alarm={alarmed.length > 0}
+              className={`size-[min(95vh,95%)] motion-safe:animate-pulse ${paused ? "opacity-10" : "opacity-25"}`}
+            />
+          </div>
+        )}
+        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden px-8 py-10 md:px-16">
+          {started && focused ? (
+            <FocusView briefing={briefing} cards={cards} machines={named} asked={asksToSee(question ?? heard)} thinking={state === "thinking"} />
           ) : (
-            !alert && (
-              <h1 className="text-3xl font-light tracking-wide text-balance text-white/90">{paused ? "Pause" : greetingFor(person, alarmed)}</h1>
-            )
-          )}
-          {split && briefing?.recommendation && (
-            <div className="flex flex-col gap-1 border-l-2 border-white/40 pl-4 text-left">
-              <span className="text-xs font-medium tracking-widest text-white/50 uppercase">Empfehlung</span>
-              <p className="text-xl font-light text-balance text-white/90">{unbroken(briefing.recommendation)}</p>
+            <div className="m-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
+              <Cloud state={state} alarm={alarmed.length > 0} className={`size-72 ${paused ? "opacity-30" : ""}`} />
+              <h1 className="text-3xl font-light tracking-wide text-balance">{paused ? "Pause" : unbroken(greetingFor(person, alarmed))}</h1>
+              {!started && (
+                <p className="flex items-center gap-2 text-base text-muted-foreground">
+                  <Kbd>Leertaste</Kbd> drücken oder klicken, um Titan zu starten.
+                </p>
+              )}
             </div>
           )}
-          {split && briefing?.suggestion && <p className="text-lg font-light text-balance text-white/60">{unbroken(briefing.suggestion)}</p>}
-          {heard && !split && <p className="text-lg font-light text-balance text-white/60">„{heard}“</p>}
-          {!started && <p className="text-base font-light text-white/50">Leertaste drücken oder klicken, um Titan zu starten.</p>}
+        </main>
         </div>
-        {heard && split && <p className="absolute top-6 px-6 text-sm text-balance text-white/40">Frage: „{heard}“</p>}
-        {line && <p className="absolute bottom-6 px-6 text-sm text-balance text-white/50">{line}</p>}
       </div>
-      {split && (
-        <aside className="min-h-0 flex-1 overflow-y-auto bg-background p-6 text-left text-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-8 md:p-10">
-          <div className="mx-auto max-w-3xl">
-            {board ? (
-              <BoardView board={board} cards={cards} hint={briefing?.hint} />
-            ) : (
-              <div className="flex flex-col gap-5">
-                {cards.map((card, index) => (
-                  <div key={index}>{card}</div>
-                ))}
-              </div>
-            )}
-          </div>
-        </aside>
-      )}
+      {/* At the bottom, quiet: on the left what comes and goes, on the right what Titan understood,
+          to check, until the answer stands. */}
+      <footer className="flex h-12 shrink-0 items-center gap-6 px-8 text-sm text-muted-foreground">
+        <p className="min-w-0 flex-1 truncate">{line}</p>
+        {heard && !briefing?.summary && cards.length === 0 && <p className="max-w-[50%] truncate italic">„{heard}“</p>}
+      </footer>
       <p className="sr-only" aria-live="polite">
         {paused ? "Pause." : said[state]}
       </p>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from "react"
 
-import { withoutList } from "./facts.ts"
+import { withoutList, withoutSaidAdvice } from "./facts.ts"
 import { piperIfReady, sentencesOf } from "./piper.ts"
 import { transcribe } from "./transcribe.ts"
 
@@ -20,6 +20,9 @@ export type VoiceState = "idle" | "listening" | "thinking" | "speaking"
 
 /** The language the browser listens in and speaks. */
 export const VOICE_LANGUAGE = "de-DE"
+
+/** How fast Titan speaks: a little faster than the voices do by themselves, which sounded slow. */
+export const SPEECH_RATE = 1.2
 
 let state: VoiceState = "idle"
 let thinking = false
@@ -186,6 +189,7 @@ function speakWithSystem(sentence: string): Promise<void> {
   return new Promise((resolve) => {
     const utterance = new SpeechSynthesisUtterance(sentence)
     utterance.lang = VOICE_LANGUAGE
+    utterance.rate = SPEECH_RATE
     const voice = voiceFor(VOICE_LANGUAGE)
     if (voice) utterance.voice = voice
     const done = () => {
@@ -204,6 +208,7 @@ function speakWithSystem(sentence: string): Promise<void> {
 function play(sound: Blob): Promise<void> {
   const address = URL.createObjectURL(sound)
   const audio = new Audio(address)
+  audio.playbackRate = SPEECH_RATE
   return new Promise((resolve) => {
     const done = () => {
       hush = undefined
@@ -332,8 +337,7 @@ export function textOf(message: ChatMessage): string {
 
 /** What of an answer is said: everything but its list of facts, which the screen shows (facts.ts). */
 function wordsOf(message: ChatMessage): string {
-  const text = textOf(message)
-  return withoutList(text)
+  return withoutSaidAdvice(withoutList(textOf(message)), message.id)
 }
 
 /**

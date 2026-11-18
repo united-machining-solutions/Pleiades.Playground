@@ -40,3 +40,10 @@ test("a pause is asked for in a few words", () => {
   for (const said of ["Pause.", "Mach mal Pause!", "Sei still", "Stopp", "Ruhe bitte", "schlafen"]) assert.equal(isPause(said), true, said)
   for (const said of ["Welche Maschine macht Pause?", "Pause von P-04 zeigen", ""]) assert.equal(isPause(said), false, said)
 })
+
+test("in a loud room, Hey Titan counts after what others said", () => {
+  assert.deepEqual(wakeQuestion("und dann haben wir gegessen. Hey Titan, wie ist die Lage?"), { woke: true, question: "wie ist die Lage?" })
+  assert.equal(wakeQuestion("Heytitan, wie läuft P-04?").woke, true)
+  assert.equal(wakeQuestion("Hey Taitan").woke, true)
+  assert.equal(wakeQuestion("Ich glaube, Titan kann das nicht.").woke, false)
+})

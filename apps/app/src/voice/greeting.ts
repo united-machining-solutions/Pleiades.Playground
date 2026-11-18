@@ -11,8 +11,8 @@ export function machinesInWords(machines: ReadonlyArray<string>): string {
 export function greetingFor(name: string | undefined, faulty: ReadonlyArray<string>): string {
   const hello = name ? `Hallo ${name}` : "Hallo"
   if (faulty.length > 0) {
-    const where = machinesInWords(faulty)
-    return name ? `${hello}, du hast ungeplante Ausfälle: ${where}.` : `${hello}, es gibt ungeplante Ausfälle: ${where}.`
+    const where = `${faulty.length === 1 ? "an der Maschine" : "an den Maschinen"} ${machinesInWords(faulty)}`
+    return name ? `${hello}, du hast ${where} ungeplante Stillstände.` : `${hello}, ${where} gibt es ungeplante Stillstände.`
   }
   return name ? `${hello}, wie kann ich dir helfen?` : `${hello}, wie kann ich helfen?`
 }

@@ -63,7 +63,8 @@ function scatter(): Point[] {
 
 const glide = (from: number, to: number, share: number) => from + (to - from) * share
 
-export function Cloud({ state, alarm }: { state: VoiceState; alarm: boolean }) {
+/** `className` sets the size; the cloud fills a square. */
+export function Cloud({ state, alarm, className = "size-72" }: { state: VoiceState; alarm: boolean; className?: string }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   // The loop reads the newest state without starting again.
   const target = useRef({ state, alarm })
@@ -159,5 +160,5 @@ export function Cloud({ state, alarm }: { state: VoiceState; alarm: boolean }) {
     return () => cancelAnimationFrame(frame)
   }, [])
 
-  return <canvas ref={canvas} aria-hidden className="size-72" />
+  return <canvas ref={canvas} aria-hidden className={className} />
 }

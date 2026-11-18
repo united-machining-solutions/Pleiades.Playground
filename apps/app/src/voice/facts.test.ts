@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { briefingOf, factOf, withoutList } from "./facts.ts"
+import { briefingOf, factOf, withoutList, withoutSaidAdvice } from "./facts.ts"
 
 const answer = `P-04 steht, weil der Spindelantrieb ausgefallen ist.
 Empfehlung: Ruf die Instandhaltung an P-04.
@@ -53,4 +53,14 @@ test("a line without columns is a fact with or without a title", () => {
   assert.deepEqual(factOf("- Kein Grund erfasst"), { text: "Kein Grund erfasst" })
   assert.deepEqual(factOf("- **M-02:** steht"), { title: "M-02", text: "steht" })
   assert.deepEqual(factOf("- **M-02** | steht"), { title: "M-02", text: "steht", step: undefined })
+})
+
+test("a recommendation is said once, and only when its sentence is complete", () => {
+  const first = "P-07 steht. Empfehlung: Werkzeug wechseln. Soll ich mehr zeigen?"
+  assert.equal(withoutSaidAdvice("P-07 steht. Empfehlung: Werkzeug wech", "a"), "P-07 steht. ")
+  assert.equal(withoutSaidAdvice(first, "a"), first)
+  // The same answer, once more as it grows: still said.
+  assert.equal(withoutSaidAdvice(first, "a"), first)
+  // A later answer about something else gives it again: shown, not said.
+  assert.equal(withoutSaidAdvice("M-02 läuft. Empfehlung: Werkzeug wechseln.", "b"), "M-02 läuft. ")
 })

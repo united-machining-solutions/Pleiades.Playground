@@ -13,7 +13,7 @@ import { transcribe } from "./transcribe.ts"
 // itself. One piece is recognised at a time: the hub takes two requests of a key at once at most.
 
 /** Titan as the recognition may write it. */
-const NAME = /\b(t[iy]t[ae]n+s?|tieten|teitan|titän)\b/i
+const NAME = /\b(?:hey|hei)?(t[iy]t[ae][nm]+s?|tieten|t[ae]itan|tytan|tighten|titän)\b/i
 /** What people say before the name. */
 const CALL = /^(hey|hei|hej|hi|he|hallo|ok|okay|na|ja|also)?$/i
 
@@ -22,9 +22,13 @@ export function wakeQuestion(text: string): { woke: boolean; question: string } 
   const words = text.trim()
   const match = NAME.exec(words)
   if (!match) return { woke: false, question: "" }
-  // The name has to come first, after at most a word like "Hey": "Was macht Titan?" is no call.
+  // The name has to come first, after at most a word like "Hey": "Was macht Titan?" is no call. In a
+  // loud room a piece may begin with what others said: then "Hey Titan" counts wherever it stands.
   const before = words.slice(0, match.index).replace(/[^\p{L}\s]/gu, " ").trim()
-  if (before.split(/\s+/).filter(Boolean).length > 1 || !CALL.test(before)) return { woke: false, question: "" }
+  const spoken = before.split(/\s+/).filter(Boolean)
+  const first = spoken.length === 0 || (spoken.length === 1 && CALL.test(before))
+  const called = /^(hey|hei|hej|hallo|okay|ok)$/i.test(spoken.at(-1) ?? "") || /^(hey|hei)/i.test(match[0])
+  if (!first && !called) return { woke: false, question: "" }
   const question = words
     .slice(match.index + match[0].length)
     .replace(/^[\s,.!?:;-]+/, "")
@@ -44,10 +48,12 @@ export function isPause(question: string): boolean {
 export const SPEECH_LEVEL = 0.02
 /** This long quiet ends what is said. */
 const QUIET_MS = 700
+/** Speech is this many times louder than the noise of the room. */
+const NOISE_FACTOR = 3
 /** A piece shorter than this is a noise, not a word. */
 const SHORTEST_MS = 400
 /** The longest piece: a question, not a speech. */
-const LONGEST_MS = 15_000
+const LONGEST_MS = 8_000
 /** Kept from before the voice began. */
 const BEFORE_MS = 400
 /** After "Hey Titan" alone, the next piece is the question if it comes within this. */
@@ -119,11 +125,12 @@ export function useWakeWord(options: WakeOptions) {
     let before: Array<Float32Array> = []
     let piece: Array<Float32Array> | undefined
     let quietSince = 0
-    let busy = false
+    // A piece is heard while another is being recognised, so a call is not lost in the noise of a room.
+    /** The level of the noise of the room. */
+    let noise = SPEECH_LEVEL / NOISE_FACTOR
     let awakeUntil = 0
 
     const recognise = async (samples: Float32Array) => {
-      busy = true
       try {
         const text = await transcribe(wavOf(samples))
         if (closed || !text) return
@@ -141,18 +148,19 @@ export function useWakeWord(options: WakeOptions) {
         latest.current.onWake()
       } catch {
         // A piece that could not be recognised is let go; the next one is tried again.
-      } finally {
-        busy = false
       }
     }
 
     const onBlock = (block: Float32Array) => {
-      if (!latest.current.enabled || busy) {
+      if (!latest.current.enabled) {
         piece = undefined
         before = []
         return
       }
-      const speech = levelOf(block) > SPEECH_LEVEL
+      const level = levelOf(block)
+      // The noise of the room, followed slowly while nobody speaks: speech is clearly louder than it.
+      const speech = level > Math.max(SPEECH_LEVEL, noise * NOISE_FACTOR)
+      if (!speech && !piece) noise = noise * 0.97 + level * 0.03
       const blockMs = (block.length / RATE) * 1000
       if (!piece) {
         before.push(block)

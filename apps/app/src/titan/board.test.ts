@@ -2,8 +2,9 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { Machine, MachineList, Reading } from "@pleiades/cards/machine/contract.ts"
+import { clock } from "@pleiades/cards/machine/format.ts"
 
-import { boardOf, headlineOf, jobInWords, sinceInWords } from "./board.ts"
+import { boardOf, headlineOf, jobInWords, keyFactsOf, machinesNamed, sinceInWords } from "./board.ts"
 
 const asOf = "2026-11-18T12:30:00.000+01:00"
 const justNow = "2026-11-18T12:29:55.000+01:00"
@@ -93,4 +94,19 @@ test("a job order and a time read as a person says them", () => {
   assert.equal(jobInWords({ jobOrderId: "5101/01", state: "Running", producedQuantity: null, runsPlanned: 6 }), "Auftrag 5101/01")
   assert.equal(sinceInWords("2026-11-18T12:15:00.000+01:00", asOf), "15 min")
   assert.equal(sinceInWords("2026-11-18T10:25:00.000+01:00", asOf), "2 h 5 min")
+})
+
+test("the key facts of a machine: since when, the error, the job order", () => {
+  const facts = keyFactsOf(list, "P-04")
+  assert.equal(facts?.state, "alarm")
+  assert.deepEqual(facts?.facts, [
+    { label: "Zustand", value: "Störung", detail: `seit ${clock(spindle.raisedAt)} · 15 min` },
+    { label: "Ursache", value: "Spindelantrieb gestört", detail: "Fehler 31002" },
+    { label: "Auftrag", value: "5 von 12 Teilen", detail: "Auftrag 4711/01 · unterbrochen" },
+  ])
+  assert.equal(keyFactsOf(list, "X-99"), undefined)
+})
+
+test("an answer names its machines by serial number, each once", () => {
+  assert.deepEqual(machinesNamed("P-04 steht, M‑02 läuft. Ruf jemand an P-04."), ["P-04", "M-02"])
 })

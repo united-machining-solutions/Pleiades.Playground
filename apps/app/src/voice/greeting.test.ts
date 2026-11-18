@@ -12,8 +12,8 @@ test("someone unknown is greeted without a name", () => {
 })
 
 test("with an open error the greeting goes straight to it", () => {
-  assert.equal(greetingFor("Tom", ["P-07"]), "Hallo Tom, du hast ungeplante Ausfälle: P-07.")
-  assert.equal(greetingFor(undefined, ["P-04", "P-07"]), "Hallo, es gibt ungeplante Ausfälle: P-04 und P-07.")
+  assert.equal(greetingFor("Tom", ["P-07"]), "Hallo Tom, du hast an der Maschine P-07 ungeplante Stillstände.")
+  assert.equal(greetingFor(undefined, ["P-04", "P-07"]), "Hallo, an den Maschinen P-04 und P-07 gibt es ungeplante Stillstände.")
 })
 
 test("machines are listed the way they are said", () => {

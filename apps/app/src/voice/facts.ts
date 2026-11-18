@@ -42,6 +42,24 @@ export function withoutList(text: string): string {
     .replace(/\n{3,}/g, "\n\n")
 }
 
+/** Each recommendation that was said, in plain letters, with the answer that said it first. */
+const saidAdvice = new Map<string, string>()
+
+/**
+ * A recommendation is said once: an answer that gives the same again, because the person asked
+ * something else, shows it on the screen but does not say it. A recommendation that is still being
+ * written is left out until its sentence is complete; the text before it keeps its place.
+ */
+export function withoutSaidAdvice(text: string, answer: string): string {
+  return text.replace(/Empfehlung:[^\n]*?(?:[.!?](?=\s|$)|$)/g, (sentence) => {
+    if (!/[.!?]$/.test(sentence)) return ""
+    const key = sentence.toLowerCase().replace(/[^a-zäöüß0-9]/g, "")
+    const first = saidAdvice.get(key)
+    if (first === undefined) saidAdvice.set(key, answer)
+    return first === undefined || first === answer ? sentence : ""
+  })
+}
+
 /** The sentences of a text, each with its mark. */
 function sentences(text: string): Array<string> {
   return (text.replace(/\s+/g, " ").match(/[^.!?…]+(?:[.!?…]+["“”»)]*|$)/g) ?? []).map((one) => one.trim()).filter(Boolean)

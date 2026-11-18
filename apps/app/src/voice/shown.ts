@@ -16,7 +16,7 @@ import type { Briefing } from "./facts.ts"
 // What an answer showed stays until the next question: a card does not vanish while Titan still
 // talks about it.
 
-export type Shown = { cards: ReadonlyArray<ReactNode>; briefing?: Briefing }
+export type Shown = { cards: ReadonlyArray<ReactNode>; briefing?: Briefing; question?: string }
 
 const nothing: Shown = { cards: [] }
 
@@ -63,8 +63,12 @@ export function useShareCards(messages: ReadonlyArray<UIMessage>, isLoading: boo
     // The text after the last tool call is the answer; a sentence before a call only says what comes.
     const texts = last.parts.flatMap((part) => (part.type === "text" && part.content.trim() !== "" ? [part.content] : []))
     const text = texts.at(-1)
+    // The question the answer is for, as it was put to the chat.
+    const asked = [...messages].reverse().find((message) => message.role === "user")
+    const question = asked?.parts.flatMap((part) => (part.type === "text" ? [part.content] : [])).join(" ")
     // A card or the briefing appears as soon as it is there, and stays while the answer goes on.
     setShown({
+      question,
       cards: cards.length > 0 ? cards : shown.cards,
       briefing: text ? briefingOf(text) : shown.briefing,
     })

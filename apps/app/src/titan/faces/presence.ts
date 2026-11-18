@@ -6,7 +6,7 @@ import { ABSENT_MS, initialArrival, observe } from "./arrival.ts"
 import type { Arrival, ArrivalState } from "./arrival.ts"
 import { CAMERA, openCamera } from "./camera.ts"
 import type { CameraSetting, CameraSource } from "./camera.ts"
-import { findFaces } from "./detector.ts"
+import { findFaces, prepareDetector } from "./detector.ts"
 import type { Face } from "./detector.ts"
 import { RECHECK_MS, initialIdentity, recheck, settle } from "./identity.ts"
 import type { IdentityState } from "./identity.ts"
@@ -14,8 +14,10 @@ import { bestMatch } from "./match.ts"
 import type { Person } from "./match.ts"
 import { listPeople, onPeopleChange } from "./store.ts"
 
-/** How often the camera is looked at: about twice a second. */
+/** How often the camera is looked at while someone is there: about twice a second. */
 export const LOOK_MS = 500
+/** How often while nobody is there yet: more often, so that a greeting comes soon. */
+export const SEEK_MS = 200
 
 export type PresenceStatus = "off" | "starting" | "watching" | "error"
 
@@ -64,7 +66,7 @@ async function look(source: CameraSource, state: ArrivalState, people: ReadonlyA
 
 /**
  * Watches the camera while `enabled` and calls `onArrive` when someone arrives. While nobody is there,
- * only the detector runs, twice a second, and not at all while the tab is hidden; the descriptor is
+ * only the detector runs, five times a second, and not at all while the tab is hidden; the descriptor is
  * computed only while an arrival waits for a name. The camera is let go when `enabled` turns false
  * and when the component unmounts.
  */
@@ -75,6 +77,11 @@ export function usePresence({ onArrive, onRename, enabled, absentMs = ABSENT_MS,
   const rename = useRef(onRename)
   rename.current = onRename
   const setting = JSON.stringify(camera)
+
+  // The models load as the page opens, before it is started, so that the greeting does not wait.
+  useEffect(() => {
+    void prepareDetector()
+  }, [])
 
   useEffect(() => {
     if (!enabled) {
@@ -139,7 +146,7 @@ export function usePresence({ onArrive, onRename, enabled, absentMs = ABSENT_MS,
         if (!cancelled) setPresence({ status: "error", error: String(error), face: false })
         return
       }
-      if (!cancelled) timer = setTimeout(() => void tick(), LOOK_MS)
+      if (!cancelled) timer = setTimeout(() => void tick(), state.present ? LOOK_MS : SEEK_MS)
     }
 
     setPresence({ status: "starting", face: false })
