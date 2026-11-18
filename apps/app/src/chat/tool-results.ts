@@ -29,8 +29,9 @@ export type ChatTool = {
    */
   cardOnly?: boolean
   /**
-   * Only the chat calls this tool: it is one of the app itself, and a page never holds it as a part,
-   * although the chat draws its result. The proposal of a page is one (pages/proposal.ts).
+   * Only the chat calls this tool: a page never holds it as a part, although the chat draws its
+   * result. The proposal of a page is one (pages/proposal.ts), and so are the cards of a server a page
+   * does not ask, which asks the generative UI backend alone (pages/call-part.ts).
    */
   chatOnly?: boolean
   /**

@@ -52,6 +52,8 @@ tools again.
 - The app checks the names of the tools and the shape of the arguments, not what the arguments mean. A part
   with an argument the tool does not take, or with a machine the backend does not know, says so when the page
   is opened; "Preview" shows it before the page is kept.
+- A card whose tool a page cannot call is marked `chatOnly` as well, and is then offered as no part. The cards
+  of the OPC UA adapter are such: a page asks the generative UI backend alone, which has no `opcua_*` tool.
 - A card names the parts of a proposed page with `part` in the chat's list, a few words. A card without it is
   named by its tool.
 - An answer that proposes a page and drew cards also has "Save as page" under it, which keeps those cards

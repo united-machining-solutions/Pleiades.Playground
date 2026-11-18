@@ -125,8 +125,8 @@ to be settled at the umati hackathon. Here everything is as the model says: path
 lists, events, manifest and connection. It is the binding of `machines/`; why: see
 [ADR-0015](../../docs/adr/0015-the-binding-of-machines-follows-the-data-model.md).
 
-In the demo stack every simulator (P-04, P-07, M-02) and the adapters of two real devices, an Ultimaker printer
-and a juice bar, publish this tree, and the services of the playground read only it (see "How the stack stores
+In the demo stack every simulator (P-04, P-07, M-02), the adapters of two real devices, an Ultimaker printer
+and a juice bar, and the OPC UA adapter publish this tree, and the services of the playground read only it (see "How the stack stores
 it").
 
 ### Topics
@@ -535,6 +535,27 @@ Each delivers of `Core` the identification, the connection and `State/Status`, w
 `None`, the value of the model for a machine without operation modes; `ProductCode`, `YearOfConstruction`,
 `State.FeedOverride`, `Notification.ActiveAlerts` and `OperationCounters.PowerOnDuration` are
 `"available": false`. Neither publishes events yet.
+
+The [OPC UA adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md) brings in every machine a person
+adds in the chat, with the same publisher and one MQTT connection per machine, so that each has its own last
+will (client id `opcua-adapter-<machineId>`). What it publishes follows from the registration of the machine:
+
+- The machine id is formed from `Identification.ManufacturerUri`, `Model` and `SerialNumber` as the server gave
+  them when the machine was added, and kept with the registration.
+- The manifest declares the core whole, what the machine lacks `"available": false`, and the other profiles
+  whose elements the registration maps whole. A value of the maker is a signal of the manufacturer, below
+  `oem/`, with the prefix of the domain of its `ManufacturerUri`.
+- A value goes out when the server reports a change, with the time of the source (`"timestampSource":
+  "source"`), in the unit of the catalogue. `State.Status` is built from the two fields of the state.
+- `Connection/State` is `Running` while the OPC UA session stands and `CommunicationFault` while it does not.
+- The alarms of the server are `Notification.ActiveAlerts` and the events `Notification.AlertRaised` and
+  `Notification.AlertCleared` on `events/notifications`; `Severity` is the category of NE 107 from the severity of
+  OPC UA (from 667 `Failure`, from 334 `OffSpec`, below `MaintenanceRequired`), an assumption of the adapter.
+  `sequence` counts from 1 in every run of the adapter; the outbox holds the events while the broker is away, as
+  the managed client keeps every message. An alarm that stood before a restart of the adapter and still stands is
+  raised once more in the new run, with its `Id` and its `Time`, so that every run names the alarms that stand.
+- When a machine is removed, the adapter takes every retained message of it back with an empty one and ends its
+  connection without its last will. While the broker cannot be reached it does not remove the machine.
 
 ### Open for the hackathon
 
