@@ -63,7 +63,11 @@ export const timeseriesLine = z.object({
     .describe("The newest value of the topic up to `to`, or null if it never had one."),
   low: z.number().nullable().describe("The smallest value published between `from` and `to`, in `unit`. Null for a yes or no, or without a value."),
   high: z.number().nullable().describe("The largest value published between `from` and `to`, in `unit`. Null for a yes or no, or without a value."),
-  values: z.number().int().describe("How many values the topic had between `from` and `to`."),
+  values: z
+    .number()
+    .int()
+    .nullable()
+    .describe("How many numbers the topic had between `from` and `to`. Null for a yes or no, which is not counted: it holds until it changes."),
 })
 export type TimeseriesLine = z.infer<typeof timeseriesLine>
 
@@ -112,7 +116,9 @@ export const timeseriesSeries = z.object({
   to: instant,
   range: timeseriesRange,
   instants: z.array(instant).describe("Oldest first, the same for every line."),
-  lines: z.array(seriesLine).describe("One for each line asked for, in that order."),
+  lines: z
+    .array(seriesLine)
+    .describe("One for each topic asked for, in the order first asked: a line asked twice, also by two names, is one."),
 })
 export type TimeseriesSeries = z.infer<typeof timeseriesSeries>
 

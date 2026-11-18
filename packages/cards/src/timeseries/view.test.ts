@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { NO_AXES, axesFor, matchesSearch, nextColour } from "./view.ts"
+import { NO_AXES, axesFor, lastValue, matchesSearch, nextColour } from "./view.ts"
 
 test("the first unit goes left, the second right", () => {
   assert.deepEqual(axesFor(NO_AXES, ["watt", "watt", "degreeCelsius"]), { left: "watt", right: "degreeCelsius" })
@@ -31,4 +31,12 @@ test("a search finds a signal by every word typed, in any order and case", () =>
   assert.equal(matchesSearch(said, "POWER ax-400"), true)
   assert.equal(matchesSearch(said, ""), true)
   assert.equal(matchesSearch(said, "P-07 power"), false)
+})
+
+test("the newest value of a line is current only where the line has it at its end", () => {
+  assert.deepEqual(lastValue([1, 2, 3]), { value: 3, current: true })
+  // The machine fell silent after 2: the value is the last one known, not what it measures now.
+  assert.deepEqual(lastValue([1, 2, null, null]), { value: 2, current: false })
+  assert.deepEqual(lastValue([true, false]), { value: false, current: true })
+  assert.equal(lastValue([null, null]), null)
 })

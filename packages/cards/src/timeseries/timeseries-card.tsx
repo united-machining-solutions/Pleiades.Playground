@@ -21,15 +21,16 @@ import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { clock } from "../machine/format.ts"
 import { labelOf } from "../machine/in-words.ts"
-import { axisNumber, measuredValue, unitSign } from "../measurement/words.ts"
+import { measuredValue, unitSign } from "../measurement/words.ts"
+import { categoryColour } from "../shared/colour.ts"
 import { MachineName } from "../shared/machine-name.tsx"
 import { axisScale } from "../shared/scale.ts"
 import { SmoothHeight } from "../shared/smooth-height.tsx"
 import { MOST_LINES, MOST_UNITS, TIMESERIES_RANGES } from "./contract.ts"
 import type { SeriesLine, SignalKind, TimeseriesRange, TimeseriesSeries, TimeseriesShow, TimeseriesSignals } from "./contract.ts"
-import { NO_AXES, axesFor, matchesSearch, nextColour } from "./view.ts"
+import { NO_AXES, axesFor, lastValue, matchesSearch, nextColour } from "./view.ts"
 import type { Axes } from "./view.ts"
-import { rangeLabel, signalLabel } from "./words.ts"
+import { rangeLabel, signalLabel, tickNumber } from "./words.ts"
 
 /** Asks for the lines of the card: whoever draws the card passes it, the host or the application. Null if they are not to be had. */
 export type AskSeries = (ask: { lines: Array<{ machine: string; signal: string }>; range: TimeseriesRange; to?: string }) => Promise<TimeseriesSeries | null>
@@ -43,7 +44,8 @@ type Drawn = { machine: string; path: string; colour: number }
 /** The width of a y axis, the same in the graph and beside the lanes, so the times line up. */
 const AXIS_WIDTH = 48
 
-const colourOf = (colour: number) => `var(--chart-${colour})`
+/** The colour of a line: `--chart-<colour>`, from 1. */
+const colourOf = (colour: number) => categoryColour(colour - 1)
 const keyOf = (line: { colour: number }) => `l${line.colour}`
 const same = (a: { machine: string; path: string }, b: { machine: string; path: string }) => a.machine === b.machine && a.path === b.path
 
@@ -72,8 +74,14 @@ export function TimeseriesCard({ values, askSeries, askSignals }: { values: Time
   const axes = useRef<Axes>(NO_AXES)
   const sync = useId()
 
-  const asked = JSON.stringify([drawn.map((line) => [line.machine, line.path]), range, until ?? null])
+  // Lines that went from the card need no reading: what remains of the series is drawn as it is.
+  const kept = useRef<{ asked: string; series: TimeseriesSeries } | null>(null)
+  const asked = askedKey(drawn, range, until)
   useEffect(() => {
+    if (kept.current?.asked === asked) {
+      kept.current = null
+      return
+    }
     let wanted = true
     const [pairs, askedRange, askedUntil] = JSON.parse(asked) as [Array<[string, string]>, TimeseriesRange, string | null]
     setReading(true)
@@ -108,9 +116,23 @@ export function TimeseriesCard({ values, askSeries, askSignals }: { values: Time
     const kept = [...new Set([axes.current.left, axes.current.right, ...units].filter((one): one is string => one !== null && units.includes(one)))].slice(0, MOST_UNITS)
     const dropped = read.lines.filter((line) => line.kind === "number" && line.unit !== null && !kept.includes(line.unit))
     axes.current = axesFor(axes.current, kept) ?? NO_AXES
-    setDrawn((lines) => lines.filter((line) => !dropped.some((one) => same(one, line))))
+    remove(read, (line) => dropped.some((one) => same(one, line)))
     const names = dropped.map((one) => `${signalLabel(one.path)} of ${labelOf(one.machine)} (${axisName(one.unit ?? "")})`)
     setNotice(`${names.join(", ")}: this card has two axes, ${kept.map(axisName).join(" and ")}. Remove the lines of one of them first.`)
+  }
+
+  /**
+   * Takes lines from the card. What was read of the others stays, with its instants and its end, and
+   * is not read again.
+   */
+  function remove(read: TimeseriesSeries | null | undefined, goes: (line: Drawn) => boolean) {
+    const remaining = drawn.filter((line) => !goes(line))
+    if (read) {
+      const series = { ...read, lines: read.lines.filter((line) => remaining.some((one) => same(one, line))) }
+      kept.current = { asked: askedKey(remaining, range, until), series }
+      setSeries(series)
+    }
+    setDrawn(remaining)
   }
 
   const change = (next: () => void) => {
@@ -145,7 +167,14 @@ export function TimeseriesCard({ values, askSeries, askSignals }: { values: Time
           drawn={drawn}
           series={shown}
           axes={axes.current}
-          onRemove={drawn.length > 1 ? (line) => change(() => setDrawn((all) => all.filter((one) => !same(one, line)))) : undefined}
+          onRemove={
+            drawn.length > 1
+              ? (line) => {
+                  setNotice(undefined)
+                  remove(series, (one) => same(one, line))
+                }
+              : undefined
+          }
         />
         {notice && <p className="text-sm text-muted-foreground">{notice}</p>}
         <AddLine
@@ -159,6 +188,11 @@ export function TimeseriesCard({ values, askSeries, askSignals }: { values: Time
       </CardContent>
     </Card>
   )
+}
+
+/** What the card asks for, as one text: the lines, the range and where it ends. An effect sees a change of it. */
+function askedKey(drawn: ReadonlyArray<Drawn>, range: TimeseriesRange, until: string | undefined): string {
+  return JSON.stringify([drawn.map((line) => [line.machine, line.path]), range, until ?? null])
 }
 
 /** The range, one of four. Changing it reads the lines again, up to now. */
@@ -247,7 +281,7 @@ function TimeseriesGraph({ series, lines, axes, sync }: { series: TimeseriesSeri
             tickMargin={4}
             domain={left ? left.domain : ["auto", "auto"]}
             ticks={left?.ticks}
-            tickFormatter={(value: number) => axisNumber(value, axes.left)}
+            tickFormatter={(value: number) => tickNumber(value, axes.left, left?.step)}
           />
           <YAxis
             yAxisId="right"
@@ -259,7 +293,7 @@ function TimeseriesGraph({ series, lines, axes, sync }: { series: TimeseriesSeri
             tickMargin={4}
             domain={right ? right.domain : ["auto", "auto"]}
             ticks={right?.ticks}
-            tickFormatter={(value: number) => axisNumber(value, axes.right)}
+            tickFormatter={(value: number) => tickNumber(value, axes.right, right?.step)}
           />
           <ChartTooltip
             content={
@@ -343,14 +377,21 @@ function described(line: Drawn, read: SeriesLine | undefined, axes: Axes): strin
   return `${signal} · ${axisName(read.unit)}, ${read.unit === axes.right ? "right" : "left"} axis`
 }
 
-/** The newest value a line has in the range, in its unit. */
-function newestOf(read: SeriesLine | undefined): string | null {
-  if (read === undefined) return null
-  for (let index = read.values.length - 1; index >= 0; index--) {
-    const value = read.values[index]
-    if (value !== null && value !== undefined) return measuredValue({ value, unit: read.unit })
-  }
-  return null
+/** The newest value a line has in the range, in its unit, and "not current" where the machine fell silent since. */
+function newestOf(read: SeriesLine | undefined): { text: string; current: boolean } | null {
+  const last = read === undefined ? null : lastValue(read.values)
+  if (read === undefined || last === null) return null
+  return { text: measuredValue({ value: last.value, unit: read.unit }), current: last.current }
+}
+
+/** The newest value of a line as the legend writes it. */
+function Newest({ newest, className }: { newest: { text: string; current: boolean }; className: string }) {
+  if (newest.current) return <span className={className}>{newest.text}</span>
+  return (
+    <span className={`${className} text-muted-foreground`}>
+      {newest.text}, not current
+    </span>
+  )
 }
 
 /** The lines of the card: colour, machine, signal and axis, the newest value, and the way to take one away. */
@@ -381,10 +422,10 @@ function Legend({
               </ItemTitle>
               <ItemDescription>{described(line, read, axes)}</ItemDescription>
               {/* Where the card is narrow, the value stands under the signal, and only the way to remove the line on the right. */}
-              {newest !== null && <span className="text-sm tabular-nums @sm/legend:hidden">{newest}</span>}
+              {newest !== null && <Newest newest={newest} className="text-sm tabular-nums @sm/legend:hidden" />}
             </ItemContent>
             <ItemActions className="ml-auto gap-1">
-              {newest !== null && <span className="hidden text-sm whitespace-nowrap tabular-nums @sm/legend:inline">{newest}</span>}
+              {newest !== null && <Newest newest={newest} className="hidden text-sm whitespace-nowrap tabular-nums @sm/legend:inline" />}
               {onRemove && (
                 <Button variant="ghost" size="xs" aria-label={`Remove ${signalLabel(line.path)} of ${line.machine}`} onClick={() => onRemove(line)}>
                   Remove
@@ -397,6 +438,9 @@ function Legend({
     </ItemGroup>
   )
 }
+
+/** How many signals the list shows at most; typing narrows it. */
+const SHOWN_SIGNALS = 50
 
 /** A signal a person can add, with what the list searches in. */
 type Choice = { machine: string; path: string; kind: SignalKind; key: string }
@@ -414,10 +458,12 @@ function AddLine({
   onAdd: (pair: { machine: string; path: string }) => void
 }) {
   const [signals, setSignals] = useState<TimeseriesSignals | null>()
-  const [asked, setAsked] = useState(false)
+  // Every time the list opens it asks again: after a failure, and for machines that began to publish since.
+  const [opened, setOpened] = useState(0)
   useEffect(() => {
-    if (!asked) return
+    if (opened === 0) return
     let wanted = true
+    setSignals((before) => (before === null ? undefined : before))
     askSignals().then(
       (read) => wanted && setSignals(read),
       () => wanted && setSignals(null),
@@ -425,7 +471,7 @@ function AddLine({
     return () => {
       wanted = false
     }
-  }, [asked, askSignals])
+  }, [opened, askSignals])
   if (full) return <p className="text-xs text-muted-foreground">A card draws {MOST_LINES} lines at most. Remove one to add another.</p>
   const groups = (signals?.machines ?? [])
     .map((one) => ({
@@ -441,12 +487,14 @@ function AddLine({
       value={null}
       itemToStringValue={(choice: Choice) => `${choice.machine} ${signalLabel(choice.path)}`}
       filter={(choice: Choice, query: string) => matchesSearch([choice.machine, signalLabel(choice.path), choice.path], query)}
-      onOpenChange={(open) => open && setAsked(true)}
+      // The first signals that match what was typed, not every signal of every machine at once.
+      limit={SHOWN_SIGNALS}
+      onOpenChange={(open) => open && setOpened((count) => count + 1)}
       onValueChange={(choice: Choice | null) => {
         if (choice) onAdd({ machine: choice.machine, path: choice.path })
       }}
     >
-      <ComboboxInput placeholder="Add a line: search a machine or a signal" aria-label="Add a line" onFocus={() => setAsked(true)} />
+      <ComboboxInput placeholder="Add a line: search a machine or a signal" aria-label="Add a line" />
       <ComboboxContent>
         <ComboboxEmpty>{signals === undefined ? "Reading the signals…" : signals === null ? "The signals could not be read." : "No signal found."}</ComboboxEmpty>
         <ComboboxList>

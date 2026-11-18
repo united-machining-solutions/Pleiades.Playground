@@ -1,7 +1,16 @@
 import assert from "node:assert/strict"
 import { afterEach, mock, test } from "node:test"
 
-import { listTimeseriesSeries, listTimeseriesSignals, onInstants, resolveLines, resolveSignal, showTimeseries, signalsOf } from "./timeseries.ts"
+import {
+  forgetPublished,
+  listTimeseriesSeries,
+  listTimeseriesSignals,
+  onInstants,
+  resolveLines,
+  resolveSignal,
+  showTimeseries,
+  signalsOf,
+} from "./timeseries.ts"
 
 const apis = { timeseriesUrl: "http://timeseries:8080", eventsUrl: "http://events:8080" }
 const now = new Date("2026-11-18T10:00:00.000Z")
@@ -10,7 +19,11 @@ const micros = (instant: string) => Date.parse(instant) * 1000
 /** The instant so many minutes before `now`. */
 const ago = (minutes: number) => new Date(now.getTime() - minutes * 60_000).toISOString()
 
-afterEach(() => mock.restoreAll())
+afterEach(() => {
+  mock.restoreAll()
+  // What the machines published is kept for a minute; every test has a store of its own.
+  forgetPublished()
+})
 
 const P04 = "alcyone-machines_AX-400_P-04"
 const P07 = "taygeta-precision_TP-800_P-07"
@@ -114,6 +127,18 @@ test("a signal is found by its path, without its namespace, as an element of the
   assert.equal(resolveSignal("umati/Spindle/1/BearingTemperature", published), undefined)
 })
 
+test("a quantity the machine does not publish is not found", () => {
+  assert.equal(resolveSignal("bearingTemperature", new Map([[POWER, "number"]])), undefined)
+})
+
+test("a quantity the machine does not publish is refused with the signals it has, not as a text", () => {
+  const published = signalsOf({ numbers: [`machines/${P04}/${POWER}`], texts: [], yesNo: [] })
+  assert.throws(
+    () => resolveLines([{ machine: P04, signal: "bearingTemperature" }], published),
+    new RegExp(`published no signal "bearingTemperature".*by path: ${POWER.replaceAll("/", "\\/")}\\.`),
+  )
+})
+
 test("a path without namespace that both namespaces have is not guessed", () => {
   const published = new Map<string, "number">([["umati/Spindle/1/Load", "number"], ["oem/Spindle/1/Load", "number"]])
   assert.equal(resolveSignal("Spindle/1/Load", published), undefined)
@@ -205,7 +230,7 @@ test("numbers of a third unit are refused: a time series card has two y axes", a
   )
 })
 
-test("a yes or no is no unit, and is read whole, never thinned", async () => {
+test("a yes or no is no unit, is not counted, and is read whole for the graph, never thinned", async () => {
   const requested = serve(demo())
   const shown = await showTimeseries(
     apis,
@@ -227,8 +252,11 @@ test("a yes or no is no unit, and is read whole, never thinned", async () => {
     now: { value: true, at: ago(10), stale: false },
     low: null,
     high: null,
-    values: 2,
+    values: null,
   })
+  // Counting it would read every one: the show reads only its newest.
+  const counted = requested.filter((url) => url.pathname.includes(ROTATING) && url.searchParams.get("sorting") !== "Descending")
+  assert.deepEqual(counted, [])
   await listTimeseriesSeries(apis, [{ machine: P04, signal: ROTATING }], "24h", undefined, 50, now)
   const reads = requested.filter((url) => url.pathname.includes(ROTATING) && url.searchParams.get("sorting") !== "Descending")
   assert.ok(reads.length > 0)
@@ -352,4 +380,42 @@ test("the signals a person can add: numbers and yes or no of each machine, by pa
       [P07, [`${POWER}:number`]],
     ],
   )
+})
+
+test("a topic named two ways is read once and drawn once", async () => {
+  const requested = serve(demo())
+  const series = await listTimeseriesSeries(
+    apis,
+    [
+      { machine: P04, signal: "activePower" },
+      { machine: P04, signal: POWER },
+      { machine: P04, signal: "Consumption.Electricity.Main.AcActivePowerTotal" },
+    ],
+    "1h",
+    undefined,
+    undefined,
+    now,
+  )
+  assert.equal(series.lines.length, 1)
+  const reads = requested.filter((url) => url.pathname.endsWith(POWER) && url.searchParams.get("downsample") === "true")
+  assert.equal(reads.length, 1)
+})
+
+test("the heartbeats are asked for together with the lines, not after them", async () => {
+  const requested = serve(demo())
+  await listTimeseriesSeries(apis, [{ machine: P04, signal: "activePower" }], "1h", undefined, undefined, now)
+  const heartbeat = requested.findIndex((url) => url.pathname.endsWith(HEARTBEAT))
+  const thinned = requested.findIndex((url) => url.searchParams.get("downsample") === "true")
+  assert.ok(heartbeat >= 0 && thinned >= 0)
+  // Both are asked before either answers: the heartbeat does not wait for the line.
+  assert.ok(heartbeat < thinned, `heartbeat asked at ${heartbeat}, the line at ${thinned}`)
+})
+
+test("what the machines published is read once for many changes of a card", async () => {
+  const requested = serve(demo())
+  for (const range of ["15m", "1h", "8h"] as const) {
+    await listTimeseriesSeries(apis, [{ machine: P04, signal: "activePower" }], range, undefined, undefined, now)
+  }
+  await listTimeseriesSignals(apis, now)
+  assert.equal(requested.filter((url) => url.pathname === "/topics").length, 1)
 })

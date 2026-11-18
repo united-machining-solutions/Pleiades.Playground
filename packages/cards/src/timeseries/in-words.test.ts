@@ -3,7 +3,7 @@ import { test } from "node:test"
 
 import type { TimeseriesLine } from "./contract.ts"
 import { timeseriesLineInWords, timeseriesShowInWords } from "./in-words.ts"
-import { signalLabel } from "./words.ts"
+import { signalLabel, tickNumber } from "./words.ts"
 
 const P04 = "alcyone-machines_AX-400_P-04"
 
@@ -48,4 +48,15 @@ test("a value that is not current, a yes or no and a line without values say so"
 test("the card in words names its range, then a line for each line", () => {
   const words = timeseriesShowInWords({ from: "2026-11-18T09:00:00.000Z", to: "2026-11-18T10:00:00.000Z", range: "1h", lines: [line({})] })
   assert.match(words, /^Over the last hour, 09:00 UTC to 10:00 UTC:\nalcyone/)
+})
+
+test("a tick has the decimals of its unit, or more where the axis steps finer, so no two read the same", () => {
+  const ticks = (values: Array<number>, unit: string, step: number) => values.map((value) => tickNumber(value, unit, step))
+  // A bearing temperature of 30.02 to 30.11 °C steps by 0.025.
+  assert.deepEqual(ticks([30, 30.025, 30.05, 30.075, 30.1], "degreeCelsius", 0.025), ["30.000", "30.025", "30.050", "30.075", "30.100"])
+  // A flat 4,000 to 4,002 W steps by 0.5.
+  assert.deepEqual(ticks([4_000, 4_000.5, 4_001], "watt", 0.5), ["4,000.0", "4,000.5", "4,001.0"])
+  // Where the step is coarser than the unit, the unit decides, as on the measurement card.
+  assert.deepEqual(ticks([30, 35], "degreeCelsius", 5), ["30.0", "35.0"])
+  assert.deepEqual(ticks([0, 5_000], "watt", 5_000), ["0", "5,000"])
 })

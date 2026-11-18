@@ -1,5 +1,5 @@
 import { QUANTITIES, QUANTITY_PATHS } from "../measurement/contract.ts"
-import { quantityLabel } from "../measurement/words.ts"
+import { axisNumber, quantityLabel } from "../measurement/words.ts"
 import type { TimeseriesRange } from "./contract.ts"
 
 // The words of the time series card. A value keeps the unit it was published in; the card writes it as
@@ -35,4 +35,21 @@ export function signalLabel(path: string): string {
   const last = levels.pop()
   if (last === undefined) return path
   return levels.length === 0 ? spaced(last) : `${levels.map(spaced).join(" ")} · ${spaced(last)}`
+}
+
+/** How many decimals a number needs to be written whole: 0.025 needs 3, 2.5 needs 1, 500 none. */
+function decimalsOf(value: number): number {
+  return String(Number(value.toPrecision(6))).split(".")[1]?.length ?? 0
+}
+
+/**
+ * A tick of a y axis: in the decimals of its unit, as the measurement card writes a value of it, or
+ * in more where the axis steps finer, so that two ticks are never written the same: 30.025 °C on an
+ * axis that steps by 0.025, where 30.0 is enough on one that steps by 1.
+ */
+export function tickNumber(value: number, unit: string | null, step: number | undefined): string {
+  // The decimals the measurement card writes a value of this unit with: 1 for 1.0 °C.
+  const ofUnit = axisNumber(1, unit).split(".")[1]?.length ?? 0
+  const digits = Math.max(ofUnit, step === undefined ? 0 : decimalsOf(step))
+  return new Intl.NumberFormat("en-GB", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)
 }

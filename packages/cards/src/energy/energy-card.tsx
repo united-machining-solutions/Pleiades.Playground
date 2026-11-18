@@ -19,6 +19,7 @@ import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@pleiades/ui/components/table"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { clock } from "../machine/format.ts"
+import { categoryColour } from "../shared/colour.ts"
 import { MachineName } from "../shared/machine-name.tsx"
 import { axisScale } from "../shared/scale.ts"
 import { SmoothHeight } from "../shared/smooth-height.tsx"
@@ -27,11 +28,8 @@ import { ENERGY_ORDERS, pageLinks, pageOf } from "./order.ts"
 import type { EnergyOrder, EnergyPage } from "./order.ts"
 import { axisKilowatts, cardRange, inKilowattHours, kilowattHours, kilowatts } from "./words.ts"
 
-/** How many machines the categorical colours of the theme name, `--chart-1` and on. */
-const COLOURS = 14
-
 /** The colour of a machine: its place in the result, the same in the graph and in the table. */
-const colourOf = (index: number) => `var(--chart-${(index % COLOURS) + 1})`
+const colourOf = categoryColour
 
 /** The lines of the graph: undefined while they are asked for, null if they are not to be had. */
 export type Lines = EnergySeries | null | undefined

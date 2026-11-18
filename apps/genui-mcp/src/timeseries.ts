@@ -13,7 +13,7 @@ import type {
   TimeseriesSignals,
 } from "@pleiades/cards/timeseries/contract.ts"
 
-import { listTopicKinds, readNewest, readStatistics, readThinned, readTimelines } from "./apis.ts"
+import { listTopicKinds, readNewest, readStatistics, readTimelines } from "./apis.ts"
 import type { Apis, Newest, Timeline, TopicKinds } from "./apis.ts"
 import { silences, silentBetween } from "./liveness.ts"
 import type { Stretch } from "./liveness.ts"
@@ -67,7 +67,8 @@ export function signalsOf(kinds: TopicKinds): Map<string, Map<string, Carried>> 
 export function resolveSignal(asked: string, published: ReadonlyMap<string, Carried>): string | undefined {
   const name = asked.trim()
   const quantity = QUANTITIES.find((one) => one === name)
-  if (quantity !== undefined) return QUANTITY_PATHS[quantity]
+  // A quantity of the measurement card counts only where the machine publishes it.
+  if (quantity !== undefined) return published.has(QUANTITY_PATHS[quantity]) ? QUANTITY_PATHS[quantity] : undefined
   let path = name
   if (!name.includes("/") && name.includes(".")) {
     const [first, ...rest] = name.split(".")
@@ -82,15 +83,9 @@ export function resolveSignal(asked: string, published: ReadonlyMap<string, Carr
 /** A line of the card as it is read: the pair asked for, and where its values lie. */
 type Resolved = { machine: string; signal: string; path: string; topic: string; kind: SignalKind }
 
-/** The pairs asked for, each once, in the order first asked. */
-function distinct(asked: ReadonlyArray<AskedLine>): Array<AskedLine> {
-  const seen = new Set<string>()
-  return asked.filter((one) => {
-    const key = JSON.stringify([one.machine, one.signal.trim()])
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+/** Each topic once, where it was first asked for: a pair named twice, also in two ways, is one line. */
+function onceByTopic<TLine extends { topic: string }>(lines: ReadonlyArray<TLine>): Array<TLine> {
+  return lines.filter((one, index) => lines.findIndex((other) => other.topic === one.topic) === index)
 }
 
 /**
@@ -99,7 +94,7 @@ function distinct(asked: ReadonlyArray<AskedLine>): Array<AskedLine> {
  * of what there is instead: a language model reads them and asks again.
  */
 export function resolveLines(asked: ReadonlyArray<AskedLine>, published: Map<string, Map<string, Carried>>): Array<Resolved> {
-  const lines = distinct(asked).map((one): Resolved => {
+  const lines = asked.map((one): Resolved => {
     const signals = published.get(one.machine)
     if (signals === undefined) {
       const known = [...published.keys()].sort()
@@ -118,8 +113,7 @@ export function resolveLines(asked: ReadonlyArray<AskedLine>, published: Map<str
     }
     return { machine: one.machine, signal: one.signal, path, topic: `machines/${one.machine}/${path}`, kind: carried }
   })
-  // Same pair asked twice in other words: draw it once.
-  return lines.filter((one, index) => lines.findIndex((other) => other.topic === one.topic) === index)
+  return onceByTopic(lines)
 }
 
 /** Where a range ends and begins: up to `to`, or up to now. */
@@ -127,25 +121,58 @@ function rangeOf(range: TimeseriesRange, to: Date): { from: Date; to: Date } {
   return { from: secondsBefore(to, RANGE_SECONDS[range]), to }
 }
 
-/** The silences of every machine between two instants, from its heartbeat and the values read of it. */
-async function readSilences(
-  apis: Apis,
-  machines: ReadonlyArray<string>,
-  from: Date,
-  to: Date,
-  values: (machine: string) => ReadonlyArray<string>,
-): Promise<Map<string, Array<Stretch>>> {
-  // The heartbeats just before say whether the machine was there where the range begins.
-  const heartbeats = await Promise.all(
+/**
+ * The heartbeats of each machine over a range, and just before it, which say whether the machine was
+ * there where the range begins. They do not depend on the values of the lines, so they are read
+ * together with them.
+ */
+async function readHeartbeats(apis: Apis, machines: ReadonlyArray<string>, from: Date, to: Date): Promise<Map<string, Array<string>>> {
+  const read = await Promise.all(
     machines.map((machine) => readTimelines(apis, "baseUnitValues", `machines/${machine}/${HEARTBEAT}`, secondsBefore(from, SILENT_AFTER_SECONDS), to)),
   )
   return new Map(
-    machines.map((machine, index) => {
-      const beats = heartbeats[index]?.find((one) => one.topic === `machines/${machine}/${HEARTBEAT}`)?.samples ?? []
-      const signs = [...beats.map((one) => one.at), ...values(machine)]
-      return [machine, silences(signs, from.toISOString(), to.toISOString())]
-    }),
+    machines.map((machine, index) => [
+      machine,
+      read[index]?.find((one) => one.topic === `machines/${machine}/${HEARTBEAT}`)?.samples.map((one) => one.at) ?? [],
+    ]),
   )
+}
+
+/** The silences of every machine between two instants, from its heartbeats and the values read of it: every value is a sign of life. */
+function silencesOf(
+  heartbeats: ReadonlyMap<string, ReadonlyArray<string>>,
+  from: Date,
+  to: Date,
+  values: (machine: string) => ReadonlyArray<string>,
+): Map<string, Array<Stretch>> {
+  return new Map(
+    [...heartbeats].map(([machine, beats]) => [machine, silences([...beats, ...values(machine)], from.toISOString(), to.toISOString())]),
+  )
+}
+
+/**
+ * What the machines published in the last 24 hours, by kind. It changes as machines come and go,
+ * not with every click on a card, so it is kept for a minute: a card asks for its lines again on
+ * every change, and `/topics` over a day need not be read for each.
+ */
+const PUBLISHED_SECONDS = 60
+const published = new Map<string, { at: number; kinds: Promise<TopicKinds> }>()
+
+async function publishedSignals(apis: Apis, to: Date): Promise<Map<string, Map<string, Carried>>> {
+  const kept = published.get(apis.timeseriesUrl)
+  const fresh = kept !== undefined && Math.abs(Date.now() - kept.at) < PUBLISHED_SECONDS * 1000
+  const kinds = fresh ? kept.kinds : listTopicKinds(apis, secondsBefore(to, HORIZON_SECONDS), to)
+  if (!fresh) {
+    published.set(apis.timeseriesUrl, { at: Date.now(), kinds })
+    // A failure is not kept: the next call asks again.
+    kinds.catch(() => published.delete(apis.timeseriesUrl))
+  }
+  return signalsOf(await kinds)
+}
+
+/** Forgets what the machines published, so the next call reads it anew: for tests, which change it. */
+export function forgetPublished(): void {
+  published.clear()
 }
 
 const kindOfStore = (kind: SignalKind) => (kind === "number" ? "baseUnitValues" : "booleanValues")
@@ -153,7 +180,7 @@ const kindOfStore = (kind: SignalKind) => (kind === "number" ? "baseUnitValues" 
 /** The values of a line between two instants: thinned by the Timeseries API for numbers, whole for a yes or no. */
 async function readLine(apis: Apis, line: Pick<Resolved, "topic" | "kind">, from: Date, to: Date, points: number): Promise<Timeline | undefined> {
   const timelines =
-    line.kind === "number" ? await readThinned(apis, line.topic, from, to, points) : await readTimelines(apis, "booleanValues", line.topic, from, to)
+    line.kind === "number" ? await readTimelines(apis, "baseUnitValues", line.topic, from, to, points) : await readTimelines(apis, "booleanValues", line.topic, from, to)
   return timelines.find((one) => one.topic === line.topic)
 }
 
@@ -164,28 +191,30 @@ async function readLine(apis: Apis, line: Pick<Resolved, "topic" | "kind">, from
  */
 export async function showTimeseries(apis: Apis, asked: ReadonlyArray<AskedLine>, range: TimeseriesRange = TIMESERIES_RANGE, now = new Date()): Promise<TimeseriesShow> {
   const { from, to } = rangeOf(range, now)
-  const resolved = resolveLines(asked, signalsOf(await listTopicKinds(apis, secondsBefore(to, HORIZON_SECONDS), to)))
-  const read = await Promise.all(
-    resolved.map(async (line) => {
-      const [newest, statistics, whole] = await Promise.all([
-        readNewest(apis, kindOfStore(line.kind), line.topic, to),
-        line.kind === "number" ? readStatistics(apis, line.topic, from, to) : undefined,
-        line.kind === "yesNo" ? readTimelines(apis, "booleanValues", line.topic, from, to) : undefined,
-      ])
-      const stats = statistics?.get(line.topic)
-      const count = stats?.count ?? whole?.find((one) => one.topic === line.topic)?.samples.length ?? 0
-      return { line, newest, stats, count }
-    }),
-  )
+  const resolved = resolveLines(asked, await publishedSignals(apis, to))
+  const machines = [...new Set(resolved.map((one) => one.machine))]
+  const [heartbeats, read] = await Promise.all([
+    readHeartbeats(apis, machines, from, to),
+    Promise.all(
+      resolved.map(async (line) => {
+        // A yes or no is not counted: the API would hand over every one of them for one number.
+        const [newest, statistics] = await Promise.all([
+          readNewest(apis, kindOfStore(line.kind), line.topic, to),
+          line.kind === "number" ? readStatistics(apis, line.topic, from, to) : undefined,
+        ])
+        const stats = statistics?.get(line.topic)
+        return { line, newest, stats, count: line.kind === "number" ? (stats?.count ?? 0) : null }
+      }),
+    ),
+  ])
   const units = [...new Set(read.flatMap(({ line, newest, stats }) => (line.kind === "number" ? (stats?.unit ?? newest?.unit ?? []) : [])))]
   if (units.length > MOST_UNITS) {
     throw new Error(
       `These lines are in ${units.length} units (${units.join(", ")}), and a time series card has ${MOST_UNITS} y axes, one unit each. Ask for the lines of at most ${MOST_UNITS} units, and the others in a second card.`,
     )
   }
-  const machines = [...new Set(resolved.map((one) => one.machine))]
   const newestOf = (machine: string) => read.filter(({ line }) => line.machine === machine).flatMap(({ newest }) => (newest ? [newest.at] : []))
-  const silent = await readSilences(apis, machines, from, to, newestOf)
+  const silent = silencesOf(heartbeats, from, to, newestOf)
   const lines = read.map(({ line, newest, stats, count }): TimeseriesLine => {
     const unit = line.kind === "number" ? (stats?.unit ?? newest?.unit ?? null) : null
     return {
@@ -266,39 +295,43 @@ export async function listTimeseriesSeries(
   now = new Date(),
 ): Promise<TimeseriesSeries> {
   const { from, to } = rangeOf(range, until === undefined ? now : new Date(until))
-  const published = signalsOf(await listTopicKinds(apis, secondsBefore(to, HORIZON_SECONDS), to))
-  const read = await Promise.all(
-    distinct(asked).map(async (one): Promise<ReadLine> => {
-      const signals = published.get(one.machine) ?? new Map<string, Carried>()
-      const path = resolveSignal(one.signal, signals) ?? one.signal.trim()
-      const topic = `machines/${one.machine}/${path}`
-      const carried = signals.get(path)
-      if (carried === undefined || carried === "text") {
-        const note = carried === "text" ? "text" : "noValues"
-        return { machine: one.machine, path, topic, kind: "number", unit: null, note, measured: [] }
-      }
-      const [held, timeline] = await Promise.all([
-        readNewest(apis, kindOfStore(carried), topic, from),
-        readLine(apis, { topic, kind: carried }, from, to, points),
-      ])
-      const samples = timeline?.samples ?? []
-      const measured = [...(held ? [{ at: held.at, value: held.value }] : []), ...samples]
-      const unit = carried === "number" ? (timeline?.unit ?? held?.unit ?? null) : null
-      return { machine: one.machine, path, topic, kind: carried, unit, note: measured.length === 0 ? "noValues" : null, measured }
+  const signals = await publishedSignals(apis, to)
+  // Resolved first, so a topic named two ways is read once.
+  const resolved = onceByTopic(
+    asked.map((one) => {
+      const ofMachine = signals.get(one.machine) ?? new Map<string, Carried>()
+      const path = resolveSignal(one.signal, ofMachine) ?? one.signal.trim()
+      return { machine: one.machine, path, topic: `machines/${one.machine}/${path}`, carried: ofMachine.get(path) }
     }),
   )
-  // The same topic named two ways is drawn once.
-  const lines = read.filter((one, index) => read.findIndex((other) => other.topic === one.topic) === index)
-  const machines = [...new Set(lines.filter((one) => one.note === null).map((one) => one.machine))]
+  const machines = [...new Set(resolved.filter((one) => one.carried === "number" || one.carried === "yesNo").map((one) => one.machine))]
+  const [heartbeats, lines] = await Promise.all([
+    readHeartbeats(apis, machines, from, to),
+    Promise.all(
+      resolved.map(async ({ machine, path, topic, carried }): Promise<ReadLine> => {
+        if (carried === undefined || carried === "text") {
+          return { machine, path, topic, kind: "number", unit: null, note: carried === "text" ? "text" : "noValues", measured: [] }
+        }
+        const [held, timeline] = await Promise.all([
+          readNewest(apis, kindOfStore(carried), topic, from),
+          readLine(apis, { topic, kind: carried }, from, to, points),
+        ])
+        const samples = timeline?.samples ?? []
+        const measured = [...(held ? [{ at: held.at, value: held.value }] : []), ...samples]
+        const unit = carried === "number" ? (timeline?.unit ?? held?.unit ?? null) : null
+        return { machine, path, topic, kind: carried, unit, note: measured.length === 0 ? "noValues" : null, measured }
+      }),
+    ),
+  ])
   const valuesOf = (machine: string) =>
     lines.filter((one) => one.machine === machine).flatMap((one) => one.measured.map((sample) => sample.at))
-  const silent = await readSilences(apis, machines, from, to, valuesOf)
+  const silent = silencesOf(heartbeats, from, to, valuesOf)
   return { from: from.toISOString(), to: to.toISOString(), range, ...onInstants(lines, silent, from, to) }
 }
 
 /** What each machine published in the last 24 hours that a time series can draw, by path: what a person can add to a card. */
 export async function listTimeseriesSignals(apis: Apis, now = new Date()): Promise<TimeseriesSignals> {
-  const published = signalsOf(await listTopicKinds(apis, secondsBefore(now, HORIZON_SECONDS), now))
+  const published = await publishedSignals(apis, now)
   const machines = [...published.keys()].sort().map((machine) => ({
     machine,
     signals: [...(published.get(machine) ?? [])]

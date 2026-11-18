@@ -49,3 +49,16 @@ export function matchesSearch(said: ReadonlyArray<string>, query: string): boole
     .filter(Boolean)
     .every((word) => text.includes(word))
 }
+
+/**
+ * The newest value of a line in the range, and whether it is current: it is not where the line has
+ * no value at its last instant, because the machine fell silent after it, as the words of the result
+ * say "not current". Null where the line has no value at all.
+ */
+export function lastValue(values: ReadonlyArray<number | boolean | null>): { value: number | boolean; current: boolean } | null {
+  for (let index = values.length - 1; index >= 0; index--) {
+    const value = values[index]
+    if (value !== null && value !== undefined) return { value, current: index === values.length - 1 }
+  }
+  return null
+}
