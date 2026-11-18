@@ -154,21 +154,69 @@ internal sealed partial class MachineOutput : IMachineOutput
     /// <inheritdoc />
     public bool CanTakeBack => _client is not { } client || client.IsConnected;
 
+    /// <summary>The identity of a machine from the values of the elements of its registration.</summary>
+    /// <inheritdoc cref="IdentityOf(Func{string, string?}, string, bool)" path="/remarks"/>
+    public static IdentityRegistration? IdentityOf(Func<string, string?> valueOf, MachineRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        return IdentityOf(valueOf, registration.SerialNumber, MapsManufacturerUri(registration));
+    }
+
+    /// <summary>
+    /// Why the values of the identification form no machine id, as a problem of a refused registration. A
+    /// <c>Manufacturer</c> that stands in and has no letter or digit <c>A-Z</c>, <c>0-9</c>, such as a name in
+    /// Japanese or Cyrillic, is named as such: the node gave a text, the mapping is not wrong.
+    /// </summary>
+    public static string IdentityProblem(Func<string, string?> valueOf, MachineRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(valueOf);
+        ArgumentNullException.ThrowIfNull(registration);
+        if (!MapsManufacturerUri(registration)
+            && NonEmpty(valueOf(MachineManifest.Manufacturer)) is { } manufacturer
+            && ManufacturerUriOf(manufacturer).Length == 0)
+        {
+            return $"identity: the server gives no Identification.ManufacturerUri, and Identification.Manufacturer, \"{manufacturer}\", " +
+                "has no letter or digit A-Z, a-z, 0-9 to stand in for it: the manufacturer of the machine id, " +
+                "<manufacturer>_<model>_<serial number>, needs one. The mapping is not wrong; the machine cannot be added.";
+        }
+
+        return "identity: Identification.ManufacturerUri (or, if the server has no node for it, Identification.Manufacturer), " +
+            "Model and SerialNumber must each be mapped and give a text: the machine id of the topics, " +
+            "<manufacturer>_<model>_<serial number>, is formed from them.";
+    }
+
+    /// <summary>
+    /// True if the registration maps <c>Identification.ManufacturerUri</c>. A server that has no node for it has
+    /// it in <c>missing</c> instead, and only then does the <c>Manufacturer</c> stand in.
+    /// </summary>
+    public static bool MapsManufacturerUri(MachineRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        return registration.Elements.Any(element => element.Area == Topics.ModelArea && element.Path == MachineManifest.ManufacturerUri);
+    }
+
     /// <summary>
     /// The identity of a machine from the values of its identification, or null without a manufacturer or a
-    /// <c>Model</c>: with the serial number of the registration they are the machine id. The manufacturer is its
-    /// <c>ManufacturerUri</c>; a server that gives none, but a <c>Manufacturer</c>, gets that name without its
-    /// special characters as <c>ManufacturerUri</c> (<see cref="ManufacturerUriOf"/>), and the identity says so
-    /// (<see cref="IdentityRegistration.ManufacturerUriFromManufacturer"/>). A machine without a
+    /// <c>Model</c>: with the serial number of the registration they are the machine id.
+    /// </summary>
+    /// <param name="valueOf">The value an element of the model has now, as text, or null.</param>
+    /// <param name="serialNumber">The serial number of the registration.</param>
+    /// <param name="manufacturerUriMapped">True if the registration maps <c>Identification.ManufacturerUri</c>.</param>
+    /// <remarks>
+    /// The manufacturer is the <c>ManufacturerUri</c>. Only a registration that does not map it, because the server
+    /// has no node for it, gets the <c>Manufacturer</c> without its special characters as <c>ManufacturerUri</c>
+    /// (<see cref="ManufacturerUriOf"/>), and the identity says so
+    /// (<see cref="IdentityRegistration.ManufacturerUriFromManufacturer"/>). A mapped <c>ManufacturerUri</c> that has
+    /// no value yet leaves the machine without an identity: it waits for the value. A machine without a
     /// <c>ProductInstanceUri</c> gets the one the binding forms, <c>{ManufacturerUri}/{Model}/{SerialNumber}</c>;
     /// one without a <c>Manufacturer</c> is named by the domain of its <c>ManufacturerUri</c>.
-    /// </summary>
-    public static IdentityRegistration? IdentityOf(Func<string, string?> valueOf, string serialNumber)
+    /// </remarks>
+    public static IdentityRegistration? IdentityOf(Func<string, string?> valueOf, string serialNumber, bool manufacturerUriMapped)
     {
         ArgumentNullException.ThrowIfNull(valueOf);
         var manufacturer = NonEmpty(valueOf(MachineManifest.Manufacturer));
         var manufacturerUri = NonEmpty(valueOf(MachineManifest.ManufacturerUri));
-        var fromManufacturer = manufacturerUri is null && manufacturer is not null;
+        var fromManufacturer = !manufacturerUriMapped && manufacturerUri is null && manufacturer is not null;
         if (fromManufacturer)
         {
             manufacturerUri = NonEmpty(ManufacturerUriOf(manufacturer!));

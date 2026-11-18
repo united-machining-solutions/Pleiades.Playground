@@ -153,7 +153,7 @@ internal static class Views
         identity is { ManufacturerUriFromManufacturer: true }
             ?
             [
-                $"Identification.ManufacturerUri: the server gives none, so the manufacturer \"{identity.Manufacturer}\" " +
+                $"Identification.ManufacturerUri: the server has no node for it, so the manufacturer \"{identity.Manufacturer}\" " +
                 $"without its special characters, \"{identity.ManufacturerUri}\", stands in for it. The machine publishes as " +
                 $"{identity.MachineId}.",
             ]

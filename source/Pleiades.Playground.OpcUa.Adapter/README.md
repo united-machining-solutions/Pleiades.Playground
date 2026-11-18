@@ -320,7 +320,7 @@ prefix of a gateway; both are open.
 | `GET /users` | The servers with a stored user, without the passwords. |
 | `DELETE /users?url=opc.tcp://host:4840` | Forgets the user of a server. |
 | `PUT /machines/{SerialNumber}?dryRun=true` | Tries a registration: connects, reads every node once, and answers with each raw and converted value. Nothing is stored or published. |
-| `PUT /machines/{SerialNumber}` | Registers the machine, or replaces its registration, and starts it. `409` with `identity: …` if the server gives no value for `Identification.ManufacturerUri` (or else `.Manufacturer`), `.Model` or `.SerialNumber`, the parts of the machine id. |
+| `PUT /machines/{SerialNumber}` | Registers the machine, or replaces its registration, and starts it. `409` with `identity: …` if the server gives no value for `Identification.ManufacturerUri` (or, if the registration has it in `missing`, `.Manufacturer`), `.Model` or `.SerialNumber`, the parts of the machine id. |
 | `POST /drafts/{draftId}/commit` | Registers what a proposal of the chat holds. The button on the proposal sends it; a draft works once and is kept for 30 minutes. Refused as `PUT /machines/{SerialNumber}` is. |
 | `GET /machines` | The registered machines with their state, and the machines each shares its session with. |
 | `GET /machines/{SerialNumber}` | One machine: its registration, the last value of every element, the alarms that stand. |
@@ -350,17 +350,19 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
   server gives no value for one of them is refused (`409`). A missing `Manufacturer` is the domain of the
   `ManufacturerUri`, a missing `ProductInstanceUri` is formed as the binding forms it. It stays, so the machine
   keeps its topics whatever its server says later.
-- `identity.manufacturerUriFromManufacturer`: true if the server gives no `ManufacturerUri`. Some servers have
-  no node for it. Then the `Manufacturer` without any character but `A-Z`, `a-z` and `0-9` stands in, since the
-  machine id is a level of every MQTT topic: `TRUMPF Werkzeugmaschinen SE + Co. KG` gives
-  `TRUMPFWerkzeugmaschinenSECoKG`, the machine id `trumpfwerkzeugmaschinensecokg_<model>_<serial number>` and the
-  prefix `x-trumpfwerkzeugmaschinensecokg` of the signals of the maker. That value is published as
-  `ManufacturerUri`, and the `ProductInstanceUri`, if the server gives none, is formed from it. It departs from
-  the [machine id](../../contracts/mqtt/README.md#machine-id) of the binding, which takes the domain of the web
-  address and never the display name: the value is no web address then, and the id changes with the name of the
-  manufacturer. The proposal
-  says so in `notices`, with the `machineId`; the card in the chat shows it under "Good to know", and the model
-  is told to say it. Without both `ManufacturerUri` and `Manufacturer` the registration is refused.
+- `identity.manufacturerUriFromManufacturer`: true if the server has no `ManufacturerUri`. Some servers have
+  no node for it; the registration then does not map it (it is in `missing`, by the model or because the
+  server lacks a node a known namespace sets). Then the `Manufacturer` without any character but `A-Z`, `a-z`
+  and `0-9` stands in, since the machine id is a level of every MQTT topic:
+  `TRUMPF Werkzeugmaschinen SE + Co. KG` gives `TRUMPFWerkzeugmaschinenSECoKG`, the machine id
+  `trumpfwerkzeugmaschinensecokg_<model>_<serial number>` and the prefix `x-trumpfwerkzeugmaschinensecokg` of the
+  signals of the maker. That value is published as `ManufacturerUri`, and the `ProductInstanceUri`, if the
+  server gives none, is formed from it, as the
+  [machine id](../../contracts/mqtt/README.md#without-a-manufactureruri) of the binding describes. A mapped
+  `ManufacturerUri` that has no value yet is never replaced: the registration is refused, and a machine that
+  learns its identity at run time waits for it. A `Manufacturer` without any letter or digit `A-Z`, `0-9`
+  cannot stand in, and the refusal says so. The proposal says what stands in in `notices`, with the
+  `machineId`; the card in the chat shows it under "Good to know", and the model is told to say it.
 - `profiles`: the profiles of the data model the elements deliver whole. The adapter sets it from the
   elements; what a proposal names is replaced ([Core and profiles](#core-and-profiles)).
 - `endpoint`: the URL, `securityMode` and `securityPolicy`. `serverCertificateThumbprint` is filled in by
@@ -406,8 +408,8 @@ The adapter checks every registration against the core and the profiles of the d
   itself. An element counts if it is mapped, also as `Derived` or `Unclear`; one in `missing` does not. What
   the machine lacks is `"available": false` in the manifest and goes out once as `null`, as with the Ultimaker
   telemetry and the juice bar. A registration is refused only without the parts of the machine id:
-  `Identification.ManufacturerUri` (or else `.Manufacturer`, see [The registration](#the-registration)), `.Model`
-  and `.SerialNumber` must be mapped and give a value.
+  `Identification.ManufacturerUri` (or, if the server has no node for it, `.Manufacturer`, see
+  [The registration](#the-registration)), `.Model` and `.SerialNumber` must be mapped and give a value.
 - **Profiles.** `IdentificationExtended`, `MonitoringExtended`, `ChannelMonitoring`, `Spindle` and
   `EnergyElectricity`. A profile is published only if all its elements are mapped; otherwise its elements go
   to `missing` with the reason, and nothing of it reaches the broker. Of a profile with instances, a channel, a

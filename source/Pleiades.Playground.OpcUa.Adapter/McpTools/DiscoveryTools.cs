@@ -104,7 +104,7 @@ internal sealed class DiscoveryTools(MachineSupervisor supervisor)
          "returns a proposal with a draftId that a person confirms with a click. If accepted is false, read " +
          "problems, correct the registration and propose again. For a machine that is added already the result " +
          "says what would change (changes). notices says what the person should know though nothing is wrong, for " +
-         "example that the server gives no ManufacturerUri and the Manufacturer stands in for it in the machine id: " +
+         "example that the server has no node for ManufacturerUri and the Manufacturer stands in for it in the machine id: " +
          "tell the person every notice. Read opcua_get_skill_guide before the first proposal.")]
     public async Task<ProposalView> Propose(
         [Description("The registration: endpoint, one element per value, alerts, and what is missing. The adapter names the profiles.")] MachineRegistration registration,

@@ -115,10 +115,12 @@ browsing each from scratch.
 The paths are those of the MQTT binding of this platform. The profiles are those of the data model,
 specification 0.17.1. **Core** is declared whole for every machine: what you do not map is published as not
 available. Required are only `Identification.ManufacturerUri`, `Identification.Model` and
-`Identification.SerialNumber`, the machine id; without them the machine is not added. A server without a
-`ManufacturerUri` is added if it gives `Identification.Manufacturer`: its name without special characters stands
-in (`TRUMPF SE + Co. KG` gives `TRUMPFSECoKG`), and the proposal says so in `notices`. Map
-`Identification.Manufacturer` always, and never map another node as `ManufacturerUri` to fill the gap. Of every other profile the adapter publishes the elements only if the profile is complete; a
+`Identification.SerialNumber`, the machine id; without them the machine is not added. A server that has no
+node for `ManufacturerUri` is added if it gives `Identification.Manufacturer`: put `ManufacturerUri` into
+`missing`, and the name without special characters stands in (`TRUMPF SE + Co. KG` gives `TRUMPFSECoKG`); the
+proposal says so in `notices`. A `ManufacturerUri` you map and that has no value yet is waited for, never
+replaced. Map `Identification.Manufacturer` always, and never map another node as `ManufacturerUri` to fill
+the gap. Of every other profile the adapter publishes the elements only if the profile is complete; a
 profile with instances (a channel, a spindle, a measuring point) is published for each complete instance,
 and a measuring point needs `Main`. Map what the server offers; the adapter decides what is complete.
 
@@ -220,7 +222,8 @@ the server does not fill is moved to `missing` by the adapter.
 - **Missing.** Every element of a profile that the server does not offer goes into `missing` with the reason.
   An element of the core that is neither mapped nor derived is published as not available. Tell the person
   which ones the core lacks; only without `Model`, `SerialNumber`, or both `ManufacturerUri` and `Manufacturer`
-  is the machine not added.
+  is the machine not added. A `Manufacturer` without any letter or digit `A-Z`, `0-9`, such as a name in
+  Japanese, cannot stand in; the refusal says so.
 - **Notices.** The proposal lists in `notices` what the person should know though nothing is wrong, and names
   the `machineId` it would publish under. Tell the person every notice in your answer, in your own words.
 - **Profiles.** Leave `profiles` out. The adapter names the profiles whose elements are all mapped, and
