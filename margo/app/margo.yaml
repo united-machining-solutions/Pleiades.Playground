@@ -33,7 +33,7 @@ deploymentProfiles:
         architectures:
           - amd64
           - arm64
-      # Estimates for thirteen containers and 30 days of retained data, not measured.
+      # Estimates for fourteen containers and 30 days of retained data, not measured.
       memory: 4Gi
       storage: 20Gi
 
@@ -79,10 +79,30 @@ parameters:
     targets:
       - pointer: MQTT_WS_PORT
         components: ["default"]
+  gatewayBind:
+    value: "0.0.0.0"
+    targets:
+      - pointer: GATEWAY_BIND
+        components: ["default"]
+  gatewayPort:
+    value: 5590
+    targets:
+      - pointer: GATEWAY_PORT
+        components: ["default"]
+  timeseriesBind:
+    value: "127.0.0.1"
+    targets:
+      - pointer: TIMESERIES_BIND
+        components: ["default"]
   timeseriesApiPort:
     value: 5500
     targets:
       - pointer: TIMESERIES_API_PORT
+        components: ["default"]
+  eventsBind:
+    value: "127.0.0.1"
+    targets:
+      - pointer: EVENTS_BIND
         components: ["default"]
   eventsApiPort:
     value: 5510
@@ -168,9 +188,34 @@ configuration:
         - parameter: mqttWsPort
           name: Port of the MQTT broker over WebSockets
           schema: port
+        - parameter: gatewayBind
+          name: Address of the gateway
+          description: >-
+            The address the gateway answers on: the one entry for clients on other computers, which passes only
+            the reading endpoints of the time series and events APIs. 0.0.0.0 opens it to the network, which is
+            what it is for; it has no sign-in, so whoever reaches it reads every value. 127.0.0.1 keeps it on the
+            device.
+          schema: bindAddress
+        - parameter: gatewayPort
+          name: Port of the gateway
+          schema: port
+        - parameter: timeseriesBind
+          name: Address of the time series API
+          description: >-
+            The address the time series API answers on. 127.0.0.1 keeps it on the device; 0.0.0.0 opens it to
+            the network. Writing needs no sign-in, so open it only to a network you control; a client on another
+            computer reads through the gateway.
+          schema: bindAddress
         - parameter: timeseriesApiPort
           name: Port of the time series API
           schema: port
+        - parameter: eventsBind
+          name: Address of the events API
+          description: >-
+            The address the events API answers on. 127.0.0.1 keeps it on the device; 0.0.0.0 opens it to the
+            network. Writing needs no sign-in, so open it only to a network you control; a client on another
+            computer reads through the gateway.
+          schema: bindAddress
         - parameter: eventsApiPort
           name: Port of the events API
           schema: port

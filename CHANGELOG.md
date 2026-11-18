@@ -7,6 +7,12 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Gateway (`gateway`, port 5590): the one REST entry for clients on other computers, such as the Oseon
+  WorkstationConnector. Traefik passes the reading endpoints of the Timeseries API below `/timeseries` and of the
+  Events API below `/events`, and refuses everything else: every write, `/mcp`, the OpenAPI documents and the
+  Swagger UI. It answers on every address (`GATEWAY_BIND`); it is a network boundary, not a sign-in
+  ([ADR-0017](docs/adr/0017-a-read-only-gateway-for-outside-clients.md)). The Margo app has it too.
+
 - Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
   shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
   from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
@@ -213,6 +219,11 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- The Timeseries API (5500) and the Events API (5510) answer on this computer only (`TIMESERIES_BIND`,
+  `EVENTS_BIND`, by default `127.0.0.1`), as the Sites API does: with sign-in off, whoever reached them could
+  also write values and events. A client on another computer reads through the gateway, port 5590; one that
+  wrote over REST from another computer no longer can, unless the setting opens the API again. The containers of
+  the stack and tools on the same computer reach them as before.
 - The Ultimaker telemetry and the juice bar publish the payloads and the delivery of the MQTT binding of
   machines, not only its tree, as the simulators do: every value retained with QoS 1 in the envelope
   `{timestamp, value, unit}` with the content type `application/json`, a manifest before the values (profile

@@ -3,6 +3,7 @@
 #   simulator ──MQTT──▶ broker ──▶ timeseries-persistence ──REST──▶ timeseries-api ──▶ mongodb
 #                          └─────▶ events-persistence ─────REST──▶ events-api ──────▶ mongodb
 #   browser ──HTTP──▶ traefik ──▶ app ──MCP──▶ genui-mcp ──▶ both APIs
+#   outside client ──HTTP, reading only──▶ gateway ──▶ timeseries-api, events-api
 #
 # The same stack as compose.yaml at the root of the repository, in the form bart accepts:
 # - no `build:`: the images are the ones the workflow "Images" publishes to ghcr.io;
@@ -55,7 +56,9 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     ports:
-      - "${TIMESERIES_API_PORT:-5500}:8080"
+      # Writing needs no sign-in in the demo: the device only, unless TIMESERIES_BIND opens it. A client on
+      # another computer reads through the gateway.
+      - "${TIMESERIES_BIND:-127.0.0.1}:${TIMESERIES_API_PORT:-5500}:8080"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -101,7 +104,9 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     ports:
-      - "${EVENTS_API_PORT:-5510}:8080"
+      # Writing needs no sign-in in the demo: the device only, unless EVENTS_BIND opens it. A client on
+      # another computer reads through the gateway.
+      - "${EVENTS_BIND:-127.0.0.1}:${EVENTS_API_PORT:-5510}:8080"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -139,6 +144,44 @@ services:
       Config__Topics__1: machines/+/events/workmasters
       Config__Topics__2: machines/+/events/notifications
       Config__EventsApi__Uri: http://events-api:8080
+
+  # The one entry for clients outside the stack: Traefik passes the reading endpoints of the Timeseries API
+  # (/timeseries/...) and of the Events API (/events/...) and nothing else, see the config gateway at the end.
+  # A network boundary, not a sign-in: whoever reaches the port reads every value, and nobody writes through it.
+  gateway:
+    image: traefik:v3.7.19
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command:
+      - --global.checkNewVersion=false
+      - --global.sendAnonymousUsage=false
+      # Inside the container on an unprivileged port, so it needs no capability.
+      - --entryPoints.web.address=:8000
+      # A topic in a path of the statistics is one segment, its slashes encoded as %2F; Traefik refuses an
+      # encoded slash unless this allows it. The routes match the decoded path.
+      - --entryPoints.web.http.encodedCharacters.allowEncodedSlash=true
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
+      # /ping on the internal entry point "traefik" (:8080), which is not published.
+      - --ping=true
+    ports:
+      # Outside access is what it is for, and it only reads: on every address of the device, unless
+      # GATEWAY_BIND narrows it.
+      - "${GATEWAY_BIND:-0.0.0.0}:${GATEWAY_PORT:-5590}:8000"
+    configs:
+      - source: gateway
+        target: /etc/traefik/dynamic.yaml
+    depends_on:
+      timeseries-api:
+        condition: service_healthy
+      events-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   # Sites and the machines placed on them, as people enter them.
   sites-api:
@@ -345,6 +388,60 @@ configs:
             loadBalancer:
               servers:
                 - url: http://app:8080
+
+  # The routes of the gateway: an allowlist of method and path, derived from the route groups of
+  # source/Pleiades.Playground.Timeseries.Api/Endpoints and source/Pleiades.Playground.Events.Api/Endpoints.
+  # A request no router matches gets 404 from Traefik and never reaches an API: every write, /mcp, the
+  # OpenAPI documents and the Swagger UI. The prefix /timeseries or /events is stripped on the way, so a
+  # client takes http://<host>:5590/timeseries and http://<host>:5590/events as the base addresses of the two
+  # APIs. Statistics is the one reading POST. compose.yaml at the root holds the same config, checked by CI.
+  gateway:
+    content: |
+      http:
+        routers:
+          timeseries-read:
+            entryPoints: [web]
+            rule: >-
+              Method(`GET`) && (
+              Path(`/timeseries/health`)
+              || Path(`/timeseries/topics`) || Path(`/timeseries/topics/`)
+              || PathRegexp(`^/timeseries/timeseries/(baseUnitValues|stringValues|booleanValues)/topics/.+`))
+            middlewares: [strip-timeseries]
+            service: timeseries-api
+          timeseries-statistics:
+            entryPoints: [web]
+            rule: Method(`POST`) && PathRegexp(`^/timeseries/statistics/baseUnitValues/topics/.+`)
+            middlewares: [strip-timeseries]
+            service: timeseries-api
+          events-read:
+            entryPoints: [web]
+            rule: >-
+              Method(`GET`) && (
+              Path(`/events/health`)
+              || Path(`/events/machineEvents`) || Path(`/events/machineEvents/`)
+              || Path(`/events/machineEvents/gaps`)
+              || Path(`/events/alerts/active`) || Path(`/events/alerts/pairs`) || Path(`/events/alerts/statistics`)
+              || Path(`/events/jobOrders`) || Path(`/events/jobOrders/`)
+              || Path(`/events/programExecutions`) || Path(`/events/programExecutions/`)
+              || PathRegexp(`^/events/jobOrders/[^/]+/.+`))
+            middlewares: [strip-events]
+            service: events-api
+        middlewares:
+          strip-timeseries:
+            stripPrefix:
+              prefixes: [/timeseries]
+          strip-events:
+            stripPrefix:
+              prefixes: [/events]
+        services:
+          timeseries-api:
+            loadBalancer:
+              servers:
+                - url: http://timeseries-api:8080
+          events-api:
+            loadBalancer:
+              servers:
+                - url: http://events-api:8080
 
 volumes:
   mongodb_data:

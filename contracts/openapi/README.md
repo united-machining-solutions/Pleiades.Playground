@@ -2,6 +2,13 @@
 
 Each API serves its own description; that document is the contract.
 
+The Timeseries and Events APIs answer on the computer of the stack only. A client on another computer reads them
+through the gateway, `http://<host>:5590/timeseries` and `http://<host>:5590/events` as base addresses, with the
+paths of the documents below them. The gateway passes only the reading operations, the statistics of the Timeseries
+API (`POST /statistics/baseUnitValues/topics/{topic}`) included; the writing operations, the documents themselves,
+the Swagger UI and `/mcp` are not reachable through it. The routes are the config `gateway` in
+[`compose.yaml`](../../compose.yaml), see [ADR-0017](../../docs/adr/0017-a-read-only-gateway-for-outside-clients.md).
+
 | Service | OpenAPI | Swagger UI |
 |---|---|---|
 | Timeseries API | `http://localhost:5500/openapi/v1.json` | `http://localhost:5500/` |
