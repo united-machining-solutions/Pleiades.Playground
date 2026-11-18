@@ -59,7 +59,19 @@ export interface Manifest {
   profiles: string[]
   heartbeatInterval: number
   elements: ManifestElement[]
+  events: { path: string }[]
 }
+
+/** An entry of `Notification.ActiveAlerts`, as the backend says it: the model's fields (Id, ErrorCode, Message, Severity, ...). */
+export type Alert = Record<string, unknown> & { Id: string | number }
+
+export const ACTIVE_ALERTS = "Notification.ActiveAlerts"
+export const ALERT_EVENTS = ["Notification.AlertRaised", "Notification.AlertChanged", "Notification.AlertCleared"] as const
+export type AlertEventType = (typeof ALERT_EVENTS)[number]
+
+/** The MQTT 5 content type of an event. */
+export const EVENT_CONTENT_TYPE = "application/cloudevents+json; charset=utf-8"
+export const EVENT_DATA_SCHEMA = `urn:umati2:datamodel:${MODEL_VERSION}:event.schema.json`
 
 /** One part of the machine id: ASCII letters, digits and `-`, at most 64 characters, `unknown` if nothing is left. */
 export function machineIdPart(text: string | undefined): string {
@@ -169,6 +181,57 @@ export function buildManifest(id: string, productInstanceUri: string, readings: 
     profiles: ["Core"],
     heartbeatInterval: heartbeatSeconds,
     elements,
+    events: ALERT_EVENTS.map((path) => ({ path })),
+  }
+}
+
+/** An entry of a list of alerts that can be told from the others: an object with an `Id`. */
+export function isAlert(node: unknown): node is Alert {
+  return isRecord(node) && (typeof node.Id === "string" || typeof node.Id === "number")
+}
+
+export interface AlertChange {
+  type: AlertEventType
+  alert: Alert
+}
+
+/**
+ * The events a change of `Notification.ActiveAlerts` makes: an entry that is new is raised, one that is gone is
+ * cleared, one whose fields changed is changed. `previous` is `null` before the list is known: every entry of the
+ * first list is raised, as the binding asks ("the first entries included").
+ */
+export function alertChanges(previous: readonly Alert[] | null, next: readonly Alert[]): AlertChange[] {
+  const before = new Map((previous ?? []).map((alert) => [String(alert.Id), alert]))
+  const after = new Map(next.map((alert) => [String(alert.Id), alert]))
+  const changes: AlertChange[] = []
+  for (const [id, alert] of after) {
+    const old = before.get(id)
+    if (old === undefined) changes.push({ type: "Notification.AlertRaised", alert })
+    else if (JSON.stringify(old) !== JSON.stringify(alert)) changes.push({ type: "Notification.AlertChanged", alert })
+  }
+  for (const [id, alert] of before) {
+    if (!after.has(id)) changes.push({ type: "Notification.AlertCleared", alert })
+  }
+  return changes
+}
+
+/** `<start of the adapter as yyyyMMddTHHmmssZ>.<count of twelve digits>`: the count of the events of a group, from 1. */
+export function sequenceOf(start: Date, count: number): string {
+  const prefix = start.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z")
+  return `${prefix}.${String(count).padStart(12, "0")}`
+}
+
+/** A CloudEvent 1.0 in structured JSON mode, as the binding asks. */
+export function cloudEvent(event: { id: string; source: string; type: string; time: string; sequence: string; data: unknown }): object {
+  return {
+    specversion: "1.0",
+    id: event.id,
+    source: event.source,
+    type: event.type,
+    time: event.time,
+    sequence: event.sequence,
+    dataschema: EVENT_DATA_SCHEMA,
+    data: event.data,
   }
 }
 

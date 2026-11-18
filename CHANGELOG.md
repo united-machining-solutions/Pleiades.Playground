@@ -14,8 +14,8 @@ All notable changes are documented here. The format follows
   origin, for a proxy in front of the app that forwards it to the broker.
 - SimpleCAM adapter (`simplecam-adapter-9042`): reads the state of the SimpleCAM machine 9042 from the SSE stream
   of the SimpleCAM backend and publishes it to the broker as `machines/united-grinding_simplecam_9042/umati/...`
-  after the data model 0.17.1. It runs without the backend and keeps trying to connect. The setting
-  `SIMPLECAM_SSE_URL` names the stream.
+  after the data model 0.17.1, and a change of its list of alerts as events on `events/notifications`. It runs
+  without the backend and keeps trying to connect. The setting `SIMPLECAM_SSE_URL` names the stream.
 - Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
   shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
   from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no

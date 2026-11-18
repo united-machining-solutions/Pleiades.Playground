@@ -1,19 +1,28 @@
 // Reads the state of the SimpleCAM machine 9042 from the SSE stream of the SimpleCAM backend and publishes it
 // to the broker as the MQTT binding of the data model says (contracts/mqtt/README.md): the manifest before the
 // values, every value retained with QoS 1, and Connection/State as the state of this adapter.
+import { randomUUID } from "node:crypto"
 import http from "node:http"
 import mqtt from "mqtt"
 import {
+  ACTIVE_ALERTS,
   ADAPTER_OWNED,
   CONNECTION_STATE,
+  EVENT_CONTENT_TYPE,
   HEARTBEAT,
+  alertChanges,
   buildManifest,
+  cloudEvent,
   envelope,
+  isAlert,
   machineId,
   manifestTopic,
   readingsOf,
+  sequenceOf,
   topicOf,
   unavailablePaths,
+  type Alert,
+  type AlertChange,
   type Manifest,
   type Reading,
 } from "./binding.ts"
@@ -28,6 +37,8 @@ const MODEL = process.env.SIMPLECAM_MODEL ?? "simplecam"
 const SERIAL_NUMBER = process.env.SIMPLECAM_SERIAL_NUMBER ?? "9042"
 
 const HEARTBEAT_SECONDS = 10
+// How many events wait at most while they cannot go out; when it is full, the oldest is dropped and logged.
+const OUTBOX_CAPACITY = 10_000
 const RETRY_MS = 5000
 // The backend sends something every ten seconds. A stream that is silent for longer is taken as lost.
 const SILENCE_MS = 35_000
@@ -65,6 +76,11 @@ const current = new Map<string, Reading>([
   ["Identification.Model", { path: "Identification.Model", value: MODEL }],
 ])
 const sent = new Map<string, string>()
+// The list of alerts as the backend said it last; null before it said one.
+let alerts: Alert[] | null = null
+let notifications = 0
+const outbox: { topic: string; payload: string }[] = []
+const EVENTS_TOPIC = `machines/${MACHINE_ID}/events/notifications`
 
 function put(topic: string, payload: object): void {
   client.publish(topic, JSON.stringify(payload), { qos: 1, retain: true, properties: JSON_TYPE }, (error) => {
@@ -92,6 +108,44 @@ function putWhole(): void {
   put(manifestTopic(MACHINE_ID), manifest)
   for (const path of unavailablePaths(manifest)) put(topicOf(MACHINE_ID, path), envelope(null, STARTED_AT))
   for (const reading of current.values()) putReading(reading)
+}
+
+function queueEvent(change: AlertChange): void {
+  const since = typeof change.alert.Time === "string" && !Number.isNaN(Date.parse(change.alert.Time)) ? change.alert.Time : undefined
+  const event = cloudEvent({
+    id: randomUUID(),
+    source: String(current.get("Identification.ProductInstanceUri")?.value ?? MACHINE_ID),
+    type: change.type,
+    // A raised alert has the time it came up; for an alert that changed or went, that is now.
+    time: change.type === "Notification.AlertRaised" && since !== undefined ? since : now(),
+    sequence: sequenceOf(new Date(STARTED_AT), ++notifications),
+    data: change.alert,
+  })
+  outbox.push({ topic: EVENTS_TOPIC, payload: JSON.stringify(event) })
+  if (outbox.length > OUTBOX_CAPACITY) {
+    const dropped = outbox.shift()
+    console.warn(`[Adapter] The outbox is full (${OUTBOX_CAPACITY}): dropped an event of ${dropped?.topic}`)
+  }
+}
+
+// An event goes out after the connect sequence of a connection, in the order it came up, not retained.
+function drain(): void {
+  while (ready && outbox.length > 0) {
+    const event = outbox.shift()
+    if (event === undefined) return
+    client.publish(event.topic, event.payload, { qos: 1, retain: false, properties: { contentType: EVENT_CONTENT_TYPE } }, (error) => {
+      if (error) console.error(`[MQTT] ${event.topic}: ${error.message}`)
+    })
+  }
+}
+
+// A change of the list of alerts is an event for each entry that came, changed or went. The list itself goes out first.
+function trackAlerts(value: unknown): void {
+  if (!Array.isArray(value)) return
+  const next = value.filter(isAlert)
+  if (next.length !== value.length) console.warn("[Adapter] An alert without an Id is not reported")
+  for (const change of alertChanges(alerts, next)) queueEvent(change)
+  alerts = next
 }
 
 function refreshManifest(): boolean {
@@ -122,6 +176,7 @@ function connectSequence(): void {
     putState("CommunicationFault")
   }
   ready = true
+  drain()
 }
 
 function reached(readings: Reading[]): void {
@@ -129,14 +184,21 @@ function reached(readings: Reading[]): void {
   reachable = true
   for (const reading of readings) current.set(reading.path, reading)
   const changed = refreshManifest()
-  if (!ready) return
+  const list = readings.find((reading) => reading.path === ACTIVE_ALERTS)
+  if (!ready) {
+    // The connect sequence says the values; the events wait for it.
+    if (list) trackAlerts(list.value)
+    return
+  }
   if (first) {
     putWhole()
     putState("Running")
-    return
+  } else {
+    if (changed && manifest !== null) put(manifestTopic(MACHINE_ID), manifest)
+    for (const reading of readings) putIfChanged(reading)
   }
-  if (changed && manifest !== null) put(manifestTopic(MACHINE_ID), manifest)
-  for (const reading of readings) putIfChanged(reading)
+  if (list) trackAlerts(list.value)
+  drain()
 }
 
 function lost(): void {

@@ -32,10 +32,26 @@ The machine id is `<manufacturer>_<model>_<serial number>`: `united-grinding_sim
 The backend's own `Connection.State` and `Connection.Heartbeat` are not forwarded: `Connection/State` and
 `Connection/Heartbeat` tell whether this adapter lives. The adapter says `Running` while the stream answers with
 `Connected`, and `CommunicationFault` while it does not. The last will of the connection says
-`CommunicationFault`, retained. The adapter publishes no events.
+`CommunicationFault`, retained.
 
 After every connect to the broker it sends the manifest and every value again, and then the state; only the
 first connect says `Initializing`.
+
+### Events
+
+A change of `Notification.ActiveAlerts` is an event on `machines/united-grinding_simplecam_9042/events/notifications`:
+`Notification.AlertRaised` for an entry that is new, `Notification.AlertChanged` for one whose fields changed,
+`Notification.AlertCleared` for one that is gone. The first list raises every entry in it. Each is a CloudEvent
+1.0 with QoS 1, not retained, the content type `application/cloudevents+json; charset=utf-8`, the entry as `data`
+and `sequence` as the binding asks: the start of the adapter, a dot and a count of twelve digits from 1 without a
+gap. The list goes out before the events that change it. While the broker is away the events wait in an outbox of
+10 000 and go out after the next connect sequence.
+
+An entry is told from the others by its `Id`; one without an `Id` is not reported. The other fields are
+the ones the data model names: `ErrorCode`, `Message`, `Severity`, `SeverityValue`, `Time` and `SourceName`. They
+go out as the backend says them. **The SimpleCAM backend sends an empty list at present**, so the adapter has
+published no event yet: its tests and a run against a stream that raises and clears alerts show the events, a
+machine does not.
 
 ## Settings
 

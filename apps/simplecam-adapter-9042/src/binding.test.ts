@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { buildManifest, machineId, readingsOf, topicOf, unavailablePaths } from "./binding.ts"
+import { alertChanges, buildManifest, cloudEvent, isAlert, machineId, readingsOf, sequenceOf, topicOf, unavailablePaths } from "./binding.ts"
 
 test("the machine id is formed as the binding says", () => {
   assert.equal(machineId("https://www.united-grinding.com", "simplecam", "9042"), "united-grinding_simplecam_9042")
@@ -83,4 +83,61 @@ test("the manifest holds the whole of Core; what the machine lacks is not availa
   assert.equal(source("State.Status"), "source")
   assert.equal(source("Identification.SerialNumber"), "adapter")
   assert.equal(source("Connection.Heartbeat"), "adapter")
+})
+
+test("the manifest names the events of the alert list", () => {
+  const manifest = buildManifest("united-grinding_simplecam_9042", "urn:united-grinding:simplecam:9042", [], 10)
+  assert.deepEqual(manifest.events, [
+    { path: "Notification.AlertRaised" },
+    { path: "Notification.AlertChanged" },
+    { path: "Notification.AlertCleared" },
+  ])
+})
+
+const overheat = { Id: "A-1", ErrorCode: "E100", Message: "Overheat", Severity: "Failure", SeverityValue: 900, Time: "2026-11-18T09:00:00.000Z", SourceName: "Spindle" }
+const door = { Id: 2, ErrorCode: "E200", Message: "Door open", Severity: "OffSpec", SeverityValue: 500, Time: "2026-11-18T09:05:00.000Z", SourceName: "Door" }
+
+test("an entry is raised, changed or cleared; the first list raises every entry", () => {
+  assert.deepEqual(alertChanges(null, []), [])
+  assert.deepEqual(alertChanges(null, [overheat, door]).map((change) => change.type), ["Notification.AlertRaised", "Notification.AlertRaised"])
+  assert.deepEqual(alertChanges([overheat], [overheat]), [])
+  assert.deepEqual(alertChanges([], [overheat]), [{ type: "Notification.AlertRaised", alert: overheat }])
+  const worse = { ...overheat, SeverityValue: 950 }
+  assert.deepEqual(alertChanges([overheat], [worse]), [{ type: "Notification.AlertChanged", alert: worse }])
+  assert.deepEqual(alertChanges([overheat, door], [door]), [{ type: "Notification.AlertCleared", alert: overheat }])
+})
+
+test("only an object with an Id is an alert", () => {
+  assert.equal(isAlert(overheat), true)
+  assert.equal(isAlert(door), true)
+  assert.equal(isAlert({ Message: "no id" }), false)
+  assert.equal(isAlert(null), false)
+  assert.equal(isAlert("A-1"), false)
+})
+
+test("the sequence is the start of the adapter and a count of twelve digits", () => {
+  const start = new Date("2026-11-18T14:03:41.490Z")
+  assert.equal(sequenceOf(start, 1), "20261118T140341Z.000000000001")
+  assert.equal(sequenceOf(start, 1842), "20261118T140341Z.000000001842")
+})
+
+test("an event is a CloudEvent 1.0 with the schema of the model version", () => {
+  const event = cloudEvent({
+    id: "0f4c4a51-8e2b-4d6a-9c1f-4b7e2d913a60",
+    source: "urn:united-grinding:simplecam:9042",
+    type: "Notification.AlertRaised",
+    time: overheat.Time,
+    sequence: sequenceOf(new Date("2026-11-18T14:03:41.490Z"), 1),
+    data: overheat,
+  })
+  assert.deepEqual(event, {
+    specversion: "1.0",
+    id: "0f4c4a51-8e2b-4d6a-9c1f-4b7e2d913a60",
+    source: "urn:united-grinding:simplecam:9042",
+    type: "Notification.AlertRaised",
+    time: "2026-11-18T09:00:00.000Z",
+    sequence: "20261118T140341Z.000000000001",
+    dataschema: "urn:umati2:datamodel:0.17.1:event.schema.json",
+    data: overheat,
+  })
 })
