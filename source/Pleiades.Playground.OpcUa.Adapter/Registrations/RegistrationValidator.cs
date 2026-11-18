@@ -143,6 +143,11 @@ internal static class RegistrationValidator
             problems.Add($"{name}: node must carry the namespace as a URI, 'nsu=<uri>;i=<number>' or 'nsu=<uri>;s=<text>', not an index.");
         }
 
+        if (element.Field is { } field && string.IsNullOrWhiteSpace(field))
+        {
+            problems.Add($"{name}: field names the member of a structure; leave it out for a node that is the element itself.");
+        }
+
         if (element.Kind == ValueKind.Number)
         {
             if (!ValueConverter.TryParseUnit(element.Unit, out _))

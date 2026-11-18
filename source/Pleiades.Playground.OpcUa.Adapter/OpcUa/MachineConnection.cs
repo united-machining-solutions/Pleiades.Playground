@@ -279,7 +279,7 @@ internal sealed class MachineConnection : ISessionTenant
             {
                 if (e.NotificationValue is MonitoredItemNotification notification)
                 {
-                    OnValue(runtime, notification.Value);
+                    OnValue(runtime, notification.Value, session.NamespaceUris);
                 }
             };
             subscription.AddItem(item);
@@ -431,7 +431,7 @@ internal sealed class MachineConnection : ISessionTenant
         return item;
     }
 
-    private void OnValue(ElementRuntime runtime, DataValue value)
+    private void OnValue(ElementRuntime runtime, DataValue value, NamespaceTable namespaces)
     {
         if (StatusCode.IsBad(value.StatusCode))
         {
@@ -440,7 +440,7 @@ internal sealed class MachineConnection : ISessionTenant
             return;
         }
 
-        var raw = Unbox(value.WrappedValue);
+        var raw = RawValues.Of(value.WrappedValue, namespaces);
         var converted = ValueConverter.Convert(runtime.Element, raw);
         var timestamp = TimestampOf(value);
         if (!runtime.Take(raw, converted, timestamp))
@@ -588,13 +588,6 @@ internal sealed class MachineConnection : ISessionTenant
         var index = session.NamespaceUris.GetIndex(field["nsu=".Length..separator]);
         return index < 0 ? null : new QualifiedName(field[(separator + 1)..], (ushort)index);
     }
-
-    private static object? Unbox(Variant value) => value.AsBoxedObject(Variant.BoxingBehavior.Legacy) switch
-    {
-        LocalizedText text => text.Text,
-        DateTimeUtc time => time.ToDateTime(),
-        var other => other,
-    };
 
     private static string? TextOf(object? value) => value switch
     {

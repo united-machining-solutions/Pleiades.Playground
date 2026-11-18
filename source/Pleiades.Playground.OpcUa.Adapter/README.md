@@ -245,6 +245,36 @@ A rule compares the namespace as written, without a prefix. That has three conse
   before the dot of the display name of the TRUMPF root, `TruMatic` for `TruMatic.A1121O0001`
   ([Machines behind a gateway](#machines-behind-a-gateway)). The rule gives the serial number instead.
 
+### A machine in `urn:umati2:datamodel:opcua`
+
+Some servers publish the data model itself, in the namespace `urn:umati2:datamodel:opcua`: an object
+`s=Machine` with one variable per element, whose node id is the path of the element
+(`s=State.FeedOverride`), with its unit in the description of the node. The gateway of an edge device shows it
+with its prefix, `urn:Z0009A0033:TRUMPF:UAInterfaces/urn:umati2:datamodel:opcua`. When the `machineNode` of a
+registration, or else the node of its serial number, is in that namespace, with or without a prefix, the
+adapter maps the machine whole ([`Mapping/Umati2DataModel.cs`](Mapping/Umati2DataModel.cs)):
+
+| Element | Node | How |
+|---|---|---|
+| `Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`, `.Model`, `.SoftwareRevision` | `s=Identification.<Element>` | as it is, `Direct` |
+| `State.FeedOverride` | `s=State.FeedOverride` | a Double in `one`, no scale |
+| `OperationCounters.PowerOnDuration` | `s=OperationCounters.PowerOnDuration` | a Double in `second`, no scale |
+| `State.MachineryItemState` | `s=State.Status`, member `MachineryItemState` | 0 NotAvailable, 1 OutOfService, 2 NotExecuting, 3 Executing |
+| `State.MachineryOperationMode` | `s=State.Status`, member `MachineryOperationMode` | 0 None, 1 Maintenance, 2 Setup, 3 Processing |
+
+`State.Status` is a structure, `DataType.Status`, of two enumerations. The adapter decodes its binary
+encoding itself ([`Mapping/KnownStructures.cs`](Mapping/KnownStructures.cs)) and reads no type definitions from
+the server; the element names the member in `field`. An element of the table that the server does not have is
+moved to `missing` when the registration is tried, instead of refusing it. Not mapped: `Notification.ActiveAlerts`,
+a list of `DataType.Alert`, which the binding does not publish, and `Connection.State` and `Connection.Heartbeat`,
+the connection of the source on the edge device to the machine, not values of the machine. The model of the
+machine is its own `Identification.Model`, so the TRUMPF rule above does not apply.
+
+Such a server may show the same machine twice: in this namespace and by the root of its TRUMPF interface.
+`/endpoints/machines` lists it once, by its node in `urn:umati2:datamodel:opcua`, with the namespaces of both. A
+registration needs nothing but its machine:
+[`samples/trumpf-trulaser-umati2-gateway.registration.json`](samples/trumpf-trulaser-umati2-gateway.registration.json).
+
 A registration that is stored already keeps its mapping until it is replaced: `/rescan` proposes the change.
 A rule is code with a unit test ([`KnownMappingsTest.cs`](../Pleiades.Playground.OpcUa.Adapter.Test/KnownMappingsTest.cs)).
 The rules and the machine list are to agree on the model, and the rules are to match a namespace behind the

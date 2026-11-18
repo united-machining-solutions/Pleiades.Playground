@@ -21,6 +21,7 @@
   <ItemGroup>
     <!-- The registration the adapter ships as an example is checked like one a person sends. -->
     <None Include="..\Pleiades.Playground.OpcUa.Adapter\samples\trumpf-trulaser-l26.registration.json" Link="trumpf-trulaser-l26.registration.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Pleiades.Playground.OpcUa.Adapter\samples\trumpf-trulaser-umati2-gateway.registration.json" Link="trumpf-trulaser-umati2-gateway.registration.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

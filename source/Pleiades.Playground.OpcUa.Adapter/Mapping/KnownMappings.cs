@@ -38,8 +38,12 @@ internal static class KnownMappings
             "TRUMPF names the machine by Identification/SerialNumber, which is taken as the model."),
     ];
 
-    /// <summary>The registration with every rule applied whose namespace it names. Applying it twice changes nothing more.</summary>
-    public static MachineRegistration Apply(MachineRegistration registration) => Apply(registration, All);
+    /// <summary>
+    /// The registration with every rule applied whose namespace it names: first the mapping of a
+    /// machine in <see cref="Umati2DataModel.Namespace"/>, then <see cref="All"/>. Applying it twice
+    /// changes nothing more.
+    /// </summary>
+    public static MachineRegistration Apply(MachineRegistration registration) => Apply(Umati2DataModel.Apply(registration), All);
 
     /// <summary>The registration with those of <paramref name="rules"/> applied whose namespace it names.</summary>
     public static MachineRegistration Apply(MachineRegistration registration, IReadOnlyList<KnownMapping> rules)
@@ -79,6 +83,20 @@ internal static class KnownMappings
         }
 
         return registration with { Elements = elements, Missing = missing };
+    }
+
+    /// <summary>
+    /// Whether <paramref name="uri"/> is the namespace <paramref name="known"/>, as it is or behind the
+    /// prefix of a gateway that ends with a slash: <c>urn:Z0009A0033:TRUMPF:UAInterfaces/urn:umati2:datamodel:opcua</c>.
+    /// </summary>
+    public static bool IsNamespace(string? uri, string known)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(known);
+        return uri is not null
+            && (string.Equals(uri, known, StringComparison.Ordinal)
+                || (uri.Length > known.Length
+                    && uri.EndsWith(known, StringComparison.Ordinal)
+                    && uri[^(known.Length + 1)] == '/'));
     }
 
     /// <summary>The namespace URI of a node written <c>nsu=&lt;uri&gt;;...</c>, or null for any other form.</summary>

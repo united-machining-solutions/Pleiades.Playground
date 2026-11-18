@@ -128,6 +128,18 @@ The namespace is compared as written. Behind a gateway it carries a prefix, for 
 `urn:A1121O0001:TRUMPF:OpcSimulator/http://trumpf.com/UA/MachineTool/`, and the adapter sets nothing: map
 those elements yourself, or leave them in `missing`.
 
+**A machine in `urn:umati2:datamodel:opcua`** (with or without the prefix of a gateway, for example
+`urn:Z0009A0033:TRUMPF:UAInterfaces/urn:umati2:datamodel:opcua`) is the data model itself: its node `s=Machine`
+holds one variable per element, named by the path of the element. The adapter maps it whole:
+`Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`, `.Model`, `.SoftwareRevision`,
+`State.MachineryItemState` and `State.MachineryOperationMode` (members of the structure `State.Status`),
+`State.FeedOverride` and `OperationCounters.PowerOnDuration`. For such a machine do not browse or read the
+tree. Propose with `machineNode` set to the `node` of `opcua_machine_list`, the `serialNumber`, the profiles
+`Core` and `IdentificationExtended`, and `elements` empty; add only what the adapter does not set. Put
+`Notification.ActiveAlerts` in `missing`: it is a list. `Connection.State` and `Connection.Heartbeat` of that
+tree are the connection of the source to the machine, not values of the machine: leave them out. An element
+the server does not fill is moved to `missing` by the adapter.
+
 ## Rules of a registration
 
 - **Node.** With the namespace as a URI: `nsu=http://example.com/;i=3003`. A browse gives `ns=7;i=3003`: take

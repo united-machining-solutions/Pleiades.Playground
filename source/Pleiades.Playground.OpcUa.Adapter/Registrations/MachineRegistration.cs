@@ -154,6 +154,14 @@ internal sealed record ElementRegistration
     [Description("The node with its namespace as a URI, never as an index: nsu=http://example.com/;i=42 or nsu=http://example.com/;s=Name. Take the URI from the namespace array of the server (i=2255).")]
     public string Node { get; init; } = string.Empty;
 
+    /// <summary>
+    /// The member of a structure the node holds, for a structure the adapter knows how to decode, for
+    /// example <c>MachineryItemState</c> of <c>DataType.Status</c> of <c>urn:umati2:datamodel:opcua</c>.
+    /// Null for a node whose value is the element itself.
+    /// </summary>
+    [Description("Leave out. The adapter sets it for a node that is a structure it knows; you cannot read the member of a structure.")]
+    public string? Field { get; init; }
+
     /// <summary>A number is multiplied by this before it is published, for example 0.01 for percent.</summary>
     [Description("A number is multiplied by this to reach the SI unit: 0.01 for percent, 3600 for hours, 1000 for kilowatt, 3600000 for kilowatt hours to joule.")]
     public double? Scale { get; init; }

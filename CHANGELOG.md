@@ -226,6 +226,12 @@ All notable changes are documented here. The format follows
   their own, apart from the values: a server built on open62541 refuses ConditionRefresh on a subscription
   that also holds values (`BadFilterNotAllowed`), so such a machine ran no values at all. A refresh that still
   fails is logged, and the machine runs without the catch-up of alarms that already stand.
+- OPC UA adapter: a machine in the namespace `urn:umati2:datamodel:opcua`, the data model published one
+  variable per element (`s=State.FeedOverride`), is mapped by the adapter itself, also behind the prefix of a
+  gateway: identification, `State.FeedOverride` and `OperationCounters.PowerOnDuration` as they are, and the
+  item state and the operation mode as the members of the structure `State.Status`, which the adapter
+  decodes. An element the server does not fill is moved to `missing`. A machine a server shows twice, in that
+  namespace and by the root of its TRUMPF interface, is listed once.
 
 ### Changed
 

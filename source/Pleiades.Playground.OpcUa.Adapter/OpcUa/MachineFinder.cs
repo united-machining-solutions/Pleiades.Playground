@@ -1,5 +1,6 @@
 using Opc.Ua;
 using Opc.Ua.Client;
+using Pleiades.Playground.OpcUa.Adapter.Mapping;
 using Pleiades.Playground.OpcUa.Adapter.Registrations;
 
 namespace Pleiades.Playground.OpcUa.Adapter.OpcUa;
@@ -147,7 +148,44 @@ internal static class MachineFinder
             }
         }
 
-        return machines;
+        return Merge(machines);
+    }
+
+    /// <summary>
+    /// One entry per serial number. A server may show one machine in several namespaces, a gateway of an
+    /// edge device for example in <see cref="Umati2DataModel.Namespace"/> and by the root of its TRUMPF
+    /// interface; every topic is named by the serial number, so it is one machine. The entry in
+    /// <see cref="Umati2DataModel.Namespace"/> is kept, or else the one found first; it takes the
+    /// namespaces of the others, and their model if it has none.
+    /// </summary>
+    internal static IReadOnlyList<FoundMachine> Merge(IReadOnlyList<FoundMachine> machines)
+    {
+        ArgumentNullException.ThrowIfNull(machines);
+        var merged = new List<FoundMachine>();
+        foreach (var machine in machines)
+        {
+            var at = machine.SerialNumber is { Length: > 0 } serial
+                ? merged.FindIndex(one => string.Equals(one.SerialNumber, serial, StringComparison.Ordinal))
+                : -1;
+            if (at < 0)
+            {
+                merged.Add(machine);
+                continue;
+            }
+
+            var (kept, other) = Umati2DataModel.Holds(machine.Node) && !Umati2DataModel.Holds(merged[at].Node)
+                ? (machine, merged[at])
+                : (merged[at], machine);
+            merged[at] = kept with
+            {
+                Model = kept.Model ?? other.Model,
+                Manufacturer = kept.Manufacturer ?? other.Manufacturer,
+                ProductInstanceUri = kept.ProductInstanceUri ?? other.ProductInstanceUri,
+                Namespaces = [.. kept.Namespaces.Concat(other.Namespaces).Distinct(StringComparer.Ordinal)],
+            };
+        }
+
+        return merged;
     }
 
     /// <summary>

@@ -374,6 +374,43 @@ public class MachineFinderTest
     }
 
     [TestMethod]
+    public async Task A_machine_in_the_umati2_namespace_and_its_TRUMPF_root_are_one_machine()
+    {
+        // The gateway of an edge device: the machine in urn:umati2:datamodel:opcua, and the same machine by its TRUMPF interface.
+        const string p = "urn:Z0009A0033:TRUMPF:UAInterfaces/";
+        var umati2 = $"nsu={p}urn:umati2:datamodel:opcua;s=Machine";
+        var space = new FakeSpace()
+            .Object("i=85", "Z0009A0033", $"nsu={Gw};s=Z0009A0033Root")
+            .Machine($"nsu={Gw};s=Z0009A0033Root", "Machine", umati2, "A0280O0001")
+            .TrumpfRoot($"nsu={Gw};s=Z0009A0033Root", "TruLaser.A0280O0001", $"nsu={p}{TrumpfMachines.Interfaces};s=1")
+            .Hidden($"nsu={p}{TrumpfMachines.MachineTool};i=3000", "A0280O0001");
+
+        var machines = await MachineFinder.FindAsync(space, CancellationToken.None);
+
+        Assert.HasCount(1, machines);
+        Assert.AreEqual(umati2, machines[0].Node, "The machine of the data model is kept.");
+        Assert.AreEqual("TruLaser", machines[0].Model, "Its own model, or else the one of the TRUMPF root.");
+        CollectionAssert.IsSubsetOf(
+            new[] { p + "urn:umati2:datamodel:opcua", p + TrumpfMachines.MachineTool, p + TrumpfMachines.Interfaces },
+            machines[0].Namespaces.ToArray());
+    }
+
+    [TestMethod]
+    public void Machines_with_one_serial_number_are_merged_and_the_umati2_one_is_kept()
+    {
+        var trumpf = Found("A", "nsu=urn:gw/http://trumpf.com/UA/MachineTool/;i=3000", "urn:gw/http://trumpf.com/UA/MachineTool/");
+        var umati2 = Found("A", "nsu=urn:gw/urn:umati2:datamodel:opcua;s=Machine", "urn:gw/urn:umati2:datamodel:opcua");
+        var other = Found("B", $"nsu={Other};i=1", Other);
+
+        var merged = MachineFinder.Merge([trumpf, other, umati2]);
+
+        Assert.HasCount(2, merged);
+        Assert.AreEqual(umati2.Node, merged[0].Node);
+        CollectionAssert.AreEquivalent(trumpf.Namespaces.Concat(umati2.Namespaces).ToArray(), merged[0].Namespaces.ToArray());
+        Assert.AreEqual(other, merged[1]);
+    }
+
+    [TestMethod]
     public void The_display_name_of_a_TRUMPF_root_is_model_dot_serial_number()
     {
         Assert.AreEqual(("TruLaser", "A0280O0001"), TrumpfMachines.Split("TruLaser.A0280O0001"));

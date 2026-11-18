@@ -22,6 +22,17 @@ internal static class ValueConverter
     public static ConvertedValue? Convert(ElementRegistration element, object? raw)
     {
         ArgumentNullException.ThrowIfNull(element);
+
+        // An element of a structure takes its member; a structure is no value of its own.
+        if (element.Field is { } field)
+        {
+            raw = raw is StructureValue structure ? structure.Member(field) : null;
+        }
+        else if (raw is StructureValue)
+        {
+            return null;
+        }
+
         if (raw is null)
         {
             return null;

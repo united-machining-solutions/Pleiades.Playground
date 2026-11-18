@@ -101,7 +101,7 @@ internal sealed class RegistrationProbe
         try
         {
             var value = await session.ReadValueAsync(node, cancellationToken).ConfigureAwait(false);
-            var raw = value.WrappedValue.AsBoxedObject(Variant.BoxingBehavior.Legacy) is LocalizedText text ? text.Text : value.WrappedValue.AsBoxedObject(Variant.BoxingBehavior.Legacy);
+            var raw = RawValues.Of(value.WrappedValue, session.NamespaceUris);
             var converted = ValueConverter.Convert(element, raw);
             return Result(converted is null ? "NotConvertible: the value does not fit the kind or the map of the element." : "Good", found: true, raw, converted);
         }

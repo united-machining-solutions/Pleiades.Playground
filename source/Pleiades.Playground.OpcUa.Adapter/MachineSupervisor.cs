@@ -277,6 +277,19 @@ internal sealed class MachineSupervisor : BackgroundService
         }
 
         var probe = await _probe.ProbeAsync(registration, cancellationToken).ConfigureAwait(false);
+
+        // An element a known namespace set and the server does not fill is missing, not wrong.
+        registration = Umati2DataModel.WithoutAbsent(registration, probe.NotFound.Select(element => (element.Area, element.Path)), out var absent);
+        if (absent.Count > 0)
+        {
+            probe = probe with { Elements = [.. probe.Elements.Where(element => !(element.Area == "umati" && absent.Contains(element.Path)))] };
+            var lacking = RegistrationValidator.Validate(registration);
+            if (lacking.Count > 0)
+            {
+                return new RegistrationOutcome(null, lacking, endpoints, probe);
+            }
+        }
+
         if (probe.NotFound.Count > 0)
         {
             return new RegistrationOutcome(

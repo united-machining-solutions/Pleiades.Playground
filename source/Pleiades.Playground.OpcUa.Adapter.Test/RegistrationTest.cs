@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Pleiades.Playground.OpcUa.Adapter.Mapping;
 using Pleiades.Playground.OpcUa.Adapter.OpcUa;
 using Pleiades.Playground.OpcUa.Adapter.Registrations;
 
@@ -94,6 +95,20 @@ public class RegistrationValidatorTest
         Assert.IsEmpty(RegistrationValidator.Validate(sample));
         CollectionAssert.Contains(sample.Profiles.ToArray(), "Core");
         Assert.AreEqual("A0280O0001", sample.SerialNumber);
+    }
+
+    [TestMethod]
+    public void The_example_of_a_umati2_machine_names_its_machine_only_and_the_adapter_fills_in_core()
+    {
+        var sample = JsonSerializer.Deserialize<MachineRegistration>(
+            File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "trumpf-trulaser-umati2-gateway.registration.json")),
+            RegistrationJson.Options)!;
+
+        Assert.IsEmpty(sample.Elements);
+        var applied = KnownMappings.Apply(sample);
+        Assert.IsEmpty(RegistrationValidator.Validate(applied));
+        Assert.HasCount(Umati2DataModel.Rules.Count, applied.Elements);
+        Assert.AreEqual("Notification.ActiveAlerts", applied.Missing.Single().Path);
     }
 
     [TestMethod]
