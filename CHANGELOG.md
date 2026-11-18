@@ -7,6 +7,23 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
+  no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
+- Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
+  each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
+  draws them with the notification card.
+- Example app: showcases. What is made for one demo or one fair lives in a folder of its own,
+  `apps/app/src/showcases/<name>/`, with its pages under `src/routes/(showcases)/`, and is built in only
+  where `APP_SHOWCASES` is set. The image `pleiades.playground.app` is the app alone, with nothing of a
+  showcase in it; the new image `pleiades.playground.app.showcases` is the same app built with all of
+  them, and `APP_SHOWCASES` in `.env` makes the stack take it. A showcase only adds: a test fails when a
+  file of the app reads from one or links to one of its pages. `AGENTS.md` and the skills `create-page`,
+  `create-card` and `build-your-own` ask whether a thing is base or a showcase
+  ([ADR-0018](docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)).
+- Documentation sources: original PDF viewer with paging, zoom and native/OCR page search, retrieved
+  through bounded MCP binary resources without adding PDFs to model context.
+- Example app: optional documentation MCP tools with clickable, revision-specific manual page sources in chat,
+  showing printed page labels alongside differing physical pages. Margo exposes the additional MCP server setting.
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
   self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
   that live values work over HTTPS. HTTP stays as it is.
@@ -15,7 +32,8 @@ All notable changes are documented here. The format follows
 - Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
   shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
   from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
-  entry in the sidebar.
+  entry in the sidebar. It is the first showcase: only a stack started with `APP_SHOWCASES` set has the
+  page.
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
@@ -24,6 +42,8 @@ All notable changes are documented here. The format follows
   the machines that send values and stand on no site. It reads the Sites API at `SITES_API_URL`.
 - Site card: a machine on no site carries what it does now (`now`), as a placed one does, so a page can keep it
   live.
+- Example app: the page Sites (`/sites`) shows where the machines stand, by site and hall. The page of a
+  machine moved under it to `/sites/<machine id>`; `/machines/<machine id>` leads there.
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
 - Example app: the button "Tools" in the message field of the chat lists the servers that give the chat
@@ -37,6 +57,8 @@ All notable changes are documented here. The format follows
   room for actions on the right.
 - Energy card: `genui_energy_show` says how much energy machines imported over the last 1 to 24 hours, from
   their meters, with mean and peak power; the card draws their power as a graph (`genui_energy_series`).
+- Time series card: `genui_timeseries_show` draws any signal of any machine over 15 minutes to 24 hours, a line for each
+  pair of a machine and a signal, on two y axes at most; a person changes the range and the lines on the card.
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,
@@ -446,6 +468,7 @@ All notable changes are documented here. The format follows
   conditions lie in the TRUMPF interface. A TRUMPF machine outside that namespace gets the events of
   `TcMachineAlarmType` with `AlarmIdentifier` if its registration names no alarms, and the TRUMPF interface counts
   as its own namespace. A stored registration takes this on `/rescan` (issue 180).
+- `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page
   never reached the broker ("not live, no connection to the broker"), and a question asked outside the chat did

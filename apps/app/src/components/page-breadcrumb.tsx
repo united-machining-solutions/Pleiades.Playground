@@ -1,6 +1,7 @@
 import { Link, useMatches, useRouter } from "@tanstack/react-router"
 import { Fragment } from "react"
 
+import { chatOf } from "@/chat/ask.ts"
 import { crumbsOf, navPages } from "@/components/nav.ts"
 import { usePages } from "@/pages/store.ts"
 import {
@@ -41,8 +42,8 @@ export function PageBreadcrumb() {
             {index > 0 && <BreadcrumbSeparator />}
             <BreadcrumbItem>
               {step.path ? (
-                // The chat stays open while the page changes.
-                <BreadcrumbLink render={<Link to={step.path as "/"} search />}>{step.title}</BreadcrumbLink>
+                // The chat stays open while the page changes; what this page chose does not go along.
+                <BreadcrumbLink render={<Link to={step.path as "/"} search={chatOf} />}>{step.title}</BreadcrumbLink>
               ) : (
                 // One line. The block sidebar-15 has `line-clamp-1` here, which lets a long title take
                 // the width of the header, and a title a person gave to a page kept from the chat can

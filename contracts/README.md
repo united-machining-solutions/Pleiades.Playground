@@ -9,5 +9,6 @@ them may bring their own implementation.
 | [`mqtt/`](mqtt/README.md) | Data | MQTT binding: topics, value envelope, units, events | This repository |
 | [`openapi/`](openapi/README.md) | Interfaces | REST contracts of the Timeseries, Events and Sites APIs | The running services (`/openapi/v1.json`) |
 | [`mcp/`](mcp/README.md) | Interfaces | MCP tools per server | The running services (`/mcp`, `tools/list`) |
+| [`docs/`](docs/README.md) | Interfaces | Optional external documentation search, source citations and original PDFs over MCP | The external documentation service; host expectations are recorded here |
 
 Contracts are versioned on their own and change by pull request with a review from every affected maintainer.

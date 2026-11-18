@@ -1,35 +1,27 @@
-import { Fragment, useEffect, useRef, useState } from "react"
-import type { CSSProperties, ReactNode } from "react"
+import { useState } from "react"
+import type { CSSProperties } from "react"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@pleiades/ui/components/chart"
 import type { ChartConfig } from "@pleiades/ui/components/chart"
 import { Meter } from "@pleiades/ui/components/meter"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@pleiades/ui/components/pagination"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@pleiades/ui/components/table"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { clock } from "../machine/format.ts"
+import { categoryColour } from "../shared/colour.ts"
+import { MachineName } from "../shared/machine-name.tsx"
+import { axisScale } from "../shared/scale.ts"
+import { SmoothHeight } from "../shared/smooth-height.tsx"
 import type { EnergySeries, EnergyShow, MachineEnergy } from "./contract.ts"
-import { ENERGY_ORDERS, pageLinks, pageOf } from "./order.ts"
-import { powerScale } from "./scale.ts"
+import { Pages } from "../shared/pages.tsx"
+import { ENERGY_ORDERS, pageOf } from "./order.ts"
 import type { EnergyOrder, EnergyPage } from "./order.ts"
-import { axisKilowatts, cardRange, inKilowattHours, kilowattHours, kilowatts, machineIdPieces } from "./words.ts"
-
-/** How many machines the categorical colours of the theme name, `--chart-1` and on. */
-const COLOURS = 14
+import { axisKilowatts, cardRange, inKilowattHours, kilowattHours, kilowatts } from "./words.ts"
 
 /** The colour of a machine: its place in the result, the same in the graph and in the table. */
-const colourOf = (index: number) => `var(--chart-${(index % COLOURS) + 1})`
+const colourOf = categoryColour
 
 /** The lines of the graph: undefined while they are asked for, null if they are not to be had. */
 export type Lines = EnergySeries | null | undefined
@@ -134,87 +126,18 @@ function OrderChoice({ order, onChange }: { order: EnergyOrder; onChange: (order
 
 /** Where the page lies among all machines, and the way to the others. The card does not navigate. */
 function EnergyPages({ view, onPage }: { view: EnergyPage; onPage: (page: number) => void }) {
-  const go = (page: number) => (event: { preventDefault: () => void }) => {
-    event.preventDefault()
-    if (page >= 1 && page <= view.pages && page !== view.page) onPage(page)
-  }
-  const off = (disabled: boolean) => (disabled ? { "aria-disabled": true, tabIndex: -1, className: "pointer-events-none opacity-50" } : {})
   return (
-    <div className="@container/pages flex flex-wrap items-center justify-between gap-2">
+    <Pages page={view.page} pages={view.pages} onPage={onPage}>
       <p className="text-xs text-muted-foreground tabular-nums">
         {view.first}–{view.last} of {view.total}
       </p>
-      {/* Where the card is narrow, the links leave out the neighbours of the current page. */}
-      <Pagination className="mx-0 w-auto hidden @sm/pages:flex">
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious href="#" onClick={go(view.page - 1)} {...off(view.page === 1)} />
-          </PaginationItem>
-          {pageLinks(view.page, view.pages, 1).map((one, index) =>
-            one === "gap" ? (
-              <PaginationItem key={`gap-${index}`}>
-                <PaginationEllipsis />
-              </PaginationItem>
-            ) : (
-              <PaginationItem key={one}>
-                <PaginationLink href="#" isActive={one === view.page} onClick={go(one)}>
-                  {one}
-                </PaginationLink>
-              </PaginationItem>
-            ),
-          )}
-          <PaginationItem>
-            <PaginationNext href="#" onClick={go(view.page + 1)} {...off(view.page === view.pages)} />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
-      <Pagination className="mx-0 w-auto @sm/pages:hidden">
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious href="#" onClick={go(view.page - 1)} {...off(view.page === 1)} />
-          </PaginationItem>
-          {pageLinks(view.page, view.pages, 0).map((one, index) =>
-            one === "gap" ? (
-              <PaginationItem key={`gap-${index}`}>
-                <PaginationEllipsis />
-              </PaginationItem>
-            ) : (
-              <PaginationItem key={one}>
-                <PaginationLink href="#" isActive={one === view.page} onClick={go(one)}>
-                  {one}
-                </PaginationLink>
-              </PaginationItem>
-            ),
-          )}
-          <PaginationItem>
-            <PaginationNext href="#" onClick={go(view.page + 1)} {...off(view.page === view.pages)} />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
-    </div>
+    </Pages>
   )
 }
 
 /** The energy of a machine in kilowatt hours, for the meters: the display converts. */
 function kilowattHoursOf(one: MachineEnergy): number | null {
   return one.energy.value === null ? null : inKilowattHours(one.energy.value, one.energy.unit)
-}
-
-/**
- * A machine id that breaks only after `_`, never inside a model or a serial number: a browser
- * would break after a hyphen by itself, so each piece holds together.
- */
-function MachineName({ id }: { id: string }) {
-  return (
-    <span className="min-w-0 whitespace-normal">
-      {machineIdPieces(id).map((piece, index) => (
-        <Fragment key={index}>
-          {index > 0 && <wbr />}
-          <span className="whitespace-nowrap">{piece}</span>
-        </Fragment>
-      ))}
-    </span>
-  )
 }
 
 /** The energy of a machine in kilowatt hours, or why it is not known. */
@@ -282,27 +205,6 @@ function EnergyTable({
   )
 }
 
-/**
- * Eases to the height of what it holds when that changes, instead of jumping: a page with fewer
- * machines grows or shrinks the card in a fifth of a second. Without motion it jumps.
- */
-function SmoothHeight({ children }: { children: ReactNode }) {
-  const inner = useRef<HTMLDivElement>(null)
-  const [height, setHeight] = useState<number>()
-  useEffect(() => {
-    const held = inner.current
-    if (!held) return
-    const observer = new ResizeObserver(() => setHeight(held.offsetHeight))
-    observer.observe(held)
-    return () => observer.disconnect()
-  }, [])
-  return (
-    <div className="overflow-hidden transition-[height] duration-200 ease-out motion-reduce:transition-none" style={{ height }}>
-      <div ref={inner}>{children}</div>
-    </div>
-  )
-}
-
 /** One machine in the table. */
 function EnergyRow({ one, colours, most }: { one: MachineEnergy; colours: Map<string, string>; most: number }) {
   const { machine, energy, power } = one
@@ -365,7 +267,8 @@ function PowerGraph({ series, colours, shown }: { series: Lines; colours: Map<st
   const keyOf = (machine: string) => `m${[...colours.keys()].indexOf(machine)}`
   const lines = series.lines.filter((line) => shown.includes(line.machine))
   // The axis spans the machines of every page, so it stands still when the pages turn.
-  const scale = powerScale(series.lines.filter((line) => colours.has(line.machine)))
+  // Machines that stand still get an axis from 0 to a kilowatt.
+  const scale = axisScale(series.lines.filter((line) => colours.has(line.machine)).flatMap((line) => line.watt), { zeroSpan: 1_000 })
   const config = Object.fromEntries(
     lines.map((line) => [keyOf(line.machine), { label: line.machine, color: colours.get(line.machine) }]),
   ) satisfies ChartConfig

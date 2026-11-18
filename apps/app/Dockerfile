@@ -11,10 +11,14 @@ COPY . .
 ARG VERSION=dev
 ARG REVISION=
 ARG SOURCE=
+# The showcases, pages made for one demo or one fair, are built in only where this argument is set to
+# anything: the image pleiades.playground.app.showcases. Without it nothing of a showcase is in .output,
+# and so nothing of one is in the image (apps/app/vite.config.ts).
+ARG SHOWCASES=
 # pnpm in the version that package.json names as "packageManager".
 RUN npm install --global --ignore-scripts "$(node --print 'require("./package.json").packageManager')" && \
     pnpm install --frozen-lockfile && \
-    APP_VERSION="$VERSION" APP_REVISION="$REVISION" APP_SOURCE="$SOURCE" pnpm --filter @pleiades/app build
+    APP_VERSION="$VERSION" APP_REVISION="$REVISION" APP_SOURCE="$SOURCE" APP_SHOWCASES="$SHOWCASES" pnpm --filter @pleiades/app build
 
 # The Alpine minor is pinned on purpose, as in the images under source/.
 FROM node:26.13-alpine3.24 AS final

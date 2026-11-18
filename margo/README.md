@@ -72,6 +72,18 @@ A change to the stack in `compose.yaml` belongs here as well, in the same pull r
 name the same services (leaving out the ones behind a profile, and Traefik) and that the broker configuration is
 the same; the rest, the variables and the settings, it does not see.
 
+## External MCP servers
+
+The *Further MCP servers* setting in *Language model* maps to `APP_MCP_SERVERS`, using comma-separated
+`name=address` entries. For a documentation app deployed separately on the same device, use
+`docs=http://host.docker.internal:3202/mcp`. The app maps that name to the host gateway on Docker Engine
+on Linux as well as Docker Desktop. The MCP listener and its published port must be reachable from the
+Playground container; a loopback-only host port may not work on Linux. Configure the documentation
+service to accept `host.docker.internal` as a Host header and expose it only on a controlled network.
+
+Enable `docs` under *Tools* in the chat. The service's contract and source/PDF requirements are in
+[contracts/docs](../contracts/docs/README.md). A gateway or chat model is still required for chat.
+
 ## Check
 
 ```bash

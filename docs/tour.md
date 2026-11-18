@@ -95,12 +95,12 @@ without data, then the ones in setup, then the running ones. It is live: the pag
 from then on the browser hears every value at the broker, MQTT over WebSocket on port 9001, the moment a
 machine publishes it.
 
-![Home with the heading Machines. Under "Needs you" are two rows, P-04 and P-07, both stopped, each with a
-button "Ask why". Under "Running" is one tile, M-02.](images/tour/home.png)
+![Home with the heading Machines. Under "Needs you" are two rows, MM-120 M-02 in alarm and AX-400 P-04
+stopped, each with a button "Ask why". Under "Setup" is one row, TP-800 P-07.](images/tour/home.png)
 
-In the picture two machines need you. P-04 is stopped without a recorded reason, P-07 is stopped with the
-warning "Safety door open, machining interrupted", and both say since when. M-02 runs the program
-`SHAFT_4711.MPF`. A row leads to the page of its machine, and "Ask why" starts a chat about it (stop 4). The
+In the picture two machines need you. M-02 is in alarm because its bar feeder is empty, error 5120; P-04 is
+stopped with the warning "Coolant pressure low", 20017; both say since when. P-07 is in setup with the work
+master `WM-HOUSING-0815`. A row leads to the page of its machine, and "Ask why" starts a chat about it (stop 4). The
 field "Ask a question" in the header starts a chat too.
 
 **In the code:** [`apps/app/src/routes/index.tsx`](../apps/app/src/routes/index.tsx) is the page and its
@@ -132,10 +132,34 @@ read once by one server function, `getCharts` in
 [`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts); from then on the page is
 live from the broker, as Home is.
 
+**Sites** in the sidebar, <http://localhost:5600/sites>, shows where the machines stand: site by site and hall by
+hall, in rows like those of Home. The head of each site names its company and how many of its machines are in
+each state; it stays at the top while the rows of its site scroll, and a click folds the site. "Needs you" keeps
+the machines in alarm, stopped or without data, each in its site and hall, and the search finds a machine by its
+name, model, serial number, machine id, work master, hall or site. Ten sites make a page; the choice and the page
+are in the address, `?show=needs&page=2`. "On no site" comes last: the machines that sent values in the last
+24 hours and stand on no site yet, live like the others. The sites without a machine are named once, on the last
+page. People enter the sites, their halls and which machine stands where in the
+[Sites API](../source/Pleiades.Playground.Sites.Api/README.md), at <http://localhost:5540/>; a stack that has just
+started has none, and the page says so.
+
+![The page Sites: "3 machines on 2 sites", the search and the buttons All and Needs you, the counts of all
+sites, then North plant of Demo Manufacturing with 1 running and 1 stopped: Lathe 4 stopped in Hall 1, MM-120 M-02
+running in Hall 2, and "Hall 3: no machine"; South plant with AX-400 M-09 without data in Hall A; and at the
+bottom On no site with TP-800 P-07 in alarm.](images/tour/sites.png)
+
+**In the code:** [`apps/app/src/routes/sites.index.tsx`](../apps/app/src/routes/sites.index.tsx) is the page,
+[`apps/app/src/sites/filter.ts`](../apps/app/src/sites/filter.ts) chooses what "Needs you" and the search
+show and cuts the pages, and [`apps/app/src/live/sites.ts`](../apps/app/src/live/sites.ts) keeps the states and counts
+live from the broker. The values are the result of the tool `genui_site_list`
+([`apps/genui-mcp/src/sites.ts`](../apps/genui-mcp/src/sites.ts)), which groups and counts.
+
 ## 3. The page of one machine
 
-A click on a machine opens its page, here <http://localhost:5600/machines/alcyone-machines_AX-400_P-04>; the
-address carries the machine id, the page is titled with model and serial number, AX-400 P-04. It shows the
+A click on a machine on Home or on Sites opens its page, here
+<http://localhost:5600/sites/alcyone-machines_AX-400_P-04>; it stands under Sites, and the breadcrumb leads back
+there. An address from before the page moved, `/machines/alcyone-machines_AX-400_P-04`, leads to it with its
+hours. The address carries the machine id, the page is titled with model and serial number, AX-400 P-04. It shows the
 machine card: what the machine does now, with which work master and job order, the alerts that stand, and what
 it did over the last hours. It needs no language model. The title is a switcher: a click on it opens the list
 of every machine with its state, to search by model, serial number, machine id or state, and Enter opens the
@@ -143,10 +167,11 @@ one picked. The buttons 1 h, 8 h and 24 h at the right choose how many hours the
 in the address, `?hours=8`, and stays when you switch to another machine. The page is live like Home: the band
 keeps its length and moves on with the clock.
 
-![The page Machines / P-04. The title P-04 has an arrow for the switcher, and at the right stand the buttons 1 h,
-8 h and 24 h, with 8 h chosen. Under the title it says "live · now 23:36". The machine card says Running, since
-23:34, program SHAFT_4711.MPF. Below is a band of the last 8 hours, the total duration of each state, and the
-MQTT topics the values were read from.](images/tour/machine-page.png)
+![The page of P-04, with the breadcrumb Sites › alcyone-machines_AX-400_P-04 and Sites active in the sidebar.
+The title AX-400 P-04 has an arrow for the switcher, and at the right stand the buttons 1 h, 8 h and 24 h, with
+8 h chosen. Under the title it says "live · now 12:10". The machine card says Stopped, no alarm, no reason
+recorded, since 12:09, work master WM-SHAFT-4711, job order 4720/01, 3 of 12. Below is a band of the last 8
+hours, the total duration of each state, and the MQTT topics the values were read from.](images/tour/machine-page.png)
 
 The card has three parts. On top is the state with its reason, since when it holds, the work master and the job order that runs.
 In the middle is the band: one stripe from the chosen number of hours ago until now, coloured by state, and
@@ -154,8 +179,8 @@ below it the total of each state. The hatched part of this band is "No data": th
 running for about three hours, and before that nobody published. At the bottom the card names the topics it
 read, so every value can be traced to the broker.
 
-**In the code:** [`apps/app/src/routes/machines.$machine.tsx`](../apps/app/src/routes/machines.%24machine.tsx)
-is the page, and the choice of the hours and the list of the switcher are in
+**In the code:** [`apps/app/src/routes/sites.$machine.tsx`](../apps/app/src/routes/sites.%24machine.tsx)
+is the page, [`machines.$machine.tsx`](../apps/app/src/routes/machines.%24machine.tsx) leads the old address to it, and the choice of the hours and the list of the switcher are in
 [`apps/app/src/machines/switcher.ts`](../apps/app/src/machines/switcher.ts). The card is
 [`packages/cards/src/machine/machine-card.tsx`](../packages/cards/src/machine/machine-card.tsx), its band
 [`state-band.tsx`](../packages/cards/src/machine/state-band.tsx), and the shape of its values the contract in
@@ -183,6 +208,15 @@ the tool's and the wording is the model's: the card says 6 minutes of running, t
 minutes". The stack had just started, so most of the 8 hours have no data. The card on the left is one minute
 newer than the one in the chat: the page reads again, an answer shows what was true when it was given.
 
+With an external documentation service configured as `docs` in `APP_MCP_SERVERS` and enabled under
+"Tools" in the message field, ask how to operate,
+maintain or program a machine. The chat searches its manuals and shows source references by filename and
+page label, with the physical PDF page also shown when it differs. Select one to open that physical PDF page. Use the page controls, zoom and **Find**
+to explore it; **Next match** moves between matching pages. The **Extracted text** tab shows the evidence
+used by chat. A replaced or unavailable source asks you to search again. Both views read documentation
+through MCP; the app has no direct connection to the documentation REST API.
+Documentation source references stay in the chat and are not cards for "Save as page".
+
 The panel works like a chat app on a phone: a list and a chat, with a way back. The head says what is open. In a
 chat it says the name of the chat, which is its first question, on one line and cut where it is too long; the
 button "All chats" at its left leads back to the list, and the page beside the panel stays where it is. The
@@ -197,13 +231,21 @@ has. The page keeps no number and no sentence of the model, so opening it calls 
 show what holds now. The row under the answer then says "Saved as page" and links to it. An answer without a
 card, such as one in words only, has no button. The group "Pages" in the sidebar lists the pages of this browser
 that are not pinned, the newest first, and a page that is pinned from its head moves to the top of the sidebar,
-beside Home.
+beside Home. "Edit" in its head moves a card up or down and removes one, with no language model; "Undo" in
+the toast puts a removed card back.
 
 A page is private to the browser that keeps it, and the stack has no sign-in, so "Share" in its head gives a
 link that carries the recipe: which answers, for which machines and hours, and no value. Open it in a private
 window to see what a colleague sees: the page with the values of now, no chat and no language model needed,
 and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for says so,
 and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
+
+Ask about the alarms of a machine, for example "Which warnings and errors did P-04 have today?", and the chat
+draws the notification card of the tool `genui_notification_list`: each warning and error with when it was
+raised, when it went and how long it stood, and the ones that have not gone first. The card is
+[`packages/cards/src/notification/notification-card.tsx`](../packages/cards/src/notification/notification-card.tsx),
+the tool is in [`apps/genui-mcp/src/notifications.ts`](../apps/genui-mcp/src/notifications.ts). No screenshot
+shows it yet.
 
 The chat needs a language model, and the demo starts without one. Then the panel says "No language model
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
@@ -289,13 +331,13 @@ docker compose stop simulator-m-02
 
 After 30 seconds without a sign of life, Home moves the machine to "Needs you" with the state "No data".
 
-![Home with M-02 under "Needs you" with the badge "No data" and the text "No data from the adapter, last
-known: Executing at 20:34". Under "Running" are P-04 and P-07; the tile of P-07 shows a
-warning.](images/tour/home-no-data.png)
+![Home with M-02 under "Needs you" with the badge "No data" and the text "No data from the adapter. The
+adapter says Shutdown. Last known: NotExecuting at 12:09". P-04 stands there too, stopped on its own. Under
+"Running" is P-07.](images/tour/home-no-data.png)
 
-The row says what is known: no data from the adapter since 20:34, and the last thing the machine reported
-before it fell silent. The other two machines are not affected. P-07 runs with an open warning, which its
-tile shows. Start the simulator again, and within a few seconds the machine is back with a fresh "since":
+The row says what is known: no data from the adapter since 12:10, and the last thing the machine reported
+before it fell silent. The other two machines are not affected: P-04 had stopped by itself a minute before,
+and P-07 runs on. Start the simulator again, and within a few seconds the machine is back with a fresh "since":
 a silence ends a run, because what happened in between is not known.
 
 ```bash

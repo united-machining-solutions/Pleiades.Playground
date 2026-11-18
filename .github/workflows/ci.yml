@@ -105,6 +105,10 @@ jobs:
         run: pnpm test
       - name: Build
         run: pnpm build
+      # The build above is the app alone. The image pleiades.playground.app.showcases is built on main only,
+      # so a showcase that does not build would show there first.
+      - name: Build the app with its showcases
+        run: APP_SHOWCASES=true pnpm --filter @pleiades/app build
 
   stack:
     name: Demo stack starts healthy
