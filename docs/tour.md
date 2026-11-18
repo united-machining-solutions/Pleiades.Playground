@@ -141,7 +141,7 @@ live by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Prog
 packing after them and the single part on its sheet have no source yet: the page draws them dashed, as the
 gaps to discuss. It has no picture in this tour.
 
-**In the code:** [`apps/app/src/routes/(showcases)/where-is-my-job.tsx`](<../apps/app/src/routes/(showcases)/where-is-my-job.tsx>)
+**In the code:** [`apps/app/src/routes/(showcases)/where-is-my-job.tsx`](../apps/app/src/routes/%28showcases%29/where-is-my-job.tsx)
 is the page; the map, the panels and `getFloor` live in
 [`apps/app/src/showcases/where-is-my-job/`](../apps/app/src/showcases/where-is-my-job/), and `floor.ts` there
 groups the job orders into orders.
