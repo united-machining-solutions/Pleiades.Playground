@@ -154,6 +154,20 @@ show and cuts the pages, and [`apps/app/src/live/sites.ts`](../apps/app/src/live
 live from the broker. The values are the result of the tool `genui_site_list`
 ([`apps/genui-mcp/src/sites.ts`](../apps/genui-mcp/src/sites.ts)), which groups and counts.
 
+A stack started with `APP_SHOWCASES` set has one more page in the sidebar, "Where is My Job?",
+<http://localhost:5600/where-is-my-job>. It is a showcase, a basis for discussion: how an order could be
+followed across the shop floor. It shows the machines of the stack from above, with their state, utilisation
+and job orders; a machine with what it did, does and what waits for it; and an order on its way. An order is
+every job order that names the same order number, read from the backend (`genui_job_order_list`) and kept
+live by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines,
+packing after them and the single part on its sheet have no source yet: the page draws them dashed, as the
+gaps to discuss. It has no picture in this tour.
+
+**In the code:** [`apps/app/src/routes/(showcases)/where-is-my-job.tsx`](../apps/app/src/routes/%28showcases%29/where-is-my-job.tsx)
+is the page; the map, the panels and `getFloor` live in
+[`apps/app/src/showcases/where-is-my-job/`](../apps/app/src/showcases/where-is-my-job/), and `floor.ts` there
+groups the job orders into orders.
+
 ## 3. The page of one machine
 
 A click on a machine on Home or on Sites opens its page, here

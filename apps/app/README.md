@@ -333,7 +333,8 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   commit this file; here everything that needs it writes it first.
 - `src/showcases/`: what is made for one demo or one fair, and is in a build only where `APP_SHOWCASES` is
   set ([ADR-0018](../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
-  it is a showcase: `where-is-my-job/` is the made-up shop floor of the page "Where is My Job?". The pages of
+  it is a showcase: `where-is-my-job/` holds the map, the panels and the grouping of job orders into orders
+  of the page "Where is My Job?", and `getFloor`, which reads its values. The pages of
   the showcases, and their server routes, are the route files under `src/routes/(showcases)/`; the brackets
   make a folder that adds nothing to an address, so `(showcases)/where-is-my-job.tsx` answers at
   `/where-is-my-job`. A page belongs to the showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and
