@@ -1,7 +1,7 @@
 # Sites API
 
 Keeps where the machines stand: sites with their halls, and which machine is placed on which site. People enter
-these; no machine sends them. The values and notifications of a machine stay in the Timeseries and Events APIs.
+these, on Home of the [example app](../../apps/app/README.md) or here; no machine sends them. The values and notifications of a machine stay in the Timeseries and Events APIs.
 
 - A **site** is a place with a company, a plant (`name`) and its halls. Its `siteId` follows the rules of
   `sites/{SiteId}` in the [MQTT binding](../../contracts/mqtt/README.md): not blank, no `/`, `+` or `#`. It also
@@ -50,7 +50,15 @@ Read-only: `sites_site_list` and `sites_placement_list` return the same JSON as 
 `GET /placements`, plus `sites_describe_server` and `sites_get_skill_guide`. No tool writes, so a language model
 cannot place or remove a machine.
 
+## Who writes
+
+Home of the example app places a machine on a site, moves it and takes it off, with buttons, from the server of
+the app (`SITES_API_URL`); it makes a new site or a new hall where a person asks for one, and changes or removes
+no site otherwise. The app has no sign-in, so whoever reaches the app writes here too, however `SITES_BIND` is
+set: opening the app (`APP_BIND`, Traefik of the Margo app) opens placing and removing.
+
 ## Authorization
 
 As for the other APIs: with `Config:Auth:Enabled` on, reading needs the role `sites:read` or `sites:write`,
-writing needs `sites:write`; a trusted service may use the internal API key. The demo stack runs with auth off.
+writing needs `sites:write`; a trusted service may use the internal API key. The demo stack runs with auth off. The example app and `genui-mcp` send no credentials, so with auth on, Home
+neither reads nor writes the sites.

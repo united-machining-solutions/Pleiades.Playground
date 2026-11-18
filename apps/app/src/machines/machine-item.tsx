@@ -9,6 +9,7 @@ import { Badge } from "@pleiades/ui/components/badge"
 import { Link } from "@tanstack/react-router"
 import { ChevronRightIcon } from "lucide-react"
 import { Fragment } from "react"
+import type { ReactNode } from "react"
 
 import { Button, buttonVariants } from "@pleiades/ui/components/button"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@pleiades/ui/components/item"
@@ -55,7 +56,8 @@ const why: Partial<Record<State, (machine: string) => string>> = {
  * the page changes. With `name`, the name people know the machine by is its title, and what it
  * is comes first in the line below. `what` says what it is where its values do not, as for a
  * machine known by its id only. Without `linked`, the row does not lead to the page: a machine that
- * sent no value in the last 24 hours has none.
+ * sent no value in the last 24 hours has none. `actions` are what else can be done with the machine,
+ * before the way to its page.
  */
 export function MachineRow({
   machine,
@@ -65,6 +67,7 @@ export function MachineRow({
   name,
   what,
   linked = true,
+  actions,
 }: {
   machine: Machine
   state: State
@@ -73,6 +76,7 @@ export function MachineRow({
   name?: string | null | undefined
   what?: string | undefined
   linked?: boolean
+  actions?: ReactNode
 }) {
   const told = tell(machine, state)
   const question = why[state]?.(machine.machine)
@@ -109,6 +113,7 @@ export function MachineRow({
             Ask why
           </Button>
         )}
+        {actions}
         {/* A link that looks like the buttons next to it: it leads somewhere, so it stays a link. */}
         {linked && (
           <Link

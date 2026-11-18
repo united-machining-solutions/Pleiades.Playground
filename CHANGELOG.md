@@ -7,6 +7,10 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: machines are added to a site and taken off it on Home, as in the mock. A bar names the machines
+  that send data and stand on no site, with "Review and add"; "Add machine" also takes one by its id. The menu of a
+  row moves a machine or removes it, and "Undo" in the toast takes a change back. `genui_site_list` counts how
+  many machines on the sites send and how many need someone.
 - Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
   `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
   shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0020).
