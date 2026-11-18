@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { Machine, Reading } from "./contract.ts"
-import { machineInWords, machineListInWords, machineShowInWords, spanListInWords } from "./in-words.ts"
+import { labelOf, machineInWords, machineListInWords, machineShowInWords, spanListInWords } from "./in-words.ts"
 
 // The instants are written as a tool writes them for a person in Zurich: local, with the offset.
 const asOf = "2026-11-16T10:30:00.000+01:00"
@@ -15,11 +15,13 @@ function reading(value: string, changes: Partial<Reading> = {}): Reading {
 function machine(changes: Partial<Machine> = {}): Machine {
   return {
     machine: "P-04",
-    connection: reading("Connected"),
+    identity: { manufacturer: null, model: null, serialNumber: null },
+    jobOrder: null,
+    connection: reading("Running"),
     heartbeat: reading("2825"),
     itemState: reading("Executing"),
     operationMode: reading("Processing"),
-    program: reading("SHAFT_4711.MPF"),
+    program: reading("WM-SHAFT-4711"),
     lastValueAt: justNow,
     notifications: [],
     ...changes,
@@ -29,6 +31,7 @@ function machine(changes: Partial<Machine> = {}): Machine {
 const notification = (level: "Warning" | "Error") => ({
   correlationId: "c",
   notificationId: "2130",
+  severity: level === "Error" ? ("Failure" as const) : ("OffSpec" as const),
   level,
   title: "Spindle overtemperature",
   raisedAt: "2026-11-16T10:28:00.000+01:00",
@@ -36,28 +39,28 @@ const notification = (level: "Warning" | "Error") => ({
 })
 
 test("a running machine is its state, since when, and its program", () => {
-  assert.equal(machineInWords(machine(), asOf), "P-04: Running since 10:00, 30 min. Program SHAFT_4711.MPF.")
+  assert.equal(machineInWords(machine(), asOf), "P-04: Running since 10:00, 30 min. Work master WM-SHAFT-4711.")
 })
 
 test("a time stands as the result writes it, and a time in UTC says so", () => {
   const inUtc = machine({ itemState: reading("Executing", { since: "2026-11-16T09:00:00.000Z" }) })
-  assert.equal(machineInWords(inUtc, "2026-11-16T09:30:00.000Z"), "P-04: Running since 09:00 UTC, 30 min. Program SHAFT_4711.MPF.")
+  assert.equal(machineInWords(inUtc, "2026-11-16T09:30:00.000Z"), "P-04: Running since 09:00 UTC, 30 min. Work master WM-SHAFT-4711.")
 })
 
 test("a machine that stands says what is the matter, in the words of the card", () => {
   assert.equal(
     machineInWords(machine({ itemState: reading("NotExecuting") }), asOf),
-    "P-04: Stopped since 10:00, 30 min. No alarm, no reason recorded (NotExecuting, as the control reports). Program SHAFT_4711.MPF.",
+    "P-04: Stopped since 10:00, 30 min. No alarm, no reason recorded (NotExecuting, as the control reports). Work master WM-SHAFT-4711.",
   )
   assert.equal(
     machineInWords(machine({ notifications: [notification("Error")] }), asOf),
-    "P-04: Alarm since 10:28, 2 min. Spindle overtemperature (Error 2130). Program SHAFT_4711.MPF.",
+    "P-04: Alarm since 10:28, 2 min. Spindle overtemperature (Error 2130). Work master WM-SHAFT-4711.",
   )
 })
 
 test("a state that began before the values that were read is told as a lower bound", () => {
   const long = machine({ itemState: reading("Executing", { sinceIsLowerBound: true }) })
-  assert.equal(machineInWords(long, asOf), "P-04: Running since before 10:00, at least 30 min. Program SHAFT_4711.MPF.")
+  assert.equal(machineInWords(long, asOf), "P-04: Running since before 10:00, at least 30 min. Work master WM-SHAFT-4711.")
 })
 
 test("a silent machine has no data, and no program is named", () => {
@@ -65,6 +68,20 @@ test("a silent machine has no data, and no program is named", () => {
   assert.equal(
     machineInWords(silent, asOf),
     "P-04: No data since 10:20, 10 min. No data from the adapter (Last known: Executing at 10:20).",
+  )
+})
+
+test("an adapter that says it does not reach its machine has no data since it said so, however often it repeats it", () => {
+  // The adapter lives, its newest value is five seconds old, and it has said CommunicationFault since 10:00.
+  const lost = machine({ connection: reading("CommunicationFault"), itemState: reading("Executing", { at: "2026-11-16T09:59:00.000+01:00" }) })
+  assert.equal(
+    machineInWords(lost, asOf),
+    "P-04: No data since 10:00, 30 min. No data from the adapter (The adapter says CommunicationFault. Last known: Executing at 09:59).",
+  )
+  const starting = machine({ connection: reading("Initializing", { sinceIsLowerBound: true }), itemState: reading("x", { value: null, at: null }) })
+  assert.equal(
+    machineInWords(starting, asOf),
+    "P-04: No data since before 10:00, at least 30 min. No data from the adapter (The adapter says Initializing. Nothing known about this machine).",
   )
 })
 
@@ -81,7 +98,7 @@ test("the card in words has the sums of the history as the backend added them up
   assert.equal(
     machineShowInWords({ asOf, windowSeconds: 1800, machine: machine(), history }),
     [
-      "P-04: Running since 10:00, 30 min. Program SHAFT_4711.MPF.",
+      "P-04: Running since 10:00, 30 min. Work master WM-SHAFT-4711.",
       "Last 8 hours, 02:30 to 10:30: running 5 h 28 min, stopped 46 min, no data 22 min.",
       "Read at 10:30.",
     ].join("\n"),
@@ -103,4 +120,31 @@ test("the list in words has a line for each machine", () => {
   assert.match(lines[1] ?? "", /^P-07: Stopped since 10:00/)
   assert.equal(lines[2], "Read at 10:30.")
   assert.equal(machineListInWords({ asOf, windowSeconds: 1800, machines: [] }), "No machine published a value in the last 24 hours.")
+})
+
+test("a machine is named by its identification and its id, with the job order it works on", () => {
+  const named = machine({
+    machine: "alcyone-machines_AX-400_P-04",
+    identity: { manufacturer: "Alcyone Machine Works", model: "AX-400", serialNumber: "P-04" },
+    jobOrder: { jobOrderId: "4711/01", state: "Running", producedQuantity: 3, runsPlanned: 12 },
+  })
+  assert.equal(
+    machineInWords(named, asOf),
+    "Alcyone Machine Works AX-400 P-04 (alcyone-machines_AX-400_P-04): Running since 10:00, 30 min. Work master WM-SHAFT-4711. Job order 4711/01, 3 of 12.",
+  )
+})
+
+test("an adapter that is not Running says nothing current about the machine", () => {
+  for (const state of ["Initializing", "CommunicationFault", "Shutdown"]) {
+    assert.match(machineInWords(machine({ connection: reading(state) }), asOf), /^P-04: No data/, state)
+  }
+})
+
+test("a label where only the machine id is known is its model and serial number", () => {
+  assert.equal(labelOf("alcyone-machines_AX-400_P-04"), "AX-400 P-04")
+  assert.equal(labelOf("unknown_JuiceBar_JUICEBAR-01"), "JuiceBar JUICEBAR-01")
+  // An id that is not of the three parts of the binding stays as it is.
+  assert.equal(labelOf("P-04"), "P-04")
+  assert.equal(labelOf("a_b"), "a_b")
+  assert.equal(labelOf("a__c"), "a__c")
 })

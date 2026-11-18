@@ -90,8 +90,8 @@ public sealed class McpServerConformanceTests
 
         foreach (var tool in new[]
         {
-            "events_notification_query", "events_notification_pairs",
-            "events_notification_level_distribution", "events_notification_time_buckets", "events_notification_message_stats",
+            "events_machine_events_query", "events_sequence_gaps_query", "events_active_alerts_query",
+            "events_alert_pairs_query", "events_alert_statistics_query", "events_job_orders_query", "events_program_executions_query",
         })
         {
             Assert.Contains("- " + tool + "\n", text, StringComparison.Ordinal);

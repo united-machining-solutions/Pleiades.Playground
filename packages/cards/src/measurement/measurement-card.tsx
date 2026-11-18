@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { Badge } from "@pleiades/ui/components/badge"
 import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import { clock } from "../machine/format.ts"
+import { labelOf } from "../machine/in-words.ts"
 import type { MachineMeasurements, MeasurementList } from "./contract.ts"
 import { measuredValue, quantityLabel } from "./words.ts"
 
@@ -17,7 +18,7 @@ export function MeasurementCard({ machine, asOf }: { machine: MachineMeasurement
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle className="font-semibold group-data-[size=sm]/card:text-base">{machine.machine}</CardTitle>
+        <CardTitle className="font-semibold group-data-[size=sm]/card:text-base">{labelOf(machine.machine)}</CardTitle>
         {stale > 0 && (
           <CardAction>
             <Badge variant="outline">{stale === measurements.length ? "No current values" : `${stale} not current`}</Badge>

@@ -25,12 +25,14 @@
     "@tanstack/react-start": "catalog:",
     "cn": "catalog:",
     "lucide-react": "catalog:",
+    "mqtt": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "recharts": "catalog:",
     "shadcn": "catalog:",
     "tailwindcss": "catalog:",
-    "tw-animate-css": "catalog:"
+    "tw-animate-css": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@pleiades/genui-mcp": "workspace:*",

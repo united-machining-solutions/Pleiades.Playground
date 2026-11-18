@@ -3,10 +3,11 @@ using System.Text.Json.Serialization;
 namespace Pleiades.Playground.Common.DataTransferObjects;
 
 /// <summary>
-/// The unit of a numeric value. Every quantity has exactly one unit, its coherent SI unit, so no
-/// value is ambiguous: lengths are metres, energy is joule, ratios and percentages are fractions
-/// with the unit <see cref="One"/> (1.0 = 100 %). Displays convert, the wire and the storage do not.
-/// The JSON name of a member is the name of the unit in lower camel case, for example <c>"joule"</c>.
+/// The unit of a numeric value, named so that no value is ambiguous. A machine sends the units of the catalogue of
+/// the data model (energy in <see cref="WattHour"/>, counts in <see cref="Piece"/>), a place the coherent SI unit of
+/// its quantity (energy in <see cref="Joule"/>). Ratios and percentages are fractions with the unit
+/// <see cref="One"/> (1.0 = 100 %). The storage keeps a value in the unit it came in; displays convert. The JSON
+/// name of a member is the name of the unit in lower camel case, for example <c>"wattHour"</c>.
 /// </summary>
 [JsonConverter(typeof(JsonStringEnumConverter<BaseUnit>))]
 public enum BaseUnit
@@ -114,4 +115,16 @@ public enum BaseUnit
     /// <summary>Electrical conductivity (S/m).</summary>
     [JsonStringEnumMemberName("siemensPerMetre")]
     SiemensPerMetre,
+
+    /// <summary>Energy in watt hours (Wh), the unit of the data model for energy.</summary>
+    [JsonStringEnumMemberName("wattHour")]
+    WattHour,
+
+    /// <summary>A count of pieces, the unit of the data model for parts produced.</summary>
+    [JsonStringEnumMemberName("piece")]
+    Piece,
+
+    /// <summary>Mass flow rate (kg/s).</summary>
+    [JsonStringEnumMemberName("kilogramPerSecond")]
+    KilogramPerSecond,
 }

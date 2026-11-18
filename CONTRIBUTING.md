@@ -28,7 +28,8 @@ There is no contributor licence agreement.
   `fix(timeseries-persistence): reject numbers without unit`.
 - **Names:** `Pleiades.Playground.<Area>.<Part>` for .NET projects, `pleiades.playground.<area>.<part>` for images,
   kebab-case for folders outside `source/`.
-- **Units:** SI only, see [ADR-0002](docs/adr/0002-si-units-joule-and-one.md).
+- **Units:** machines keep the units of the data model, places use SI units; only a display converts, see
+  [ADR-0002](docs/adr/0002-si-units-joule-and-one.md).
 - **Secrets:** never commit a value. Add the name to `.env.example` and document it.
 - **Licence headers:** new files may carry `SPDX-License-Identifier: Apache-2.0`; documentation is CC BY 4.0.
 - **Decisions:** a choice that shapes the repository gets a short record under `docs/adr/`.
@@ -84,7 +85,12 @@ Agents are welcome. You stay responsible for the change: you sign off the commit
 you ask a person. See [Working with Claude](docs/working-with-claude.md); the rules for agents are in
 [AGENTS.md](AGENTS.md).
 
+Let the agent open the pull request: it knows what it did and what it checked, and fills in the template from
+that. GitHub's own page knows only the commits. If you open it there, paste the text the agent gives you.
+
 ## Adding a service
 
 A service is a folder with a `Dockerfile` and a short README. It reads and writes data only through a contract
-under `contracts/`, exposes a liveness endpoint and is added to `compose.yaml`. The language is up to you.
+under `contracts/`, exposes a liveness endpoint and is added to `compose.yaml` and to
+`margo/compose/compose.yaml`, the Margo app (see [margo/README.md](margo/README.md)); CI fails while the two name
+different services. The language is up to you.

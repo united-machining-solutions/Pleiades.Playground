@@ -34,11 +34,25 @@ public sealed class ManagedMqttClientOptions
     /// <returns>The options for <see cref="IManagedMqttClient.StartAsync"/>.</returns>
     public static ManagedMqttClientOptions From(MqttConfig config)
     {
+        return From(config, null);
+    }
+
+    /// <summary>
+    /// Creates the options from an <see cref="MqttConfig"/> and sets further ones the configuration cannot give,
+    /// such as a last will.
+    /// </summary>
+    /// <param name="config">The MQTT configuration of a service.</param>
+    /// <param name="configure">Sets further options on the builder after the configuration; may be null.</param>
+    /// <returns>The options for <see cref="IManagedMqttClient.StartAsync"/>.</returns>
+    public static ManagedMqttClientOptions From(MqttConfig config, Action<MqttClientOptionsBuilder>? configure)
+    {
         ArgumentNullException.ThrowIfNull(config);
 
+        var builder = new MqttClientOptionsBuilder().WithConfig(config);
+        configure?.Invoke(builder);
         return new ManagedMqttClientOptions
         {
-            ClientOptions = new MqttClientOptionsBuilder().WithConfig(config).Build(),
+            ClientOptions = builder.Build(),
             AutoReconnectDelay = TimeSpan.FromSeconds(AutoReconnectDelaySeconds),
             MaxPendingMessages = config.MaxPendingMessages ?? int.MaxValue,
         };

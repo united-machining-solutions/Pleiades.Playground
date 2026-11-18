@@ -29,7 +29,9 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   route tree, `routeTree.gen.ts`, is not committed here. It is written from the route files, see
   [`apps/app`: What is where](apps/app/README.md#what-is-where). Never commit it, and never edit it.
 - A service reads and writes data only through a contract under `contracts/`. Change the contract first.
-- SI units only; energy in joule, fractions in `one`. Never invent or convert units on the wire.
+- Units: a machine below `machines/` keeps the units of the data model (energy in `wattHour`); a place below
+  `sites/` uses SI units, energy in joule, fractions in `one`. Never invent or convert units on the wire, in a
+  store or in an API; a display converts (ADR-0002).
 - Never commit a secret value. Names go to `.env.example`.
 - Verify before you claim: `dotnet build` and `dotnet test --solution source/Pleiades.Playground.slnx`; for
   TypeScript `pnpm typecheck`, `pnpm test` and `pnpm build`; for the stack
@@ -38,6 +40,10 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
 - Do not commit, push or publish unless asked.
 - When asked: work on a branch, never on `main`; one topic per pull request; sign off every commit
   (`git commit -s`) and add a `Co-Authored-By` trailer that names you; fill in the pull request template.
+  When you push a branch for a person, offer to open its pull request, and open it yourself
+  (`gh pr create --body-file`): GitHub's page knows only the commits and leaves the template empty. Before
+  you open it, merge `origin/main` (`--signoff`, and after a conflict `git commit -s --no-edit`): a pull
+  request with a conflict runs no check. If the person opens it on GitHub, give them the filled-in text.
   When a pull request is open, or its check "Pull request says what it is" fails, run
   `node .github/scripts/check-pull-request.mjs <number>` and do what it says, also where a person opened it.
 - Use the GitHub CLI (`gh`) for pull requests, checks and logs. The person signs in; never ask for a token and
