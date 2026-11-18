@@ -343,6 +343,12 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
+  as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page
+  never reached the broker ("not live, no connection to the broker"), and a question asked outside the chat did
+  not begin one. The app makes its ids from `crypto.getRandomValues`, which is there in both.
+  [`docs/deployment.md`](docs/deployment.md) says what a reverse proxy with HTTPS needs for the live pages:
+  a route to the WebSocket of the broker and `MQTT_WS_URL`.
 - Ultimaker pairing can be repeated after rejection or a forgotten request without removing files;
   existing credentials survive failed replacements. Invalid printer status responses return HTTP 502
   and MCP tool errors instead of unhandled server errors.
