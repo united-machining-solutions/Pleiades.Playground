@@ -1,3 +1,5 @@
+using Pleiades.Playground.Mqtt.Extensions.Machines;
+
 namespace Pleiades.Playground.JuiceBar.Api;
 
 internal sealed record DrinkComponent(string Id, string? Name);
@@ -30,10 +32,13 @@ internal sealed class JuiceBarOptions
     /// <summary>An order is refused while this many orders wait at the machine.</summary>
     public int MaximumQueueLength { get; set; } = 3;
 
-    /// <summary>The first part of the machine id: the manufacturer, as the domain of its address without its ending.</summary>
-    public string Manufacturer { get; set; } = "trumpf";
+    /// <summary>
+    /// The web address of the manufacturer, <c>Identification/ManufacturerUri</c>. Its domain without the top-level
+    /// domain is the first part of the machine id, and with it the prefix of the signals of the manufacturer.
+    /// </summary>
+    public string ManufacturerUri { get; set; } = "https://www.trumpf.com";
 
-    /// <summary>The name of the manufacturer, as <c>Identification/Manufacturer</c> says it; not published while empty.</summary>
+    /// <summary>The name of the manufacturer, as <c>Identification/Manufacturer</c> says it.</summary>
     public string ManufacturerName { get; set; } = "TRUMPF";
 
     /// <summary>The model of the machine, the second part of the machine id.</summary>
@@ -42,8 +47,14 @@ internal sealed class JuiceBarOptions
     /// <summary>The serial number of the machine, the third part of the machine id.</summary>
     public string SerialNumber { get; set; } = "JUICEBAR-01";
 
+    /// <summary>The globally unique id of the machine; empty for <c>{ManufacturerUri}/{Model}/{SerialNumber}</c>.</summary>
+    public string ProductInstanceUri { get; set; } = string.Empty;
+
+    /// <summary>Who the machine is, by the rules of the MQTT binding.</summary>
+    public MachineIdentity Identity => new(ManufacturerName, ManufacturerUri, Model, SerialNumber, ProductInstanceUri);
+
     /// <summary>The machine id of the MQTT binding, <c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>.</summary>
-    public string MachineId => Manufacturer + "_" + Model + "_" + SerialNumber;
+    public string MachineId => Identity.MachineId;
 
     /// <summary>Language of the names the machine returns: <c>en</c> or <c>de</c>.</summary>
     public string Language { get; set; } = "en";

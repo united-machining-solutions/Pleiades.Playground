@@ -41,8 +41,8 @@ All notable changes are documented here. The format follows
   a machine that runs MixerControl over REST and MCP, an order on request, and its state on the broker below
   `machines/{MachineId}/`, `trumpf_JuiceBar_JUICEBAR-01` by default, with its own values below `oem/JuiceBar/`.
   It never starts the production; `JUICEBAR_ENABLE_ORDERING=false` makes it read-only. `JUICEBAR_SERIAL_NUMBER`
-  names its serial number, `JUICEBAR_MANUFACTURER`, `JUICEBAR_MANUFACTURER_NAME` and `JUICEBAR_MODEL` the rest
-  of its machine id and its name on the screen.
+  names its serial number, `JUICEBAR_MANUFACTURER_URI`, `JUICEBAR_MANUFACTURER_NAME` and `JUICEBAR_MODEL` the
+  rest of its machine id and its name on the screen.
 
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
@@ -216,6 +216,20 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- The Ultimaker telemetry and the juice bar publish the payloads and the delivery of the MQTT binding of
+  machines, not only its tree, as the simulators do: every value retained with QoS 1 in the envelope
+  `{timestamp, value, unit}` with the content type `application/json`, a manifest before the values (profile
+  `Core`, what the device lacks `"available": false`, their own signals with the prefix `x-ultimaker-com` and
+  `x-trumpf-com`), the snapshot `umati/State/Status` instead of a value on `umati/State/Status/MachineryItemState` (a printer
+  state the model has no word for is `OutOfService`),
+  `Connection/State` `Initializing`, `Running`, `CommunicationFault` and `Shutdown`, a last will with
+  `CommunicationFault`, and the identification with `ProductInstanceUri` and `ManufacturerUri` retained at every
+  connect instead of every five minutes. A value goes out when it changes. The machine ids stay
+  `ultimaker_UM3_UM3-01` and `trumpf_JuiceBar_JUICEBAR-01`; both adapters form them now by the rule of the binding
+  from the web address of the manufacturer (`Config:ManufacturerUri`, `JUICEBAR_MANUFACTURER_URI`), which replaces
+  `Config:Manufacturer` and `JUICEBAR_MANUFACTURER`. The Timeseries store keeps the same topics as before. The
+  publisher, the rule of the machine id and the last will live in `Pleiades.Playground.Mqtt.Extensions.Machines`
+  and the simulator uses them too; `AddClient` of the MQTT client host takes further options, such as a last will.
 - `machines/{machineId}/` carries the umati data model 0.17.1 instead of the binding of the playground
   ([`contracts/mqtt`](contracts/mqtt/README.md), ADR-0015; [`contracts/datamodel`](contracts/datamodel/README.md)
   refers to commit `3a799d5`): `umati/Manifest`, `umati/<path>`, `oem/<path>` for the signals of the

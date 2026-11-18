@@ -1,9 +1,11 @@
 # Ultimaker telemetry
 
 A separate .NET adapter publishes read-only live observations from the requesting user's Ultimaker
-to the existing Pleiades MQTT broker. It uses the same managed MQTT client, value DTOs, content
-types and health-check libraries as the simulator. Its proposed contract is
-[telemetry.md](../../contracts/ultimaker/telemetry.md); the shared MQTT binding is unchanged.
+to the existing Pleiades MQTT broker, as the [MQTT binding of machines](../../contracts/mqtt/README.md) says:
+retained values with QoS 1 in the envelope of the data model, a manifest, `Connection/State` as the state of
+the adapter and a last will. It uses the same managed MQTT client, the same publisher of the binding
+(`Pleiades.Playground.Mqtt.Extensions.Machines`) and the same health-check libraries as the simulator. Its
+contract is [telemetry.md](../../contracts/ultimaker/telemetry.md); the shared MQTT binding is unchanged.
 
 ## Run
 
@@ -21,8 +23,10 @@ depend on the slicer, require printer pairing or enable printing.
 Settings in .env.example: ULTIMAKER_SERIAL_NUMBER (logical serial number, default UM3-01), ULTIMAKER_PRINTER_URL,
 ULTIMAKER_POLL_INTERVAL_SECOND (default 2), ULTIMAKER_MQTT_URL, ULTIMAKER_MQTT_USER and
 ULTIMAKER_MQTT_PASSWORD. The logical serial number is not asserted to be the physical one. The machine id
-is `<manufacturer>_<model>_<serial number>`, `ultimaker_UM3_UM3-01` by default (`Config:Manufacturer`,
-`Config:Model`, `Config:SerialNumber`).
+is `<manufacturer>_<model>_<serial number>` by the rule of the binding, `ultimaker_UM3_UM3-01` by default: the
+domain of `Config:ManufacturerUri` (`https://ultimaker.com`) without its ending, `Config:Model` and
+`Config:SerialNumber`. `Config:ManufacturerName` is `Identification/Manufacturer`, `Config:ProductInstanceUri`
+the globally unique id (empty: `https://ultimaker.com/UM3/UM3-01`).
 Secrets are configured by the operator, never logged or copied into code.
 
 ## Observations and units
@@ -37,17 +41,19 @@ See the contract table for every topic under `machines/{MachineId}/`.
 Temperatures use `degreeCelsius`, the explicit exception already documented in the MQTT binding.
 Positions and lengths are converted from manufacturer millimetres to metre; fan percentages to
 fractions. Unknown negative material lengths and missing job measurements are omitted, not zeroed.
-Job filenames and user names are not published. Unknown machine states are not fabricated into an
-umati state; the original state of the manufacturer remains available below `oem/`.
+Job filenames and user names are not published. A printer state the model has no word for is
+`OutOfService` in `State/Status` (see the contract); the original state of the manufacturer remains available
+below `oem/`.
 
 UTC timestamps are the adapter's observation time of each live snapshot. No printer clock or
-diagnostics boot-relative timestamp is substituted. Messages are not retained.
+diagnostics boot-relative timestamp is substituted. Every value is retained and goes out when it changes.
 An independent ten-second heartbeat counter runs even while printer requests are blocked. The
-connection state reports CommunicationFault when polling fails or the last success becomes stale,
-and Running otherwise.
-Abrupt process loss is detected by a missing heartbeat; the counter resets on process restart.
-The shared MQTT client reconnects and has a bounded outgoing queue. The adapter skips sensor
-publishing while disconnected from the broker. Consumers must still respect timestamps and age.
+connection state says Initializing until the printer first answers, Running while it answers,
+CommunicationFault while a poll fails, and Shutdown at a clean stop; the last will sets CommunicationFault
+when the connection to the broker breaks off. After every connect the adapter publishes the manifest and every
+value again, then the state. The counter resets on process restart.
+The shared MQTT client reconnects and has a bounded outgoing queue. Consumers must still respect timestamps and
+age.
 
 ## Faults as alert events
 
@@ -59,8 +65,8 @@ The Events persistence stores them, and the Events API pairs raising and clearin
 the next job starts, a failed job when the printer reports the build plate as cleared. The contract table
 says what each event carries. While the broker is away up to 1000 events wait in order.
 The printer log names hosts and users: only time, code and text of a fault are published, and nothing of
-the log is written to the adapter's own log. `Config:FaultPollIntervalSecond` (5..600),
-`Config:FaultLogLines` (50..5000) and `Config:ManufacturerUri` change the defaults.
+the log is written to the log of the adapter. `Config:FaultPollIntervalSecond` (5..600) and
+`Config:FaultLogLines` (50..5000) change the defaults.
 
 ## Health
 
@@ -76,9 +82,10 @@ times. The existing `genui_machine_list` discovers ultimaker_UM3_UM3-01 from sto
 The existing card focuses on state; numeric temperatures are available through Timeseries.
 
 Run `dotnet test --project source/Pleiades.Playground.Ultimaker.Telemetry.Test/Pleiades.Playground.Ultimaker.Telemetry.Test.csproj`.
-The tests cover unit conversion, unknown-value handling, state mapping, an independent heartbeat
-while the printer request is blocked, and the alert events of a printer whose levelling failed,
-replayed from its log. Build and run the container to verify the actual broker path.
+The tests cover unit conversion, unknown-value handling, state mapping, the manifest and the values against
+the JSON schemas of the data model (with a clone of it, as for the simulator), the states of the adapter
+against a fake printer that answers and fails, an independent heartbeat while the printer request is
+blocked, and the alert events of a printer whose levelling failed, replayed from its log. Build and run the container to verify the actual broker path.
 The Images workflow publishes `ghcr.io/united-machining-solutions/pleiades.playground.ultimaker.telemetry`
 after a merge to main or release tag. Enable `COMPOSE_PROFILES=ultimaker` in the deployment computer's
 private .env; see [deployment](../../docs/deployment.md#enable-the-ultimaker-services).

@@ -293,8 +293,9 @@ services:
       JuiceBar__EnableOrdering: ${JUICEBAR_ENABLE_ORDERING:-true}
       JuiceBar__MaximumQueueLength: ${JUICEBAR_MAX_QUEUE_LENGTH:-3}
       # The machine id in every topic is <manufacturer>_<model>_<serial number>, by default
-      # trumpf_JuiceBar_JUICEBAR-01: the juice bar of the demo was built by TRUMPF.
-      JuiceBar__Manufacturer: ${JUICEBAR_MANUFACTURER:-trumpf}
+      # trumpf_JuiceBar_JUICEBAR-01: the juice bar of the demo was built by TRUMPF. The manufacturer is the domain
+      # of its web address without www. and its ending, as the MQTT binding forms it.
+      JuiceBar__ManufacturerUri: ${JUICEBAR_MANUFACTURER_URI:-https://www.trumpf.com}
       JuiceBar__ManufacturerName: ${JUICEBAR_MANUFACTURER_NAME:-TRUMPF}
       JuiceBar__Model: ${JUICEBAR_MODEL:-JuiceBar}
       JuiceBar__SerialNumber: ${JUICEBAR_SERIAL_NUMBER:-JUICEBAR-01}

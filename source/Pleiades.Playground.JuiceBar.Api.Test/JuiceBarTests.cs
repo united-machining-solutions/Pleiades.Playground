@@ -15,6 +15,11 @@ using ModelContextProtocol.Protocol;
 using Pleiades.Playground.Common.DataTransferObjects;
 using Pleiades.Playground.Mcp.Server;
 using Pleiades.Playground.Mcp.Testing;
+using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Mqtt.Extensions.Machines;
+using Pleiades.Playground.Mqtt.Extensions.Testing;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Pleiades.Playground.JuiceBar.Api.Test;
 
@@ -46,40 +51,29 @@ public sealed class JuiceBarTests
     }
 
     [TestMethod]
-    public void TheMachineIdIsManufacturerModelAndSerialNumberAndTheIdentificationNamesWhatIsKnown()
+    public void TheMachineIdFollowsTheRuleOfTheBinding_AndTheDefaultsNameTheJuiceBarOfTheDemo()
     {
         var options = new JuiceBarOptions();
-        // The juice bar of the demo, by default.
+        // The juice bar of the demo, by default: the domain of TRUMPF without its ending.
         Assert.AreEqual("trumpf_JuiceBar_JUICEBAR-01", options.MachineId);
+        Assert.AreEqual("https://www.trumpf.com/JuiceBar/JUICEBAR-01", options.Identity.EffectiveProductInstanceUri);
+        Assert.AreEqual("x-trumpf-com", options.Identity.ExtensionPrefix);
         CollectionAssert.AreEqual(
-            new[] { ("Manufacturer", "TRUMPF"), ("Model", "JuiceBar"), ("SerialNumber", "JUICEBAR-01") },
-            TelemetryMapper.Identification(options).ToArray());
+            new[] { ("Identification.Manufacturer", "TRUMPF"), ("Identification.SerialNumber", "JUICEBAR-01"),
+                ("Identification.ProductInstanceUri", "https://www.trumpf.com/JuiceBar/JUICEBAR-01"),
+                ("Identification.ManufacturerUri", "https://www.trumpf.com"), ("Identification.Model", "JuiceBar") },
+            options.Identity.Values(DateTimeOffset.UnixEpoch).Select(v => (v.Path, v.Value!.GetValue<string>())).ToArray());
 
-        // A manufacturer without a name is not published: nothing is said that is not known.
-        var unnamed = new JuiceBarOptions { Manufacturer = "unknown", ManufacturerName = string.Empty };
-        Assert.AreEqual("unknown_JuiceBar_JUICEBAR-01", unnamed.MachineId);
-        CollectionAssert.AreEqual(
-            new[] { ("Model", "JuiceBar"), ("SerialNumber", "JUICEBAR-01") },
-            TelemetryMapper.Identification(unnamed).ToArray());
-
-        var named = new JuiceBarOptions { Manufacturer = "example-mixers", ManufacturerName = "Example Mixers", Model = "JB-8", SerialNumber = "0042" };
+        var named = new JuiceBarOptions { ManufacturerUri = "https://www.example-mixers.example", ManufacturerName = "Example Mixers", Model = "JB 8", SerialNumber = "0042" };
         Assert.AreEqual("example-mixers_JB-8_0042", named.MachineId);
-        CollectionAssert.AreEqual(
-            new[] { ("Manufacturer", "Example Mixers"), ("Model", "JB-8"), ("SerialNumber", "0042") },
-            TelemetryMapper.Identification(named).ToArray());
     }
 
     [TestMethod]
-    public void TelemetryUsesBindingUnitsAndSaysNothingAboutAMachineThatDoesNotAnswer()
+    public void TelemetryUsesBindingUnitsAndTheSnapshotOfTheModel()
     {
         var live = new LiveState(TimeProvider.System);
-        var now = DateTime.UtcNow;
-        var silent = TelemetryMapper.Map(live.Snapshot(), now);
-        Assert.HasCount(1, silent);
-        // The adapter runs and does not reach the machine: the state of the data model for that.
-        Assert.AreEqual("umati/Connection/State", silent[0].Suffix);
-        Assert.AreEqual("CommunicationFault", ((StringValueDto)silent[0].Message).Value);
-
+        var identity = new JuiceBarOptions().Identity;
+        var now = DateTimeOffset.UtcNow;
         live.Connected();
         Apply(live, """42/production,["state","processingOrder"]""");
         Apply(live, """42/production,["progress",40]""");
@@ -87,19 +81,29 @@ public sealed class JuiceBarTests
         Apply(live, """42/production,["warning",{"pumpNr":2}]""");
         Apply(live, """42/production,["amountWarning",{"pumpNr":"1","warningCleared":true}]""");
         Apply(live, """42/production,["unknown",{"x":1}]""");
-        var values = TelemetryMapper.Map(live.Snapshot(), now).ToDictionary(s => s.Suffix, s => s.Message);
-        Assert.AreEqual("Running", ((StringValueDto)values["umati/Connection/State"]).Value);
+        var values = TelemetryMapper.Map(live.Snapshot(), now, identity)
+            .ToDictionary(v => MachineBinding.Topic(identity.MachineId, v.Path)["machines/trumpf_JuiceBar_JUICEBAR-01/".Length..]);
         // What the data model does not know lies in the namespace oem, and nothing in the earlier vendor.
-        Assert.IsFalse(values.Keys.Any(suffix => suffix.StartsWith("vendor/", StringComparison.Ordinal)));
-        var progress = (BaseUnitValueDto)values["oem/JuiceBar/Production/Progress"];
-        Assert.AreEqual(.4, progress.Value);
-        Assert.AreEqual(BaseUnit.One, progress.Unit);
+        Assert.IsFalse(values.Keys.Any(topic => topic.StartsWith("vendor/", StringComparison.Ordinal)));
+        var progress = values["oem/JuiceBar/Production/Progress"];
+        Assert.AreEqual(.4, progress.Value!.GetValue<double>());
+        Assert.AreEqual("one", progress.Unit);
         Assert.AreEqual(now, progress.Timestamp);
-        Assert.AreEqual(1, ((BaseUnitValueDto)values["oem/JuiceBar/Production/QueueLength"]).Value);
-        // The state is a field of the snapshot State/Status, on the topic the store keeps it on.
-        Assert.AreEqual("Executing", ((StringValueDto)values["umati/State/Status/MachineryItemState"]).Value);
-        Assert.IsTrue(((BooleanValueDto)values["oem/JuiceBar/Pump/2/AmountWarning"]).Value);
-        Assert.IsFalse(((BooleanValueDto)values["oem/JuiceBar/Pump/1/AmountWarning"]).Value);
+        Assert.AreEqual(1, values["oem/JuiceBar/Production/QueueLength"].Value!.GetValue<int>());
+        // The state is the snapshot State/Status of the model, one topic, not a value on a field topic.
+        Assert.AreEqual("Executing", values["umati/State/Status"].Value!["MachineryItemState"]!.GetValue<string>());
+        Assert.AreEqual("None", values["umati/State/Status"].Value!["MachineryOperationMode"]!.GetValue<string>());
+        Assert.IsFalse(values.ContainsKey("umati/State/Status/MachineryItemState"));
+        Assert.IsTrue(values["oem/JuiceBar/Pump/2/AmountWarning"].Value!.GetValue<bool>());
+        Assert.IsFalse(values["oem/JuiceBar/Pump/1/AmountWarning"].Value!.GetValue<bool>());
+        foreach (var unit in values.Values.Select(v => v.Unit).OfType<string>())
+        {
+            Assert.IsNotNull(JsonSerializer.Deserialize<BaseUnit?>("\"" + unit + "\""), unit);
+        }
+
+        var manifest = TelemetryMapper.Manifest(identity, TimeSpan.FromSeconds(10), [.. TelemetryMapper.Signals, TelemetryMapper.PumpWarning(1), TelemetryMapper.PumpWarning(2)]);
+        ModelSchemas.AssertManifestValid(manifest);
+        ModelSchemas.AssertValuesValid(values.Values.Select(v => MachineBinding.ValueMessage(identity.MachineId, v)), identity.MachineId, manifest);
 
         // Progress belongs to the drink that is being mixed, and to nothing after it.
         Apply(live, """42/production,["state","waitingOrder"]""");
@@ -109,6 +113,63 @@ public sealed class JuiceBarTests
         live.Disconnected();
         Assert.IsNull(live.Snapshot().ProductionState);
         Assert.IsEmpty(live.Snapshot().Queue);
+    }
+
+    [TestMethod]
+    public async Task TheAdapterSaysCommunicationFaultWhileTheMachineIsSilent_AndNamesANewPumpInTheManifestBeforeItsValue()
+    {
+        using var mqtt = new RecordingManagedMqttClient();
+        var live = new LiveState(TimeProvider.System);
+        var options = new JuiceBarOptions();
+        var identity = options.Identity;
+        using var worker = new TelemetryWorker(mqtt, live, Options.Create(options), TimeProvider.System, NullLogger<TelemetryWorker>.Instance);
+        using var publisher = new MachinePublisher(mqtt, identity, TelemetryMapper.Manifest(identity, TimeSpan.FromSeconds(10), TelemetryMapper.Signals),
+            TimeProvider.System, NullLogger.Instance);
+        await publisher.AttachAsync();
+
+        await worker.PublishAsync(publisher, identity, live.Snapshot(), DateTimeOffset.UtcNow);
+        var silent = mqtt.Take();
+        Assert.AreEqual("Initializing", (string?)RecordingManagedMqttClient.Json(silent[0])["value"]);
+        Assert.AreEqual("CommunicationFault", (string?)RecordingManagedMqttClient.Json(silent[^1])["value"]);
+        Assert.IsFalse(silent.Any(m => m.Topic.Contains("/oem/", StringComparison.Ordinal)), "nothing is said about a machine that does not answer");
+
+        live.Connected();
+        Apply(live, """42/production,["state","waitingOrder"]""");
+        Apply(live, """42/production,["warning",{"pumpNr":3}]""");
+        await worker.PublishAsync(publisher, identity, live.Snapshot(), DateTimeOffset.UtcNow);
+        var reached = mqtt.Take();
+        var manifest = reached.FindIndex(m => m.Topic.EndsWith("/umati/Manifest", StringComparison.Ordinal));
+        var pump = reached.FindIndex(m => m.Topic.EndsWith("/oem/JuiceBar/Pump/3/AmountWarning", StringComparison.Ordinal));
+        Assert.IsTrue(manifest >= 0 && manifest < pump, "the manifest names the pump before its value goes out");
+        Assert.AreEqual("Running", (string?)RecordingManagedMqttClient.Json(reached[^1])["value"]);
+        ModelSchemas.AssertManifestValid(RecordingManagedMqttClient.Json(reached[manifest]));
+        ModelSchemas.AssertValuesValid(reached, identity.MachineId, RecordingManagedMqttClient.Json(reached[manifest]));
+    }
+
+    [TestMethod]
+    public async Task WithABrokerTheServicePublishesWhatTheMachineSaysAsTheBindingSays()
+    {
+        await using var machine = await FakeMixerControl.StartAsync(TestContext.CancellationToken);
+        using var mqtt = new RecordingManagedMqttClient();
+        await using var factory = new JuiceBarFactory(machine.BaseUrl, ("Config:MqttDestination:ConnectionString", "mqtt://127.0.0.1:1")) { Mqtt = mqtt };
+        using var http = factory.CreateClient();
+        await ConnectedAsync(http);
+        const string Machine = "machines/trumpf_JuiceBar_JUICEBAR-01/";
+        await UntilAsync(() => Task.FromResult(mqtt.Messages.Any(m => m.Topic == Machine + "oem/JuiceBar/Pump/2/AmountWarning")
+            && mqtt.Messages.Any(m => m.Topic == Machine + "umati/Connection/State" && (string?)RecordingManagedMqttClient.Json(m)["value"] == "Running")));
+
+        var messages = mqtt.Messages.ToList();
+        Assert.IsTrue(messages.All(m => m.Retain && m.QualityOfServiceLevel == MQTTnet.Protocol.MqttQualityOfServiceLevel.AtLeastOnce && m.ContentType == "application/json"));
+        Assert.AreEqual("Initializing", (string?)RecordingManagedMqttClient.Json(messages[0])["value"]);
+        var status = RecordingManagedMqttClient.Json(messages.Last(m => m.Topic == Machine + "umati/State/Status"));
+        Assert.AreEqual("NotExecuting", status["value"]!["MachineryItemState"]!.GetValue<string>());
+        Assert.IsTrue(RecordingManagedMqttClient.Json(messages.Last(m => m.Topic == Machine + "oem/JuiceBar/Pump/2/AmountWarning"))["value"]!.GetValue<bool>());
+        var manifest = RecordingManagedMqttClient.Json(messages.Last(m => m.Topic == Machine + "umati/Manifest"));
+        ModelSchemas.AssertValuesValid(messages, "trumpf_JuiceBar_JUICEBAR-01", manifest);
+        // The last will of the binding is set on the client.
+        Assert.AreEqual(Machine + "umati/Connection/State", mqtt.Options!.ClientOptions.WillTopic);
+        Assert.IsTrue(mqtt.Options.ClientOptions.WillRetain);
+        Assert.IsFalse(machine.Requests.Any(r => r.StartsWith("POST", StringComparison.Ordinal)), "the adapter only reads");
     }
 
     [TestMethod]
@@ -377,8 +438,20 @@ public sealed class JuiceBarTests
             SigningCredentials = new SigningCredentials(Key, SecurityAlgorithms.HmacSha256),
         });
 
+        /// <summary>A broker without a broker: the service publishes to it once a connection string is set.</summary>
+        internal RecordingManagedMqttClient? Mqtt { get; init; }
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
+            if (Mqtt is { } mqtt)
+            {
+                builder.ConfigureTestServices(services =>
+                {
+                    services.AddKeyedSingleton<IManagedMqttClient>("default", mqtt);
+                    services.AddSingleton<IManagedMqttClient>(mqtt);
+                });
+            }
+
             builder.UseSetting("JuiceBar:BaseUrl", machine.ToString());
             builder.UseSetting("Config:Auth:Enabled", SignIn ? "true" : "false");
             foreach (var (key, value) in settings)

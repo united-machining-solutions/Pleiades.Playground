@@ -19,7 +19,7 @@ internal sealed class FaultEventWorker(IHttpClientFactory clients, IManagedMqttC
     internal const int OutboxCapacity = 1000;
     private const int HistoryCount = 10;
     private readonly FaultEventTracker _tracker = new();
-    private readonly FaultEventEnvelope _envelope = new(options.Value.ProductInstanceUri, DateTimeOffset.UtcNow);
+    private readonly FaultEventEnvelope _envelope = new(options.Value.Identity.EffectiveProductInstanceUri, DateTimeOffset.UtcNow);
     // Events wait here, in the order they came up, while the broker is away.
     private readonly Queue<string> _outbox = new();
     private string Topic => "machines/" + options.Value.MachineId + "/events/notifications";

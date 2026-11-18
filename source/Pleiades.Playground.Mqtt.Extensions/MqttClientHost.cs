@@ -49,10 +49,13 @@ internal class MqttClientHost: IHostedService
     private readonly ILogger _logger;
     private readonly Dictionary<string, EventHandlers> _eventHandlers = [];
     private readonly Dictionary<string, ConnectionWatchdog> _watchdogs = [];
+    private readonly IImmutableDictionary<string, Action<MqttClientOptionsBuilder>> _configure;
 
-    public MqttClientHost(IImmutableDictionary<string, IManagedMqttClient> clients, IOptionsMonitor<MqttConfig> configOptions, ILogger<MqttClientHost> logger)
+    public MqttClientHost(IImmutableDictionary<string, IManagedMqttClient> clients, IOptionsMonitor<MqttConfig> configOptions, ILogger<MqttClientHost> logger,
+        IImmutableDictionary<string, Action<MqttClientOptionsBuilder>>? configure = null)
     {
         _clients = clients;
+        _configure = configure ?? ImmutableDictionary<string, Action<MqttClientOptionsBuilder>>.Empty;
         _configOptions = configOptions;
         _logger = logger;
     }
@@ -65,7 +68,7 @@ internal class MqttClientHost: IHostedService
                 _logMqttClientStart(_logger, client.Key, null);
                 AttachLifecycleHandlers(client.Key, client.Value);
                 var config = _configOptions.Get(client.Key);
-                var options = ManagedMqttClientOptions.From(config);
+                var options = ManagedMqttClientOptions.From(config, _configure.GetValueOrDefault(client.Key));
                 var watchdog = new ConnectionWatchdog(client.Key, client.Value, _logger);
                 _watchdogs[client.Key] = watchdog;
                 return StartClientAsync(client.Value, options, watchdog);

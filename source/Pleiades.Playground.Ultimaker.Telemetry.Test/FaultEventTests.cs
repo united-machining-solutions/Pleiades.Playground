@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
-using Moq;
 using MQTTnet;
 using MQTTnet.Protocol;
-using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Mqtt.Extensions.Testing;
 using Pleiades.Playground.Ultimaker.Faults;
 
 namespace Pleiades.Playground.Ultimaker.Telemetry.Test;
@@ -28,7 +26,8 @@ public sealed class FaultEventTests
     [TestMethod]
     public async Task FaultAndFailedJobOfThePrinterBecomeAlertEventsOfTheBinding()
     {
-        var (mqtt, messages) = Broker(connected: true);
+        var mqtt = new RecordingManagedMqttClient();
+        var messages = mqtt.Messages;
         using var printer = new ReplayPrinter { Log = "[]", History = "[" + AbortedJob + "]" };
         using var worker = Worker(printer, mqtt);
 
@@ -108,7 +107,8 @@ public sealed class FaultEventTests
     [TestMethod]
     public async Task EventsWaitInOrderWhileTheBrokerIsAwayAndAnUnreachablePrinterRaisesNothing()
     {
-        var (mqtt, messages) = Broker(connected: false);
+        var mqtt = new RecordingManagedMqttClient(connected: false);
+        var messages = mqtt.Messages;
         using var printer = new ReplayPrinter { Log = "[]", History = "[]" };
         using var worker = Worker(printer, mqtt);
         await worker.PollAsync(TestContext.CancellationToken).ConfigureAwait(false);
@@ -119,7 +119,7 @@ public sealed class FaultEventTests
 
         // The printer stops answering while the broker comes back: what waited goes out, nothing new comes up.
         printer.Status = HttpStatusCode.ServiceUnavailable;
-        mqtt.SetupGet(m => m.IsConnected).Returns(true);
+        await mqtt.ConnectAsync().ConfigureAwait(false);
         await Assert.ThrowsAsync<HttpRequestException>(() => worker.PollAsync(TestContext.CancellationToken)).ConfigureAwait(false);
         CollectionAssert.AreEqual(new[] { "000000000001", "000000000002", "000000000003" },
             messages.Select(m => JsonDocument.Parse(m.Payload).RootElement.GetProperty("sequence").GetString()!.Split('.')[1]).ToArray());
@@ -127,21 +127,8 @@ public sealed class FaultEventTests
         Assert.HasCount(3, messages);
     }
 
-    private static (Mock<IManagedMqttClient> Mqtt, ConcurrentQueue<MqttApplicationMessage> Messages) Broker(bool connected)
-    {
-        var messages = new ConcurrentQueue<MqttApplicationMessage>();
-        var mqtt = new Mock<IManagedMqttClient>();
-        mqtt.SetupGet(m => m.IsConnected).Returns(connected);
-        mqtt.Setup(m => m.EnqueueAsync(It.IsAny<MqttApplicationMessage>())).Returns((MqttApplicationMessage message) =>
-        {
-            messages.Enqueue(message);
-            return Task.CompletedTask;
-        });
-        return (mqtt, messages);
-    }
-
-    private static FaultEventWorker Worker(ReplayPrinter printer, Mock<IManagedMqttClient> mqtt)
-        => new(new FakeFactory(printer), mqtt.Object, Options.Create(new TelemetryOptions()), NullLogger<FaultEventWorker>.Instance);
+    private static FaultEventWorker Worker(ReplayPrinter printer, RecordingManagedMqttClient mqtt)
+        => new(new FakeFactory(printer), mqtt, Options.Create(new TelemetryOptions()), NullLogger<FaultEventWorker>.Instance);
 
     private sealed class FakeFactory(HttpMessageHandler handler) : IHttpClientFactory
     {

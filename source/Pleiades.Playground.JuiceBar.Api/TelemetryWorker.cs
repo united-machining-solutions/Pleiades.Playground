@@ -1,138 +1,152 @@
 using System.Globalization;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
-using Pleiades.Playground.Common.DataTransferObjects;
 using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Mqtt.Extensions.Machines;
 
 namespace Pleiades.Playground.JuiceBar.Api;
 
-internal sealed record TelemetrySample(string Suffix, IMessage Message);
-
 /// <summary>
-/// The state of the machine as values of the MQTT binding, below <c>machines/{MachineId}/</c>: the elements of the
-/// data model below <c>umati/</c>, the values of the machine itself, which the model does not know, below
-/// <c>oem/JuiceBar/</c>.
+/// The state of the machine as values of the MQTT binding, below <c>machines/{MachineId}/</c>: the snapshot
+/// <c>State.Status</c> of the data model below <c>umati/</c>, and the values of the machine itself, which the model
+/// does not know, as signals of the manufacturer below the prefix <c>x-&lt;domain&gt;</c>, which the binding maps to
+/// <c>oem/</c>. Their paths begin with <c>JuiceBar</c>, as the topics did before the payloads followed the binding.
 /// </summary>
-internal static class TelemetryMapper
+internal static partial class TelemetryMapper
 {
-    internal const string Oem = "oem/JuiceBar/";
+    /// <summary>The first segment of every signal below the prefix of the manufacturer.</summary>
+    internal const string Root = "JuiceBar";
 
-    /// <summary>The adapter reaches the machine.</summary>
-    internal const string Running = "Running";
+    /// <summary>
+    /// The machine has no operation modes of the model: <c>None</c>, which OPC 40001 gives for "no operation mode
+    /// available". The schema of the snapshot asks for both fields.
+    /// </summary>
+    internal const string NoOperationMode = "None";
 
-    /// <summary>The adapter runs and does not reach the machine.</summary>
-    internal const string CommunicationFault = "CommunicationFault";
+    /// <summary>The signals every juice bar has; a pump adds one of its own once the machine reports it.</summary>
+    internal static readonly IReadOnlyList<string> Signals =
+        [Root + ".Production.State", Root + ".PumpControl.Mode", Root + ".Production.QueueLength", Root + ".Production.Progress"];
 
-    internal static IReadOnlyList<TelemetrySample> Map(LiveSnapshot snapshot, DateTime observedAt)
+    /// <summary>
+    /// The whole of what a machine that answers says now; a value it does not give is left out. A machine that does
+    /// not answer says nothing: the adapter reports <c>CommunicationFault</c>, and the values stand.
+    /// </summary>
+    internal static IReadOnlyList<MachineValue> Map(LiveSnapshot snapshot, DateTimeOffset observedAt, MachineIdentity identity)
     {
-        var samples = new List<TelemetrySample>
-        {
-            // The states of an adapter of the data model: Running while the machine answers, CommunicationFault
-            // while it does not.
-            new("umati/Connection/State", new StringValueDto { Timestamp = observedAt, Value = snapshot.Connected ? Running : CommunicationFault }),
-        };
-        if (!snapshot.Connected)
-        {
-            // Nothing is known about a machine that does not answer, so nothing else is said.
-            return samples;
-        }
-
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(identity);
+        var values = new List<MachineValue>();
         if (snapshot.ProductionState is { } state)
         {
-            samples.Add(new(Oem + "Production/State", new StringValueDto { Timestamp = observedAt, Value = state }));
-            // A field of the snapshot State/Status, on the topic the store keeps it on: this adapter sends no
-            // snapshots yet, as the Ultimaker telemetry.
-            samples.Add(new("umati/State/Status/MachineryItemState",
-                new StringValueDto { Timestamp = observedAt, Value = state == "processingOrder" ? "Executing" : "NotExecuting" }));
+            values.Add(new(identity.Signal(Root + ".Production.State"), JsonValue.Create(state), observedAt));
         }
+
+        // The snapshot of the model; null while the machine has not said its state.
+        values.Add(new(MachineManifest.Status, snapshot.ProductionState is { } production
+            ? new JsonObject
+            {
+                ["MachineryItemState"] = production == "processingOrder" ? "Executing" : "NotExecuting",
+                ["MachineryOperationMode"] = NoOperationMode,
+            }
+            : null, observedAt));
 
         if (snapshot.PumpControlMode is { } mode)
         {
-            samples.Add(new(Oem + "PumpControl/Mode", new StringValueDto { Timestamp = observedAt, Value = mode }));
+            values.Add(new(identity.Signal(Root + ".PumpControl.Mode"), JsonValue.Create(mode), observedAt));
         }
 
-        samples.Add(new(Oem + "Production/QueueLength",
-            new BaseUnitValueDto { Timestamp = observedAt, Value = snapshot.Queue.Count, Unit = BaseUnit.One }));
+        values.Add(new(identity.Signal(Root + ".Production.QueueLength"), JsonValue.Create(snapshot.Queue.Count), observedAt, MachineUnit.One.Name));
         if (snapshot.ProgressFraction is { } progress)
         {
-            samples.Add(new(Oem + "Production/Progress", new BaseUnitValueDto { Timestamp = observedAt, Value = progress, Unit = BaseUnit.One }));
+            values.Add(new(identity.Signal(Root + ".Production.Progress"), JsonValue.Create(progress), observedAt, MachineUnit.One.Name));
         }
 
         foreach (var (pump, warning) in snapshot.AmountWarnings.OrderBy(w => w.Key))
         {
-            samples.Add(new(Oem + "Pump/" + pump.ToString(CultureInfo.InvariantCulture) + "/AmountWarning",
-                new BooleanValueDto { Timestamp = observedAt, Value = warning }));
+            values.Add(new(identity.Signal(PumpWarning(pump)), JsonValue.Create(warning), observedAt));
         }
 
-        return samples;
-    }
-
-    /// <summary>The identification values of the data model this machine has: its model and serial number, and its manufacturer where one is named.</summary>
-    internal static IReadOnlyList<(string Name, string Value)> Identification(JuiceBarOptions options)
-    {
-        var values = new List<(string Name, string Value)>();
-        if (!string.IsNullOrWhiteSpace(options.ManufacturerName))
-        {
-            values.Add(("Manufacturer", options.ManufacturerName));
-        }
-
-        values.Add(("Model", options.Model));
-        values.Add(("SerialNumber", options.SerialNumber));
         return values;
     }
+
+    /// <summary>The path below the prefix of the warning of a pump.</summary>
+    internal static string PumpWarning(int pump) => Root + ".Pump." + pump.ToString(CultureInfo.InvariantCulture) + ".AmountWarning";
+
+    /// <summary>What the manifest says about a signal below the prefix: type, unit and description.</summary>
+    /// <exception cref="ArgumentException">The path is no signal of this adapter.</exception>
+    internal static MachineSignal Describe(string relative)
+    {
+        ArgumentNullException.ThrowIfNull(relative);
+        if (PumpPath().Match(relative) is { Success: true } pump)
+        {
+            return MachineSignal.Flag($"Whether the bottle of pump {pump.Groups[1].Value} runs low");
+        }
+        return relative switch
+        {
+            Root + ".Production.State" => MachineSignal.Text("State of the production as the machine says it, for example waitingOrder or processingOrder"),
+            Root + ".PumpControl.Mode" => MachineSignal.Text("Mode of the pump control as the machine says it"),
+            Root + ".Production.QueueLength" => MachineSignal.WholeNumber(MachineUnit.One, "Orders waiting at the machine"),
+            Root + ".Production.Progress" => MachineSignal.Number(MachineUnit.One, "Progress of the drink being mixed, as a fraction"),
+            _ => throw new ArgumentException($"'{relative}' is no signal of the juice bar.", nameof(relative)),
+        };
+    }
+
+    /// <summary>
+    /// The manifest: the profile Core with the snapshot <c>State.Status</c>, and every signal of
+    /// <paramref name="signals"/> (paths below the prefix).
+    /// </summary>
+    internal static JsonObject Manifest(MachineIdentity identity, TimeSpan heartbeatInterval, IEnumerable<string> signals)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        IEnumerable<MachineElement> elements =
+        [
+            new(MachineManifest.Status),
+            .. signals.Select(relative => new MachineElement(identity.Signal(relative), MachineElement.Adapter, Describe(relative))),
+        ];
+        return MachineManifest.Build(identity, heartbeatInterval, elements);
+    }
+
+    [GeneratedRegex(@"^JuiceBar\.Pump\.([0-9]+)\.AmountWarning$")]
+    private static partial Regex PumpPath();
 }
 
 /// <summary>
-/// Publishes the state every ten seconds, with a heartbeat of its own, the way a machine says that it is
-/// there, and who the machine is every five minutes, since nothing is retained. Runs only when a broker is
-/// configured.
+/// Publishes the state of the machine as the MQTT binding of machines says (<see cref="MachinePublisher"/>):
+/// retained, QoS 1, the manifest before the values, <c>Connection/State</c> as the state of the adapter
+/// (<c>CommunicationFault</c> while the machine does not answer), a value when it changes, and a heartbeat of its own
+/// every ten seconds. Runs only when a broker is configured.
 /// </summary>
 internal sealed class TelemetryWorker(IManagedMqttClient mqtt, LiveState live, IOptions<JuiceBarOptions> options,
-    TimeProvider time) : BackgroundService
+    TimeProvider time, ILogger<TelemetryWorker> logger) : BackgroundService
 {
+    /// <summary>How often the heartbeat comes; the manifest names it.</summary>
+    internal static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(10);
+
+    /// <summary>How often the state of the machine is looked at; a value goes out only when it changed.</summary>
+    internal static readonly TimeSpan Tick = TimeSpan.FromSeconds(1);
+
+    private readonly SortedSet<string> _signals = new(TelemetryMapper.Signals, StringComparer.Ordinal);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var prefix = "machines/" + options.Value.MachineId + "/";
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10), time);
-        long count = 0;
+        var identity = options.Value.Identity;
+        using var publisher = new MachinePublisher(mqtt, identity, TelemetryMapper.Manifest(identity, HeartbeatInterval, _signals), time, logger);
+        await publisher.AttachAsync().ConfigureAwait(false);
+        using var timer = new PeriodicTimer(Tick, time);
+        var lastHeartbeat = DateTimeOffset.MinValue;
         try
         {
             do
             {
-                if (!mqtt.IsConnected)
+                var now = time.GetUtcNow();
+                if (now - lastHeartbeat >= HeartbeatInterval)
                 {
-                    continue;
+                    await publisher.HeartbeatAsync(now).ConfigureAwait(false);
+                    lastHeartbeat = now;
                 }
 
-                var now = time.GetUtcNow().UtcDateTime;
-                await mqtt.Publish(prefix + "umati/Connection/Heartbeat",
-                    new BaseUnitValueDto { Timestamp = now, Value = ++count, Unit = BaseUnit.One }).ConfigureAwait(false);
-                // Who the machine is, so a display can name it: at the start and then every five minutes.
-                if (count % 30 == 1)
-                {
-                    foreach (var (name, value) in TelemetryMapper.Identification(options.Value))
-                    {
-                        await mqtt.Publish(prefix + "umati/Identification/" + name,
-                            new StringValueDto { Timestamp = now, Value = value }).ConfigureAwait(false);
-                    }
-                }
-
-                foreach (var sample in TelemetryMapper.Map(live.Snapshot(), now))
-                {
-                    switch (sample.Message)
-                    {
-                        case BaseUnitValueDto number:
-                            await mqtt.Publish(prefix + sample.Suffix, number).ConfigureAwait(false);
-                            break;
-                        case StringValueDto text:
-                            await mqtt.Publish(prefix + sample.Suffix, text).ConfigureAwait(false);
-                            break;
-                        case BooleanValueDto flag:
-                            await mqtt.Publish(prefix + sample.Suffix, flag).ConfigureAwait(false);
-                            break;
-                        default:
-                            break;
-                    }
-                }
+                await PublishAsync(publisher, identity, live.Snapshot(), now).ConfigureAwait(false);
             }
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false));
         }
@@ -140,5 +154,33 @@ internal sealed class TelemetryWorker(IManagedMqttClient mqtt, LiveState live, I
         {
             // Stopping.
         }
+        finally
+        {
+            await publisher.ShutdownAsync(time.GetUtcNow(), TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>One look at the machine: its values while it answers, <c>CommunicationFault</c> while it does not.</summary>
+    internal async Task PublishAsync(MachinePublisher publisher, MachineIdentity identity, LiveSnapshot snapshot, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(publisher);
+        ArgumentNullException.ThrowIfNull(identity);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (!snapshot.Connected)
+        {
+            await publisher.LostAsync(now).ConfigureAwait(false);
+            return;
+        }
+
+        var values = TelemetryMapper.Map(snapshot, now, identity);
+        // A pump the manifest does not name yet: the manifest grows before its value goes out.
+        var before = _signals.Count;
+        _signals.UnionWith(snapshot.AmountWarnings.Keys.Select(TelemetryMapper.PumpWarning));
+        if (_signals.Count != before)
+        {
+            await publisher.UpdateManifestAsync(TelemetryMapper.Manifest(identity, HeartbeatInterval, _signals)).ConfigureAwait(false);
+        }
+
+        await publisher.ReachedAsync(values, now).ConfigureAwait(false);
     }
 }

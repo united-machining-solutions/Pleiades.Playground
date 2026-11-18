@@ -190,6 +190,12 @@ internal class Worker : BackgroundService
             return;
         }
 
+        // "Not available right now": a JSON null is no node, so it never reaches the case Null below.
+        if (json is JsonObject envelope && envelope.TryGetPropertyValue("value", out var value) && value is null)
+        {
+            return;
+        }
+
         switch (json?["value"]?.GetValueKind())
         {
             case JsonValueKind.Number:
