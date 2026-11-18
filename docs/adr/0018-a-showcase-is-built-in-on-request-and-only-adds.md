@@ -29,6 +29,9 @@ My Job?" drew it for itself, in a comment: made-up data, so no entry in the side
 - The base layers take base only: `contracts/`, `source/`, `apps/genui-mcp`, `packages/cards` and
   `packages/ui`. A showcase that needs a card or a tool makes it general first, or draws it in its own
   folder.
+- An optional service of the stack, a profile of `compose.yaml` such as `juicebar`, is base with its device.
+  A card for its tools may stand in the example application, and draws nothing where `APP_MCP_SERVERS` does
+  not name that service.
 - A showcase of the example application is a folder `apps/app/src/showcases/<name>/`, and its pages are the
   route files under `apps/app/src/routes/(showcases)/`. The brackets make a folder that adds nothing to an
   address.

@@ -1,8 +1,8 @@
 // The MCP servers whose tools the chat hands to its language model, read from the settings of the
 // server. The generative UI backend is always there. Further servers, the optional services of the
-// stack, are named in one setting, so a stack without them starts and answers as before. The app has
-// code for one of them only, the drink card of the juice bar (cards/juicebar), which draws nothing
-// where the chat has no `juicebar`.
+// stack, are named in one setting, so a stack without them starts and answers as before. A card for the
+// tools of one of them may stand in the app and draws nothing where the chat lacks that server
+// (ADR-0018): so far the drink card of the juice bar (cards/juicebar).
 
 type Settings = Record<string, string | undefined>
 
