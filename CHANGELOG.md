@@ -7,6 +7,9 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: the list of commands under the chat field works from the keyboard, as in other chats. One
+  command is marked; the arrow keys move the mark, Tab writes the marked command into the field, Enter takes
+  it and Escape closes the list. The field keeps the focus and points to the marked command for screen readers.
 - Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
   `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
   shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0020).

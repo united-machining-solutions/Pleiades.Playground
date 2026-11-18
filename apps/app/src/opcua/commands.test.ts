@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { commandsFor, endpointOf, matching, readTyped, usage } from "./commands.ts"
+import { commandsFor, completion, endpointOf, matching, readTyped, stepped, usage } from "./commands.ts"
 
 const all = commandsFor(true)
 const withoutOpcUa = commandsFor(false)
@@ -72,4 +72,20 @@ test("while the name is typed, the commands that begin with it are offered", () 
   )
   assert.deepEqual(matching("/mapping A02", all), [], "after the name the list closes")
   assert.deepEqual(matching("mapping", all), [], "without a slash there is no list")
+})
+
+test("Tab completes the marked command, and the list closes behind it", () => {
+  const [mapping] = matching("/map", all)
+  assert.ok(mapping)
+  const completed = completion(mapping)
+  assert.equal(completed, "/mapping ")
+  assert.deepEqual(matching(completed, all), [], "the space closes the list")
+  assert.equal(readTyped(`${completed}A02`, all).kind, "question", "the argument follows")
+})
+
+test("the arrow keys go round the list", () => {
+  assert.equal(stepped(0, 1, 3), 1)
+  assert.equal(stepped(2, 1, 3), 0, "past the last to the first")
+  assert.equal(stepped(0, -1, 3), 2, "before the first to the last")
+  assert.equal(stepped(0, 1, 0), 0, "an empty list has nothing to mark")
 })

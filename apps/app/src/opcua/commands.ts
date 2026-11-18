@@ -121,6 +121,23 @@ export function matching(text: string, offered: ReadonlyArray<ChatCommand>): Rea
   return offered.filter((command) => command.name.startsWith(begun))
 }
 
+/**
+ * What Tab writes into the field for the command that is marked in the list: its name and a space.
+ * The space closes the list, and the cursor stands where an argument goes; Enter sends the command.
+ */
+export function completion(command: ChatCommand): string {
+  return `/${command.name} `
+}
+
+/**
+ * The command marked after an arrow key: `by` is +1 down and -1 up, and past the end of the list it
+ * goes round to its other end, as in the lists of commands of other chats.
+ */
+export function stepped(marked: number, by: number, count: number): number {
+  if (count === 0) return 0
+  return (((marked + by) % count) + count) % count
+}
+
 /** How a command is written, for the help: `/mapping <serial number>`. */
 export function usage(command: ChatCommand): string {
   return command.argument ? `/${command.name} <${command.argument}>` : `/${command.name}`
