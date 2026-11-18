@@ -164,3 +164,6 @@ APP_SHOWCASES=true
 
 The stack then runs the second image. Any value switches them on, `false` too; to run the app alone, leave
 the value empty. It is read when the image is pulled, not while the app runs.
+
+The [Margo app](../margo/README.md) has no such setting: it always runs the app alone, since bart takes the
+name of an image as it stands. A device that is to show a showcase runs `compose.yaml` instead.

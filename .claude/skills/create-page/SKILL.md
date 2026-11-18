@@ -55,8 +55,9 @@ Decide before the first file, and say which it is in your hand-over
   microphone, the wording of one customer. It is in a build only where `APP_SHOWCASES` is set: the app
   alone, and its image, have nothing of it. Its route file is
   `apps/app/src/routes/(showcases)/<name>.tsx`, written as `createFileRoute("/(showcases)/<name>")`; the
-  brackets add nothing to the address, so the page answers at `/<name>`. A server route of a showcase
-  stands in the same folder. Everything else it needs lives in `apps/app/src/showcases/<showcase>/`. It
+  brackets add nothing to the address, so the page answers at `/<name>`. A page belongs to the showcase
+  its name begins with: a second page is `<name>.<more>.tsx` or stands below `<name>/`. A server route of
+  a showcase stands in the same folder. Everything else it needs lives in `apps/app/src/showcases/<name>/`. It
   changes no shared file, no file outside reads from its folder, and no other page links to it:
   `pnpm --filter @pleiades/app test` fails if one does. To see the page, start the development server
   with the showcases: `APP_SHOWCASES=true` in the shell that runs `pnpm --filter @pleiades/app dev`. In

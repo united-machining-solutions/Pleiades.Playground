@@ -46,6 +46,9 @@ My Job?" drew it for itself, in a comment: made-up data, so no entry in the side
 
 - An image of the application alone has nothing of a showcase in it, and a stack started without the setting
   runs that image. "Where is My Job?" is the first showcase: a stack that wants it sets `APP_SHOWCASES`.
+- The Margo app is always the application alone. bart takes an image reference as it stands, so no setting
+  can choose the image there, and a release is base. A device that is to show a showcase runs
+  `compose.yaml` with the setting, or would need a Margo app of its own, which this record does not ask for.
 - A page for a demo costs one folder and one route file, and nobody else's page changes with it.
 - The showcases stay in the repository, next to the application they show. Whoever copies the repository
   has their folders and can delete them; whoever pulls the image of the application never had them.

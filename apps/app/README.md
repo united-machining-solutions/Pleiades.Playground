@@ -205,11 +205,17 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   it is a showcase: `where-is-my-job/` is the made-up shop floor of the page "Where is My Job?". The pages of
   the showcases, and their server routes, are the route files under `src/routes/(showcases)/`; the brackets
   make a folder that adds nothing to an address, so `(showcases)/where-is-my-job.tsx` answers at
-  `/where-is-my-job`. A build without the setting leaves that folder out (`vite.config.ts`): the router does
-  not know the pages, nothing imports the folder of a showcase, and `.output` has nothing of one, so neither
-  has the image. There is no switch while the app runs. `rule.test.ts` fails when a file of the app reads
-  from a showcase or names the address of one of its pages, and when one showcase reads from another. The
-  typecheck reads every route, with the showcases (`route-tree.mjs`).
+  `/where-is-my-job`. A page belongs to the showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and
+  `titan/faces.tsx` are pages of `showcases/titan/`. A build without the setting leaves that folder out
+  (`vite.config.ts`): the router does not know the pages, nothing imports the folder of a showcase, and
+  `.output` has nothing of one, so neither has the image. There is no switch while the app runs.
+  `rule.test.ts` fails when a file of the app reads from a showcase or names the address of one of its pages,
+  and when a showcase, its folder or one of its pages, reads from another. It resolves every import to a path
+  from `src/` first, so `../other/data.ts` counts as `@/showcases/other/data.ts` does. The typecheck reads
+  every route, with the showcases (`route-tree.mjs`). After a build without the setting, the route tree on
+  disk has no showcase routes, and the editor or a plain `tsc` reports `TS2345` in the route files of the
+  showcases (`'"/(showcases)/where-is-my-job"' is not assignable to parameter of type 'keyof FileRoutesByPath'`).
+  `pnpm typecheck` or `node route-tree.mjs` writes the whole tree again, and the error is gone.
 - `src/cards/`: a folder for each card, named like the card. `machine/chat.tsx` is the machine card in the
   chat: what a call of each of its tools is called, what the chat draws for a result (`results.ts` checks it
   against the contract), and which tool only a card calls. Which value of the binding is which state, the
