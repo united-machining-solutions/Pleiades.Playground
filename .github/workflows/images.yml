@@ -49,6 +49,12 @@ jobs:
           - image: pleiades.playground.cutting.adapter
             context: source
             file: source/Pleiades.Playground.Cutting.Adapter/Dockerfile
+          - image: pleiades.playground.bend.simulator
+            context: source
+            file: source/Pleiades.Playground.Bend.Simulator/Dockerfile
+          - image: pleiades.playground.bend.adapter
+            context: source
+            file: source/Pleiades.Playground.Bend.Adapter/Dockerfile
           - image: pleiades.playground.ultimaker.api
             context: source
             file: source/Pleiades.Playground.Ultimaker.Api/Dockerfile
