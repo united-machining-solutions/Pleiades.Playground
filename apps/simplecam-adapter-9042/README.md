@@ -23,8 +23,7 @@ The machine id is `<manufacturer>_<model>_<serial number>`: `united-grinding_sim
 | `Manifest` | the adapter | The manifest: model 0.17.1, the profile `Core`, every element of it |
 | `Connection/State` | the adapter | The state of the adapter: `Initializing`, `Running`, `CommunicationFault`, `Shutdown` |
 | `Connection/Heartbeat` | the adapter | A count that grows every ten seconds |
-| `Identification/Manufacturer`, `SerialNumber`, `ProductInstanceUri` | the stream | As it says them |
-| `Identification/ManufacturerUri`, `Model` | settings | They form the machine id; the stream says neither |
+| `Identification/Manufacturer`, `SerialNumber`, `ProductInstanceUri`, `ManufacturerUri`, `Model` | settings, then the stream | The settings give all five at the start; where the stream says one, its value stands. It says neither the model nor the URI of the manufacturer. |
 | `State/Status` | the stream | `MachineryItemState` and `MachineryOperationMode`, goes out when it changes |
 | `Notification/ActiveAlerts` | the stream | The list of alerts |
 | `WorkMasterMonitoring/ActiveWorkMaster` | `activity.jobName` of the stream | The job, the model's name for what the machine works on; `null` when none runs |
@@ -44,8 +43,19 @@ The backend's own `Connection.State` and `Connection.Heartbeat` are not forwarde
 `Connected`, and `CommunicationFault` while it does not. The last will of the connection says
 `CommunicationFault`, retained.
 
-After every connect to the broker it sends the manifest and every value again, and then the state; only the
-first connect says `Initializing`.
+The manifest is made at the start from what the adapter delivers, so it comes before the first value even when no
+backend runs. An element the stream has not sent yet has no value yet; it is not "not available". The elements the
+machine lacks for good are the four in the last row of the table.
+
+After every connect to the broker the adapter sends the manifest and every value known again, and then the
+state; only the first connect says `Initializing`. While the backend has neither answered nor failed, there is no
+state beyond `Initializing`. A message of the stream that says only `Connected` also ends a `CommunicationFault`.
+At a clean stop `Shutdown` is the last message.
+
+A value that has no time of its own (the identification) carries the time the adapter first read it, and keeps it
+while the value stays the same. The job, the context and the progress carry the time they were read: the time of
+`State.Status` is that of its last change and says nothing about the progress made since. The manifest says which
+is which, as `timestampSource`.
 
 ### Events
 
@@ -68,9 +78,11 @@ machine does not.
 | Variable | Default | What |
 |---|---|---|
 | `SIMPLECAM_SSE_URL` | `http://host.docker.internal:5450/stream/machine-9042/state` in the stack | The SSE stream of the backend |
+| `SIMPLECAM_MANUFACTURER` | `United Grinding` | The name of the manufacturer, until the stream says it |
 | `SIMPLECAM_MANUFACTURER_URI` | `https://www.united-grinding.com` | The manufacturer in the machine id: its domain without `www.` and its top-level domain |
 | `SIMPLECAM_MODEL` | `simplecam` | The model in the machine id |
 | `SIMPLECAM_SERIAL_NUMBER` | `9042` | The serial number in the machine id |
+| `SIMPLECAM_PRODUCT_INSTANCE_URI` | `<manufacturer URI>/<model>/<serial number>` | The `ProductInstanceUri` and the `source` of the events, until the stream says it |
 | `MQTT_BROKER_URL` | `mqtt://broker:1883` | The broker |
 | `MQTT_CLIENT_ID` | `simplecam-adapter-9042` | The client id at the broker |
 | `HEALTH_PORT` | `3042` (`8080` in the image) | The port of `/health` |

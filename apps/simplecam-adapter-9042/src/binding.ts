@@ -168,13 +168,13 @@ function signalOf(path: string): Signal | undefined {
 /**
  * What the backend says about the job beside `State.Status`, as elements. The job is the active work master, the
  * model's name for what the machine works on; what it does and how far it is are signals of the manufacturer. Where
- * the backend says no job, all three are `null`: not available right now.
+ * the backend says no job, all three are `null`: not available right now. `timestamp` is the time the adapter read
+ * them: the time of `State.Status` is that of its last change, and says nothing about the progress made since.
  */
-export function activityReadings(status: Reading, prefix: string): Reading[] {
+export function activityReadings(status: Reading, prefix: string, timestamp: string): Reading[] {
   const activity = status.activity
   const text = (value: unknown): string | null => (typeof value === "string" && value.length > 0 ? value : null)
   const percent = typeof activity?.progressPercent === "number" && Number.isFinite(activity.progressPercent) ? activity.progressPercent : null
-  const timestamp = status.timestamp
   return [
     { path: "WorkMasterMonitoring.ActiveWorkMaster", value: text(activity?.jobName), timestamp },
     { path: `${prefix}.Activity.Context`, value: text(activity?.context), timestamp },
@@ -215,20 +215,65 @@ export function readingsOf(data: unknown): Reading[] {
   return found
 }
 
-/** The manifest of an adapter that delivers `readings` and the profile Core. What Core has and the machine lacks is "available": false. */
-export function buildManifest(id: string, productInstanceUri: string, readings: readonly Reading[], heartbeatSeconds: number): Manifest {
-  const delivered = new Map(readings.map((reading) => [reading.path, reading]))
+/** What the adapter knows about the machine at its start, from its settings: the stream may say it again, and then it says it. */
+export interface Identity {
+  manufacturer: string
+  manufacturerUri: string
+  model: string
+  serialNumber: string
+  productInstanceUri: string
+}
+
+/** `<manufacturer URI>/<model>/<serial number>`, as the .NET adapters form it when no other is set. */
+export function defaultProductInstanceUri(manufacturerUri: string, model: string, serialNumber: string): string {
+  return `${manufacturerUri.replace(/\/+$/, "")}/${encodeURIComponent(model)}/${encodeURIComponent(serialNumber)}`
+}
+
+/** The five elements of the identification that every adapter delivers. */
+export function identityReadings(identity: Identity): Reading[] {
+  return [
+    { path: "Identification.Manufacturer", value: identity.manufacturer },
+    { path: "Identification.SerialNumber", value: identity.serialNumber },
+    { path: "Identification.ProductInstanceUri", value: identity.productInstanceUri },
+    { path: "Identification.ManufacturerUri", value: identity.manufacturerUri },
+    { path: "Identification.Model", value: identity.model },
+  ]
+}
+
+/** An element the adapter delivers, and whose time it says: that of the machine (`source`) or the time it was read (`adapter`). */
+export interface DeliveredElement {
+  path: string
+  timestampSource: "adapter" | "source"
+}
+
+/**
+ * What this adapter delivers beside the identification and the connection. It is fixed: the manifest does not
+ * wait for the stream, and an element that has not come yet is not "not available".
+ */
+export function deliveredElements(prefix: string): DeliveredElement[] {
+  return [
+    { path: "State.Status", timestampSource: "source" },
+    { path: ACTIVE_ALERTS, timestampSource: "source" },
+    { path: "WorkMasterMonitoring.ActiveWorkMaster", timestampSource: "adapter" },
+    { path: `${prefix}.Activity.Context`, timestampSource: "adapter" },
+    { path: `${prefix}.Activity.Progress`, timestampSource: "adapter" },
+  ]
+}
+
+/** The manifest of an adapter that delivers `delivered` and the profile Core. What Core has and the machine lacks is "available": false. */
+export function buildManifest(id: string, productInstanceUri: string, delivered: readonly DeliveredElement[], heartbeatSeconds: number): Manifest {
+  const byPath = new Map(delivered.map((element) => [element.path, element]))
   const elements: ManifestElement[] = []
   const element = (path: string): ManifestElement => ({
     path,
-    timestampSource: delivered.get(path)?.timestamp === undefined ? "adapter" : "source",
+    timestampSource: byPath.get(path)?.timestampSource ?? "adapter",
     ...signalOf(path),
   })
   for (const path of CORE) {
-    if (delivered.has(path) || ALWAYS.has(path)) elements.push(element(path))
+    if (byPath.has(path) || ALWAYS.has(path)) elements.push(element(path))
     else elements.push({ path, available: false })
   }
-  for (const path of delivered.keys()) {
+  for (const { path } of delivered) {
     if (!CORE.includes(path)) elements.push(element(path))
   }
   return {
@@ -253,19 +298,34 @@ export interface AlertChange {
   alert: Alert
 }
 
+// The number 2 and the text "2" are two alerts.
+const alertKey = (alert: Alert): string => `${typeof alert.Id}:${String(alert.Id)}`
+
+/** A text of a value that does not depend on the order of the fields: the same alert in another order is the same alert. */
+export function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`
+  if (isRecord(value)) {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`)
+      .join(",")}}`
+  }
+  return JSON.stringify(value) ?? "null"
+}
+
 /**
  * The events a change of `Notification.ActiveAlerts` makes: an entry that is new is raised, one that is gone is
  * cleared, one whose fields changed is changed. `previous` is `null` before the list is known: every entry of the
  * first list is raised, as the binding asks ("the first entries included").
  */
 export function alertChanges(previous: readonly Alert[] | null, next: readonly Alert[]): AlertChange[] {
-  const before = new Map((previous ?? []).map((alert) => [String(alert.Id), alert]))
-  const after = new Map(next.map((alert) => [String(alert.Id), alert]))
+  const before = new Map((previous ?? []).map((alert) => [alertKey(alert), alert]))
+  const after = new Map(next.map((alert) => [alertKey(alert), alert]))
   const changes: AlertChange[] = []
   for (const [id, alert] of after) {
     const old = before.get(id)
     if (old === undefined) changes.push({ type: "Notification.AlertRaised", alert })
-    else if (JSON.stringify(old) !== JSON.stringify(alert)) changes.push({ type: "Notification.AlertChanged", alert })
+    else if (canonical(old) !== canonical(alert)) changes.push({ type: "Notification.AlertChanged", alert })
   }
   for (const [id, alert] of before) {
     if (!after.has(id)) changes.push({ type: "Notification.AlertCleared", alert })

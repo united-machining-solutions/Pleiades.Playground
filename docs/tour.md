@@ -25,8 +25,8 @@ docker compose up -d --build --wait
 
 The command returns when the stack is ready, that is when every container reports healthy: the broker, the
 database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app, one
-simulator per machine, three cutting machines, each a simulator with its adapter, and the OPC UA adapter with a
-simulated OPC UA machine. To see the demo without building it, start it from the published images, see
+simulator per machine, three cutting machines, each a simulator with its adapter, the OPC UA adapter with a
+simulated OPC UA machine, and the adapter of the SimpleCAM machine. To see the demo without building it, start it from the published images, see
 [Start](../README.md#start).
 
 ```bash
@@ -72,8 +72,6 @@ timeseries-persistence   Up 3 minutes (healthy)
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
 port and setting. The three simulated machines, P-04, P-07 and M-02, are the three `simulator-*` services.
-`simplecam-adapter-9042` is a fourth machine, a real one: it reads the SimpleCAM backend and shows as "No data"
-until that backend runs.
 Each publishes after the umati data model, below `machines/<manufacturer>_<model>_<serial number>/` (for P-04
 `machines/alcyone-machines_AX-400_P-04/`): manifest, values, its stack light, and job orders, program executions
 and alerts as CloudEvents. It is described in
@@ -81,6 +79,11 @@ and alerts as CloudEvents. It is described in
 T-01 and PU-01, are the `cutting-*` services: a simulator that speaks the telegram protocol of the machine through
 files, and an adapter that reads it and publishes the same tree, below `machines/trumpf_Laser2D_L-01/` and the like
 (see [`Cutting.Adapter`](../source/Pleiades.Playground.Cutting.Adapter/README.md)).
+
+The SimpleCAM machine 9042 is `simplecam-adapter-9042`: it reads the stream of the SimpleCAM backend that runs on
+this computer, outside of the stack, and publishes the same tree for it, below
+`machines/united-grinding_simplecam_9042/` (see [`simplecam-adapter-9042`](../apps/simplecam-adapter-9042/README.md)).
+Without that backend it shows as "No data" and says `CommunicationFault`.
 
 The OPC UA machine, `opc-simulator`, is not on Home yet: it is added in the chat, see
 [Add a machine that speaks OPC UA](#add-a-machine-that-speaks-opc-ua).
