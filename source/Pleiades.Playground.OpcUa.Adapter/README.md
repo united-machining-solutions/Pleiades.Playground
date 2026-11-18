@@ -611,7 +611,7 @@ clicked.
 
 ## Deployment
 
-The workflow "Images" builds the image of the adapter with the others, for amd64 and arm64, and "Deploy" starts
+The workflow "Images" builds the image of the adapter with the others, for amd64, and "Deploy" starts
 the stack from them ([deployment](../../docs/deployment.md)), the adapter and the simulator with it. The image
 of the simulator is pulled from umati. Registrations live in the volume of the deployment: a machine added there
 stays across deployments.

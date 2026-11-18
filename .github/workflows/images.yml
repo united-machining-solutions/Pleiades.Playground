@@ -1,6 +1,6 @@
 name: Images
 
-# Builds multi-architecture images and pushes them to the GitHub Container Registry.
+# Builds the images, for linux/amd64 only, and pushes them to the GitHub Container Registry.
 # Every push to main publishes the tags `main` and `sha-<commit>`; a version tag (v1.2.3) publishes `1.2.3`
 # and then pushes the Margo app of that version with the workflow "Margo push".
 on:
@@ -52,13 +52,9 @@ jobs:
           - image: pleiades.playground.ultimaker.api
             context: source
             file: source/Pleiades.Playground.Ultimaker.Api/Dockerfile
-            # The printer services run on the deployment computer only, which is amd64.
-            platforms: linux/amd64
           - image: pleiades.playground.ultimaker.telemetry
             context: source
             file: source/Pleiades.Playground.Ultimaker.Telemetry/Dockerfile
-            # The printer services run on the deployment computer only, which is amd64.
-            platforms: linux/amd64
           - image: pleiades.playground.juicebar.api
             context: source
             file: source/Pleiades.Playground.JuiceBar.Api/Dockerfile
@@ -79,7 +75,6 @@ jobs:
             build-args: SHOWCASES=true
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
       - uses: docker/login-action@v4
         with:
@@ -107,7 +102,8 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
-          platforms: ${{ matrix.platforms || 'linux/amd64,linux/arm64' }}
+          # amd64 only: some images the stack runs, such as the OPC UA simulator of umati, exist for amd64 only.
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
