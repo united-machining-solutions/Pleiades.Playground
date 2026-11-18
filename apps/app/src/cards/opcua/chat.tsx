@@ -27,6 +27,7 @@ import {
   ItemActions,
   ItemContent,
   ItemDescription,
+  ItemFooter,
   ItemGroup,
   ItemSeparator,
   ItemTitle,
@@ -36,6 +37,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { commitProposal, removeMachine, storeUser } from "@/opcua/adapter.ts"
 import type { Outcome } from "@/opcua/adapter.ts"
 import {
+  endpointSummary,
   machineListOf,
   mappingOf,
   needingALook,
@@ -554,17 +556,60 @@ function UserForm({ url, user }: { url: string; user?: string }) {
   )
 }
 
-function EndpointList({ values }: { values: RankedEndpoints }) {
+/**
+ * The endpoint the adapter takes, in one line, and the rest folded: the person cannot choose another one
+ * here. That the server also takes sessions without security is said without unfolding.
+ */
+function EndpointSummary({ values }: { values: RankedEndpoints }) {
+  const { used, others, unsecured } = endpointSummary(values)
+  if (!used) {
+    return (
+      <Item size="sm">
+        <ItemContent>
+          <ItemTitle>No endpoint for this session</ItemTitle>
+          <ItemDescription>{values.url} offers no endpoint the adapter can use.</ItemDescription>
+        </ItemContent>
+      </Item>
+    )
+  }
+  return (
+    <Collapsible>
+      <Item size="sm">
+        <ItemContent>
+          <ItemTitle>
+            {securityOf({ ...used, user: values.user })}
+            {used.weak && <Badge variant="outline">Weak</Badge>}
+          </ItemTitle>
+          <ItemDescription>The strongest the server offers, the one the adapter connects with.</ItemDescription>
+          {unsecured && <ItemDescription>The server also accepts sessions without security.</ItemDescription>}
+        </ItemContent>
+        {others.length > 0 && (
+          <ItemFooter>
+            <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
+              {others.length === 1 ? "1 more endpoint" : `${others.length} more endpoints`}
+            </CollapsibleTrigger>
+          </ItemFooter>
+        )}
+      </Item>
+      <CollapsibleContent>
+        <ItemSeparator className="my-0" />
+        <EndpointList endpoints={others} user={values.user} />
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+/** The endpoints the adapter does not take, strongest first. */
+function EndpointList({ endpoints, user }: { endpoints: RankedEndpoints["endpoints"]; user?: string }) {
   return (
     <ItemGroup className="gap-0">
-      {values.endpoints.map((endpoint, position) => (
+      {endpoints.map((endpoint, position) => (
         <Fragment key={`${endpoint.securityMode}/${endpoint.securityPolicy}`}>
           {position > 0 && <ItemSeparator className="my-0" />}
           <Item size="sm">
             <ItemContent>
               <ItemTitle>
-                {securityOf({ ...endpoint, user: values.user })}
-                {endpoint.recommended && <Badge variant="secondary">Recommended</Badge>}
+                {securityOf({ ...endpoint, user })}
                 {endpoint.weak && <Badge variant="outline">Weak</Badge>}
               </ItemTitle>
             </ItemContent>
@@ -580,7 +625,7 @@ function Endpoints({ values }: { values: RankedEndpoints }) {
   if (step === "none") {
     return (
       <Card className="gap-0 py-0">
-        <EndpointList values={values} />
+        <EndpointSummary values={values} />
       </Card>
     )
   }
@@ -611,7 +656,7 @@ function Endpoints({ values }: { values: RankedEndpoints }) {
           </CollapsibleContent>
         </Collapsible>
       </CardFooter>
-      <EndpointList values={values} />
+      <EndpointSummary values={values} />
     </Card>
   )
 }
