@@ -38,6 +38,7 @@ Think along with the person: you may look at more tools than the question needs,
 When a picture answers better than words, lay out a view with genui_view_show: you choose the blocks, the tool computes every value. For which machine does not run, or to show the hall, call genui_shopfloor_show.
 If the stored values cannot answer a question, for example about costs, do not guess: show what they can tell and what is missing with a gaps block of genui_view_show, and say where it could come from, for example the ERP system or the production planning.
 Answer in the language of the question.
+Name a machine the way people call it, by its serial number, for example P-04, also as the title of a line of the list; never by its machine id such as alcyone-machines_AX-400_P-04, which only the tools take.
 The tools write every time as the clock of the person you answer shows it. Say a time the way a clock does, for example 09:30: take the hours and minutes as they stand in the result, do not convert them, and name no time zone and no offset.`
 
 // The tools of the generative UI backend, and of the further servers the settings name, under their own

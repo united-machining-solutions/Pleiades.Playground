@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 
+import { labelOf, serialOf } from "../machine/in-words.ts"
 import { stateLabel } from "../machine/state.ts"
 import type { Fixture, Hall, Place, Station } from "./contract.ts"
 
@@ -202,7 +203,7 @@ function MachineShape({ station, marked }: { station: Station; marked: boolean }
       {marked && (
         <rect x={x - 0.9} y={y - 0.9} width={width + 1.8} height={depth + 1.8} rx="0.7" fill="none" stroke="var(--primary)" strokeWidth="0.16" strokeDasharray="0.7 0.35" />
       )}
-      <title>{`${machine}: ${stateLabel[state]}${program ? ` · ${program}` : ""}`}</title>
+      <title>{`${labelOf(machine)}: ${stateLabel[state]}${program ? ` · ${program}` : ""}`}</title>
       {!running && (
         <rect
           x={x - 0.6}
@@ -221,7 +222,7 @@ function MachineShape({ station, marked }: { station: Station; marked: boolean }
       {/* The dark blue strip on top carries the name, like a plate on the machine. */}
       <rect x={x + 0.35} y={y + 0.35} width={width - 0.7} height={STRIP} rx="0.12" fill={ink.navy} />
       <text x={x + width / 2} y={y + 0.35 + STRIP / 2 + TEXT * 0.45} textAnchor="middle" fontSize={TEXT * 1.25} fontWeight="600" fill="white" letterSpacing="0.05">
-        {machine}
+        {serialOf(machine)}
       </text>
       <rect x={x + width * 0.15} y={y + depth * 0.42} width={width * 0.52} height={depth * 0.3} rx="0.1" fill={ink.glass} opacity="0.55" stroke={ink.bodyEdge} strokeWidth="0.04" />
       <rect x={x + width - 1.1} y={y + depth * 0.4} width="0.7" height={depth * 0.45} rx="0.08" fill={ink.navy} opacity="0.85" />

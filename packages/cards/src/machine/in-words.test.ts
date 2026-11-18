@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { Machine, Reading } from "./contract.ts"
-import { labelOf, machineInWords, machineListInWords, machineShowInWords, spanListInWords } from "./in-words.ts"
+import { labelOf, machineInWords, machineListInWords, machineShowInWords, spanListInWords, serialOf } from "./in-words.ts"
 
 // The instants are written as a tool writes them for a person in Zurich: local, with the offset.
 const asOf = "2026-11-16T10:30:00.000+01:00"
@@ -147,4 +147,10 @@ test("a label where only the machine id is known is its model and serial number"
   assert.equal(labelOf("P-04"), "P-04")
   assert.equal(labelOf("a_b"), "a_b")
   assert.equal(labelOf("a__c"), "a__c")
+})
+
+test("a machine is called by its serial number where there is room for one word", () => {
+  assert.equal(serialOf("alcyone-machines_AX-400_P-04"), "P-04")
+  assert.equal(serialOf("P-04"), "P-04")
+  assert.equal(serialOf("a_b"), "a_b")
 })

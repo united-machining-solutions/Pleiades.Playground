@@ -2,6 +2,7 @@ import { Badge } from "@pleiades/ui/components/badge"
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 
 import { clock } from "../machine/format.ts"
+import { labelOf } from "../machine/in-words.ts"
 import { stateLabel } from "../machine/state.ts"
 import { StateSymbol } from "../machine/state-symbol.tsx"
 import type { ShopfloorShow } from "./contract.ts"
@@ -42,7 +43,7 @@ export function ShopfloorCard({ asOf, hall, machines, notRunning }: ShopfloorSho
             <ul className="sr-only">
               {machines.map(({ machine, state, reason, program }) => (
                 <li key={machine}>
-                  {machine}: {stateLabel[state]}
+                  {labelOf(machine)}: {stateLabel[state]}
                   {reason ? `, ${reason.message}` : program ? `, ${program}` : ""}
                 </li>
               ))}

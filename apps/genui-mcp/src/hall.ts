@@ -1,3 +1,4 @@
+import { serialOf } from "@pleiades/cards/machine/in-words.ts"
 import type { Fixture, Hall, Place } from "@pleiades/cards/shopfloor/contract.ts"
 
 // The plan of the hall of the demo: where the simulated machines stand, and what else is in the hall.
@@ -47,7 +48,8 @@ export function placesOf(machines: ReadonlyArray<string>): Map<string, Place> {
   const places = new Map<string, Place>()
   let next = 22
   for (const machine of machines) {
-    const planned = machinePlaces[machine]
+    // The plan names a machine by its serial number, the last part of its id.
+    const planned = machinePlaces[machine] ?? machinePlaces[serialOf(machine)]
     if (planned) {
       places.set(machine, planned)
       continue

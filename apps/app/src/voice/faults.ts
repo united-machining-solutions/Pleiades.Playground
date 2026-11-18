@@ -1,3 +1,4 @@
+import { serialOf } from "@pleiades/cards/machine/in-words.ts"
 import { openError } from "@pleiades/cards/machine/state.ts"
 import { useEffect, useRef, useState } from "react"
 
@@ -11,7 +12,10 @@ const LOOK_EVERY_MS = 3_000
 
 /** An error that a machine raised and that has not gone. */
 export type Fault = {
+  /** The machine as people call it, its serial number, for example P-04. */
   machine: string
+  /** Its machine id, which the tools take. */
+  id: string
   title: string
   notificationId: string
   raisedAt: string
@@ -19,7 +23,8 @@ export type Fault = {
 
 /**
  * Calls `onFault` for each error that is raised while the page is open. The errors that are already
- * open when it opens are known, not new. Returns the machines that have an open error now.
+ * open when it opens are known, not new. Returns the machines that have an open error now, by
+ * their serial numbers.
  */
 export function useNewFaults(onFault: (fault: Fault) => void): ReadonlyArray<string> {
   const known = useRef<Set<string> | null>(null)
@@ -35,7 +40,7 @@ export function useNewFaults(onFault: (fault: Fault) => void): ReadonlyArray<str
       const faults = answer.values.machines.flatMap((machine) => {
         const error = openError(machine)
         return error
-          ? [{ key: error.correlationId, fault: { machine: machine.machine, title: error.title, notificationId: error.notificationId, raisedAt: error.raisedAt } }]
+          ? [{ key: error.correlationId, fault: { machine: serialOf(machine.machine), id: machine.machine, title: error.title, notificationId: error.notificationId, raisedAt: error.raisedAt } }]
           : []
       })
       setAlarmed(faults.map((one) => one.fault.machine))
@@ -66,7 +71,7 @@ export function faultBriefing(fault: Fault, person: string | undefined): string 
   const at = new Date(fault.raisedAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
   const who = person ?? "der Person vor dem Bildschirm"
   return [
-    `[Meldung der Anlage, nicht von ${person ?? "der Person"}] Um ${at} hat die Maschine ${fault.machine} einen Fehler gemeldet: „${fault.title}“ (Fehler ${fault.notificationId}).`,
+    `[Meldung der Anlage, nicht von ${person ?? "der Person"}] Um ${at} hat die Maschine ${fault.machine} (Maschinen-ID ${fault.id}) einen Fehler gemeldet: „${fault.title}“ (Fehler ${fault.notificationId}).`,
     `Sprich ${person ?? "die Person"} direkt an${person ? "" : ", ohne Namen,"} und sag ${who} in zwei kurzen Sätzen auf Deutsch, was los ist. Zeig dazu die Halle mit genui_shopfloor_show.`,
     `Schlag einen sinnvollen nächsten Schritt vor und frag am Ende, ob du die Details der Maschine zeigen sollst. Erfinde keine Ursache, die die Daten nicht nennen.`,
   ].join(" ")

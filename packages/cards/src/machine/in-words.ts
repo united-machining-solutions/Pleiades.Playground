@@ -29,6 +29,16 @@ export function labelOf(machineId: string): string {
   return parts.length === 3 && parts.every(Boolean) ? `${parts[1]} ${parts[2]}` : machineId
 }
 
+/**
+ * A machine as people call it, where there is room for one word: the serial number, the last part
+ * of a machine id of the binding. So `alcyone-machines_AX-400_P-04` is "P-04". An id of another
+ * shape stays as it is.
+ */
+export function serialOf(machineId: string): string {
+  const parts = machineId.split("_")
+  return parts.length === 3 && parts.every(Boolean) ? (parts[2] as string) : machineId
+}
+
 /** A machine by what it is, its manufacturer, model and serial number, and its id. */
 export function nameOf(machine: Machine): string {
   const { manufacturer, model, serialNumber } = machine.identity
