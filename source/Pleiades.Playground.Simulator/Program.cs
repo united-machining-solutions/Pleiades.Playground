@@ -1,12 +1,10 @@
 using Microsoft.AspNetCore.Builder;
+using MQTTnet;
 using Pleiades.Playground.Common.Json;
-using Pleiades.Playground.Events.Generators.NotificationEvent;
-using Pleiades.Playground.Timeseries.Generators.BaseUnitValue;
 using Pleiades.Playground.HealthChecks.AspNetCore;
 using Pleiades.Playground.HealthChecks.Mqtt;
-using Pleiades.Playground.Timeseries.Generators.BooleanValue;
-using Pleiades.Playground.Timeseries.Generators.StringValue;
 using Pleiades.Playground.Simulator;
+using Pleiades.Playground.Simulator.Spec;
 using Pleiades.Playground.Mqtt.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
@@ -38,40 +36,17 @@ builder.Services.AddOptions<MqttConfig>()
     .Bind(builder.Configuration.GetSection("Config:MqttDestination"))
     .ValidateDataAnnotations()
     .ValidateOnStart();
-builder.Services.AddMqttClientHost().AddClient(builder.Configuration.GetSection("Config:MqttDestination"));
 
-// One simulator instance is one machine: the serial number is the machine id of every topic.
-var serialNumber = builder.Configuration["Config:SerialNumber"]
-    ?? throw new InvalidOperationException("Config:SerialNumber is required.");
-var baseTopic = $"machines/{serialNumber}";
-
-builder.Services.AddOptions<BaseUnitValueGeneratorConfig>()
-    .Bind(builder.Configuration.GetSection("Config:BaseUnitValueGeneratorConfig"))
-    .PostConfigure(c => c.BaseTopic = baseTopic)
-    .ValidateDataAnnotations();
-builder.Services.AddSingleton<IBaseUnitValueGenerator, BaseUnitValueGenerator>();
-
-builder.Services.AddOptions<StringValueGeneratorConfig>()
-    .Bind(builder.Configuration.GetSection("Config:StringValueGeneratorConfig"))
-    .PostConfigure(c => c.BaseTopic = baseTopic)
-    .ValidateDataAnnotations();
-builder.Services.AddSingleton<IStringValueGenerator, StringValueGenerator>();
-
-builder.Services.AddOptions<BooleanValueGeneratorConfig>()
-    .Bind(builder.Configuration.GetSection("Config:BooleanValueGeneratorConfig"))
-    .PostConfigure(c => c.BaseTopic = baseTopic)
-    .ValidateDataAnnotations();
-builder.Services.AddSingleton<IBooleanValueGenerator, BooleanValueGenerator>();
-
-builder.Services.AddOptions<NotificationEventGeneratorConfig>()
-    .Bind(builder.Configuration.GetSection("Config:NotificationEventGeneratorConfig"))
-    .PostConfigure(c => c.MId = serialNumber)
-    .ValidateDataAnnotations();
-builder.Services.AddSingleton<INotificationEventGenerator, NotificationEventGenerator>();
+// One simulator instance is one machine: a virtual machine that publishes after the data model below
+// machines/{MachineId}/. Its MQTT client is the one the health check watches; the service starts it with the last
+// will of the machine and stops it.
+builder.Services.AddSingleton<IManagedMqttClient>(provider =>
+    new MqttClientFactory().CreateManagedMqttClientWithLogger(provider.GetRequiredService<ILoggerFactory>()));
 
 builder.Services.AddPleiadesDefaultJsonOptions();
 
-builder.Services.AddHostedService<Worker>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddHostedService<VirtualMachineService>();
 
 builder.Services.AddHealthChecks()
     .AddMqtt();

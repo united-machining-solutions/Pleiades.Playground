@@ -151,7 +151,7 @@ const questions = [
       { value: "P-04", label: "P-04", description: "In alarm since 09:02" },
       { value: "M-02", label: "M-02", description: "In setup since 08:48" },
     ],
-    input: { label: "Another machine", placeholder: "Another serial number" },
+    input: { label: "Another machine", placeholder: "Another machine id" },
   },
   {
     name: "hours",

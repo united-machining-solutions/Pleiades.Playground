@@ -1,4 +1,4 @@
-import { BAND_SLOTS, instant, machineList, machineShow, serialNumber, spanList } from "@pleiades/cards/machine/contract.ts"
+import { BAND_SLOTS, instant, machineId, machineList, machineShow, spanList } from "@pleiades/cards/machine/contract.ts"
 import { machineListInWords, machineShowInWords, spanListInWords } from "@pleiades/cards/machine/in-words.ts"
 import { toolDefinition } from "@tanstack/ai"
 import { z } from "zod"
@@ -18,12 +18,14 @@ import { MACHINE_CARD_URI, SPAN_LIST_TOOL } from "./machine.names.ts"
 const shownAsCard =
   "Where the host shows MCP Apps, the person already sees this result as the machine card: these values, and the states of the last hours as a band. Then a sentence or two is the whole answer. Do not list the values again, and do not draw them again."
 
-const machine = serialNumber.describe("The serial number of the machine, for example P-04.")
+const machine = machineId.describe(
+  "The machine id, <manufacturer>_<model>_<serial number>, for example alcyone-machines_AX-400_P-04. genui_machine_list names every machine with its id.",
+)
 
 const machineListTool = toolDefinition({
   name: "genui_machine_list",
   description:
-    "List every machine with what it does now: connection, state and operation mode with the time since when, the active program, and the warnings and errors of the last 24 hours that have not gone. The result says it in a line for each machine and carries the values for a display. Every value names the topic it comes from.",
+    "List every machine with what it does now: manufacturer, model and serial number, connection, state and operation mode with the time since when, the active work master and job order, and the alerts of the last 24 hours that have not been cleared. The result says it in a line for each machine and carries the values for a display. Every value names the topic it comes from.",
   inputSchema: z.object({ timeZone }),
   outputSchema: machineList,
   metadata: { title: "List machines", annotations: readOnly },

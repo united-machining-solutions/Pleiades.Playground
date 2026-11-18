@@ -22,21 +22,21 @@ internal static class TelemetryMapper
             samples.Add(new(suffix, new BaseUnitValueDto { Timestamp = observedAt, Value = number * scale, Unit = unit }));
         }
         var status = String(Find(printer, "status"));
-        Text("vendor/Ultimaker/PrinterStatus", status);
-        Number("vendor/Ultimaker/Bed/Temperature", Find(printer, "bed", "temperature", "current"), BaseUnit.DegreeCelsius);
-        Number("vendor/Ultimaker/Bed/TargetTemperature", Find(printer, "bed", "temperature", "target"), BaseUnit.DegreeCelsius);
+        Text("oem/Ultimaker/PrinterStatus", status);
+        Number("oem/Ultimaker/Bed/Temperature", Find(printer, "bed", "temperature", "current"), BaseUnit.DegreeCelsius);
+        Number("oem/Ultimaker/Bed/TargetTemperature", Find(printer, "bed", "temperature", "target"), BaseUnit.DegreeCelsius);
         if (Find(printer, "heads") is { ValueKind: JsonValueKind.Array } heads && heads.GetArrayLength() > 0)
         {
             var head = heads[0];
             foreach (var axis in new[] { "x", "y", "z" })
-                Number("vendor/Ultimaker/Position/" + axis.ToUpperInvariant(), Find(head, "position", axis), BaseUnit.Metre, .001);
-            Number("vendor/Ultimaker/FanFraction", Find(head, "fan"), BaseUnit.One, .01, 0, 100);
+                Number("oem/Ultimaker/Position/" + axis.ToUpperInvariant(), Find(head, "position", axis), BaseUnit.Metre, .001);
+            Number("oem/Ultimaker/FanFraction", Find(head, "fan"), BaseUnit.One, .01, 0, 100);
             if (Find(head, "extruders") is { ValueKind: JsonValueKind.Array } extruders)
             {
                 var index = 0;
                 foreach (var extruder in extruders.EnumerateArray())
                 {
-                    var prefix = "vendor/Ultimaker/Extruder/" + index.ToString(CultureInfo.InvariantCulture) + "/";
+                    var prefix = "oem/Ultimaker/Extruder/" + index.ToString(CultureInfo.InvariantCulture) + "/";
                     Number(prefix + "Temperature", Find(extruder, "hotend", "temperature", "current"), BaseUnit.DegreeCelsius);
                     Number(prefix + "TargetTemperature", Find(extruder, "hotend", "temperature", "target"), BaseUnit.DegreeCelsius);
                     Number(prefix + "MaterialRemainingLength", Find(extruder, "active_material", "length_remaining"), BaseUnit.Metre, .001, 0);
@@ -45,14 +45,14 @@ internal static class TelemetryMapper
             }
         }
         var jobState = job is { } current ? String(Find(current, "state")) : "none";
-        Text("vendor/Ultimaker/Print/State", jobState);
+        Text("oem/Ultimaker/Print/State", jobState);
         if (job is { } active && jobState != "none")
         {
-            Text("vendor/Ultimaker/Print/JobId", String(Find(active, "uuid")));
-            Text("vendor/Ultimaker/Print/Result", String(Find(active, "result")));
-            Number("vendor/Ultimaker/Print/Progress", Find(active, "progress"), BaseUnit.One, 1, 0, 1);
-            Number("vendor/Ultimaker/Print/TimeElapsed", Find(active, "time_elapsed"), BaseUnit.Second, 1, 0);
-            Number("vendor/Ultimaker/Print/TimeTotal", Find(active, "time_total"), BaseUnit.Second, 1, 0);
+            Text("oem/Ultimaker/Print/JobId", String(Find(active, "uuid")));
+            Text("oem/Ultimaker/Print/Result", String(Find(active, "result")));
+            Number("oem/Ultimaker/Print/Progress", Find(active, "progress"), BaseUnit.One, 1, 0, 1);
+            Number("oem/Ultimaker/Print/TimeElapsed", Find(active, "time_elapsed"), BaseUnit.Second, 1, 0);
+            Number("oem/Ultimaker/Print/TimeTotal", Find(active, "time_total"), BaseUnit.Second, 1, 0);
         }
         var machineState = jobState switch
         {
@@ -61,7 +61,7 @@ internal static class TelemetryMapper
             "none" when status == "idle" => "NotExecuting",
             _ => null,
         };
-        Text("umati/State/MachineryItemState", machineState);
+        Text("umati/State/Status/MachineryItemState", machineState);
         return samples;
     }
 

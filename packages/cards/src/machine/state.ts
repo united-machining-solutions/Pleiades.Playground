@@ -33,8 +33,9 @@ export type Known = {
 }
 
 export function stateFrom(known: Known): State {
-  // Without a sign of life the values are the last known ones, not the present.
-  if (!known.live || known.connection !== "Connected") return "no-data"
+  // Without a sign of life the values are the last known ones, not the present. An adapter that is
+  // not Running (it starts, cannot reach the machine or stops) says nothing current about it.
+  if (!known.live || known.connection !== "Running") return "no-data"
   if (known.error) return "alarm"
   if (known.operationMode === "Setup") return "setup"
   if (known.itemState !== "Executing") return "stopped"

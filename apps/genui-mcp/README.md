@@ -16,8 +16,8 @@ durations are computed here, never by a language model.
 
 | Tool | What it returns |
 |---|---|
-| `genui_machine_list` | Every machine with what it does now: connection, heartbeat, state and operation mode with the time since when, the active program, and the warnings and errors of the last 24 hours that have not gone. |
-| `genui_machine_show` | One machine (`machine`, the serial number): the same readings, and how long each state lasted in total over the last hours (`hours`, 8 if omitted). Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
+| `genui_machine_list` | Every machine with what it does now: manufacturer, model and serial number, connection, heartbeat, state and operation mode with the time since when, the active work master and job order, and the alerts of the last 24 hours that have not been cleared. |
+| `genui_machine_show` | One machine (`machine`, the machine id): the same readings, and how long each state lasted in total over the last hours (`hours`, 8 if omitted). Its output is the contract of the machine card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_span_list` | The states of one machine between two instants (`from`, `to`) as spans without a gap: the band of the machine card. A card calls it after `genui_machine_show`. A host that shows MCP Apps does not offer it to its language model. |
 | `genui_measurement_list` | Every machine, or one (`machine`), with the newest value of each physical quantity: active power, energy imported, spindle bearing temperature, whether the spindle rotates, feed and spindle override, power-on duration. Each in the unit it was published in, and whether it is current: a value holds until the next one, as long as the machine is there (see below). Its output is the contract of the measurement card in [`@pleiades/cards`](../../packages/cards/README.md). |
 | `genui_measurement_series` | Every physical quantity over the last minutes (`minutes`, 15 if omitted), a line for each machine on the same instants (`slots`, 180 if omitted): what the graphs of the measurements draw. Each point is the value that held at its instant, also one published before the minutes began; none while the machine is silent, and none after a silence until the next value. The card file of the measurements calls it and draws the graphs below its cards; the page "Live values" of the example app calls it too. A host that shows MCP Apps does not offer it to its language model. |
@@ -38,7 +38,7 @@ So whoever reads the result, a language model included, has nothing to convert.
 A result has two parts, for two readers:
 
 - **Its text is for a language model**, and for a host that shows nothing else. It says in words what a
-  display shows: what a machine does, since when, with which program, and for one machine how long each
+  display shows: what a machine does, since when, with which work master, and for one machine how long each
   state lasted over the last hours. A few lines, in the words of the card.
 - **Its values (`structuredContent`) are for a display.** The example application and the card file draw
   them.
@@ -91,7 +91,7 @@ To see it, add `http://localhost:5520/mcp` to a host that shows MCP Apps and ask
 runs somewhere else needs an address it can reach.
 
 Without a host and without a language model, a script stands in for one:
-`node .claude/skills/build-your-own/show-card.mjs genui_machine_show machine=P-04` calls the tool, reads the
+`node .claude/skills/build-your-own/show-card.mjs genui_machine_show machine=alcyone-machines_AX-400_P-04` calls the tool, reads the
 card file it links and serves a page that hands the file the result, as a host does. A tool the card calls
 itself goes on to this server. It is what the recipe `create-card` looks at a new card with.
 
@@ -126,8 +126,8 @@ The [MQTT binding](../../contracts/mqtt/README.md) has no quality field: whether
 by `Connection/State` and `Connection/Heartbeat`. This server reads it so:
 
 - **A value holds until the next one of its topic**, however long that takes. A machine may publish its state
-  only when the state changes, and one that runs for days says once that it is connected; a simulator repeats
-  it every few seconds. Both read the same.
+  only when the state changes, and one that runs for days says once that its adapter is `Running`; another
+  repeats it every few seconds. Both read the same.
 - **Every value is a sign of life**, and the heartbeat is one that is nothing else. A machine that gave no sign
   for more than 30 seconds is silent: it has no data, whatever its last values say.
 - **A silence ends a run.** What a value was while the machine was silent is not known, so "since" is the
@@ -137,10 +137,10 @@ by `Connection/State` and `Connection/Heartbeat`. This server reads it so:
 
 A warning or an error that has stood for more than 24 hours is not in a result: not in the list, not on a
 card and not in the history of a machine. All three look back 24 hours, from now or from where a history
-ends, so the state of a machine and the end of its history say the same. The Events API returns
-the notifications that were raised between two instants; it cannot be asked for the ones that are open. Reading
-every notification of the retention time on each call would be the only way around it here. A filter for open
-notifications in the Events API would solve it.
+ends, so the state of a machine and the end of its history say the same. This server reads the alerts that
+were raised in those 24 hours (`/alerts/pairs` of the Events API). The Events API also names the alerts that stand
+now, however old (`/alerts/active`); it has no such view for an earlier instant, where a history ends. Reading
+the active alerts for the list, and every alert of the retention time for a history, would lift the limit.
 
 ## When an API fails
 

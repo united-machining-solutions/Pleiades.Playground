@@ -9,7 +9,6 @@
 
   <ItemGroup>
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
-    <PackageReference Include="Riok.Mapperly" PrivateAssets="all" />
     <ProjectReference Include="..\Pleiades.Playground.Mcp.Server\Pleiades.Playground.Mcp.Server.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="MongoDB.Driver" />
@@ -28,7 +27,6 @@
     <ProjectReference Include="..\Pleiades.Playground.Common.Exceptions\Pleiades.Playground.Common.Exceptions.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.HealthChecks.AspNetCore\Pleiades.Playground.HealthChecks.AspNetCore.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.HealthChecks.MongoDb\Pleiades.Playground.HealthChecks.MongoDb.csproj" />
-    <ProjectReference Include="..\Pleiades.Playground.Notification.DataTransferObjects\Pleiades.Playground.Notification.DataTransferObjects.csproj" />
   </ItemGroup>
 
   <ItemGroup>

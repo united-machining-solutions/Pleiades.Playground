@@ -14,8 +14,9 @@ builder.Services.AddOptions<JuiceBarOptions>().BindConfiguration("JuiceBar")
         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) && string.IsNullOrEmpty(uri.UserInfo),
         "JuiceBar:BaseUrl must be an HTTP(S) URL without credentials.")
     .Validate(o => o.MaximumQueueLength is >= 1 and <= 20, "JuiceBar:MaximumQueueLength must be 1..20.")
-    .Validate(o => !string.IsNullOrWhiteSpace(o.SerialNumber) && !o.SerialNumber.Any(c => char.IsWhiteSpace(c) || "/+#".Contains(c, StringComparison.Ordinal)),
-        "JuiceBar:SerialNumber must be one nonempty MQTT topic segment.")
+    .Validate(o => new[] { o.Manufacturer, o.Model, o.SerialNumber }.All(part => !string.IsNullOrWhiteSpace(part)
+            && !part.Any(c => char.IsWhiteSpace(c) || "/+#_".Contains(c, StringComparison.Ordinal))),
+        "JuiceBar:Manufacturer, JuiceBar:Model and JuiceBar:SerialNumber must each be nonempty, fit in one MQTT topic segment and hold no '_', which separates them in the machine id.")
     .ValidateOnStart();
 builder.Services.AddPleiadesHttpJsonOptions();
 builder.Services.AddPleiadesForwardedHeaders();

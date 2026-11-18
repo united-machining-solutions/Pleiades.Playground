@@ -15,7 +15,7 @@ export type Told = {
 
 /** `time` writes an instant as a time of day: the clock of the browser, unless the caller has another. */
 export function tell(machine: Machine, state: State, time: (instant: string) => string = clock): Told {
-  const { itemState, operationMode, program } = machine
+  const { connection, itemState, operationMode, program } = machine
   const warning = openWarning(machine)
   switch (state) {
     case "alarm": {
@@ -34,16 +34,22 @@ export function tell(machine: Machine, state: State, time: (instant: string) => 
         since: itemState.since,
         atLeast: itemState.sinceIsLowerBound,
       }
-    case "no-data":
-      return {
-        message: "No data from the adapter",
-        detail:
-          itemState.value && itemState.at
-            ? `Last known: ${itemState.value} at ${time(itemState.at)}`
-            : "Nothing known about this machine",
-        since: machine.lastValueAt,
-        atLeast: false,
+    case "no-data": {
+      const lastKnown =
+        itemState.value && itemState.at ? `Last known: ${itemState.value} at ${time(itemState.at)}` : "Nothing known about this machine"
+      // An adapter that is there and says it is not Running (it starts, does not reach the machine or
+      // stops) has no data since it said so, however often it repeats it. One that says nothing, or
+      // said Running last, is silent since its last sign of life.
+      if (connection.value !== null && connection.value !== "Running") {
+        return {
+          message: "No data from the adapter",
+          detail: `The adapter says ${connection.value}. ${lastKnown}`,
+          since: connection.since,
+          atLeast: connection.sinceIsLowerBound,
+        }
       }
+      return { message: "No data from the adapter", detail: lastKnown, since: machine.lastValueAt, atLeast: false }
+    }
     case "setup":
       return {
         message: "Setup mode",
@@ -53,7 +59,7 @@ export function tell(machine: Machine, state: State, time: (instant: string) => 
       }
     case "running":
       return {
-        message: program.value ?? "No program",
+        message: program.value ?? "No work master",
         detail: warning ? `Warning: ${warning.title}` : "",
         since: itemState.since,
         atLeast: itemState.sinceIsLowerBound,

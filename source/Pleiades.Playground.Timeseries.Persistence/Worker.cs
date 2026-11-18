@@ -171,9 +171,24 @@ internal class Worker : BackgroundService
         }
     }
 
+    /// <summary>
+    /// A value in the envelope of the data model, <c>{timestamp, value, unit?, correlationId?}</c>, kept as it came:
+    /// a number with its unit (a number without one, such as the heartbeat, with <c>one</c>), a text, a truth value.
+    /// A snapshot (an object, such as <c>State/Status</c>) is kept field by field, each text or truth value on the
+    /// topic of the snapshot and the name of the field (<c>…/State/Status/MachineryItemState</c>), with the time of
+    /// the snapshot. A number inside a snapshot carries no unit on the wire and is not kept; the sums of a program
+    /// execution are in its events. A list, the manifest and <c>null</c> ("not available right now") are not
+    /// series: the Events API keeps job orders and alerts, and the identification lies in values of its own.
+    /// </summary>
     private void HandleDefaultPayload(string payload, string topic)
     {
         var json = JsonNode.Parse(payload);
+
+        if (json?["value"] is JsonObject snapshot)
+        {
+            ProcessSnapshot(snapshot, json["timestamp"], topic);
+            return;
+        }
 
         switch (json?["value"]?.GetValueKind())
         {
@@ -190,9 +205,39 @@ internal class Worker : BackgroundService
                 ProcessBooleanValue(payload, topic);
                 break;
 
+            case JsonValueKind.Null:
+            case JsonValueKind.Array:
+                break;
+
             default:
+                // The manifest and anything else without a value of its own.
+                if (json?["value"] is null && json?["timestamp"] is null)
+                {
+                    break;
+                }
                 LogPayloadMissmatch(_logger, topic, payload, null);
                 break;
+        }
+    }
+
+    private void ProcessSnapshot(JsonObject snapshot, JsonNode? timestampNode, string topic)
+    {
+        var timestamp = timestampNode?.GetValue<DateTime>().ToUniversalTime()
+            ?? throw new InvalidOperationException("A snapshot without a timestamp.");
+        foreach (var (field, node) in snapshot)
+        {
+            switch (node?.GetValueKind())
+            {
+                case JsonValueKind.String:
+                    AddStringValue(new StringValueDao { Timestamp = timestamp, Topic = $"{topic}/{field}", Value = node.GetValue<string>() });
+                    break;
+                case JsonValueKind.True:
+                case JsonValueKind.False:
+                    AddBooleanValue(new BooleanValueDao { Timestamp = timestamp, Topic = $"{topic}/{field}", Value = node.GetValue<bool>() });
+                    break;
+                default:
+                    break;
+            }
         }
     }
 

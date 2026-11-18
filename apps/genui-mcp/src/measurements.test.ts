@@ -192,7 +192,7 @@ test("a line shows at the end of each slot the value that held, as it was measur
 })
 
 test("the series give a line for each machine and quantity, from the value that held where they begin", async () => {
-  const temperature = (machine: string) => `machines/${machine}/vendor/Spindle/1/BearingTemperature`
+  const temperature = (machine: string) => `machines/${machine}/oem/Spindle/1/BearingTemperature`
   const requested = serve({
     ...heartbeat("P-04", 960, 0),
     ...heartbeat("P-07", 960, 0),

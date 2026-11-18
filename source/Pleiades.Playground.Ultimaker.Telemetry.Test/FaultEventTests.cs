@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text;
@@ -6,9 +7,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using MQTTnet;
-using Pleiades.Playground.Common.DataTransferObjects;
+using MQTTnet.Protocol;
 using Pleiades.Playground.Mqtt.Extensions;
-using Pleiades.Playground.Notification.DataTransferObjects;
 using Pleiades.Playground.Ultimaker.Faults;
 
 namespace Pleiades.Playground.Ultimaker.Telemetry.Test;
@@ -26,19 +26,11 @@ public sealed class FaultEventTests
     private static string FaultLog() => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "system-log-fault-48.json"));
 
     [TestMethod]
-    public async Task FaultAndFailedJobOfThePrinterBecomeNotificationEventsOfTheBinding()
+    public async Task FaultAndFailedJobOfThePrinterBecomeAlertEventsOfTheBinding()
     {
-        var messages = new ConcurrentQueue<MqttApplicationMessage>();
-        var mqtt = new Mock<IManagedMqttClient>();
-        mqtt.SetupGet(m => m.IsConnected).Returns(true);
-        mqtt.Setup(m => m.EnqueueAsync(It.IsAny<MqttApplicationMessage>())).Returns((MqttApplicationMessage message) =>
-        {
-            messages.Enqueue(message);
-            return Task.CompletedTask;
-        });
+        var (mqtt, messages) = Broker(connected: true);
         using var printer = new ReplayPrinter { Log = "[]", History = "[" + AbortedJob + "]" };
-        using var worker = new FaultEventWorker(new FakeFactory(printer), mqtt.Object,
-            Options.Create(new TelemetryOptions()), NullLogger<FaultEventWorker>.Instance);
+        using var worker = Worker(printer, mqtt);
 
         // What the printer shows when the adapter starts is the baseline, not news.
         await worker.PollAsync(TestContext.CancellationToken).ConfigureAwait(false);
@@ -49,74 +41,107 @@ public sealed class FaultEventTests
         await worker.PollAsync(TestContext.CancellationToken).ConfigureAwait(false);
         await worker.PollAsync(TestContext.CancellationToken).ConfigureAwait(false);
 
-        Assert.IsTrue(messages.All(m => m.Topic == "machines/UM3-01/events/notifications" && m.ContentType == "notificationeventdtov1"));
+        Assert.IsTrue(messages.All(m => m.Topic == "machines/ultimaker_UM3_UM3-01/events/notifications"
+            && m.ContentType == "application/cloudevents+json; charset=utf-8"
+            && m.QualityOfServiceLevel == MqttQualityOfServiceLevel.AtLeastOnce && !m.Retain));
         var events = messages.Select(m => JsonDocument.Parse(m.Payload).RootElement).ToArray();
         // The fault came and stays; the failed job came and went when the plate was reported as cleared.
-        Assert.HasCount(3, events);
-        var fault = events.Single(e => e.GetProperty("notificationId").GetString() == "ultimaker-fault-48");
-        Assert.AreEqual("Raised", fault.GetProperty("action").GetString());
-        Assert.AreEqual("Error", fault.GetProperty("level").GetString());
-        Assert.AreEqual("UM3-01", fault.GetProperty("mId").GetString());
-        Assert.AreEqual("The found Z-level 150.000 is not within the expected range [-30.000, 150.000]", fault.GetProperty("title").GetString());
-        Assert.AreEqual(new DateTime(2026, 11, 17, 20, 18, 20, 59, DateTimeKind.Utc), fault.GetProperty("timestamp").GetDateTime().ToUniversalTime());
-        Assert.AreEqual(24, fault.GetProperty("id").GetString()!.Length);
-        var job = events.Where(e => e.GetProperty("notificationId").GetString() == "ultimaker-print-failed").ToArray();
-        CollectionAssert.AreEqual(new[] { "Raised", "Reset" }, job.Select(e => e.GetProperty("action").GetString()).ToArray());
-        Assert.AreEqual(job[0].GetProperty("correlationId").GetString(), job[1].GetProperty("correlationId").GetString());
+        CollectionAssert.AreEqual(new[] { "Notification.AlertRaised", "Notification.AlertRaised", "Notification.AlertCleared" },
+            events.Select(e => e.GetProperty("type").GetString()).ToArray());
+        var fault = events[0];
+        Assert.AreEqual("1.0", fault.GetProperty("specversion").GetString());
+        Assert.AreEqual("https://ultimaker.com/UM3/UM3-01", fault.GetProperty("source").GetString());
+        Assert.AreEqual("2026-11-17T20:18:20.059Z", fault.GetProperty("time").GetString());
+        Assert.AreEqual("urn:umati2:datamodel:0.17.1:event.schema.json", fault.GetProperty("dataschema").GetString());
+        Assert.IsTrue(Guid.TryParse(fault.GetProperty("id").GetString(), out _));
+        var alert = fault.GetProperty("data");
+        Assert.AreEqual("fault-48-20261117T201820059Z", alert.GetProperty("Id").GetString());
+        Assert.AreEqual("48", alert.GetProperty("ErrorCode").GetString());
+        Assert.AreEqual("The found Z-level 150.000 is not within the expected range [-30.000, 150.000]", alert.GetProperty("Message").GetString());
+        Assert.AreEqual("Failure", alert.GetProperty("Severity").GetString());
+        Assert.AreEqual("2026-11-17T20:18:20.059Z", alert.GetProperty("Time").GetString());
+        Assert.IsFalse(alert.TryGetProperty("SeverityValue", out _));
+        // The count has no gap, and coming and going of the job carry the same alert.
+        var sequences = events.Select(e => e.GetProperty("sequence").GetString()!).ToArray();
+        CollectionAssert.AreEqual(new[] { "000000000001", "000000000002", "000000000003" }, sequences.Select(s => s.Split('.')[1]).ToArray());
+        Assert.HasCount(1, sequences.Select(s => s.Split('.')[0]).Distinct());
+        Assert.AreEqual("print-013e14bf-4829-4be6-a394-4a73221ecc7f", events[1].GetProperty("data").GetProperty("Id").GetString());
+        Assert.AreEqual(events[1].GetProperty("data").GetRawText(), events[2].GetProperty("data").GetRawText());
+        Assert.AreEqual("2026-11-17T20:18:48.000Z", events[2].GetProperty("time").GetString());
+        Assert.HasCount(3, events.Select(e => e.GetProperty("id").GetString()).Distinct());
         Assert.IsFalse(messages.Any(m => Encoding.UTF8.GetString(m.Payload).Contains("ultimakersystem", StringComparison.Ordinal)));
     }
 
     [TestMethod]
-    public void FaultGoesWithTheSameCorrelationWhenALaterJobStarts()
+    public void FaultIsClearedWithTheSameAlertWhenALaterJobStarts()
     {
-        var tracker = new FaultEventTracker("UM3-01");
+        var tracker = new FaultEventTracker();
         Assert.IsEmpty(tracker.Observe([], [], null));
         var raised = tracker.Observe([Fault], [], null).Single();
         // A job that started before the fault is the one that failed, not a sign that the fault is gone.
         Assert.IsEmpty(tracker.Observe([Fault], [], Fault.RaisedAt.AddMinutes(-2)));
         var later = Fault.RaisedAt.AddMinutes(20);
-        var reset = tracker.Observe([Fault], [], later).Single();
-        Assert.AreEqual(NotificationAction.Raised, raised.Action);
-        Assert.AreEqual(NotificationAction.Reset, reset.Action);
-        Assert.AreEqual(raised.CorrelationId, reset.CorrelationId);
-        Assert.AreEqual(raised.NotificationId, reset.NotificationId);
-        Assert.AreEqual(later.UtcDateTime, reset.Timestamp);
-        Assert.AreNotEqual(raised.Id, reset.Id);
+        var cleared = tracker.Observe([Fault], [], later).Single();
+        Assert.AreEqual(FaultEventTracker.AlertRaised, raised.Type);
+        Assert.AreEqual(FaultEventTracker.AlertCleared, cleared.Type);
+        Assert.AreEqual(raised.Data.ToJsonString(), cleared.Data.ToJsonString());
+        Assert.AreEqual(later, cleared.Time);
         Assert.IsEmpty(tracker.Observe([Fault], [], later));
     }
 
     [TestMethod]
-    public void AbortedJobIsAWarningAndStaysUntilThePlateIsCleared()
+    public void AbortedJobIsAMessageThatDoesNotStayAndAJobWithoutATimeRaisesNothing()
     {
-        var tracker = new FaultEventTracker("UM3-01");
+        var tracker = new FaultEventTracker();
         Assert.IsEmpty(tracker.Observe([], [], null));
         var finished = new DateTimeOffset(2026, 11, 17, 20, 15, 52, TimeSpan.Zero);
-        var open = new JobOutcome("19a2bb79-e661-43a2-bcc9-3c70e4339493", "Aborted", finished.AddMinutes(-26), finished, null);
-        var raised = tracker.Observe([], [open], null).Single();
-        Assert.AreEqual(EventLevel.Warning, raised.Level);
-        Assert.AreEqual("ultimaker-print-aborted", raised.NotificationId);
-        Assert.IsEmpty(tracker.Observe([], [open], null));
-        var reset = tracker.Observe([], [open with { CleanedAt = finished.AddSeconds(41) }], null).Single();
-        Assert.AreEqual(NotificationAction.Reset, reset.Action);
-        Assert.AreEqual(raised.CorrelationId, reset.CorrelationId);
-        // A finished job and a job without a time of the printer raise nothing.
+        var aborted = new JobOutcome("19a2bb79-e661-43a2-bcc9-3c70e4339493", "Aborted", finished.AddMinutes(-26), finished, null);
+        var message = tracker.Observe([], [aborted], null).Single();
+        Assert.AreEqual(FaultEventTracker.NotificationEvent, message.Type);
+        Assert.AreEqual("PrintAborted", message.Data["ErrorCode"]!.GetValue<string>());
+        Assert.IsFalse(message.Data.ContainsKey("Severity"));
+        // Clearing the plate brings nothing more: a message has no end.
+        Assert.IsEmpty(tracker.Observe([], [aborted with { CleanedAt = finished.AddSeconds(41) }], null));
         Assert.IsEmpty(tracker.Observe([], [new("a", "Finished", finished, finished, null), new("b", "Failed", finished, null, null)], null));
     }
 
     [TestMethod]
-    public async Task UnreachablePrinterOrBrokerRaisesAndResetsNothing()
+    public async Task EventsWaitInOrderWhileTheBrokerIsAwayAndAnUnreachablePrinterRaisesNothing()
     {
-        var mqtt = new Mock<IManagedMqttClient>();
-        mqtt.SetupGet(m => m.IsConnected).Returns(true);
-        using var printer = new ReplayPrinter { Log = "[]", History = "[]", Status = HttpStatusCode.ServiceUnavailable };
-        using var worker = new FaultEventWorker(new FakeFactory(printer), mqtt.Object,
-            Options.Create(new TelemetryOptions()), NullLogger<FaultEventWorker>.Instance);
-        await Assert.ThrowsAsync<HttpRequestException>(() => worker.PollAsync(TestContext.CancellationToken)).ConfigureAwait(false);
-        mqtt.SetupGet(m => m.IsConnected).Returns(false);
+        var (mqtt, messages) = Broker(connected: false);
+        using var printer = new ReplayPrinter { Log = "[]", History = "[]" };
+        using var worker = Worker(printer, mqtt);
         await worker.PollAsync(TestContext.CancellationToken).ConfigureAwait(false);
-        Assert.AreEqual(1, printer.Requests);
-        mqtt.Verify(m => m.EnqueueAsync(It.IsAny<MqttApplicationMessage>()), Times.Never);
+        printer.Log = FaultLog();
+        printer.History = "[" + FailedJob + "]";
+        await worker.PollAsync(TestContext.CancellationToken).ConfigureAwait(false);
+        Assert.IsEmpty(messages);
+
+        // The printer stops answering while the broker comes back: what waited goes out, nothing new comes up.
+        printer.Status = HttpStatusCode.ServiceUnavailable;
+        mqtt.SetupGet(m => m.IsConnected).Returns(true);
+        await Assert.ThrowsAsync<HttpRequestException>(() => worker.PollAsync(TestContext.CancellationToken)).ConfigureAwait(false);
+        CollectionAssert.AreEqual(new[] { "000000000001", "000000000002", "000000000003" },
+            messages.Select(m => JsonDocument.Parse(m.Payload).RootElement.GetProperty("sequence").GetString()!.Split('.')[1]).ToArray());
+        await Assert.ThrowsAsync<HttpRequestException>(() => worker.PollAsync(TestContext.CancellationToken)).ConfigureAwait(false);
+        Assert.HasCount(3, messages);
     }
+
+    private static (Mock<IManagedMqttClient> Mqtt, ConcurrentQueue<MqttApplicationMessage> Messages) Broker(bool connected)
+    {
+        var messages = new ConcurrentQueue<MqttApplicationMessage>();
+        var mqtt = new Mock<IManagedMqttClient>();
+        mqtt.SetupGet(m => m.IsConnected).Returns(connected);
+        mqtt.Setup(m => m.EnqueueAsync(It.IsAny<MqttApplicationMessage>())).Returns((MqttApplicationMessage message) =>
+        {
+            messages.Enqueue(message);
+            return Task.CompletedTask;
+        });
+        return (mqtt, messages);
+    }
+
+    private static FaultEventWorker Worker(ReplayPrinter printer, Mock<IManagedMqttClient> mqtt)
+        => new(new FakeFactory(printer), mqtt.Object, Options.Create(new TelemetryOptions()), NullLogger<FaultEventWorker>.Instance);
 
     private sealed class FakeFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
@@ -128,10 +153,8 @@ public sealed class FaultEventTests
         internal string Log = "[]";
         internal string History = "[]";
         internal HttpStatusCode Status = HttpStatusCode.OK;
-        internal int Requests;
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            Requests++;
             Assert.AreEqual(HttpMethod.Get, request.Method);
             if (Status != HttpStatusCode.OK) return Task.FromResult(new HttpResponseMessage(Status));
             var path = request.RequestUri!.AbsolutePath;

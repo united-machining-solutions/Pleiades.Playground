@@ -5,11 +5,11 @@ import {
   ArrowUpIcon,
   BotOffIcon,
   ChevronDownIcon,
+  ChevronLeftIcon,
   CircleAlertIcon,
   CircleCheckIcon,
   LoaderCircleIcon,
   MessageCircleDashedIcon,
-  PlusIcon,
   SquareIcon,
   XIcon,
 } from "lucide-react"
@@ -45,7 +45,7 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
+  SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -61,22 +61,29 @@ import {
   TraceTitle,
 } from "@pleiades/ui/components/trace"
 
+import { keepOfAnswer } from "@/pages/from-answer.ts"
+
 import { Answer } from "./answer.tsx"
 import {
   NEW_CHAT,
   afterSwitch,
+  markPress,
+  peekFirstQuestion,
   pickModel,
   pickSwitchedOff,
   pickedModel,
   pickedSwitchedOff,
   rememberThread,
   takeFirstQuestion,
+  takePress,
   useChatPanel,
 } from "./ask.ts"
 import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
 import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
+import { chatName, nameOfQuestion } from "./chat-name.ts"
 import { DictateButton } from "./dictate.tsx"
+import { SaveAsPage } from "./save-as-page.tsx"
 import { chooseChatModel, fetchChatSettings, switchChatServer } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
 import { toolLabel } from "./tool-results.ts"
@@ -87,15 +94,16 @@ const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
 
 /**
  * Everything about the chat lives in this panel on the right, after the shadcn block sidebar-15:
- * the chat itself, "New chat" and the chats so far. Without it the app is complete; it only loses
- * the chat.
+ * the list of the chats and the chat itself. It works like a chat app on a phone, a list and a
+ * chat with a way back: in a chat the head says what the chat is called and leads back to the list,
+ * and the list is where a new chat begins. Without the panel the app is complete; it only loses the
+ * chat.
  *
  * It never covers the page. It stands next to it, and where the two do not fit side by side it
  * takes the lower half of the screen.
  */
 export function ChatSidebar({ chat }: { chat: string }) {
   const { chatStatus } = root.useLoaderData()
-  const panel = useChatPanel()
   return (
     <Sidebar
       side="right"
@@ -103,20 +111,6 @@ export function ChatSidebar({ chat }: { chat: string }) {
       aria-label="Chat"
       className="sticky top-0 h-svh w-[clamp(20rem,36vw,28rem)] shrink-0 border-l max-lg:top-auto max-lg:bottom-0 max-lg:h-[50svh] max-lg:w-full max-lg:border-t max-lg:border-l-0"
     >
-      <SidebarHeader className="h-14 flex-row items-center justify-between border-b">
-        <span className="px-2 font-medium">Chat</span>
-        <div className="flex items-center gap-1">
-          {chatStatus.configured && chat !== NEW_CHAT && (
-            <Button variant="ghost" size="sm" onClick={panel.startNew}>
-              <PlusIcon data-icon="inline-start" />
-              New chat
-            </Button>
-          )}
-          <Button variant="ghost" size="icon-sm" aria-label="Close the chat" onClick={panel.close}>
-            <XIcon />
-          </Button>
-        </div>
-      </SidebarHeader>
       {!chatStatus.configured ? (
         <NoLanguageModel />
       ) : chat === NEW_CHAT ? (
@@ -129,27 +123,66 @@ export function ChatSidebar({ chat }: { chat: string }) {
   )
 }
 
-function NoLanguageModel() {
-  const { chatStatus } = root.useLoaderData()
+/**
+ * The head of the panel. In a chat (`back`) a button leads back to the list, then comes the name of
+ * the chat; elsewhere there is only the title of the view. The name takes the room that is left and
+ * is cut where it is too long: the buttons never give way.
+ *
+ * "All chats" and the link of a chat go away with the view they stand in. After such a press the
+ * heading of the new view takes the focus, so it does not fall to the page and a screen reader says
+ * where it is. On a page load the focus stays where it was.
+ */
+function PanelHead({ title, back = false }: { title: string; back?: boolean }) {
+  const panel = useChatPanel()
+  const heading = useRef<HTMLHeadingElement>(null)
+  useEffect(() => {
+    if (takePress()) heading.current?.focus()
+  }, [])
   return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <BotOffIcon />
-        </EmptyMedia>
-        <EmptyTitle>No language model configured</EmptyTitle>
-        <EmptyDescription>
-          {/* What is missing first, by the names of the settings. */}
-          {chatStatus.gaps.map((gap) => `${gap}. `)}
-          Set <code>LLM_BASE_URL</code> and <code>LLM_API_KEY</code> of a LiteLLM gateway in <code>.env</code>{" "}
-          and start the app again with <code>docker compose up -d app</code>. Home needs no language model.
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <SidebarHeader className="h-14 flex-row items-center gap-1 border-b">
+      {back && (
+        <Button variant="ghost" size="icon-sm" aria-label="All chats" onClick={panel.showList}>
+          <ChevronLeftIcon />
+        </Button>
+      )}
+      <h2 ref={heading} tabIndex={-1} className="min-w-0 flex-1 truncate px-2 font-medium outline-none">
+        {title}
+      </h2>
+      <Button variant="ghost" size="icon-sm" aria-label="Close the chat" onClick={panel.close}>
+        <XIcon />
+      </Button>
+    </SidebarHeader>
   )
 }
 
-/** The panel before a chat: the chats so far, and questions to begin with above the field. */
+function NoLanguageModel() {
+  const { chatStatus } = root.useLoaderData()
+  return (
+    <>
+      <PanelHead title="Chat" />
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <BotOffIcon />
+          </EmptyMedia>
+          <EmptyTitle>No language model configured</EmptyTitle>
+          <EmptyDescription>
+            {/* What is missing first, by the names of the settings. */}
+            {chatStatus.gaps.map((gap) => `${gap}. `)}
+            Set <code>LLM_BASE_URL</code> and <code>LLM_API_KEY</code> of a LiteLLM gateway in <code>.env</code>{" "}
+            and start the app again with <code>docker compose up -d app</code>. Home needs no language model.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    </>
+  )
+}
+
+/**
+ * The list of the chats, where a chat leads back to: the chats so far, and below them the field that
+ * begins a new chat, with questions to begin with above it. The head says "Chats", so the group has no
+ * label of its own.
+ */
 function Start() {
   const { chats, chatStatus } = root.useLoaderData()
   const panel = useChatPanel()
@@ -168,19 +201,21 @@ function Start() {
   }
   return (
     <>
+      <PanelHead title="Chats" />
       <SidebarContent>
         {chats.length > 0 ? (
           <SidebarGroup>
-            <SidebarGroupLabel>Chats</SidebarGroupLabel>
-            <SidebarMenu>
-              {chats.map((entry) => (
-                <SidebarMenuItem key={entry.threadId}>
-                  <SidebarMenuButton render={<Link to="." search={{ chat: entry.threadId }} />}>
-                    <span>{entry.title}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {chats.map((entry) => (
+                  <SidebarMenuItem key={entry.threadId}>
+                    <SidebarMenuButton render={<Link to="." search={{ chat: entry.threadId }} onClick={markPress} />}>
+                      <span>{entry.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
           </SidebarGroup>
         ) : (
           <Empty className="h-full">
@@ -212,7 +247,11 @@ function Start() {
 function Conversation({ threadId }: { threadId: string }) {
   const router = useRouter()
   const { chats, chatStatus } = root.useLoaderData()
-  const titled = chats.some((entry) => entry.threadId === threadId && entry.titled)
+  const entry = chats.find((chat) => chat.threadId === threadId)
+  const titled = entry?.titled ?? false
+  // The first question of a chat begun from the list or from a machine, as long as it waits for this
+  // panel: the head can call the chat by it from the first render.
+  const [asked] = useState(() => peekFirstQuestion(threadId))
   const { messages, sendMessage, isLoading, error, stop } = useChat({
     threadId,
     connection: fetchServerSentEvents("/api/harness/run"),
@@ -337,7 +376,7 @@ function Conversation({ threadId }: { threadId: string }) {
     void fetch("/api/harness/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ op: "rename", threadId, title: firstQuestion.slice(0, 80) }),
+      body: JSON.stringify({ op: "rename", threadId, title: nameOfQuestion(firstQuestion) }),
     }).then(() => router.invalidate())
   }, [isLoading, firstQuestion, titled, threadId, router])
 
@@ -346,6 +385,7 @@ function Conversation({ threadId }: { threadId: string }) {
 
   return (
     <>
+      <PanelHead title={chatName(entry, firstQuestion ?? asked)} back />
       <div className="min-h-0 flex-1">
         {/* A new question settles near the top and the answer grows under it; a chat from before
             opens at its last question. */}
@@ -353,7 +393,7 @@ function Conversation({ threadId }: { threadId: string }) {
           <MessageScroller>
             <MessageScrollerViewport>
               <MessageScrollerContent aria-busy={isLoading} className="gap-6 p-4">
-                {messages.map((message) => {
+                {messages.map((message, position) => {
                   if (message.role === "user") {
                     return (
                       <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor>
@@ -367,9 +407,14 @@ function Conversation({ threadId }: { threadId: string }) {
                       </MessageScrollerItem>
                     )
                   }
-                  const blocks = blocksOf(message.parts, isLoading && message === messages.at(-1), chatTools)
+                  const live = isLoading && message === messages.at(-1)
+                  const blocks = blocksOf(message.parts, live, chatTools)
                   // An answer that has nothing to show yet takes no room.
                   if (blocks.length === 0) return null
+                  // An answer that has ended, and for which the chat drew a card, can be saved as a
+                  // page: its cards, titled with the question it answers (pages/from-answer.ts). The
+                  // answer is more than this message: the button stands under its last one.
+                  const keep = keepOfAnswer(messages, position, chatTools, isLoading)
                   return (
                     // An item paints nothing outside its box, and a card draws its edge as a ring
                     // around itself: one pixel of room keeps that edge.
@@ -385,6 +430,7 @@ function Conversation({ threadId }: { threadId: string }) {
                               }
                             />
                           ))}
+                          {keep && <SaveAsPage answer={`${threadId}/${message.id}`} recipe={keep.recipe} left={keep.left} />}
                         </MessageContent>
                       </Message>
                     </MessageScrollerItem>
