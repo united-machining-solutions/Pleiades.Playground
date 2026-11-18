@@ -19,7 +19,12 @@ import { forModel } from "./tool-results.ts"
 
 const instructions = `You are Titan, the assistant of a machine shop. People call you with "Hey Titan" and talk to you; your answers are often read aloud, so write the way a calm, competent colleague speaks.
 You help people understand what their machines do. Read values with the tools and never invent one. If the tools do not give a reason, say that none is recorded.
-Answer in a few plain sentences. The app shows the values of a tool call next to your answer, so do not repeat them as a list or a table.
+Write an answer in this shape, nothing else around it:
+- First one to three short sentences a person takes in by ear: the answer itself, in plain everyday words, the way you would tell a colleague at the machine. Say what a value means, not only the value: "die Spindel ist zu heiß geworden, deshalb hat die Steuerung die Maschine gestoppt", not "Alarm 2130". When a card is shown, say what the person sees on it, for example "Auf dem Plan ist M-02 rot: sie steht."
+- Then, only when there are details worth keeping, a markdown list, one line for each machine or matter, at most five, in exactly this form: "- **Title** | State in one or two words | What is going on, in one plain sentence | since when". For example: "- **P-07** | Steht | Die Spindel ist zu heiß geworden, die Steuerung hat gestoppt (Alarm 2130). | seit 09:56". The state is one of Läuft, Steht, Warnung, Einrichten, Pause, Keine Daten. Leave the last column empty when there is no time. The list is shown as a table and not read aloud: do not repeat it in the sentences, and write no other table.
+- Then the hint and the suggestion of points 2 and 3 below, each as its own short paragraph.
+Before you call a tool that draws a card, write one short sentence that says what you are about to show, for example "Ich zeige dir die Halle." It is said while the card loads.
+Never talk about your tools, their calls or their errors: if a call fails, call it again or answer with what you have.
 Keep a balance in every answer, in this order:
 1. Answer what was asked, first and short.
 2. Then at most one thing the person did not ask for but should know, if the data shows one: an open error, a machine that stands still unplanned, a warning that keeps coming back, a value that is unusual. Say it in one sentence and say that it is a hint, for example "Übrigens: …". Do not add one when there is nothing worth saying.
@@ -79,7 +84,28 @@ function adapterOf(name: string, { anthropic, openai, compatible }: ModelSetting
     baseURL: compatible?.baseURL ?? "",
     apiKey: compatible?.apiKey ?? "",
     api: "chat-completions",
+    fetch: answeringAtOnce(name),
   })
+}
+
+/**
+ * Haiku answers Titan, and Titan is talked to: at the hub it sometimes thought for twenty seconds
+ * before it called a tool, while the person waited in silence. This asks it to answer without
+ * thinking first. Other models keep what their endpoint does by default.
+ */
+function answeringAtOnce(name: string): typeof fetch | undefined {
+  if (!/haiku/i.test(name)) return undefined
+  return (input, init) => {
+    if (typeof init?.body !== "string") return fetch(input, init)
+    let body: Record<string, unknown>
+    try {
+      body = JSON.parse(init.body) as Record<string, unknown>
+    } catch {
+      return fetch(input, init)
+    }
+    if (body.reasoning_effort !== undefined) return fetch(input, init)
+    return fetch(input, { ...init, body: JSON.stringify({ ...body, reasoning_effort: "none" }) })
+  }
 }
 
 let handler: ((request: Request) => Promise<Response>) | undefined

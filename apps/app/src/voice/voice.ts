@@ -1,5 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from "react"
 
+import { withoutList } from "./facts.ts"
 import { piperIfReady, sentencesOf } from "./piper.ts"
 import { transcribe } from "./transcribe.ts"
 
@@ -321,12 +322,18 @@ function microphoneError(error: unknown): string {
 type Part = { type: string; content?: unknown }
 type ChatMessage = { id: string; role: string; parts: ReadonlyArray<Part> }
 
-/** The words of an answer, without what its cards show. */
-function wordsOf(message: ChatMessage): string {
+/** The text of an answer, without what its cards show. */
+export function textOf(message: ChatMessage): string {
   return message.parts
     .filter((part) => part.type === "text" && typeof part.content === "string")
     .map((part) => part.content as string)
     .join("\n")
+}
+
+/** What of an answer is said: everything but its list of facts, which the screen shows (facts.ts). */
+function wordsOf(message: ChatMessage): string {
+  const text = textOf(message)
+  return withoutList(text)
 }
 
 /**

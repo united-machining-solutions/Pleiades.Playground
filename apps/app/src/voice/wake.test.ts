@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { levelOf, wakeQuestion } from "./wake.ts"
+import { levelOf, isPause, wakeQuestion } from "./wake.ts"
 
 test("Hey Titan with a question wakes and keeps the question", () => {
   assert.deepEqual(wakeQuestion("Hey Titan, welche Maschine steht?"), { woke: true, question: "welche Maschine steht?" })
@@ -34,4 +34,9 @@ test("a growing answer is said up to its last complete sentence", async () => {
   assert.equal(text.slice(0, sentencesEnd(text, 0)), "P-04 steht. Die Tür ist offen. ")
   assert.equal(sentencesEnd(text, 31), 31)
   assert.equal(sentencesEnd("Noch kein Satz", 0), 0)
+})
+
+test("a pause is asked for in a few words", () => {
+  for (const said of ["Pause.", "Mach mal Pause!", "Sei still", "Stopp", "Ruhe bitte", "schlafen"]) assert.equal(isPause(said), true, said)
+  for (const said of ["Welche Maschine macht Pause?", "Pause von P-04 zeigen", ""]) assert.equal(isPause(said), false, said)
 })

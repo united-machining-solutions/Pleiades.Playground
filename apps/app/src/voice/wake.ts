@@ -32,10 +32,18 @@ export function wakeQuestion(text: string): { woke: boolean; question: string } 
   return { woke: true, question }
 }
 
+/** Words that send Titan into a pause: it stays quiet until "Hey Titan" or the space bar. */
+const PAUSE = /^(bitte\s+)?(mach\s+(mal\s+)?)?(eine\s+)?(pause|pausier\w*|schlaf\w*|ruhe|sei\s+(mal\s+)?(still|ruhig)|still|stopp?|halt)(\s+bitte)?$/i
+
+/** Whether what was said after the name asks Titan to pause, as in "Hey Titan, Pause". */
+export function isPause(question: string): boolean {
+  return PAUSE.test(question.replace(/[^\p{L}\s]/gu, " ").replace(/\s+/g, " ").trim())
+}
+
 /** Sound louder than this is speech: a root mean square of the samples, between 0 and 1. */
 export const SPEECH_LEVEL = 0.02
 /** This long quiet ends what is said. */
-const QUIET_MS = 900
+const QUIET_MS = 700
 /** A piece shorter than this is a noise, not a word. */
 const SHORTEST_MS = 400
 /** The longest piece: a question, not a speech. */

@@ -5,21 +5,32 @@ import type { ReactNode } from "react"
 import { blocksOf } from "@/chat/blocks.ts"
 import { chatTools } from "@/chat/cards.tsx"
 
-// What the cards of the newest answer draw, for the assistant page: the chat runs behind its black
-// screen, and the page shows the cards of the answer there, the shop floor for example. They are the
-// same nodes the chat draws, so nothing is drawn twice in two ways.
+import { briefingOf } from "./facts.ts"
+import type { Briefing } from "./facts.ts"
 
-let shown: ReadonlyArray<ReactNode> = []
+// What the newest answer shows, for the assistant page: the chat runs behind its black screen, and
+// the page shows the cards of the answer there, the shop floor for example, and its text taken apart
+// into summary, facts, hint and suggestion (facts.ts). The cards are the same nodes the chat draws,
+// so nothing is drawn twice in two ways.
+//
+// What an answer showed stays until the next question: a card does not vanish while Titan still
+// talks about it.
+
+export type Shown = { cards: ReadonlyArray<ReactNode>; briefing?: Briefing }
+
+const nothing: Shown = { cards: [] }
+let shown: Shown = nothing
 const listeners = new Set<() => void>()
 
-function setShown(next: ReadonlyArray<ReactNode>) {
-  if (next.length === 0 && shown.length === 0) return
-  shown = next
+function setShown(next: Shown) {
+  const empty = next.cards.length === 0 && !next.briefing
+  if (next === shown || (empty && shown === nothing)) return
+  shown = empty ? nothing : next
   for (const listener of listeners) listener()
 }
 
-/** The cards of the newest answer, none while a new question waits for one. */
-export function useShownCards(): ReadonlyArray<ReactNode> {
+/** The cards and the briefing of the newest answer, none while a new question waits for one. */
+export function useShown(): Shown {
   return useSyncExternalStore(
     (listener) => {
       listeners.add(listener)
@@ -30,17 +41,28 @@ export function useShownCards(): ReadonlyArray<ReactNode> {
   )
 }
 
-/** For the open chat: hands the cards of its newest answer to the assistant page. */
+/** The cards of the newest answer. */
+export function useShownCards(): ReadonlyArray<ReactNode> {
+  return useShown().cards
+}
+
+/** For the open chat: hands the cards and the briefing of its newest answer to the assistant page. */
 export function useShareCards(messages: ReadonlyArray<UIMessage>, isLoading: boolean) {
   useEffect(() => {
     const last = messages.at(-1)
     if (!last) return
-    // A new question: the cards of the answer before are gone.
-    if (last.role !== "assistant") return setShown([])
-    const nodes = blocksOf(last.parts, isLoading, chatTools).flatMap((block) => (block.kind === "drawn" ? [block.node] : []))
-    // While an answer arrives, a card appears as soon as it is there.
-    if (nodes.length > 0 || !isLoading) setShown(nodes)
+    // A new question: what the answer before showed is gone.
+    if (last.role !== "assistant") return setShown(nothing)
+    const cards = blocksOf(last.parts, isLoading, chatTools).flatMap((block) => (block.kind === "drawn" ? [block.node] : []))
+    // The text after the last tool call is the answer; a sentence before a call only says what comes.
+    const texts = last.parts.flatMap((part) => (part.type === "text" && part.content.trim() !== "" ? [part.content] : []))
+    const text = texts.at(-1)
+    // A card or the briefing appears as soon as it is there, and stays while the answer goes on.
+    setShown({
+      cards: cards.length > 0 ? cards : shown.cards,
+      briefing: text ? briefingOf(text) : shown.briefing,
+    })
   }, [messages, isLoading])
-  // A chat that closes takes its cards along.
-  useEffect(() => () => setShown([]), [])
+  // A chat that closes takes what it showed along.
+  useEffect(() => () => setShown(nothing), [])
 }

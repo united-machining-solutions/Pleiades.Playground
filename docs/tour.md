@@ -164,11 +164,16 @@ same in two paragraphs.](images/tour/machine-card-in-host.png)
 <http://localhost:5600/assistant>, "Titan" in the sidebar, is Titan: the chat without a keyboard, a black screen
 with a cloud of glowing points that greets, listens and speaks German. A first click or press of the space bar
 starts it. Then say "Hey Titan" and the question, or "Hey Titan" alone and the question after its "Ja?";
-holding the space bar works too. The question goes to the chat of stop 4, the answer is read aloud sentence by
-sentence while it arrives, and its cards stand below the cloud. Escape leaves the screen.
+holding the space bar works too. Titan says "Moment." at once, and the question goes to the chat of stop 4.
+With the answer the screen splits: Titan stays on the left, with what it says written under it and its
+suggestion; on the right, black on white, stand its cards, and beside them the details, one row for each
+machine with the sign of its state, and the hint. Titan says only two or three sentences in plain words and
+does not read the details. "Hey Titan, Pause" or the key P pauses it; "Hey Titan" or the space bar wakes it.
+It speaks only once started and while its tab is in front. Escape leaves the screen.
 
 Titan answers first, then adds at most one hint nobody asked for and one suggestion, and says plainly when
-the data cannot answer. Its chats begin with the fastest model the settings name (Haiku at the hub).
+the data cannot answer. Its chats begin with the fastest model the settings name (Haiku at the hub), which
+is asked to answer without thinking first, so that a card stands after about a second.
 
 With a camera, Titan greets whoever steps in front of it: by name when the face is known, and straight away
 with the machines that stand still with an error. It checks every few seconds who stands there, and greets
