@@ -76,9 +76,9 @@ workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your
 - Every commit is signed off (`git commit -s`). The sign-off is yours: you certify the
   [DCO](../CONTRIBUTING.md#sign-your-work-dco) for the change, also when an agent wrote it.
 - A commit an agent wrote carries a `Co-Authored-By` trailer that names the agent.
-- The agent opens the pull request with `gh pr create` and fills in the template, including the line
-  "Not verified".
-- Commit, push and pull request happen only when you ask for them.
+- The agent opens the pull request with `gh pr create`: it brings the branch up to date with `main`, pushes
+  it and fills in the template from what it did and checked, including the line "Not verified".
+- Commit, push and pull request happen only when you say yes. The agent may offer them.
 
 ## Useful requests
 
@@ -88,6 +88,7 @@ workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your
 | Something of your own in the demo | `/build-your-own`, or "I would like to see which machine stood still the longest." The agent finds out whether that is a page, a card or a source, and builds it. |
 | To see the demo | "Start the stack and show me what the simulator publishes for one machine." |
 | A new value | "Add the topic `…` to the simulator and to the MQTT binding, with its SI unit." |
+| To share what you built | "Open a pull request." |
 | To know why a check is red | "Why is pull request 12 red?" The agent reads `gh pr checks` and `gh run view --log-failed`. |
 | A review before you ask a person | "Review the diff of this branch against `main` for correctness." |
 | A decision recorded | "Write an ADR for this decision." |

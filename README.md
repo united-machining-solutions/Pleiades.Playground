@@ -41,6 +41,7 @@ In PowerShell, set the variable first: `$env:PLEIADES_VERSION = "main"`. Or writ
 |---|---|---|
 | Timeseries API | <http://localhost:5500/> | Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp` |
 | Events API | <http://localhost:5510/> | Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp` |
+| Sites API | <http://localhost:5540/> | Where the machines stand: Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp`. It answers on this computer only (`SITES_BIND`) |
 | MQTT broker | `localhost:1883` | Anonymous in the demo network |
 | Generative UI backend | <http://localhost:5520/mcp> | MCP server for displays, see [`apps/genui-mcp`](apps/genui-mcp/README.md) |
 | Example app | <http://localhost:5600/> | What every machine does now, and a chat about it. It answers on this computer only (`APP_BIND`); see [`apps/app`](apps/app/README.md) |
@@ -53,6 +54,10 @@ The separate [Ultimaker telemetry adapter](source/Pleiades.Playground.Ultimaker.
 publishes read-only printer observations to the existing broker and time-series persistence.
 For deployment from published images, enable `COMPOSE_PROFILES=ultimaker` and configure the printer
 URL in the server's private .env; see [deployment](docs/deployment.md#enable-the-ultimaker-services).
+An optional [juice bar service](source/Pleiades.Playground.JuiceBar.Api/README.md) puts a machine that mixes
+drinks behind REST and MCP and publishes its state to the broker. It is started only with the `juicebar`
+Compose profile and needs a machine that runs MixerControl; it places orders and never starts the production.
+For a deployment, see [deployment](docs/deployment.md#enable-the-juice-bar-service).
 Copy `.env.example` to `.env` to change ports or the simulated machines. No secret is needed for the demo; only
 the chat of the example app needs a language model, through a LiteLLM gateway:
 
@@ -77,7 +82,7 @@ Four layers, three agreed interfaces. Everything below the solution layer is the
 |---|---|---|
 | Solution | Applications that people use | `apps/` (the example app) |
 | Agentic | A harness that talks to a language model and calls tools | `apps/app` (the chat of the example app), or bring your own (any MCP client) |
-| Tool | Time series, events and cards over REST and MCP | `source/*.Timeseries.Api`, `source/*.Events.Api`, `apps/` (cards) |
+| Tool | Time series, events and cards over REST and MCP | `source/*.Timeseries.Api`, `source/*.Events.Api`, `source/*.Sites.Api`, `apps/` (cards) |
 | Data | Adapters, broker, persistence | `source/*.Simulator`, `source/*.Persistence`, broker config in `stacks/` |
 
 | Agreed interface | Contract | Where |
@@ -99,6 +104,7 @@ stacks/       Configuration of third-party containers (broker)
 docs/         Architecture, decisions (ADR) and guides
 .github/      CI workflows and templates
 compose.yaml  The demo stack
+margo/        The demo stack as a Margo app, packaged and published with bart
 ```
 
 Project and image names follow one pattern: `Pleiades.Playground.<Area>.<Part>` in .NET and

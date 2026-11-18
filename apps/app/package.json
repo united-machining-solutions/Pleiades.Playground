@@ -25,6 +25,7 @@
     "@tanstack/react-start": "catalog:",
     "cn": "catalog:",
     "lucide-react": "catalog:",
+    "mqtt": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "recharts": "catalog:",

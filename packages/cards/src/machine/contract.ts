@@ -25,6 +25,22 @@ export const instant = z.iso.datetime({ offset: true })
  */
 export const serialNumber = z.string().regex(/^[^/+#]+$/)
 
+/**
+ * Where each reading of a machine is published, below `machines/{SerialNumber}/`. The backend reads
+ * the stored values of these topics, and a page that is live subscribes to them at the broker.
+ */
+export const READING_PATHS = {
+  connection: "umati/Connection/State",
+  heartbeat: "umati/Connection/Heartbeat",
+  itemState: "umati/State/MachineryItemState",
+  operationMode: "umati/State/MachineryOperationMode",
+  program: "umati/Production/ActiveProgram",
+} as const
+export type ReadingName = keyof typeof READING_PATHS
+
+/** Where the notifications of a machine are published, below `machines/{SerialNumber}/`. */
+export const NOTIFICATIONS_PATH = "events/notifications"
+
 export const reading = z.object({
   value: z.string().nullable().describe("The newest value, or null if the topic had none."),
   at: instant.nullable().describe("When the newest value was measured."),

@@ -24,8 +24,8 @@ docker compose up -d --build --wait
 ```
 
 The command returns when the stack is ready, that is when every container reports healthy: the broker, the
-database, the two APIs with their persistence workers, the generative UI backend, the app and one simulator
-per machine. To see the demo without building it, start it from the published images, see
+database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app and
+one simulator per machine. To see the demo without building it, start it from the published images, see
 [Start](../README.md#start).
 
 ```bash
@@ -43,6 +43,7 @@ mongodb                  Up 3 minutes (healthy)
 simulator-m-02           Up 3 minutes (healthy)
 simulator-p-04           Up 3 minutes (healthy)
 simulator-p-07           Up 3 minutes (healthy)
+sites-api                Up 3 minutes (healthy)
 timeseries-api           Up 3 minutes (healthy)
 timeseries-persistence   Up 3 minutes (healthy)
 ```
@@ -53,6 +54,7 @@ timeseries-persistence   Up 3 minutes (healthy)
 | <http://localhost:5520/mcp> | The generative UI backend, an MCP server. The app reads every value from it. |
 | <http://localhost:5500/> | The Timeseries API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. |
+| <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
 | `localhost:1883` | The MQTT broker the simulators publish to. |
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
@@ -61,7 +63,9 @@ port and setting. The three simulated machines, P-04, P-07 and M-02, are the thr
 ## 2. Home
 
 Home asks "what needs you?". It sorts the machines by what they do now: first the ones in alarm, stopped or
-without data, then the ones in setup, then the running ones, and it reads them again every ten seconds.
+without data, then the ones in setup, then the running ones. It is live: the page reads the list once, and
+from then on the browser hears every value at the broker, MQTT over WebSocket on port 9001, the moment a
+machine publishes it.
 
 ![Home with the heading Machines. Under "Needs you" are two rows, P-04 and P-07, both stopped, each with a
 button "Ask why". Under "Running" is one tile, M-02.](images/tour/home.png)
@@ -75,7 +79,9 @@ field "Ask a question" in the header starts a chat too.
 groups, [`apps/app/src/machines/machine-item.tsx`](../apps/app/src/machines/machine-item.tsx) draws a row and a
 tile. The values are the result of the tool `genui_machine_list`
 ([`apps/genui-mcp/src/machines.ts`](../apps/genui-mcp/src/machines.ts)). Which value is which state is decided
-in one file, [`packages/cards/src/machine/state.ts`](../packages/cards/src/machine/state.ts).
+in one file, [`packages/cards/src/machine/state.ts`](../packages/cards/src/machine/state.ts). What the broker
+sends is laid onto the list in [`apps/app/src/live/`](../apps/app/src/live/), and
+[`apps/app/src/hooks/use-live.ts`](../apps/app/src/hooks/use-live.ts) keeps a page live.
 
 The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
 physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
@@ -94,8 +100,9 @@ minutes.
 **In the code:** [`apps/app/src/routes/charts.tsx`](../apps/app/src/routes/charts.tsx) is the page,
 [`apps/app/src/charts/state-tiles.tsx`](../apps/app/src/charts/state-tiles.tsx) draws the two charts with the
 chart of shadcn/ui. The values are those of the machine card, from `genui_machine_show` and `genui_span_list`,
-read by one server function, `getCharts` in
-[`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts).
+read once by one server function, `getCharts` in
+[`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts); from then on the page is
+live from the broker, as Home is.
 
 ## 3. The page of one machine
 
@@ -158,6 +165,13 @@ The chat has no sign-in, and whoever reaches the port chats at the cost of the o
 
 With more than one model, the input field offers a choice. The first model answers until a chat picks
 another one, and the choice stays with that chat.
+
+The button "Tools" in the input field lists the servers that give the chat its tools: the generative UI
+backend, and the further ones the setting `APP_MCP_SERVERS` names, such as the optional Ultimaker service.
+It says whether each one answers and names its tools, and marks a tool that can change something. A switch
+takes a further server out of the chat from its next question on: the model then gets none of its tools. The
+choice stays with the chat, as the model does. The two pictures of this stop were taken before the button
+was there.
 
 ![Home on the left and the chat panel on the right, before the first question. The model picker in the input
 field is open and lists seven models: spark/qwen3.8-27b, ticked, then three named openai/gpt and three named
@@ -232,8 +246,9 @@ Each part has a section "What is where" that maps its files:
 | A card, its contract, the wording or the colours of a state | [`packages/cards`: What is where](../packages/cards/README.md#what-is-where), and [A new card](../packages/cards/README.md#a-new-card) |
 | What a machine publishes and how it is stored | [`contracts/`](../contracts/README.md) first, then the .NET services under [`source/`](../source) |
 
-Below the app are the two APIs. Each one offers the same queries twice: over REST for applications, with a
-Swagger UI to try them, and over MCP for agents.
+Below the app are the two APIs, and next to them the Sites API, which keeps where the machines stand. Each one
+offers the same queries twice: over REST for applications, with a Swagger UI to try them, and over MCP for
+agents.
 
 ![The Swagger UI of the Timeseries API at localhost:5500, version 0.0.1.0, with the first endpoints of the
 group Timeseries: GET and POST for base unit values, string values and boolean
@@ -247,9 +262,10 @@ endpoint and choose "Try it out" to send a request to the running stack.
 |---|---|---|---|
 | Timeseries | <http://localhost:5500/>, OpenAPI at `/openapi/v1.json` | `http://localhost:5500/mcp` | [`contracts/openapi`](../contracts/openapi/README.md), [`contracts/mcp`](../contracts/mcp/README.md) |
 | Events | <http://localhost:5510/>, OpenAPI at `/openapi/v1.json` | `http://localhost:5510/mcp` | the same |
+| Sites | <http://localhost:5540/>, OpenAPI at `/openapi/v1.json` | `http://localhost:5540/mcp` | the same |
 | Generative UI | none: it is an MCP server only | `http://localhost:5520/mcp` | [`contracts/mcp`](../contracts/mcp/README.md), [`packages/cards`](../packages/cards/README.md) |
 
-To use the tools from your own agent, add the three MCP addresses to any MCP client; the entry to copy is in
+To use the tools from your own agent, add the MCP addresses to any MCP client; the entry to copy is in
 [`contracts/mcp`](../contracts/mcp/README.md).
 
 ---
@@ -271,6 +287,21 @@ it therefore still shows only simulated machines.
 For deployment from published images, enable `COMPOSE_PROFILES=ultimaker` in the server's private
 .env; both services use the same commit tag as the rest of the stack. See
 [deployment](deployment.md#enable-the-ultimaker-services).
+
+## Optional: a juice bar
+
+A machine that mixes drinks is not part of the six stops either. With a machine that runs MixerControl at
+`JUICEBAR_URL`, start its service with
+`docker compose --profile juicebar up -d --build --wait juicebar-api`.
+It exposes MCP at <http://localhost:5550/mcp> and an OpenAPI document at
+<http://localhost:5550/openapi/v1.json>: the card, the state of the machine, and an order. An order joins
+the queue of the real machine; a person then presses its start button. What the service does and never does
+is in the [juice bar service guide](../source/Pleiades.Playground.JuiceBar.Api/README.md).
+The service publishes the state of the machine to the broker. Its machine ID defaults to `JUICEBAR-01`,
+which then appears in the machine list of Home next to the simulated machines. With
+`juicebar=http://juicebar-api:8080/mcp` in `APP_MCP_SERVERS`, the chat answers what the bar can mix and
+orders a drink when asked. No tour screenshot was retaken: they show the stack without the profile.
+For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).
 
 ## Retaking the screenshots
 
