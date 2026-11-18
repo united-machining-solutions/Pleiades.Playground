@@ -203,6 +203,9 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   `proposal.ts` checks a page the language model proposes (`proposePage`): only tools a page can call, the
   schema of a part, no time zone, the same part once, at most 12, and each part left out with a reason the
   model can act on; it also reads the recipe back from the result for the chat (`proposedRecipe`).
+  `kept-proposals.ts` notes which page a proposal was kept as, by the id of its tool call, under a key of its
+  own, `pleiades-playground.proposals.v1`: so a proposal still says "Saved as page" after a reload and after the
+  page was renamed or its parts changed, and does not offer to keep a second page.
 - `src/routeTree.gen.ts`: written from the route files and not in the repository, so that two branches with
   a page each have nothing to merge in it. `pnpm install` and `pnpm typecheck` write it
   (`route-tree.mjs`), and so do the development server and the build. Never edit it. TanStack advises to
