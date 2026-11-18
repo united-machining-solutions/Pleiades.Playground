@@ -231,6 +231,9 @@ export const juicebarTools: ReadonlyArray<ChatTool> = [
   {
     name: "juicebar_drinks_list",
     label: { running: "Reading the drinks", done: "Read the drinks", failed: "Failed to read the drinks" },
+    // For the chat only: a page asks the generative UI backend alone (pages/call-part.ts), which has no
+    // juicebar_* tool. The showcase page /juice-bar draws the card on a page of its own.
+    saveAsPage: false,
     draw(content) {
       const drinks = drinksOf(content)
       return drinks && <DrinkPicker drinks={drinks} />
