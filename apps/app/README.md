@@ -66,7 +66,7 @@ once the broker is back, for what it missed. A page reads on a clock only while 
 |---|---|
 | In the demo stack | <http://localhost:5600/>, port from `APP_PORT`, on this computer only (`APP_BIND`) |
 | Liveness | `GET /health` |
-| Image | `pleiades.playground.app` |
+| Image | `pleiades.playground.app`, the app alone. `pleiades.playground.app.showcases` is the same app built with its showcases, for a demo or a fair; `APP_SHOWCASES` in `.env` takes that one, see `src/showcases/` under [What is where](#what-is-where) |
 | Version | At the bottom of the sidebar: `0.0.142 · 7a83c2f` for an image of the workflow "Images", linked to its commit; `dev` for a build of your own, with the commit of the checkout under `vite dev` |
 | Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `MQTT_WS_PORT`, the port the browser reaches the broker's WebSocket on, at the host of the page (9001 if unset); or `MQTT_WS_URL`, the whole address, for a broker behind a proxy (`wss://…`); or `MQTT_WSS_PATH`, for a page over HTTPS only, a path at the origin of the page that the proxy in front of the app forwards to the broker (`/mqtt`, the Margo app). `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); the app draws nothing for their results, the answer says them, and a chat switches each of them off and on under "Tools" in its message field. `OPCUA_MCP_URL` and `OPCUA_ADAPTER_URL`, the MCP endpoint and the API of the [OPC UA adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md); empty, the chat has no OPC UA. The language models of the chat, see below. |
 
@@ -149,6 +149,14 @@ pnpm --filter @pleiades/app test
 The development server listens on <http://localhost:3000/> and reads from <http://localhost:5520/mcp>, where
 the backend of the running demo stack answers.
 
+It serves the app alone. To work on a showcase, start it with the showcases, and build with them the same
+way; `src/showcases/` under [What is where](#what-is-where) says what a showcase is:
+
+```bash
+APP_SHOWCASES=true pnpm --filter @pleiades/app dev      # PowerShell: $env:APP_SHOWCASES = "true" first
+APP_SHOWCASES=true pnpm --filter @pleiades/app build
+```
+
 ## What is where
 
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
@@ -192,6 +200,22 @@ the backend of the running demo stack answers.
   a page each have nothing to merge in it. `pnpm install` and `pnpm typecheck` write it
   (`route-tree.mjs`), and so do the development server and the build. Never edit it. TanStack advises to
   commit this file; here everything that needs it writes it first.
+- `src/showcases/`: what is made for one demo or one fair, and is in a build only where `APP_SHOWCASES` is
+  set ([ADR-0018](../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
+  it is a showcase: `where-is-my-job/` is the made-up shop floor of the page "Where is My Job?". The pages of
+  the showcases, and their server routes, are the route files under `src/routes/(showcases)/`; the brackets
+  make a folder that adds nothing to an address, so `(showcases)/where-is-my-job.tsx` answers at
+  `/where-is-my-job`. A page belongs to the showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and
+  `titan/faces.tsx` are pages of `showcases/titan/`. A build without the setting leaves that folder out
+  (`vite.config.ts`): the router does not know the pages, nothing imports the folder of a showcase, and
+  `.output` has nothing of one, so neither has the image. There is no switch while the app runs.
+  `rule.test.ts` fails when a file of the app reads from a showcase or names the address of one of its pages,
+  and when a showcase, its folder or one of its pages, reads from another. It resolves every import to a path
+  from `src/` first, so `../other/data.ts` counts as `@/showcases/other/data.ts` does. The typecheck reads
+  every route, with the showcases (`route-tree.mjs`). After a build without the setting, the route tree on
+  disk has no showcase routes, and the editor or a plain `tsc` reports `TS2345` in the route files of the
+  showcases (`'"/(showcases)/where-is-my-job"' is not assignable to parameter of type 'keyof FileRoutesByPath'`).
+  `pnpm typecheck` or `node route-tree.mjs` writes the whole tree again, and the error is gone.
 - `src/cards/`: a folder for each card, named like the card. `machine/chat.tsx` is the machine card in the
   chat: what a call of each of its tools is called, what the chat draws for a result (`results.ts` checks it
   against the contract), and which tool only a card calls. Which value of the binding is which state, the

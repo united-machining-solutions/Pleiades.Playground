@@ -5,6 +5,7 @@
  * stands in the conversation of a host.
  */
 @import "tailwindcss" source(".");
+@import "shadcn/tailwind.css";
 @import "@pleiades/ui/globals.css";
 @import "@pleiades/cards/styles.css";
 

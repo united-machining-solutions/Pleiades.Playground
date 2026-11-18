@@ -7,13 +7,21 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
+  each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
+  draws them with the notification card.
+- Example app: showcases. What is made for one demo or one fair lives in a folder of its own,
+  `apps/app/src/showcases/<name>/`, with its pages under `src/routes/(showcases)/`, and is built in only
+  where `APP_SHOWCASES` is set. The image `pleiades.playground.app` is the app alone, with nothing of a
+  showcase in it; the new image `pleiades.playground.app.showcases` is the same app built with all of
+  them, and `APP_SHOWCASES` in `.env` makes the stack take it. A showcase only adds: a test fails when a
+  file of the app reads from one or links to one of its pages. `AGENTS.md` and the skills `create-page`,
+  `create-card` and `build-your-own` ask whether a thing is base or a showcase
+  ([ADR-0018](docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)).
 - Documentation sources: original PDF viewer with paging, zoom and native/OCR page search, retrieved
   through bounded MCP binary resources without adding PDFs to model context.
-
 - Example app: optional documentation MCP tools with clickable, revision-specific manual page sources in chat,
   showing printed page labels alongside differing physical pages. Margo exposes the additional MCP server setting.
-
-
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
   self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
   that live values work over HTTPS. HTTP stays as it is.
@@ -22,7 +30,8 @@ All notable changes are documented here. The format follows
 - Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
   shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
   from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
-  entry in the sidebar.
+  entry in the sidebar. It is the first showcase: only a stack started with `APP_SHOWCASES` set has the
+  page.
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
@@ -447,6 +456,7 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page
   never reached the broker ("not live, no connection to the broker"), and a question asked outside the chat did
