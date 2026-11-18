@@ -318,6 +318,8 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Notification card: all notifications or those of one level, errors or warnings, ten a page, those that stand
+  first, with the pagination of the energy card; the counts at the head and the sums at the foot follow the level.
 - Example app: Home (`/`) shows where the machines stand, by site and hall; "Needs you" keeps what it showed first.
   The tiles of the running machines are gone. `/sites` leads to `/`.
 - Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
