@@ -113,6 +113,7 @@ for example as an entry in the configuration file of the Claude desktop app:
         "--network", "pleiades-playground_default",
         "-e", "TIMESERIES_API_URL=http://timeseries-api:8080",
         "-e", "EVENTS_API_URL=http://events-api:8080",
+        "-e", "SITES_API_URL=http://sites-api:8080",
         "-e", "CARD_RESOURCE_DOMAINS=https://assets.claude.ai",
         "ghcr.io/united-machining-solutions/pleiades.playground.genui.mcp:dev",
         "--stdio"

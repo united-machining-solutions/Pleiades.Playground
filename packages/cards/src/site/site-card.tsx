@@ -12,7 +12,7 @@ import {
 import { Fragment } from "react"
 import type { ReactNode } from "react"
 import type { State } from "../machine/contract.ts"
-import { clock } from "../machine/format.ts"
+import { clock, duration } from "../machine/format.ts"
 import { stateLabel } from "../machine/state.ts"
 import { StateSymbol } from "../machine/state-symbol.tsx"
 import { tell } from "../machine/tell.ts"
@@ -63,7 +63,7 @@ export function SiteCard({ site, asOf, source }: { site: Site; asOf: string; sou
       <CardContent className="flex flex-col gap-4">
         {site.counts.length > 0 && <Counts counts={site.counts} />}
         {site.halls.map((hall) => (
-          <HallList key={hall.name ?? ""} hall={hall} />
+          <HallList key={hall.name ?? ""} hall={hall} asOf={asOf} />
         ))}
         {site.halls.length === 0 && <p className="text-sm text-muted-foreground">No hall and no machine yet.</p>}
       </CardContent>
@@ -89,7 +89,7 @@ function Counts({ counts }: { counts: ReadonlyArray<StateCount> }) {
   )
 }
 
-function HallList({ hall }: { hall: Hall }) {
+function HallList({ hall, asOf }: { hall: Hall; asOf: string }) {
   const name = hall.name ?? "No hall"
   return (
     <section aria-label={name} className="flex flex-col gap-1.5">
@@ -99,7 +99,7 @@ function HallList({ hall }: { hall: Hall }) {
       ) : (
         <Rows>
           {hall.machines.map((one) => (
-            <MachineLine key={one.machine} placed={one} />
+            <MachineLine key={one.machine} placed={one} asOf={asOf} />
           ))}
         </Rows>
       )}
@@ -122,8 +122,8 @@ function Rows({ children }: { children: Array<ReactNode> }) {
 }
 
 /**
- * A machine in a row: its sign, its title and what it is, and on the right its state and since
- * when. The machine id is its tooltip.
+ * A machine in a row: its sign, its title and what it is, and on the right its state and how long
+ * it has held. The machine id is its tooltip.
  */
 function MachineItem({
   machine,
@@ -156,16 +156,27 @@ function MachineItem({
   )
 }
 
-/** A machine of a hall: the name people know it by and what it is, and its state since when. */
-function MachineLine({ placed }: { placed: PlacedMachine }) {
-  const since = placed.now ? tell(placed.now, placed.state).since : null
+/**
+ * How long the state of a machine has held, in the words of the second line of a row of Home:
+ * "30 min", or "at least 30 min" where it began before the values that were read. The row has no
+ * room for the time of day as well; the duration says what the time alone would hide, a state
+ * that began days ago. Nothing for a machine without values.
+ */
+function lastingOf({ now, state }: Pick<PlacedMachine, "now" | "state">, asOf: string): string | undefined {
+  if (!now) return undefined
+  const told = tell(now, state)
+  return told.since ? `${told.atLeast ? "at least " : ""}${duration(told.since, asOf)}` : undefined
+}
+
+/** A machine of a hall: the name people know it by and what it is, and its state and how long it held. */
+function MachineLine({ placed, asOf }: { placed: PlacedMachine; asOf: string }) {
   return (
     <MachineItem
       machine={placed.machine}
       state={placed.state}
       title={titleOfPlaced(placed)}
       description={placed.displayName ? modelOf(placed) : undefined}
-      when={since ? `since ${clock(since)}` : undefined}
+      when={lastingOf(placed, asOf)}
     />
   )
 }

@@ -33,14 +33,14 @@ function placedInWords(placed: PlacedMachine): string {
 
 function siteInWords(site: Site): string {
   const head = `${site.name}, ${site.company} (site ${site.siteId}): ${machinesInWords(site.machineCount)}`
-  if (site.machineCount === 0) return `${head}.`
-  const halls = site.halls
-    .filter((hall) => hall.machines.length > 0)
-    .map((hall) => {
-      const machines = hall.machines.map((one) => `${placedInWords(one)} ${stateLabel[one.state].toLowerCase()}`).join(", ")
-      return `${hall.name ?? "No hall"}: ${machines}`
-    })
-  return `${head}, ${countsInWords(site.counts)}. ${halls.join(". ")}.`
+  if (site.halls.length === 0) return `${head}, no hall.`
+  // Every hall is named, one without a machine too: a reader asks which halls a site has, and which is free.
+  const halls = site.halls.map((hall) => {
+    const machines = hall.machines.map((one) => `${placedInWords(one)} ${stateLabel[one.state].toLowerCase()}`).join(", ")
+    return `${hall.name ?? "No hall"}: ${machines || "no machine"}`
+  })
+  const counts = site.machineCount === 0 ? "" : `, ${countsInWords(site.counts)}`
+  return `${head}${counts}. ${halls.join(". ")}.`
 }
 
 /** The site card in words. */
