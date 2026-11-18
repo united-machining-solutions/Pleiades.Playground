@@ -24,7 +24,8 @@ namespace Pleiades.Playground.Mqtt.Extensions.Machines;
 /// <item>At a clean stop (<see cref="ShutdownAsync"/>): <c>Shutdown</c>, the last message.</item>
 /// </list>
 /// The last will (<see cref="MachineBinding.WithMachineLastWill"/>) belongs to the options of the client. Events
-/// are not published here.
+/// (<see cref="EventAsync"/>) wait in a bounded outbox and go out only after the connect sequence of a connection, in
+/// the order they came up; when the outbox is full, the oldest is dropped and logged.
 /// </summary>
 public sealed partial class MachinePublisher : IDisposable
 {
@@ -50,14 +51,19 @@ public sealed partial class MachinePublisher : IDisposable
     private bool _attached;
     private DateTimeOffset _lastStateAt = DateTimeOffset.MinValue;
     private long _heartbeats;
+    private readonly Queue<MqttApplicationMessage> _outbox = new();
+    private readonly int _outboxCapacity;
 
     /// <param name="client">The MQTT connection of the adapter, with the last will of the binding.</param>
     /// <param name="identity">Who the machine is; its values go out at every connect.</param>
     /// <param name="manifest">The manifest (<see cref="MachineManifest.Build"/>).</param>
     /// <param name="time">The clock.</param>
     /// <param name="logger">The logger.</param>
-    public MachinePublisher(IManagedMqttClient client, MachineIdentity identity, JsonObject manifest, TimeProvider time, ILogger logger)
+    /// <param name="outboxCapacity">How many events wait at most while they cannot go out.</param>
+    public MachinePublisher(IManagedMqttClient client, MachineIdentity identity, JsonObject manifest, TimeProvider time, ILogger logger,
+        int outboxCapacity = DefaultOutboxCapacity)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(outboxCapacity, 1);
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(identity);
         ArgumentNullException.ThrowIfNull(manifest);
@@ -67,10 +73,17 @@ public sealed partial class MachinePublisher : IDisposable
         _time = time;
         _logger = logger;
         _manifest = manifest;
+        _outboxCapacity = outboxCapacity;
         _start = time.GetUtcNow();
         MachineId = identity.MachineId;
         _identification = identity.Values(_start);
     }
+
+    /// <summary>How many events wait at most, unless the constructor names another number.</summary>
+    public const int DefaultOutboxCapacity = 10_000;
+
+    /// <summary>The events that wait for the connect sequence of a connection.</summary>
+    public int PendingEvents => _outbox.Count;
 
     /// <summary>The machine id, a level of every topic.</summary>
     public string MachineId { get; }
@@ -229,6 +242,38 @@ public sealed partial class MachinePublisher : IDisposable
             {
                 var heartbeat = new MachineValue(MachineBinding.Heartbeat, JsonValue.Create(++_heartbeats), now);
                 await _client.EnqueueAsync(MachineBinding.ValueMessage(MachineId, heartbeat)).ConfigureAwait(false);
+                // Events a failed drain left behind.
+                await DrainAsync().ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// An event, not retained: it goes out at once when the connect sequence of the connection has gone out, else it
+    /// waits in the outbox and goes out after the next one, in the order the events came up.
+    /// </summary>
+    public async Task EventAsync(MqttApplicationMessage message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        if (!await EnterAsync().ConfigureAwait(false))
+        {
+            return;
+        }
+        try
+        {
+            _outbox.Enqueue(message);
+            if (_outbox.Count > _outboxCapacity)
+            {
+                var dropped = _outbox.Dequeue();
+                LogEventDropped(MachineId, dropped.Topic, _outboxCapacity);
+            }
+            if (await ReadyAsync(_time.GetUtcNow()).ConfigureAwait(false))
+            {
+                await DrainAsync().ConfigureAwait(false);
             }
         }
         finally
@@ -389,6 +434,12 @@ public sealed partial class MachinePublisher : IDisposable
             _syncFailed = true;
             LogSyncFailed(MachineId, exception);
         }
+
+        if (_synced)
+        {
+            // The events that waited for this connection, after its sequence.
+            await DrainAsync().ConfigureAwait(false);
+        }
     }
 
     private Task OnConnectedAsync(MqttClientConnectedEventArgs args)
@@ -402,6 +453,34 @@ public sealed partial class MachinePublisher : IDisposable
         _synced = false;
         _syncFailed = false;
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// The events of the outbox, oldest first. One the client refuses as invalid is dropped and logged; on any other
+    /// failure the rest waits for the next event, heartbeat or connect. Holds the gate; throws nothing but a
+    /// cancellation.
+    /// </summary>
+    private async Task DrainAsync()
+    {
+        while (_outbox.Count > 0)
+        {
+            var message = _outbox.Peek();
+            try
+            {
+                await _client.EnqueueAsync(message).ConfigureAwait(false);
+            }
+            catch (ArgumentException exception)
+            {
+                LogEventRefused(MachineId, message.Topic, exception);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                LogDrainFailed(MachineId, _outbox.Count, exception);
+                return;
+            }
+
+            _outbox.Dequeue();
+        }
     }
 
     private async Task SendAllAsync()
@@ -451,4 +530,15 @@ public sealed partial class MachinePublisher : IDisposable
     [LoggerMessage(EventId = 203, Level = LogLevel.Warning,
         Message = "The connect sequence of {MachineId} failed; it is tried again with the next value, state or heartbeat")]
     private partial void LogSyncFailed(string machineId, Exception exception);
+
+    [LoggerMessage(EventId = 204, Level = LogLevel.Warning,
+        Message = "The outbox of {MachineId} holds {Capacity} events; the oldest, for {Topic}, is dropped")]
+    private partial void LogEventDropped(string machineId, string topic, int capacity);
+
+    [LoggerMessage(EventId = 205, Level = LogLevel.Error, Message = "The client refuses an event of {MachineId} for {Topic}; it is dropped")]
+    private partial void LogEventRefused(string machineId, string topic, Exception exception);
+
+    [LoggerMessage(EventId = 206, Level = LogLevel.Warning,
+        Message = "Could not send the outbox of {MachineId}; {Count} events wait for the next try")]
+    private partial void LogDrainFailed(string machineId, int count, Exception exception);
 }
