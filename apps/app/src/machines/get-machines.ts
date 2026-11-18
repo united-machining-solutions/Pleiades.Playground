@@ -1,6 +1,7 @@
 import type { EnergySeries } from "@pleiades/cards/energy/contract.ts"
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
 import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
+import type { SiteList } from "@pleiades/cards/site/contract.ts"
 import type { TimeseriesRange, TimeseriesSeries, TimeseriesSignals } from "@pleiades/cards/timeseries/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
@@ -95,6 +96,18 @@ export const getMachine = createServerFn({ method: "GET" })
         return result.structuredContent
       }),
   )
+
+/** Where the machines stand: every site with its machines, hall by hall, and the machines on no site. */
+export const getSites = createServerFn({ method: "GET" }).handler(
+  (): Promise<Answer<SiteList>> =>
+    ask(async (backend) => {
+      const result = await backend.callTool("genui_site_list", {})
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? "genui_site_list returned no values.")
+      }
+      return result.structuredContent
+    }),
+)
 
 /** The newest physical values of every machine: the values of the measurement cards. */
 export const getMeasurements = createServerFn({ method: "GET" }).handler(

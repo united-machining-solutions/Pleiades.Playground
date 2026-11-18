@@ -109,9 +109,20 @@ const pictures = [
     },
   },
   {
+    name: "sites",
+    async show(page, at) {
+      await page.goto(`${at.app}/sites`)
+      const tiles = page.getByRole("list", { name: "Sites" })
+      const none = page.getByText("No sites", { exact: true })
+      await tiles.or(none).first().waitFor()
+      if (await none.isVisible()) return "no site is entered in the Sites API"
+      await page.getByText("· live · now").waitFor()
+    },
+  },
+  {
     name: "machine-page",
     async show(page, at) {
-      await page.goto(`${at.app}/machines/${SHOWN}`)
+      await page.goto(`${at.app}/sites/${SHOWN}`)
       await page.getByRole("heading", { name: SHOWN_TITLE }).waitFor()
       await page.getByText(/^Last (hour|\d+ hours)$/).waitFor()
     },
@@ -131,7 +142,7 @@ const pictures = [
   {
     name: "chat-answer",
     async show(page, at) {
-      const reason = await openChat(page, `${at.app}/machines/${SHOWN}`)
+      const reason = await openChat(page, `${at.app}/sites/${SHOWN}`)
       if (reason) return reason
       console.log(`  asking the language model: ${QUESTION}`)
       const field = page.getByRole("textbox", { name: "Message" })
