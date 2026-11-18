@@ -154,21 +154,81 @@ internal sealed partial class MachineOutput : IMachineOutput
     /// <inheritdoc />
     public bool CanTakeBack => _client is not { } client || client.IsConnected;
 
+    /// <summary>The identity of a machine from the values of the elements of its registration.</summary>
+    /// <inheritdoc cref="IdentityOf(Func{string, string?}, string, bool)" path="/remarks"/>
+    public static IdentityRegistration? IdentityOf(Func<string, string?> valueOf, MachineRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        return IdentityOf(valueOf, registration.SerialNumber, MapsManufacturerUri(registration));
+    }
+
     /// <summary>
-    /// The identity of a machine from the values of its identification, or null without <c>ManufacturerUri</c> or
-    /// <c>Model</c>: with the serial number of the registration they are the machine id. A machine without a
-    /// <c>ProductInstanceUri</c> gets the one the binding forms, <c>{ManufacturerUri}/{Model}/{SerialNumber}</c>;
-    /// one without a <c>Manufacturer</c> is named by the domain of its <c>ManufacturerUri</c>.
+    /// Why the values of the identification form no machine id, as a problem of a refused registration. A
+    /// <c>Manufacturer</c> that stands in and has no letter or digit <c>A-Z</c>, <c>0-9</c>, such as a name in
+    /// Japanese or Cyrillic, is named as such: the node gave a text, the mapping is not wrong.
     /// </summary>
-    public static IdentityRegistration? IdentityOf(Func<string, string?> valueOf, string serialNumber)
+    public static string IdentityProblem(Func<string, string?> valueOf, MachineRegistration registration)
     {
         ArgumentNullException.ThrowIfNull(valueOf);
-        var manufacturerUri = valueOf(MachineManifest.ManufacturerUri) ?? string.Empty;
+        ArgumentNullException.ThrowIfNull(registration);
+        if (!MapsManufacturerUri(registration)
+            && NonEmpty(valueOf(MachineManifest.Manufacturer)) is { } manufacturer
+            && ManufacturerUriOf(manufacturer).Length == 0)
+        {
+            return $"identity: the server gives no Identification.ManufacturerUri, and Identification.Manufacturer, \"{manufacturer}\", " +
+                "has no letter or digit A-Z, a-z, 0-9 to stand in for it: the manufacturer of the machine id, " +
+                "<manufacturer>_<model>_<serial number>, needs one. The mapping is not wrong; the machine cannot be added.";
+        }
+
+        return "identity: Identification.ManufacturerUri (or, if the server has no node for it, Identification.Manufacturer), " +
+            "Model and SerialNumber must each be mapped and give a text: the machine id of the topics, " +
+            "<manufacturer>_<model>_<serial number>, is formed from them.";
+    }
+
+    /// <summary>
+    /// True if the registration maps <c>Identification.ManufacturerUri</c>. A server that has no node for it has
+    /// it in <c>missing</c> instead, and only then does the <c>Manufacturer</c> stand in.
+    /// </summary>
+    public static bool MapsManufacturerUri(MachineRegistration registration)
+    {
+        ArgumentNullException.ThrowIfNull(registration);
+        return registration.Elements.Any(element => element.Area == Topics.ModelArea && element.Path == MachineManifest.ManufacturerUri);
+    }
+
+    /// <summary>
+    /// The identity of a machine from the values of its identification, or null without a manufacturer or a
+    /// <c>Model</c>: with the serial number of the registration they are the machine id.
+    /// </summary>
+    /// <param name="valueOf">The value an element of the model has now, as text, or null.</param>
+    /// <param name="serialNumber">The serial number of the registration.</param>
+    /// <param name="manufacturerUriMapped">True if the registration maps <c>Identification.ManufacturerUri</c>.</param>
+    /// <remarks>
+    /// The manufacturer is the <c>ManufacturerUri</c>. Only a registration that does not map it, because the server
+    /// has no node for it, gets the <c>Manufacturer</c> without its special characters as <c>ManufacturerUri</c>
+    /// (<see cref="ManufacturerUriOf"/>), and the identity says so
+    /// (<see cref="IdentityRegistration.ManufacturerUriFromManufacturer"/>). A mapped <c>ManufacturerUri</c> that has
+    /// no value yet leaves the machine without an identity: it waits for the value. A machine without a
+    /// <c>ProductInstanceUri</c> gets the one the binding forms, <c>{ManufacturerUri}/{Model}/{SerialNumber}</c>;
+    /// one without a <c>Manufacturer</c> is named by the domain of its <c>ManufacturerUri</c>.
+    /// </remarks>
+    public static IdentityRegistration? IdentityOf(Func<string, string?> valueOf, string serialNumber, bool manufacturerUriMapped)
+    {
+        ArgumentNullException.ThrowIfNull(valueOf);
+        var manufacturer = NonEmpty(valueOf(MachineManifest.Manufacturer));
+        var manufacturerUri = NonEmpty(valueOf(MachineManifest.ManufacturerUri));
+        var fromManufacturer = !manufacturerUriMapped && manufacturerUri is null && manufacturer is not null;
+        if (fromManufacturer)
+        {
+            manufacturerUri = NonEmpty(ManufacturerUriOf(manufacturer!));
+        }
+
+        manufacturerUri ??= string.Empty;
         var model = valueOf(MachineManifest.Model) ?? string.Empty;
         var identity = new IdentityRegistration
         {
-            Manufacturer = NonEmpty(valueOf(MachineManifest.Manufacturer)) ?? MachineBinding.DomainOf(manufacturerUri),
+            Manufacturer = manufacturer ?? MachineBinding.DomainOf(manufacturerUri),
             ManufacturerUri = manufacturerUri,
+            ManufacturerUriFromManufacturer = fromManufacturer && manufacturerUri.Length > 0,
             Model = model,
             ProductInstanceUri = NonEmpty(valueOf(MachineManifest.ProductInstanceUri))
                 ?? new MachineIdentity(string.Empty, manufacturerUri, model, serialNumber).EffectiveProductInstanceUri,
@@ -176,6 +236,30 @@ internal sealed partial class MachineOutput : IMachineOutput
         return Complete(identity) is { } complete
             ? complete with { MachineId = MachineIdentityOf(complete, serialNumber).MachineId }
             : null;
+    }
+
+    /// <summary>
+    /// The stand-in for the <c>ManufacturerUri</c> of a server that gives none: the name of the manufacturer with
+    /// <c>ä</c>, <c>ö</c>, <c>ü</c> and <c>ß</c> written out, other accents dropped, and every character but
+    /// <c>A-Z</c>, <c>a-z</c> and <c>0-9</c> removed. It forms the manufacturer of the machine id and the prefix of the
+    /// signals of the maker, so it holds nothing an MQTT topic would read otherwise, and no dot that would be taken
+    /// for a top-level domain. <c>TRUMPF Werkzeugmaschinen SE + Co. KG</c> gives <c>TRUMPFWerkzeugmaschinenSECoKG</c>.
+    /// </summary>
+    public static string ManufacturerUriOf(string manufacturer)
+    {
+        ArgumentNullException.ThrowIfNull(manufacturer);
+        var written = manufacturer
+            .Replace("ä", "ae", StringComparison.Ordinal).Replace("ö", "oe", StringComparison.Ordinal).Replace("ü", "ue", StringComparison.Ordinal)
+            .Replace("Ä", "Ae", StringComparison.Ordinal).Replace("Ö", "Oe", StringComparison.Ordinal).Replace("Ü", "Ue", StringComparison.Ordinal)
+            .Replace("ß", "ss", StringComparison.Ordinal)
+            .Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(written.Length);
+        foreach (var c in written.Where(char.IsAsciiLetterOrDigit))
+        {
+            builder.Append(c);
+        }
+
+        return builder.ToString();
     }
 
     /// <summary>The identity as the publisher of the binding takes it.</summary>
@@ -709,7 +793,7 @@ internal sealed partial class MachineOutput : IMachineOutput
     private partial void LogStarted(string serialNumber, string machineId);
 
     [LoggerMessage(EventId = 301, Level = LogLevel.Information,
-        Message = "Machine {SerialNumber} has no identity yet: it is published once its server gave ManufacturerUri and Model")]
+        Message = "Machine {SerialNumber} has no identity yet: it is published once its server gave ManufacturerUri (or Manufacturer) and Model")]
     private partial void LogNotIdentified(string serialNumber);
 
     [LoggerMessage(EventId = 303, Level = LogLevel.Warning, Message = "Machine {SerialNumber}: the oldest alert event that waited for the identity is dropped")]

@@ -221,6 +221,26 @@ The domain stays when the company is renamed; the display name of the manufactur
 proposal of this binding, not an element of the model: globally unique stays `ProductInstanceUri`, also as the
 `source` of every event.
 
+#### Without a ManufacturerUri
+
+Some OPC UA servers have no node for `Identification.ManufacturerUri`. For such a machine, and only then, the
+[OPC UA adapter](#what-the-adapters-of-real-devices-publish) takes `Identification.Manufacturer` instead: the name with `ä`, `ö`,
+`ü`, `ß` written out as above, other accents dropped and every character but `A-Z`, `a-z` and `0-9` removed,
+dots included, so that no part of it is taken for a top-level domain. This stand-in is published as
+`umati/Identification/ManufacturerUri`, the manufacturer part of the machine id and the prefix `x-<domain>` are
+formed from it by the rules above, and so is a `ProductInstanceUri` the server does not give
+(`{ManufacturerUri}/{Model}/{SerialNumber}`).
+
+| Manufacturer, Model, SerialNumber | `ManufacturerUri` | Machine id | Prefix |
+|---|---|---|---|
+| `TRUMPF Werkzeugmaschinen SE + Co. KG`, `TruLaser 5030`, `A0280O0001` | `TRUMPFWerkzeugmaschinenSECoKG` | `trumpfwerkzeugmaschinensecokg_TruLaser-5030_A0280O0001` | `x-trumpfwerkzeugmaschinensecokg` |
+
+A consumer should know what it then gets: `ManufacturerUri` is no web address, a formed `ProductInstanceUri`
+(`TRUMPFWerkzeugmaschinenSECoKG/TruLaser%205030/A0280O0001`) is a relative URI reference and no absolute URI,
+and the id changes with the name of the manufacturer, not with its domain. A server that has a node for
+`ManufacturerUri` and gives no value yet gets no stand-in: the machine waits for the value. A name without any
+letter or digit `A-Z`, `0-9`, such as one in Japanese, cannot stand in; such a machine is not added.
+
 A wildcard takes a whole level, so it selects every machine (`machines/+/umati/#`) or one
 (`machines/alcyone-machines_AX-400_P-04/#`); MQTT has no wildcard for a part of a level. Who wants the machines of
 one manufacturer or model filters on the id after `_`, or reads the manifests.
@@ -550,10 +570,12 @@ adds in the chat, with the same publisher and one MQTT connection per machine, s
 will (client id `opcua-adapter-<machineId>`). What it publishes follows from the registration of the machine:
 
 - The machine id is formed from `Identification.ManufacturerUri`, `Model` and `SerialNumber` as the server gave
-  them when the machine was added, and kept with the registration.
+  them when the machine was added, and kept with the registration. A server without a node for
+  `ManufacturerUri` gets `Identification.Manufacturer` without its special characters in its place, published
+  as `ManufacturerUri` (see [Without a ManufacturerUri](#without-a-manufactureruri)).
 - The manifest declares the core whole, what the machine lacks `"available": false`, and the other profiles
   whose elements the registration maps whole. A value of the maker is a signal of the manufacturer, below
-  `oem/`, with the prefix of the domain of its `ManufacturerUri`.
+  `oem/`, with the prefix of the domain of its `ManufacturerUri`, or of the stand-in.
 - A value goes out when the server reports a change, with the time of the source (`"timestampSource":
   "source"`), in the unit of the catalogue. `State.Status` is built from the two fields of the state.
 - `Connection/State` is `Running` while the OPC UA session stands and `CommunicationFault` while it does not.
