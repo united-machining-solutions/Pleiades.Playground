@@ -1,8 +1,9 @@
-import type { EnergySeries } from "@pleiades/cards/energy/contract.ts"
+import type { EnergySeries, EnergyShow } from "@pleiades/cards/energy/contract.ts"
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
 import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
+import type { NotificationList } from "@pleiades/cards/notification/contract.ts"
 import type { SiteList } from "@pleiades/cards/site/contract.ts"
-import type { TimeseriesRange, TimeseriesSeries, TimeseriesSignals } from "@pleiades/cards/timeseries/contract.ts"
+import type { TimeseriesRange, TimeseriesSeries, TimeseriesShow, TimeseriesSignals } from "@pleiades/cards/timeseries/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
@@ -243,3 +244,45 @@ export const getTimeseriesSignals = createServerFn({ method: "GET" }).handler(as
   })
   return answer.values
 })
+
+/** The warnings and errors of one machine over the last hours: the values of the notification card. */
+export const getNotifications = createServerFn({ method: "GET" })
+  .validator((request: { machine: string; hours: number }) => request)
+  .handler(
+    ({ data }): Promise<Answer<NotificationList>> =>
+      ask(async (backend) => {
+        const result = await backend.callTool("genui_notification_list", data)
+        if (result.isError || !result.structuredContent) {
+          throw new Refused(textOf(result) ?? "genui_notification_list returned no values.")
+        }
+        return result.structuredContent
+      }),
+  )
+
+/** The energy machines imported over the last hours, and their mean and peak power: the values of the energy card. */
+export const getEnergy = createServerFn({ method: "GET" })
+  .validator((request: { machines: Array<string>; hours: number }) => request)
+  .handler(
+    ({ data }): Promise<Answer<EnergyShow>> =>
+      ask(async (backend) => {
+        const result = await backend.callTool("genui_energy_show", data)
+        if (result.isError || !result.structuredContent) {
+          throw new Refused(textOf(result) ?? "genui_energy_show returned no values.")
+        }
+        return result.structuredContent
+      }),
+  )
+
+/** Signals of machines over a range: the values of the time series card, which asks for its lines itself. */
+export const getTimeseries = createServerFn({ method: "GET" })
+  .validator((request: { lines: Array<{ machine: string; signal: string }>; range: TimeseriesRange }) => request)
+  .handler(
+    ({ data }): Promise<Answer<TimeseriesShow>> =>
+      ask(async (backend) => {
+        const result = await backend.callTool("genui_timeseries_show", data)
+        if (result.isError || !result.structuredContent) {
+          throw new Refused(textOf(result) ?? "genui_timeseries_show returned no values.")
+        }
+        return result.structuredContent
+      }),
+  )

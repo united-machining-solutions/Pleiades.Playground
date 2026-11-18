@@ -47,6 +47,14 @@ test("the page hears every quantity of every machine, and the readings as signs 
   assert.ok(filters.includes("machines/+/umati/State/Status/MachineryItemState"))
 })
 
+test("the page of one machine hears only that machine", () => {
+  const filters = measurementFilters(P04)
+  assert.ok(filters.includes(power))
+  assert.ok(filters.includes(`machines/${P04}/umati/Connection/Heartbeat`))
+  assert.ok(filters.every((filter) => filter.startsWith(`machines/${P04}/`)))
+  assert.equal(filters.length, measurementFilters().length)
+})
+
 test("a new value stands next to the title at once", () => {
   const page = liveWith(livePageOf(series, current), power, value("2026-11-16T09:30:01Z", 3100, "watt"), NOW)
   assert.deepEqual(page.current?.machines[0]?.measurements[0], {
