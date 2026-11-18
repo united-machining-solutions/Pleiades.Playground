@@ -248,8 +248,8 @@ All notable changes are documented here. The format follows
   proposal card and the list of the added servers in the chat show whether the core is fulfilled and which
   profiles are complete, and the answers carry it as `conformance`.
 - OPC UA adapter: removing a machine takes every retained message of it back from the broker, the manifest
-  last, so that a new subscriber no longer sees it. What the stores kept of it stays; deleting it is a pull
-  request of its own.
+  last, so that a new subscriber no longer sees it. While the broker cannot be reached the removal answers `503`
+  and the machine stays added. What the stores kept of it stays; deleting it is a pull request of its own.
 - OPC UA adapter: it publishes by the binding of machines, with the publisher the Ultimaker telemetry and the
   juice bar use, and one MQTT connection per machine, each with its own last will. A machine is named by its
   machine id, `<manufacturer>_<model>_<serial number>`, formed from the identification its server gave when it

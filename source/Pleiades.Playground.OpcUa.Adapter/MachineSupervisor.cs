@@ -50,6 +50,19 @@ internal sealed record EndpointOffer(string Url, IReadOnlyList<OfferedEndpoint> 
 /// <param name="Machines">The machines found below Objects.</param>
 internal sealed record ServedMachines(string Url, IReadOnlyList<RankedEndpoint> Endpoints, IReadOnlyList<FoundMachine> Machines);
 
+/// <summary>What came of the removal of a machine.</summary>
+internal enum MachineRemoval
+{
+    /// <summary>Removed, and its retained messages taken back from the broker.</summary>
+    Removed = 0,
+
+    /// <summary>No such machine is added.</summary>
+    NotAdded = 1,
+
+    /// <summary>Not removed: the broker cannot be reached, so its retained messages could not be taken back.</summary>
+    BrokerUnreachable = 2,
+}
+
 /// <summary>
 /// Keeps every registered machine running. At start it reads the stored registrations and connects
 /// each: no discovery, no language model, nothing but the files. A machine is added and removed at
@@ -415,18 +428,29 @@ internal sealed class MachineSupervisor : BackgroundService
     /// <summary>
     /// Removes a machine: closes its session, clears the alarms that stand, takes its retained messages back
     /// from the broker and deletes its registration. What the stores kept of it stays: deleting it is a step
-    /// of its own, with a contract of its own. Returns false if no such machine is added.
+    /// of its own, with a contract of its own.
     /// </summary>
-    public async Task<bool> RemoveAsync(string serialNumber, CancellationToken cancellationToken)
+    /// <returns>
+    /// <see cref="MachineRemoval.NotAdded"/> if no such machine is added; <see cref="MachineRemoval.BrokerUnreachable"/>
+    /// if the broker cannot be reached, so that its retained messages could not be taken back: then the machine stays
+    /// as it was, and the removal can be tried again.
+    /// </returns>
+    public async Task<MachineRemoval> RemoveAsync(string serialNumber, CancellationToken cancellationToken)
     {
         await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            if (_machines.TryGetValue(serialNumber, out var running) && !running.Connection.Output.CanTakeBack)
+            {
+                _logger.MachineNotRemoved(serialNumber);
+                return MachineRemoval.BrokerUnreachable;
+            }
+
             await StopAsync(serialNumber, removed: true).ConfigureAwait(false);
             _alertStore.Delete(serialNumber);
             if (!_store.Delete(serialNumber))
             {
-                return false;
+                return MachineRemoval.NotAdded;
             }
 
             _logger.MachineRemoved(serialNumber);
@@ -436,7 +460,7 @@ internal sealed class MachineSupervisor : BackgroundService
             _changes.Release();
         }
 
-        return true;
+        return MachineRemoval.Removed;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

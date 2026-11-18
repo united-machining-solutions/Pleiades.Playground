@@ -555,7 +555,7 @@ will (client id `opcua-adapter-<machineId>`). What it publishes follows from the
   the managed client keeps every message. An alarm that stood before a restart of the adapter and still stands is
   raised once more in the new run, with its `Id` and its `Time`, so that every run names the alarms that stand.
 - When a machine is removed, the adapter takes every retained message of it back with an empty one and ends its
-  connection without its last will.
+  connection without its last will. While the broker cannot be reached it does not remove the machine.
 
 ### Open for the hackathon
 

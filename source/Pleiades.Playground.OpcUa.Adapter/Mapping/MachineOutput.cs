@@ -42,6 +42,12 @@ internal interface IMachineOutput : IAsyncDisposable
     Task AlertAsync(AlertChange change, IReadOnlyList<OpenAlert> open);
 
     /// <summary>
+    /// Whether a removal can take back what the machine left on the broker now: true while the connection to the
+    /// broker stands, or when the machine has no connection because it was never identified and so published nothing.
+    /// </summary>
+    bool CanTakeBack { get; }
+
+    /// <summary>
     /// Ends the output. A machine that stops says <c>Shutdown</c>; a machine that is removed takes every retained
     /// message it left on the broker back, so that nothing of it is delivered again.
     /// </summary>
@@ -144,6 +150,9 @@ internal sealed partial class MachineOutput : IMachineOutput
 
     /// <inheritdoc />
     public string? MachineId => _identity is null ? null : MachineIdentityOf(_identity, _registration.SerialNumber).MachineId;
+
+    /// <inheritdoc />
+    public bool CanTakeBack => _client is not { } client || client.IsConnected;
 
     /// <summary>
     /// The identity of a machine from the values of its identification, or null without <c>ManufacturerUri</c> or
@@ -481,7 +490,15 @@ internal sealed partial class MachineOutput : IMachineOutput
                 }
 
                 await DrainAsync().ConfigureAwait(false);
-                LogRetainedCleared(machineId);
+                if (_client.PendingApplicationMessagesCount > 0)
+                {
+                    // The broker went away during the removal: what did not go out stays retained there.
+                    LogRetainedNotCleared(machineId, _client.PendingApplicationMessagesCount);
+                }
+                else
+                {
+                    LogRetainedCleared(machineId);
+                }
             }
             else
             {
@@ -700,4 +717,8 @@ internal sealed partial class MachineOutput : IMachineOutput
 
     [LoggerMessage(EventId = 302, Level = LogLevel.Information, Message = "The retained messages of {MachineId} are taken back from the broker")]
     private partial void LogRetainedCleared(string machineId);
+
+    [LoggerMessage(EventId = 304, Level = LogLevel.Warning,
+        Message = "The broker went away while the retained messages of {MachineId} were taken back: {Pending} did not go out and stay retained")]
+    private partial void LogRetainedNotCleared(string machineId, int pending);
 }

@@ -325,7 +325,7 @@ prefix of a gateway; both are open.
 | `GET /machines` | The registered machines with their state, and the machines each shares its session with. |
 | `GET /machines/{SerialNumber}` | One machine: its registration, the last value of every element, the alarms that stand. |
 | `GET /machines/{SerialNumber}/mapping` | The mapping review of one machine, element by element. |
-| `DELETE /machines/{SerialNumber}` | Removes the machine and takes its retained messages back from the broker. `204`, or `404` if no such machine is added. |
+| `DELETE /machines/{SerialNumber}` | Removes the machine and takes its retained messages back from the broker. `204`; `404` if no such machine is added; `503` if the broker cannot be reached, so that its retained messages cannot be taken back: the machine then stays added, and the removal can be tried again. |
 
 A registration is refused with the reasons, one per line of `problems`: `400` if it is malformed, `409` if it
 does not fit its server, is not the machine it says it is or does not fulfil the core (checked once the server
@@ -490,8 +490,10 @@ consumer that ends the alarms of an earlier run at the start of the next one doe
   every registration.
 - **Removal.** The machine leaves its session, the alarms that stand are cleared, every retained message of the
   machine is taken back from the broker with an empty one, its connection to the broker ends without its last
-  will, and the registration is deleted, the manifest last. The session closes with the last machine of its
-  endpoint. The broker brings nothing of the machine back to a new subscriber. What the stores kept of it stays:
+  will, and the registration is deleted, the manifest last. While the broker cannot be reached the machine is not
+  removed (`503`): its retained messages could not be taken back, and a new subscriber would still see it.
+  The session closes with the last machine of its endpoint. The broker brings nothing of the machine back to a new
+  subscriber. What the stores kept of it stays:
   the machine leaves Home once its values are older than the list looks back, and its history remains. Deleting
   the stored data of a machine is a step of its own, with a contract of its own, in a later pull request.
 - **A server that changed.** If a registered node is gone, the element says so and the machine has

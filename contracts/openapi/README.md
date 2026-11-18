@@ -31,7 +31,8 @@ The management API of the OPC UA adapter adds, lists and removes the machines th
 `/endpoints` and `/endpoints/machines` ask a server, `/users` keeps the user of a server that wants one,
 `/machines` and `/machines/{serialNumber}` register, show and remove a machine, `/drafts/{draftId}/commit` adds
 what a proposal of the chat holds. It has no sign-in and answers on this computer only (`OPCUA_ADAPTER_BIND`).
-Removing a machine takes its retained messages back from the broker; it deletes nothing that is stored.
+Removing a machine takes its retained messages back from the broker; it deletes nothing that is stored. While the
+broker cannot be reached, the removal answers `503` and the machine stays added.
 
 Snapshots of the documents will be committed here once the first release is tagged, so that a change to an API
 shows up as a diff in review.

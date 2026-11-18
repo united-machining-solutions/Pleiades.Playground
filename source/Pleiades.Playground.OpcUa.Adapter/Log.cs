@@ -27,6 +27,9 @@ internal static partial class Log
     [LoggerMessage(9, LogLevel.Information, "Machine {SerialNumber} removed.")]
     public static partial void MachineRemoved(this ILogger logger, string serialNumber);
 
+    [LoggerMessage(26, LogLevel.Warning, "Machine {SerialNumber} not removed: the broker cannot be reached, so its retained messages cannot be taken back.")]
+    public static partial void MachineNotRemoved(this ILogger logger, string serialNumber);
+
     [LoggerMessage(10, LogLevel.Information, "{Count} registered machines loaded from {Directory}.")]
     public static partial void RegistrationsLoaded(this ILogger logger, int count, string directory);
 

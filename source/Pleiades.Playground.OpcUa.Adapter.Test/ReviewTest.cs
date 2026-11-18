@@ -275,8 +275,8 @@ public class MachineSupervisorTest
         var (supervisor, outputs) = Supervisor(directory.Path);
         await Started(supervisor, 2);
 
-        Assert.IsTrue(await supervisor.RemoveAsync("A1121O0001", TestContext.CancellationToken));
-        Assert.IsFalse(await supervisor.RemoveAsync("A1121O0001", TestContext.CancellationToken), "A machine that is not added is not removed.");
+        Assert.AreEqual(MachineRemoval.Removed, await supervisor.RemoveAsync("A1121O0001", TestContext.CancellationToken));
+        Assert.AreEqual(MachineRemoval.NotAdded, await supervisor.RemoveAsync("A1121O0001", TestContext.CancellationToken), "A machine that is not added is not removed.");
         await supervisor.StopAsync(TestContext.CancellationToken);
         supervisor.Dispose();
 
@@ -288,6 +288,31 @@ public class MachineSupervisorTest
         Assert.IsFalse(File.Exists(Path.Combine(directory.Path, "machines", "A1121O0001.json")));
         Assert.IsTrue(File.Exists(Path.Combine(directory.Path, "machines", "M3.json")));
         Assert.IsTrue(removed.Lost > 0, "A server that does not answer is a CommunicationFault.");
+    }
+
+    [TestMethod]
+    public async Task A_machine_is_not_removed_while_the_broker_cannot_be_reached_and_is_once_it_can()
+    {
+        using var directory = new TemporaryDirectory();
+        new RegistrationStore(directory.Path).Save(Registration("A1121O0001", "trumpf_TruMatic_A1121O0001"));
+        var (supervisor, outputs) = Supervisor(directory.Path);
+        await Started(supervisor, 1);
+        var output = outputs.Created.Single();
+        output.CanTakeBack = false;
+
+        var refused = await supervisor.RemoveAsync("A1121O0001", TestContext.CancellationToken);
+
+        Assert.AreEqual(MachineRemoval.BrokerUnreachable, refused, "Its retained messages could not be taken back, so it is not reported removed.");
+        Assert.IsEmpty(output.Stops, "The machine keeps running as it was.");
+        Assert.HasCount(1, supervisor.Machines);
+        Assert.IsTrue(File.Exists(Path.Combine(directory.Path, "machines", "A1121O0001.json")), "The registration stays.");
+
+        output.CanTakeBack = true;
+        Assert.AreEqual(MachineRemoval.Removed, await supervisor.RemoveAsync("A1121O0001", TestContext.CancellationToken), "Tried again once the broker is back.");
+        CollectionAssert.AreEqual(new[] { true }, output.Stops);
+        Assert.IsFalse(File.Exists(Path.Combine(directory.Path, "machines", "A1121O0001.json")));
+        await supervisor.StopAsync(TestContext.CancellationToken);
+        supervisor.Dispose();
     }
 
     private sealed class FakeOutputs : IMachineOutputFactory
@@ -317,6 +342,8 @@ public class MachineSupervisorTest
         public int Lost { get; private set; }
 
         public bool Disposed { get; private set; }
+
+        public bool CanTakeBack { get; set; } = true;
 
         public Task StartAsync() => Task.CompletedTask;
 
