@@ -29,9 +29,9 @@ export function kilowatts(watt: number): string {
   return `${number(watt / 1000, 2)} kW`
 }
 
-/** A value of the graph on its axis, in kilowatts: 2.4. */
+/** A value of the graph on its axis, in kilowatts: 2.0, 2.25. A round tick needs no more than two decimals. */
 export function axisKilowatts(watt: number): string {
-  return number(watt / 1000, 1)
+  return new Intl.NumberFormat("en-GB", { minimumFractionDigits: 1, maximumFractionDigits: 2 }).format(watt / 1000)
 }
 
 /** "the last hour", "the last 8 hours". */
