@@ -14,6 +14,13 @@ All notable changes are documented here. The format follows
   the model or the extension, and is a tool of `genui-mcp` of its own (`genui_trulaser_status`,
   `genui_trulaser_joborder`, `genui_trulaser_devices`, `genui_trulaser_technology`,
   `genui_trulaser_collision`, `genui_trulaser_conditions`), which the chat shows as a card.
+- Example app: the list under the chat field that `/` opens offers the tools of the MCP servers the chat
+  has, after its commands, and works from the keyboard, as in other chats. `/genui_machine_show M-02` asks
+  the model to answer with that tool; it is a request, not a call, so the model still fills in the
+  arguments. A server the chat has switched off under "Tools" gives none, and neither does a tool only a
+  card calls. A part of a name finds the tool too (`/machine`). One entry is marked; the arrow keys move
+  the mark, Tab writes it into the field, Enter takes it and Escape closes the list. The field keeps the
+  focus and points to the marked entry for screen readers.
 - MQTT binding, draft 0.3.0: a third first level, `hub/`, beside `machines` and `sites`. It carries the
   registration of apps at the Pleiades Hub (repository `umati/pleiades-hub`), the page that shows the apps of
   a Pleiades system under one header. The binding only reserves the level and says who owns it: the topics
@@ -569,6 +576,12 @@ All notable changes are documented here. The format follows
   `TcMachineAlarmType` with `AlarmIdentifier` if its registration names no alarms and its server has that type,
   and the TRUMPF interface counts as its own namespace. A server without the list or the type moves
   `Notification.ActiveAlerts` to `missing`. A stored registration takes this on `/rescan` (issue 180).
+- `app`: a new question in the chat stays at the top of the panel and its answer grows under it, also when the
+  answer is a card taller than the panel. Until now the chat ran to the end of such an answer at once, so the
+  question and the head of the card were out of sight; with the machines of the stack today, the cards of power
+  and energy or of the measurements of all machines are that tall. A long text no longer pulls the panel along
+  either: it grows under its question too, and the button at the foot leads to its end as it stands. An alert
+  under an answer, such as "The language model did not answer", comes into view by itself.
 - `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page

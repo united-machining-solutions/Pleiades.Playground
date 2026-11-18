@@ -356,7 +356,10 @@ reads which models the settings name, `cards.tsx` lists what the app draws for w
 
 ### Add a machine that speaks OPC UA
 
-Type `/` in the chat field: the list of commands opens, and `/help` explains them. Ask
+Type `/` in the chat field: the list of commands opens, and `/help` explains them. Below the commands
+stand the tools of the MCP servers the chat has: `/machine` finds `/genui_machine_show`, and
+`/genui_machine_show M-02` asks the model to answer with that tool. The arrow keys mark an entry, Tab writes
+it into the field, Enter takes it and Escape closes the list. Ask
 `/discover A1121O0001`, and the model scans the OPC UA server of the simulated machine, matches its nodes to
 the data model and shows a proposal: the endpoint with the strongest security, whether the machine fulfils
 the core of the data model and which profiles are complete, every element with its value, and what is
