@@ -5,8 +5,9 @@ import { z } from "zod"
 import { chatTools } from "@/chat/cards.tsx"
 import { withTimeZone } from "@/chat/local-times.ts"
 import type { Answer } from "@/machines/get-machines.ts"
-import { reasonOf, textOf } from "@/machines/get-machines.ts"
+import { textOf } from "@/machines/get-machines.ts"
 import { keptClient } from "@/machines/kept-client.ts"
+import { reasonOf } from "@/reason.ts"
 
 import { drawingTool, noCardFor } from "./parts.ts"
 import { recipePartSchema } from "./recipe.ts"
@@ -24,17 +25,17 @@ const partCallSchema = recipePartSchema.extend({ timeZone: z.string().max(64).op
 /** What a part got. `refused`: the tool answered and said no, which asking again does not change. */
 export type PartAnswer = Answer<string> & { refused?: true }
 
+/** The one connection of the server of the app to the backend, kept between parts and pages. */
+const backend = keptClient(() =>
+  createMCPClient({ transport: { type: "http", url: process.env.GENUI_MCP_URL ?? "http://localhost:5520/mcp" } }),
+)
+
 /**
  * Calls the tool of one part and returns what the chat hands to `draw` of that tool for the same
  * call: the values a tool with an output schema gives as `structuredContent`, written as JSON, or
  * else its text. Without values the answer is a sentence that says why: the app has no card for the
  * tool, the tool refused, or the backend did not answer.
  */
-/** The one connection of the server of the app to the backend, kept between parts and pages. */
-const backend = keptClient(() =>
-  createMCPClient({ transport: { type: "http", url: process.env.GENUI_MCP_URL ?? "http://localhost:5520/mcp" } }),
-)
-
 export const callPart = createServerFn({ method: "GET" })
   .validator((input: PartCall) => {
     const call = partCallSchema.safeParse(input)

@@ -7,7 +7,8 @@ namespace Pleiades.Playground.Sites.Api.DataTransferObjects;
 /// <param name="Company">The company the site belongs to. Example: Demo Manufacturing</param>
 /// <param name="Name">The name of the plant. Example: North plant</param>
 /// <param name="Halls">The halls of the site. Example: ["Hall 1", "Hall 2"]</param>
-internal sealed record SiteDtoV1(string SiteId, string Company, string Name, IReadOnlyList<string> Halls);
+/// <param name="Etag">The entity tag of the site, which changes with its company, name or halls: send it as If-Match to change or remove only this site. Example: "3f1c0a9d2b7e4c51"</param>
+internal sealed record SiteDtoV1(string SiteId, string Company, string Name, IReadOnlyList<string> Halls, string Etag);
 
 /// <summary>
 /// The body of <c>PUT /sites/{siteId}</c>: what a site is, without its id, which the path carries.
