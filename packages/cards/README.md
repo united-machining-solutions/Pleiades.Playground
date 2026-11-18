@@ -10,6 +10,9 @@ generative UI backend. Its contract and its component lie next to each other, so
 
 | Card | Tool | Contract | Component |
 |---|---|---|---|
+| Machine: what one machine does now, since when, with which work master and job order, and the states of the last hours | `genui_machine_show` | `machineShow` in `src/machine/contract.ts` | `MachineCard` in `src/machine/machine-card.tsx` |
+| Measurement: the newest physical values of every machine, each in the unit it was published in | `genui_measurement_list` | `measurementList` in `src/measurement/contract.ts` | `MeasurementCards` in `src/measurement/measurement-card.tsx` |
+| Measurement graph: one quantity of every machine over the last minutes, a line for each machine | `genui_measurement_series`, called by the card file of the measurements below its cards, and by the page `/live` of the example app. The chat draws no graph | `measurementSeries` in `src/measurement/contract.ts` | `MeasurementGraph` in `src/measurement/measurement-graph.tsx` |
 | Machine: what one machine does now, since when, with which program, and the states of the last hours | `genui_machine_show` | `machineShow` in `src/machine/contract.ts` | `MachineCard` in `src/machine/machine-card.tsx` |
 | Shop floor: the plan of the hall with every machine at its place, the running ones greyed out, and over each one that does not run, why | `genui_shopfloor_show` | `shopfloorShow` in `src/shopfloor/contract.ts` | `ShopfloorCard` in `src/shopfloor/shopfloor-card.tsx` |
 | View: an answer a language model lays out itself from blocks (figures, rankings, frequent faults, the hall, notes, what is missing); every value is computed by the backend | `genui_view_show` | `viewShow` in `src/view/contract.ts` | `ViewCard` in `src/view/view-card.tsx` |
@@ -31,7 +34,7 @@ Nothing is built here. The package is source: an import names the file, for exam
 | Importer | Files | Needs |
 |---|---|---|
 | The backend, in Node.js | `.ts` files only: contracts and rules | `zod` |
-| An application, through its bundler | everything | React, the components of `@pleiades/ui` and a theme: its `globals.css`, or one of its own |
+| An application, through its bundler | everything | React, the components of `@pleiades/ui` and a theme: its `globals.css`, or one of its own; Recharts for the graphs of the measurements |
 | A card file of the backend, through its bundler | everything | the same |
 
 Node.js runs the `.ts` files as they are. So they use no syntax that needs compiling, every import names its
@@ -71,7 +74,7 @@ Both import the theme from [`packages/ui`](../ui/README.md), so the card looks t
    [`contracts/mcp`](../../contracts/mcp/README.md).
 3. Write the component with the inferred type as its properties.
 4. In the application, say what the chat draws for a result of the tool: a module for the card, like
-   `src/machines/chat.tsx`, and one line in `src/chat/cards.tsx`.
+   `src/cards/machine/chat.tsx`, and one line in `src/chat/cards.tsx`.
 5. For other hosts, add a page for the card under `apps/genui-mcp/ui/` and link it from the tool. The build
    finds the page by itself.
 6. If the card shows a series, keep it out of the contract of the card: give it a contract and a tool of its

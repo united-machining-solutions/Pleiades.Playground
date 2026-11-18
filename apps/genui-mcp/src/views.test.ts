@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { secondsOfTimeSpan } from "./apis.ts"
+import { messageStatsOf } from "./apis.ts"
 import { valueOf } from "./views.ts"
 
 test("a count of the hall is the sum of the machines, and a machine without a value is left out", () => {
@@ -18,8 +18,20 @@ test("without any value there is no value", () => {
   assert.equal(valueOf("running-share", []), null)
 })
 
-test("a time span of .NET reads as seconds", () => {
-  assert.equal(secondsOfTimeSpan("00:39:26.6320000"), 39 * 60 + 26.632)
-  assert.equal(secondsOfTimeSpan("1.02:03:04"), 86400 + 2 * 3600 + 3 * 60 + 4)
-  assert.equal(secondsOfTimeSpan("nonsense"), 0)
+test("alerts are counted by their code, with the time they stood inside the range", () => {
+  const from = new Date("2026-11-18T08:00:00Z")
+  const to = new Date("2026-11-18T10:00:00Z")
+  const stats = messageStatsOf(
+    [
+      { errorCode: "2130", message: "Spindle overtemperature", severity: "Failure", raisedAt: "2026-11-18T07:00:00Z", clearedAt: "2026-11-18T08:30:00Z" },
+      { errorCode: "2130", message: "Spindle overtemperature", severity: "Failure", raisedAt: "2026-11-18T09:30:00Z", clearedAt: null },
+      { errorCode: "4105", message: "Safety door open", severity: "CheckFunction", raisedAt: "2026-11-18T09:00:00Z", clearedAt: "2026-11-18T09:10:00Z" },
+    ],
+    from,
+    to,
+  )
+  assert.deepEqual(stats, [
+    { notificationId: "2130", title: "Spindle overtemperature", level: "Error", count: 2, seconds: 3600 },
+    { notificationId: "4105", title: "Safety door open", level: "Warning", count: 1, seconds: 600 },
+  ])
 })

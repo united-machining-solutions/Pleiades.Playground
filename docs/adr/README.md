@@ -18,3 +18,9 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0007](0007-generative-ui-in-typescript.md) | Generative UI in TypeScript: a backend for displays, a card catalogue and the harness in the example app | proposed |
 | [0008](0008-route-tree-is-written-not-committed.md) | The route tree of the example app is written, not committed | proposed |
 | [0009](0009-shadcn-components-in-one-package.md) | The shadcn/ui components live in one package, `packages/ui` | proposed |
+| [0010](0010-language-models-through-one-gateway.md) | The chat takes its language models from a LiteLLM gateway | proposed |
+| [0011](0011-a-brand-is-a-block-of-theme-tokens.md) | A brand is a block of theme tokens, switched by one attribute | proposed |
+| [0012](0012-headless-ultimaker-tool-service.md) | Headless Ultimaker 3 slicing and explicit print operations | proposed |
+| [0013](0013-live-values-from-the-broker.md) | Live values reach the browser from the broker | proposed |
+| [0014](0014-a-page-from-the-chat-is-a-recipe-kept-in-the-browser.md) | A page from the chat is a recipe, kept in the browser | proposed |
+| [0015](0015-the-binding-of-machines-follows-the-data-model.md) | The tree of machines on the broker follows the data model exactly | proposed |

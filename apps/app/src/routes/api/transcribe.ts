@@ -1,48 +1,32 @@
+import { generateTranscription, generationParamsFromBody, toServerSentEventsResponse } from "@tanstack/ai"
 import { createFileRoute } from "@tanstack/react-router"
 
-import { HUB_TRANSCRIBE_MODEL, transcriptionFile } from "@/voice/transcribe.ts"
+import { readBodyText } from "@/chat/body.ts"
+import { dictationAdapter, dictationPrompt } from "@/chat/dictation.server.ts"
 
-// Speech recognition through the endpoint of the language model (LLM_BASE_URL), such as the hub of
-// the hackathon: the browser sends what it recorded, and this asks the endpoint's transcription model.
-// The key stays on the server. Without an endpoint, the page recognises speech in the browser instead.
-//
-// GET says whether it is there; POST takes a recording as its body and answers with { text }.
-
-function endpoint() {
-  const baseURL = process.env.LLM_BASE_URL
-  if (!baseURL) return undefined
-  return { baseURL, apiKey: process.env.LLM_API_KEY || "not-needed", model: process.env.TRANSCRIBE_MODEL || HUB_TRANSCRIBE_MODEL }
-}
-
+// The browser sends a recording from the chat field, and gets back what was said in it, as text.
 async function transcribe({ request }: { request: Request }) {
-  const hub = endpoint()
-  if (!hub) return Response.json({ error: "No endpoint for speech recognition configured" }, { status: 503 })
-  const recording = await request.blob()
-  const form = new FormData()
-  form.append("file", recording, transcriptionFile(recording.type || request.headers.get("content-type") || ""))
-  form.append("model", hub.model)
-  form.append("language", "de")
-  // The words of the demo, so that they are written as the app writes them.
-  form.append("prompt", "Hey Titan. Die Maschinen P-04, P-07 und M-02. Lagebild, Halle, Störung, Spindel.")
-  const answer = await fetch(`${hub.baseURL.replace(/\/$/, "")}/audio/transcriptions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${hub.apiKey}` },
-    body: form,
-  }).catch((error: unknown) => error as Error)
-  if (answer instanceof Error) {
-    const cause = (answer as { cause?: { code?: string } }).cause?.code
-    return Response.json({ error: `The endpoint cannot be reached (${cause ?? answer.message})` }, { status: 502 })
-  }
-  if (!answer.ok) return Response.json({ error: `The endpoint answered ${answer.status}` }, { status: 502 })
-  const { text } = (await answer.json()) as { text?: string }
-  return Response.json({ text: (text ?? "").trim() })
+  const adapter = await dictationAdapter()
+  if (!adapter) return Response.json({ error: "No transcription model configured" }, { status: 503 })
+  // The button stops after two minutes, a few megabytes; a body over the limit did not come from it.
+  const text = await readBodyText(request)
+  if (text === null) return Response.json({ error: "The recording is too large" }, { status: 413 })
+  const { input, threadId, runId } = generationParamsFromBody("transcription", JSON.parse(text))
+  const prompt = await dictationPrompt()
+  const stream = generateTranscription({
+    adapter,
+    threadId,
+    runId,
+    audio: input.audio,
+    language: input.language,
+    ...(prompt !== undefined && { prompt }),
+    stream: true,
+  })
+  return toServerSentEventsResponse(stream)
 }
 
 export const Route = createFileRoute("/api/transcribe")({
   server: {
-    handlers: {
-      GET: () => Response.json({ available: endpoint() !== undefined }),
-      POST: transcribe,
-    },
+    handlers: { POST: transcribe },
   },
 })

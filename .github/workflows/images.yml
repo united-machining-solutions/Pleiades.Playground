@@ -1,7 +1,8 @@
 name: Images
 
 # Builds multi-architecture images and pushes them to the GitHub Container Registry.
-# Every push to main publishes the tags `main` and `sha-<commit>`; a version tag (v1.2.3) publishes `1.2.3`.
+# Every push to main publishes the tags `main` and `sha-<commit>`; a version tag (v1.2.3) publishes `1.2.3`
+# and then pushes the Margo app of that version with the workflow "Margo push".
 on:
   push:
     branches: [main]
@@ -36,9 +37,25 @@ jobs:
           - image: pleiades.playground.events.persistence
             context: source
             file: source/Pleiades.Playground.Events.Persistence/Dockerfile
+          - image: pleiades.playground.sites.api
+            context: source
+            file: source/Pleiades.Playground.Sites.Api/Dockerfile
           - image: pleiades.playground.simulator
             context: source
             file: source/Pleiades.Playground.Simulator/Dockerfile
+          - image: pleiades.playground.ultimaker.api
+            context: source
+            file: source/Pleiades.Playground.Ultimaker.Api/Dockerfile
+            # The printer services run on the deployment computer only, which is amd64.
+            platforms: linux/amd64
+          - image: pleiades.playground.ultimaker.telemetry
+            context: source
+            file: source/Pleiades.Playground.Ultimaker.Telemetry/Dockerfile
+            # The printer services run on the deployment computer only, which is amd64.
+            platforms: linux/amd64
+          - image: pleiades.playground.juicebar.api
+            context: source
+            file: source/Pleiades.Playground.JuiceBar.Api/Dockerfile
           - image: pleiades.playground.genui.mcp
             context: .
             file: apps/genui-mcp/Dockerfile
@@ -75,12 +92,16 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.file }}
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.platforms || 'linux/amd64,linux/arm64' }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # The .NET images compile this version in; the TypeScript images do not use it.
-          build-args: VERSION=${{ steps.version.outputs.value }}
+          # The .NET images compile the version in; the app shows the version and the commit in its sidebar,
+          # as a link into the repository. genui-mcp uses none of them.
+          build-args: |
+            VERSION=${{ steps.version.outputs.value }}
+            REVISION=${{ github.sha }}
+            SOURCE=${{ github.server_url }}/${{ github.repository }}
           sbom: true
           provenance: mode=max
       # GitHub stores attestations for public repositories only (private ones need an enterprise plan).
@@ -90,3 +111,16 @@ jobs:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+  # A release: the Margo app of this version, with exactly the images above. Only for a version tag, never for main.
+  margo-push:
+    name: Margo app
+    needs: image
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/margo-push.yml
+    # Only the two it needs. Kept in the environment margo-staging, they reach the job there and these stay empty.
+    secrets:
+      BART_REGISTRY_USER: ${{ secrets.BART_REGISTRY_USER }}
+      BART_REGISTRY_TOKEN: ${{ secrets.BART_REGISTRY_TOKEN }}
+    with:
+      version: ${{ github.ref_name }}

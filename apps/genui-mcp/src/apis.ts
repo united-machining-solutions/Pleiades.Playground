@@ -14,13 +14,24 @@ export type Sample = { at: string; value: string }
 export type Series = { topic: string; samples: Array<Sample> }
 
 export type NotificationLevel = "Warning" | "Error"
+/** The categories of an alert after NAMUR NE 107. */
+export type Severity = "Failure" | "CheckFunction" | "OffSpec" | "MaintenanceRequired"
 export type OpenNotification = {
   correlationId: string
   machine: string
   notificationId: string
+  severity: Severity | null
   level: NotificationLevel
   title: string
   raisedAt: string
+}
+/** The job order a machine works on. */
+export type RunningJobOrder = {
+  machine: string
+  jobOrderId: string
+  state: string
+  producedQuantity: number | null
+  runsPlanned: number | null
 }
 
 const topicsAnswer = z.object({
@@ -45,15 +56,31 @@ const seriesAnswer = (value: z.ZodType<string | number>): z.ZodType<SeriesAnswer
 const stringSeriesAnswer = seriesAnswer(z.string())
 const numberSeriesAnswer = seriesAnswer(z.number())
 
-const pairsAnswer = z.object({
+const severityAnswer = z.enum(["Failure", "CheckFunction", "OffSpec", "MaintenanceRequired"])
+
+const alertPairsAnswer = z.object({
   items: z.array(
     z.object({
-      correlationId: z.string(),
       mId: z.string(),
-      notificationId: z.string(),
-      title: z.string().nullish(),
-      timestampRaised: z.string(),
-      timestampGone: z.string().nullable(),
+      alertId: z.string(),
+      errorCode: z.string().nullish(),
+      message: z.string().nullish(),
+      severity: severityAnswer.nullish(),
+      raisedAt: z.string(),
+      clearedAt: z.string().nullable(),
+    }),
+  ),
+})
+
+const jobOrdersAnswer = z.object({
+  items: z.array(
+    z.object({
+      mId: z.string(),
+      jobOrderId: z.string(),
+      state: z.string(),
+      lastChange: z.string(),
+      producedQuantity: z.number().nullish(),
+      runsPlanned: z.number().nullish(),
     }),
   ),
 })
@@ -110,7 +137,7 @@ export async function listTopics(apis: Apis, from: Date, to: Date): Promise<Arra
 
 /**
  * A topic as part of the path of a URL. Its levels stay levels and `*` stays the wildcard; what
- * else a serial number may contain, a space or a question mark, must not end the path.
+ * else a machine id may contain, a space or a question mark, must not end the path.
  */
 export function inPath(topic: string): string {
   return topic.split("/").map(encodeURIComponent).join("/")
@@ -166,91 +193,182 @@ export const readStrings: ReadValues = (...read) => readSeries("stringValues", s
 /** The same for a topic whose values are numbers. A number comes back as its text. */
 export const readNumbers: ReadValues = (...read) => readSeries("baseUnitValues", numberSeriesAnswer, ...read)
 
-/** The notifications of one level that were raised between the two instants, each with when it went. */
-async function readPairs(apis: Apis, level: NotificationLevel, from: Date, to: Date, machine?: string) {
-  const url = between(
-    new URL("/notificationEvents/correlationPairs", apis.eventsUrl),
-    ["from", "to"],
-    from,
-    to,
-  )
-  url.searchParams.set("level", level)
-  url.searchParams.set("Take", "1000")
-  if (machine !== undefined) url.searchParams.set("mId", machine)
-  return (await getJson("Events API", url, pairsAnswer)).items
+/** A display that knows errors and warnings: a `Failure` is an error, every other category a warning. */
+export function levelOf(severity: Severity | null | undefined): NotificationLevel {
+  return severity === "Failure" ? "Error" : "Warning"
 }
 
-/** The notifications of one level that were raised between the two instants and have not gone. */
-export async function readOpenNotifications(
-  apis: Apis,
-  level: NotificationLevel,
-  from: Date,
-  to: Date,
-): Promise<Array<OpenNotification>> {
-  const pairs = await readPairs(apis, level, from, to)
+/**
+ * The alerts that stood at some time between the two instants (raised before the end and not
+ * cleared before the start), each with when it was cleared, or null while it stands.
+ */
+async function readAlertPairs(apis: Apis, from: Date, to: Date, machine?: string, severity?: Severity) {
+  const url = between(new URL("/alerts/pairs", apis.eventsUrl), ["from", "to"], from, to)
+  url.searchParams.set("Take", "1000")
+  if (machine !== undefined) url.searchParams.set("mId", machine)
+  if (severity !== undefined) url.searchParams.set("severity", severity)
+  return (await getJson("Events API", url, alertPairsAnswer)).items
+}
+
+/** The alerts of every machine that were raised between the two instants and have not been cleared. */
+export async function readOpenNotifications(apis: Apis, from: Date, to: Date): Promise<Array<OpenNotification>> {
+  const pairs = await readAlertPairs(apis, from, to)
   return pairs
-    .filter((pair) => pair.timestampGone === null)
+    .filter((pair) => pair.clearedAt === null && Date.parse(pair.raisedAt) >= from.getTime())
     .map((pair) => ({
-      correlationId: pair.correlationId,
+      correlationId: pair.alertId,
       machine: pair.mId,
-      notificationId: pair.notificationId,
-      level,
-      title: pair.title ?? "",
-      raisedAt: new Date(pair.timestampRaised).toISOString(),
+      notificationId: pair.errorCode ?? "",
+      severity: pair.severity ?? null,
+      level: levelOf(pair.severity),
+      title: pair.message ?? "",
+      raisedAt: new Date(pair.raisedAt).toISOString(),
     }))
 }
 
-/** From when to when a notification stood. `goneAt` is null as long as it has not gone. */
+/** From when to when an alert stood. `goneAt` is null as long as it has not been cleared. */
 export type Raised = { raisedAt: string; goneAt: string | null }
 
-/** When the notifications of one level of one machine were raised and when they went. */
+/** When the alerts of one category of one machine were raised in the range and when they were cleared. */
 export async function readRaised(
   apis: Apis,
-  level: NotificationLevel,
+  severity: Severity,
   machine: string,
   from: Date,
   to: Date,
 ): Promise<Array<Raised>> {
-  const pairs = await readPairs(apis, level, from, to, machine)
-  return pairs.map((pair) => ({
-    raisedAt: new Date(pair.timestampRaised).toISOString(),
-    goneAt: pair.timestampGone === null ? null : new Date(pair.timestampGone).toISOString(),
+  // Only what was raised in the range, as the list of machines takes it: an alert that came up
+  // before and still stands is not counted again, so the state and the history agree.
+  const pairs = await readAlertPairs(apis, from, to, machine, severity)
+  return pairs.filter((pair) => Date.parse(pair.raisedAt) >= from.getTime()).map((pair) => ({
+    raisedAt: new Date(pair.raisedAt).toISOString(),
+    goneAt: pair.clearedAt === null ? null : new Date(pair.clearedAt).toISOString(),
   }))
 }
 
-const messageStatsAnswer = z.array(
-  z.object({
-    notificationId: z.string(),
-    title: z.string().nullish(),
-    level: z.string(),
-    occurrenceCount: z.number(),
-    totalDuration: z.string().describe("A .NET time span, for example 00:39:26.6320000 or 1.02:03:04."),
-  }),
-)
-
-/** How often each kind of notification was raised between the two instants, and how long it stood in total. */
-export type MessageStat = { notificationId: string; title: string; level: string; count: number; seconds: number }
-
-/** "1.02:03:04.5" is a day, two hours, three minutes and 4.5 seconds. */
-export function secondsOfTimeSpan(span: string): number {
-  const match = /^(?:(\d+)\.)?(\d+):(\d+):(\d+(?:\.\d+)?)$/.exec(span)
-  if (!match) return 0
-  const [, days = "0", h = "0", m = "0", s = "0"] = match
-  return Number(days) * 86_400 + Number(h) * 3_600 + Number(m) * 60 + Number(s)
+/** The job orders that run or are interrupted now, the newest change of each machine first. */
+export async function readRunningJobOrders(apis: Apis): Promise<Array<RunningJobOrder>> {
+  const items = await Promise.all(
+    ["Running", "Interrupted"].map(async (state) => {
+      const url = new URL("/jobOrders", apis.eventsUrl)
+      url.searchParams.set("state", state)
+      url.searchParams.set("Take", "1000")
+      return (await getJson("Events API", url, jobOrdersAnswer)).items
+    }),
+  )
+  return items
+    .flat()
+    .sort((a, b) => b.lastChange.localeCompare(a.lastChange))
+    .map((one) => ({
+      machine: one.mId,
+      jobOrderId: one.jobOrderId,
+      state: one.state,
+      producedQuantity: one.producedQuantity ?? null,
+      runsPlanned: one.runsPlanned ?? null,
+    }))
 }
 
-/** The notifications by kind, for one machine or for all, between the two instants. */
+/** The newest value of one topic: when, what, and in which unit. A yes or no has no unit. */
+export type Newest = { at: string; value: number | boolean; unit: string | null }
+
+const newestAnswer = z.object({
+  series: z.array(
+    z.object({
+      topic: z.string(),
+      unit: z.string().nullish(),
+      timestamps: z.array(z.number()),
+      values: z.array(z.union([z.number(), z.boolean()]).nullable()),
+    }),
+  ),
+})
+
+/**
+ * The newest value of one topic before `to`, however old, or null if it never had one. A number
+ * keeps the unit the Timeseries API stored with it.
+ */
+export async function readNewest(
+  apis: Apis,
+  kind: "baseUnitValues" | "booleanValues",
+  topic: string,
+  to: Date,
+): Promise<Newest | null> {
+  const url = between(
+    new URL(`/timeseries/${kind}/topics/${inPath(topic)}`, apis.timeseriesUrl),
+    ["startTime", "stopTime"],
+    EVER,
+    to,
+  )
+  url.searchParams.set("limit", "1")
+  url.searchParams.set("sorting", "Descending")
+  const { series } = await getJson("Timeseries API", url, newestAnswer)
+  const found = series.find((one) => one.topic === topic)
+  const value = found?.values[0]
+  const timestamp = found?.timestamps[0]
+  if (value == null || timestamp === undefined) return null
+  return { at: fromMicroseconds(timestamp), value, unit: found?.unit ?? null }
+}
+
+/** The values of a topic between two instants, oldest first, with the unit they were stored in. */
+export type Timeline = { topic: string; unit: string | null; samples: Array<{ at: string; value: number | boolean }> }
+
+/**
+ * The values of a topic between the two instants, oldest first. The topic may contain `*` as a
+ * wildcard and then yields one timeline per topic.
+ */
+export async function readTimelines(
+  apis: Apis,
+  kind: "baseUnitValues" | "booleanValues",
+  topic: string,
+  from: Date,
+  to: Date,
+): Promise<Array<Timeline>> {
+  const url = between(
+    new URL(`/timeseries/${kind}/topics/${inPath(topic)}`, apis.timeseriesUrl),
+    ["startTime", "stopTime"],
+    from,
+    to,
+  )
+  const { series } = await getJson("Timeseries API", url, newestAnswer)
+  return series.map((one) => ({
+    topic: one.topic,
+    unit: one.unit ?? null,
+    samples: one.timestamps
+      .flatMap((timestamp, index) => {
+        const value = one.values[index]
+        return value == null ? [] : [{ at: fromMicroseconds(timestamp), value }]
+      })
+      .sort((a, b) => a.at.localeCompare(b.at)),
+  }))
+}
+
+/** How often each kind of alert was raised between the two instants, and how long it stood in total. */
+export type MessageStat = { notificationId: string; title: string; level: NotificationLevel; count: number; seconds: number }
+
+/** An alert as `/alerts/pairs` gives it, as far as the statistics need it. */
+type AlertPair = { errorCode?: string | null; message?: string | null; severity?: Severity | null; raisedAt: string; clearedAt: string | null }
+
+/**
+ * The alerts by kind, the kind being their error code, or their text where they have none: how often
+ * each was raised, and how long it stood inside the range. Most often first, then longest.
+ */
+export function messageStatsOf(pairs: ReadonlyArray<AlertPair>, from: Date, to: Date): Array<MessageStat> {
+  const kinds = new Map<string, MessageStat>()
+  for (const pair of pairs) {
+    const id = pair.errorCode || pair.message || "?"
+    const kind = kinds.get(id) ?? { notificationId: id, title: pair.message || id, level: levelOf(pair.severity), count: 0, seconds: 0 }
+    const start = Math.max(Date.parse(pair.raisedAt), from.getTime())
+    const end = Math.min(pair.clearedAt === null ? to.getTime() : Date.parse(pair.clearedAt), to.getTime())
+    kind.count += 1
+    kind.seconds += Math.max(0, end - start) / 1000
+    if (pair.severity === "Failure") kind.level = "Error"
+    kinds.set(id, kind)
+  }
+  return [...kinds.values()].sort((a, b) => b.count - a.count || b.seconds - a.seconds)
+}
+
+/** The alerts by kind, for one machine or for all, between the two instants. */
 export async function readMessageStats(apis: Apis, from: Date, to: Date, machine?: string): Promise<Array<MessageStat>> {
-  const url = between(new URL("/notificationEvents/statistics/messages", apis.eventsUrl), ["from", "to"], from, to)
-  if (machine !== undefined) url.searchParams.set("mId", machine)
-  const items = await getJson("Events API", url, messageStatsAnswer)
-  return items.map((one) => ({
-    notificationId: one.notificationId,
-    title: one.title ?? one.notificationId,
-    level: one.level,
-    count: one.occurrenceCount,
-    seconds: secondsOfTimeSpan(one.totalDuration),
-  }))
+  return messageStatsOf(await readAlertPairs(apis, from, to, machine), from, to)
 }
 
 /** The oldest and the newest number of a topic between the two instants, or null if it has none. */

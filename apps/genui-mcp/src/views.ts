@@ -12,18 +12,21 @@ import { secondsBefore } from "./time.ts"
 const DEFAULT_HOURS = 24
 
 /** The topic of the energy a machine took from the grid since it was built: a counter in joule. */
+/** The categories of NE 107 that are warnings, not failures. */
+const WARNINGS = ["CheckFunction", "OffSpec", "MaintenanceRequired"] as const
+
 const energyTopic = (machine: string) => `machines/${machine}/umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp`
 
 const measures: Record<Measure, { label: string; unit: Unit; source: string }> = {
   errors: {
     label: "Errors",
     unit: "count",
-    source: "Events API: the errors raised, machines/{SerialNumber}/events/notifications",
+    source: "Events API: the failures raised, /alerts/pairs",
   },
   warnings: {
     label: "Warnings",
     unit: "count",
-    source: "Events API: the warnings raised, machines/{SerialNumber}/events/notifications",
+    source: "Events API: the other alerts raised, /alerts/pairs",
   },
   "running-share": {
     label: "Running",
@@ -45,9 +48,11 @@ async function amountOf(apis: Apis, measure: Measure, machine: string, hours: nu
   const from = secondsBefore(now, hours * 3600)
   switch (measure) {
     case "errors":
-      return { value: (await readRaised(apis, "Error", machine, from, now)).length, of: 1 }
+      return { value: (await readRaised(apis, "Failure", machine, from, now)).length, of: 1 }
     case "warnings":
-      return { value: (await readRaised(apis, "Warning", machine, from, now)).length, of: 1 }
+      // Every category of NE 107 but a failure is a warning (levelOf in apis.ts).
+      const counts = await Promise.all(WARNINGS.map(async (severity) => (await readRaised(apis, severity, machine, from, now)).length))
+      return { value: counts.reduce((sum, one) => sum + one, 0), of: 1 }
     case "running-share": {
       // The share of the time the machine gave data: while it was silent, nobody knows whether it ran.
       const { history } = await showMachine(apis, machine, hours, now)
@@ -108,17 +113,14 @@ async function blockOf(apis: Apis, request: BlockRequest, machines: ReadonlyArra
     case "causes": {
       const hours = request.hours ?? DEFAULT_HOURS
       const stats = await readMessageStats(apis, secondsBefore(now, hours * 3600), now, request.machine)
-      const items = stats
-        .flatMap((one) => (one.level === "Warning" || one.level === "Error" ? [{ title: one.title, level: one.level as "Warning" | "Error", count: one.count, seconds: one.seconds }] : []))
-        .sort((a, b) => b.count - a.count || b.seconds - a.seconds)
-        .slice(0, 5)
+      const items = stats.slice(0, 5).map(({ title, level, count, seconds }) => ({ title, level, count, seconds }))
       return {
         type: "causes",
         title: request.title ?? `Most frequent faults${request.machine ? ` · ${request.machine}` : ""}`,
         machine: request.machine ?? null,
         items,
         ...spanOf(hours, now),
-        source: "Events API: /notificationEvents/statistics/messages",
+        source: "Events API: /alerts/pairs, counted by error code",
       }
     }
     case "hall": {

@@ -15,9 +15,14 @@
 @import "@pleiades/ui/globals.css";
 @source "../../../packages/ui/src";
 @import "@pleiades/cards/styles.css";
+/* The brands the switch at the top of the sidebar offers: each a block of tokens over the theme. */
+@import "@pleiades/ui/brands.css";
 
-/* The font is this application's own. */
-@theme inline {
+/*
+ * The font is this application's own. Not "inline", so that a class asks for the variable and a
+ * brand that sets --font-sans changes the font.
+ */
+@theme {
     --font-sans: 'Roboto Variable', sans-serif;
 }
 

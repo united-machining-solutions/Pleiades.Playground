@@ -24,6 +24,7 @@ missing.
 | A screen people open, made of answers that exist | [`create-page`](../.claude/skills/create-page/SKILL.md) |
 | An answer that does not exist yet, to data that does | [`create-card`](../.claude/skills/create-card/SKILL.md) |
 | Data the stack does not have yet | [`add-source`](../.claude/skills/add-source/SKILL.md) |
+| The look of your own brand: colours, corners, font, logo | [`add-brand`](../.claude/skills/add-brand/SKILL.md) |
 | The data in an agent you already use | Nothing to build: [`contracts/mcp`](../contracts/mcp/README.md) |
 
 Which language model answers in the chat is a setting, also for a model on your own computer:

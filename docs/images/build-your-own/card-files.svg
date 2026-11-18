@@ -75,7 +75,7 @@
 
     <rect x="526" y="336" width="418" height="132" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
     <text x="538" y="360" font-size="13" font-weight="600" fill="#111827">Your card in the chat</text>
-    <text x="932" y="360" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">src/&lt;name&gt;/chat.tsx</text>
+    <text x="932" y="360" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">src/cards/&lt;name&gt;/chat.tsx</text>
     <text x="538" y="384">what a call of each tool is called in the chat</text>
     <text x="538" y="402">what the chat draws for a result: your component</text>
     <text x="538" y="420">which of its tools only a card calls,</text>
@@ -83,7 +83,7 @@
 
     <rect x="526" y="484" width="418" height="56" rx="8" fill="#ffffff" stroke="#d1d5db" stroke-dasharray="5 4"/>
     <text x="538" y="508" font-size="13" font-weight="600" fill="#111827">Next to it, where needed</text>
-    <text x="932" y="508" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">src/&lt;name&gt;/</text>
+    <text x="932" y="508" text-anchor="end" font-family="ui-monospace, Consolas, monospace" fill="#374151">src/cards/&lt;name&gt;/</text>
     <text x="538" y="528">checks a result against its contract, or fetches a series</text>
 
     <!-- Below both: the catalogue. -->

@@ -1,24 +1,28 @@
 import { defineChatMiddleware } from "@tanstack/ai"
 import type { AnyTextAdapter } from "@tanstack/ai"
-import { createAnthropicChat } from "@tanstack/ai-anthropic"
 import { createHarnessHost, defineHarness, definePlugin } from "@tanstack/ai-harness"
 import { createHarnessHandler } from "@tanstack/ai-harness/server"
 import { mcp } from "@tanstack/ai-mcp/harness"
-import { createOpenaiChat } from "@tanstack/ai-openai"
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
 
 import { chatTools } from "./cards.tsx"
+import { chatSettings } from "./gateway.ts"
+import type { ChatSettings } from "./gateway.ts"
 import { withTimeZone } from "./local-times.ts"
-import { modelNames, modelSettings } from "./models.ts"
+import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
+import { leftOut, mcpServers, serverSwitch } from "./mcp-servers.ts"
 import { forModel } from "./tool-results.ts"
 
 // The agent harness of the app. It runs on the server only: the keys of the language models stay
 // here, and the browser talks to /api/harness.
 
 const instructions = `You are Titan, the assistant of a machine shop. People call you with "Hey Titan" and talk to you; your answers are often read aloud, so write the way a calm, competent colleague speaks.
-You help people understand what their machines do. Read values with the tools and never invent one. If the tools do not give a reason, say that none is recorded.
+Read values with the tools and never invent one. If the tools do not give a reason, say that your tools show none.
+If no tool gives what the person asks for, say that your tools do not show it, not that it does not exist: it may be recorded where your tools do not reach.
+Then, where a place fits the question, say in one sentence where to ask: the maker of the machine or its manuals for a fault or a specification, the maintenance records for a service, the people at the machine for what happened there.
+If none fits, say only that your tools do not show it. Name a maker, a person or an address only when a tool result names one, and say nothing about what they will do or know.
 Write an answer in this shape, nothing else around it:
 - First one to three short sentences a person takes in by ear: the answer itself, in plain everyday words, the way you would tell a colleague at the machine. Say what a value means, not only the value: "die Spindel ist zu heiß geworden, deshalb hat die Steuerung die Maschine gestoppt", not "Alarm 2130". When a card is shown, say what the person sees on it, for example "Auf dem Plan ist M-02 rot: sie steht."
 - Then, only when there are details worth keeping, a markdown list, one line for each machine or matter, at most five, in exactly this form: "- **Title** | State in one or two words | What is going on, in one plain sentence | since when". For example: "- **P-07** | Steht | Die Spindel ist zu heiß geworden, die Steuerung hat gestoppt (Alarm 2130). | seit 09:56". The state is one of Läuft, Steht, Warnung, Einrichten, Pause, Keine Daten. Leave the last column empty when there is no time. The list is shown as a table and not read aloud: do not repeat it in the sentences, and write no other table.
@@ -36,16 +40,25 @@ If the stored values cannot answer a question, for example about costs, do not g
 Answer in the language of the question.
 The tools write every time as the clock of the person you answer shows it. Say a time the way a clock does, for example 09:30: take the hours and minutes as they stand in the result, do not convert them, and name no time zone and no offset.`
 
-// The tools of the generative UI backend, under their own names. Created once, shared by all chats.
-const tools = mcp({
-  servers: {
-    genui: {
-      type: "http",
-      url: process.env.GENUI_MCP_URL ?? "http://localhost:5520/mcp",
-      toolName: (tool) => tool.name,
-    },
-  },
+// The tools of the generative UI backend, and of the further servers the settings name, under their own
+// names (mcp-servers.ts). A server that does not answer has no tools until it does; the others work.
+// Created once, shared by all chats.
+const tools = mcp({ servers: mcpServers() })
+
+// A chat switches a further server off and on (the panel "Tools" of the chat). The setting is the chat's,
+// kept by the harness, and it holds here, on the server: before every turn the tools of a server that is
+// off are taken out of what the model gets, and the model is told only about the servers that are on.
+// Which servers there are is read once, here, as it is for the connections above.
+const switches = serverSwitch()
+const switchPlugin = definePlugin({
+  name: "pleiades/server-switch",
+  setup: (ctx) => switches.forChat((key) => ctx.config.get(key)),
 })
+
+// A typing mistake in the setting shows here, once, when the server starts.
+for (const name of leftOut()) {
+  console.warn(`APP_MCP_SERVERS: the entry "${name}" is left out. An entry is name=address, the name in lower case.`)
+}
 
 // A tool that only a card calls is not for the model. The plugin above has no setting for that,
 // so this one takes those tools out of every turn, after the servers listed theirs. Which tools
@@ -66,26 +79,12 @@ const localTimes = defineChatMiddleware({
 })
 
 /**
- * The adapter of one model. Each provider gets its own: Anthropic and OpenAI theirs, any other
- * endpoint the one for chat completions. Where two blocks name the same model, the earlier one
- * has it.
- *
- * The names come from the settings, not from the lists the adapters know. A name a provider does
- * not have fails at the first question, with the provider's own words.
+ * The adapter of one model: OpenAI's chat completions at the endpoint of the settings. The names come
+ * from the settings or from the endpoint's own list. A name the endpoint does not have fails at the
+ * first question, with the endpoint's own words.
  */
-function adapterOf(name: string, { anthropic, openai, compatible }: ModelSettings): AnyTextAdapter {
-  if (anthropic?.models.includes(name)) {
-    return createAnthropicChat(name as Parameters<typeof createAnthropicChat>[0], anthropic.apiKey)
-  }
-  if (openai?.models.includes(name)) {
-    return createOpenaiChat(name as Parameters<typeof createOpenaiChat>[0], openai.apiKey)
-  }
-  return openaiCompatibleText(name, {
-    baseURL: compatible?.baseURL ?? "",
-    apiKey: compatible?.apiKey ?? "",
-    api: "chat-completions",
-    fetch: answeringAtOnce(name),
-  })
+function adapterOf(name: string, { baseURL, apiKey }: ModelSettings): AnyTextAdapter {
+  return openaiCompatibleText(name, { baseURL, apiKey, api: "chat-completions", fetch: answeringAtOnce(name) })
 }
 
 /**
@@ -108,18 +107,27 @@ function answeringAtOnce(name: string): typeof fetch | undefined {
   }
 }
 
-let handler: ((request: Request) => Promise<Response>) | undefined
+type Handler = (request: Request) => Promise<Response>
+
+// The handler and the snapshot of the settings it was built from. A new snapshot comes only where the
+// last one had no models (see gateway.ts), so a handler that serves chats is never replaced.
+let built: { chat: ChatSettings; handler: Handler | null } | undefined
 
 /** The fetch handler of the harness, or null as long as no language model is configured. */
-export function harnessHandler() {
-  if (handler) return handler
-  const settings = modelSettings(process.env)
+export async function harnessHandler(): Promise<Handler | null> {
+  const chat = await chatSettings()
+  // No await between the check and the assignment: requests that wait for the same snapshot share one handler.
+  if (built?.chat !== chat) built = { chat, handler: build(chat.settings) }
+  return built.handler
+}
+
+function build(settings: ModelSettings | undefined): Handler | null {
   const names = modelNames(settings)
   const [first] = names
-  if (first === undefined) return null
+  if (settings === undefined || first === undefined) return null
   // In the order of the settings, which is the order the chat offers them in.
   const models = Object.fromEntries(names.map((name) => [name, adapterOf(name, settings)]))
-  handler = createHarnessHandler({
+  return createHarnessHandler({
     // Chats live in memory: they are gone when the server restarts.
     host: createHarnessHost({ persistence: memoryPersistence() }),
     harness: defineHarness({
@@ -128,14 +136,14 @@ export function harnessHandler() {
       // name. The harness keeps that choice with the chat.
       adapter: models[first],
       models,
-      // Of a chat's settings the browser may change the model, and nothing else.
-      expose: { settings: ["model"] },
+      // Of a chat's settings the browser may change the model and switch a further server off and
+      // on, and nothing else.
+      expose: { settings: ["model"], config: switches.exposed },
       middleware: [localTimes],
       systemPrompts: [instructions],
-      plugins: () => [tools, modelTools],
+      plugins: () => [tools, switchPlugin, modelTools],
     }),
     // The demo has no sign-in: every request runs without a user.
     openAccess: true,
   })
-  return handler
 }

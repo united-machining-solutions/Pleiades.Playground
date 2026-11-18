@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { instant, serialNumber, state } from "../machine/contract.ts"
+import { instant, machineId, state } from "../machine/contract.ts"
 
 // The contract of the shop floor card: the hall with every machine at its place, whether it runs,
 // and for each one that does not, why. The backend decides all of it, from the list of machines and
@@ -27,7 +27,7 @@ export type Place = z.infer<typeof place>
 
 /** One machine in the hall. */
 export const station = z.object({
-  machine: serialNumber.describe("The serial number of the machine."),
+  machine: machineId.describe("The machine id."),
   state,
   running: z.boolean().describe("True if the machine runs a program now (state `running`)."),
   reason: reason.nullable().describe("Why the machine does not run. Null for a machine that runs."),

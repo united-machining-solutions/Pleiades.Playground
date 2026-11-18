@@ -7,14 +7,16 @@ import { Card } from "@pleiades/ui/components/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { ItemGroup, ItemSeparator } from "@pleiades/ui/components/item"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, useRouter } from "@tanstack/react-router"
 import { ClipboardListIcon, FactoryIcon } from "lucide-react"
-import { Fragment } from "react"
+import { Fragment, useEffect } from "react"
 import type { ReactNode } from "react"
 
 import { useChatPanel } from "@/chat/ask.ts"
 import { NoAnswer } from "@/components/no-answer.tsx"
-import { useLive } from "@/hooks/use-live.ts"
+import { useLive, useRetry } from "@/hooks/use-live.ts"
+import type { Live } from "@/hooks/use-live.ts"
+import { listAt, listWith, machineFilters } from "@/live/machines.ts"
 import { getMachines, getShopfloor } from "@/machines/get-machines.ts"
 import { MachineRow } from "@/machines/machine-item.tsx"
 
@@ -23,6 +25,16 @@ import { MachineRow } from "@/machines/machine-item.tsx"
  * the shop floor card and the machines with their state, program, open warnings and errors, in the
  * order the backend returns them. The page asks and draws; it computes nothing.
  */
+/** The machines are read once, from the backend; then every value comes from the broker. */
+const live: Live<MachineList | null> = {
+  filters: machineFilters(),
+  message: (values, topic, payload, now) => values && listWith(values, topic, payload, now),
+  at: (values, now) => values && listAt(values, now),
+}
+
+/** How often the plan of the hall is read again. */
+const PLAN_MS = 10_000
+
 export const Route = createFileRoute("/lagebild")({
   staticData: { nav: { title: "Lagebild", icon: ClipboardListIcon } },
   // Each answer on its own: if one is missing, the other still stands, and the page keeps trying.
@@ -40,9 +52,17 @@ export const Route = createFileRoute("/lagebild")({
 function Lagebild() {
   const { shopfloor, machines } = Route.useLoaderData()
   const { ask } = useChatPanel()
-  useLive()
+  // The machines stay live from the broker, as on Home. The plan of the hall is computed by the
+  // backend, so it is read again every few seconds.
+  const { values: list } = useLive(machines.values, live)
+  useRetry(machines.values === null)
+  const router = useRouter()
+  useEffect(() => {
+    const timer = setInterval(() => void router.invalidate(), PLAN_MS)
+    return () => clearInterval(timer)
+  }, [router])
 
-  const asOf = machines.values?.asOf ?? shopfloor.values?.asOf
+  const asOf = list?.asOf ?? shopfloor.values?.asOf
   return (
     <Page line={asOf ? `live · Stand ${clock(asOf)}` : undefined}>
       <section className="flex flex-col gap-2.5">
@@ -52,11 +72,11 @@ function Lagebild() {
       <section className="flex flex-col gap-2.5">
         <h2 className="flex items-center gap-2 font-medium">
           Maschinen
-          {machines.values && <Badge variant="secondary">{machines.values.machines.length}</Badge>}
+          {list && <Badge variant="secondary">{list.machines.length}</Badge>}
         </h2>
-        {machines.values === null ? (
-          <NoAnswer error={machines.error} />
-        ) : machines.values.machines.length === 0 ? (
+        {list === null ? (
+          <NoAnswer error={machines.error ?? ""} />
+        ) : list.machines.length === 0 ? (
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -67,7 +87,7 @@ function Lagebild() {
             </EmptyHeader>
           </Empty>
         ) : (
-          <Machines values={machines.values} onAsk={ask} />
+          <Machines values={list} onAsk={ask} />
         )}
       </section>
     </Page>

@@ -28,7 +28,7 @@ claude mcp add --transport http pleiades-events http://localhost:5510/mcp
 claude mcp add --transport http pleiades-genui http://localhost:5520/mcp
 ```
 
-The agent can then answer questions from the data, for example "which notifications did machine P-04 raise in
+The agent can then answer questions from the data, for example "which alerts did the machine AX-400 P-04 raise in
 the last hour, and what did the spindle do at that time?". The tools are listed in
 [`contracts/mcp`](../contracts/mcp/README.md).
 
@@ -54,7 +54,8 @@ smallest thing that shows it. On your yes it builds on a branch of your own and 
 
 Four skills under `.claude/skills/` do this, and Claude Code loads them by itself: `build-your-own` finds the
 step where the idea starts, and `create-page`, `create-card` and `add-source` are the recipes of the steps.
-A fifth, `setup`, gets a computer ready first.
+A fifth, `setup`, gets a computer ready first. A sixth, `add-brand`, puts the look of a brand of your own on
+the user interface: its colours, its corners, its font and its logo.
 Each names the files it touches and the checks that say it is done. Before it writes code, a recipe loads the
 skills of the libraries: the one of shadcn/ui above, and those the TanStack packages ship, in the versions the
 workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your-own.md).
@@ -75,9 +76,9 @@ workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your
 - Every commit is signed off (`git commit -s`). The sign-off is yours: you certify the
   [DCO](../CONTRIBUTING.md#sign-your-work-dco) for the change, also when an agent wrote it.
 - A commit an agent wrote carries a `Co-Authored-By` trailer that names the agent.
-- The agent opens the pull request with `gh pr create` and fills in the template, including the line
-  "Not verified".
-- Commit, push and pull request happen only when you ask for them.
+- The agent opens the pull request with `gh pr create`: it brings the branch up to date with `main`, pushes
+  it and fills in the template from what it did and checked, including the line "Not verified".
+- Commit, push and pull request happen only when you say yes. The agent may offer them.
 
 ## Useful requests
 
@@ -86,16 +87,16 @@ workspace pins (`pnpm exec intent list`). The map is [Build your own](build-your
 | A tour of the demo | "Give me a tour." The agent walks you through the [tour](tour.md) stop by stop, in your running stack. It offers the tour itself when a session begins without a task. |
 | Something of your own in the demo | `/build-your-own`, or "I would like to see which machine stood still the longest." The agent finds out whether that is a page, a card or a source, and builds it. |
 | To see the demo | "Start the stack and show me what the simulator publishes for one machine." |
-| A new value | "Add the topic `…` to the simulator and to the MQTT binding, with its SI unit." |
+| A new value | "Add the topic `…` to the simulator and to the MQTT binding, with its unit." |
+| To share what you built | "Open a pull request." |
 | To know why a check is red | "Why is pull request 12 red?" The agent reads `gh pr checks` and `gh run view --log-failed`. |
 | A review before you ask a person | "Review the diff of this branch against `main` for correctness." |
 | A decision recorded | "Write an ADR for this decision." |
 
 ## What stays with you
 
-- Secrets. The demo needs none. The chat in the example app needs the key of a language model, in `.env`:
-  `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `LLM_API_KEY` for any other endpoint
-  ([Language models](../apps/app/README.md#language-models)). You set it yourself, and its value stays out of
+- Secrets. The demo needs none. The chat in the example app needs the key of its LiteLLM gateway, in `.env`:
+  `LLM_API_KEY` ([Language models](../apps/app/README.md#language-models)). You set it yourself, and its value stays out of
   prompts, commits and logs.
 - Publishing: merging, releasing, changing repository settings.
 - The judgement whether a change is right. The agent is fast, and it can be wrong with confidence.

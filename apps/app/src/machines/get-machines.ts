@@ -1,10 +1,11 @@
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
+import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import type { ShopfloorShow } from "@pleiades/cards/shopfloor/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
-import { SPAN_LIST_TOOL } from "./card-tools.ts"
+import { MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL } from "./card-tools.ts"
 
 // The values come from the generative UI backend. These functions run on the server of the app:
 // the browser never talks to the backend itself.
@@ -45,7 +46,7 @@ async function ask<TValues>(
  * Why a request got no answer. The client and `fetch` each wrap what the network said, for example
  * ECONNREFUSED, in an error of their own: the innermost cause is the reason.
  */
-function reasonOf(error: unknown): string {
+export function reasonOf(error: unknown): string {
   let innermost = error
   while (innermost instanceof Error && innermost.cause !== undefined) innermost = innermost.cause
   const { code, message } = (innermost ?? {}) as { code?: unknown; message?: unknown }
@@ -53,7 +54,7 @@ function reasonOf(error: unknown): string {
 }
 
 /** What a tool wrote as text, which is where it says why it failed. */
-function textOf(result: unknown): string | undefined {
+export function textOf(result: unknown): string | undefined {
   const { content } = result as { content?: unknown }
   if (!Array.isArray(content)) return undefined
   const texts = content.flatMap((part: { type?: unknown; text?: unknown }) =>
@@ -62,13 +63,62 @@ function textOf(result: unknown): string | undefined {
   return texts[0]
 }
 
+/** What every machine does now, for code on the server. The browser asks with `getMachines`. */
+export function listMachines(): Promise<Answer<MachineList>> {
+  return ask(async (backend) => {
+    const result = await backend.callTool("genui_machine_list", {})
+    if (result.isError || !result.structuredContent) {
+      throw new Refused(textOf(result) ?? "genui_machine_list returned no values.")
+    }
+    return result.structuredContent
+  })
+}
+
 /** What every machine does now. */
-export const getMachines = createServerFn({ method: "GET" }).handler(
-  (): Promise<Answer<MachineList>> =>
+export const getMachines = createServerFn({ method: "GET" }).handler(() => listMachines())
+
+/**
+ * One machine, and how long each state lasted over the last hours: the values of the machine card.
+ * Without `hours` the backend says how far back the history goes.
+ */
+export const getMachine = createServerFn({ method: "GET" })
+  .validator((request: { machine: string; hours?: number }) => request)
+  .handler(
+    ({ data: { machine, hours } }): Promise<Answer<MachineShow>> =>
+      ask(async (backend) => {
+        const input = hours === undefined ? { machine } : { machine, hours }
+        const result = await backend.callTool("genui_machine_show", input)
+        if (result.isError || !result.structuredContent) {
+          throw new Refused(textOf(result) ?? "genui_machine_show returned no values.")
+        }
+        return result.structuredContent
+      }),
+  )
+
+/** The newest physical values of every machine: the values of the measurement cards. */
+export const getMeasurements = createServerFn({ method: "GET" }).handler(
+  (): Promise<Answer<MeasurementList>> =>
     ask(async (backend) => {
-      const result = await backend.callTool("genui_machine_list", {})
+      const result = await backend.callTool("genui_measurement_list", {})
       if (result.isError || !result.structuredContent) {
-        throw new Refused(textOf(result) ?? "genui_machine_list returned no values.")
+        throw new Refused(textOf(result) ?? "genui_measurement_list returned no values.")
+      }
+      return result.structuredContent
+    }),
+)
+
+/**
+ * The values of every quantity over the last minutes, a line for each machine: what the graphs of
+ * the measurements draw. They are not among the values of the list, because a language model reads
+ * those.
+ */
+export const getMeasurementSeries = createServerFn({ method: "GET" }).handler(
+  (): Promise<Answer<MeasurementSeries>> =>
+    ask(async (backend) => {
+      // The name is checked against the tools of the backend: if it changes there, this fails to compile.
+      const result = await backend.callTool(MEASUREMENT_SERIES_TOOL, {})
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? `${MEASUREMENT_SERIES_TOOL} returned no values.`)
       }
       return result.structuredContent
     }),
@@ -86,17 +136,41 @@ export const getShopfloor = createServerFn({ method: "GET" }).handler(
     }),
 )
 
-/** One machine, and how long each state lasted over the last hours: the values of the machine card. */
-export const getMachine = createServerFn({ method: "GET" })
-  .validator((machine: string) => machine)
+/** The values of the page Charts: each machine with the sums of its last hours, and its recent spans. */
+export type Charts = {
+  asOf: string
+  machines: Array<{ show: MachineShow; from: string; spans: Array<Span> | null }>
+}
+
+/**
+ * Everything the page Charts draws, over one connection: the list, then for each machine its values
+ * and its spans of the last `recent` milliseconds only, not of all its hours. A machine without
+ * values is left out; one without spans keeps its sums.
+ */
+export const getCharts = createServerFn({ method: "GET" })
+  .validator((recent: number) => recent)
   .handler(
-    ({ data: machine }): Promise<Answer<MachineShow>> =>
+    ({ data: recent }): Promise<Answer<Charts>> =>
       ask(async (backend) => {
-        const result = await backend.callTool("genui_machine_show", { machine })
-        if (result.isError || !result.structuredContent) {
-          throw new Refused(textOf(result) ?? "genui_machine_show returned no values.")
+        const list = await backend.callTool("genui_machine_list", {})
+        if (list.isError || !list.structuredContent) {
+          throw new Refused(textOf(list) ?? "genui_machine_list returned no values.")
         }
-        return result.structuredContent
+        const machines = await Promise.all(
+          list.structuredContent.machines.map(async ({ machine }) => {
+            const show = await backend.callTool("genui_machine_show", { machine })
+            if (show.isError || !show.structuredContent) return null
+            const { history } = show.structuredContent
+            const from = new Date(Math.max(Date.parse(history.from), Date.parse(history.to) - recent)).toISOString()
+            const spans = await backend.callTool(SPAN_LIST_TOOL, { machine, from, to: history.to })
+            return {
+              show: show.structuredContent,
+              from,
+              spans: spans.isError || !spans.structuredContent ? null : spans.structuredContent.spans,
+            }
+          }),
+        )
+        return { asOf: list.structuredContent.asOf, machines: machines.filter((one) => one !== null) }
       }),
   )
 

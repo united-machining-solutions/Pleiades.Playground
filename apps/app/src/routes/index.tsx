@@ -1,5 +1,4 @@
-import type { State } from "@pleiades/cards/machine/contract.ts"
-import { clock } from "@pleiades/cards/machine/format.ts"
+import type { MachineList, State } from "@pleiades/cards/machine/contract.ts"
 import { stateOf } from "@pleiades/cards/machine/state.ts"
 import { Badge } from "@pleiades/ui/components/badge"
 import { Card } from "@pleiades/ui/components/card"
@@ -13,9 +12,18 @@ import { useChatPanel } from "@/chat/ask.ts"
 import { NoAnswer } from "@/components/no-answer.tsx"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { ItemGroup, ItemSeparator } from "@pleiades/ui/components/item"
-import { useLive } from "@/hooks/use-live.ts"
+import { liveness, useLive, useRetry } from "@/hooks/use-live.ts"
+import type { Live } from "@/hooks/use-live.ts"
+import { listAt, listWith, machineFilters } from "@/live/machines.ts"
 import { getMachines } from "@/machines/get-machines.ts"
 import { MachineRow, MachineTile } from "@/machines/machine-item.tsx"
+
+/** The list is read once, from the backend; then every value of every machine comes from the broker. */
+const live: Live<MachineList | null> = {
+  filters: machineFilters(),
+  message: (list, topic, payload, now) => list && listWith(list, topic, payload, now),
+  at: (list, now) => list && listAt(list, now),
+}
 
 /** Home asks "what needs you?": first the machines that do, then the rest. */
 const groups: ReadonlyArray<{ title: string; states: ReadonlyArray<State> }> = [
@@ -37,17 +45,18 @@ export const Route = createFileRoute("/")({
 function Home() {
   const answer = Route.useLoaderData()
   const { ask } = useChatPanel()
-  useLive()
+  const { values: list, connected } = useLive(answer.values, live)
+  useRetry(answer.values === null)
 
-  if (answer.values === null) {
+  if (answer.values === null || list === null) {
     return (
       <Page>
-        <NoAnswer error={answer.error} />
+        <NoAnswer error={answer.error ?? ""} />
       </Page>
     )
   }
 
-  const { asOf, machines } = answer.values
+  const { asOf, machines } = list
   if (machines.length === 0) {
     return (
       <Page>
@@ -66,7 +75,7 @@ function Home() {
 
   const shown = machines.map((machine) => ({ machine, state: stateOf(machine, asOf) }))
   return (
-    <Page line={`${machines.length} ${machines.length === 1 ? "machine" : "machines"} · live · now ${clock(asOf)}`}>
+    <Page line={`${machines.length} ${machines.length === 1 ? "machine" : "machines"} · ${liveness(connected, asOf)}`}>
       {groups.map(({ title, states }) => {
         const members = states.flatMap((state) => shown.filter((one) => one.state === state))
         // "Needs you" is the question of this page, so it also says when the answer is "nothing".

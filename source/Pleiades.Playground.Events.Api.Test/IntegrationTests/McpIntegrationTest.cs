@@ -4,9 +4,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Client;
-using Pleiades.Playground.Events.Api.Repositories.NotificationEvent;
+using Pleiades.Playground.Events.Api.Repositories.MachineEvent;
 using Pleiades.Playground.Common.Pagination;
-using Pleiades.Playground.Common.DataTransferObjects;
 
 namespace Pleiades.Playground.Events.Api.Test.IntegrationTests;
 
@@ -38,11 +37,13 @@ public class McpIntegrationTest : IntegrationTestBase
     [
         "events_describe_server",
         "events_get_skill_guide",
-        "events_notification_query",
-        "events_notification_pairs",
-        "events_notification_level_distribution",
-        "events_notification_time_buckets",
-        "events_notification_message_stats"
+        "events_machine_events_query",
+        "events_sequence_gaps_query",
+        "events_active_alerts_query",
+        "events_alert_pairs_query",
+        "events_alert_statistics_query",
+        "events_job_orders_query",
+        "events_program_executions_query"
     ];
 
     [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "The created disposables are transferred to McpClient and McpClientScope for the test lifetime.")]
@@ -139,7 +140,7 @@ public class McpIntegrationTest : IntegrationTestBase
 
         var result = await scope.Client.CallToolAsync(
             "events_get_skill_guide",
-            new Dictionary<string, object?> { ["topic"] = "notification" },
+            new Dictionary<string, object?> { ["topic"] = "alerts" },
             cancellationToken: TestContext.CancellationToken);
 
         Assert.IsNotNull(result);
@@ -147,7 +148,7 @@ public class McpIntegrationTest : IntegrationTestBase
 
         var content = GetTextContent(result);
         Assert.Contains("Pleiades Events API", content, StringComparison.Ordinal);
-        Assert.Contains("events_notification_query", content, StringComparison.Ordinal);
+        Assert.Contains("events_active_alerts_query", content, StringComparison.Ordinal);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -155,50 +156,44 @@ public class McpIntegrationTest : IntegrationTestBase
     // ═══════════════════════════════════════════════════════════════
 
     [TestMethod]
-    public async Task CallTool_NotificationQuery_ReturnsPagedResult()
+    [DataRow("events_machine_events_query")]
+    [DataRow("events_active_alerts_query")]
+    [DataRow("events_alert_pairs_query")]
+    [DataRow("events_job_orders_query")]
+    [DataRow("events_program_executions_query")]
+    public async Task CallTool_PagedViews_ReturnPagedResults(string tool)
     {
         await using var scope = await CreateMcpClientAsync(TestContext.CancellationToken);
 
         var result = await scope.Client.CallToolAsync(
-            "events_notification_query",
-            new Dictionary<string, object?>
-            {
-                ["level"] = "Warning",
-                ["take"] = 10
-            },
+            tool,
+            new Dictionary<string, object?> { ["mId"] = MachineEventSamples.MachineId, ["take"] = 10 },
             cancellationToken: TestContext.CancellationToken);
 
-        Assert.IsNotNull(result);
         Assert.AreNotEqual(true, result.IsError, $"Tool returned error: {GetTextContent(result)}");
-
-        var json = GetTextContent(result);
-        Assert.IsNotNull(json);
-
-        using var doc = JsonDocument.Parse(json);
-        Assert.IsTrue(doc.RootElement.TryGetProperty("items", out _), "Response missing 'items' property");
+        using var doc = JsonDocument.Parse(GetTextContent(result) ?? string.Empty);
+        Assert.IsTrue(doc.RootElement.TryGetProperty("items", out var items), "Response missing 'items' property");
         Assert.IsTrue(doc.RootElement.TryGetProperty("totalCount", out _), "Response missing 'totalCount' property");
+        if (!Containerized)
+        {
+            Assert.IsGreaterThan(0, items.GetArrayLength(), $"{tool} answers from the events");
+        }
     }
 
     [TestMethod]
-    public async Task CallTool_NotificationLevelDistribution_ReturnsList()
+    [DataRow("events_alert_statistics_query")]
+    [DataRow("events_sequence_gaps_query")]
+    public async Task CallTool_Lists_ReturnArrays(string tool)
     {
         await using var scope = await CreateMcpClientAsync(TestContext.CancellationToken);
 
         var result = await scope.Client.CallToolAsync(
-            "events_notification_level_distribution",
-            new Dictionary<string, object?>
-            {
-                ["mId"] = "9000-0000"
-            },
+            tool,
+            new Dictionary<string, object?> { ["mId"] = MachineEventSamples.MachineId },
             cancellationToken: TestContext.CancellationToken);
 
-        Assert.IsNotNull(result);
         Assert.AreNotEqual(true, result.IsError, $"Tool returned error: {GetTextContent(result)}");
-
-        var json = GetTextContent(result);
-        Assert.IsNotNull(json);
-
-        using var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(GetTextContent(result));
         Assert.AreEqual(JsonValueKind.Array, doc.RootElement.ValueKind, "Expected array response");
     }
 
@@ -267,19 +262,18 @@ public class McpIntegrationTest : IntegrationTestBase
     [TestMethod]
     public async Task CallTool_InvalidFilterValue_IsAToolErrorNamingTheAllowedValues()
     {
-        // With Enum.TryParse(...) ? value : null an invalid level would silently drop the filter and the
-        // tool would answer with unfiltered data. REST answers 400 for the same input.
+        // An invalid severity that silently dropped the filter would answer with unfiltered data.
         await using var scope = await CreateMcpClientAsync(TestContext.CancellationToken);
 
         var result = await scope.Client.CallToolAsync(
-            "events_notification_query",
-            new Dictionary<string, object?> { ["level"] = "Severe" },
+            "events_alert_pairs_query",
+            new Dictionary<string, object?> { ["severity"] = "Severe" },
             cancellationToken: TestContext.CancellationToken);
 
-        Assert.IsTrue(result.IsError, "An invalid level must be refused, not ignored.");
+        Assert.IsTrue(result.IsError, "An invalid severity must be refused, not ignored.");
         var text = GetTextContent(result);
-        Assert.Contains("Invalid level 'Severe'", text, StringComparison.Ordinal);
-        Assert.Contains("Warning", text, StringComparison.Ordinal);
+        Assert.Contains("Invalid severity 'Severe'", text, StringComparison.Ordinal);
+        Assert.Contains("MaintenanceRequired", text, StringComparison.Ordinal);
     }
 
     [TestMethod]
@@ -288,7 +282,7 @@ public class McpIntegrationTest : IntegrationTestBase
         await using var scope = await CreateMcpClientAsync(TestContext.CancellationToken);
 
         var result = await scope.Client.CallToolAsync(
-            "events_notification_query",
+            "events_machine_events_query",
             new Dictionary<string, object?> { ["sortDirection"] = "Newest" },
             cancellationToken: TestContext.CancellationToken);
 
@@ -297,19 +291,17 @@ public class McpIntegrationTest : IntegrationTestBase
     }
 
     [TestMethod]
-    public async Task CallTool_InvalidBucketSize_KeepsItsFormatHelp()
+    public async Task CallTool_InvalidGroup_NamesTheGroups()
     {
-        // An ArgumentException would not do: the SDK replaces its message with a generic one, so the
-        // format help would never reach the caller.
         await using var scope = await CreateMcpClientAsync(TestContext.CancellationToken);
 
         var result = await scope.Client.CallToolAsync(
-            "events_notification_time_buckets",
-            new Dictionary<string, object?> { ["mId"] = "9000-0000", ["bucketSize"] = "2w" },
+            "events_sequence_gaps_query",
+            new Dictionary<string, object?> { ["group"] = "Production" },
             cancellationToken: TestContext.CancellationToken);
 
         Assert.IsTrue(result.IsError);
-        Assert.Contains("Supported formats", GetTextContent(result), StringComparison.Ordinal);
+        Assert.Contains("JobMonitoring, WorkMasterMonitoring, Notification", GetTextContent(result), StringComparison.Ordinal);
     }
 
     [TestMethod]
@@ -320,7 +312,7 @@ public class McpIntegrationTest : IntegrationTestBase
         await using var scope = await CreateMcpClientAsync(TestContext.CancellationToken);
 
         var result = await scope.Client.CallToolAsync(
-            "events_notification_query",
+            "events_machine_events_query",
             new Dictionary<string, object?> { ["take"] = 500 },
             cancellationToken: TestContext.CancellationToken);
 
@@ -342,32 +334,15 @@ public class McpIntegrationTest : IntegrationTestBase
 
     private static void MockRepositories(IServiceCollection services)
     {
-        // Mock NotificationEventRepository
-        var notificationMock = new Mock<INotificationEventRepository>();
-        notificationMock.Setup(r => r.QueryEventsWithPaginationAsync(
-                It.IsAny<string?>(), It.IsAny<Pleiades.Playground.Notification.DataTransferObjects.NotificationAction?>(),
-                It.IsAny<string?>(), It.IsAny<EventLevel?>(),
-                It.IsAny<DateTime?>(), It.IsAny<DateTime?>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(([], 0L));
-        notificationMock.Setup(r => r.QueryPairedEventsWithPaginationAsync(
-                It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<EventLevel?>(),
-                It.IsAny<DateTime?>(), It.IsAny<DateTime?>(),
-                It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(([], 0L));
-        notificationMock.Setup(r => r.GetLevelDistributionAsync(
-                It.IsAny<string?>(), It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
-        notificationMock.Setup(r => r.GetTimeBucketsAsync(
-                It.IsAny<string?>(), It.IsAny<EventLevel?>(),
-                It.IsAny<DateTime?>(), It.IsAny<DateTime?>(),
-                It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
-        notificationMock.Setup(r => r.GetMessageStatisticsAsync(
-                It.IsAny<string?>(), It.IsAny<EventLevel?>(),
-                It.IsAny<DateTime?>(), It.IsAny<DateTime?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync([]);
-        ReplaceService(services, notificationMock.Object);
+        // The repository of the CloudEvents: one shift of one machine.
+        var stored = MachineEventSamples.StoredShift();
+        var repository = new Mock<IMachineEventRepository>();
+        repository.Setup(r => r.QueryAsync(
+                It.IsAny<MachineEventFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((stored, stored.Count));
+        repository.Setup(r => r.FindForViewAsync(It.IsAny<MachineEventFilter>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((MachineEventFilter f, CancellationToken _) => [.. stored.Where(e => f.Group is null || e.Group == f.Group)]);
+        ReplaceService(services, repository.Object);
     }
 
     private static void ReplaceService<T>(IServiceCollection services, T implementation) where T : class

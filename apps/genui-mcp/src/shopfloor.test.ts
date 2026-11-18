@@ -12,15 +12,17 @@ function reading(value: string, topic: string, changes: Partial<Reading> = {}): 
   return { value, at: justNow, since: "2026-11-16T10:00:00.000+01:00", sinceIsLowerBound: false, topic, ...changes }
 }
 
-function machine(serial: string, changes: Partial<Machine> = {}): Machine {
-  const base = `machines/${serial}/umati`
+function machine(id: string, changes: Partial<Machine> = {}): Machine {
+  const base = `machines/${id}/umati`
   return {
-    machine: serial,
-    connection: reading("Connected", `${base}/Connection/State`),
+    machine: id,
+    identity: { manufacturer: "TRUMPF", model: "TruMill", serialNumber: id },
+    connection: reading("Running", `${base}/Connection/State`),
     heartbeat: reading("1", `${base}/Connection/Heartbeat`),
     itemState: reading("Executing", `${base}/State/MachineryItemState`),
     operationMode: reading("Processing", `${base}/State/MachineryOperationMode`),
     program: reading("HOUSING_0815.MPF", `${base}/Production/ActiveProgram`),
+    jobOrder: null,
     lastValueAt: justNow,
     notifications: [],
     ...changes,
@@ -32,10 +34,11 @@ const place = { x: 1, y: 2, width: 3, depth: 4 }
 const coolant = {
   correlationId: "c",
   notificationId: "4711",
+  severity: "Failure" as const,
   level: "Error" as const,
   title: "Coolant pressure below minimum",
   raisedAt: "2026-11-16T10:20:00.000+01:00",
-  topic: "machines/P-04/events/notifications",
+  topic: "machines/P-04/events/AlertsEvents",
 }
 
 test("a running machine has no reason and keeps its program", () => {

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 148 32" role="img" aria-label="Example">
+  <rect x="0" y="4" width="24" height="24" rx="2" fill="#b3410e"/>
+  <path d="M7 10h10v3H10v2h6v3h-6v2h7v3H7z" fill="#ffffff"/>
+  <text x="34" y="22" font-family="system-ui, 'Segoe UI', sans-serif" font-size="18" font-weight="600" letter-spacing="0.5" fill="#1c1917">Example</text>
+</svg>

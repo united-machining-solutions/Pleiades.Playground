@@ -10,6 +10,10 @@ The data model referenced under contracts/datamodel is a separate project of the
 not covered by the licences of this repository. Its descriptions originate from OPC UA Companion
 Specifications; copyright remains with their owners.
 
+The umati sign and wordmark under apps/app/public/ (favicon.svg, favicon.ico, apple-touch-icon.png,
+umati-wordmark.svg) are trademarks of VDW e.V. and are not covered by the licences of this repository.
+They are used in the example application with the agreement of United Machining Solutions (Christoph Plüss).
+
 Third-party container images referenced by compose.yaml (MQTT broker, database) are distributed under
 their own licences and are not part of this repository.
 
@@ -18,10 +22,12 @@ the SIL Open Font License 1.1. The chart and state colours of the cards (package
 and the image of the generative UI backend (apps/genui-mcp) contain, are taken from the IBM Carbon Design
 System, licensed under the Apache License, Version 2.0.
 
-The user interface components under apps/app/src/components/ui/ and packages/cards/src/ui/, the hook
-apps/app/src/hooks/use-mobile.ts and the theme in packages/cards/src/theme.css are copies from shadcn/ui
-(https://ui.shadcn.com), some of them changed. The files under .claude/skills/shadcn/ are a copy of the
-agent skill of shadcn/ui, unchanged. shadcn/ui is licensed under the MIT License:
+The user interface components under packages/ui/src/components/, the hooks under packages/ui/src/hooks/
+(use-mobile.ts, use-highlighted-code.ts), packages/ui/src/lib/highlighter.tsx and the theme in
+packages/ui/src/styles/globals.css are copies from shadcn/ui (https://ui.shadcn.com), some of them changed.
+The files under .claude/skills/shadcn/ are a copy of the agent skill of shadcn/ui, unchanged; color-pair.tsx,
+state-matrix.tsx and preview-states.css under apps/design-system/src/ are copies of its helpers, two of them
+with their imports changed. shadcn/ui is licensed under the MIT License:
 
     MIT License
 

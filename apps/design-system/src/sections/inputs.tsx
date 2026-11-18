@@ -71,13 +71,13 @@ import { Block, Example, Examples, Section } from "@/block.tsx"
 import { StateMatrix, previewState } from "@/state-matrix.tsx"
 
 // The words of the examples are those of the demo: its machines, the topics its machines publish
-// to, and the rule of the contract for a serial number.
+// to, and the rule of the contract for a machine id.
 
 const machines = [
   { label: "Select a machine", value: null },
-  { label: "P-04", value: "P-04" },
-  { label: "P-07", value: "P-07" },
-  { label: "M-02", value: "M-02" },
+  { label: "AX-400 P-04", value: "alcyone-machines_AX-400_P-04" },
+  { label: "TP-800 P-07", value: "taygeta-precision_TP-800_P-07" },
+  { label: "MM-120 M-02", value: "merope-microtec_MM-120_M-02" },
 ]
 
 const hours = [
@@ -88,17 +88,17 @@ const hours = [
 
 const topics = [
   "umati/Connection/State",
-  "umati/Production/ActiveProgram",
+  "umati/WorkMasterMonitoring/ActiveWorkMaster",
   "umati/Spindle/1/Override",
   "umati/State/FeedOverride",
-  "umati/State/MachineryItemState",
-  "umati/State/MachineryOperationMode",
-  "vendor/Spindle/1/BearingTemperature",
+  "umati/State/Status/MachineryItemState",
+  "umati/State/Status/MachineryOperationMode",
+  "oem/Spindle/1/BearingTemperature",
 ]
 
 const topicGroups = [
   { value: "Named by the data model", items: topics.filter((topic) => topic.startsWith("umati/")) },
-  { value: "Of the manufacturer", items: topics.filter((topic) => topic.startsWith("vendor/")) },
+  { value: "Of the manufacturer", items: topics.filter((topic) => topic.startsWith("oem/")) },
 ]
 
 const fieldStates = ["default", "hover", "focus", "disabled", "invalid"] as const
@@ -195,25 +195,25 @@ export function Inputs() {
         <Example title="Typical, with an error, disabled, required" className="items-start">
           <FieldGroup className="grid gap-6 md:grid-cols-2">
             <Field>
-              <FieldLabel htmlFor="field-serial">Serial number</FieldLabel>
-              <Input id="field-serial" placeholder="P-04" />
+              <FieldLabel htmlFor="field-serial">Machine id</FieldLabel>
+              <Input id="field-serial" placeholder="alcyone-machines_AX-400_P-04" />
               <FieldDescription>The level after machines/ in every topic.</FieldDescription>
             </Field>
             <Field data-invalid>
-              <FieldLabel htmlFor="field-serial-invalid">Serial number</FieldLabel>
-              <Input id="field-serial-invalid" defaultValue="P/04" aria-invalid />
-              <FieldError>A serial number contains no /, + or #.</FieldError>
+              <FieldLabel htmlFor="field-serial-invalid">Machine id</FieldLabel>
+              <Input id="field-serial-invalid" defaultValue="alcyone-machines/AX-400/P-04" aria-invalid />
+              <FieldError>A machine id contains no /, + or #.</FieldError>
             </Field>
             <Field data-disabled>
-              <FieldLabel htmlFor="field-serial-disabled">Serial number</FieldLabel>
-              <Input id="field-serial-disabled" defaultValue="P-04" disabled />
+              <FieldLabel htmlFor="field-serial-disabled">Machine id</FieldLabel>
+              <Input id="field-serial-disabled" defaultValue="alcyone-machines_AX-400_P-04" disabled />
               <FieldDescription>Taken from the topic, not to be changed here.</FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor="field-serial-required">
-                Serial number <span className="text-destructive">*</span>
+                Machine id <span className="text-destructive">*</span>
               </FieldLabel>
-              <Input id="field-serial-required" placeholder="P-04" required />
+              <Input id="field-serial-required" placeholder="alcyone-machines_AX-400_P-04" required />
               <FieldDescription>It identifies the machine in every topic.</FieldDescription>
             </Field>
           </FieldGroup>
@@ -226,12 +226,12 @@ export function Inputs() {
                 <FieldDescription>Which machine it belongs to, and where it comes from.</FieldDescription>
                 <FieldGroup>
                   <Field>
-                    <FieldLabel htmlFor="field-machine">Serial number</FieldLabel>
-                    <Input id="field-machine" defaultValue="P-04" />
+                    <FieldLabel htmlFor="field-machine">Machine id</FieldLabel>
+                    <Input id="field-machine" defaultValue="alcyone-machines_AX-400_P-04" />
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="field-topic">Topic</FieldLabel>
-                    <Input id="field-topic" defaultValue="vendor/Spindle/1/BearingTemperature" />
+                    <Input id="field-topic" defaultValue="oem/Spindle/1/BearingTemperature" />
                   </Field>
                 </FieldGroup>
               </FieldSet>
@@ -401,7 +401,7 @@ export function Inputs() {
             rows={["select"] as const}
             states={fieldStates}
             render={(_, state) => (
-              <Select items={machines} defaultValue="P-04" disabled={state === "disabled"}>
+              <Select items={machines} defaultValue="alcyone-machines_AX-400_P-04" disabled={state === "disabled"}>
                 <SelectTrigger
                   aria-label="Machine"
                   className="w-36"
@@ -876,7 +876,7 @@ export function Inputs() {
             <FieldGroup dir="rtl" className="grid gap-6 md:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="rtl-machine">Machine</FieldLabel>
-                <Select items={machines} defaultValue="P-04">
+                <Select items={machines} defaultValue="alcyone-machines_AX-400_P-04">
                   <SelectTrigger id="rtl-machine" className="w-full">
                     <SelectValue />
                   </SelectTrigger>

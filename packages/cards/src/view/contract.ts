@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { instant, serialNumber } from "../machine/contract.ts"
+import { instant, machineId } from "../machine/contract.ts"
 import { shopfloorShow } from "../shopfloor/contract.ts"
 
 // The contract of a view: an answer that a language model lays out itself, from a set of blocks.
@@ -21,7 +21,7 @@ const hours = z
   .optional()
   .describe("How many hours back the block looks, 24 if omitted.")
 
-const machine = serialNumber.optional().describe("One machine, for example P-04. The whole hall if omitted.")
+const machine = machineId.optional().describe("One machine, for example P-04. The whole hall if omitted.")
 
 // ---- What a language model asks for ----
 
@@ -48,7 +48,7 @@ export const blockRequest = z.discriminatedUnion("type", [
   }).describe("The warnings and errors that occurred most often, with how often and how long in total."),
   z.object({
     type: z.literal("hall"),
-    highlight: z.array(serialNumber).optional().describe("Machines to mark on the plan, for example the one a question is about."),
+    highlight: z.array(machineId).optional().describe("Machines to mark on the plan, for example the one a question is about."),
     title: z.string().optional(),
   }).describe("The plan of the hall with every machine and its state."),
   z.object({
@@ -81,7 +81,7 @@ export const block = z.discriminatedUnion("type", [
     type: z.literal("kpi"),
     label: z.string(),
     measure,
-    machine: serialNumber.nullable(),
+    machine: machineId.nullable(),
     value: z.number().nullable().describe("Null if no value is known for that time."),
     unit,
     ...span,
@@ -92,14 +92,14 @@ export const block = z.discriminatedUnion("type", [
     title: z.string(),
     measure,
     unit,
-    items: z.array(z.object({ machine: serialNumber, value: z.number().nullable() })).describe("The largest first; a machine without a value last."),
+    items: z.array(z.object({ machine: machineId, value: z.number().nullable() })).describe("The largest first; a machine without a value last."),
     ...span,
     source,
   }),
   z.object({
     type: z.literal("causes"),
     title: z.string(),
-    machine: serialNumber.nullable(),
+    machine: machineId.nullable(),
     items: z
       .array(
         z.object({
@@ -113,7 +113,7 @@ export const block = z.discriminatedUnion("type", [
     ...span,
     source,
   }),
-  z.object({ type: z.literal("hall"), title: z.string(), highlight: z.array(serialNumber), shopfloor: shopfloorShow }),
+  z.object({ type: z.literal("hall"), title: z.string(), highlight: z.array(machineId), shopfloor: shopfloorShow }),
   z.object({ type: z.literal("note"), text: z.string(), tone: z.enum(["info", "warning"]) }),
   z.object({
     type: z.literal("gaps"),
