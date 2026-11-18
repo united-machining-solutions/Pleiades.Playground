@@ -58,6 +58,13 @@ All notable changes are documented here. The format follows
 - Timeseries: API (REST, MCP) and persistence worker (MQTT to API).
 - Events: API (REST, MCP) and persistence worker, for notification events.
 - Simulator for values, states and notifications of several machines.
+- Cutting machines, part of the stack: simulators of a 2D laser, a tube laser and a punching machine that take
+  their jobs through telegram files, each with a web page, and one adapter per machine that publishes it to the
+  broker by the binding of machines as `trumpf_Laser2D_L-01`, `trumpf_Tube_T-01` and `trumpf_Punch_PU-01`:
+  manifest, identification, `State/Status`, channel, feed override, the NC program below `oem/`, and its alarms as
+  `Notification.ActiveAlerts` and CloudEvents on `events/notifications`. The web page shows the serial number, and an endless mode writes new
+  orders into the plan and refills the stacks, so that a machine produces without anyone at it. They are part of
+  the Margo app too, there in endless mode.
 - Deployment (`docs/deployment.md`): the workflow "Deploy" starts the stack with `docker compose` on a runner of
   your own, from the images of the commit that was merged into `main`. It is off until the variable
   `DEPLOY_ENABLED` is `true`.

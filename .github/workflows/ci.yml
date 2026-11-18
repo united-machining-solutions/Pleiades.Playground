@@ -262,7 +262,7 @@ jobs:
             fi
           done
           exit "$missing"
-      # The thirteen containers come up healthy from the images of this pull request, with the configs: entries and
+      # The nineteen containers come up healthy from the images of this pull request, with the configs: entries and
       # the template of Traefik, which bart validate does not run.
       - name: Start the Margo stack
         run: docker compose up -d --wait --wait-timeout 300

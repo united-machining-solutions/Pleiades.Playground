@@ -109,6 +109,21 @@ parameters:
     targets:
       - pointer: GENUI_MCP_PORT
         components: ["default"]
+  cuttingLaser2dPort:
+    value: 5611
+    targets:
+      - pointer: CUTTING_LASER_2D_PORT
+        components: ["default"]
+  cuttingTubePort:
+    value: 5612
+    targets:
+      - pointer: CUTTING_TUBE_PORT
+        components: ["default"]
+  cuttingPunchPort:
+    value: 5613
+    targets:
+      - pointer: CUTTING_PUNCH_PORT
+        components: ["default"]
   opcuaAdapterBind:
     value: "127.0.0.1"
     targets:
@@ -211,6 +226,18 @@ configuration:
           schema: port
         - parameter: genuiMcpPort
           name: Port of the generative UI MCP server
+          schema: port
+        - parameter: cuttingLaser2dPort
+          name: Port of the page of the 2D laser
+          description: The page answers on the device only (127.0.0.1).
+          schema: port
+        - parameter: cuttingTubePort
+          name: Port of the page of the tube laser
+          description: The page answers on the device only (127.0.0.1).
+          schema: port
+        - parameter: cuttingPunchPort
+          name: Port of the page of the punching machine
+          description: The page answers on the device only (127.0.0.1).
           schema: port
         - parameter: opcuaAdapterBind
           name: Address of the OPC UA adapter

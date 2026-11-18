@@ -1,0 +1,25 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Cutting.Simulator.Test</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Cutting.Simulator.Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Cutting.Simulator\Pleiades.Playground.Cutting.Simulator.csproj" />
+  </ItemGroup>
+
+</Project>
