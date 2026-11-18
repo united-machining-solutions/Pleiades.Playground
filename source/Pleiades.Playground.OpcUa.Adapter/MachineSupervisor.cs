@@ -337,7 +337,7 @@ internal sealed class MachineSupervisor : BackgroundService
         {
             return new RegistrationOutcome(
                 null,
-                ["identity: Identification.ManufacturerUri, Model and SerialNumber must each be mapped and give a text: the machine id of the topics, <manufacturer>_<model>_<serial number>, is formed from them."],
+                ["identity: Identification.ManufacturerUri (or else Identification.Manufacturer), Model and SerialNumber must each be mapped and give a text: the machine id of the topics, <manufacturer>_<model>_<serial number>, is formed from them."],
                 endpoints,
                 probe) { Tried = registration };
         }
@@ -402,7 +402,9 @@ internal sealed class MachineSupervisor : BackgroundService
             outcome.Probe is null ? null : MappingReview.Summary(rows),
             rows,
             Replaces: stored is not null,
-            stored is null ? null : RegistrationChanges.Between(stored, tried));
+            stored is null ? null : RegistrationChanges.Between(stored, tried),
+            outcome.Registration?.Identity?.MachineId,
+            Views.Notices(outcome.Registration?.Identity));
     }
 
     /// <summary>

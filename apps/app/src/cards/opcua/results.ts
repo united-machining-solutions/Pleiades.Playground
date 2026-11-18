@@ -100,6 +100,10 @@ export type Proposal = {
   rows: Array<MappingRow>
   replaces: boolean
   changes?: Changes
+  /** The machine id it would publish under. Absent if not accepted, or from an older adapter. */
+  machineId?: string
+  /** What the person should know though nothing is wrong. Absent from an older adapter. */
+  notices?: Array<string>
 }
 
 export type RankedEndpoints = {

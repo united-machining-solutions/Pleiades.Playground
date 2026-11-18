@@ -14,7 +14,8 @@ namespace Pleiades.Playground.OpcUa.Adapter.Test;
 
 /// <summary>
 /// A registration is refused only without the parts of the machine id: the server has to give a value for
-/// <c>Identification.ManufacturerUri</c>, <c>Model</c> and <c>SerialNumber</c>.
+/// <c>Identification.ManufacturerUri</c> (or else <c>Identification.Manufacturer</c>), <c>Model</c> and
+/// <c>SerialNumber</c>.
 /// </summary>
 [TestClass]
 public class MachineIdentityRefusalTest
@@ -26,12 +27,12 @@ public class MachineIdentityRefusalTest
 
     [TestMethod]
     [DataRow("Identification.Model")]
-    [DataRow("Identification.ManufacturerUri")]
+    [DataRow("Identification.ManufacturerUri,Identification.Manufacturer")]
     public async Task A_registration_whose_server_gives_no_value_for_a_part_of_the_machine_id_is_refused(string withoutValue)
     {
         using var directory = new TemporaryDirectory();
         var outputs = new Mock<IMachineOutputFactory>(MockBehavior.Strict);
-        var supervisor = Supervisor(directory.Path, outputs.Object, new ServerWithout(withoutValue));
+        var supervisor = Supervisor(directory.Path, outputs.Object, new ServerWithout(withoutValue.Split(',')));
 
         var outcome = await supervisor.RegisterAsync(Registration(), dryRun: false, TestContext.CancellationToken);
 
@@ -41,6 +42,40 @@ public class MachineIdentityRefusalTest
         Assert.IsEmpty(supervisor.Machines, "No connection starts.");
         Assert.IsFalse(File.Exists(Path.Combine(directory.Path, "machines", SerialNumber + ".json")), "Nothing is stored.");
         outputs.VerifyNoOtherCalls();
+        supervisor.Dispose();
+    }
+
+    [TestMethod]
+    public async Task Without_a_ManufacturerUri_the_Manufacturer_stands_in_and_the_proposal_says_so()
+    {
+        using var directory = new TemporaryDirectory();
+        var outputs = new Mock<IMachineOutputFactory>(MockBehavior.Strict);
+        var supervisor = Supervisor(directory.Path, outputs.Object, new ServerWithout("Identification.ManufacturerUri"));
+
+        var proposal = await supervisor.ProposeAsync(Registration(), TestContext.CancellationToken);
+
+        Assert.IsTrue(proposal.Accepted, string.Join(" ", proposal.Problems));
+        Assert.AreEqual("trumpf_TruMatic-1000-fiber_A1121O0001", proposal.MachineId);
+        var notice = proposal.Notices.Single();
+        StringAssert.Contains(notice, "Identification.ManufacturerUri", StringComparison.Ordinal);
+        StringAssert.Contains(notice, "\"TRUMPF\"", StringComparison.Ordinal);
+        StringAssert.Contains(notice, "trumpf_TruMatic-1000-fiber_A1121O0001", StringComparison.Ordinal);
+        outputs.VerifyNoOtherCalls();
+        supervisor.Dispose();
+    }
+
+    [TestMethod]
+    public async Task A_server_with_a_ManufacturerUri_gives_no_notice()
+    {
+        using var directory = new TemporaryDirectory();
+        var outputs = new Mock<IMachineOutputFactory>(MockBehavior.Strict);
+        var supervisor = Supervisor(directory.Path, outputs.Object, new ServerWithout());
+
+        var proposal = await supervisor.ProposeAsync(Registration(), TestContext.CancellationToken);
+
+        Assert.IsTrue(proposal.Accepted, string.Join(" ", proposal.Problems));
+        Assert.AreEqual("trumpf_TruMatic-1000-fiber_A1121O0001", proposal.MachineId);
+        Assert.IsEmpty(proposal.Notices);
         supervisor.Dispose();
     }
 
@@ -88,14 +123,14 @@ public class MachineIdentityRefusalTest
         ["Identification.Model"] = "TruMatic 1000 fiber",
     };
 
-    /// <summary>A server that has every node of the registration, and no value yet for one of them.</summary>
-    private sealed class ServerWithout(string path) : IRegistrationProbe
+    /// <summary>A server that has every node of the registration, and no value yet for the ones named.</summary>
+    private sealed class ServerWithout(params string[] paths) : IRegistrationProbe
     {
         public Task<ProbeResult> ProbeAsync(MachineRegistration registration, CancellationToken cancellationToken) =>
             Task.FromResult(new ProbeResult(
                 "01020304",
                 ["http://opcfoundation.org/UA/", "urn:test"],
-                [.. registration.Elements.Select(element => element.Path == path
+                [.. registration.Elements.Select(element => paths.Contains(element.Path)
                     ? new ProbedElement(element.Area, element.Path, element.Node, "BadWaitingForInitialData", NodeFound: true, null, null, null)
                     : new ProbedElement(element.Area, element.Path, element.Node, "Good", NodeFound: true, Values[element.Path], Values[element.Path], null))],
                 []));

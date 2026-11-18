@@ -7,6 +7,11 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- OPC UA adapter: a server without `Identification.ManufacturerUri` is added if it gives
+  `Identification.Manufacturer`: that name without any character but `A-Z`, `a-z` and `0-9` stands in for the
+  `ManufacturerUri` and forms the machine id (`TRUMPF SE + Co. KG` gives `trumpfsecokg_<model>_<serial number>`).
+  The proposal in the chat says so under "Good to know" (`notices`, with the `machineId`), and the registration
+  keeps it as `identity.manufacturerUriFromManufacturer`.
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
   self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
   that live values work over HTTPS. HTTP stays as it is.

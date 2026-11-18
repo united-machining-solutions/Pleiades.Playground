@@ -217,7 +217,11 @@ Only the last label of the domain goes, the top-level domain. With an ending of 
 the rest stays (`co`), as the row above shows: the rule needs no list of endings, and the id stays the same for a
 manufacturer as long as its domain does. A subdomain stays a part of the id.
 
-The domain stays when the company is renamed; the display name of the manufacturer is not used. The id is a
+The domain stays when the company is renamed; the display name of the manufacturer is not used, with one
+exception. A source whose machine gives no `ManufacturerUri` may take its `Manufacturer` without any character but
+`A-Z`, `a-z` and `0-9` as `ManufacturerUri` instead, and publishes that value: `TRUMPF SE + Co. KG` gives
+`TRUMPFSECoKG` and the manufacturer `trumpfsecokg`. It is no web address then, and the id changes with the name.
+The OPC UA adapter does so, and tells the person who adds the machine. The id is a
 proposal of this binding, not an element of the model: globally unique stays `ProductInstanceUri`, also as the
 `source` of every event.
 

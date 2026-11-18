@@ -155,20 +155,32 @@ internal sealed partial class MachineOutput : IMachineOutput
     public bool CanTakeBack => _client is not { } client || client.IsConnected;
 
     /// <summary>
-    /// The identity of a machine from the values of its identification, or null without <c>ManufacturerUri</c> or
-    /// <c>Model</c>: with the serial number of the registration they are the machine id. A machine without a
+    /// The identity of a machine from the values of its identification, or null without a manufacturer or a
+    /// <c>Model</c>: with the serial number of the registration they are the machine id. The manufacturer is its
+    /// <c>ManufacturerUri</c>; a server that gives none, but a <c>Manufacturer</c>, gets that name without its
+    /// special characters as <c>ManufacturerUri</c> (<see cref="ManufacturerUriOf"/>), and the identity says so
+    /// (<see cref="IdentityRegistration.ManufacturerUriFromManufacturer"/>). A machine without a
     /// <c>ProductInstanceUri</c> gets the one the binding forms, <c>{ManufacturerUri}/{Model}/{SerialNumber}</c>;
     /// one without a <c>Manufacturer</c> is named by the domain of its <c>ManufacturerUri</c>.
     /// </summary>
     public static IdentityRegistration? IdentityOf(Func<string, string?> valueOf, string serialNumber)
     {
         ArgumentNullException.ThrowIfNull(valueOf);
-        var manufacturerUri = valueOf(MachineManifest.ManufacturerUri) ?? string.Empty;
+        var manufacturer = NonEmpty(valueOf(MachineManifest.Manufacturer));
+        var manufacturerUri = NonEmpty(valueOf(MachineManifest.ManufacturerUri));
+        var fromManufacturer = manufacturerUri is null && manufacturer is not null;
+        if (fromManufacturer)
+        {
+            manufacturerUri = NonEmpty(ManufacturerUriOf(manufacturer!));
+        }
+
+        manufacturerUri ??= string.Empty;
         var model = valueOf(MachineManifest.Model) ?? string.Empty;
         var identity = new IdentityRegistration
         {
-            Manufacturer = NonEmpty(valueOf(MachineManifest.Manufacturer)) ?? MachineBinding.DomainOf(manufacturerUri),
+            Manufacturer = manufacturer ?? MachineBinding.DomainOf(manufacturerUri),
             ManufacturerUri = manufacturerUri,
+            ManufacturerUriFromManufacturer = fromManufacturer && manufacturerUri.Length > 0,
             Model = model,
             ProductInstanceUri = NonEmpty(valueOf(MachineManifest.ProductInstanceUri))
                 ?? new MachineIdentity(string.Empty, manufacturerUri, model, serialNumber).EffectiveProductInstanceUri,
@@ -176,6 +188,30 @@ internal sealed partial class MachineOutput : IMachineOutput
         return Complete(identity) is { } complete
             ? complete with { MachineId = MachineIdentityOf(complete, serialNumber).MachineId }
             : null;
+    }
+
+    /// <summary>
+    /// The stand-in for the <c>ManufacturerUri</c> of a server that gives none: the name of the manufacturer with
+    /// <c>ä</c>, <c>ö</c>, <c>ü</c> and <c>ß</c> written out, other accents dropped, and every character but
+    /// <c>A-Z</c>, <c>a-z</c> and <c>0-9</c> removed. It forms the manufacturer of the machine id and the prefix of the
+    /// signals of the maker, so it holds nothing an MQTT topic would read otherwise, and no dot that would be taken
+    /// for a top-level domain. <c>TRUMPF Werkzeugmaschinen SE + Co. KG</c> gives <c>TRUMPFWerkzeugmaschinenSECoKG</c>.
+    /// </summary>
+    public static string ManufacturerUriOf(string manufacturer)
+    {
+        ArgumentNullException.ThrowIfNull(manufacturer);
+        var written = manufacturer
+            .Replace("ä", "ae", StringComparison.Ordinal).Replace("ö", "oe", StringComparison.Ordinal).Replace("ü", "ue", StringComparison.Ordinal)
+            .Replace("Ä", "Ae", StringComparison.Ordinal).Replace("Ö", "Oe", StringComparison.Ordinal).Replace("Ü", "Ue", StringComparison.Ordinal)
+            .Replace("ß", "ss", StringComparison.Ordinal)
+            .Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(written.Length);
+        foreach (var c in written.Where(char.IsAsciiLetterOrDigit))
+        {
+            builder.Append(c);
+        }
+
+        return builder.ToString();
     }
 
     /// <summary>The identity as the publisher of the binding takes it.</summary>
@@ -709,7 +745,7 @@ internal sealed partial class MachineOutput : IMachineOutput
     private partial void LogStarted(string serialNumber, string machineId);
 
     [LoggerMessage(EventId = 301, Level = LogLevel.Information,
-        Message = "Machine {SerialNumber} has no identity yet: it is published once its server gave ManufacturerUri and Model")]
+        Message = "Machine {SerialNumber} has no identity yet: it is published once its server gave ManufacturerUri (or Manufacturer) and Model")]
     private partial void LogNotIdentified(string serialNumber);
 
     [LoggerMessage(EventId = 303, Level = LogLevel.Warning, Message = "Machine {SerialNumber}: the oldest alert event that waited for the identity is dropped")]
