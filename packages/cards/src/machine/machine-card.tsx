@@ -18,8 +18,11 @@ import { tell } from "./tell.ts"
  *
  * The spans of its band are not part of that result. Whoever draws the card asks for them
  * (`genui_span_list`) and hands them in as they arrive. The card stands without them.
+ *
+ * `topics` false leaves out the line at the foot that names the topics read, for a page that names
+ * none; the chat keeps it.
  */
-export function MachineCard({ machine, asOf, history, spans }: MachineShow & { spans?: Spans }) {
+export function MachineCard({ machine, asOf, history, spans, topics: withTopics = true }: MachineShow & { spans?: Spans; topics?: boolean }) {
   const state = stateOf(machine, asOf)
   const told = tell(machine, state)
   const warning = openWarning(machine)
@@ -66,9 +69,11 @@ export function MachineCard({ machine, asOf, history, spans }: MachineShow & { s
         </dl>
         <StateBand history={history} spans={spans} />
       </CardContent>
-      <CardFooter className="block text-xs break-words text-muted-foreground">
-        Read at {clock(asOf)} from {topics.join(", ")}
-      </CardFooter>
+      {withTopics && (
+        <CardFooter className="block text-xs break-words text-muted-foreground">
+          Read at {clock(asOf)} from {topics.join(", ")}
+        </CardFooter>
+      )}
     </Card>
   )
 }

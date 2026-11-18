@@ -21,11 +21,12 @@ internal enum AlertAction
 /// <param name="SeverityValue">The severity of OPC UA, 1 to 1000.</param>
 /// <param name="Since">When it was raised.</param>
 /// <param name="SourceName">The part of the machine it came from, as the server names it.</param>
+/// <param name="Category">The category after NAMUR NE 107 as the server gave it, or null to derive it from the severity.</param>
 internal sealed record OpenAlert(
-    string ConditionId, string Id, string Code, string Message, int SeverityValue, DateTime Since, string? SourceName = null)
+    string ConditionId, string Id, string Code, string Message, int SeverityValue, DateTime Since, string? SourceName = null, string? Category = null)
 {
-    /// <summary>The category after NAMUR NE 107 (<see cref="AlertTracker.CategoryOf"/>).</summary>
-    public string Severity => AlertTracker.CategoryOf(SeverityValue);
+    /// <summary>The category after NAMUR NE 107: the server's, or else <see cref="AlertTracker.CategoryOf"/>.</summary>
+    public string Severity => Category ?? AlertTracker.CategoryOf(SeverityValue);
 
     /// <summary>The alert as the model lists it, in <c>Notification.ActiveAlerts</c> and in every alert event.</summary>
     public JsonObject ToJson()
@@ -107,7 +108,8 @@ internal sealed class AlertTracker
     /// Takes one event of a condition. Returns what to publish, or null if the event changes
     /// nothing: an alarm that already stands, or the end of one that was never raised here.
     /// </summary>
-    public AlertChange? Observe(string conditionId, bool active, string code, string message, int severity, DateTime at, string? sourceName = null)
+    public AlertChange? Observe(
+        string conditionId, bool active, string code, string message, int severity, DateTime at, string? sourceName = null, string? category = null)
     {
         ArgumentNullException.ThrowIfNull(conditionId);
         if (active)
@@ -120,7 +122,7 @@ internal sealed class AlertTracker
                 return _carried.Remove(conditionId) ? new AlertChange(AlertAction.Raised, standing, _now()) : null;
             }
 
-            var raised = new OpenAlert(conditionId, NewId(), code, message, Math.Clamp(severity, 1, 1000), at, sourceName);
+            var raised = new OpenAlert(conditionId, NewId(), code, message, Math.Clamp(severity, 1, 1000), at, sourceName, category);
             _open[conditionId] = raised;
             return new AlertChange(AlertAction.Raised, raised, at);
         }
@@ -152,5 +154,30 @@ internal sealed class AlertTracker
 
         _seenInRefresh = null;
         return [.. gone.Select(alert => new AlertChange(AlertAction.Cleared, alert, now))];
+    }
+
+    /// <summary>
+    /// Takes the whole list of the alerts that stand, as a server lists them in <c>Notification.ActiveAlerts</c>:
+    /// an alert that is new is raised, one that is no longer in the list is cleared. The id of an alert in
+    /// the list is its condition. Returns the raisings in the order of the list, then the clearings.
+    /// </summary>
+    /// <param name="list">The alerts that stand now.</param>
+    /// <param name="now">The time, UTC: of a clearing, and of a raising whose alert has no time or one in the future.</param>
+    public IReadOnlyList<AlertChange> Reconcile(IEnumerable<ListedAlert> list, DateTime now)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+        var changes = new List<AlertChange>();
+        BeginRefresh();
+        foreach (var alert in list)
+        {
+            var at = alert.Time is { } time && time <= now ? time : now;
+            if (Observe(alert.Id, active: true, alert.ErrorCode, alert.Message, alert.SeverityValue, at, alert.SourceName, alert.Severity) is { } change)
+            {
+                changes.Add(change);
+            }
+        }
+
+        changes.AddRange(EndRefresh(now));
+        return changes;
     }
 }

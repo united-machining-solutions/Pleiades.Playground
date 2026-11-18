@@ -205,6 +205,11 @@ public sealed class JuiceBarTests
         var drinks = await GetAsync<Drink[]>(http, "/drinks");
         Assert.AreEqual("Tropical Mix", drinks.Single().Title);
         Assert.AreEqual("language=en", drinks[0].Description);
+        // What the author chose in the marketplace, and each ingredient with its colour and its bottle.
+        Assert.AreEqual("#ff9900", drinks[0].Color);
+        Assert.AreEqual("_22", drinks[0].Picture);
+        Assert.AreEqual(new DrinkComponent(FakeMixerControl.Orange, "Orange Juice", "#ff9900", false), drinks[0].Components[0]);
+        Assert.AreEqual(new DrinkComponent("unknown", "Mystery", null, true), drinks[0].Components[1]);
         Assert.AreEqual(HttpStatusCode.NotFound, (await http.GetAsync(new Uri("/drinks/nope", UriKind.Relative), TestContext.CancellationToken)).StatusCode);
 
         var status = await GetAsync<JuiceBarStatus>(http, "/status");

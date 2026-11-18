@@ -15,6 +15,7 @@
     "@pleiades/cards": "workspace:*",
     "@pleiades/hub-sdk": "catalog:",
     "@pleiades/ui": "workspace:*",
+    "@react-three/fiber": "catalog:",
     "@tanstack/ai": "catalog:",
     "@tanstack/ai-harness": "catalog:",
     "@tanstack/ai-mcp": "catalog:",
@@ -33,6 +34,7 @@
     "recharts": "catalog:",
     "shadcn": "catalog:",
     "tailwindcss": "catalog:",
+    "three": "catalog:",
     "tw-animate-css": "catalog:",
     "zod": "catalog:"
   },
@@ -42,6 +44,7 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@types/three": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "nitro": "catalog:",
     "typescript": "catalog:",

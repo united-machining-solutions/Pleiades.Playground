@@ -110,6 +110,9 @@ test("the machines of a site are grouped by hall, in the order of the site, and 
     { state: "stopped", machines: 1 },
     { state: "alarm", machines: 1 },
   ])
+  // All four send; the stopped one and the one in alarm need someone.
+  assert.equal(result.sending, 4)
+  assert.equal(result.needsYou, 2)
   // M-07 sends values and stands on no site: the one suggestion.
   assert.deepEqual(
     result.unplaced.map(({ now: _, ...rest }) => rest),
@@ -135,6 +138,8 @@ test("a machine on a site that published nothing in the last 24 hours has no dat
   assert.equal(placed?.state, "no-data")
   assert.equal(placed?.now, null)
   assert.deepEqual(result.counts, [{ state: "no-data", machines: 1 }])
+  assert.equal(result.sending, 0)
+  assert.equal(result.needsYou, 1)
   assert.deepEqual(result.unplaced, [])
 })
 

@@ -5,11 +5,10 @@ the app. The server delivers the document, the server routes and the server func
 harness.
 
 - **Home** (`/`) shows where the machines stand: site by site and hall by hall, a row for each machine, each
-  site under a head with how many of its machines are in each state, and the machines that send values and stand
-  on no site. "Needs you" keeps the machines that need someone, what Home used to show first; a search finds one; ten sites make a
-  page, and the choice and the page stay in the URL (`?show=needs`, `?page=`). The sites come from the Sites API through `genui_site_list`; without sites, every machine stands under
-  "On no site". It is live: see below. It needs no language model. The address `/sites`, where the list of the
-  sites stood before, leads to `/`.
+  site under a head with how many of its machines are in each state, and under the title how many send data now and
+  how many need someone, as `genui_site_list` counts them. "Needs you" keeps the machines that need someone, what Home used to show first; a search finds one; ten sites make a
+  page, and the choice and the page stay in the URL (`?show=needs`, `?page=`). The sites come from the Sites API through `genui_site_list`. It is live: see below. It needs no language model. The address `/sites`, where the list of the
+  sites stood before, leads to `/`. A machine is on Home only once people put it on a site: a bar above the list names the machines that sent data in the last 24 hours and stand on no site, a few by name and "+N", and its "Review and add" opens "Add machine" with the first of them chosen; "Add machine" at the top opens the same dialog empty, where a machine is also named by its id. The dialog takes the machine, the site, the hall and the name people know it by; a new site or hall is made there too. While the Sites API does not answer, one line says so and names a few of the machines that send, and nothing can be added. The menu of a row on a site moves the machine ("Move…") or takes it off its site ("Remove from site"), and each change is undone from its toast, as long as nobody changed the machine since; a site or hall the change made goes with it. The app writes to the REST endpoints of the Sites API, from its server, with no sign-in: whoever reaches the app can add and remove machines.
 - **A page per machine** (`/sites/alcyone-machines_AX-400_P-04`, by the machine id) shows the machine card of the
   [card catalogue](../../packages/cards/README.md): what the machine does now and what it did over the last
   hours. It needs no language model. Home leads to it, and it stands under Home. An address of before, `/machines/<machine id>`, leads to it with
@@ -93,7 +92,7 @@ at the broker of the stack, see [Pleiades Hub](#pleiades-hub).
 | Liveness | `GET /health` |
 | Image | `pleiades.playground.app`, the app alone. `pleiades.playground.app.showcases` is the same app built with its showcases, for a demo or a fair; `APP_SHOWCASES` in `.env` takes that one, see `src/showcases/` under [What is where](#what-is-where) |
 | Version | At the bottom of the sidebar: `0.0.142 · 7a83c2f` for an image of the workflow "Images", linked to its commit; `dev` for a build of your own, with the commit of the checkout under `vite dev` |
-| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `MQTT_WS_PORT`, the port the browser reaches the broker's WebSocket on, at the host of the page (9001 if unset); or `MQTT_WS_URL`, the whole address, for a broker behind a proxy (`wss://…`); or `MQTT_WSS_PATH`, for a page over HTTPS only, a path at the origin of the page that the proxy in front of the app forwards to the broker (`/mqtt`, the Margo app). `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); the app draws nothing for their results, the answer says them, and a chat switches each of them off and on under "Tools" in its message field. `OPCUA_MCP_URL` and `OPCUA_ADAPTER_URL`, the MCP endpoint and the API of the [OPC UA adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md); empty, the chat has no OPC UA. The language models of the chat, see below. `HUB_MQTT_URL` and `HUB_APP_URL` for the registration at the [Pleiades Hub](#pleiades-hub): the demo stack sets both, and an empty `HUB_MQTT_URL` in `.env` switches the registration off. |
+| Settings | `GENUI_MCP_URL`, the MCP endpoint of the generative UI backend. `MQTT_WS_PORT`, the port the browser reaches the broker's WebSocket on, at the host of the page (9001 if unset); or `MQTT_WS_URL`, the whole address, for a broker behind a proxy (`wss://…`); or `MQTT_WSS_PATH`, for a page over HTTPS only, a path at the origin of the page that the proxy in front of the app forwards to the broker (`/mqtt`, the Margo app). `APP_MCP_SERVERS`, optional: further MCP servers whose tools the chat has too, as `name=address` separated by commas (`ultimaker=http://ultimaker-api:8080/mcp`); the app draws nothing for their results but the drink card of `juicebar`, the answer says them, and a chat switches each of them off and on under "Tools" in its message field. `OPCUA_MCP_URL` and `OPCUA_ADAPTER_URL`, the MCP endpoint and the API of the [OPC UA adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md); empty, the chat has no OPC UA. `SITES_API_URL`, the REST endpoints of the [Sites API](../../source/Pleiades.Playground.Sites.Api/README.md) that Home writes to (http://localhost:5540 if unset); empty, "Add machine", "Move…" and "Remove from site" say that there is none. The language models of the chat, see below. `HUB_MQTT_URL` and `HUB_APP_URL` for the registration at the [Pleiades Hub](#pleiades-hub): the demo stack sets both, and an empty `HUB_MQTT_URL` in `.env` switches the registration off. |
 
 ## Language models
 
@@ -356,10 +355,12 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   commit this file; here everything that needs it writes it first.
 - `src/showcases/`: what is made for one demo or one fair, and is in a build only where `APP_SHOWCASES` is
   set ([ADR-0018](../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
-  it is a showcase; there is none yet. The pages of the showcases, and their server routes, are the route
-  files under `src/routes/(showcases)/`; the brackets make a folder that adds nothing to an address, so
-  `(showcases)/titan.tsx` answers at `/titan`. A page belongs to the showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and
-  `titan/faces.tsx` are pages of `showcases/titan/`. A build without the setting leaves that folder out
+  it is a showcase: `juice-bar/` is what the page `/juice-bar` reads, the drink card of the chat on a page of
+  its own for a screen next to the machine, without a language model. The pages of the showcases, and their
+  server routes, are the route files under `src/routes/(showcases)/`; the brackets make a folder that adds
+  nothing to an address, so `(showcases)/juice-bar.tsx` answers at `/juice-bar`. A page belongs to the
+  showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and `titan/faces.tsx` are pages of
+  `showcases/titan/`. A build without the setting leaves that folder out
   (`vite.config.ts`): the router does not know the pages, nothing imports the folder of a showcase, and
   `.output` has nothing of one, so neither has the image. There is no switch while the app runs.
   `rule.test.ts` fails when a file of the app reads from a showcase or names the address of one of its pages,
@@ -375,7 +376,11 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   signs and the wording come from [`@pleiades/cards`](../../packages/cards/README.md). `measurement/chat.tsx`
   is the measurement card in the chat: the cards of `genui_measurement_list`, without graphs. `opcua/chat.tsx`
   holds the cards of the OPC UA adapter: the server list, a mapping, a proposal and the endpoints, and
-  `results.ts` checks what its tools give back.
+  `results.ts` checks what its tools give back. `juicebar/chat.tsx` is the drink card of the
+  [juice bar](../../source/Pleiades.Playground.JuiceBar.Api/README.md), for the result of
+  `juicebar_drinks_list`: a drink to pick, its glass (`glass.tsx`, moving by `glass.css`), and a button that
+  orders it at once over the server functions of `src/juicebar/orders.ts`; `follow.ts` reads the order again
+  until it is done, also after a call that did not reach the server of the app.
 - `src/machines/`: what the pages and the chat both take of a machine. `get-machines.ts` holds the server
   functions that call the backend as a typed MCP client, `card-tools.ts` the names of the tools only a card
   calls, `machine-item.tsx` draws a machine as a row or a tile. A card folder imports from here, never the
@@ -388,7 +393,7 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   `src/hooks/use-live.ts` puts it together for a route: `useLive(loaded, live)`.
 - `src/sites/`: what Home chooses to show of the sites. `filter.ts` groups the values of `genui_site_list` by site
   and hall, keeps what "Needs you" and a search ask for, cuts the pages, and adds up nothing; `moved.ts` says where an old address of the page of a
-  machine or of the list of the sites leads.
+  machine or of the list of the sites leads. `unplaced.ts` names the machines on no site for the bar; `row-actions.tsx` is "Add machine" and the menu of a row, `place-dialog.tsx` the dialog of "Add machine" and "Move…"; `sites-api.ts` holds the server functions that write, `placements.ts` their steps against the Sites API and `placing.ts` their rules.
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `mcp-servers.ts` reads the servers whose tools the chat has and holds a chat to the ones it left on,

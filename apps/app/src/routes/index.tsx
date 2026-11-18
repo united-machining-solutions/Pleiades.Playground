@@ -2,6 +2,7 @@ import { Pages } from "@pleiades/cards/shared/pages.tsx"
 import type { SiteList, StateCount } from "@pleiades/cards/site/contract.ts"
 import { machinesInWords } from "@pleiades/cards/site/in-words.ts"
 import { StateCounts } from "@pleiades/cards/site/state-counts.tsx"
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
 import { Badge } from "@pleiades/ui/components/badge"
 import { Button } from "@pleiades/ui/components/button"
 import { Card } from "@pleiades/ui/components/card"
@@ -12,7 +13,7 @@ import { ItemGroup, ItemSeparator } from "@pleiades/ui/components/item"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { ChevronRightIcon, HouseIcon, MapPinOffIcon, SearchIcon, SearchXIcon } from "lucide-react"
+import { ChevronRightIcon, HouseIcon, MapPinIcon, MapPinOffIcon, SearchIcon, SearchXIcon, WifiIcon } from "lucide-react"
 import { Fragment, useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
 
@@ -26,6 +27,10 @@ import { getSites } from "@/machines/get-machines.ts"
 import { MachineRow } from "@/machines/machine-item.tsx"
 import { changed, emptyOf, groupsOf, pageOf, pageOfSearch, showOf, showOfToggle } from "@/sites/filter.ts"
 import type { Group, Row } from "@/sites/filter.ts"
+import { placementsOf } from "@/sites/placing.ts"
+import type { Placement } from "@/sites/placing.ts"
+import { AddMachine, PlacedMenu } from "@/sites/row-actions.tsx"
+import { headInWords, unplacedInWords, unreadableInWords } from "@/sites/unplaced.ts"
 
 /** The sites are read once, from the backend; then what every machine on them does comes from the broker. */
 const live: Live<SiteList | null> = {
@@ -95,23 +100,33 @@ function Home() {
     )
   }
   const { groups, emptySites } = groupsOf(list, { needs, query })
+  // Where every machine stands, read once for all rows, not once by each row.
+  const placed = placementsOf(list)
   const shown = pageOf(groups, search.page)
-  const line = `${machinesInWords(list.machineCount)} on ${list.sites.length} ${list.sites.length === 1 ? "site" : "sites"} · ${liveness(connected, list.asOf)}`
-  return (
-    <Page line={list.sites.length === 0 ? `${machinesInWords(list.unplaced.length)} on no site · ${liveness(connected, list.asOf)}` : line}>
-      {/* Without sites the page stays as it is: one line says why, and every machine that sends
-          stands under "On no site", also while the Sites API does not answer. */}
-      {list.sites.length === 0 && (
+  // What the backend counted: the machines on the sites, how many of them send, how many need someone.
+  const line = `${headInWords(list)} · ${liveness(connected, list.asOf)}`
+  if (list.sitesError !== null) {
+    // The sites cannot be read: nothing to show by site and nothing to add to one. The line names a few
+    // of the machines that sent data, so the page does not look as if none did.
+    return (
+      <Page line={liveness(connected, list.asOf)}>
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <MapPinOffIcon className="size-4 shrink-0" />
-          {list.sitesError === null
-            ? "No site is entered yet. Enter sites and place the machines in the Sites API."
-            : "The sites cannot be read now: the Sites API did not answer. Every machine that sends stands under \"On no site\"."}
+          {unreadableInWords(list.unplaced)}
         </p>
+      </Page>
+    )
+  }
+  return (
+    <Page line={list.sites.length === 0 ? liveness(connected, list.asOf) : line} action={<AddMachine list={list}>Add machine</AddMachine>}>
+      {/* The machines that sent data and stand on no site are no rows: a bar names a few of them, and they
+          are added to a site from there. */}
+      {list.unplaced.length > 0 && <Unplaced list={list} />}
+      {list.sites.length > 0 && (
+        <div ref={bar} className="scroll-mt-20">
+          <Filters needs={needs} query={query} onQuery={onQuery} counts={list.counts} />
+        </div>
       )}
-      <div ref={bar} className="scroll-mt-20">
-        <Filters needs={needs} query={query} onQuery={onQuery} counts={list.counts} />
-      </div>
       {shown.groups.length === 0 ? (
         <Nothing
           {...emptyOf({ needs, query })}
@@ -119,11 +134,16 @@ function Home() {
             setQuery("")
             void navigate({ to: ".", search: (previous) => changed(previous, { show: undefined }) })
           }}
+          add={
+            <AddMachine list={list} variant="outline">
+              Add machine
+            </AddMachine>
+          }
         />
       ) : (
         <div className="flex flex-col gap-3">
           {shown.groups.map((group) => (
-            <GroupSection key={group.site?.siteId ?? ""} group={group} asOf={list.asOf} />
+            <GroupSection key={group.site.siteId} group={group} list={list} placed={placed} />
           ))}
         </div>
       )}
@@ -140,43 +160,66 @@ function Home() {
   )
 }
 
-/** Why the list is empty, and where a filter is chosen, the way back to every machine. */
+/**
+ * The machines that sent data in the last 24 hours and stand on no site: how many, a few of them by what they are, and
+ * "Review and add", which opens "Add machine" with the first of them chosen.
+ */
+function Unplaced({ list }: { list: SiteList }) {
+  const { title, names } = unplacedInWords(list.unplaced)
+  return (
+    // On a narrow page the button goes under the words, where it covers none of them.
+    <Alert className="max-sm:has-data-[slot=alert-action]:pr-4 sm:has-data-[slot=alert-action]:pr-36">
+      <WifiIcon />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>{names}</AlertDescription>
+      <AlertAction className="max-sm:static max-sm:col-start-2 max-sm:mt-2">
+        <AddMachine list={list} review size="xs" variant="outline">
+          Review and add
+        </AddMachine>
+      </AlertAction>
+    </Alert>
+  )
+}
+
+/**
+ * Why the list is empty: where a filter is chosen, the way back to every machine; where no machine
+ * stands on a site, the way to add one.
+ */
 function Nothing({
   title,
   description,
   clearable,
   onShowAll,
+  add,
 }: {
   title: string
   description: string
   clearable: boolean
   onShowAll: () => void
+  add: ReactNode
 }) {
   return (
     <Empty>
       <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <SearchXIcon />
-        </EmptyMedia>
+        <EmptyMedia variant="icon">{clearable ? <SearchXIcon /> : <MapPinIcon />}</EmptyMedia>
         <EmptyTitle>{title}</EmptyTitle>
         <EmptyDescription>{description}</EmptyDescription>
       </EmptyHeader>
-      {clearable && (
-        <EmptyContent>
-          <Button onClick={onShowAll}>Show every machine</Button>
-        </EmptyContent>
-      )}
+      <EmptyContent>{clearable ? <Button onClick={onShowAll}>Show every machine</Button> : add}</EmptyContent>
     </Empty>
   )
 }
 
-/** The title and the line under it, at the top of the page. */
-function Page({ line, children }: { line?: string; children: ReactNode }) {
+/** The title and the line under it, at the top of the page, and beside them what the page offers to do. */
+function Page({ line, action, children }: { line?: string; action?: ReactNode; children: ReactNode }) {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
-      <div>
-        <h1 className="text-2xl font-semibold">Home</h1>
-        {line && <p className="text-sm text-muted-foreground">{line}</p>}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Home</h1>
+          {line && <p className="text-sm text-muted-foreground">{line}</p>}
+        </div>
+        {action}
       </div>
       {children}
     </div>
@@ -233,12 +276,12 @@ function Filters({
 }
 
 /**
- * A site, or the machines on no site: a head that stays under the header of the app while its rows
- * scroll, with the counts of the whole site, and a click on it folds the site. Then hall by hall the
- * rows; the halls without a machine share one line.
+ * A site: a head that stays under the header of the app while its rows scroll, with the counts of the
+ * whole site, and a click on it folds the site. Then hall by hall the rows; the halls without a
+ * machine share one line. A machine is moved or taken off its site in the menu of its row.
  */
-function GroupSection({ group, asOf }: { group: Group; asOf: string }) {
-  const title = group.site?.name ?? "On no site"
+function GroupSection({ group, list, placed }: { group: Group; list: SiteList; placed: ReadonlyMap<string, Placement> }) {
+  const title = group.site.name
   return (
     <Collapsible defaultOpen render={<section aria-label={title} />} className="flex flex-col">
       {/* As an accordion has it: the heading holds the button that folds the site. */}
@@ -246,9 +289,9 @@ function GroupSection({ group, asOf }: { group: Group; asOf: string }) {
         <CollapsibleTrigger className="group/head flex w-full flex-wrap items-center gap-x-3 gap-y-1 py-2 text-left font-normal">
           <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]/head:rotate-90" />
           <span className="font-medium">{title}</span>
-          <span className="text-sm text-muted-foreground">{group.site?.company ?? "Sent values in the last 24 hours"}</span>
+          <span className="text-sm text-muted-foreground">{group.site.company}</span>
           <span className="ml-auto flex flex-wrap items-center gap-3">
-            {group.counts && <StateCounts counts={group.counts} inButton />}
+            <StateCounts counts={group.counts} inButton />
             <Badge variant="secondary" className="tabular-nums">
               {machinesInWords(group.machines)}
             </Badge>
@@ -258,8 +301,18 @@ function GroupSection({ group, asOf }: { group: Group; asOf: string }) {
       <CollapsibleContent className="flex flex-col gap-3 pt-3">
         {group.halls.map((hall) => (
           <div key={hall.name} className="flex flex-col gap-1.5">
-            {group.site && <h3 className="text-xs font-medium text-muted-foreground">{hall.name}</h3>}
-            <Rows rows={hall.rows} asOf={asOf} />
+            <h3 className="text-xs font-medium text-muted-foreground">{hall.name}</h3>
+            <Rows
+              rows={hall.rows}
+              asOf={list.asOf}
+              actions={(row) => (
+                <PlacedMenu
+                  machine={{ machine: row.machine.machine, title: row.name ?? row.what, what: row.what }}
+                  shown={placed.get(row.machine.machine)}
+                  list={list}
+                />
+              )}
+            />
           </div>
         ))}
         {group.emptyHalls.length > 0 && <p className="text-xs text-muted-foreground">{group.emptyHalls.join(", ")}: no machine</p>}
@@ -268,8 +321,8 @@ function GroupSection({ group, asOf }: { group: Group; asOf: string }) {
   )
 }
 
-/** Rows of a list, one below the other with a line between. */
-function Rows({ rows, asOf }: { rows: ReadonlyArray<Row>; asOf: string }) {
+/** Rows of a list, one below the other with a line between, each with what can be done with its machine. */
+function Rows({ rows, asOf, actions }: { rows: ReadonlyArray<Row>; asOf: string; actions: (row: Row) => ReactNode }) {
   const { ask } = useChatPanel()
   return (
     <Card className="gap-0 py-0">
@@ -277,7 +330,16 @@ function Rows({ rows, asOf }: { rows: ReadonlyArray<Row>; asOf: string }) {
         {rows.map((row, position) => (
           <Fragment key={row.machine.machine}>
             {position > 0 && <ItemSeparator className="my-0" />}
-            <MachineRow machine={row.machine} state={row.state} asOf={asOf} onAsk={ask} name={row.name} what={row.what} linked={row.linked} />
+            <MachineRow
+              machine={row.machine}
+              state={row.state}
+              asOf={asOf}
+              onAsk={ask}
+              name={row.name}
+              what={row.what}
+              linked={row.linked}
+              actions={actions(row)}
+            />
           </Fragment>
         ))}
       </ItemGroup>

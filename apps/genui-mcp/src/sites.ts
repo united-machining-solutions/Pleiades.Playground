@@ -1,7 +1,7 @@
 import type { Machine, MachineList } from "@pleiades/cards/machine/contract.ts"
 import { stateOf } from "@pleiades/cards/machine/state.ts"
 import { SITES_SOURCE } from "@pleiades/cards/site/contract.ts"
-import { countsOf } from "@pleiades/cards/site/counts.ts"
+import { countsOf, needsYouOf, sendingOf } from "@pleiades/cards/site/counts.ts"
 import type { Hall, PlacedMachine, SiteList } from "@pleiades/cards/site/contract.ts"
 
 import { readPlacements, readSites } from "./apis.ts"
@@ -67,13 +67,15 @@ export function sitesOf(
   const placed = new Set(
     placements.filter((one) => sites.some((site) => site.siteId === one.siteId)).map((one) => one.machineId),
   )
-  const all = grouped.flatMap((site) => site.halls.flatMap((one) => one.machines))
+  const all = grouped.flatMap((site) => site.halls.flatMap((one) => one.machines)).map((one) => one.state)
   return {
     asOf: list.asOf,
     windowSeconds: list.windowSeconds,
     source: SITES_SOURCE,
     machineCount: all.length,
-    counts: countsOf(all.map((one) => one.state)),
+    counts: countsOf(all),
+    sending: sendingOf(all),
+    needsYou: needsYouOf(all),
     sites: grouped,
     unplaced: list.machines
       .filter((one) => !placed.has(one.machine))

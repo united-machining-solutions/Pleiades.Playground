@@ -22,8 +22,25 @@ All notable changes are documented here. The format follows
   itself is not part of the stack. The SDK of the hub, `@pleiades/hub-sdk`, is not on npmjs.org: it is
   checked in as a tarball under `vendor/`, and the catalog refers to it with `file:`. ADR-0021 records the
   decision and the deviation from "npmjs.org is the only registry". The settings are in
-  `apps/app/README.md`. The tarball is version 0.1.1, which brings the guide `register-an-app.md`, and the
-  skill `register-hub-app`, a copy from the hub's repository, leads an agent to it.
+  `apps/app/README.md`. The tarball is version 0.1.1, which brings the guide
+  `register-an-app.md`, and the skill `register-hub-app`, a copy from the hub's repository, leads an agent to it.
+- Example app: machines are added to a site and taken off it on Home, as in the mock. A bar names the machines
+  that sent data in the last 24 hours and stand on no site, with "Review and add"; "Add machine" also takes one by
+  its id. The menu of a row moves a machine or removes it, and "Undo" in the toast takes a change back.
+  `genui_site_list` counts how many machines on the sites send and how many need someone.
+- Sites API: a write of a site may name a condition. `If-None-Match: *` makes it only where there is none,
+  `If-Match` with the `etag` of the site changes or removes only the site that was read; 412 otherwise.
+- Example app: the drink card of the juice bar. For the result of `juicebar_drinks_list` the chat draws the
+  drinks whose bottles do not warn, each in the glass its author chose in the marketplace, filled with its
+  colour; a person picks one, and its button orders it at once, without a question of the language model.
+  The card follows the order and shows the glass waiting for the start button of the machine, filling while
+  the pumps run, and full, with an umbrella. Without motion the glass shows the same, still.
+- Example app: the showcase page `/juice-bar`, the same drink card on a page of its own, for a screen next to
+  the machine at a fair: a guest picks and orders without a language model. It reads the card of the machine
+  every half minute. Only a build with `APP_SHOWCASES` has it.
+- Juice bar API: a drink carries its colour and the picture of a glass its author chose (`color`, `picture`),
+  an ingredient its colour and whether its bottle runs low (`color`, `runsLow`). Colours that are not `#rrggbb`
+  are left out.
 - Example app: "Add a card" at the end of a kept page in "Edit" adds a card by hand, with no language model:
   the cards a page can hold, by what they show, and what the chosen one takes, read from its input schema
   (a machine by its name, the hours of its history). The same card twice or a thirteenth is not added.
@@ -40,6 +57,19 @@ All notable changes are documented here. The format follows
 - Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
   `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
   shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0020).
+- Example app: the page "OSACA cell" (`/osaca`) shows the OSACA demo cell, a robot that feeds a milling machine,
+  as a live 3D model with its key figures, axes, job orders, NC channels, alerts and machine data, from the
+  values the cell publishes over MQTT (`<root>/oem/…` and `<root>/umati/…`), and starts its preconfigured job
+  again after a confirmation. The settings `OSACA_MQTT_URL` and `OSACA_SIM_URL` name the broker and the
+  simulation.
+- Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
+  no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
+- Page of a machine: under the title where the machine stands, and below the machine card three sections as the
+  mock has them: Now, live tiles of its power, energy, spindle and feed; Alarms & warnings; Power and energy over
+  the chosen hours. Other hours read the sections again without loading the page again; a section that gets no
+  answer says so and asks again on its own, one question at a time. The page draws the cards without their feet
+  and topic lines, the chat with them. It reads the measurements of its machine only, and the alarms once after a
+  burst of alerts.
 - Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
   each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
   draws them with the notification card.
@@ -346,6 +376,13 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Notification card: all notifications or those of one level, errors or warnings, ten a page, those that stand
+  first, with the pagination of the energy card; the counts at the head and the sums at the foot follow the level.
+- Time series and energy card: power in kilowatts with an area under its line, a taller graph, and times on full
+  hours and quarter hours; the energy table has columns for the meter, kWh, Avg kW and Peak kW. The machine card
+  writes the times under its band. This holds in the chat as well, which draws the same cards.
+- Generative UI backend: `genui_measurement_series` takes an optional `machine`, as `genui_measurement_list` does,
+  and then reads the values and signs of life of that machine only.
 - Example app: Home (`/`) shows where the machines stand, by site and hall; "Needs you" keeps what it showed first.
   The tiles of the running machines are gone. `/sites` leads to `/`.
 - Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
@@ -507,6 +544,20 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Example app and generative UI backend: the demo stays quick with many machines. Live values draws its graphs
+  at most twice a second and only the graphs whose values changed, instead of all of them for every message of
+  the broker. `genui_machine_show` reads the one machine it shows instead of the whole fleet, so Charts, which asks
+  for every machine, no longer grows with the square of the machines. A kept page or one opened from a link stands
+  at once and draws each part when its answer comes. The server of the app keeps one connection to the backend.
+- OPC UA adapter: the alarms of a machine in `urn:umati2:datamodel:opcua` reach
+  `umati/Notification/ActiveAlerts` and `events/notifications`. The adapter reads the list
+  `Notification.ActiveAlerts` of that namespace, decodes `DataType.Alert` itself and raises and clears an alert
+  as it comes into the list and leaves it, with the severity the server gives (`alerts.list`, set by the rules of
+  the namespace). Before, the list went out once as `null`, and alarm events were dropped because their
+  conditions lie in the TRUMPF interface. A TRUMPF machine outside that namespace gets the events of
+  `TcMachineAlarmType` with `AlarmIdentifier` if its registration names no alarms and its server has that type,
+  and the TRUMPF interface counts as its own namespace. A server without the list or the type moves
+  `Notification.ActiveAlerts` to `missing`. A stored registration takes this on `/rescan` (issue 180).
 - `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page
