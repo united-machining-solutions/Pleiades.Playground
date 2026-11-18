@@ -22,13 +22,13 @@ function connect() {
 }
 
 /** A tool that answered, but without values. Its message is the sentence the backend gave as the reason. */
-class Refused extends Error {}
+export class Refused extends Error {}
 
 /**
  * Asks the backend and closes the connection again. If there are no values, the error is a
  * sentence that names who did not answer: the backend names its APIs, this function the backend.
  */
-async function ask<TValues>(
+export async function ask<TValues>(
   read: (backend: Awaited<ReturnType<typeof connect>>) => Promise<TValues>,
 ): Promise<Answer<TValues>> {
   try {
