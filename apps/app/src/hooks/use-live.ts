@@ -20,6 +20,9 @@ export type Live<TValues> = {
 /** How often the clock of a page moves on. */
 const TICK_MS = 1_000
 
+/** How long the messages of the broker are gathered before a page is drawn with them. */
+const FLUSH_MS = 500
+
 /**
  * Keeps a page live. Its loader reads what held when the page was opened, from the backend; from
  * then on every value comes from the broker the moment it is published, and nothing is read again.
@@ -42,14 +45,26 @@ export function useLive<TValues>(loaded: TValues, live: Live<TValues>): { values
   })
 
   const filters = live.filters.join("\n")
-  useEffect(
-    () =>
-      subscribe(filters.split("\n"), (topic, payload) => {
-        const now = Date.parse(serverNow())
-        setValues((before) => current.current.message(before, topic, payload, now))
-      }),
-    [filters],
-  )
+  useEffect(() => {
+    // The messages of a moment are laid on together: a page is drawn again at most every FLUSH_MS,
+    // not once for every message. With a dozen machines that is several times a second fewer.
+    let waiting: Array<{ topic: string; payload: string; now: number }> = []
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const flush = () => {
+      timer = null
+      const batch = waiting
+      waiting = []
+      setValues((before) => batch.reduce((values, one) => current.current.message(values, one.topic, one.payload, one.now), before))
+    }
+    const unsubscribe = subscribe(filters.split("\n"), (topic, payload) => {
+      waiting.push({ topic, payload, now: Date.parse(serverNow()) })
+      timer ??= setTimeout(flush, FLUSH_MS)
+    })
+    return () => {
+      unsubscribe()
+      if (timer !== null) clearTimeout(timer)
+    }
+  }, [filters])
 
   const status = useSyncExternalStore(onBrokerStatus, brokerStatus, brokerStatus)
   useEffect(() => {

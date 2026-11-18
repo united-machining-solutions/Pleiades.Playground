@@ -466,6 +466,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Example app and generative UI backend: the demo stays quick with many machines. Live values draws its graphs
+  at most twice a second and only the graphs whose values changed, instead of all of them for every message of
+  the broker. `genui_machine_show` reads the one machine it shows instead of the whole fleet, so Charts, which asks
+  for every machine, no longer grows with the square of the machines. A kept page or one opened from a link stands
+  at once and draws each part when its answer comes. The server of the app keeps one connection to the backend.
 - `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page

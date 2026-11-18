@@ -1,6 +1,7 @@
 import { clock } from "@pleiades/cards/machine/format.ts"
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
 import { Button, buttonVariants } from "@pleiades/ui/components/button"
+import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { Link, createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router"
 import { LinkIcon, SearchXIcon } from "lucide-react"
@@ -8,7 +9,7 @@ import { useState } from "react"
 
 import { useRetry } from "@/hooks/use-live.ts"
 import { Column, PartsLoading } from "@/pages/column.tsx"
-import { DrawnPart, answerParts, waitsForBackend } from "@/pages/drawn-part.tsx"
+import { DrawnPart, askParts, useAnswers, waitsForBackend } from "@/pages/drawn-part.tsx"
 import { RECIPE_PARAM, decodeRecipe } from "@/pages/link.ts"
 import type { Recipe } from "@/pages/recipe.ts"
 import { savePage } from "@/pages/store.ts"
@@ -43,15 +44,19 @@ export const Route = createFileRoute("/pages/open")({
   loader: async ({ deps }) => {
     const recipe = decodeRecipe(deps.recipe)
     if (recipe === null) return { opened: null }
-    return { opened: { recipe, parts: await answerParts(recipe.parts), readAt: new Date().toISOString() } }
+    return { opened: { recipe, parts: askParts(recipe.parts), readAt: new Date().toISOString() } }
   },
   component: OpenedPage,
   pendingComponent: Loading,
 })
 
+/** No parts: one array, so that the answers are not asked for again on every draw. */
+const NO_PARTS: ReadonlyArray<never> = []
+
 function OpenedPage() {
   const { opened } = Route.useLoaderData()
-  useRetry(opened?.parts.some(waitsForBackend) ?? false)
+  const answers = useAnswers(opened?.parts ?? NO_PARTS)
+  useRetry([...answers.values()].some(waitsForBackend))
   if (!opened) return <NoRecipe />
   return (
     <Column>
@@ -59,7 +64,7 @@ function OpenedPage() {
       <Head title={opened.recipe.title} line={`as of ${clock(opened.readAt)} · from a link`} />
       {opened.parts.map((part, index) => (
         // The parts of a page keep their order, so the place is the key.
-        <DrawnPart key={index} part={part} />
+        answers.get(part) ? <DrawnPart key={index} part={answers.get(part)!} /> : <Skeleton key={index} className="h-40 w-full" />
       ))}
     </Column>
   )

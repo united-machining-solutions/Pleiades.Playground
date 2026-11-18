@@ -1,4 +1,5 @@
 import { SearchXIcon, ServerOffIcon } from "lucide-react"
+import { useEffect, useState } from "react"
 import type { ReactNode } from "react"
 
 import { chatTools } from "@/chat/cards.tsx"
@@ -18,22 +19,42 @@ const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
 /** A part with its answer: what the tool gave now, or why it gave nothing. */
 export type AnsweredPart = RecipePart & { answer: PartAnswer }
 
-/**
- * Asks every part of a recipe at the same time, for a loader. Each part answers for itself: one
- * without an answer leaves the others whole. A tool without a card is not asked, because the
- * server of the app would refuse it too.
- */
-export function answerParts(parts: ReadonlyArray<RecipePart>): Promise<Array<AnsweredPart>> {
-  return Promise.all(
-    parts.map(async (part): Promise<AnsweredPart> => {
-      if (!drawingTool(part.tool, chatTools)) return { ...part, answer: { values: null, error: noCardFor(part.tool) } }
-      // If the server of the app itself is away for a moment, the part says so and the page keeps trying.
-      const answer = await callPart({ data: { tool: part.tool, args: part.args, timeZone } }).catch(
-        (error: unknown): PartAnswer => ({ values: null, error: String(error) }),
-      )
-      return { ...part, answer }
-    }),
+/** A part that has been asked: its answer comes when the tool has given it. */
+export type AskedPart = RecipePart & { answer: Promise<PartAnswer> }
+
+/** One part, asked: a tool without a card is not asked, because the server of the app would refuse it too. */
+function askPart(part: RecipePart): Promise<PartAnswer> {
+  if (!drawingTool(part.tool, chatTools)) return Promise.resolve({ values: null, error: noCardFor(part.tool) })
+  // If the server of the app itself is away for a moment, the part says so and the page keeps trying.
+  return callPart({ data: { tool: part.tool, args: part.args, timeZone } }).catch(
+    (error: unknown): PartAnswer => ({ values: null, error: String(error) }),
   )
+}
+
+/**
+ * Asks every part of a recipe at the same time, for a loader, and does not wait for them: the page
+ * stands at once and each part is drawn when its answer comes, so one slow part does not hold back
+ * the others. Each part answers for itself: one without an answer leaves the others whole.
+ */
+export function askParts(parts: ReadonlyArray<RecipePart>): Array<AskedPart> {
+  return parts.map((part) => ({ ...part, answer: askPart(part) }))
+}
+
+/** The parts that have answered so far, each by the asked part it belongs to. */
+export function useAnswers(asked: ReadonlyArray<AskedPart>): ReadonlyMap<AskedPart, AnsweredPart> {
+  const [answers, setAnswers] = useState<ReadonlyMap<AskedPart, AnsweredPart>>(new Map())
+  useEffect(() => {
+    let gone = false
+    for (const part of asked) {
+      void part.answer.then((answer) => {
+        if (!gone) setAnswers((before) => new Map(before).set(part, { ...part, answer }))
+      })
+    }
+    return () => {
+      gone = true
+    }
+  }, [asked])
+  return answers
 }
 
 /**

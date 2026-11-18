@@ -9,7 +9,7 @@ import { useEffect, useId, useRef, useState } from "react"
 
 import { useRetry } from "@/hooks/use-live.ts"
 import { Column, PartsLoading } from "@/pages/column.tsx"
-import { DrawnPart, answerParts, waitsForBackend } from "@/pages/drawn-part.tsx"
+import { DrawnPart, askParts, useAnswers, waitsForBackend } from "@/pages/drawn-part.tsx"
 import { OnlyPart, PartControls, controlId } from "@/pages/part-controls.tsx"
 import { MAX_TITLE_LENGTH } from "@/pages/recipe.ts"
 import type { StoredPage } from "@/pages/recipe.ts"
@@ -65,7 +65,7 @@ export const Route = createFileRoute("/pages/$page")({
   loader: async ({ params }) => {
     const page = getPage(params.page)
     if (!page) throw notFound()
-    return { parts: await answerParts(page.recipe.parts), readAt: new Date().toISOString() }
+    return { parts: askParts(page.recipe.parts), readAt: new Date().toISOString() }
   },
   component: KeptPage,
   pendingComponent: Loading,
@@ -92,9 +92,13 @@ function KeptPage() {
 function ShownPage({ page }: { page: StoredPage }) {
   const router = useRouter()
   const { parts, readAt } = Route.useLoaderData()
+  const answers = useAnswers(parts)
   const shown = shownParts(page.recipe.parts, parts)
   const unasked = shown.some(({ answered }) => answered === undefined)
-  useRetry(shown.some(({ answered }) => answered !== undefined && waitsForBackend(answered)))
+  useRetry(shown.some(({ answered }) => {
+    const answer = answered && answers.get(answered)
+    return answer !== undefined && waitsForBackend(answer)
+  }))
   useEffect(() => {
     if (unasked) void router.invalidate()
   }, [unasked, router])
@@ -169,7 +173,7 @@ function ShownPage({ page }: { page: StoredPage }) {
             ) : (
               <PartControls prefix={prefix} at={at} count={shown.length} onMove={move} onRemove={remove} />
             ))}
-          {answered ? <DrawnPart part={answered} /> : <Skeleton className="h-40 w-full" />}
+          {answered && answers.get(answered) ? <DrawnPart part={answers.get(answered)!} /> : <Skeleton className="h-40 w-full" />}
         </div>
       ))}
     </Column>
