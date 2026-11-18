@@ -417,6 +417,9 @@ All notable changes are documented here. The format follows
   is the start view, now headed "Chats"; its field begins a new chat. "New chat" is gone from the head of a
   chat, since it led to the same view the way back leads to. Without a language model the head still says
   "Chat". After "All chats" or a chat of the list the focus is on the heading of the view it leads to.
+- OPC UA adapter: the endpoint card of `/discover` shows the endpoint the adapter takes in one line, and says
+  when the server also accepts sessions without security. The other endpoints are folded behind "n more
+  endpoints", since a person cannot choose one there.
 
 ### Removed
 
