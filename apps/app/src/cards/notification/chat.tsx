@@ -10,6 +10,7 @@ import { notificationListOf } from "./results.ts"
 export const notificationTools: ReadonlyArray<ChatTool> = [
   {
     name: "genui_notification_list",
+    part: "The warnings and errors of one machine",
     label: {
       running: "Reading the notifications",
       done: "Read the notifications",

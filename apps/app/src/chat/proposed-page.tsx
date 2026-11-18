@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router"
 import { CircleCheckIcon } from "lucide-react"
 import { useState } from "react"
 
+import { keepProposal, keptPageOf } from "@/pages/kept-proposals.ts"
 import { encodeRecipe } from "@/pages/link.ts"
 import { PROPOSE_PAGE_TOOL, partInWords, proposedRecipe } from "@/pages/proposal.ts"
 import type { Recipe } from "@/pages/recipe.ts"
@@ -11,12 +12,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@pleiades/ui/components/item"
 
 import type { ChatTool } from "./tool-results.ts"
-
-/**
- * The page a proposal was kept as in this tab, by its recipe. A page kept with exactly this recipe
- * counts too, so a chat opened again after a reload still says that the page is kept.
- */
-const saved = new Map<string, string>()
 
 /**
  * The entry of the chat's list for the proposal of a page (pages/proposal.ts): what a call is called,
@@ -32,9 +27,9 @@ export function proposalTool(tools: () => ReadonlyArray<ChatTool>): ChatTool {
       failed: "Failed to propose a page",
     },
     saveAsPage: false,
-    draw(content) {
+    draw(content, call) {
       const recipe = proposedRecipe(content)
-      return recipe && <ProposedPage recipe={recipe} tools={tools()} />
+      return recipe && <ProposedPage recipe={recipe} call={call?.id} tools={tools()} />
     },
   }
 }
@@ -44,13 +39,18 @@ export function proposalTool(tools: () => ReadonlyArray<ChatTool>): ChatTool {
  * where a page from a link opens (`/pages/open`), drawn with the values of now. "Save to my pages"
  * keeps it, as "Save as page" does, and goes to it beside the chat. Then the card says so and leads
  * to the page; a page deleted since then is no longer said to be there.
+ *
+ * Which page the proposal was kept as is noted by the id of its tool call (`call`, pages/kept-proposals.ts),
+ * so it holds after a reload and after the page was renamed or its parts changed: the proposal does not
+ * offer to keep a second page. A page kept otherwise, from "Preview", is found while its recipe is still
+ * exactly the proposed one.
  */
-function ProposedPage({ recipe, tools }: { recipe: Recipe; tools: ReadonlyArray<ChatTool> }) {
+function ProposedPage({ recipe, call, tools }: { recipe: Recipe; call?: string; tools: ReadonlyArray<ChatTool> }) {
   const navigate = useNavigate()
   const pages = usePages()
-  const key = JSON.stringify(recipe)
-  const [id, setId] = useState(() => saved.get(key))
+  const [id, setId] = useState(() => (call === undefined ? undefined : keptPageOf(call)))
   const [refused, setRefused] = useState(false)
+  const key = JSON.stringify(recipe)
   const kept = pages.find((page) => page.id === id) ?? pages.find((page) => JSON.stringify(page.recipe) === key)
   // A page too long for an address has no preview; it can still be kept.
   const link = encodeRecipe(recipe)
@@ -61,7 +61,7 @@ function ProposedPage({ recipe, tools }: { recipe: Recipe; tools: ReadonlyArray<
       return
     }
     setRefused(false)
-    saved.set(key, page)
+    if (call !== undefined) keepProposal(call, page)
     setId(page)
     void navigate({ to: "/pages/$page", params: { page }, search: true })
   }

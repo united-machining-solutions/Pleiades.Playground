@@ -19,8 +19,9 @@ export type ChatTool = {
   /**
    * What the chat draws for a result of the tool: a card, a list. Null if the result does not keep
    * the contract. For a tool without it the chat draws nothing, and the answer is the model's.
+   * `call` is the call the result answers, where the chat has it; a page has none.
    */
-  draw?: (content: unknown) => ReactNode | null
+  draw?: (content: unknown, call?: { id: string }) => ReactNode | null
   /**
    * Only a card calls this tool, so the chat keeps it from its language model. The backend marks
    * such a tool (MCP Apps: `visibility`), and a host that shows MCP Apps leaves it out of what
