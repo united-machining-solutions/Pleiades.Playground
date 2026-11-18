@@ -31,7 +31,8 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
 - A service reads and writes data only through a contract under `contracts/`. Change the contract first.
 - Units: a machine below `machines/` keeps the units of the data model (energy in `wattHour`); a place below
   `sites/` uses SI units, energy in joule, fractions in `one`. Never invent or convert units on the wire, in a
-  store or in an API; a display converts (ADR-0002).
+  store or in an API; a display converts (ADR-0002). The words of a tool result are such a display: they may name
+  a value in the unit people use, next to the values, which keep the unit they came with (ADR-0017).
 - Never commit a secret value. Names go to `.env.example`.
 - Verify before you claim: `dotnet build` and `dotnet test --solution source/Pleiades.Playground.slnx`; for
   TypeScript `pnpm typecheck`, `pnpm test` and `pnpm build`; for the stack
