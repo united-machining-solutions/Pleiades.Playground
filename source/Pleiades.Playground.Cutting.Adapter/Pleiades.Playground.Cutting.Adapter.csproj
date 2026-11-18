@@ -22,13 +22,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
-    <ProjectReference Include="..\Pleiades.Playground.Common.DataTransferObjects\Pleiades.Playground.Common.DataTransferObjects.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.Common.Logging\Pleiades.Playground.Common.Logging.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.Common.Logging.Configuration\Pleiades.Playground.Common.Logging.Configuration.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.HealthChecks.AspNetCore\Pleiades.Playground.HealthChecks.AspNetCore.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.HealthChecks.Mqtt\Pleiades.Playground.HealthChecks.Mqtt.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.Mqtt.Extensions\Pleiades.Playground.Mqtt.Extensions.csproj" />
-    <ProjectReference Include="..\Pleiades.Playground.Notification.DataTransferObjects\Pleiades.Playground.Notification.DataTransferObjects.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.Cutting.Protocol\Pleiades.Playground.Cutting.Protocol.csproj" />
   </ItemGroup>
 

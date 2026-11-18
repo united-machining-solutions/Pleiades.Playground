@@ -45,7 +45,7 @@ In PowerShell, set the variable first: `$env:PLEIADES_VERSION = "main"`. Or writ
 | MQTT broker | `localhost:1883` | Anonymous in the demo network |
 | Generative UI backend | <http://localhost:5520/mcp> | MCP server for displays, see [`apps/genui-mcp`](apps/genui-mcp/README.md) |
 | Example app | <http://localhost:5600/> | What every machine does now, and a chat about it. It answers on this computer only (`APP_BIND`); see [`apps/app`](apps/app/README.md) |
-| Cutting simulators | <http://localhost:5611/>, `:5612`, `:5613` | Only with `--profile cutting`: a 2D laser, a tube laser and a punching machine that take their jobs through telegram files; see [`Cutting.Simulator`](source/Pleiades.Playground.Cutting.Simulator/README.md). One [`Cutting.Adapter`](source/Pleiades.Playground.Cutting.Adapter/README.md) each publishes them to the broker as `L-01`, `T-01` and `PU-01` |
+| Cutting simulators | <http://localhost:5611/>, `:5612`, `:5613` | A 2D laser, a tube laser and a punching machine that take their jobs through telegram files; see [`Cutting.Simulator`](source/Pleiades.Playground.Cutting.Simulator/README.md). One [`Cutting.Adapter`](source/Pleiades.Playground.Cutting.Adapter/README.md) each publishes them to the broker as `trumpf_Laser2D_L-01`, `trumpf_Tube_T-01` and `trumpf_Punch_PU-01` |
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
 An optional [Ultimaker 3 service](source/Pleiades.Playground.Ultimaker.Api/README.md) adds CuraEngine,

@@ -13,9 +13,9 @@ The web page shows the machine, with its serial number, and lets you drive it: s
 the plan, raise and acknowledge alarms, edit the production plan, fill or empty a stack, send any notification by
 hand, and watch every telegram in and out.
 
-The serial number (`Config__SerialNumber`) is the machine id in Pleiades: the adapter publishes below
-`machines/{SerialNumber}/`. The telegrams do not carry it, so simulator and adapter are each told it; in
-`compose.yaml` one YAML anchor gives both the same value.
+The serial number (`Config__SerialNumber`) is the last part of the machine id in Pleiades: the adapter publishes
+below `machines/<manufacturer>_<model>_<serial number>/`, such as `machines/trumpf_Laser2D_L-01/`. The telegrams do
+not carry it, so simulator and adapter are each told it; in `compose.yaml` one YAML anchor gives both the same value.
 
 ## Endless mode
 
@@ -34,14 +34,14 @@ setting survives one.
 
 The other side, the host, is a separate program. In this repository it is the
 [cutting adapter](../Pleiades.Playground.Cutting.Adapter/README.md), which brings the data into Pleiades; the
-profile `cutting` starts one per simulator. The simulator itself does not publish to the MQTT broker.
+stack starts one per simulator. The simulator itself does not publish to the MQTT broker.
 
 ## Run it
 
 With the stack, three machines, one of each type:
 
 ```sh
-docker compose --profile cutting up -d --build --wait
+docker compose up -d --build --wait
 ```
 
 | Machine | Web page | Telegram files |

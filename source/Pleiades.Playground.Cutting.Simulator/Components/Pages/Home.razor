@@ -16,7 +16,7 @@
             <dd>
                 @if (State.SerialNumber.Length > 0)
                 {
-                    <span class="mono" title="The machine id in Pleiades: the adapter publishes below machines/@State.SerialNumber/">@State.SerialNumber</span>
+                    <span class="mono" title="The serial number, the last part of the machine id in Pleiades: the adapter publishes below machines/&lt;manufacturer&gt;_&lt;model&gt;_@State.SerialNumber/">@State.SerialNumber</span>
                 }
                 else
                 {

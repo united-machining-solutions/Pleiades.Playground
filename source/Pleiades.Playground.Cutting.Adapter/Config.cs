@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Mqtt.Extensions.Machines;
 using Pleiades.Playground.Cutting.Protocol.Transport;
 
 namespace Pleiades.Playground.Cutting.Adapter;
@@ -13,12 +14,35 @@ namespace Pleiades.Playground.Cutting.Adapter;
 internal sealed class Config
 {
     /// <summary>
-    /// The serial number of the machine: the machine id in every topic, <c>machines/{SerialNumber}/...</c>.
-    /// Must not contain '/', '+' or '#'.
+    /// The serial number of the machine, <c>Identification.SerialNumber</c>, the last part of the machine id
+    /// <c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>.
     /// </summary>
     [Required]
-    [RegularExpression(@"^[^/+#\s]+$")]
     public required string SerialNumber { get; init; }
+
+    /// <summary>The name of the manufacturer, <c>Identification.Manufacturer</c>.</summary>
+    [Required]
+    public string Manufacturer { get; init; } = "TRUMPF";
+
+    /// <summary>
+    /// The web address of the manufacturer, <c>Identification.ManufacturerUri</c>. Its domain without <c>www.</c>
+    /// and its ending is the first part of the machine id, and with dashes the prefix of its signals
+    /// (<c>x-trumpf-com</c>).
+    /// </summary>
+    [Required]
+    [Url]
+    public string ManufacturerUri { get; init; } = "https://www.trumpf.com";
+
+    /// <summary>The model, <c>Identification.Model</c>, the middle part of the machine id.</summary>
+    [Required]
+    public string Model { get; init; } = "Laser2D";
+
+    /// <summary>The globally unique id of the machine; empty for <c>{ManufacturerUri}/{Model}/{SerialNumber}</c>.</summary>
+    [MaxLength(255)]
+    public string ProductInstanceUri { get; init; } = string.Empty;
+
+    /// <summary>Who the machine is, as the binding names it.</summary>
+    public MachineIdentity Identity => new(Manufacturer, ManufacturerUri, Model, SerialNumber, ProductInstanceUri);
 
     /// <summary>The machine number of the protocol, field 1 of every request (§3).</summary>
     [Required]
@@ -50,8 +74,8 @@ internal sealed class Config
     public TimeSpan ReplyTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// How often the adapter asks the machine for its time (<c>SYSTTIME</c>). Each reply is one heartbeat; the
-    /// binding wants one every ten seconds.
+    /// How often the adapter asks the machine for its time (<c>SYSTTIME</c>), and how often it publishes its own
+    /// <c>Connection/Heartbeat</c>; the manifest names it.
     /// </summary>
     [Range(typeof(TimeSpan), "00:00:01", "00:10:00")]
     public TimeSpan HeartbeatInterval { get; init; } = TimeSpan.FromSeconds(10);

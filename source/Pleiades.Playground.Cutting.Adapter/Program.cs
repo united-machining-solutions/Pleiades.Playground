@@ -5,6 +5,7 @@ using Pleiades.Playground.Common.Logging.Configuration;
 using Pleiades.Playground.HealthChecks.AspNetCore;
 using Pleiades.Playground.HealthChecks.Mqtt;
 using Pleiades.Playground.Mqtt.Extensions;
+using Pleiades.Playground.Mqtt.Extensions.Machines;
 using Pleiades.Playground.Cutting.Adapter;
 using Pleiades.Playground.Cutting.Protocol.Transport;
 
@@ -24,9 +25,15 @@ builder.Services.AddOptions<MqttConfig>()
     .Bind(builder.Configuration.GetSection("Config:MqttDestination"))
     .ValidateDataAnnotations()
     .ValidateOnStart();
-builder.Services.AddMqttClientHost().AddClient(builder.Configuration.GetSection("Config:MqttDestination"));
+// The last will of the binding: Connection/State = CommunicationFault, retained, as the broker publishes it when the
+// connection of the adapter breaks off.
+builder.Services.AddMqttClientHost().AddClient(builder.Configuration.GetSection("Config:MqttDestination"),
+    (services, client) => client.WithMachineLastWill(
+        services.GetRequiredService<IOptions<Config>>().Value.Identity.MachineId,
+        services.GetRequiredService<TimeProvider>().GetUtcNow()));
 
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton(sp => sp.GetRequiredService<IOptions<Config>>().Value.Identity);
 builder.Services.AddSingleton(sp =>
 {
     var config = sp.GetRequiredService<IOptions<Config>>().Value;
@@ -50,6 +57,7 @@ builder.Services.AddSingleton(sp =>
     var config = sp.GetRequiredService<IOptions<Config>>().Value;
     var zone = config.MachineTimeZone;
     return new CuttingTranslator(
+        config.Identity,
         string.IsNullOrWhiteSpace(zone) ? TimeZoneInfo.Local : TimeZoneInfo.FindSystemTimeZoneById(zone),
         sp.GetRequiredService<TimeProvider>(),
         config.StateHold,
