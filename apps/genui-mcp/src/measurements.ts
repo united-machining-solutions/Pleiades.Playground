@@ -53,7 +53,7 @@ export async function listMeasurements(apis: Apis, now = new Date(), machine?: s
   const windowStart = secondsBefore(now, WINDOW_SECONDS)
   const [topics, signs] = await Promise.all([
     listTopics(apis, secondsBefore(now, HORIZON_SECONDS), now),
-    readSignsOfLife(apis, secondsBefore(windowStart, SILENT_AFTER_SECONDS), now),
+    readSignsOfLife(apis, secondsBefore(windowStart, SILENT_AFTER_SECONDS), now, machine),
   ])
   const known = [...new Set(topics.flatMap((topic) => machineOf(topic) ?? []))].sort()
   if (machine !== undefined && !known.includes(machine)) {
@@ -115,20 +115,23 @@ export function slotted(
 
 /**
  * Every quantity of every machine over the last minutes, a line for each machine that has a
- * value of it. A line begins with the value that held where the minutes begin, however old, so a
- * value that is published only when it changes is drawn too.
+ * value of it; with `machine`, the lines of that machine only, and nothing of the others is read.
+ * A line begins with the value that held where the minutes begin, however old, so a value that is
+ * published only when it changes is drawn too.
  */
 export async function listMeasurementSeries(
   apis: Apis,
   minutes = SERIES_MINUTES,
   slots = SERIES_SLOTS,
   now = new Date(),
+  machine?: string,
 ): Promise<MeasurementSeries> {
   const from = secondsBefore(now, minutes * 60)
+  const who = machine ?? "*"
   // The signs of life just before say whether the machine was there where the lines begin.
   const [signs, ...timelines] = await Promise.all([
-    readSignsOfLife(apis, secondsBefore(from, SILENT_AFTER_SECONDS), now),
-    ...QUANTITIES.map((quantity) => readTimelines(apis, sources[quantity].kind, `machines/*/${sources[quantity].path}`, from, now)),
+    readSignsOfLife(apis, secondsBefore(from, SILENT_AFTER_SECONDS), now, who),
+    ...QUANTITIES.map((quantity) => readTimelines(apis, sources[quantity].kind, `machines/${who}/${sources[quantity].path}`, from, now)),
   ])
   const samplesOf = (quantity: Quantity, machine: string) =>
     timelines[QUANTITIES.indexOf(quantity)]?.find((one) => one.topic === topicOf(machine, quantity))?.samples ?? []
