@@ -7,6 +7,8 @@ import {
   askFollowUp,
   canListen,
   listen,
+  remembering,
+  setSentenceVoice,
   setVoiceEnabled,
   speak,
   stopListening,
@@ -14,6 +16,7 @@ import {
   useVoiceState,
 } from "@/voice/voice.ts"
 import type { VoiceState } from "@/voice/voice.ts"
+import { tom, tomAvailable } from "@/voice/tom.ts"
 import { faultBriefing, faultInWords, useNewFaults } from "@/voice/faults.ts"
 import type { Fault } from "@/voice/faults.ts"
 import { useShownCards } from "@/voice/shown.ts"
@@ -96,9 +99,23 @@ function Assistant() {
     return () => setVoiceEnabled(false)
   }, [])
 
-  // Titan speaks with the voice of the system, which sounds at once. The voice of Tom (tom.ts,
-  // apps/titan-voice) is ready in the code, but on a computer without a graphics card it takes as long
-  // to make a sentence as to say it, which is too slow to talk with.
+  // Titan speaks with the voice of Tom when its service runs (apps/titan-voice), else with the voice of
+  // the system. What Titan says often is made at once and kept, so it sounds without waiting.
+  useEffect(() => {
+    let open = true
+    void tomAvailable().then(async (available) => {
+      if (!open || !available) return
+      const voice = remembering(tom)
+      setSentenceVoice(voice)
+      for (const sentence of [READY, AWAKE, greetingFor(undefined, [])]) {
+        if (open) await voice.predict(sentence).catch(() => undefined)
+      }
+    })
+    return () => {
+      open = false
+      setSentenceVoice(undefined)
+    }
+  }, [])
 
   // The cloud keeps an eye on the hall. A new fault turns it red at once, and the assistant speaks
   // first: it is told what happened and says it in its own words, with the shop floor. Without a

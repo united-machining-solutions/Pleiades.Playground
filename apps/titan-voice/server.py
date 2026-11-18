@@ -1,6 +1,6 @@
 """HTTP for the voice of Titan.
 
-GET  /health  200 "Healthy" once the models and Tom's embedding are loaded and warm, 503 before.
+GET  /health  200 "Healthy" once the voice of Tom is loaded and warm, 503 before.
 POST /speak   JSON {"text": "..."}, one sentence at a time, answers audio/wav (mono, 16 bit, 22050 Hz).
 """
 
@@ -21,7 +21,7 @@ MAX_TEXT = 1000
 MAX_BODY = 16 * 1024
 
 state: dict[str, object] = {"voice": None, "error": None}
-# One synthesis at a time: torch already uses the threads it is given, two at once only slow each other.
+# One synthesis at a time: Piper already uses the threads it is given, two at once only slow each other.
 speaking = threading.Lock()
 
 

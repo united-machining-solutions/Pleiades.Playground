@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router"
 
 import { MAX_SENTENCE, speakableText } from "@/voice/tom.ts"
 
-// The voice of Tom for Titan: a service on this computer (TITAN_VOICE_URL, see apps/titan-voice) turns a
+// The voice of Tom for Titan: a service of the stack (TITAN_VOICE_URL, see apps/titan-voice) turns a
 // sentence into a wav. The browser does not reach it directly; this passes the sentence on.
 //
 // GET says whether it is there and ready; POST takes JSON { text } and answers with audio/wav.
@@ -31,7 +31,9 @@ async function speak({ request }: { request: Request }) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
-    signal: AbortSignal.timeout(60_000),
+    // The service makes one sentence at a time, in a fraction of a second: a sentence may wait behind the
+    // one being made.
+    signal: AbortSignal.timeout(30_000),
   }).catch((error: unknown) => error as Error)
   if (answer instanceof Error) {
     const cause = (answer as { cause?: { code?: string } }).cause?.code

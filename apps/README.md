@@ -8,7 +8,7 @@ container each, with a `Dockerfile`.
 | [`genui-mcp/`](genui-mcp/README.md) | Generative UI backend: an MCP server whose tools read the Timeseries and Events APIs and return text and values. The values of a card keep the contract of that card. The machine card is also a `ui://` resource (MCP App): one HTML file that other hosts show. |
 | [`app/`](app/README.md) | The example application: a single-page app. Home lists what every machine does now, a page per machine shows the machine card, and a chat with an agent harness answers questions with the tools of the MCP server. The app draws the values itself, with the cards of the catalogue. |
 | [`design-system/`](design-system/README.md) | The design system on one page: the tokens, every component of `packages/ui` in its variants and states, and what the card catalogue builds from them. It runs with its development server and is not part of the demo stack. |
-| [`titan-voice/`](titan-voice/README.md) | Not TypeScript: a Python service on the CPU that speaks a German sentence in the voice of Tom, for Titan, the assistant of the app (Piper and the tone colour converter of OpenVoice V2). Started locally with `compose.override.yaml`, not part of `compose.yaml`; the reference recording stays outside the repository. |
+| [`titan-voice/`](titan-voice/README.md) | Not TypeScript: a Python service on the CPU that speaks a German sentence in the voice of Tom, for Titan, the assistant of the app (Piper, with a voice trained on a recording of Tom alone). Part of `compose.yaml`; the trained voice is in the image, kept with the recording in Git LFS. |
 
 What the first two look like when they run: the [tour of the demo](../docs/tour.md), with screenshots.
 

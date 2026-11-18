@@ -185,6 +185,8 @@ services:
         condition: service_healthy
     environment:
       GENUI_MCP_URL: http://genui-mcp:8080/mcp
+      # The voice of Tom for Titan; empty leaves Titan with the voice of the browser.
+      TITAN_VOICE_URL: ${TITAN_VOICE_URL-http://titan-voice:8080}
       # The chat needs at least one language model; everything else works without one. A block counts
       # once its key is set, so a key alone is enough: the model names default to those of .env.example.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -194,6 +196,22 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODELS: ${LLM_MODELS:-}
+
+  # The voice of Tom for Titan, the assistant of the app: a German sentence in, a wav out, by Piper on the
+  # CPU. The voice is in the image; the app reaches it inside the stack, no port is published.
+  titan-voice:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.titan.voice:${PLEIADES_VERSION:-dev}
+    build:
+      context: ./apps/titan-voice
+    environment:
+      THREADS: ${TITAN_VOICE_THREADS:-4}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   # One simulator per machine. The serial number is the machine id in every topic.
   # All three run the same image. Only the first one builds it, or pulls it, so that happens once and not

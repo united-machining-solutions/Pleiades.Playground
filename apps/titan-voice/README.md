@@ -1,114 +1,97 @@
 # titan-voice
 
-Titan, the voice assistant of the example app, can answer in the voice of Tom. This service makes that
-voice: it takes one German sentence and answers with a wav. It runs on this computer, on the CPU, and needs
-no network once its image is built.
+Titan, the voice assistant of the example app, answers in the voice of Tom. This service makes that voice:
+it takes one German sentence and answers with a wav, in a fraction of a second, on the CPU. It needs no
+graphics card and no network.
 
-- [Piper](https://github.com/OHF-Voice/piper1-gpl) speaks the sentence with the German voice
-  `de_DE-thorsten-medium` from [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices).
-- The tone colour converter of [OpenVoice V2](https://github.com/myshell-ai/OpenVoice) (MIT, checkpoint
-  [myshell-ai/OpenVoiceV2](https://huggingface.co/myshell-ai/OpenVoiceV2) `converter/`) then gives that
-  speech the timbre of Tom. Only the converter is used: no whisper, no watermark model, nothing that is
-  fetched at run time.
-
-The words, the rhythm and the pronunciation stay those of Piper; the converter changes how the voice sounds.
+It uses [Piper](https://github.com/OHF-voice/piper1-gpl) (GPL-3.0) with a voice trained on Tom's recording
+alone: the training starts from the weights of a German Piper voice, so that it learns quickly, and then
+learns only from Tom. No other voice speaks first, and nothing is converted or mixed.
 
 | | |
 |---|---|
-| In the demo stack | not part of `compose.yaml`; added locally with `compose.override.yaml`, see below. The port is not published: the app reaches it as `http://titan-voice:8080` |
-| Liveness | `GET /health`: `Healthy` once the models are loaded and warm, `503` before |
+| In the demo stack | `titan-voice` in `compose.yaml`. The port is not published: the app reaches it as `http://titan-voice:8080` (`TITAN_VOICE_URL`; set it empty to leave Titan with the voice of the browser) |
+| Liveness | `GET /health`: `Healthy` once the voice is loaded and warm, `503` before |
 | Speech | `POST /speak` with JSON `{ "text": "..." }`, one sentence, at most 1000 characters; answers `audio/wav`, mono, 16 bit, 22 050 Hz |
-| Image | `pleiades.playground.titan.voice` |
-| Settings | `TORCH_THREADS` (4), `TAU` (0.3, how strongly the converter follows the source), `REFERENCE` (`Stimmprofil_Tom.mp4`) |
+| Image | `pleiades.playground.titan.voice`, about 600 MB, the voice included |
+| Settings | `THREADS` (4, from `TITAN_VOICE_THREADS`), `LENGTH_SCALE` (1.0, higher speaks slower), `VOICE` (`de_DE-tom-medium.onnx`) |
 
-## Consent and the recording of Tom
+## Consent
 
-Tom agreed that Titan speaks with his voice, and asked for it. His recording is personal data, and so are
-the sound taken from it and the speaker embedding made of it. So:
+Tom agreed that Titan speaks with his voice, and that his recording and the voice trained on it are kept in
+this repository for that. Both are personal data: use them only for Titan in this demo. If Tom withdraws his
+consent, delete `voice/` and `train/recording/`, remove them from the history of Git LFS, and remove the
+service from `compose.yaml`.
 
-- The recording is **not in this repository and not in the image**. It lives in `~/titan-voice/` on the
-  computer that runs the service (on Windows `C:\Users\<you>\titan-voice\`), and the container mounts that
-  folder at `/data`.
-- At its first start the service takes the sound out of the recording with ffmpeg, in memory, cuts out long
-  pauses, and computes the speaker embedding of Tom once. It keeps the embedding next to the recording, as
-  `tom.se.pt` with `tom.se.json` (a fingerprint of the recording, to notice a new one). No wav is written.
-- Nothing of it leaves the computer: not to a language model, not to any cloud. The service needs no network
-  at run time, its port is not published, and the app only sends it the text to speak.
-- Never commit the recording, a wav made from it or the embedding. If Tom withdraws his consent, delete the
-  folder `~/titan-voice/` and remove the service from `compose.override.yaml`.
+## Files
+
+- `voice/de_DE-tom-medium.onnx` and its `.json`: the voice of Tom, in Git LFS, built into the image.
+- `train/recording/`: Tom's recording (`Stimmprofil_Tom.wav`, in Git LFS) and `metadata.csv`, the sentences
+  cut from it with their text, as Whisper heard them and as the voice was trained.
+- `Dockerfile`: Python 3.11, Piper and the voice.
+- `voice.py`: loads the voice and speaks. `server.py`: the HTTP API, loading and warming up in the background.
+- `train/`: the image to train the voice, `prepare.py`, which cuts the recording into sentences, and
+  `train.py`, which runs Piper's training without a network.
+
+Git LFS must be installed before you clone (`git lfs install`); without it, `voice/` holds only pointers and
+the service reports `Unhealthy`. After a clone without it: `git lfs pull`.
 
 ## Run it
 
-1. Put the recording into the folder: `~/titan-voice/Stimmprofil_Tom.mp4`. A minute or more of clear
-   speech, without music, is best.
-2. The service takes about 1.1 GB of memory; give Docker Desktop 8 GB for the whole stack.
-3. Add the service to your local, git-ignored `compose.override.yaml` next to `compose.yaml`, and tell the
-   app where it is. Keep what is already in your file, and add:
+It starts with the stack:
 
-   ```yaml
-   services:
-     app:
-       environment:
-         TITAN_VOICE_URL: http://titan-voice:8080
+```bash
+docker compose up -d
+docker compose ps titan-voice    # healthy once the voice is loaded and has spoken a first sentence
+```
 
-     titan-voice:
-       image: ghcr.io/united-machining-solutions/pleiades.playground.titan.voice:${PLEIADES_VERSION:-dev}
-       build:
-         context: ./apps/titan-voice
-       restart: unless-stopped
-       cap_drop: [ALL]
-       security_opt: ["no-new-privileges:true"]
-       volumes:
-         - ~/titan-voice:/data
-       environment:
-         TORCH_THREADS: ${TITAN_VOICE_THREADS:-4}
-       healthcheck:
-         test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
-         start_period: 120s
-         interval: 10s
-         timeout: 5s
-         retries: 3
-   ```
-
-4. Build and start it, then the app again so it reads the new setting:
-
-   ```bash
-   docker compose build titan-voice
-   docker compose up -d titan-voice app
-   docker compose ps titan-voice    # healthy after half a minute or so
-   ```
-
-The build downloads about 600 MB (ffmpeg, torch for the CPU, Piper, the voice and the converter) once; the
-image is about 2.5 GB.
-
-To hear it without the app, publish nothing and ask from inside the stack:
+To hear it without the app:
 
 ```bash
 docker compose exec titan-voice curl -s -X POST localhost:8080/speak \
   -H "Content-Type: application/json" -d '{"text":"Die Presse P-04 steht still."}' -o /tmp/probe.wav
-docker compose cp titan-voice:/tmp/probe.wav ~/probe.wav   # outside the repository
+docker compose cp titan-voice:/tmp/probe.wav ./probe.wav
 ```
+
+## Train the voice again
+
+`train/` is an image with Piper's training and Whisper. It needs an NVIDIA graphics card; on a laptop GPU
+2000 epochs take about four hours. The more minutes of clear speech, the better the voice.
+
+```bash
+docker build -t pleiades.playground.titan.voice.train:local apps/titan-voice/train
+W=/path/to/work                      # a folder outside the repository with a few GB free
+mkdir -p $W/cache/ckpt $W/voice $W/run
+# 1. cut the recording into sentences with their text (Whisper); needs the network once for Whisper
+docker run --rm -v "$PWD/apps/titan-voice/train/recording:/data:ro" -v $W:/work/out -e HF_HOME=/work/out/cache/hf \
+  pleiades.playground.titan.voice.train:local python prepare.py /data/Stimmprofil_Tom.wav /work/out/train
+# 2. the German base voice to start from
+curl -fL -o $W/cache/ckpt/thorsten-medium.ckpt \
+  "https://huggingface.co/datasets/rhasspy/piper-checkpoints/resolve/main/de/de_DE/thorsten/medium/epoch%3D666-step%3D677672.ckpt"
+# 3. learn Tom's voice, without a network
+docker run --rm --network none --gpus all --shm-size 2g -v $W:/work/out pleiades.playground.titan.voice.train:local \
+  python train.py fit --data.voice_name tom --model.mos_metric none \
+  --data.csv_path /work/out/train/metadata.csv --data.audio_dir /work/out/train/wavs \
+  --model.sample_rate 22050 --data.espeak_voice de --data.cache_dir /work/out/cache/piper \
+  --data.config_path /work/out/voice/de_DE-tom-medium.onnx.json --data.batch_size 8 \
+  --model.warmstart_ckpt /work/out/cache/ckpt/thorsten-medium.ckpt \
+  --trainer.max_epochs 2000 --trainer.check_val_every_n_epoch 250 --trainer.default_root_dir /work/out/run
+# 4. write the voice into the repository, then rebuild the image
+docker run --rm --network none -v $W:/work/out pleiades.playground.titan.voice.train:local sh -c \
+  'python -m piper.train.export_onnx --checkpoint "$(ls -t /work/out/run/lightning_logs/*/checkpoints/*.ckpt | head -1)" \
+   --output-file /work/out/voice/de_DE-tom-medium.onnx'
+cp $W/voice/de_DE-tom-medium.onnx* apps/titan-voice/voice/
+docker compose up -d --build titan-voice
+```
+
+Read `$W/train/metadata.csv` after step 1: what Whisper misheard, correct there before step 3. To learn from
+a further recording, cut it the same way, add its sentences, and start step 3 from the voice of Tom instead
+of the base voice: `--model.warmstart_ckpt` with the last checkpoint of `$W/run`.
 
 ## In the app
 
 `apps/app/src/routes/api/speak.ts` passes a sentence on: `GET /api/speak` says `{ available }`, `POST
 /api/speak` with `{ text }` answers the wav, `503` without `TITAN_VOICE_URL`. In the browser,
 `apps/app/src/voice/tom.ts` has `tomAvailable()`, `speakAsTom(sentence)` and `tom.predict(sentence)`, the
-same shape as a Piper session, so the assistant plays Tom sentence by sentence like Piper.
-
-## Speed
-
-Measured on a laptop CPU (Intel Core Ultra 7 265U, Docker with 8 GB, four threads): a sentence of twelve
-words, about 4.4 seconds of speech, takes about 4.3 seconds, so the voice is made about as fast as it is
-spoken. Piper needs a quarter of a second of that; the decoder of the converter takes most of the rest. More
-threads, ONNX Runtime for the decoder or decoding in parallel pieces gained nothing worth the complexity on
-this CPU. The first sentence is heard after about four seconds; while it plays, the next is made. The
-service makes one sentence at a time and takes about 1.1 GB of memory. It is ready six seconds after it
-starts (nine the first time, when it computes Tom's embedding).
-
-## Files
-
-- `Dockerfile`: Python 3.11, ffmpeg, torch for the CPU, Piper, OpenVoice without its dependencies, and the
-  model files from Hugging Face at pinned revisions.
-- `voice.py`: Piper, the converter, the embeddings.
-- `server.py`: the HTTP API, loading and warming up in the background.
+same shape as a Piper session, so the assistant plays Tom sentence by sentence. When the service does not
+answer, the assistant falls back to Piper in the browser or the voice of the system.
