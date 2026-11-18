@@ -5,6 +5,10 @@ All notable changes are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Documentation chat: retain evidence and citation instructions when using the per-chat MCP server switches.
+
 ### Added
 
 - Example app: optional documentation MCP tools with clickable, revision-specific manual page sources in chat.
