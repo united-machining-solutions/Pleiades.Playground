@@ -27,6 +27,7 @@ import {
   ItemActions,
   ItemContent,
   ItemDescription,
+  ItemFooter,
   ItemGroup,
   ItemSeparator,
   ItemTitle,
@@ -36,6 +37,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { commitProposal, removeMachine, storeUser } from "@/opcua/adapter.ts"
 import type { Outcome } from "@/opcua/adapter.ts"
 import {
+  endpointSummary,
   machineListOf,
   mappingOf,
   needingALook,
@@ -554,17 +556,60 @@ function UserForm({ url, user }: { url: string; user?: string }) {
   )
 }
 
-function EndpointList({ values }: { values: RankedEndpoints }) {
+/**
+ * The endpoint the adapter takes, in one line, and the rest folded: the person cannot choose another one
+ * here. That the server also takes sessions without security is said without unfolding.
+ */
+function EndpointSummary({ values }: { values: RankedEndpoints }) {
+  const { used, others, unsecured } = endpointSummary(values)
+  if (!used) {
+    return (
+      <Item size="sm">
+        <ItemContent>
+          <ItemTitle>No endpoint for this session</ItemTitle>
+          <ItemDescription>{values.url} offers no endpoint the adapter can use.</ItemDescription>
+        </ItemContent>
+      </Item>
+    )
+  }
+  return (
+    <Collapsible>
+      <Item size="sm">
+        <ItemContent>
+          <ItemTitle>
+            {securityOf({ ...used, user: values.user })}
+            {used.weak && <Badge variant="outline">Weak</Badge>}
+          </ItemTitle>
+          <ItemDescription>The strongest the server offers, the one the adapter connects with.</ItemDescription>
+          {unsecured && <ItemDescription>The server also accepts sessions without security.</ItemDescription>}
+        </ItemContent>
+        {others.length > 0 && (
+          <ItemFooter>
+            <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
+              {others.length === 1 ? "1 more endpoint" : `${others.length} more endpoints`}
+            </CollapsibleTrigger>
+          </ItemFooter>
+        )}
+      </Item>
+      <CollapsibleContent>
+        <ItemSeparator className="my-0" />
+        <EndpointList endpoints={others} user={values.user} />
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+/** The endpoints the adapter does not take, strongest first. */
+function EndpointList({ endpoints, user }: { endpoints: RankedEndpoints["endpoints"]; user?: string }) {
   return (
     <ItemGroup className="gap-0">
-      {values.endpoints.map((endpoint, position) => (
+      {endpoints.map((endpoint, position) => (
         <Fragment key={`${endpoint.securityMode}/${endpoint.securityPolicy}`}>
           {position > 0 && <ItemSeparator className="my-0" />}
           <Item size="sm">
             <ItemContent>
               <ItemTitle>
-                {securityOf({ ...endpoint, user: values.user })}
-                {endpoint.recommended && <Badge variant="secondary">Recommended</Badge>}
+                {securityOf({ ...endpoint, user })}
                 {endpoint.weak && <Badge variant="outline">Weak</Badge>}
               </ItemTitle>
             </ItemContent>
@@ -580,7 +625,7 @@ function Endpoints({ values }: { values: RankedEndpoints }) {
   if (step === "none") {
     return (
       <Card className="gap-0 py-0">
-        <EndpointList values={values} />
+        <EndpointSummary values={values} />
       </Card>
     )
   }
@@ -611,17 +656,21 @@ function Endpoints({ values }: { values: RankedEndpoints }) {
           </CollapsibleContent>
         </Collapsible>
       </CardFooter>
-      <EndpointList values={values} />
+      <EndpointSummary values={values} />
     </Card>
   )
 }
 
 const label = (running: string, done: string, failed: string): ToolLabel => ({ running, done, failed })
 
+// The cards of the OPC UA adapter are for the chat only (`saveAsPage: false`): a page asks the generative UI
+// backend alone (pages/call-part.ts), which has no opcua_* tool, and a scan is no part to run again
+// each time a page opens.
 export const opcuaTools: ReadonlyArray<ChatTool> = [
   {
     name: "opcua_server_list",
     label: label("Reading the OPC UA servers", "Read the OPC UA servers", "Failed to read the OPC UA servers"),
+    saveAsPage: false,
     draw(content) {
       const values = serverListOf(content)
       return values && <Servers values={values} />
@@ -630,6 +679,7 @@ export const opcuaTools: ReadonlyArray<ChatTool> = [
   {
     name: "opcua_machine_list",
     label: label("Looking for the machines of the server", "Looked for the machines of the server", "Failed to look for the machines"),
+    saveAsPage: false,
     draw(content) {
       const values = machineListOf(content)
       return values && <ServedMachines values={values} />
@@ -638,6 +688,7 @@ export const opcuaTools: ReadonlyArray<ChatTool> = [
   {
     name: "opcua_mapping_show",
     label: label("Reading the mapping", "Read the mapping", "Failed to read the mapping"),
+    saveAsPage: false,
     draw(content) {
       const values = mappingOf(content)
       return values && <ShownMapping values={values} />
@@ -646,6 +697,7 @@ export const opcuaTools: ReadonlyArray<ChatTool> = [
   {
     name: "opcua_registration_propose",
     label: label("Trying the registration on the server", "Tried the registration on the server", "Failed to try the registration"),
+    saveAsPage: false,
     draw(content) {
       const values = proposalOf(content)
       return values && <ShownProposal values={values} />
@@ -654,6 +706,7 @@ export const opcuaTools: ReadonlyArray<ChatTool> = [
   {
     name: "opcua_endpoint_rank",
     label: label("Asking the server for its endpoints", "Asked the server for its endpoints", "Failed to reach the server"),
+    saveAsPage: false,
     draw(content) {
       const values = rankedEndpointsOf(content)
       return values && <Endpoints values={values} />

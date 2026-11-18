@@ -81,7 +81,8 @@ the language model its tools, and which file says what the app draws for which t
   changes with an issue first: on your own branch add the name, and say in your hand-over that the pull
   request needs the issue.
 - `apps/app/src/cards/<name>/chat.tsx`: new, the card in the chat: what a call of each of its tools is called,
-  what the chat draws for a result, and which tool only a card calls. Next to it, as in `src/cards/machine/`:
+  what the chat draws for a result, which tool only a card calls, and in a few words what a part of a page
+  with the tool shows (`part`), with which the chat names it in a page it proposes. Next to it, as in `src/cards/machine/`:
   what checks a result against the contract, with tests. If the card fetches a series with a tool only the
   card calls, the name of that tool goes into `apps/app/src/machines/card-tools.ts` and its server function
   next to the others in `get-machines.ts`: the card folder imports from `src/machines/`, never the other way.

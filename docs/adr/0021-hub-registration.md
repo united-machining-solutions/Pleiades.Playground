@@ -4,7 +4,7 @@ status: proposed
 date: 2026-11-18
 ---
 
-# ADR-0020: The example app registers at the Pleiades Hub, with the SDK as a vendored tarball
+# ADR-0021: The example app registers at the Pleiades Hub, with the SDK as a vendored tarball
 
 ## Context
 

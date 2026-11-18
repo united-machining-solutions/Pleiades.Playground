@@ -29,6 +29,12 @@ test("a tool only a card calls is not called, even where it would draw", () => {
   assert.equal(drawingTool("genui_span_list", [{ name: "genui_span_list", cardOnly: true, draw: () => "band" }]), undefined)
 })
 
+test("a tool of the app only the chat calls is not called, although the chat draws it: the proposal of a page", () => {
+  const withProposal: ReadonlyArray<ChatTool> = [...tools, { name: "app_page_propose", saveAsPage: false, draw: () => "proposal" }]
+  assert.equal(drawingTool("app_page_propose", withProposal), undefined)
+  assert.equal(drawingTool("genui_machine_show", withProposal)?.name, "genui_machine_show")
+})
+
 test("a part without a card says which tool it asks for", () => {
   assert.equal(noCardFor("genui_alarm_list"), "It asks for genui_alarm_list, and this app has no card for that tool.")
 })

@@ -47,7 +47,7 @@ that shows the apps of a Pleiades system under one header:
 - Its topics, `hub/discover`, `hub/clients/{ClientId}/announce` and `hub/clients/{ClientId}/offline`, and
   their payloads are defined by the contract of the hub, `contracts/mqtt/README.md` in the repository
   `umati/pleiades-hub`, not here. This binding only reserves the level and says who owns it; the decision
-  is [ADR-0020](../../docs/adr/0020-hub-registration.md).
+  is [ADR-0021](../../docs/adr/0021-hub-registration.md).
 - What this document says about a value does not apply below `hub/`: the envelope, the units, the content
   types and `Connection/State`. The messages there are not values. They are JSON, published with QoS 1 and
   never retained.

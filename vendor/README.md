@@ -3,7 +3,7 @@
 Packages that are not on npmjs.org and are therefore checked in as tarballs. The catalog in
 `pnpm-workspace.yaml` refers to a tarball with `file:`, so `pnpm install --frozen-lockfile` needs neither a
 registry nor a neighbouring folder for it, also in CI and in the image builds. The decision is
-[ADR-0020](../docs/adr/0020-hub-registration.md).
+[ADR-0021](../docs/adr/0021-hub-registration.md).
 
 | File | Package | Version | Origin |
 | --- | --- | --- | --- |
