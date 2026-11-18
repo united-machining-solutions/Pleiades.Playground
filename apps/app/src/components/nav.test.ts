@@ -13,7 +13,7 @@ const route = (fullPath: string, nav?: { title: string; order?: number; sidebar?
 
 const routes = [
   route("/warnings", { title: "Warnings" }),
-  route("/machines/$machine"),
+  route("/jobs/$job"),
   route("/alarms", { title: "Alarms" }),
   route("/", { title: "Home", order: 0 }),
   route("/health"),
@@ -43,8 +43,8 @@ test("a page with an entry is under its own entry", () => {
   assert.equal(activePage(navPages(routes), "/")?.title, "Home")
 })
 
-test("a page without an entry is under the nearest page above it: the page of a machine under Home", () => {
-  assert.equal(activePage(navPages(routes), "/machines/P-04")?.title, "Home")
+test("a page without an entry is under the nearest page above it: a page of a job under Home", () => {
+  assert.equal(activePage(navPages(routes), "/jobs/4711")?.title, "Home")
   assert.equal(activePage(navPages(routes), "/warnings/open")?.title, "Warnings")
 })
 
@@ -60,7 +60,7 @@ test("without any entry nothing is marked", () => {
 const withCrumbs = [
   { fullPath: "/", options: { staticData: { nav: { title: "Home", icon, order: 0 }, crumb: "Machines" } } },
   route("/warnings", { title: "Warnings" }),
-  route("/machines/$machine"),
+  route("/jobs/$job"),
 ]
 
 test("a page with an entry is called by the title of its entry, or by its crumb", () => {
@@ -80,15 +80,15 @@ test("a page with an entry is called by the title of its entry, or by its crumb"
   )
 })
 
-test("a page without an entry stands behind the entry it is under: the page of a machine behind Machines", () => {
+test("a page without an entry stands behind the entry it is under: a page of a job behind Machines", () => {
   assert.deepEqual(
     crumbsOf(navPages(withCrumbs), {
-      fullPath: "/machines/$machine",
-      pathname: "/machines/P-04",
-      params: { machine: "P-04" },
-      staticData: { crumb: (params) => params.machine ?? "" },
+      fullPath: "/jobs/$job",
+      pathname: "/jobs/4711",
+      params: { job: "4711" },
+      staticData: { crumb: (params) => params.job ?? "" },
     }),
-    [{ title: "Machines", path: "/" }, { title: "P-04" }],
+    [{ title: "Machines", path: "/" }, { title: "4711" }],
   )
 })
 
@@ -237,5 +237,39 @@ test("a page opened from a link stands behind Pages, called by what the link say
       staticData: { crumb: (_params, search) => String(search.r ?? "") },
     }),
     [{ title: "Pages", path: "/pages" }, { title: "Morning round" }],
+  )
+})
+
+// Sites and the page of a machine under it, as the example app has them: the list of Sites is the
+// index route "/sites/", the page of a machine "/sites/$machine" names no entry of its own.
+const withSites = [
+  ...withCrumbs,
+  route("/sites/", { title: "Sites" }),
+  { fullPath: "/sites/$machine", options: { staticData: { crumb: (params: Record<string, string>) => params.machine ?? "" } } },
+]
+
+test("the page of a machine is under Sites: Sites is the marked row", () => {
+  const entries = navPages(withSites)
+  assert.equal(activePage(entries, "/sites/alcyone-machines_AX-400_P-04")?.title, "Sites")
+  assert.equal(activePage(entries, "/sites")?.title, "Sites")
+  assert.equal(activePage(entries, "/")?.title, "Home")
+})
+
+test("the page of a machine stands behind Sites in the breadcrumb", () => {
+  assert.deepEqual(
+    crumbsOf(navPages(withSites), {
+      fullPath: "/sites/$machine",
+      pathname: "/sites/alcyone-machines_AX-400_P-04",
+      params: { machine: "alcyone-machines_AX-400_P-04" },
+      staticData: { crumb: (params) => params.machine ?? "" },
+    }),
+    [{ title: "Sites", path: "/sites" }, { title: "alcyone-machines_AX-400_P-04" }],
+  )
+})
+
+test("Sites itself is called Sites and does not link to itself", () => {
+  assert.deepEqual(
+    crumbsOf(navPages(withSites), { fullPath: "/sites/", pathname: "/sites", params: {}, staticData: { nav: { title: "Sites", icon } } }),
+    [{ title: "Sites" }],
   )
 })
