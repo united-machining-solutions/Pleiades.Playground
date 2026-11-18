@@ -100,7 +100,7 @@ and the certificate of the adapter.
 | Nodes, units, conversions, alarm type | `machines/<serial>.json`, `elements`, `alerts` | The registration, with the elements of the known mappings the adapter adds | When the machine is attached to its session |
 | Profiles delivered, and the elements of profiles that are not complete | `machines/<serial>.json`, `profiles`, `missing` | The adapter, from the check of the core and the profiles, when it stores the registration | Checked again for the server list and the mapping review |
 | Namespaces of the server at the scan | `machines/<serial>.json`, `discovery.namespaces` | The adapter, when it stores the registration | By a person who compares a rescan |
-| Alarms that stand | `alerts/<serial>.json` | [`AlertStore`](Registrations/AlertStore.cs), on every change | At start, so an alarm that ended while the adapter was down is cleared |
+| Alarms that stand | `alerts/<serial>.json` | [`AlertStore`](Registrations/AlertStore.cs), on every change | At start, so an alarm that ended while the adapter was down is cleared, and one that still stands is raised again in the new run |
 | Certificate of the adapter, the client certificate of every session | `pki/certs`, `pki/private`, one RSA certificate and ECC ones (NistP256, NistP384, BrainpoolP256r1, BrainpoolP384r1) | The OPC UA stack, at the first start, if there is none | On every connect and every scan |
 | Application name and URI of the adapter | Not a file: `Pleiades Playground OPC UA Adapter` and `Config:ApplicationUri` (`urn:pleiades:playground:opcua:adapter`) | [`Program.cs`](Program.cs), at every start | They are in the certificate the stack creates |
 

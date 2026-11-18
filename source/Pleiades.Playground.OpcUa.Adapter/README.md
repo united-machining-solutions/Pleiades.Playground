@@ -439,7 +439,9 @@ publisher the Ultimaker telemetry and the juice bar use too
 
 The job orders are not published. After a reconnect, and after a restart of the adapter, the server is asked for
 the conditions that still stand (`ConditionRefresh`). An alarm that went while nobody listened is cleared then,
-so none stays open for ever.
+so none stays open for ever. An alarm that stood before a restart of the adapter and still stands is raised once
+more in the new run, with its `Id` and its `Time`: the events of every run name every alarm that stands, so a
+consumer that ends the alarms of an earlier run at the start of the next one does not lose it.
 
 ## Security
 

@@ -245,6 +245,29 @@ public class AlertTrackerTest
     }
 
     [TestMethod]
+    public void An_alarm_of_the_last_run_that_still_stands_is_raised_again_once_in_this_run()
+    {
+        var restart = Start.AddHours(2);
+        var stands = new OpenAlert("stands", "6f1c1d3e-8f5a-4b5e-9d55-0c1b8a7e2f10", "4711", "Coolant low", 400, Start);
+        var gone = new OpenAlert("gone", "0b7d2c4e-1a3f-4e5b-8c6d-7e8f9a0b1c2d", "4712", "Door open", 800, Start);
+        var tracker = new AlertTracker([stands, gone], () => restart);
+
+        tracker.BeginRefresh();
+        var raisedAgain = tracker.Observe("stands", active: true, "4711", "Coolant low", 400, Start);
+        var cleared = tracker.EndRefresh(restart);
+        var thenAgain = tracker.Observe("stands", active: true, "4711", "Coolant low", 400, Start);
+
+        Assert.AreEqual(AlertAction.Raised, raisedAgain!.Action, "This run names the alarm, so a consumer does not end it with the last run.");
+        Assert.AreEqual(stands.Id, raisedAgain.Alert.Id, "The same occurrence keeps its id.");
+        Assert.AreEqual(Start, raisedAgain.Alert.Since, "It came up when it came up: Time stays.");
+        Assert.AreEqual(restart, raisedAgain.At, "The event is of this run, not before its start.");
+        Assert.HasCount(1, cleared);
+        Assert.AreEqual(gone.Id, cleared[0].Alert.Id, "What went while the adapter was down is cleared.");
+        Assert.IsNull(thenAgain, "Raised again once, not with every refresh.");
+        CollectionAssert.AreEqual(new[] { "stands" }, tracker.Open.Select(alert => alert.ConditionId).ToArray());
+    }
+
+    [TestMethod]
     public void An_alert_has_the_fields_of_the_model()
     {
         var alert = new OpenAlert("c1", "6f1c1d3e-8f5a-4b5e-9d55-0c1b8a7e2f10", "4711", "Coolant low", 400, Start, "Coolant");

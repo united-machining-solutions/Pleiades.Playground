@@ -552,7 +552,8 @@ will (client id `opcua-adapter-<machineId>`). What it publishes follows from the
   `Notification.AlertCleared` on `events/notifications`; `Severity` is the category of NE 107 from the severity of
   OPC UA (from 667 `Failure`, from 334 `OffSpec`, below `MaintenanceRequired`), an assumption of the adapter.
   `sequence` counts from 1 in every run of the adapter; the outbox holds the events while the broker is away, as
-  the managed client keeps every message.
+  the managed client keeps every message. An alarm that stood before a restart of the adapter and still stands is
+  raised once more in the new run, with its `Id` and its `Time`, so that every run names the alarms that stand.
 - When a machine is removed, the adapter takes every retained message of it back with an empty one and ends its
   connection without its last will.
 

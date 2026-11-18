@@ -59,17 +59,29 @@ internal sealed record AlertChange(AlertAction Action, OpenAlert Alert, DateTime
 /// lost connection: after a reconnect the server lists what still stands, and what is not in that
 /// list any more is cleared.
 /// </summary>
+/// <remarks>
+/// An alarm that stood when the adapter last ran is carried into this run. The first time the server names it as
+/// active again, it is raised once more in this run, with its id and the time it came up, so that the events of
+/// this run name every alarm that stands: a consumer may end an alarm of an earlier run that the next run does not
+/// name again. One the server no longer lists is cleared, as before.
+/// </remarks>
 internal sealed class AlertTracker
 {
     private readonly Dictionary<string, OpenAlert> _open = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _carried = new(StringComparer.Ordinal);
+    private readonly Func<DateTime> _now;
     private HashSet<string>? _seenInRefresh;
 
     /// <summary>Starts with the alarms that stood when the adapter last ran.</summary>
-    public AlertTracker(IEnumerable<OpenAlert>? open = null)
+    /// <param name="open">The alarms of the last run, carried into this one.</param>
+    /// <param name="now">The clock, UTC; the time an alarm of the last run is raised again in this one.</param>
+    public AlertTracker(IEnumerable<OpenAlert>? open = null, Func<DateTime>? now = null)
     {
+        _now = now ?? (() => DateTime.UtcNow);
         foreach (var alert in open ?? [])
         {
             _open[alert.ConditionId] = alert;
+            _carried.Add(alert.ConditionId);
         }
     }
 
@@ -101,9 +113,11 @@ internal sealed class AlertTracker
         if (active)
         {
             _seenInRefresh?.Add(conditionId);
-            if (_open.ContainsKey(conditionId))
+            if (_open.TryGetValue(conditionId, out var standing))
             {
-                return null;
+                // An alarm of the last run is raised again once in this run; one of this run changes nothing.
+                // The event takes the time it is seen in this run, which is not before the run began.
+                return _carried.Remove(conditionId) ? new AlertChange(AlertAction.Raised, standing, _now()) : null;
             }
 
             var raised = new OpenAlert(conditionId, NewId(), code, message, Math.Clamp(severity, 1, 1000), at, sourceName);
@@ -111,6 +125,7 @@ internal sealed class AlertTracker
             return new AlertChange(AlertAction.Raised, raised, at);
         }
 
+        _carried.Remove(conditionId);
         return _open.Remove(conditionId, out var open) ? new AlertChange(AlertAction.Cleared, open, at) : null;
     }
 
@@ -132,6 +147,7 @@ internal sealed class AlertTracker
         foreach (var alert in gone)
         {
             _open.Remove(alert.ConditionId);
+            _carried.Remove(alert.ConditionId);
         }
 
         _seenInRefresh = null;

@@ -260,7 +260,8 @@ All notable changes are documented here. The format follows
   energy in `wattHour`: a registration of version 1 is moved over when it is read (`joule` to `wattHour`, a
   count to `piece`, a year without a unit), and the examples are version 2. The alarms are the list
   `Notification.ActiveAlerts` and the CloudEvents `Notification.AlertRaised` and `AlertCleared`, with the
-  category of NE 107 from the severity of OPC UA. A value of the maker is in the area `oem` of a registration, as
+  category of NE 107 from the severity of OPC UA. An alarm that stood before a restart of the adapter and still
+  stands is raised once more in the new run, with its `Id`, so that every run names the alarms that stand. A value of the maker is in the area `oem` of a registration, as
   the namespace level of the binding; a registration that says `vendor` is moved over. `Production.ActiveProgram`
   goes out as `WorkMasterMonitoring.ActiveWorkMaster`, and `Identification.SoftwareRevision`, no element of the
   model 0.17.1, as a signal of the manufacturer. The adapter answers on port 5560 (`OPCUA_ADAPTER_PORT`), since
