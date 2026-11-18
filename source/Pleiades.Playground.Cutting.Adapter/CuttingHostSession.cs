@@ -49,6 +49,12 @@ internal sealed partial class CuttingHostSession(CuttingFileChannel channel, Tim
         {
             return null;
         }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // A file the adapter cannot write is a request without a reply, as one the machine does not answer.
+            LogWriteFailed(ex, channel.Options.OwnFile);
+            return null;
+        }
         finally
         {
             _pending.TryRemove(request.TransactionNumber, out _);
@@ -119,6 +125,9 @@ internal sealed partial class CuttingHostSession(CuttingFileChannel channel, Tim
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Could not read the telegram file {Path}.")]
     private partial void LogReadFailed(Exception exception, string path);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not write the telegram file {Path}; the request counts as unanswered.")]
+    private partial void LogWriteFailed(Exception exception, string path);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The machine wrote a line that is not a telegram ({Error}): {Line}")]
     private partial void LogNotATelegram(string line, string error);

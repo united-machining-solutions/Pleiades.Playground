@@ -242,6 +242,8 @@ public sealed partial class MachinePublisher : IDisposable
             {
                 var heartbeat = new MachineValue(MachineBinding.Heartbeat, JsonValue.Create(++_heartbeats), now);
                 await _client.EnqueueAsync(MachineBinding.ValueMessage(MachineId, heartbeat)).ConfigureAwait(false);
+                // Events a failed drain left behind.
+                await DrainAsync().ConfigureAwait(false);
             }
         }
         finally
@@ -426,12 +428,17 @@ public sealed partial class MachinePublisher : IDisposable
             _synced = true;
             _syncFailed = false;
             LogConnected(MachineId, _current.Count);
-            await DrainAsync().ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             _syncFailed = true;
             LogSyncFailed(MachineId, exception);
+        }
+
+        if (_synced)
+        {
+            // The events that waited for this connection, after its sequence.
+            await DrainAsync().ConfigureAwait(false);
         }
     }
 
@@ -448,12 +455,30 @@ public sealed partial class MachinePublisher : IDisposable
         return Task.CompletedTask;
     }
 
-    /// <summary>The events of the outbox, oldest first. One that cannot be enqueued stays for the next try. Holds the gate.</summary>
+    /// <summary>
+    /// The events of the outbox, oldest first. One the client refuses as invalid is dropped and logged; on any other
+    /// failure the rest waits for the next event, heartbeat or connect. Holds the gate; throws nothing but a
+    /// cancellation.
+    /// </summary>
     private async Task DrainAsync()
     {
         while (_outbox.Count > 0)
         {
-            await _client.EnqueueAsync(_outbox.Peek()).ConfigureAwait(false);
+            var message = _outbox.Peek();
+            try
+            {
+                await _client.EnqueueAsync(message).ConfigureAwait(false);
+            }
+            catch (ArgumentException exception)
+            {
+                LogEventRefused(MachineId, message.Topic, exception);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                LogDrainFailed(MachineId, _outbox.Count, exception);
+                return;
+            }
+
             _outbox.Dequeue();
         }
     }
@@ -509,4 +534,11 @@ public sealed partial class MachinePublisher : IDisposable
     [LoggerMessage(EventId = 204, Level = LogLevel.Warning,
         Message = "The outbox of {MachineId} holds {Capacity} events; the oldest, for {Topic}, is dropped")]
     private partial void LogEventDropped(string machineId, string topic, int capacity);
+
+    [LoggerMessage(EventId = 205, Level = LogLevel.Error, Message = "The client refuses an event of {MachineId} for {Topic}; it is dropped")]
+    private partial void LogEventRefused(string machineId, string topic, Exception exception);
+
+    [LoggerMessage(EventId = 206, Level = LogLevel.Warning,
+        Message = "Could not send the outbox of {MachineId}; {Count} events wait for the next try")]
+    private partial void LogDrainFailed(string machineId, int count, Exception exception);
 }

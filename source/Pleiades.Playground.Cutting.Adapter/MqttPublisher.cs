@@ -31,6 +31,7 @@ internal sealed class MqttPublisher : IPublisher, IDisposable
     private readonly TimeProvider _time;
     private readonly MachinePublisher _machine;
     private readonly Dictionary<string, MachineValue> _values = new(StringComparer.Ordinal);
+    private readonly List<AlertPublication> _heldAlerts = [];
     private readonly string _sequencePrefix;
     private long _notifications;
 
@@ -74,7 +75,8 @@ internal sealed class MqttPublisher : IPublisher, IDisposable
     /// <summary>
     /// The values go to the publisher together, so that <c>Running</c> follows all of them. A path that changes twice
     /// in one batch, such as a halt and the end of a program, goes out first, so that both of its values are seen.
-    /// While the machine counts as not reached, values are only kept: they go out with the next <c>Running</c>.
+    /// While the machine counts as not reached, values and alert events are only kept: they go out with the next
+    /// <c>Running</c>, the events after the values, so that the events and <c>ActiveAlerts</c> tell the same.
     /// </summary>
     private async Task PublishAsync(IReadOnlyList<Publication> publications, bool reached)
     {
@@ -94,12 +96,11 @@ internal sealed class MqttPublisher : IPublisher, IDisposable
 
                     _values[value.Path] = new MachineValue(value.Path, value.Value?.DeepClone(), value.Timestamp, value.Unit);
                     break;
+                case AlertPublication alert when !send:
+                    _heldAlerts.Add(alert);
+                    break;
                 case AlertPublication alert:
-                    if (send)
-                    {
-                        await FlushAsync(pending).ConfigureAwait(false);
-                    }
-
+                    await FlushAsync(pending).ConfigureAwait(false);
                     await _machine.EventAsync(Event(alert, ++_notifications)).ConfigureAwait(false);
                     break;
             }
@@ -108,6 +109,12 @@ internal sealed class MqttPublisher : IPublisher, IDisposable
         if (send)
         {
             await FlushAsync(pending, force: reached && _machine.Reachable != true).ConfigureAwait(false);
+            foreach (var held in _heldAlerts)
+            {
+                await _machine.EventAsync(Event(held, ++_notifications)).ConfigureAwait(false);
+            }
+
+            _heldAlerts.Clear();
         }
     }
 

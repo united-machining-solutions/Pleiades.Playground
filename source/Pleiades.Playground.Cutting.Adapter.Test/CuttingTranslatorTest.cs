@@ -179,6 +179,42 @@ public sealed class CuttingTranslatorTest
     }
 
     [TestMethod]
+    public void AMachineThatSwitchesOff_WhileAProgramRuns_EndsTheProgram()
+    {
+        Translate(CuttingNotifications.StartNcp, "1", "PROG");
+
+        var off = _translator.Disconnected(machineSwitchedOff: true);
+
+        AssertValue(off, Paths.ChannelState, "Reset");
+        Assert.IsNull(Value(off, Program));
+    }
+
+    [TestMethod]
+    public void AMachineThatFallsSilent_KeepsItsProgram_SoThatAHaltAfterIsStillAHalt()
+    {
+        Translate(CuttingNotifications.StartNcp, "1", "PROG");
+
+        Assert.IsEmpty(_translator.Disconnected(machineSwitchedOff: false));
+        var paused = Translate(CuttingNotifications.MachineStopped, "1", "PROG", "", "2");
+
+        AssertValue(paused, Paths.ChannelState, "Interrupted");
+    }
+
+    [TestMethod]
+    public void AMachineThatRestarts_EndsItsProgramAndClearsItsAlerts()
+    {
+        Translate(CuttingNotifications.StartNcp, "1", "PROG");
+        Translate(CuttingNotifications.CurrentAlarms, "1", "4711", "Text", "");
+
+        var restarted = _translator.Restarted();
+
+        AssertValue(restarted, Paths.ChannelState, "Reset");
+        Assert.IsNull(Value(restarted, Program));
+        Assert.AreEqual(Paths.AlertCleared, restarted.OfType<AlertPublication>().Single().Type);
+        Assert.IsEmpty(_translator.ActiveAlarms);
+    }
+
+    [TestMethod]
     public void AMachineThatSwitchesOff_ClearsItsAlerts()
     {
         Translate(CuttingNotifications.CurrentAlarms, "1", "4711", "Text", "");
