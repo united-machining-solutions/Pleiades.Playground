@@ -1,42 +1,43 @@
-# Build stage: compile TypeScript
+# Build stage
 FROM node:22-alpine AS builder
-WORKDIR /workspace
 
-# Install pnpm
-RUN npm install -g pnpm
-
-# Copy workspace files
-COPY pnpm-workspace.yaml pnpm-lock.yaml ./
-
-# Copy adapter package
-COPY apps/simplecam-adapter-9042 apps/simplecam-adapter-9042/
-
-# Install dependencies (frozen lockfile from workspace)
-RUN pnpm install --frozen-lockfile --filter=@pleiades/simplecam-adapter-9042
-
-# Build TypeScript
-WORKDIR /workspace/apps/simplecam-adapter-9042
-RUN pnpm build
-
-# Runtime stage: minimal image with compiled code
-FROM node:22-alpine
 WORKDIR /app
 
-# Install pnpm for runtime
-RUN npm install -g pnpm
+# Copy workspace files
+COPY pnpm-workspace.yaml .
+COPY pnpm-lock.yaml .
 
-# Copy from builder
-COPY --from=builder /workspace/pnpm-workspace.yaml .
-COPY --from=builder /workspace/pnpm-lock.yaml .
-COPY --from=builder /workspace/apps/simplecam-adapter-9042/package.json .
-COPY --from=builder /workspace/apps/simplecam-adapter-9042/dist ./dist
+# Copy adapter
+COPY apps/simplecam-adapter-9042 ./apps/simplecam-adapter-9042
 
-# Install only production dependencies for this filter
-RUN pnpm install --frozen-lockfile --filter=@pleiades/simplecam-adapter-9042 --prod
+# Install dependencies
+RUN npm install -g pnpm && \
+    pnpm install --frozen-lockfile
+
+# Build TypeScript
+WORKDIR /app/apps/simplecam-adapter-9042
+RUN pnpm build
+
+# Runtime stage
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Copy built application from builder
+COPY --from=builder /app/apps/simplecam-adapter-9042/dist ./dist
+COPY --from=builder /app/apps/simplecam-adapter-9042/package.json .
+
+# Install production dependencies only
+RUN npm install -g pnpm && \
+    pnpm install --frozen-lockfile --prod
 
 # Health check
-HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3042/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-# Run adapter
+# Run with dumb-init
+ENTRYPOINT ["/usr/sbin/dumb-init", "--"]
 CMD ["node", "dist/index.js"]

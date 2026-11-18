@@ -1,123 +1,198 @@
 # SimpleCAM Adapter 9042
 
-AG2 machine state adapter for SimpleCAM machine 9042. Consumes Server-Sent Events (SSE) from the C++ backend (port 5450) and publishes AG2 Core data model values to the MQTT broker.
-
-## Overview
-
-```
-SimpleCAM Backend (C++)
-SSE: /stream/machine-9042/state
-         ↓
-SimpleCAM Adapter 9042 (TypeScript/Node.js)
-         ↓
-MQTT Broker (Pleiades)
-Topic: machines/9042/umati/*
-```
+**AG2 v0.17.1 Adapter** — Consumes Server-Sent Events (SSE) from SimpleCAM backend, publishes machine state to Pleiades MQTT broker in CloudEvents format.
 
 ## Data Flow
 
-1. **Source:** SimpleCAM C++ backend at `http://localhost:5450`
-   - Endpoint: `GET /stream/machine-9042/state`
-   - Format: Server-Sent Events (SSE)
-   - Data: AG2 Core data model v0.13.1
-
-2. **Adapter:** This service (TypeScript)
-   - Consumes SSE stream
-   - Maps AG2 JSON to MQTT topics
-   - Publishes to `machines/9042/umati/*`
-
-3. **Destination:** MQTT Broker (Mosquitto)
-   - Topics stored by timeseries-persistence
-   - Queryable via timeseries-api (port 5500)
-   - Visible in Pleiades UI
-
-## Topics (AG2 Core Mandatory)
-
 ```
-machines/9042/umati/Identification/Manufacturer
-machines/9042/umati/Identification/SerialNumber
-machines/9042/umati/Identification/ProductInstanceUri
-machines/9042/umati/Connection/Heartbeat
-machines/9042/umati/Connection/State
-machines/9042/umati/State/Status
-machines/9042/umati/Notification/ActiveAlerts
+SimpleCAM Backend (C++)
+  ↓ SSE /stream/machine-9042/state
+Adapter (TypeScript)
+  ↓ Parse JSON events
+  ↓ Map to AG2 v0.17.1 paths
+  ↓ Publish to MQTT
+Pleiades Broker (MQTT)
+  ├─ machines/united-grinding_simplecam_9042/umati/* (state values, retained)
+  └─ machines/united-grinding_simplecam_9042/events/* (CloudEvents, transient)
 ```
 
-Each topic receives a JSON payload with:
+## MQTT Topics
+
+### State Values (Retained)
+
+Retained messages on `machines/united-grinding_simplecam_9042/umati/{path}`:
+
 ```json
 {
   "value": <any>,
-  "timestamp": "2026-11-17T14:32:15.000Z"
+  "timestamp": "2026-11-18T10:30:00.000Z"
+}
+```
+
+**Paths from AG2 v0.17.1:**
+- `Identification/*` — manufacturer, model, serialNumber
+- `Connection/State` — Connected | Disconnected
+- `Connection/Heartbeat` — UNIX timestamp (every 10 seconds)
+- `State/Status` — Idle | Executing | Error
+- `Notification/ActiveAlerts` — array of alert objects
+
+### Events (CloudEvents, Not Retained)
+
+Transient CloudEvents on `machines/united-grinding_simplecam_9042/events/{type}`:
+
+```json
+{
+  "specversion": "1.0",
+  "type": "com.pleiades.simplecam.{type}",
+  "source": "machines/united-grinding_simplecam_9042",
+  "subject": "{path}",
+  "id": "uuid",
+  "time": "2026-11-18T10:30:00.000Z",
+  "datacontenttype": "application/json",
+  "data": {
+    "path": "{path}",
+    "value": <any>,
+    "timestamp": "2026-11-18T10:30:00.000Z"
+  }
 }
 ```
 
 ## Environment Variables
 
 | Variable | Default | Description |
-|---|---|---|
-| `SIMPLECAM_SSE_URL` | `http://localhost:5450/stream/machine-9042/state` | SimpleCAM SSE endpoint URL |
-| `MQTT_BROKER_URL` | `mqtt://broker:1883` | MQTT broker connection string |
+|----------|---------|-------------|
+| `SIMPLECAM_SSE_URL` | `http://localhost:5450/stream/machine-9042/state` | SimpleCAM SSE endpoint |
+| `MQTT_BROKER_URL` | `mqtt://broker:1883` | MQTT broker connection URL |
 | `MQTT_CLIENT_ID` | `simplecam-adapter-9042` | MQTT client identifier |
 | `HEALTH_PORT` | `3042` | Health check endpoint port |
 
 ## Running Locally
 
+### Prerequisites
+- Node.js 22+
+- SimpleCAM backend running on `localhost:5450` (or set `SIMPLECAM_SSE_URL`)
+- MQTT broker running on `localhost:1883` (or set `MQTT_BROKER_URL`)
+
+### Development
+
 ```bash
-# Install dependencies
 pnpm install
-
-# Type check
-pnpm typecheck
-
-# Run (requires SimpleCam backend on port 5450 and MQTT broker on port 1883)
 pnpm dev
 ```
 
-## Health Check
-
-The adapter exposes a health endpoint on port 3042:
-
+Health check:
 ```bash
 curl http://localhost:3042/health
 ```
 
-Returns HTTP 200 if connected to MQTT broker, 503 if disconnected.
+### Type Check & Build
 
-## Docker Compose
+```bash
+pnpm typecheck
+pnpm build
+```
 
-Configured in `compose.yaml`:
-- Waits for MQTT broker to be healthy
-- Waits for timeseries-persistence to be started
-- Automatic reconnection on failure
-- Health check integrated with Docker health system
+## Docker
+
+Build and run:
+```bash
+docker build -t simplecam-adapter-9042 .
+docker run -e SIMPLECAM_SSE_URL=http://host.docker.internal:5450/stream/machine-9042/state \
+           -e MQTT_BROKER_URL=mqtt://broker:1883 \
+           -p 3042:3042 \
+           simplecam-adapter-9042
+```
+
+## Docker Compose Integration
+
+In `compose.yaml`:
+
+```yaml
+simplecam-adapter-9042:
+  build:
+    context: .
+    dockerfile: apps/simplecam-adapter-9042/Dockerfile
+  environment:
+    SIMPLECAM_SSE_URL: http://host.docker.internal:5450/stream/machine-9042/state
+    MQTT_BROKER_URL: mqtt://broker:1883
+    MQTT_CLIENT_ID: simplecam-adapter-9042
+    HEALTH_PORT: "3042"
+  ports:
+    - "3042:3042"
+  depends_on:
+    - broker
+    - timeseries-persistence
+  healthcheck:
+    test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3042/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 5s
+```
 
 ## Verification
 
-After starting the stack:
-
+### 1. Check adapter health
 ```bash
-# 1. Verify adapter is healthy
-docker compose ps  # simplecam-adapter-9042 should be "Up"
-
-# 2. Check topics in Swagger UI
-# Navigate to http://localhost:5500/
-# Search for topics starting with "machines/9042/"
-
-# 3. Manual MQTT subscription
-docker compose exec -T broker mosquitto_sub -t 'machines/9042/umati/#'
+curl http://localhost:3042/health
 ```
 
-## Implementation Notes
+Expected: `HTTP 200 OK`
 
-- **SSE Parsing:** Manual line-based parsing (compatible with standard SSE format)
-- **Connection Resilience:** Automatic reconnection to SSE on stream loss (5s delay)
-- **MQTT Publishing:** Retained topics for state recovery after disconnect
-- **Timestamps:** ISO8601 format (UTC, `Z` suffix)
-- **Terms of Use:** SimpleCAM is internal UnitedGrinding software; no external license restrictions
+### 2. Subscribe to state topic
 
-## References
+```bash
+docker exec -it broker mosquitto_sub -h localhost -t 'machines/united-grinding_simplecam_9042/umati/+' -v
+```
 
-- AG2 Spec: `C:\Repos\MachineTool-DataModel\spec\spec.md` (v0.13.1)
-- SimpleCAM SSE API: `C:\Repos\UnitedGrinding.SimpleCamUgVcpkg\source\Backend\RestApi.yml`
-- MQTT Binding: `contracts/mqtt/README.md` (this repository)
-- Pleiades add-source Skill: `.claude/skills/add-source/SKILL.md`
+Expected output when SimpleCAM sends state:
+```
+machines/united-grinding_simplecam_9042/umati/Identification/Manufacturer {"value":"united-grinding","timestamp":"..."}
+machines/united-grinding_simplecam_9042/umati/Connection/Heartbeat {"value":1700300400,"timestamp":"..."}
+machines/united-grinding_simplecam_9042/umati/State/Status {"value":"Idle","timestamp":"..."}
+```
+
+### 3. Subscribe to events topic
+
+```bash
+docker exec -it broker mosquitto_sub -h localhost -t 'machines/united-grinding_simplecam_9042/events/+' -v
+```
+
+Expected: CloudEvents for state changes
+
+## AG2 v0.17.1 Changes from v0.13.1
+
+- **Machine ID format**: `united-grinding_simplecam_9042` (from `9042`)
+- **Topic hierarchy**: `machines/{id}/umati` for state, `machines/{id}/events` for CloudEvents
+- **CloudEvents**: New CloudEvents 1.0 envelope for all event topics
+- **Identification**: Now includes `manufacturer`, `model`, `serialNumber` (separately)
+- **Heartbeat**: Every 10 seconds as UNIX timestamp (not counter)
+
+## Architecture Notes
+
+- **Automatic reconnection**: Connects every 5 seconds if SSE stream is lost
+- **Retained messages**: State values stay on broker until replaced
+- **Non-retained events**: CloudEvents expire after disconnect
+- **Health endpoint**: Returns 503 Service Unavailable if MQTT not connected
+- **Signal handling**: Uses dumb-init in Docker for graceful shutdown
+
+## Troubleshooting
+
+### No data appearing on MQTT topics
+
+1. Check adapter is running: `curl http://localhost:3042/health`
+2. Check SimpleCAM SSE endpoint: `curl http://localhost:5450/stream/machine-9042/state`
+3. Check adapter logs for JSON parse errors
+4. Verify MQTT broker is accessible from adapter container
+
+### SSE connection lost
+
+Adapter logs: `[SSE] Stream error: ...`
+
+Check SimpleCAM backend is running and SSE endpoint returns valid events.
+
+### MQTT connection refused
+
+Adapter logs: `[MQTT] Error: ...`
+
+Check broker is running on specified URL and accepting connections.

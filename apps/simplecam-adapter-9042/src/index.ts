@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 /**
- * SimpleCAM SSE Adapter for Machine 9042
- * Consumes AG2 state events from SimpleCAM backend (port 5450)
- * Publishes to MQTT broker for Pleiades integration
+ * SimpleCAM Adapter for Machine 9042
+ * Consumes Server-Sent Events from SimpleCAM backend (/stream/machine-9042/state)
+ * Publishes AG2 v0.17.1 events to MQTT broker for Pleiades integration
+ *
+ * Topics:
+ * - machines/united-grinding_simplecam_9042/umati/* (state values)
+ * - machines/united-grinding_simplecam_9042/events/* (CloudEvents)
  */
 
 import mqtt from "mqtt";
 import http from "http";
+import crypto from "crypto";
 
 const SIMPLECAM_SSE_URL =
   process.env.SIMPLECAM_SSE_URL || "http://localhost:5450/stream/machine-9042/state";
@@ -14,9 +19,13 @@ const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || "mqtt://broker:1883";
 const MQTT_CLIENT_ID = process.env.MQTT_CLIENT_ID || "simplecam-adapter-9042";
 const HEALTH_PORT = parseInt(process.env.HEALTH_PORT || "3042", 10);
 
-// Machine metadata
-const MACHINE_SERIAL = "9042";
-const BASE_TOPIC = `machines/${MACHINE_SERIAL}/umati`;
+// Machine metadata (AG2 v0.17.1 format)
+const MANUFACTURER = "united-grinding";
+const MODEL = "simplecam";
+const SERIAL_NUMBER = "9042";
+const MACHINE_ID = `${MANUFACTURER}_${MODEL}_${SERIAL_NUMBER}`;
+const BASE_TOPIC = `machines/${MACHINE_ID}/umati`;
+const EVENTS_TOPIC = `machines/${MACHINE_ID}/events`;
 
 let mqttClient: mqtt.MqttClient;
 let isConnected = false;
@@ -59,17 +68,73 @@ async function connectMqtt(): Promise<void> {
 function startHeartbeat(): void {
   heartbeatTimer = setInterval(() => {
     if (isConnected) {
-      const heartbeat = {
-        value: Math.floor(Date.now() / 1000),
-        timestamp: new Date().toISOString(),
-      };
+      const heartbeat = Math.floor(Date.now() / 1000);
       mqttClient.publish(
         `${BASE_TOPIC}/Connection/Heartbeat`,
-        JSON.stringify(heartbeat.value),
+        JSON.stringify({
+          value: heartbeat,
+          timestamp: new Date().toISOString(),
+        }),
         { retain: true }
       );
     }
   }, 10000);
+}
+
+/**
+ * Create CloudEvent envelope (AG2 v0.17.1)
+ */
+function createCloudEvent(type: string, subject: string, data: any): any {
+  return {
+    specversion: "1.0",
+    type: `com.pleiades.simplecam.${type}`,
+    source: `machines/${MACHINE_ID}`,
+    subject,
+    id: crypto.randomUUID(),
+    time: new Date().toISOString(),
+    datacontenttype: "application/json",
+    data,
+  };
+}
+
+/**
+ * Publish state value (retained)
+ */
+function publishState(path: string, value: any, timestamp: string): void {
+  if (!isConnected) return;
+
+  const topic = `${BASE_TOPIC}/${path}`;
+  const payload = JSON.stringify({
+    value,
+    timestamp,
+  });
+
+  mqttClient.publish(topic, payload, { retain: true }, (err) => {
+    if (err) {
+      console.error(`[MQTT] Publish error on ${topic}:`, err.message);
+    } else {
+      console.log(`[MQTT] Published ${path}`);
+    }
+  });
+}
+
+/**
+ * Publish CloudEvent (not retained)
+ */
+function publishEvent(type: string, subject: string, data: any): void {
+  if (!isConnected) return;
+
+  const topic = `${EVENTS_TOPIC}/${type}`;
+  const event = createCloudEvent(type, subject, data);
+  const payload = JSON.stringify(event);
+
+  mqttClient.publish(topic, payload, { retain: false }, (err) => {
+    if (err) {
+      console.error(`[MQTT] Event publish error on ${topic}:`, err.message);
+    } else {
+      console.log(`[MQTT] Published event ${type}`);
+    }
+  });
 }
 
 /**
@@ -85,19 +150,15 @@ function mapEventToMqtt(event: any): void {
     return;
   }
 
-  const topic = `${BASE_TOPIC}/${path}`;
-  const payload = JSON.stringify({
-    value,
-    timestamp,
-  });
+  // Publish state value (retained)
+  publishState(path, value, timestamp);
 
-  if (isConnected) {
-    mqttClient.publish(topic, payload, { retain: true }, (err) => {
-      if (err) {
-        console.error(`[MQTT] Publish error on ${topic}:`, err.message);
-      } else {
-        console.log(`[MQTT] Published ${topic}`);
-      }
+  // Optionally publish as CloudEvent for state changes
+  if (path === "State/Status" || path === "Connection/State") {
+    publishEvent("StateChanged", path, {
+      path,
+      value,
+      timestamp,
     });
   }
 }
@@ -109,14 +170,7 @@ function mapStateSnapshot(state: any): void {
   // Identification (static, only once)
   if (state.identification) {
     Object.entries(state.identification).forEach(([key, val]) => {
-      const topic = `${BASE_TOPIC}/Identification/${key}`;
-      const payload = JSON.stringify({
-        value: val,
-        timestamp: new Date().toISOString(),
-      });
-      if (isConnected) {
-        mqttClient.publish(topic, payload, { retain: true });
-      }
+      publishState(`Identification/${key}`, val, new Date().toISOString());
     });
   }
 
@@ -143,7 +197,6 @@ async function listenToSseStream(): Promise<void> {
   console.log(`[SSE] Connecting to ${SIMPLECAM_SSE_URL}`);
 
   try {
-    // Using fetch with manual SSE parsing (eventsource package may not be available)
     const response = await fetch(SIMPLECAM_SSE_URL);
 
     if (!response.ok) {
@@ -169,16 +222,13 @@ async function listenToSseStream(): Promise<void> {
       for (let i = 0; i < lines.length - 1; i++) {
         const line = lines[i];
 
-        // Parse SSE format: "event: name" and "data: {...}"
         if (line.startsWith("data:")) {
           const dataStr = line.substring(5).trim();
           try {
             const data = JSON.parse(dataStr);
             if (data.identification) {
-              // Full state snapshot
               mapStateSnapshot(data);
             } else if (data.path) {
-              // Single event
               mapEventToMqtt(data);
             }
           } catch (err) {
@@ -189,7 +239,6 @@ async function listenToSseStream(): Promise<void> {
     }
   } catch (err) {
     console.error("[SSE] Stream error:", err instanceof Error ? err.message : String(err));
-    // Reconnect after delay
     setTimeout(() => listenToSseStream(), 5000);
   }
 }
@@ -222,9 +271,10 @@ function startHealthEndpoint(): void {
  * Main
  */
 async function main(): Promise<void> {
-  console.log("🚀 SimpleCAM Adapter 9042 starting...");
+  console.log("🚀 SimpleCAM Adapter 9042 (AG2 v0.17.1) starting...");
   console.log(`   SSE URL: ${SIMPLECAM_SSE_URL}`);
   console.log(`   MQTT: ${MQTT_BROKER_URL}`);
+  console.log(`   Machine ID: ${MACHINE_ID}`);
   console.log(`   Health: http://0.0.0.0:${HEALTH_PORT}/health`);
 
   startHealthEndpoint();
@@ -232,7 +282,6 @@ async function main(): Promise<void> {
   try {
     await connectMqtt();
     console.log("[Adapter] Ready!");
-    // Start listening to SSE stream (runs in background)
     listenToSseStream().catch((err) => {
       console.error("[Adapter] Fatal error:", err);
       process.exit(1);
