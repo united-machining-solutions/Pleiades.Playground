@@ -571,7 +571,7 @@ internal sealed class MachineConnection : ISessionTenant
     private async Task IdentifyAsync()
     {
         if (Output.MachineId is null
-            && MachineOutput.IdentityOf(ValueOf, Registration.SerialNumber) is { } identity)
+            && MachineOutput.IdentityOf(ValueOf, Registration) is { } identity)
         {
             await Output.IdentifyAsync(identity).ConfigureAwait(false);
             if (Output.MachineId is not null && Interlocked.Exchange(ref _identifiedOnce, 1) == 0)

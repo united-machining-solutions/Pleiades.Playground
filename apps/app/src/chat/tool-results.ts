@@ -38,7 +38,8 @@ export type ChatTool = {
   saveAsPage?: boolean
   /**
    * What a part of a page with this tool shows, in a few words. The chat names the parts of a page
-   * it proposes with it; a tool without it is named by its name.
+   * it proposes with it; a tool without it is named by its name. "Add a card" on a page offers only a
+   * tool with it: a person chooses a card by what it shows.
    */
   part?: string
 }
