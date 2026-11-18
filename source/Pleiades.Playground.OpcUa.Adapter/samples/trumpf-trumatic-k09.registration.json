@@ -50,10 +50,6 @@
       "evidence": "TRUMPF interface, ActivityMeters/DrivesOnTime, hours. The data model has no such element, so it is a value of the maker."
     }
   ],
-  "alerts": {
-    "eventType": "nsu=http://trumpf.com/TRUMPF-Interfaces/;i=1006",
-    "codeField": "nsu=http://trumpf.com/TRUMPF-Interfaces/;AlarmIdentifier"
-  },
   "missing": [
     {
       "path": "OperationCounters.PartsProducedInLifetime",

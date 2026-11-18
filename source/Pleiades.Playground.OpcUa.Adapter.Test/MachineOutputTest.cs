@@ -4,6 +4,7 @@ using MQTTnet;
 using Pleiades.Playground.Common.Logging.Loki.Configuration;
 using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Mqtt.Extensions.Testing;
+using Pleiades.Playground.OpcUa.Adapter.Api;
 using Pleiades.Playground.OpcUa.Adapter.Mapping;
 using Pleiades.Playground.OpcUa.Adapter.Registrations;
 
@@ -36,19 +37,89 @@ public class MachineOutputTest
             ["Identification.ProductInstanceUri"] = "urn:trumpf:A0280O0001",
         };
 
-        var identity = MachineOutput.IdentityOf(path => values.GetValueOrDefault(path), "A0280O0001");
+        var identity = MachineOutput.IdentityOf(path => values.GetValueOrDefault(path), "A0280O0001", manufacturerUriMapped: true);
 
         Assert.IsNotNull(identity);
         Assert.AreEqual(MachineId, identity.MachineId);
-        Assert.IsNull(MachineOutput.IdentityOf(path => path == "Identification.Model" ? null : values.GetValueOrDefault(path), "A0280O0001"),
+        Assert.IsNull(MachineOutput.IdentityOf(path => path == "Identification.Model" ? null : values.GetValueOrDefault(path), "A0280O0001", manufacturerUriMapped: true),
             "Without a model there is no machine id.");
-        Assert.IsNull(MachineOutput.IdentityOf(path => path == "Identification.ManufacturerUri" ? null : values.GetValueOrDefault(path), "A0280O0001"),
-            "Without the web address of the manufacturer there is no machine id.");
+        Assert.IsNull(MachineOutput.IdentityOf(path => path is "Identification.ManufacturerUri" or "Identification.Manufacturer" ? null : values.GetValueOrDefault(path), "A0280O0001", manufacturerUriMapped: false),
+            "Without the web address and the name of the manufacturer there is no machine id.");
+        Assert.IsNull(MachineOutput.IdentityOf(path => path == "Identification.ManufacturerUri" ? null : values.GetValueOrDefault(path), "A0280O0001", manufacturerUriMapped: true),
+            "A mapped web address without a value yet is waited for: the name does not stand in.");
+        Assert.IsFalse(identity.ManufacturerUriFromManufacturer, "The server gave the web address.");
         var formed = MachineOutput.IdentityOf(
-            path => path is "Identification.ProductInstanceUri" or "Identification.Manufacturer" ? null : values.GetValueOrDefault(path), "A0280O0001")!;
+            path => path is "Identification.ProductInstanceUri" or "Identification.Manufacturer" ? null : values.GetValueOrDefault(path), "A0280O0001", manufacturerUriMapped: true)!;
         Assert.AreEqual("https://www.trumpf.com/TruLaser%205030/A0280O0001", formed.ProductInstanceUri, "Formed as the binding forms it.");
         Assert.AreEqual("trumpf.com", formed.Manufacturer, "Named by the domain of its web address.");
     }
+
+    [TestMethod]
+    public void Without_a_ManufacturerUri_the_Manufacturer_without_special_characters_stands_in()
+    {
+        var values = new Dictionary<string, string>
+        {
+            ["Identification.Manufacturer"] = "TRUMPF Werkzeugmaschinen SE + Co. KG",
+            ["Identification.Model"] = "TruLaser 5030",
+        };
+
+        var identity = MachineOutput.IdentityOf(path => values.GetValueOrDefault(path), "A0280O0001", manufacturerUriMapped: false);
+
+        Assert.IsNotNull(identity);
+        Assert.IsTrue(identity.ManufacturerUriFromManufacturer);
+        Assert.AreEqual("TRUMPF Werkzeugmaschinen SE + Co. KG", identity.Manufacturer, "The name stays as the server gave it.");
+        Assert.AreEqual("TRUMPFWerkzeugmaschinenSECoKG", identity.ManufacturerUri);
+        Assert.AreEqual("trumpfwerkzeugmaschinensecokg_TruLaser-5030_A0280O0001", identity.MachineId);
+        Assert.AreEqual("TRUMPFWerkzeugmaschinenSECoKG/TruLaser%205030/A0280O0001", identity.ProductInstanceUri);
+        Assert.AreEqual("x-trumpfwerkzeugmaschinensecokg", MachineOutput.ExtensionPrefix(identity.ManufacturerUri));
+        var notice = Views.Notices(identity).Single();
+        StringAssert.Contains(notice, "Identification.ManufacturerUri", StringComparison.Ordinal);
+        StringAssert.Contains(notice, "trumpfwerkzeugmaschinensecokg_TruLaser-5030_A0280O0001", StringComparison.Ordinal);
+        Assert.AreEqual(0, Views.Notices(Identity).Count, "No notice when the server gave the web address.");
+
+        values["Identification.Manufacturer"] = " + . ";
+        Assert.IsNull(MachineOutput.IdentityOf(path => values.GetValueOrDefault(path), "A0280O0001", manufacturerUriMapped: false),
+            "A name of special characters only leaves no manufacturer.");
+    }
+
+    [TestMethod]
+    public void A_machine_that_learns_its_identity_waits_for_a_mapped_ManufacturerUri()
+    {
+        // At run time the values come one by one: Manufacturer and Model may come before ManufacturerUri.
+        var values = new Dictionary<string, string>
+        {
+            ["Identification.Manufacturer"] = "TRUMPF",
+            ["Identification.Model"] = "TruLaser 5030",
+        };
+        var registration = new MachineRegistration
+        {
+            SerialNumber = "A0280O0001",
+            Elements =
+            [
+                .. values.Keys.Append("Identification.ManufacturerUri")
+                    .Select(path => new ElementRegistration { Path = path, Kind = ValueKind.Text, Node = $"nsu=urn:test;s={path}" }),
+            ],
+        };
+
+        Assert.IsTrue(MachineOutput.MapsManufacturerUri(registration));
+        Assert.IsNull(MachineOutput.IdentityOf(path => values.GetValueOrDefault(path), registration),
+            "Not identified with the name while the web address has not come yet.");
+
+        values["Identification.ManufacturerUri"] = "https://www.trumpf.com";
+        var identity = MachineOutput.IdentityOf(path => values.GetValueOrDefault(path), registration);
+
+        Assert.IsNotNull(identity);
+        Assert.IsFalse(identity.ManufacturerUriFromManufacturer);
+        Assert.AreEqual(MachineId, identity.MachineId);
+    }
+
+    [TestMethod]
+    [DataRow("TRUMPF", "TRUMPF")]
+    [DataRow("Müller-Maschinen GmbH & Co.", "MuellerMaschinenGmbHCo")]
+    [DataRow("Société Générale/Ötztal #1", "SocieteGeneraleOetztal1")]
+    [DataRow("www.example.com", "wwwexamplecom")]
+    public void The_stand_in_for_the_ManufacturerUri_holds_letters_and_digits_only(string manufacturer, string expected) =>
+        Assert.AreEqual(expected, MachineOutput.ManufacturerUriOf(manufacturer));
 
     [TestMethod]
     public void The_manifest_names_the_profiles_the_elements_on_their_paths_and_the_alert_events()

@@ -114,6 +114,8 @@ const pictures = [
       await page.goto(`${at.app}/sites/${SHOWN}`)
       await page.getByRole("heading", { name: SHOWN_TITLE }).waitFor()
       await page.getByText(/^Last (hour|\d+ hours)$/).waitFor()
+      // The sections below the card come after it: the tiles of now are the first of them.
+      await page.getByText("Bearing temperature").first().waitFor()
     },
   },
   {

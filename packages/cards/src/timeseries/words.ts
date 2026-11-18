@@ -5,6 +5,15 @@ import type { TimeseriesRange } from "./contract.ts"
 // The words of the time series card. A value keeps the unit it was published in; the card writes it as
 // the measurement card does (measurement/words.ts), so the two cards never say a value two ways.
 
+/**
+ * The unit a value is shown in, and the factor from the unit it was published in: a power in watt
+ * is shown in kilowatts, as a person reads it at a machine (ADR-0002: a display converts). Any other
+ * unit stays as it came.
+ */
+export function displayed(unit: string | null): { unit: string | null; factor: number } {
+  return unit === "watt" ? { unit: "kilowatt", factor: 1 / 1000 } : { unit, factor: 1 }
+}
+
 /** "the last 15 minutes", "the last hour". */
 export const rangeWords: Record<TimeseriesRange, string> = {
   "15m": "the last 15 minutes",

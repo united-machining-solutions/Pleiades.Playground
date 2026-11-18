@@ -73,4 +73,7 @@ internal static partial class Log
 
     [LoggerMessage(25, LogLevel.Error, "The stored users of the OPC UA servers cannot be read: {Reason}")]
     public static partial void CredentialsUnreadable(this ILogger logger, string reason);
+
+    [LoggerMessage(27, LogLevel.Warning, "Machine {SerialNumber}: the list of alerts of {Node} is not taken: {Reason}. The alerts that stand are kept.")]
+    public static partial void AlertListNotTaken(this ILogger logger, string serialNumber, string node, string reason);
 }

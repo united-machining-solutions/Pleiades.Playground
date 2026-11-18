@@ -8,7 +8,7 @@ namespace Pleiades.Playground.Sites.Api.Endpoints;
 /// </summary>
 internal static class SitesMapper
 {
-    internal static SiteDtoV1 ToDto(SiteDao site) => new(site.SiteId, site.Company, site.Name, site.Halls);
+    internal static SiteDtoV1 ToDto(SiteDao site) => new(site.SiteId, site.Company, site.Name, site.Halls, SiteTags.Of(site));
 
     internal static PlacementDtoV1 ToDto(PlacementDao placement) =>
         new(placement.MachineId, placement.SiteId, placement.Hall, placement.DisplayName, placement.PlacedAt);

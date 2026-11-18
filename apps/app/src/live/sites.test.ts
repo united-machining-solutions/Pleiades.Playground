@@ -63,6 +63,8 @@ const list: SiteList = {
     { state: "running", machines: 1 },
     { state: "no-data", machines: 1 },
   ],
+  sending: 1,
+  needsYou: 1,
   sites: [
     {
       siteId: "north-plant",
@@ -88,7 +90,7 @@ const list: SiteList = {
 const north = (sites: SiteList) => sites.sites[0]!
 const south = (sites: SiteList) => sites.sites[1]!
 
-test("a machine on a site that stops: its state, the counts of its site and of all sites follow", () => {
+test("a machine on a site that stops: its state, the counts of its site and of all sites, and who needs someone follow", () => {
   const next = sitesWith(list, `machines/${P04}/umati/State/Status`, status("2026-11-18T09:31:00Z", "OutOfService"), NOW)
   assert.equal(north(next).halls[0]!.machines[0]!.state, "stopped")
   assert.deepEqual(north(next).counts, [{ state: "stopped", machines: 1 }])
@@ -96,6 +98,8 @@ test("a machine on a site that stops: its state, the counts of its site and of a
     { state: "stopped", machines: 1 },
     { state: "no-data", machines: 1 },
   ])
+  assert.equal(next.sending, 1)
+  assert.equal(next.needsYou, 2)
   // The other site stays as it was, the same object.
   assert.equal(south(next), south(list))
 })
@@ -175,6 +179,8 @@ test("as time passes, a machine that falls silent has no data, and its site coun
   assert.equal(north(later).halls[0]!.machines[0]!.state, "no-data")
   assert.deepEqual(north(later).counts, [{ state: "no-data", machines: 1 }])
   assert.deepEqual(later.counts, [{ state: "no-data", machines: 2 }])
+  assert.equal(later.sending, 0)
+  assert.equal(later.needsYou, 2)
 })
 
 test("as time passes, a machine on no site that falls silent has no data too", () => {
