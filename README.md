@@ -45,6 +45,8 @@ In PowerShell, set the variable first: `$env:PLEIADES_VERSION = "main"`. Or writ
 | MQTT broker | `localhost:1883` | Anonymous in the demo network |
 | Generative UI backend | <http://localhost:5520/mcp> | MCP server for displays, see [`apps/genui-mcp`](apps/genui-mcp/README.md) |
 | Example app | <http://localhost:5600/> | What every machine does now, and a chat about it. It answers on this computer only (`APP_BIND`); see [`apps/app`](apps/app/README.md) |
+| Cutting simulators | <http://localhost:5611/>, `:5612`, `:5613` | A 2D laser, a tube laser and a punching machine that take their jobs through telegram files; see [`Cutting.Simulator`](source/Pleiades.Playground.Cutting.Simulator/README.md). One [`Cutting.Adapter`](source/Pleiades.Playground.Cutting.Adapter/README.md) each publishes them to the broker as `trumpf_Laser2D_L-01`, `trumpf_Tube_T-01` and `trumpf_Punch_PU-01` |
+| OPC UA adapter | <http://localhost:5560/machines> | Machines that speak OPC UA, added in the chat; with a simulated one, A1121O0001, web UI at <http://localhost:8090/>. On this computer only (`OPCUA_ADAPTER_BIND`); see [the adapter](source/Pleiades.Playground.OpcUa.Adapter/README.md) |
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
 An optional [Ultimaker 3 service](source/Pleiades.Playground.Ultimaker.Api/README.md) adds CuraEngine,
@@ -83,7 +85,7 @@ Four layers, three agreed interfaces. Everything below the solution layer is the
 | Solution | Applications that people use | `apps/` (the example app) |
 | Agentic | A harness that talks to a language model and calls tools | `apps/app` (the chat of the example app), or bring your own (any MCP client) |
 | Tool | Time series, events and cards over REST and MCP | `source/*.Timeseries.Api`, `source/*.Events.Api`, `source/*.Sites.Api`, `apps/` (cards) |
-| Data | Adapters, broker, persistence | `source/*.Simulator`, `source/*.Persistence`, broker config in `stacks/` |
+| Data | Adapters, broker, persistence | `source/*.Simulator`, `source/*.OpcUa.Adapter`, `source/*.Persistence`, broker config in `stacks/` |
 
 | Agreed interface | Contract | Where |
 |---|---|---|

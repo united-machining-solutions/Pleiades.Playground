@@ -24,8 +24,9 @@ docker compose up -d --build --wait
 ```
 
 The command returns when the stack is ready, that is when every container reports healthy: the broker, the
-database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app and
-one simulator per machine. To see the demo without building it, start it from the published images, see
+database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app, one
+simulator per machine, three cutting machines, each a simulator with its adapter, and the OPC UA adapter with a
+simulated OPC UA machine. To see the demo without building it, start it from the published images, see
 [Start](../README.md#start).
 
 ```bash
@@ -36,10 +37,18 @@ docker compose ps --format "table {{.Service}}	{{.Status}}"
 SERVICE                  STATUS
 app                      Up 3 minutes (healthy)
 broker                   Up 3 minutes (healthy)
+cutting-adapter-laser-2d Up 3 minutes (healthy)
+cutting-adapter-punch    Up 3 minutes (healthy)
+cutting-adapter-tube     Up 3 minutes (healthy)
+cutting-laser-2d         Up 3 minutes (healthy)
+cutting-punch            Up 3 minutes (healthy)
+cutting-tube             Up 3 minutes (healthy)
 events-api               Up 3 minutes (healthy)
 events-persistence       Up 3 minutes (healthy)
 genui-mcp                Up 3 minutes (healthy)
 mongodb                  Up 3 minutes (healthy)
+opc-simulator            Up 3 minutes (healthy)
+opcua-adapter            Up 3 minutes (healthy)
 simulator-m-02           Up 3 minutes (healthy)
 simulator-p-04           Up 3 minutes (healthy)
 simulator-p-07           Up 3 minutes (healthy)
@@ -55,14 +64,23 @@ timeseries-persistence   Up 3 minutes (healthy)
 | <http://localhost:5500/> | The Timeseries API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
-| `localhost:1883` | The MQTT broker the simulators publish to. |
+| <http://localhost:5611/>, `:5612`, `:5613` | The web pages of the three cutting machines, a 2D laser, a tube laser and a punching machine: their plan, their alarms and every telegram. They answer on this computer only. |
+| `localhost:1883` | The MQTT broker the simulators and adapters publish to. |
+| <http://localhost:5560/machines> | The OPC UA adapter: the machines added over OPC UA. It answers on this computer only. |
+| <http://localhost:8090/> | The web UI of the simulated OPC UA machine, A1121O0001. |
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
 port and setting. The three simulated machines, P-04, P-07 and M-02, are the three `simulator-*` services.
 Each publishes after the umati data model, below `machines/<manufacturer>_<model>_<serial number>/` (for P-04
 `machines/alcyone-machines_AX-400_P-04/`): manifest, values, its stack light, and job orders, program executions
 and alerts as CloudEvents. It is described in
-[`contracts/mqtt`](../contracts/mqtt/README.md#machines-the-binding-of-the-data-model).
+[`contracts/mqtt`](../contracts/mqtt/README.md#machines-the-binding-of-the-data-model). The cutting machines, L-01,
+T-01 and PU-01, are the `cutting-*` services: a simulator that speaks the telegram protocol of the machine through
+files, and an adapter that reads it and publishes the same tree, below `machines/trumpf_Laser2D_L-01/` and the like
+(see [`Cutting.Adapter`](../source/Pleiades.Playground.Cutting.Adapter/README.md)).
+
+The OPC UA machine, `opc-simulator`, is not on Home yet: it is added in the chat, see
+[Add a machine that speaks OPC UA](#add-a-machine-that-speaks-opc-ua).
 
 The persistence services store the values as they come, in the units of the model, and the CloudEvents as they
 came; the APIs put job orders, program executions and alerts together from them when they are read.
@@ -236,6 +254,20 @@ picker and the head with the way back to the list, `chat-name.ts` what a chat is
 reads which models the settings name, `cards.tsx` lists what the app draws for which tool, card by card, and
 `suggestions.ts` holds the three questions.
 
+### Add a machine that speaks OPC UA
+
+Type `/` in the chat field: the list of commands opens, and `/help` explains them. Ask
+`/discover A1121O0001`, and the model scans the OPC UA server of the simulated machine, matches its nodes to
+the data model and shows a proposal: the endpoint with the strongest security, whether the machine fulfils
+the core of the data model and which profiles are complete, every element with its value, and what is
+derived, unclear or missing. What the core lacks is marked as not available. The machine is added when you
+press "Add machine" on the proposal; from then on it is on Home like the others, also after a restart.
+`/opcua` lists the added servers with their core and profiles, and a button that removes a machine together
+with its retained messages on the broker; `/mapping A1121O0001` shows what needs a look.
+
+**In the code:** [`apps/app/src/opcua/`](../apps/app/src/opcua) holds the commands and the cards of the chat,
+and the adapter is [`source/Pleiades.Playground.OpcUa.Adapter`](../source/Pleiades.Playground.OpcUa.Adapter/README.md).
+
 ### The card in another host
 
 The machine card is also an MCP App: one HTML file that the generative UI backend serves as the resource
@@ -287,6 +319,8 @@ Each part has a section "What is where" that maps its files:
 | A tool, its text for a model, or how states and silence are computed | [`apps/genui-mcp`: What is where](../apps/genui-mcp/README.md#what-is-where) |
 | A card, its contract, the wording or the colours of a state | [`packages/cards`: What is where](../packages/cards/README.md#what-is-where), and [A new card](../packages/cards/README.md#a-new-card) |
 | What a machine publishes and how it is stored | [`contracts/`](../contracts/README.md) first, then the .NET services under [`source/`](../source) |
+| Cutting machines that take their jobs through telegram files, and the adapter that brings them onto the broker (they start with the stack; the tour does not visit them) | [`Cutting.Simulator`](../source/Pleiades.Playground.Cutting.Simulator/README.md), [`Cutting.Adapter`](../source/Pleiades.Playground.Cutting.Adapter/README.md) |
+| How a machine that speaks OPC UA is scanned, mapped and run | [OPC UA adapter](../source/Pleiades.Playground.OpcUa.Adapter/README.md) |
 
 Below the app are the two APIs, and next to them the Sites API, which keeps where the machines stand. Each one
 offers the same queries twice: over REST for applications, with a Swagger UI to try them, and over MCP for

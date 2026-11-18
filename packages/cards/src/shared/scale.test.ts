@@ -26,3 +26,12 @@ test("without a value the graph chooses its axis itself", () => {
   assert.equal(axisScale([]), null)
   assert.equal(axisScale([null, null]), null)
 })
+
+test("an axis does not reach below 0 where no value is below 0", () => {
+  assert.deepEqual(axisScale([0, 300]), { domain: [0, 300], ticks: [0, 100, 200, 300] })
+})
+
+test("values that are all 0: from 0 to the span asked for, nothing below", () => {
+  // The energy card asks for a kilowatt, as #140 has it for machines that stand still.
+  assert.deepEqual(axisScale([0, 0, null, 0], { zeroSpan: 1_000 }), { domain: [0, 1_000], ticks: [0, 250, 500, 750, 1_000] })
+})

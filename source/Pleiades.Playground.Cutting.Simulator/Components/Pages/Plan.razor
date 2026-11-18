@@ -1,0 +1,204 @@
+@page "/plan"
+@inherits LiveComponent
+
+<PageTitle>Production plan · @State.DisplayName</PageTitle>
+
+<div class="page-head">
+    <h1>Production plan</h1>
+    <span class="muted">@State.Orders.Count orders · the host reads it with PRD_SHOW</span>
+    @if (State.EndlessMode)
+    {
+        <span class="badge info" title="The machine writes a new order whenever the plan runs out. Switch it on the Overview page.">Endless mode</span>
+    }
+</div>
+
+<section class="card">
+    @if (State.Orders.Count == 0)
+    {
+        <p class="muted">The plan is empty. Add an order below, or let the host send PRDINSER@(InsertSupported ? "" : " (not on this machine type)").</p>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th class="num">No.</th>
+                        <th>Order</th>
+                        <th>NC program</th>
+                        <th>Job</th>
+                        <th class="num">Done</th>
+                        <th>Status</th>
+                        <th>Material</th>
+                        <th class="num">Runtime</th>
+                        <th aria-label="Actions"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in State.Orders)
+                    {
+                        var running = order.Sequence == State.CurrentOrder;
+                        <tr class="@(running ? "current" : "")">
+                            <td class="num">@order.Sequence</td>
+                            <td>@order.Name@if (order.Generated) {<span class="muted small" title="Written by the endless mode"> · generated</span>}</td>
+                            <td class="mono">@order.NcProgram</td>
+                            <td>@order.JobName</td>
+                            <td class="num">@order.Actual / @order.Target</td>
+                            <td><span class="badge @Labels.StatusTone(order.Status)">@((int)order.Status) @Labels.Status(order.Status)</span></td>
+                            <td>@order.MaterialId</td>
+                            <td class="num">@order.RuntimeSeconds s</td>
+                            <td class="row-actions">
+                                <button class="btn icon" title="Move up" disabled="@running" @onclick="() => Do(() => Actions.ShiftOrderAsync(order.Sequence, -1))">↑</button>
+                                <button class="btn icon" title="Move down" disabled="@running" @onclick="() => Do(() => Actions.ShiftOrderAsync(order.Sequence, 1))">↓</button>
+                                @if (order.Status == CuttingOrderStatus.Locked || order.Status == CuttingOrderStatus.Paused)
+                                {
+                                    <button class="btn small" disabled="@running" @onclick="() => SetStatus(order, CuttingOrderStatus.Free)">Release</button>
+                                }
+                                else if (order.Status != CuttingOrderStatus.Completed)
+                                {
+                                    <button class="btn small" disabled="@running" @onclick="() => SetStatus(order, CuttingOrderStatus.Locked)">Lock</button>
+                                    @if (State.Type == CuttingMachineType.Punch)
+                                    {
+                                        <button class="btn small" disabled="@running" @onclick="() => SetStatus(order, CuttingOrderStatus.Paused)">Pause</button>
+                                    }
+                                }
+                                else
+                                {
+                                    <button class="btn small" @onclick="() => Repeat(order)">Run again</button>
+                                }
+                                <button class="btn small" disabled="@running" @onclick="() => Edit(order)">Edit</button>
+                                <button class="btn small danger" disabled="@running" @onclick="() => Do(() => Actions.DeleteOrderAsync(order.Sequence))">Delete</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<section class="card">
+    <h2>@(_editing is null ? "Add an order" : $"Edit order {_editing.Sequence}")</h2>
+    <div class="form-grid">
+        <label>Order name <input class="input" @bind="_name" maxlength="15" /></label>
+        <label>NC program <input class="input mono" @bind="_program" maxlength="24" /></label>
+        <label>Job <input class="input" @bind="_job" /></label>
+        <label>Quantity <input class="input" type="number" min="1" max="999" @bind="_target" /></label>
+        <label>@(State.Type == CuttingMachineType.Tube ? "Profile" : "Material") <input class="input" @bind="_material" maxlength="21" /></label>
+        <label>Runtime per run, s <input class="input" type="number" min="1" @bind="_runtime" /></label>
+        @if (State.Type == CuttingMachineType.Tube)
+        {
+            <label>Tube length, mm <input class="input" type="number" @bind="_length" /></label>
+            <label>Bounding circle, mm <input class="input" type="number" @bind="_diameter" /></label>
+        }
+        <label class="check"><input type="checkbox" @bind="_locked" /> Locked (status 9)</label>
+    </div>
+    <div class="actions">
+        <button class="btn primary" @onclick="Save">@(_editing is null ? "Add" : "Save")</button>
+        @if (_editing is not null)
+        {
+            <button class="btn" @onclick="Reset">Cancel</button>
+        }
+        @if (_message.Length > 0)
+        {
+            <span class="muted small">@_message</span>
+        }
+    </div>
+</section>
+
+<section class="card">
+    <h2>NC archive</h2>
+    <p class="muted small">The programs the machine knows. PRGSTART with a single program, and PRGDELET, work on these.</p>
+    <div class="chips">
+        @foreach (var program in State.Archive)
+        {
+            <span class="chip mono">@program</span>
+        }
+    </div>
+</section>
+
+@code {
+    private ProductionOrder? _editing;
+    private string _name = string.Empty;
+    private string _program = string.Empty;
+    private string _job = string.Empty;
+    private int _target = 1;
+    private string _material = string.Empty;
+    private int _runtime = 40;
+    private double _length = 6000;
+    private double _diameter = 40;
+    private bool _locked;
+    private string _message = string.Empty;
+
+    private bool InsertSupported => CuttingSupport.Supports(State.Type, CuttingCommands.InsertOrder);
+
+    private Task SetStatus(ProductionOrder order, CuttingOrderStatus status) =>
+        Do(() => Actions.SetOrderStatusAsync(order.Sequence, status));
+
+    private Task Repeat(ProductionOrder order) =>
+        Do(() => Actions.ReplaceOrderAsync(order with { Actual = 0, Status = CuttingOrderStatus.Free }));
+
+    private void Edit(ProductionOrder order)
+    {
+        _editing = order;
+        _name = order.Name;
+        _program = order.NcProgram;
+        _job = order.JobName;
+        _target = order.Target;
+        _material = order.MaterialId;
+        _runtime = order.RuntimeSeconds;
+        _length = order.TubeLength;
+        _diameter = order.TubeDiameter;
+        _locked = order.Status == CuttingOrderStatus.Locked;
+        _message = string.Empty;
+    }
+
+    private void Reset()
+    {
+        _editing = null;
+        _name = string.Empty;
+        _program = string.Empty;
+        _job = string.Empty;
+        _target = 1;
+        _material = string.Empty;
+        _runtime = 40;
+        _locked = false;
+    }
+
+    private async Task Save()
+    {
+        var order = (_editing ?? new ProductionOrder { Sequence = 0, Name = string.Empty, NcProgram = string.Empty }) with
+        {
+            Name = _name.Trim(),
+            NcProgram = _program.Trim(),
+            JobName = _job.Trim(),
+            Target = _target,
+            MaterialId = _material.Trim(),
+            RuntimeSeconds = Math.Max(1, _runtime),
+            TubeLength = _length,
+            TubeDiameter = _diameter,
+            Status = _locked ? CuttingOrderStatus.Locked : CuttingOrderStatus.Free,
+        };
+
+        if (_editing is null)
+        {
+            var result = await Actions.InsertOrderAsync(order);
+            _message = result switch
+            {
+                > 0 => $"Added as number {result}.",
+                -3 => "An order with this name exists.",
+                -9 => "Name, NC program and a quantity from 1 to 999 are needed.",
+                _ => "The plan is full.",
+            };
+            if (result > 0)
+            {
+                Reset();
+            }
+        }
+        else
+        {
+            _message = await Actions.ReplaceOrderAsync(order) ? "Saved." : "The order runs or is gone.";
+            Reset();
+        }
+    }
+}

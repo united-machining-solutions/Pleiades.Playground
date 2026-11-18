@@ -9,6 +9,7 @@ import { Meter } from "@pleiades/ui/components/meter"
 import {
   Pagination,
   PaginationContent,
+  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
@@ -22,9 +23,9 @@ import { MachineName } from "../shared/machine-name.tsx"
 import { axisScale } from "../shared/scale.ts"
 import { SmoothHeight } from "../shared/smooth-height.tsx"
 import type { EnergySeries, EnergyShow, MachineEnergy } from "./contract.ts"
-import { ENERGY_ORDERS, pageOf } from "./order.ts"
+import { ENERGY_ORDERS, pageLinks, pageOf } from "./order.ts"
 import type { EnergyOrder, EnergyPage } from "./order.ts"
-import { axisKilowatts, inKilowattHours, kilowattHours, kilowatts } from "./words.ts"
+import { axisKilowatts, cardRange, inKilowattHours, kilowattHours, kilowatts } from "./words.ts"
 
 /** How many machines the categorical colours of the theme name, `--chart-1` and on. */
 const COLOURS = 14
@@ -58,7 +59,7 @@ export function EnergyCard({ from, to, hours, machines, series }: EnergyShow & {
       <CardHeader>
         <CardTitle className="font-semibold group-data-[size=sm]/card:text-base">Power and energy</CardTitle>
         <CardDescription>
-          {hours === 1 ? "Last hour" : `Last ${hours} hours`}, {clock(from)} to {clock(to)}
+          {cardRange(from, to, hours)}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -141,22 +142,52 @@ function EnergyPages({ view, onPage }: { view: EnergyPage; onPage: (page: number
   }
   const off = (disabled: boolean) => (disabled ? { "aria-disabled": true, tabIndex: -1, className: "pointer-events-none opacity-50" } : {})
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="@container/pages flex flex-wrap items-center justify-between gap-2">
       <p className="text-xs text-muted-foreground tabular-nums">
         {view.first}–{view.last} of {view.total}
       </p>
-      <Pagination className="mx-0 w-auto">
+      {/* Where the card is narrow, the links leave out the neighbours of the current page. */}
+      <Pagination className="mx-0 w-auto hidden @sm/pages:flex">
         <PaginationContent>
           <PaginationItem>
             <PaginationPrevious href="#" onClick={go(view.page - 1)} {...off(view.page === 1)} />
           </PaginationItem>
-          {Array.from({ length: view.pages }, (_, index) => index + 1).map((one) => (
-            <PaginationItem key={one}>
-              <PaginationLink href="#" isActive={one === view.page} onClick={go(one)}>
-                {one}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
+          {pageLinks(view.page, view.pages, 1).map((one, index) =>
+            one === "gap" ? (
+              <PaginationItem key={`gap-${index}`}>
+                <PaginationEllipsis />
+              </PaginationItem>
+            ) : (
+              <PaginationItem key={one}>
+                <PaginationLink href="#" isActive={one === view.page} onClick={go(one)}>
+                  {one}
+                </PaginationLink>
+              </PaginationItem>
+            ),
+          )}
+          <PaginationItem>
+            <PaginationNext href="#" onClick={go(view.page + 1)} {...off(view.page === view.pages)} />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+      <Pagination className="mx-0 w-auto @sm/pages:hidden">
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious href="#" onClick={go(view.page - 1)} {...off(view.page === 1)} />
+          </PaginationItem>
+          {pageLinks(view.page, view.pages, 0).map((one, index) =>
+            one === "gap" ? (
+              <PaginationItem key={`gap-${index}`}>
+                <PaginationEllipsis />
+              </PaginationItem>
+            ) : (
+              <PaginationItem key={one}>
+                <PaginationLink href="#" isActive={one === view.page} onClick={go(one)}>
+                  {one}
+                </PaginationLink>
+              </PaginationItem>
+            ),
+          )}
           <PaginationItem>
             <PaginationNext href="#" onClick={go(view.page + 1)} {...off(view.page === view.pages)} />
           </PaginationItem>
@@ -179,15 +210,23 @@ function EnergyValue({ energy }: { energy: MachineEnergy["energy"] }) {
 
 /** Mean and peak power of a machine, or why there are none. */
 function PowerValue({ power }: { power: MachineEnergy["power"] }) {
-  if (power.meanWatt !== null && power.peakWatt !== null) {
-    return (
-      <>
-        <span className="text-muted-foreground">mean</span> {kilowatts(power.meanWatt)}
-        <span className="block text-xs text-muted-foreground">peak {kilowatts(power.peakWatt)}</span>
-      </>
-    )
+  if (power.meanWatt === null && power.peakWatt === null) {
+    return <span className="text-muted-foreground">{power.unit !== null && power.unit !== "watt" ? `in ${power.unit}` : "no value"}</span>
   }
-  return <span className="text-muted-foreground">{power.unit !== null && power.unit !== "watt" ? `in ${power.unit}` : "no value"}</span>
+  return (
+    <>
+      {power.meanWatt !== null && (
+        <>
+          <span className="text-muted-foreground">mean</span> {kilowatts(power.meanWatt)}
+        </>
+      )}
+      {power.peakWatt !== null ? (
+        <span className="block text-xs text-muted-foreground">peak {kilowatts(power.peakWatt)}</span>
+      ) : (
+        power.error !== null && <span className="block text-xs text-muted-foreground">peak not known</span>
+      )}
+    </>
+  )
 }
 
 /**
@@ -290,7 +329,8 @@ function PowerGraph({ series, colours, shown }: { series: Lines; colours: Map<st
   const keyOf = (machine: string) => `m${[...colours.keys()].indexOf(machine)}`
   const lines = series.lines.filter((line) => shown.includes(line.machine))
   // The axis spans the machines of every page, so it stands still when the pages turn.
-  const scale = axisScale(series.lines.filter((line) => colours.has(line.machine)).flatMap((line) => line.watt))
+  // Machines that stand still get an axis from 0 to a kilowatt.
+  const scale = axisScale(series.lines.filter((line) => colours.has(line.machine)).flatMap((line) => line.watt), { zeroSpan: 1_000 })
   const config = Object.fromEntries(
     lines.map((line) => [keyOf(line.machine), { label: line.machine, color: colours.get(line.machine) }]),
   ) satisfies ChartConfig

@@ -56,7 +56,9 @@ export type Site = z.infer<typeof site>
 export const unplacedMachine = z.object({
   machine: machineId.describe("The machine id."),
   state: state.describe("What the machine does now."),
-  lastValueAt: instant.nullable().describe("The newest value of any of its readings: the last sign of life."),
+  now: machine.describe(
+    "What the machine does now, as genui_machine_list says it: the values a live page starts from. Its topics a page can also build from the machine id. Required: the example app and genui-mcp are built from the same commit and run under the same tag, and a card file comes with genui-mcp itself.",
+  ),
 })
 export type UnplacedMachine = z.infer<typeof unplacedMachine>
 

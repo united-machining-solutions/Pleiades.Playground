@@ -11,11 +11,13 @@
     <title>Energy</title>
     <!--
       The host gives the frame the height the card announces. While it catches up with a card that
-      grows, the frame must not scroll: its scrollbar would show for a moment.
+      grows, a scrollbar would show for a moment: the frame scrolls without one, so a host that caps
+      the height still lets a person reach the bottom.
     -->
     <style>
       html {
-        overflow: hidden;
+        overflow-y: auto;
+        scrollbar-width: none;
       }
     </style>
   </head>

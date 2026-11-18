@@ -1,0 +1,219 @@
+@page "/"
+@inherits LiveComponent
+
+<PageTitle>Overview · @State.DisplayName</PageTitle>
+
+<div class="page-head">
+    <h1>Overview</h1>
+    <span class="badge @Labels.StateTone(State.State)">@Labels.State(State.State)</span>
+</div>
+
+<div class="grid">
+    <section class="card">
+        <h2>Connection</h2>
+        <dl class="facts">
+            <dt>Serial number</dt>
+            <dd>
+                @if (State.SerialNumber.Length > 0)
+                {
+                    <span class="mono" title="The serial number, the last part of the machine id in Pleiades: the adapter publishes below machines/&lt;manufacturer&gt;_&lt;model&gt;_@State.SerialNumber/">@State.SerialNumber</span>
+                }
+                else
+                {
+                    <span class="muted">Not set (Config__SerialNumber)</span>
+                }
+            </dd>
+            <dt>Machine number</dt>
+            <dd class="mono">@State.MachineNumber</dd>
+            <dt>Machine</dt>
+            <dd>
+                <span class="dot @(State.Online ? "ok" : "neutral")"></span>
+                @(State.Online ? "On, reads and writes telegrams" : "Off")
+            </dd>
+            <dt>Host</dt>
+            <dd>
+                <span class="dot @(State.HostConnected ? "ok" : "warn")"></span>
+                @(State.HostConnected ? "Connected with SRC9CONN" : "Not connected: notifications are held")
+            </dd>
+            <dt>Production plan</dt>
+            <dd>@(State.ProductionActive ? "Runs" : "Stopped")@StopText@(State.EndlessMode ? ", endless mode" : "")</dd>
+        </dl>
+        <div class="actions">
+            @if (State.Online)
+            {
+                <button class="btn" @onclick="() => Do(Actions.PowerOffAsync)">Switch off</button>
+            }
+            else
+            {
+                <button class="btn primary" @onclick="() => Do(Actions.PowerOnAsync)">Switch on</button>
+            }
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Current program</h2>
+        @if (State.CurrentProgram.Length > 0)
+        {
+            <dl class="facts">
+                <dt>NC program</dt>
+                <dd class="mono">@State.CurrentProgram</dd>
+                <dt>Order</dt>
+                <dd>@(CurrentOrder?.Name ?? "Single program start")</dd>
+                <dt>Sheet</dt>
+                <dd>@State.CurrentSheet@(CurrentOrder is null ? "" : $" of {CurrentOrder.Target}")</dd>
+            </dl>
+            <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Percent">
+                <div class="bar" style="width: @Percent.ToString(CultureInfo.InvariantCulture)%"></div>
+            </div>
+        }
+        else if (State.WaitingFor.Length > 0)
+        {
+            <p class="callout warn">@State.WaitingFor Make the place available on the <a href="stock">Stock</a> page, or let the host send LOCAVAIL@(State.EndlessMode ? "; in endless mode the machine does it itself after a while" : "").</p>
+        }
+        else
+        {
+            <p class="muted">No program runs.</p>
+        }
+        <div class="actions">
+            <button class="btn primary" disabled="@(!State.Online)" @onclick="StartPlan">Start plan</button>
+            <button class="btn" disabled="@(!State.Online)" @onclick="() => Stop(1)">Stop after program</button>
+            <button class="btn" disabled="@(!State.Online)" @onclick="() => Stop(2)">Stop after order</button>
+            <button class="btn danger" disabled="@(State.CurrentProgram.Length == 0)" @onclick="Abort">Abort program</button>
+        </div>
+        @if (_message.Length > 0)
+        {
+            <p class="muted small">@_message</p>
+        }
+    </section>
+
+    <section class="card">
+        <h2>Alarms</h2>
+        @if (State.Alarms.Count == 0)
+        {
+            <p class="muted">No alarm.</p>
+        }
+        else
+        {
+            <ul class="alarms">
+                @foreach (var alarm in State.Alarms)
+                {
+                    <li><span class="mono">@alarm.Number.ToString("D8", CultureInfo.InvariantCulture)</span> @alarm.Text <span class="muted small">@alarm.Time.ToString("HH:mm:ss", CultureInfo.InvariantCulture)</span></li>
+                }
+            </ul>
+        }
+        <div class="form-row">
+            <label>Number <input class="input narrow" type="number" @bind="_alarmNumber" /></label>
+            <label class="grow">Text <input class="input" @bind="_alarmText" maxlength="180" /></label>
+        </div>
+        <div class="actions">
+            <button class="btn danger" disabled="@(!State.Online)" @onclick="RaiseAlarm">Raise alarm</button>
+            <button class="btn" disabled="@(State.Alarms.Count == 0)" @onclick="() => Do(Actions.AcknowledgeAlarmsAsync)"
+                    title="Clears the alarms. A program that was halted runs on, as after NC start.">@(string.IsNullOrEmpty(State.CurrentProgram) ? "Acknowledge" : "Acknowledge and continue")</button>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>Settings</h2>
+        <div class="form-row">
+            <label class="check">
+                <input type="checkbox" checked="@State.AutoRun" @onchange="e => Machine.SetAutoRun(e.Value is true)" />
+                Start the plan by itself when it holds a free order
+            </label>
+        </div>
+        <div class="form-row">
+            <label class="check" title="Switched on, it starts the plan. Done orders of its own beyond the last ten are cleared away.">
+                <input type="checkbox" checked="@State.EndlessMode" @onchange="e => Machine.SetEndlessMode(e.Value is true)" />
+                Endless mode: write a new order whenever the plan runs out, and fill or empty a stack by itself
+            </label>
+        </div>
+        <div class="form-row">
+            <label>
+                Time scale
+                <select class="input" value="@State.TimeScale.ToString(CultureInfo.InvariantCulture)" @onchange="SetTimeScale">
+                    @foreach (var (value, text) in TimeScales)
+                    {
+                        <option value="@value.ToString(CultureInfo.InvariantCulture)">@text</option>
+                    }
+                </select>
+            </label>
+        </div>
+        <div class="form-row">
+            <label class="grow">
+                Feed rate: @_feedrate %
+                <input type="range" min="0" max="200" step="5" @bind="_feedrate" @bind:event="oninput" />
+            </label>
+            <button class="btn" disabled="@(!State.Online)" @onclick="() => Do(() => Actions.SetFeedrateAsync(_feedrate))">Send Feedrate</button>
+        </div>
+        <div class="form-row">
+            <label class="grow">NC user message <input class="input" @bind="_userMessage" maxlength="31" /></label>
+            <button class="btn" disabled="@(!State.Online || _userMessage.Length == 0)" @onclick="() => Do(() => Actions.SendUserMessageAsync(_userMessage))">Send</button>
+        </div>
+    </section>
+</div>
+
+@code {
+    private static readonly (double Value, string Text)[] TimeScales =
+    [
+        (1, "Real time"),
+        (0.5, "2 × faster"),
+        (0.2, "5 × faster"),
+        (0.1, "10 × faster"),
+        (0.02, "50 × faster"),
+    ];
+
+    private int _alarmNumber = 10_001_234;
+    private string _alarmText = "Laser beam path: protective glass dirty";
+    private int _feedrate = 100;
+    private string _userMessage = "Check nozzle";
+    private string _message = string.Empty;
+
+    private ProductionOrder? CurrentOrder => State.Orders.FirstOrDefault(o => o.Sequence == State.CurrentOrder);
+
+    private double Percent => Math.Round(State.ProgramProgress * 100, 1);
+
+    private string StopText => State.StopMode switch
+    {
+        StopMode.AfterProgram => ", stops after this program",
+        StopMode.AfterOrder => ", stops after this order",
+        _ => string.Empty,
+    };
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _feedrate = State.Feedrate;
+    }
+
+    private void StartPlan()
+    {
+        _message = Actions.StartPlan() switch
+        {
+            0 => "The plan starts.",
+            -1 => "The plan holds no free order.",
+            -4 => "A program runs already.",
+            -10 => "Acknowledge the alarms first.",
+            var code => $"The machine refused: {code}.",
+        };
+    }
+
+    private void Stop(int mode)
+    {
+        _message = Actions.Stop(mode) == 0 ? "The machine stops." : "Nothing runs.";
+    }
+
+    private void Abort()
+    {
+        Actions.Abort();
+        _message = "The program is aborted.";
+    }
+
+    private Task RaiseAlarm() => Do(() => Actions.RaiseAlarmAsync(_alarmNumber, _alarmText));
+
+    private void SetTimeScale(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+        {
+            Machine.SetTimeScale(value);
+        }
+    }
+}

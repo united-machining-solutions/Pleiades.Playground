@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start"
 
+import { adapterIsUp } from "@/opcua/adapter.ts"
+
 import { randomId } from "../random-id.ts"
 import { UNNAMED_CHAT } from "./chat-name.ts"
 import { chatSettings } from "./gateway.ts"
@@ -10,6 +12,8 @@ import type { ListedServer } from "./server-list.ts"
 
 export type ChatStatus = {
   configured: boolean
+  /** Whether the OPC UA adapter answers: the chat offers its commands only then. */
+  opcua: boolean
   /** The models a chat can pick, by name. The first one answers until a chat picks another. */
   models: Array<string>
   /** What the settings lack, or why the gateway gave no models, by the names of the settings. */
@@ -22,10 +26,11 @@ export type ChatStatus = {
 
 /** Which language models are configured: the same snapshot the harness is built from. Keys never leave the server. */
 export const getChatStatus = createServerFn({ method: "GET" }).handler(async (): Promise<ChatStatus> => {
-  const chat = await chatSettings()
+  const [chat, opcua] = await Promise.all([chatSettings(), adapterIsUp()])
   const models = modelNames(chat.settings)
   return {
     configured: models.length > 0,
+    opcua,
     models,
     gaps: chat.gaps,
     dictation: chat.dictation !== undefined,

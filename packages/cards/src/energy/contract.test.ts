@@ -20,7 +20,7 @@ const shown = {
         unit: "joule",
         topic: meter,
       },
-      power: { meanWatt: 900, peakWatt: 2400, values: 14400, unit: "watt", topic: power },
+      power: { meanWatt: 900, peakWatt: 2400, values: 14400, unit: "watt", error: null, topic: power },
     },
   ],
 }

@@ -43,6 +43,12 @@ jobs:
           - image: pleiades.playground.simulator
             context: source
             file: source/Pleiades.Playground.Simulator/Dockerfile
+          - image: pleiades.playground.cutting.simulator
+            context: source
+            file: source/Pleiades.Playground.Cutting.Simulator/Dockerfile
+          - image: pleiades.playground.cutting.adapter
+            context: source
+            file: source/Pleiades.Playground.Cutting.Adapter/Dockerfile
           - image: pleiades.playground.ultimaker.api
             context: source
             file: source/Pleiades.Playground.Ultimaker.Api/Dockerfile
@@ -56,6 +62,9 @@ jobs:
           - image: pleiades.playground.juicebar.api
             context: source
             file: source/Pleiades.Playground.JuiceBar.Api/Dockerfile
+          - image: pleiades.playground.opcua.adapter
+            context: source
+            file: source/Pleiades.Playground.OpcUa.Adapter/Dockerfile
           - image: pleiades.playground.genui.mcp
             context: .
             file: apps/genui-mcp/Dockerfile
