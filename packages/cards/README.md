@@ -55,6 +55,9 @@ Both import the theme from [`packages/ui`](../ui/README.md), so the card looks t
   - `in-words.ts`: the list and the card in words, for a reader that does not see them. The backend sends
     them as the text of a result, which is what a language model reads.
   - `machine-card.tsx`: the machine card.
+- `src/shared/`: what more than one card draws: the y axis over every line (`scale.ts`), a machine id that breaks
+  only after `_`, never inside a model or a serial number (`machine-name.tsx`, `machine-id.ts`), and a height
+  that eases when a card grows (`smooth-height.tsx`).
 - The [shadcn/ui](https://ui.shadcn.com) components the cards are built from are in
   [`packages/ui`](../ui/README.md), with every other component of the user interface.
 - `src/dataviz.css`: chart and state colours. `src/styles.css` is what a page imports: the colours, the class

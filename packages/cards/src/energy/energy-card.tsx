@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useRef, useState } from "react"
-import type { CSSProperties, ReactNode } from "react"
+import { useState } from "react"
+import type { CSSProperties } from "react"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@pleiades/ui/components/card"
@@ -18,9 +18,11 @@ import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@pleiades/ui/components/table"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { clock } from "../machine/format.ts"
+import { MachineName } from "../shared/machine-name.tsx"
+import { axisScale } from "../shared/scale.ts"
+import { SmoothHeight } from "../shared/smooth-height.tsx"
 import type { EnergySeries, EnergyShow, MachineEnergy } from "./contract.ts"
 import { ENERGY_ORDERS, pageOf } from "./order.ts"
-import { powerScale } from "./scale.ts"
 import type { EnergyOrder, EnergyPage } from "./order.ts"
 import { axisKilowatts, inKilowattHours, kilowattHours, kilowatts } from "./words.ts"
 
@@ -169,23 +171,6 @@ function kilowattHoursOf(one: MachineEnergy): number | null {
   return one.energy.value === null ? null : inKilowattHours(one.energy.value, one.energy.unit)
 }
 
-/**
- * A machine id that breaks only after `_` and `-`, never inside a word:
- * alcyone-machines_AX-400_P-04 becomes alcyone-|machines_|AX-|400_|P-04 where the cell is narrow.
- */
-function MachineName({ id }: { id: string }) {
-  return (
-    <span className="min-w-0 whitespace-normal">
-      {id.split(/(?<=[_-])/).map((part, index) => (
-        <Fragment key={index}>
-          {index > 0 && <wbr />}
-          {part}
-        </Fragment>
-      ))}
-    </span>
-  )
-}
-
 /** The energy of a machine in kilowatt hours, or why it is not known. */
 function EnergyValue({ energy }: { energy: MachineEnergy["energy"] }) {
   if (energy.value !== null) return <>{kilowattHours(energy.value, energy.unit)}</>
@@ -239,27 +224,6 @@ function EnergyTable({
           ))}
         </TableBody>
       </Table>
-    </div>
-  )
-}
-
-/**
- * Eases to the height of what it holds when that changes, instead of jumping: a page with fewer
- * machines grows or shrinks the card in a fifth of a second. Without motion it jumps.
- */
-function SmoothHeight({ children }: { children: ReactNode }) {
-  const inner = useRef<HTMLDivElement>(null)
-  const [height, setHeight] = useState<number>()
-  useEffect(() => {
-    const held = inner.current
-    if (!held) return
-    const observer = new ResizeObserver(() => setHeight(held.offsetHeight))
-    observer.observe(held)
-    return () => observer.disconnect()
-  }, [])
-  return (
-    <div className="overflow-hidden transition-[height] duration-200 ease-out motion-reduce:transition-none" style={{ height }}>
-      <div ref={inner}>{children}</div>
     </div>
   )
 }
@@ -326,7 +290,7 @@ function PowerGraph({ series, colours, shown }: { series: Lines; colours: Map<st
   const keyOf = (machine: string) => `m${[...colours.keys()].indexOf(machine)}`
   const lines = series.lines.filter((line) => shown.includes(line.machine))
   // The axis spans the machines of every page, so it stands still when the pages turn.
-  const scale = powerScale(series.lines.filter((line) => colours.has(line.machine)))
+  const scale = axisScale(series.lines.filter((line) => colours.has(line.machine)).flatMap((line) => line.watt))
   const config = Object.fromEntries(
     lines.map((line) => [keyOf(line.machine), { label: line.machine, color: colours.get(line.machine) }]),
   ) satisfies ChartConfig
