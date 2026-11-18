@@ -59,6 +59,16 @@ timeseries-persistence   Up 3 minutes (healthy)
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
 port and setting. The three simulated machines, P-04, P-07 and M-02, are the three `simulator-*` services.
+Each publishes after the umati data model, below `machines/<manufacturer>_<model>_<serial number>/` (for P-04
+`machines/alcyone-machines_AX-400_P-04/`): manifest, values, its stack light, and job orders, program executions
+and alerts as CloudEvents. It is described in
+[`contracts/mqtt`](../contracts/mqtt/README.md#machines-the-binding-of-the-data-model).
+
+The persistence services store the values as they come, in the units of the model, and the CloudEvents as they
+came; the APIs put job orders, program executions and alerts together from them when they are read.
+
+> **For now:** the screenshots of the stops below show the state before the machine id and the work master; they
+> are retaken once the stack runs with this tree.
 
 ## 2. Home
 
@@ -106,21 +116,29 @@ live from the broker, as Home is.
 
 ## 3. The page of one machine
 
-A click on a machine opens its page, here <http://localhost:5600/machines/P-04>. It shows the machine card:
-what the machine does now, and what it did over the last eight hours. It needs no language model.
+A click on a machine opens its page, here <http://localhost:5600/machines/alcyone-machines_AX-400_P-04>; the
+address carries the machine id, the page is titled with model and serial number, AX-400 P-04. It shows the
+machine card: what the machine does now, with which work master and job order, the alerts that stand, and what
+it did over the last hours. It needs no language model. The title is a switcher: a click on it opens the list
+of every machine with its state, to search by model, serial number, machine id or state, and Enter opens the
+one picked. The buttons 1 h, 8 h and 24 h at the right choose how many hours the card goes back; the choice is
+in the address, `?hours=8`, and stays when you switch to another machine. The page is live like Home: the band
+keeps its length and moves on with the clock.
 
-![The page Machines / P-04 with the machine card. The card says Stopped, no alarm and no reason recorded,
-since 20:36, program SHAFT_4711.MPF. Below is a band of the last 8 hours, the total duration of each state,
-and the MQTT topics the values were read from.](images/tour/machine-page.png)
+![The page Machines / P-04. The title P-04 has an arrow for the switcher, and at the right stand the buttons 1 h,
+8 h and 24 h, with 8 h chosen. Under the title it says "live · now 23:36". The machine card says Running, since
+23:34, program SHAFT_4711.MPF. Below is a band of the last 8 hours, the total duration of each state, and the
+MQTT topics the values were read from.](images/tour/machine-page.png)
 
-The card has three parts. On top is the state with its reason, since when it holds, and the active program.
-In the middle is the band: one stripe from eight hours ago until now, coloured by state, and below it the
-total of each state. The hatched part of this band is "No data": the stack of the picture had been running
-for about two hours, and before that nobody published. At the bottom the card names the topics it read, so
-every value can be traced to the broker.
+The card has three parts. On top is the state with its reason, since when it holds, the work master and the job order that runs.
+In the middle is the band: one stripe from the chosen number of hours ago until now, coloured by state, and
+below it the total of each state. The hatched part of this band is "No data": the stack of the picture had been
+running for about three hours, and before that nobody published. At the bottom the card names the topics it
+read, so every value can be traced to the broker.
 
 **In the code:** [`apps/app/src/routes/machines.$machine.tsx`](../apps/app/src/routes/machines.%24machine.tsx)
-is the page. The card is
+is the page, and the choice of the hours and the list of the switcher are in
+[`apps/app/src/machines/switcher.ts`](../apps/app/src/machines/switcher.ts). The card is
 [`packages/cards/src/machine/machine-card.tsx`](../packages/cards/src/machine/machine-card.tsx), its band
 [`state-band.tsx`](../packages/cards/src/machine/state-band.tsx), and the shape of its values the contract in
 [`contract.ts`](../packages/cards/src/machine/contract.ts). The tool `genui_machine_show` returns the values
@@ -146,6 +164,28 @@ chat draws the card from the values of the tool, and the model sums it up in a f
 the tool's and the wording is the model's: the card says 6 minutes of running, the model "just under 7
 minutes". The stack had just started, so most of the 8 hours have no data. The card on the left is one minute
 newer than the one in the chat: the page reads again, an answer shows what was true when it was given.
+
+The panel works like a chat app on a phone: a list and a chat, with a way back. The head says what is open. In a
+chat it says the name of the chat, which is its first question, on one line and cut where it is too long; the
+button "All chats" at its left leads back to the list, and the page beside the panel stays where it is. The
+list, headed "Chats", shows the chats so far, and the field at its foot begins a new one, with the questions to
+begin with above it. Close the panel and open it again, and the chat you left is there. The chats are kept in
+the memory of the app's server and are gone when it restarts.
+
+Under an answer that has ended and for which the chat drew a card, the chat offers "Save as page". It keeps all
+the cards of that answer, in their order, as a page titled with your question, and opens the page beside the
+chat, which stays open. No language model is asked: the app reads the tool calls from the answer it already
+has. The page keeps no number and no sentence of the model, so opening it calls the tools again and its cards
+show what holds now. The row under the answer then says "Saved as page" and links to it. An answer without a
+card, such as one in words only, has no button. The group "Pages" in the sidebar lists the pages of this browser
+that are not pinned, the newest first, and a page that is pinned from its head moves to the top of the sidebar,
+beside Home.
+
+A page is private to the browser that keeps it, and the stack has no sign-in, so "Share" in its head gives a
+link that carries the recipe: which answers, for which machines and hours, and no value. Open it in a private
+window to see what a colleague sees: the page with the values of now, no chat and no language model needed,
+and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for says so,
+and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
 
 The chat needs a language model, and the demo starts without one. Then the panel says "No language model
 configured" and names the missing settings; Home and the machine pages work as before. To configure a model,
@@ -190,7 +230,9 @@ writes it down, see [Dictation](../apps/app/README.md#dictation). The picture of
 at the right of the field.
 
 **In the code:** [`apps/app/src/chat/`](../apps/app/src/chat). `chat-sidebar.tsx` is the panel with the model
-picker, `dictate.tsx` the microphone, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
+picker and the head with the way back to the list, `chat-name.ts` what a chat is called,
+`save-as-page.tsx` the row under an answer with "Save as page" (the recipe of an answer is read in
+[`pages/from-answer.ts`](../apps/app/src/pages/from-answer.ts)), `dictate.tsx` the microphone, `assistant.server.ts` the agent harness that talks to the model and calls the tools, `models.ts`
 reads which models the settings name, `cards.tsx` lists what the app draws for which tool, card by card, and
 `suggestions.ts` holds the three questions.
 
@@ -255,7 +297,10 @@ group Timeseries: GET and POST for base unit values, string values and boolean
 values.](images/tour/swagger-ui.png)
 
 The picture shows the Swagger UI of the Timeseries API at <http://localhost:5500/>, in its light mode; the
-lamp at the top right switches it. The Events API has the same page at <http://localhost:5510/>. Open an
+lamp at the top right switches it. The Events API has the same page at <http://localhost:5510/>, with the
+CloudEvents of the machines as they came (`/machineEvents`, and the gaps in their `sequence`), and the views put
+together from them: the alerts (`/alerts/active`, `/alerts/pairs`, `/alerts/statistics`), the job orders
+(`/jobOrders`) and the program executions (`/programExecutions`). Open an
 endpoint and choose "Try it out" to send a request to the running stack.
 
 | API | REST | MCP | Contract |
@@ -280,7 +325,7 @@ preview workflow and validation limits are in the
 [Ultimaker service guide](../source/Pleiades.Playground.Ultimaker.Api/README.md).
 No tour screenshot changes: this service adds no application screen.
 The optional `ultimaker-telemetry` service publishes live printer observations to the existing broker.
-Its logical machine ID defaults to `UM3-01`, which then appears in the existing machine list/card.
+Its machine id defaults to `ultimaker_UM3_UM3-01`, which then appears in the existing machine list/card.
 See the [adapter guide](../source/Pleiades.Playground.Ultimaker.Telemetry/README.md) for topic names,
 units, timestamps and how to verify persistence. The existing Home screenshot was not retaken;
 it therefore still shows only simulated machines.
@@ -297,8 +342,9 @@ It exposes MCP at <http://localhost:5550/mcp> and an OpenAPI document at
 <http://localhost:5550/openapi/v1.json>: the card, the state of the machine, and an order. An order joins
 the queue of the real machine; a person then presses its start button. What the service does and never does
 is in the [juice bar service guide](../source/Pleiades.Playground.JuiceBar.Api/README.md).
-The service publishes the state of the machine to the broker. Its machine ID defaults to `JUICEBAR-01`,
-which then appears in the machine list of Home next to the simulated machines. With
+The service publishes the state of the machine to the broker. Its machine id defaults to
+`trumpf_JuiceBar_JUICEBAR-01`, which then appears in the machine list of Home as "JuiceBar JUICEBAR-01", next
+to the simulated machines. With
 `juicebar=http://juicebar-api:8080/mcp` in `APP_MCP_SERVERS`, the chat answers what the bar can mix and
 orders a drink when asked. No tour screenshot was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).

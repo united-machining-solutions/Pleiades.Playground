@@ -149,15 +149,17 @@ jobs:
             -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
             -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"genui_machine_list","arguments":{}}}' \
             | tee machines.txt
-          grep -q "P-04" machines.txt
+          grep -q "alcyone-machines_AX-400_P-04" machines.txt
       - name: The backend shows one machine with its history
         run: |
           curl -fsS -X POST http://localhost:5520/mcp \
             -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
-            -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"genui_machine_show","arguments":{"machine":"P-04"}}}' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"genui_machine_show","arguments":{"machine":"alcyone-machines_AX-400_P-04"}}}' \
             | tee machine.txt
-          # The text says the machine in words, and the sums of the history come from the server.
-          grep -q '"text":"P-04: ' machine.txt
+          # The text says the machine in words, named by its identification and its machine id ("Alcyone Machine
+          # Works AX-400 P-04 (alcyone-machines_AX-400_P-04): Running since …"), and the sums of the history come
+          # from the server.
+          grep -qE '"text":"[^"]*alcyone-machines_AX-400_P-04\)?: ' machine.txt
           grep -q '"totals"' machine.txt
           # What a language model reads stays short: the spans of the band are not in it.
           if grep -q '"spans"' machine.txt; then echo "The result of genui_machine_show carries spans."; exit 1; fi
@@ -165,7 +167,7 @@ jobs:
         run: |
           curl -fsS -X POST http://localhost:5520/mcp \
             -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
-            -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"genui_span_list\",\"arguments\":{\"machine\":\"P-04\",\"from\":\"$(date -u -d '-10 minutes' +%FT%TZ)\",\"to\":\"$(date -u +%FT%TZ)\"}}}" \
+            -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"genui_span_list\",\"arguments\":{\"machine\":\"alcyone-machines_AX-400_P-04\",\"from\":\"$(date -u -d '-10 minutes' +%FT%TZ)\",\"to\":\"$(date -u +%FT%TZ)\"}}}" \
             | tee spans.txt
           grep -q '"spans":\[{"state"' spans.txt
       - name: The backend serves the machine card as an MCP App
@@ -242,7 +244,7 @@ jobs:
             fi
           done
           exit "$missing"
-      # The twelve containers come up healthy from the images of this pull request, with the configs: entries and
+      # The thirteen containers come up healthy from the images of this pull request, with the configs: entries and
       # the template of Traefik, which bart validate does not run.
       - name: Start the Margo stack
         run: docker compose up -d --wait --wait-timeout 300

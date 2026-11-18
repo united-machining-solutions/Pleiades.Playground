@@ -31,7 +31,8 @@
     "recharts": "catalog:",
     "shadcn": "catalog:",
     "tailwindcss": "catalog:",
-    "tw-animate-css": "catalog:"
+    "tw-animate-css": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@pleiades/genui-mcp": "workspace:*",

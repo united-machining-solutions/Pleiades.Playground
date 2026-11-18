@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="$(AssemblyName).Test" />
+  </ItemGroup>
+
+  <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
@@ -22,9 +26,4 @@
     <ProjectReference Include="..\Pleiades.Playground.Mqtt.Extensions\Pleiades.Playground.Mqtt.Extensions.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Pleiades.Playground.Timeseries.Common\Pleiades.Playground.Timeseries.Common.csproj" />
-    <ProjectReference Include="..\Pleiades.Playground.Timeseries.Generators\Pleiades.Playground.Timeseries.Generators.csproj" />
-    <ProjectReference Include="..\Pleiades.Playground.Events.Generators\Pleiades.Playground.Events.Generators.csproj" />
-  </ItemGroup>
 </Project>

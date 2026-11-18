@@ -1,8 +1,16 @@
-import { BAND_SLOTS, NOTIFICATIONS_PATH, READING_PATHS, SILENT_AFTER_SECONDS, serialNumber } from "@pleiades/cards/machine/contract.ts"
-import type { Machine, MachineList, MachineShow, Reading, ReadingName, Span, SpanList } from "@pleiades/cards/machine/contract.ts"
+import {
+  BAND_SLOTS,
+  HORIZON_SECONDS,
+  IDENTITY_PATHS,
+  NOTIFICATIONS_PATH,
+  READING_PATHS,
+  SILENT_AFTER_SECONDS,
+  machineId,
+} from "@pleiades/cards/machine/contract.ts"
+import type { Identity, Machine, MachineList, MachineShow, Reading, ReadingName, Span, SpanList } from "@pleiades/cards/machine/contract.ts"
 
-import { EVER, listTopics, readNumbers, readOpenNotifications, readRaised, readStrings } from "./apis.ts"
-import type { Apis, OpenNotification, Sample, Series } from "./apis.ts"
+import { EVER, listTopics, readNumbers, readOpenNotifications, readRaised, readRunningJobOrders, readStrings } from "./apis.ts"
+import type { Apis, Sample, Series } from "./apis.ts"
 import { spansBetween, thinned, totalsOf } from "./history.ts"
 import { silences, silentBetween } from "./liveness.ts"
 import type { Stretch } from "./liveness.ts"
@@ -15,15 +23,17 @@ import { secondsBefore } from "./time.ts"
 /** How far back the values are read to find since when a state has lasted. */
 export const WINDOW_SECONDS = 30 * 60
 /**
- * How far back a machine and its open notifications are still looked for. A value has no such
- * limit: the last one of a topic holds, however long ago the machine reported it.
+ * How far back a machine and its open notifications are still looked for: the horizon of the contract. A
+ * value has no such limit: the last one of a topic holds, however long ago the machine reported it.
  */
-export const HORIZON_SECONDS = 24 * 60 * 60
+export { HORIZON_SECONDS }
 /** How many hours back the history of one machine goes, if nobody asks for more or less. */
 export const HISTORY_HOURS = 8
 /** How many hours a history covers at most. */
 export const MOST_HOURS = 24
 
+// The topics of the umati data model below `machines/{machineId}/`, as the contract of the machine
+// names them: the backend reads their stored values, a page that is live hears them at the broker.
 const paths = READING_PATHS
 const names = Object.keys(paths) as Array<ReadingName>
 
@@ -31,12 +41,24 @@ const names = Object.keys(paths) as Array<ReadingName>
 const readValues = (name: ReadingName) => (name === "heartbeat" ? readNumbers : readStrings)
 
 /**
- * `machines/P-04/umati/State/MachineryItemState` belongs to the machine `P-04`. A level that is
- * no serial number by the rule of the contract names no machine.
+ * `machines/alcyone-machines_AX-400_P-04/umati/Connection/State` belongs to the machine
+ * `alcyone-machines_AX-400_P-04`. A level that is no machine id by the rule of the contract names no
+ * machine.
  */
 export function machineOf(topic: string): string | undefined {
   const level = /^machines\/([^/]+)\//.exec(topic)?.[1]
-  return serialNumber.safeParse(level).success ? level : undefined
+  return machineId.safeParse(level).success ? level : undefined
+}
+
+/** The identification of a machine: the newest value of each, however old. */
+async function readIdentity(apis: Apis, machine: string, now: Date): Promise<Identity> {
+  const [manufacturer, model, serialNumber] = await Promise.all(
+    Object.values(IDENTITY_PATHS).map(async (path) => {
+      const [series] = await readStrings(apis, `machines/${machine}/${path}`, EVER, now, 1)
+      return series?.samples.at(-1)?.value ?? null
+    }),
+  )
+  return { manufacturer: manufacturer ?? null, model: model ?? null, serialNumber: serialNumber ?? null }
 }
 
 /**
@@ -85,22 +107,21 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
   const readFrom = secondsBefore(windowStart, SILENT_AFTER_SECONDS)
   const horizon = secondsBefore(now, HORIZON_SECONDS)
 
-  const [topics, errors, warnings, ...series] = await Promise.all([
+  const [topics, open, jobOrders, ...series] = await Promise.all([
     listTopics(apis, horizon, now),
-    readOpenNotifications(apis, "Error", horizon, now),
-    readOpenNotifications(apis, "Warning", horizon, now),
+    readOpenNotifications(apis, horizon, now),
+    readRunningJobOrders(apis),
     ...names.map((name) => readValues(name)(apis, `machines/*/${paths[name]}`, readFrom, now)),
   ])
   const inWindow = Object.fromEntries(names.map((name, index) => [name, series[index] ?? []])) as Record<
     ReadingName,
     Array<Series>
   >
-  const open: Array<OpenNotification> = [...errors, ...warnings]
-  const serialNumbers = [...new Set(topics.flatMap((topic) => machineOf(topic) ?? []))].sort()
+  const machineIds = [...new Set(topics.flatMap((topic) => machineOf(topic) ?? []))].sort()
 
   const machines = await Promise.all(
-    serialNumbers.map(async (serialNumber): Promise<Machine> => {
-      const topicOf = (name: ReadingName) => `machines/${serialNumber}/${paths[name]}`
+    machineIds.map(async (id): Promise<Machine> => {
+      const topicOf = (name: ReadingName) => `machines/${id}/${paths[name]}`
       const recent = (name: ReadingName) => samplesOf(inWindow[name], topicOf(name))
       // Every value is a sign of life, whatever it says.
       const signs = names.flatMap((name) => recent(name).map((sample) => sample.at))
@@ -119,16 +140,22 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
         const before = earlier?.samples ?? []
         return currentRun(topicOf(name), [...before, ...samples], silent, before.length === 2)
       }
-      const [connection, heartbeat, itemState, operationMode, program] = await Promise.all([
+      const [connection, heartbeat, itemState, operationMode, program, identity] = await Promise.all([
         read("connection"),
         read("heartbeat"),
         read("itemState"),
         read("operationMode"),
         read("program"),
+        readIdentity(apis, id, now),
       ])
-      const topic = `machines/${serialNumber}/${NOTIFICATIONS_PATH}`
+      const topic = `machines/${id}/${NOTIFICATIONS_PATH}`
+      const job = jobOrders.find((one) => one.machine === id)
       return {
-        machine: serialNumber,
+        machine: id,
+        identity,
+        jobOrder: job
+          ? { jobOrderId: job.jobOrderId, state: job.state, producedQuantity: job.producedQuantity, runsPlanned: job.runsPlanned }
+          : null,
         connection,
         heartbeat,
         itemState,
@@ -136,11 +163,12 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
         program,
         lastValueAt: newest([connection.at, heartbeat.at, itemState.at, operationMode.at, program.at]),
         notifications: open
-          .filter((one) => one.machine === serialNumber)
+          .filter((one) => one.machine === id)
           .sort((a, b) => b.raisedAt.localeCompare(a.raisedAt))
-          .map(({ correlationId, notificationId, level, title, raisedAt }) => ({
+          .map(({ correlationId, notificationId, severity, level, title, raisedAt }) => ({
             correlationId,
             notificationId,
+            severity,
             level,
             title,
             raisedAt,
@@ -172,10 +200,10 @@ export async function readSignsOfLife(apis: Apis, from: Date, to: Date): Promise
 }
 
 /** The states of one machine between two instants, as spans without a gap. */
-async function readSpans(apis: Apis, serialNumber: string, from: Date, to: Date): Promise<Array<Span>> {
+async function readSpans(apis: Apis, machine: string, from: Date, to: Date): Promise<Array<Span>> {
   // The signs of life just before say whether the machine was there where the history begins.
   const readFrom = secondsBefore(from, SILENT_AFTER_SECONDS)
-  const topic = (name: ReadingName) => `machines/${serialNumber}/${paths[name]}`
+  const topic = (name: ReadingName) => `machines/${machine}/${paths[name]}`
   const read = async (name: ReadingName) =>
     samplesOf(await readValues(name)(apis, topic(name), readFrom, to), topic(name))
   /** The values of a reading, and before them the one that held where the history begins, however old. */
@@ -189,10 +217,10 @@ async function readSpans(apis: Apis, serialNumber: string, from: Date, to: Date)
     readWithHeld("itemState"),
     readWithHeld("operationMode"),
     read("heartbeat"),
-    // An error that still stands may have been raised before the history begins. It is looked
-    // for as far back from the end as the list looks for one that has not gone, so the state
-    // of a machine and the end of its history say the same.
-    readRaised(apis, "Error", serialNumber, secondsBefore(to, HORIZON_SECONDS), to),
+    // An error (an alert Failure) that still stands may have been raised before the history
+    // begins. It is looked for as far back from the end as the list looks for one that has not
+    // gone, so the state of a machine and the end of its history say the same.
+    readRaised(apis, "Failure", machine, secondsBefore(to, HORIZON_SECONDS), to),
   ])
   return spansBetween(from.toISOString(), to.toISOString(), { connection, itemState, operationMode, heartbeat, errors })
 }
@@ -203,16 +231,16 @@ async function readSpans(apis: Apis, serialNumber: string, from: Date, to: Date)
  */
 export async function showMachine(
   apis: Apis,
-  serialNumber: string,
+  machine: string,
   hours = HISTORY_HOURS,
   now = new Date(),
 ): Promise<MachineShow> {
   const from = secondsBefore(now, hours * 60 * 60)
-  const [list, spans] = await Promise.all([listMachines(apis, now), readSpans(apis, serialNumber, from, now)])
-  const found = list.machines.find((one) => one.machine === serialNumber)
+  const [list, spans] = await Promise.all([listMachines(apis, now), readSpans(apis, machine, from, now)])
+  const found = list.machines.find((one) => one.machine === machine)
   if (!found) {
     const known = list.machines.map((one) => one.machine).join(", ") || "none"
-    throw new Error(`No machine "${serialNumber}" published a value in the last 24 hours. Machines that did: ${known}.`)
+    throw new Error(`No machine "${machine}" published a value in the last 24 hours. Machines that did: ${known}.`)
   }
   return {
     asOf: list.asOf,
@@ -229,7 +257,7 @@ export async function showMachine(
  */
 export async function listSpans(
   apis: Apis,
-  serialNumber: string,
+  machine: string,
   from: string,
   to: string,
   slots = BAND_SLOTS,
@@ -238,6 +266,6 @@ export async function listSpans(
   const hours = (end.getTime() - begin.getTime()) / 3_600_000
   if (!(hours > 0)) throw new Error("The spans end before they begin: `to` must be later than `from`.")
   if (hours > MOST_HOURS) throw new Error(`The spans reach back ${MOST_HOURS} hours at most, as the history of a machine does.`)
-  const spans = thinned(await readSpans(apis, serialNumber, begin, end), slots)
-  return { machine: serialNumber, from: begin.toISOString(), to: end.toISOString(), spans }
+  const spans = thinned(await readSpans(apis, machine, begin, end), slots)
+  return { machine, from: begin.toISOString(), to: end.toISOString(), spans }
 }

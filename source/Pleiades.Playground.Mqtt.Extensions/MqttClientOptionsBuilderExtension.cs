@@ -30,6 +30,11 @@ public static class MqttClientOptionsBuilderExtension
             retBuilder = retBuilder.WithClientId(config.ClientId);
         }
 
+        if (config.SessionExpiry is { } expiry)
+        {
+            retBuilder = retBuilder.WithSessionExpiryInterval((uint)Math.Clamp(expiry.TotalSeconds, 0, uint.MaxValue));
+        }
+
         bool useTls;
         if (config.UseSecureWebSocket)
         {

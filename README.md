@@ -1,7 +1,7 @@
 # Pleiades Playground
 
 An open playground for machine data: adapters publish to an MQTT broker, services persist time series and
-notification events, and every service offers the same data over REST and over the Model Context Protocol (MCP),
+the events of machines, and every service offers the same data over REST and over the Model Context Protocol (MCP),
 so applications and AI agents use one set of tools.
 
 The repository is a monorepo so that the whole demo case starts with one command. What proves itself here moves
@@ -132,9 +132,10 @@ Every tool and how to check it: [development setup](docs/development-setup.md).
 
 ## Units
 
-Every numeric value is in its coherent SI unit. Energy is in joule, ratios and percentages are fractions with the
-unit `one` (1.0 = 100 %). Displays convert, the wire does not. See
-[ADR-0002](docs/adr/0002-si-units-joule-and-one.md).
+A value of a machine below `machines/` carries the unit of the umati data model, energy in watt hours for
+example, and is stored and served in it. A value of a place below `sites/` is in its coherent SI unit: energy in
+joule, ratios and percentages as fractions with the unit `one` (1.0 = 100 %). Displays convert; the wire, the
+stores and the APIs do not. See [ADR-0002](docs/adr/0002-si-units-joule-and-one.md).
 
 ## Contributing, security, licence
 

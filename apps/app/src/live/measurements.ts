@@ -1,8 +1,8 @@
-import { READING_PATHS, SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
+import { HORIZON_SECONDS, READING_PATHS, SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
 import { QUANTITIES, QUANTITY_PATHS } from "@pleiades/cards/measurement/contract.ts"
 import type { MachineMeasurements, MeasurementList, MeasurementSeries, Quantity } from "@pleiades/cards/measurement/contract.ts"
 
-import { filterOf, machineOf, valueOf } from "./messages.ts"
+import { brokerPathsOf, filterOf, machineOf, valuesOf } from "./messages.ts"
 
 // What every machine measures, kept up to date from the broker. The backend gives the graphs of the
 // last minutes and the values of then; every value the broker sends after that is laid onto them
@@ -22,7 +22,8 @@ export type LivePage = {
   held: Readonly<Record<string, number | boolean | null>>
 }
 
-const readingPaths = Object.values(READING_PATHS)
+/** The readings of what a machine does, where the broker carries them: a snapshot is one topic. */
+const readingPaths = [...new Set(Object.values(READING_PATHS).flatMap(brokerPathsOf))]
 
 /**
  * The topics the page subscribes to: every quantity, and the readings of what a machine does,
@@ -116,8 +117,13 @@ function seriesWithLine(series: MeasurementSeries, machine: string, quantity: Qu
  */
 export function liveWith(page: LivePage, topic: string, payload: string, now = Date.now()): LivePage {
   const machine = machineOf(topic)
-  const value = machine && valueOf(payload, now)
+  // A snapshot is several values of one instant; a quantity is one value on its topic.
+  const value = machine && valuesOf(topic, payload, now)[0]?.value
   if (!machine || !value) return page
+  // At the broker the retained values of a machine that is long gone still stand. The backend lists a
+  // machine that published in the last 24 hours; a page that has not heard of one keeps to the same.
+  const heardOf = page.lastSign[machine] !== undefined || (page.current?.machines.some((one) => one.machine === machine) ?? false)
+  if (!heardOf && now - Date.parse(value.at) > HORIZON_SECONDS * 1000) return page
   // Every value is a sign of life, whatever it says.
   const lastSign = { ...page.lastSign, [machine]: later(page.lastSign[machine], value.at) ?? value.at }
   const quantity = QUANTITIES.find((one) => topic === filterOf(QUANTITY_PATHS[one], machine))

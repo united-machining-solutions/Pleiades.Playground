@@ -28,7 +28,8 @@ There is no contributor licence agreement.
   `fix(timeseries-persistence): reject numbers without unit`.
 - **Names:** `Pleiades.Playground.<Area>.<Part>` for .NET projects, `pleiades.playground.<area>.<part>` for images,
   kebab-case for folders outside `source/`.
-- **Units:** SI only, see [ADR-0002](docs/adr/0002-si-units-joule-and-one.md).
+- **Units:** machines keep the units of the data model, places use SI units; only a display converts, see
+  [ADR-0002](docs/adr/0002-si-units-joule-and-one.md).
 - **Secrets:** never commit a value. Add the name to `.env.example` and document it.
 - **Licence headers:** new files may carry `SPDX-License-Identifier: Apache-2.0`; documentation is CC BY 4.0.
 - **Decisions:** a choice that shapes the repository gets a short record under `docs/adr/`.

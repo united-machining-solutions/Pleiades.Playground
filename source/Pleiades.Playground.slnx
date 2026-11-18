@@ -46,7 +46,6 @@
     <Project Path="Pleiades.Playground.Timeseries.Api.Test/Pleiades.Playground.Timeseries.Api.Test.csproj" />
     <Project Path="Pleiades.Playground.Timeseries.Common/Pleiades.Playground.Timeseries.Common.csproj" />
     <Project Path="Pleiades.Playground.Timeseries.DataTransferObjects/Pleiades.Playground.Timeseries.DataTransferObjects.csproj" />
-    <Project Path="Pleiades.Playground.Timeseries.Generators/Pleiades.Playground.Timeseries.Generators.csproj" />
     <Project Path="Pleiades.Playground.Timeseries.Persistence/Pleiades.Playground.Timeseries.Persistence.csproj" />
     <Project Path="Pleiades.Playground.Timeseries.Persistence.Test/Pleiades.Playground.Timeseries.Persistence.Test.csproj" />
   </Folder>
@@ -56,13 +55,13 @@
     <Project Path="Pleiades.Playground.Events.Api.Client.Test/Pleiades.Playground.Events.Api.Client.Test.csproj" />
     <Project Path="Pleiades.Playground.Events.Api.Test/Pleiades.Playground.Events.Api.Test.csproj" />
     <Project Path="Pleiades.Playground.Events.DataTransferObjects/Pleiades.Playground.Events.DataTransferObjects.csproj" />
-    <Project Path="Pleiades.Playground.Events.Generators/Pleiades.Playground.Events.Generators.csproj" />
     <Project Path="Pleiades.Playground.Events.Persistence/Pleiades.Playground.Events.Persistence.csproj" />
     <Project Path="Pleiades.Playground.Events.Persistence.Test/Pleiades.Playground.Events.Persistence.Test.csproj" />
     <Project Path="Pleiades.Playground.Notification.DataTransferObjects/Pleiades.Playground.Notification.DataTransferObjects.csproj" />
   </Folder>
   <Folder Name="/Simulator/">
     <Project Path="Pleiades.Playground.Simulator/Pleiades.Playground.Simulator.csproj" />
+    <Project Path="Pleiades.Playground.Simulator.Test/Pleiades.Playground.Simulator.Test.csproj" />
   </Folder>
   <Folder Name="/Sites/">
     <Project Path="Pleiades.Playground.Sites.Api/Pleiades.Playground.Sites.Api.csproj" />

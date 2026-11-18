@@ -19,27 +19,60 @@ export const SILENT_AFTER_SECONDS = 30
 export const instant = z.iso.datetime({ offset: true })
 
 /**
- * The serial number of a machine: the level after `machines/` in every topic. The MQTT binding
- * forbids what would break a topic, `/`, `+` and `#`, and nothing else. Whoever takes or lists a
- * serial number uses this rule, so a machine that is listed can also be asked for.
+ * The machine id: the level after `machines/` in every topic, `<manufacturer>_<model>_<serial
+ * number>`, for example `alcyone-machines_AX-400_P-04`. The MQTT binding forms it so that it holds
+ * nothing that would break a topic; this rule forbids `/`, `+` and `#` and nothing else. Whoever
+ * takes or lists a machine id uses this rule, so a machine that is listed can also be asked for.
  */
-export const serialNumber = z.string().regex(/^[^/+#]+$/)
+export const machineId = z.string().regex(/^[^/+#]+$/)
 
 /**
- * Where each reading of a machine is published, below `machines/{SerialNumber}/`. The backend reads
- * the stored values of these topics, and a page that is live subscribes to them at the broker.
+ * Where each reading of a machine is kept, below `machines/{machineId}/`: the topics of the umati data
+ * model. The backend reads the stored values of these topics, and a page that is live hears them at
+ * the broker. The state and the operation mode are the two fields of the snapshot `State/Status`: see
+ * `SNAPSHOT_PATHS`.
  */
 export const READING_PATHS = {
   connection: "umati/Connection/State",
   heartbeat: "umati/Connection/Heartbeat",
-  itemState: "umati/State/MachineryItemState",
-  operationMode: "umati/State/MachineryOperationMode",
-  program: "umati/Production/ActiveProgram",
+  itemState: "umati/State/Status/MachineryItemState",
+  operationMode: "umati/State/Status/MachineryOperationMode",
+  program: "umati/WorkMasterMonitoring/ActiveWorkMaster",
 } as const
 export type ReadingName = keyof typeof READING_PATHS
 
-/** Where the notifications of a machine are published, below `machines/{SerialNumber}/`. */
+/**
+ * The snapshots among the readings. A snapshot is one topic at the broker, its value an object with
+ * a field for each reading; the Timeseries store keeps it field by field, each below the topic of the
+ * snapshot: `umati/State/Status` arrives as one message and is read as
+ * `umati/State/Status/MachineryItemState` and `umati/State/Status/MachineryOperationMode`.
+ */
+export const SNAPSHOT_PATHS = ["umati/State/Status"] as const
+
+/** Who a machine is: its identification values, published once and retained. */
+export const IDENTITY_PATHS = {
+  manufacturer: "umati/Identification/Manufacturer",
+  model: "umati/Identification/Model",
+  serialNumber: "umati/Identification/SerialNumber",
+} as const
+
+/** Where the alerts and notifications of a machine are published, as CloudEvents, below `machines/{machineId}/`. */
 export const NOTIFICATIONS_PATH = "events/notifications"
+
+/**
+ * The job orders of a machine and what came of them, below `machines/{machineId}/`: two lists of the
+ * data model, retained, each message the whole list. The backend reads the job order that runs from
+ * the events of the Events API; a page that is live hears these lists, which say the same.
+ */
+export const JOB_ORDERS_PATH = "umati/JobMonitoring/JobOrders"
+export const JOB_ORDER_RESULTS_PATH = "umati/JobMonitoring/JobOrderResults"
+
+/**
+ * How far back a machine and its alerts are still looked for, in seconds. A machine that published
+ * nothing for longer is not listed, by the backend and by a page that is live alike: at the broker
+ * its retained values still stand.
+ */
+export const HORIZON_SECONDS = 24 * 60 * 60
 
 export const reading = z.object({
   value: z.string().nullable().describe("The newest value, or null if the topic had none."),
@@ -52,28 +85,56 @@ export const reading = z.object({
 })
 export type Reading = z.infer<typeof reading>
 
+/** The categories of an alert after NAMUR NE 107, from the most urgent. */
+export const severity = z.enum(["Failure", "CheckFunction", "OffSpec", "MaintenanceRequired"])
+export type Severity = z.infer<typeof severity>
+
+/**
+ * An alert of the machine that stands: raised and not cleared. `level` is what a display that knows
+ * errors and warnings shows: a `Failure` is an error, every other category a warning.
+ */
 export const notification = z.object({
-  correlationId: z.string(),
-  notificationId: z.string(),
+  correlationId: z.string().describe("The id of the alert, the same in its raise and its clear."),
+  notificationId: z.string().describe("The error code of the manufacturer."),
+  severity: severity.nullable().describe("The category after NAMUR NE 107."),
   level: z.enum(["Warning", "Error"]),
-  title: z.string(),
+  title: z.string().describe("The message of the alert."),
   raisedAt: instant,
-  topic: z.string().describe("The MQTT topic the notification comes from."),
+  topic: z.string().describe("The MQTT topic the alert comes from."),
 })
 export type Notification = z.infer<typeof notification>
 
+/** Who the machine is, from its identification values; null where it reported none. */
+export const identity = z.object({
+  manufacturer: z.string().nullable(),
+  model: z.string().nullable(),
+  serialNumber: z.string().nullable(),
+})
+export type Identity = z.infer<typeof identity>
+
+/** The job order the machine works on, with what came of it so far. */
+export const jobOrder = z.object({
+  jobOrderId: z.string(),
+  state: z.string().describe("Running or Interrupted."),
+  producedQuantity: z.number().nullable(),
+  runsPlanned: z.number().nullable(),
+})
+export type JobOrder = z.infer<typeof jobOrder>
+
 /** What a machine does now. */
 export const machine = z.object({
-  machine: serialNumber.describe("The serial number, which identifies the machine in every topic."),
-  connection: reading,
+  machine: machineId.describe("The machine id, which identifies the machine in every topic."),
+  identity,
+  connection: reading.describe("The state of the adapter: Initializing, Running, CommunicationFault or Shutdown."),
   heartbeat: reading.describe("The sign of life of the machine. Its value counts up and says nothing else."),
   itemState: reading,
   operationMode: reading,
-  program: reading,
+  program: reading.describe("The work master the machine carries out."),
+  jobOrder: jobOrder.nullable().describe("The job order that runs or is interrupted, or null."),
   lastValueAt: instant.nullable().describe("The newest value of any of the readings: the last sign of life."),
   notifications: z
     .array(notification)
-    .describe("Warnings and errors that were raised in the last 24 hours and have not gone."),
+    .describe("Alerts that were raised in the last 24 hours and have not been cleared."),
 })
 export type Machine = z.infer<typeof machine>
 
@@ -126,7 +187,7 @@ export type MachineShow = z.infer<typeof machineShow>
  * model reads.
  */
 export const spanList = z.object({
-  machine: serialNumber.describe("The serial number of the machine."),
+  machine: machineId.describe("The machine id."),
   from: instant,
   to: instant,
   spans: z.array(span).describe("The states between `from` and `to`, oldest first and without a gap."),

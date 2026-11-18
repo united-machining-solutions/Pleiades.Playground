@@ -76,8 +76,8 @@ public sealed class McpServerConformanceTests
     {
         var store = new InMemorySitesStore();
         await store.SaveSiteAsync(new SiteDao { SiteId = "north-plant", Company = "Demo Manufacturing", Name = "North plant", Halls = ["Hall 1", "Hall 2"] }, Ct);
-        await store.SavePlacementAsync(new PlacementDao { SerialNumber = "M-05", SiteId = "north-plant", Hall = "Hall 2", DisplayName = "M-05", PlacedAt = ApiTestBase.Start.UtcDateTime }, Ct);
-        await store.SavePlacementAsync(new PlacementDao { SerialNumber = "P-04", SiteId = "north-plant", PlacedAt = ApiTestBase.Start.UtcDateTime }, Ct);
+        await store.SavePlacementAsync(new PlacementDao { MachineId = "M-05", SiteId = "north-plant", Hall = "Hall 2", DisplayName = "M-05", PlacedAt = ApiTestBase.Start.UtcDateTime }, Ct);
+        await store.SavePlacementAsync(new PlacementDao { MachineId = "P-04", SiteId = "north-plant", PlacedAt = ApiTestBase.Start.UtcDateTime }, Ct);
         return store;
     }
 }

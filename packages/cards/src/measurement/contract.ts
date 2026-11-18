@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { SILENT_AFTER_SECONDS, instant, serialNumber } from "../machine/contract.ts"
+import { SILENT_AFTER_SECONDS, instant, machineId } from "../machine/contract.ts"
 
 // The contract of the measurement card: what every machine measures now. Each value is the
 // newest one of its topic, in the unit it was published in, and names the topic it comes from.
@@ -19,13 +19,14 @@ export const quantity = z.enum(QUANTITIES)
 export type Quantity = z.infer<typeof quantity>
 
 /**
- * Where each quantity is published, below `machines/{SerialNumber}/`. The backend reads the stored
- * values of these topics, and a page that is live subscribes to them at the broker.
+ * Where each quantity is published, below `machines/{machineId}/`: the elements of the umati data
+ * model below `umati/`, the signals of the machine manufacturer below `oem/`. The backend reads the
+ * stored values of these topics, and a page that is live subscribes to them at the broker.
  */
 export const QUANTITY_PATHS: Record<Quantity, string> = {
   activePower: "umati/Consumption/Electricity/Main/AcActivePowerTotal",
   energyImported: "umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp",
-  bearingTemperature: "vendor/Spindle/1/BearingTemperature",
+  bearingTemperature: "oem/Spindle/1/BearingTemperature",
   spindleRotating: "umati/Spindle/1/IsRotating",
   feedOverride: "umati/State/FeedOverride",
   spindleOverride: "umati/Spindle/1/Override",
@@ -53,7 +54,7 @@ export const measurement = z.object({
 export type Measurement = z.infer<typeof measurement>
 
 export const machineMeasurements = z.object({
-  machine: serialNumber.describe("The serial number, which identifies the machine in every topic."),
+  machine: machineId.describe("The machine id, which identifies the machine in every topic."),
   measurements: z.array(measurement).describe("One for each quantity, in the order of `QUANTITIES`."),
 })
 export type MachineMeasurements = z.infer<typeof machineMeasurements>
@@ -78,7 +79,7 @@ export const lineValue = z
 export type LineValue = z.infer<typeof lineValue>
 
 export const measurementLine = z.object({
-  machine: serialNumber,
+  machine: machineId,
   topic: z.string().describe("The MQTT topic the values come from."),
   values: z.array(lineValue).describe("One for each of `instants` of the result, in that order."),
 })

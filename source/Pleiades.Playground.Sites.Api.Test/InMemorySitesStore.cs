@@ -4,8 +4,8 @@ using Pleiades.Playground.Sites.Api.Services;
 namespace Pleiades.Playground.Sites.Api.Test;
 
 /// <summary>
-/// The store in memory, keyed like the MongoDB collections: one site per site id, one placement per serial
-/// number. A transaction holds a lock, so transactions run one after the other; the conflicts of concurrent
+/// The store in memory, keyed like the MongoDB collections: one site per site id, one placement per machine
+/// id. A transaction holds a lock, so transactions run one after the other; the conflicts of concurrent
 /// transactions in MongoDB are covered by <see cref="MongoSitesStoreRaceTests"/>.
 /// </summary>
 internal sealed class InMemorySitesStore : ISitesStore, ISitesTransaction, IDisposable
@@ -26,15 +26,15 @@ internal sealed class InMemorySitesStore : ISitesStore, ISitesTransaction, IDisp
     {
         lock (_sites)
         {
-            return Task.FromResult<IReadOnlyList<PlacementDao>>([.. _placements.Values.OrderBy(p => p.SerialNumber, StringComparer.Ordinal)]);
+            return Task.FromResult<IReadOnlyList<PlacementDao>>([.. _placements.Values.OrderBy(p => p.MachineId, StringComparer.Ordinal)]);
         }
     }
 
-    public Task<bool> DeletePlacementAsync(string serialNumber, CancellationToken cancellationToken)
+    public Task<bool> DeletePlacementAsync(string machineId, CancellationToken cancellationToken)
     {
         lock (_sites)
         {
-            return Task.FromResult(_placements.Remove(serialNumber));
+            return Task.FromResult(_placements.Remove(machineId));
         }
     }
 
@@ -84,15 +84,15 @@ internal sealed class InMemorySitesStore : ISitesStore, ISitesTransaction, IDisp
         lock (_sites)
         {
             return Task.FromResult<IReadOnlyList<PlacementDao>>(
-                [.. _placements.Values.Where(p => p.SiteId == siteId).OrderBy(p => p.SerialNumber, StringComparer.Ordinal)]);
+                [.. _placements.Values.Where(p => p.SiteId == siteId).OrderBy(p => p.MachineId, StringComparer.Ordinal)]);
         }
     }
 
-    public Task<PlacementDao?> FindPlacementAsync(string serialNumber, CancellationToken cancellationToken)
+    public Task<PlacementDao?> FindPlacementAsync(string machineId, CancellationToken cancellationToken)
     {
         lock (_sites)
         {
-            return Task.FromResult(_placements.GetValueOrDefault(serialNumber));
+            return Task.FromResult(_placements.GetValueOrDefault(machineId));
         }
     }
 
@@ -100,7 +100,7 @@ internal sealed class InMemorySitesStore : ISitesStore, ISitesTransaction, IDisp
     {
         lock (_sites)
         {
-            _placements[placement.SerialNumber] = placement;
+            _placements[placement.MachineId] = placement;
         }
 
         return Task.CompletedTask;

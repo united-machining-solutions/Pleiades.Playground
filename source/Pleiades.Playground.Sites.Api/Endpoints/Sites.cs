@@ -85,7 +85,7 @@ internal static class Sites
                         {
                             return TypedResults.Conflict(
                                 $"The hall '{inLeftOut[0].Hall}' of the site '{siteId}' still has machines: " +
-                                $"{string.Join(", ", inLeftOut.Select(p => p.SerialNumber))}. Move or remove them first.");
+                                $"{string.Join(", ", inLeftOut.Select(p => p.MachineId))}. Move or remove them first.");
                         }
                     }
                 }
@@ -125,7 +125,7 @@ internal static class Sites
                 if (placements.Count > 0)
                 {
                     return TypedResults.Conflict(
-                        $"The site '{siteId}' still has machines: {string.Join(", ", placements.Select(p => p.SerialNumber))}. " +
+                        $"The site '{siteId}' still has machines: {string.Join(", ", placements.Select(p => p.MachineId))}. " +
                         "Move or remove them first.");
                 }
 

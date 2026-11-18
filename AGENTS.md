@@ -29,7 +29,9 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   route tree, `routeTree.gen.ts`, is not committed here. It is written from the route files, see
   [`apps/app`: What is where](apps/app/README.md#what-is-where). Never commit it, and never edit it.
 - A service reads and writes data only through a contract under `contracts/`. Change the contract first.
-- SI units only; energy in joule, fractions in `one`. Never invent or convert units on the wire.
+- Units: a machine below `machines/` keeps the units of the data model (energy in `wattHour`); a place below
+  `sites/` uses SI units, energy in joule, fractions in `one`. Never invent or convert units on the wire, in a
+  store or in an API; a display converts (ADR-0002).
 - Never commit a secret value. Names go to `.env.example`.
 - Verify before you claim: `dotnet build` and `dotnet test --solution source/Pleiades.Playground.slnx`; for
   TypeScript `pnpm typecheck`, `pnpm test` and `pnpm build`; for the stack

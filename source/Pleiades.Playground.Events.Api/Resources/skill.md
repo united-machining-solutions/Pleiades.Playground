@@ -1,44 +1,52 @@
 # Pleiades Events API - Skill Guide
 
-This guide helps AI agents effectively use the Events API tools to analyze industrial machine events.
+This guide helps AI agents use the Events API tools to analyse the events of industrial machines.
 
 ## Domain Overview
 
-The Events API tracks notification events from **Pleiades industrial machines**. Each machine is identified by a **machine ID (mId)**, e.g. `9000-0001`. Events have severity levels: Silent, Information, Warning, Error.
+The Events API stores the **CloudEvents** of Pleiades machines as they came, after the umati data model, and puts
+views together from them when they are read. A machine is identified by its **machine id (mId)**, the second level
+of its MQTT topic: `<manufacturer>_<model>_<serial number>`, e.g. `alcyone-machines_AX-400_P-04`. Units are those
+of the data model: durations in seconds, energy in **watt hours** (1 kWh = 1000 Wh).
 
-## Event Types
+Three groups of events:
+- **Notification**: `AlertRaised`, `AlertChanged`, `AlertCleared` and `NotificationEvent`. An alert has an `Id`,
+  an `ErrorCode`, a `Message` and a **severity after NAMUR NE 107**: `Failure`, `CheckFunction`, `OffSpec`,
+  `MaintenanceRequired` (most to least urgent), and the `correlationId` of the program execution it came up in.
+- **JobMonitoring**: job orders (`JobOrderAdded`, `…Released`, `…Started`, `…Interrupted`, `…Resumed`, `…Ended`,
+  `…Aborted`, `…Cancelled`, `…Changed`, `…Removed`) and their result (`JobOrderResultChanged`).
+- **WorkMasterMonitoring**: program executions (`ProgramExecutionStarted`, `…Interrupted`, `…Resumed`, `…Ended`,
+  `…Aborted`); Ended and Aborted carry the sums.
 
-### Notification Events (`events_notification_query`)
-System alerts with a **Raised/Reset lifecycle**:
-- **Raised** = condition detected (e.g. temperature too high)
-- **Reset** = condition cleared
-- Linked via `correlationId` — use `events_notification_pairs` to see durations
-- Severity levels indicate urgency: Silent < Information < Warning < Error
+## Tools
+
+- `events_active_alerts_query` — the alerts that stand now
+- `events_alert_pairs_query` — alerts that stood in a time range, from raise to clear, with their duration
+- `events_alert_statistics_query` — alerts per severity in a range: how many, how many still stand, how long
+- `events_job_orders_query` — the last state of each job order with its result and energy
+- `events_program_executions_query` — program executions from start to end: duration, parts, energy
+- `events_machine_events_query` — the stored events themselves, filtered by machine, group, type, time
+- `events_sequence_gaps_query` — events that never arrived (gaps in the numbers per group)
 
 ## Recommended Workflows
 
 ### Assess Machine Health
-1. `events_notification_level_distribution` — check severity distribution
-2. If errors/warnings found → `events_notification_query` with level filter for details
-3. `events_notification_message_stats` — identify most frequent issues
+1. `events_active_alerts_query` with `mId` — what stands now
+2. `events_alert_statistics_query` with `fromDate`/`toDate` — how often each severity occurred today
+3. `events_alert_pairs_query` with `severity=Failure` — which failures, and how long they lasted
 
-### Investigate a Time Window
-1. `events_notification_query` — with `fromDate`/`toDate` for the window
-2. `events_notification_pairs` — check active notification durations
+### Production of a Day
+1. `events_job_orders_query` with `mId`, `state=Ended` and `fromDate`/`toDate` — which job orders ended, with how
+   many parts and how much energy
+2. `events_program_executions_query` with `jobOrderId` — cycle times and aborts of one job order
+3. `events_machine_events_query` with `group=JobMonitoring` — every event of the job orders, in order
 
-### Analyze Notification Trends
-1. `events_notification_time_buckets` — visualize trends with bucket size (e.g. `1h`, `1d`)
-2. `events_notification_message_stats` — find most frequent/longest notifications
-3. `events_notification_pairs` — examine individual notification lifecycles
+### Trust the Data
+`events_sequence_gaps_query` — an empty list means no event of the machine is missing.
 
 ## Pagination Tips
 
-- All query tools return `{ items, totalCount, skip, take }`
+- Query tools return `{ items, totalCount, skip, take }`
 - Default: `skip=0, take=20`, max `take=100`
 - If `totalCount > skip + take`, there are more results — increase `skip`
-- Use `Descending` sort (default) for most recent events first
-
-## Bucket Size Format (Time Buckets)
-- Minutes: `15m`, `30m`
-- Hours: `1h`, `6h`, `12h`
-- Days: `1d`, `7d`, `30d`
+- Use `Descending` sort (default) for the most recent first

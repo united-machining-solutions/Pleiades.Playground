@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start"
 
+import { randomId } from "../random-id.ts"
+import { UNNAMED_CHAT } from "./chat-name.ts"
 import { chatSettings } from "./gateway.ts"
 import { furtherServers, switchKey, switchedOffOf } from "./mcp-servers.ts"
 import { modelNames } from "./models.ts"
@@ -47,7 +49,7 @@ export async function switchChatServer(threadId: string, name: string, on: boole
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       threadId,
-      input: { op: "config", key: switchKey(name), value: on, inputId: crypto.randomUUID() },
+      input: { op: "config", key: switchKey(name), value: on, inputId: randomId() },
     }),
   })
   // The harness answers a request it refuses with 200 too, and says so in the receipt.
@@ -66,7 +68,7 @@ export async function fetchChats(): Promise<Array<ChatEntry>> {
   const page = (await response.json()) as { entries?: Array<{ threadId: string; title?: string }> }
   return (page.entries ?? []).map((entry) => ({
     threadId: entry.threadId,
-    title: entry.title || "New chat",
+    title: entry.title || UNNAMED_CHAT,
     titled: Boolean(entry.title),
   }))
 }
@@ -89,7 +91,7 @@ export async function chooseChatModel(threadId: string, model: string): Promise<
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       threadId,
-      input: { op: "configure", settings: { model }, inputId: crypto.randomUUID() },
+      input: { op: "configure", settings: { model }, inputId: randomId() },
     }),
   })
   // The harness answers a request it refuses with 200 too, and says so in the receipt.

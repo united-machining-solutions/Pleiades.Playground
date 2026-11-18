@@ -78,7 +78,7 @@ can order then.
 
 ## Values
 
-SI units, as everywhere in the stack.
+SI units, in the answers of REST and MCP and on the broker.
 
 - Progress is a fraction from 0 to 1; the machine counts in percent.
 - `bottleVolumeCubicMetre` is the configured size of a full bottle; the machine keeps it in millilitre. It is
@@ -87,22 +87,45 @@ SI units, as everywhere in the stack.
 
 ## On the broker
 
-With a broker configured, the service publishes every ten seconds below `machines/{JUICEBAR_MACHINE_ID}/`, by
-the [MQTT binding](../../contracts/mqtt/README.md). The machine is not in the umati data model, so its own
-values are `vendor/` topics.
+With a broker configured, the service publishes the state of the machine below `machines/{MachineId}/`, as the
+[MQTT binding of machines](../../contracts/mqtt/README.md) says, with the same publisher of the binding as the
+Ultimaker telemetry (`Pleiades.Playground.Mqtt.Extensions.Machines`). The machine id is
+`<manufacturer>_<model>_<serial number>` by the rule of the binding, `trumpf_JuiceBar_JUICEBAR-01` by default:
+the juice bar of the demo was built by TRUMPF, and the domain of `JUICEBAR_MANUFACTURER_URI`
+(`https://www.trumpf.com`) without `www.` and its ending gives `trumpf`. The machine is not in the umati data
+model, so its own values are signals of the manufacturer, named with the prefix `x-trumpf-com` in the manifest
+and lying in the namespace `oem`, below `oem/JuiceBar/`.
+
+- Every value and the manifest: the envelope `{timestamp, value, unit}`, retained, QoS 1, content type
+  `application/json`. The state of the machine is looked at every second; a value goes out when it changes. The
+  heartbeat comes every ten seconds.
+- `umati/Manifest`, before the values: the profile `Core`, `machineId` and every element the service publishes.
+  Of `Core` the machine lacks `ProductCode`, `YearOfConstruction`, `State.FeedOverride`,
+  `Notification.ActiveAlerts` and `OperationCounters.PowerOnDuration`: `"available": false`, published once as
+  `null`. A pump is named once the machine reports it, with a new manifest before its value.
+- `umati/Connection/State`: `Initializing` at the start, `Running` while the machine answers, `CommunicationFault`
+  while it does not (the values stand with their time, only the heartbeat goes on), every value anew and
+  `Running` when it answers again and after every reconnect to the broker, `Shutdown` at a clean stop. The last
+  will sets `CommunicationFault`, retained. The machine card and the list of machines show a machine whose
+  adapter is not `Running` as "No data".
 
 | Topic | Kind | Unit |
 |---|---|---|
+| `umati/Manifest` | manifest | – |
 | `umati/Connection/State` | string | – |
-| `umati/Connection/Heartbeat` | number | `one` |
-| `umati/State/MachineryItemState` | string (`Executing` while it mixes, else `NotExecuting`) | – |
-| `vendor/JuiceBar/Production/State` | string | – |
-| `vendor/JuiceBar/Production/QueueLength` | number | `one` |
-| `vendor/JuiceBar/Production/Progress` | number, only while it mixes | `one` |
-| `vendor/JuiceBar/PumpControl/Mode` | string | – |
-| `vendor/JuiceBar/Pump/{n}/AmountWarning` | boolean | – |
+| `umati/Connection/Heartbeat` | integer, a counter from 1 | – |
+| `umati/Identification/Manufacturer`, `umati/Identification/SerialNumber`, `umati/Identification/ProductInstanceUri`, `umati/Identification/ManufacturerUri`, `umati/Identification/Model` | string, retained at every connect | – |
+| `umati/Identification/ProductCode`, `umati/Identification/YearOfConstruction`, `umati/State/FeedOverride`, `umati/Notification/ActiveAlerts`, `umati/OperationCounters/PowerOnDuration` | `null`, `"available": false` | – |
+| `umati/State/Status` | snapshot: `MachineryItemState` `Executing` while it mixes, else `NotExecuting`; `MachineryOperationMode` `None` | – |
+| `oem/JuiceBar/Production/State` | string | – |
+| `oem/JuiceBar/Production/QueueLength` | integer | `one` |
+| `oem/JuiceBar/Production/Progress` | number, `null` when it does not mix | `one` |
+| `oem/JuiceBar/PumpControl/Mode` | string | – |
+| `oem/JuiceBar/Pump/{n}/AmountWarning` | boolean | – |
 
-While the machine does not answer, only the heartbeat and `Connection/State` = `Disconnected` are published.
+The Timeseries store keeps the snapshot field by field, as `umati/State/Status/MachineryItemState`, the topic the
+cards read. `MachineryOperationMode` is `None`, the value of the model for a machine without operation modes:
+the schema of the snapshot asks for the field.
 
 ## Settings
 
@@ -113,7 +136,10 @@ While the machine does not answer, only the heartbeat and `Connection/State` = `
 | `JUICEBAR_MAX_QUEUE_LENGTH` | `3` | No order while this many wait. |
 | `JUICEBAR_BIND` | `127.0.0.1` | The address the port is published on. |
 | `JUICEBAR_API_PORT` | `5550` | |
-| `JUICEBAR_MACHINE_ID` | `JUICEBAR-01` | The machine id in the topics. |
+| `JUICEBAR_SERIAL_NUMBER` | `JUICEBAR-01` | The serial number, the last part of the machine id in the topics. It was `JUICEBAR_MACHINE_ID` before; an existing `.env` no longer applies. |
+| `JUICEBAR_MANUFACTURER_URI` | `https://www.trumpf.com` | The web address of the manufacturer, `Identification/ManufacturerUri`. Its domain without `www.` and its ending is the first part of the machine id, and with dashes the prefix of the signals (`x-trumpf-com`). It replaces `JUICEBAR_MANUFACTURER`, which no longer applies. |
+| `JUICEBAR_MANUFACTURER_NAME` | `TRUMPF` | The name of the manufacturer, `Identification/Manufacturer`; it must not be empty. |
+| `JUICEBAR_MODEL` | `JuiceBar` | The model, the second part of the machine id. |
 | `JUICEBAR_LANGUAGE` | `en` | `en` or `de`, for the names of drinks and ingredients. |
 | `JUICEBAR_AUTH_ENABLED` | `false` | `true` switches sign-in on; it needs `JUICEBAR_AUTH_METADATA_ADDRESS`, `JUICEBAR_AUTH_VALID_ISSUER` and `JUICEBAR_AUTH_AUDIENCE`. |
 

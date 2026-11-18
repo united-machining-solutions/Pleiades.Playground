@@ -27,12 +27,12 @@ internal sealed class MongoSitesStore(IMongoClient client, IOptions<MongoDbSetti
 
     public async Task<IReadOnlyList<PlacementDao>> ListPlacementsAsync(CancellationToken cancellationToken) =>
         await _placements.Find(FilterDefinition<PlacementDao>.Empty)
-            .SortBy(p => p.SerialNumber)
+            .SortBy(p => p.MachineId)
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
-    public async Task<bool> DeletePlacementAsync(string serialNumber, CancellationToken cancellationToken)
+    public async Task<bool> DeletePlacementAsync(string machineId, CancellationToken cancellationToken)
     {
-        var result = await _placements.DeleteOneAsync(p => p.SerialNumber == serialNumber, cancellationToken).ConfigureAwait(false);
+        var result = await _placements.DeleteOneAsync(p => p.MachineId == machineId, cancellationToken).ConfigureAwait(false);
         return result.DeletedCount > 0;
     }
 
@@ -72,14 +72,14 @@ internal sealed class MongoSitesStore(IMongoClient client, IOptions<MongoDbSetti
 
         public async Task<IReadOnlyList<PlacementDao>> ListPlacementsOfSiteAsync(string siteId, CancellationToken cancellationToken) =>
             await placements.Find(session, p => p.SiteId == siteId)
-                .SortBy(p => p.SerialNumber)
+                .SortBy(p => p.MachineId)
                 .ToListAsync(cancellationToken).ConfigureAwait(false);
 
-        public async Task<PlacementDao?> FindPlacementAsync(string serialNumber, CancellationToken cancellationToken) =>
-            await placements.Find(session, p => p.SerialNumber == serialNumber).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        public async Task<PlacementDao?> FindPlacementAsync(string machineId, CancellationToken cancellationToken) =>
+            await placements.Find(session, p => p.MachineId == machineId).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
 
         public Task SavePlacementAsync(PlacementDao placement, CancellationToken cancellationToken) =>
             placements.ReplaceOneAsync(
-                session, p => p.SerialNumber == placement.SerialNumber, placement, new ReplaceOptions { IsUpsert = true }, cancellationToken);
+                session, p => p.MachineId == placement.MachineId, placement, new ReplaceOptions { IsUpsert = true }, cancellationToken);
     }
 }

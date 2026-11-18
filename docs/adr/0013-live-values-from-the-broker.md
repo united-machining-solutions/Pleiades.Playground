@@ -30,7 +30,15 @@ out, as the backend, which reads stored values up to now, would not show it yet 
 - The code of the app only subscribes; it never publishes. The broker does not hold a client to that: its
   WebSocket listener takes anonymous publishes, as it did before this decision.
 - The topics come from the contracts: `READING_PATHS` and `NOTIFICATIONS_PATH` of the machine card,
-  `QUANTITY_PATHS` of the measurement card. The backend reads the same paths.
+  `QUANTITY_PATHS` of the measurement card. The backend reads the same paths in the store. Since the tree of
+  machines follows the data model ([ADR-0015](0015-the-binding-of-machines-follows-the-data-model.md)), the
+  broker and the store differ in three places, and the page reads the message as the store keeps it: a
+  snapshot such as `State/Status` is one message at the broker and a value per field in the store; the job
+  order that runs comes from the retained lists of job orders, which say what the views of the Events API
+  say; and an alert is a CloudEvent, raised, changed and cleared by its id.
+- Values are retained at the broker, so the last values of a machine that is long gone still stand there. A
+  page takes a machine it has not heard of only with a sign of life of the last 24 hours, as the backend
+  lists one.
 - A page reads from the backend again in two cases only: after the connection to the broker was lost, for
   what it missed, and while the backend has not answered.
 - The browser finds the broker at the host of the page and `MQTT_WS_PORT`, or at `MQTT_WS_URL` where the

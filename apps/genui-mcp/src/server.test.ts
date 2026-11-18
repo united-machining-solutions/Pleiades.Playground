@@ -47,7 +47,7 @@ test("the spans of a band are for a card: a host does not offer that tool to its
   assert.equal(tools.find((tool) => tool.name === "genui_machine_show")?._meta?.ui?.visibility, undefined)
 })
 
-test("the tools that take a machine take every serial number the MQTT binding allows", async () => {
+test("the tools that take a machine take every machine id the MQTT binding allows", async () => {
   const { tools = [] } = await ask("tools/list")
   for (const name of ["genui_machine_show", SPAN_LIST_TOOL, "genui_measurement_list"]) {
     // The rule reaches a caller as a pattern, and the server checks what comes in against it.

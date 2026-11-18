@@ -12,7 +12,8 @@
 # - no bind mount out of this folder: the configurations of the broker and of Traefik are config files
 #   next to this one, and Traefik reads its routes from a file rather than from the Docker socket.
 # Every ${VAR} is a parameter in app/margo.yaml; the default after `:-` is the same as the value there.
-# Every numeric value on the broker is in its coherent SI unit (contracts/mqtt).
+# A machine publishes after the umati data model, in its units (energy in watt hours); a place below sites/
+# keeps the coherent SI units (contracts/mqtt).
 
 services:
   broker:
@@ -88,7 +89,7 @@ services:
       Config__MqttSource__Password: ""
       Config__MqttSource__ClientId: timeseries-persistence
       Config__Topics__0: machines/+/umati/#
-      Config__Topics__1: machines/+/vendor/#
+      Config__Topics__1: machines/+/oem/#
       # Values about a place, see contracts/mqtt. A first level the binding does not name is not stored.
       Config__Topics__2: sites/+/#
       Config__CachingTime: "00:00:05"
@@ -131,8 +132,33 @@ services:
       Config__MqttSource__User: ""
       Config__MqttSource__Password: ""
       Config__MqttSource__ClientId: events-persistence
-      Config__Topics__0: machines/+/events/#
+      # A persistent session: the broker keeps the CloudEvents (QoS 1) while the service restarts.
+      Config__MqttSource__CleanSession: "false"
+      Config__MqttSource__SessionExpiry: "1.00:00:00"
+      Config__Topics__0: machines/+/events/jobs
+      Config__Topics__1: machines/+/events/workmasters
+      Config__Topics__2: machines/+/events/notifications
       Config__EventsApi__Uri: http://events-api:8080
+
+  # Sites and the machines placed on them, as people enter them.
+  sites-api:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.sites.api:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      # Writing needs no sign-in in the demo: this computer only, unless SITES_BIND opens it.
+      - "${SITES_BIND:-127.0.0.1}:${SITES_API_PORT:-5540}:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      Config__Loki__Sinks__0__Name: demo
+      Config__Loki__Sinks__0__Enabled: "false"
+      Config__Loki__Sinks__0__Uri: http://localhost:3100
+      Config__MongoDb__ConnectionString: mongodb://mongodb:27017/?replicaSet=rs0
+      Config__MongoDb__DatabaseName: Sites
+      Config__Auth__Enabled: "false"
 
   # The generative UI backend: an MCP server that reads both APIs.
   genui-mcp:
@@ -215,7 +241,9 @@ services:
       timeout: 5s
       retries: 20
 
-  # One simulator per machine. The serial number is the machine id in every topic.
+  # One simulator per machine. Each publishes after the data model, below machines/{MachineId}/
+  # (<manufacturer>_<model>_<serial number>, contracts/mqtt), from a virtual machine of its own with a scenario of
+  # its own kind of machine and a made-up manufacturer of its own.
   simulator-p-04:
     image: ghcr.io/united-machining-solutions/pleiades.playground.simulator:main
     restart: unless-stopped
@@ -224,10 +252,11 @@ services:
     depends_on:
       broker:
         condition: service_healthy
+      # Healthy means the broker has acknowledged the subscriptions: an event sent before is lost for good.
       timeseries-persistence:
-        condition: service_started
+        condition: service_healthy
       events-persistence:
-        condition: service_started
+        condition: service_healthy
     environment:
       Config__Loki__Sinks__0__Name: demo
       Config__Loki__Sinks__0__Enabled: "false"
@@ -235,6 +264,7 @@ services:
       Config__SerialNumber: P-04
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-p-04
+      # Shafts, flanges and bushings: the default scenario, machine id alcyone-machines_AX-400_P-04.
 
   simulator-p-07:
     image: ghcr.io/united-machining-solutions/pleiades.playground.simulator:main
@@ -244,10 +274,11 @@ services:
     depends_on:
       broker:
         condition: service_healthy
+      # Healthy means the broker has acknowledged the subscriptions: an event sent before is lost for good.
       timeseries-persistence:
-        condition: service_started
+        condition: service_healthy
       events-persistence:
-        condition: service_started
+        condition: service_healthy
     environment:
       Config__Loki__Sinks__0__Name: demo
       Config__Loki__Sinks__0__Enabled: "false"
@@ -255,6 +286,8 @@ services:
       Config__SerialNumber: P-07
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-p-07
+      # Housings, machine id taygeta-precision_TP-800_P-07.
+      Config__SpecOutput__ScenarioName: housings
 
   simulator-m-02:
     image: ghcr.io/united-machining-solutions/pleiades.playground.simulator:main
@@ -264,10 +297,11 @@ services:
     depends_on:
       broker:
         condition: service_healthy
+      # Healthy means the broker has acknowledged the subscriptions: an event sent before is lost for good.
       timeseries-persistence:
-        condition: service_started
+        condition: service_healthy
       events-persistence:
-        condition: service_started
+        condition: service_healthy
     environment:
       Config__Loki__Sinks__0__Name: demo
       Config__Loki__Sinks__0__Enabled: "false"
@@ -275,6 +309,8 @@ services:
       Config__SerialNumber: M-02
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-m-02
+      # Small parts, machine id merope-microtec_MM-120_M-02.
+      Config__SpecOutput__ScenarioName: small-parts
 
 configs:
   mosquitto:

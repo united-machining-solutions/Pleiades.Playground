@@ -70,13 +70,13 @@ public sealed class PlacementsEndpointTests : ApiTestBase
     }
 
     [TestMethod]
-    public async Task GetPlacements_ListsThemBySerialNumber()
+    public async Task GetPlacements_ListsThemByMachineId()
     {
         await GivenSiteAsync("north-plant");
         await GivenPlacementAsync("P-07", "north-plant");
         await GivenPlacementAsync("M-02", "north-plant");
 
-        Assert.AreEqual("M-02, P-07", string.Join(", ", (await GetPlacementsAsync()).Select(p => p.SerialNumber)));
+        Assert.AreEqual("M-02, P-07", string.Join(", ", (await GetPlacementsAsync()).Select(p => p.MachineId)));
     }
 
     [TestMethod]
@@ -105,11 +105,11 @@ public sealed class PlacementsEndpointTests : ApiTestBase
     [DataRow("M%2305")]
     [DataRow("M%2F05")]
     [DataRow("%20M-05")]
-    public async Task PutPlacement_WithASerialNumberThatIsNoLevelOfATopic_ReturnsBadRequest(string escapedSerialNumber)
+    public async Task PutPlacement_WithAMachineIdThatIsNoLevelOfATopic_ReturnsBadRequest(string escapedMachineId)
     {
         await GivenSiteAsync("north-plant");
 
-        using var response = await PutPlacementAsync(escapedSerialNumber, new PlacementRequestV1("north-plant", null, null));
+        using var response = await PutPlacementAsync(escapedMachineId, new PlacementRequestV1("north-plant", null, null));
 
         Assert.AreEqual(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.IsEmpty(await GetPlacementsAsync());
