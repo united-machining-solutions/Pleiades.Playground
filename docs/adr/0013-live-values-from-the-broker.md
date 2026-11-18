@@ -42,7 +42,8 @@ out, as the backend, which reads stored values up to now, would not show it yet 
 - A page reads from the backend again in two cases only: after the connection to the broker was lost, for
   what it missed, and while the backend has not answered.
 - The browser finds the broker at the host of the page and `MQTT_WS_PORT`, or at `MQTT_WS_URL` where the
-  broker stands behind a proxy.
+  broker stands behind a proxy. On a page over HTTPS, `MQTT_WSS_PATH` names a path at the origin of the page
+  instead, which the proxy that serves the page forwards to the broker.
 
 ## Consequences
 
