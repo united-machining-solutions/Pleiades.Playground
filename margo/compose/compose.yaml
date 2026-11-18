@@ -2,7 +2,8 @@
 #
 #   simulator ──MQTT──▶ broker ──▶ timeseries-persistence ──REST──▶ timeseries-api ──▶ mongodb
 #                          └─────▶ events-persistence ─────REST──▶ events-api ──────▶ mongodb
-#   browser ──HTTP──▶ traefik ──▶ app ──MCP──▶ genui-mcp ──▶ both APIs
+#   browser ──HTTP(S)──▶ traefik ──▶ app ──MCP──▶ genui-mcp ──▶ both APIs
+#   browser ──WS :9001, or WSS at /mqtt of traefik──▶ broker (live values)
 #   outside client ──HTTP, reading only──▶ gateway ──▶ timeseries-api, events-api
 #
 # The same stack as compose.yaml at the root of the repository, in the form bart accepts:
@@ -219,6 +220,7 @@ services:
     environment:
       TIMESERIES_API_URL: http://timeseries-api:8080
       EVENTS_API_URL: http://events-api:8080
+      SITES_API_URL: http://sites-api:8080
       # The origins a card file may load the font of its host from; none unless set.
       CARD_RESOURCE_DOMAINS: ${CARD_RESOURCE_DOMAINS:-}
 
@@ -241,13 +243,18 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       GENUI_MCP_URL: http://genui-mcp:8080/mcp
-      # The browser hears live values at the broker's WebSocket: at the host of the page and this port.
+      # The browser hears live values at the broker's WebSocket: at the host of the page and this port, and on a
+      # page over HTTPS at this path of Traefik, which forwards it to the broker (the broker speaks no TLS).
       MQTT_WS_PORT: ${MQTT_WS_PORT:-9001}
+      MQTT_WSS_PATH: /mqtt
       # The chat needs a language model; everything else works without one. The models come from a LiteLLM
       # gateway: the app offers those it marks for chat, and dictation takes the first it marks for speech
       # to text.
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      # The OPC UA adapter. While it does not answer, the chat leaves its tools and commands out.
+      OPCUA_MCP_URL: http://opcua-adapter:8080/mcp
+      OPCUA_ADAPTER_URL: http://opcua-adapter:8080
 
   # The reverse proxy in front of the example app, found by its host name. Not in compose.yaml at the root.
   traefik:
@@ -260,6 +267,9 @@ services:
       - --global.sendAnonymousUsage=false
       # Inside the container on an unprivileged port, so it needs no capability.
       - --entryPoints.web.address=:8000
+      # HTTPS. No certificate is configured, so Traefik serves the self-signed one it generates at start, in
+      # memory: the host names are internal to the device, and no public CA (and no ACME) can sign them.
+      - --entryPoints.websecure.address=:8443
       - --providers.file.filename=/etc/traefik/dynamic.yaml
       # /ping on the internal entry point "traefik" (:8080), which is not published.
       - --ping=true
@@ -267,6 +277,7 @@ services:
       # The same reason as for the app: Traefik answers on the device only, unless HTTP_BIND opens it to the
       # network. Its Host() rule is no guard, a client sets the Host header it likes.
       - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-80}:8000"
+      - "${HTTP_BIND:-127.0.0.1}:${HTTPS_PORT:-443}:8443"
     configs:
       - source: traefik
         target: /etc/traefik/dynamic.yaml
@@ -355,6 +366,49 @@ services:
       # Small parts, machine id merope-microtec_MM-120_M-02.
       Config__SpecOutput__ScenarioName: small-parts
 
+  # The OPC UA adapter: brings in the machines a person adds in the chat, by the binding of machines.
+  #   opc-simulator ──OPC UA──▶ opcua-adapter ──MQTT──▶ broker
+  opcua-adapter:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.opcua.adapter:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      # Whoever reaches this port can add and remove machines: it has no sign-in. So it answers on the
+      # device only, unless OPCUA_ADAPTER_BIND opens it to the network.
+      - "${OPCUA_ADAPTER_BIND:-127.0.0.1}:${OPCUA_ADAPTER_PORT:-5560}:8080"
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-persistence:
+        condition: service_healthy
+      events-persistence:
+        condition: service_healthy
+    environment:
+      Config__Loki__Sinks__0__Name: demo
+      Config__Loki__Sinks__0__Enabled: "false"
+      Config__Loki__Sinks__0__Uri: http://localhost:3100
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: opcua-adapter
+      Config__DataDirectory: /data
+    volumes:
+      - opcua_adapter_data:/data
+
+  # A machine to try the adapter with: the TRUMPF OPC UA simulator with a TruMatic, definition K09, as umati
+  # publishes it. It is not registered with the adapter: a person adds it in the chat, /discover A1121O0001.
+  opc-simulator:
+    image: ghcr.io/umati/trumpf/edge/opc-simulator:1.4.0-alpha3
+    restart: unless-stopped
+    # The name the server announces in its endpoints and carries in its certificate, and the machine of the
+    # definition.
+    hostname: A1121O0001
+    command: ["run", "-c", "/opt/opcsim/samples/definitions/K09.simulation.yaml"]
+    ports:
+      # The web UI of the simulator. Its OPC UA port, 4840, is reached inside the network of the app only.
+      - "${OPC_SIMULATOR_UI_PORT:-8090}:8080"
+    volumes:
+      - opc_simulator_pki:/data/pki
+
 # The configurations inline, as `content:`, not as `file:`: the Margo client does not mount a file of the
 # package into a container. Compose interpolates ${VAR} in content, so a literal dollar sign is written $$.
 configs:
@@ -383,11 +437,29 @@ configs:
             entryPoints: [web]
             rule: 'Host(`{{ env "APP_HOST" }}`) || Host(`{{ env "SERVER_HOST" }}`)'
             service: app
+          # The same route over HTTPS, with Traefik's own self-signed certificate. HTTP is not redirected: the app
+          # works over both.
+          app-secure:
+            entryPoints: [websecure]
+            rule: 'Host(`{{ env "APP_HOST" }}`) || Host(`{{ env "SERVER_HOST" }}`)'
+            service: app
+            tls: {}
+          # A page over HTTPS may not open ws://, and the broker speaks no TLS: its WebSocket over HTTPS is this
+          # path of Traefik (MQTT_WSS_PATH of the app). Over HTTP the page reaches the published port itself.
+          broker-secure:
+            entryPoints: [websecure]
+            rule: '(Host(`{{ env "APP_HOST" }}`) || Host(`{{ env "SERVER_HOST" }}`)) && Path(`/mqtt`)'
+            service: broker
+            tls: {}
         services:
           app:
             loadBalancer:
               servers:
                 - url: http://app:8080
+          broker:
+            loadBalancer:
+              servers:
+                - url: http://broker:9001
 
   # The routes of the gateway: an allowlist of method and path, derived from the route groups of
   # source/Pleiades.Playground.Timeseries.Api/Endpoints and source/Pleiades.Playground.Events.Api/Endpoints.
@@ -445,3 +517,5 @@ configs:
 
 volumes:
   mongodb_data:
+  opcua_adapter_data:
+  opc_simulator_pki:

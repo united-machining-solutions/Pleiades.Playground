@@ -41,18 +41,34 @@ that bart accepts it, and one more, Traefik:
   ```
 
 - **Traefik in front of the example app.** It serves the app on the HTTP port (setting *HTTP port of Traefik*,
-  80), on `127.0.0.1` unless the setting *Address of Traefik* opens it to the network, under two host names:
+  80) and the HTTPS port (*HTTPS port of Traefik*, 443), both on `127.0.0.1` unless the setting *Address of
+  Traefik* opens them to the network, under two host names:
   *Host name of the app*, a CNAME of the device, and *Host name of the device*, its A record. Their defaults, `pleiades.example.internal` and `device.example.internal`, are placeholders: set both
   to the names of your device when you install the app. Traefik reads its route from
   the `configs:` entry `traefik`, and not from Docker labels: those need the Docker socket,
   a bind mount out of `compose/`. The configuration is a Go template that takes the host names from the environment.
-  Plain HTTP only; there is no certificate.
 - **The gateway is the same as at the root.** The service `gateway`, a second Traefik, is the one entry for
   clients on other computers and passes only the reading endpoints of the time series and events APIs (setting
   *Address of the gateway*, `0.0.0.0`, and *Port of the gateway*, 5590), see
   [ADR-0017](../docs/adr/0017-a-read-only-gateway-for-outside-clients.md). Its routes are the `configs:` entry
   `gateway`, a copy of the one in `compose.yaml`; CI checks that both are the same. The two APIs answer on the
   device only (*Address of the time series API*, *Address of the events API*).
+- **HTTPS with a self-signed certificate.** The host names are internal to the device, so no public CA can
+  sign them and ACME cannot reach them. Traefik is given no certificate and serves the one it generates in
+  memory at start, `TRAEFIK DEFAULT CERT`: no file, no volume, no Docker socket. A browser warns until the
+  person accepts it; a new one comes with every restart of Traefik. The app works over both, so HTTP is not
+  redirected to HTTPS.
+- **Live values over HTTPS through Traefik.** A page over HTTPS may not open `ws://`, and the broker speaks no
+  TLS. So Traefik forwards the path `/mqtt` of its HTTPS port to the broker's WebSocket, and the app's
+  `MQTT_WSS_PATH: /mqtt` sends the browser there, at the origin of the page. Over HTTP the browser reaches the
+  broker at the published port, `MQTT_WS_PORT`, as before.
+
+  ```bash
+  curl -k --resolve device.example.internal:443:127.0.0.1 https://device.example.internal/
+  ```
+
+  `curl -k https://localhost/` gets a 404: the route needs one of the two host names, in the Host header and
+  the SNI.
 - **Settings, not `.env`.** Every `${VAR}` of the compose file is a parameter in `app/margo.yaml`, and each one
   is a setting the person who installs the app can change: the ports, the address of the example app, the
   retention and the language models. The default after `:-` in the compose file is the same as the value of the

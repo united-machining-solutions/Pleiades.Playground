@@ -67,6 +67,10 @@
     <Project Path="Pleiades.Playground.Sites.Api/Pleiades.Playground.Sites.Api.csproj" />
     <Project Path="Pleiades.Playground.Sites.Api.Test/Pleiades.Playground.Sites.Api.Test.csproj" />
   </Folder>
+  <Folder Name="/OpcUa/">
+    <Project Path="Pleiades.Playground.OpcUa.Adapter/Pleiades.Playground.OpcUa.Adapter.csproj" />
+    <Project Path="Pleiades.Playground.OpcUa.Adapter.Test/Pleiades.Playground.OpcUa.Adapter.Test.csproj" />
+  </Folder>
   <Folder Name="/Ultimaker/">
     <Project Path="Pleiades.Playground.Ultimaker.Api.Test/Pleiades.Playground.Ultimaker.Api.Test.csproj" />
     <Project Path="Pleiades.Playground.Ultimaker.Api/Pleiades.Playground.Ultimaker.Api.csproj" />
