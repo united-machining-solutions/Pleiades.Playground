@@ -241,9 +241,10 @@ broker publishes the Last Will of the client, and the hub drops the app as well.
 The messages travel below the first level `hub/` of the [MQTT binding](../../contracts/mqtt/README.md).
 Their topics and payloads are defined in the repository of the hub, in its `contracts/mqtt/README.md`.
 
-The SDK is not on npmjs.org. It is checked in as a tarball, `vendor/pleiades-hub-sdk-0.1.1.tgz`, and
-[`vendor/README.md`](../../vendor/README.md) names its version, its origin and its checksum. The catalog in
-`pnpm-workspace.yaml` refers to it (`"@pleiades/hub-sdk": file:vendor/pleiades-hub-sdk-0.1.1.tgz`), and
+The SDK is not on npmjs.org. It is checked in as a tarball, `vendor/pleiades-hub-sdk-0.1.2.tgz`, licensed
+under Apache-2.0; the tarball includes its `LICENSE` file. [`vendor/README.md`](../../vendor/README.md) names
+its version, origin and checksum. The catalog in `pnpm-workspace.yaml` refers to it
+(`"@pleiades/hub-sdk": file:vendor/pleiades-hub-sdk-0.1.2.tgz`), and
 `package.json` says `"catalog:"`, like every other dependency. The decision and what follows from it:
 [ADR-0021](../../docs/adr/0021-hub-registration.md).
 

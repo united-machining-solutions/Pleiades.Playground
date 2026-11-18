@@ -7,10 +7,10 @@ registry nor a neighbouring folder for it, also in CI and in the image builds. T
 
 | File | Package | Version | Origin |
 | --- | --- | --- | --- |
-| `pleiades-hub-sdk-0.1.1.tgz` | `@pleiades/hub-sdk` | 0.1.1 | `packages/sdk` of `umati/pleiades-hub`, packed there with `pnpm sdk:pack` on 2026-11-18 from its commit `1f823ff` on the branch `feat/register-hub-app-skill` |
+| `pleiades-hub-sdk-0.1.2.tgz` | `@pleiades/hub-sdk` | 0.1.2 | `packages/sdk` of `umati/pleiades-hub`, packed there with `pnpm sdk:pack` on 2026-11-18 from its commit `75e8162` on the branch `feat/register-hub-app-skill` |
 
-SHA-256 of `pleiades-hub-sdk-0.1.1.tgz`:
-`9272585826f2115b109d03a16bde9b91327710eb5b0ff84590389bfc8e46f110`
+SHA-256 of `pleiades-hub-sdk-0.1.2.tgz`:
+`a3f288963a21c9b1790b566276809816332111882beffe12533aa26bd3c1c43f`
 
 ## Refreshing a tarball
 

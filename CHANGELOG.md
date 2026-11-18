@@ -22,7 +22,7 @@ All notable changes are documented here. The format follows
   itself is not part of the stack. The SDK of the hub, `@pleiades/hub-sdk`, is not on npmjs.org: it is
   checked in as a tarball under `vendor/`, and the catalog refers to it with `file:`. ADR-0021 records the
   decision and the deviation from "npmjs.org is the only registry". The settings are in
-  `apps/app/README.md`. The tarball is version 0.1.1, which brings the guide
+  `apps/app/README.md`. The tarball is version 0.1.2, licensed under Apache-2.0, which brings the guide
   `register-an-app.md`, and the skill `register-hub-app`, a copy from the hub's repository, leads an agent to it.
 - Example app: machines are added to a site and taken off it on Home, as in the mock. A bar names the machines
   that sent data in the last 24 hours and stand on no site, with "Review and add"; "Add machine" also takes one by

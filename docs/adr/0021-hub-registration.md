@@ -43,7 +43,8 @@ What stood in the way of the example app taking part:
 - It registers one app, `pleiades-playground`, with a label and a description in English and German and an
   icon. The icon is an SVG drawn for this app, which the server of the app serves, and it is registered as
   a link relative to the address of the app.
-- The SDK is checked in as a tarball, `vendor/pleiades-hub-sdk-0.1.1.tgz`. The catalog in
+- The SDK is checked in as a tarball, `vendor/pleiades-hub-sdk-0.1.2.tgz`, licensed under Apache-2.0.
+  The catalog in
   `pnpm-workspace.yaml` refers to it with `file:`, and `apps/app/package.json` says `"catalog:"`, like
   every other dependency. [`vendor/README.md`](../../vendor/README.md) names its version, its origin and
   its checksum. From version 0.1.1 on the tarball holds the guide `register-an-app.md`, and the repository
@@ -134,8 +135,8 @@ Not checked: Docker Engine on Linux, the image of `genui-mcp` built with `vendor
   in the `Development` environment does (`"Topics": ["#"]` in its `appsettings.Development.json`); a hub
   message is no value, so it logs a warning for it and stores nothing. Since the stack registers by
   default, such messages are on its broker without anyone having set a variable.
-- The tarball holds code of the hub's repository, which is private, and its `package.json` names no
-  licence. Whether it may be published with this repository is to be settled before this branch is pushed.
+- The tarball holds code from the hub's private repository. Its `package.json` declares `Apache-2.0`, and the
+  tarball includes the corresponding `LICENSE` file.
 
 ## Alternatives considered
 

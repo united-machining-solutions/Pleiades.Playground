@@ -1,8 +1,8 @@
 # Source of this skill
 
 A copy of `.claude/skills/register-hub-app/SKILL.md` of the repository of the Pleiades Hub
-(`umati/pleiades-hub`), unchanged. It was taken on 2026-11-18 together with version 0.1.1 of the SDK
-`@pleiades/hub-sdk`, from the hub's commit `1f823ff` on the branch
+(`umati/pleiades-hub`), unchanged. It was taken on 2026-11-18 together with version 0.1.2 of the SDK
+`@pleiades/hub-sdk`, from the hub's commit `75e8162` on the branch
 `feat/register-hub-app-skill`. Do not edit it here: a rule that is specific to this repository belongs in
 [AGENTS.md](../../../AGENTS.md).
 
