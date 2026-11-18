@@ -2,12 +2,14 @@ import { z } from "zod"
 
 import { fromMicroseconds } from "./time.ts"
 
-// The two data services, read over REST. Every answer is checked against the shape this server
+// The data services, read over REST. Every answer is checked against the shape this server
 // relies on, so a change in an API fails here, loudly, and not somewhere in a card.
 
 export type Apis = {
   timeseriesUrl: string
   eventsUrl: string
+  /** Where the Sites API is. Only the site card reads it, so a server without it has every other card. */
+  sitesUrl?: string
 }
 
 export type Sample = { at: string; value: string }
@@ -85,7 +87,7 @@ const jobOrdersAnswer = z.object({
   ),
 })
 
-type Api = "Timeseries API" | "Events API"
+type Api = "Timeseries API" | "Events API" | "Sites API"
 const TIMEOUT_SECONDS = 10
 
 /**
@@ -339,4 +341,44 @@ export async function readTimelines(
       })
       .sort((a, b) => a.at.localeCompare(b.at)),
   }))
+}
+
+/** A site as the Sites API keeps it: a place with a company, a plant and its halls. */
+export type StoredSite = { siteId: string; company: string; name: string; halls: Array<string> }
+/** A machine on a site, as the Sites API keeps it. */
+export type Placement = {
+  machineId: string
+  siteId: string
+  hall: string | null
+  displayName: string | null
+  placedAt: string
+}
+
+const sitesAnswer = z.array(
+  z.object({ siteId: z.string(), company: z.string(), name: z.string(), halls: z.array(z.string()) }),
+)
+const placementsAnswer = z.array(
+  z.object({
+    machineId: z.string(),
+    siteId: z.string(),
+    hall: z.string().nullable(),
+    displayName: z.string().nullable(),
+    placedAt: z.string(),
+  }),
+)
+
+function sitesUrlOf(apis: Apis, path: string): URL {
+  if (apis.sitesUrl === undefined) throw new Error("The Sites API is not set: SITES_API_URL names where it is.")
+  return new URL(path, apis.sitesUrl)
+}
+
+/** Every site with its halls, by site id. */
+export async function readSites(apis: Apis): Promise<Array<StoredSite>> {
+  return getJson("Sites API", sitesUrlOf(apis, "/sites"), sitesAnswer)
+}
+
+/** Every machine that stands on a site, by machine id. */
+export async function readPlacements(apis: Apis): Promise<Array<Placement>> {
+  const placements = await getJson("Sites API", sitesUrlOf(apis, "/placements"), placementsAnswer)
+  return placements.map((one) => ({ ...one, placedAt: new Date(one.placedAt).toISOString() }))
 }

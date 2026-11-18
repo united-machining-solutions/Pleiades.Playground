@@ -15,6 +15,11 @@ All notable changes are documented here. The format follows
   file of the app reads from one or links to one of its pages. `AGENTS.md` and the skills `create-page`,
   `create-card` and `build-your-own` ask whether a thing is base or a showcase
   ([ADR-0016](docs/adr/0016-a-showcase-is-built-in-on-request-and-only-adds.md)).
+- Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
+  self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
+  that live values work over HTTPS. HTTP stays as it is.
+- Example app: the setting `MQTT_WSS_PATH` sends a page over HTTPS to the broker at that path of the page's
+  origin, for a proxy in front of the app that forwards it to the broker.
 - Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
   shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
   from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
@@ -24,6 +29,10 @@ All notable changes are documented here. The format follows
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
   as every other API does.
+- Site card: `genui_site_list` in `genui-mcp` lists every site with its machines by hall and state, counted, and
+  the machines that send values and stand on no site. It reads the Sites API at `SITES_API_URL`.
+- Site card: a machine on no site carries what it does now (`now`), as a placed one does, so a page can keep it
+  live.
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
 - Example app: the button "Tools" in the message field of the chat lists the servers that give the chat
