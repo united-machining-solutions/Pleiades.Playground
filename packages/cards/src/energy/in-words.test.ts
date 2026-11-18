@@ -13,25 +13,25 @@ test("joule are written as kilowatt hours and watt as kilowatts", () => {
 })
 
 const machine = (
-  serial: string,
+  id: string,
   joule: number | null,
   more: Partial<{ meterWentBack: boolean; startAt: string; meanWatt: number | null; meterUnit: string | null; powerUnit: string | null }> = {},
 ) => ({
-  machine: serial,
+  machine: id,
   energy: {
     joule,
     start: joule === null && !more.meterWentBack ? null : { joule: 1_000, at: more.startAt ?? "2026-11-17T07:59:55.000Z" },
     end: joule === null && !more.meterWentBack ? null : { joule: 1_000 + (joule ?? 0), at: "2026-11-17T15:59:58.000Z" },
     meterWentBack: more.meterWentBack ?? false,
     unit: more.meterUnit === undefined ? "joule" : more.meterUnit,
-    topic: `machines/${serial}/umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp`,
+    topic: `machines/${id}/umati/Consumption/Electricity/Main/AcActiveEnergyTotalImportHp`,
   },
   power: {
     meanWatt: more.meanWatt === undefined ? 1550 : more.meanWatt,
     peakWatt: more.meanWatt === null ? null : 3400,
     values: more.meanWatt === null ? 0 : 14400,
     unit: more.powerUnit === undefined ? (more.meanWatt === null ? null : "watt") : more.powerUnit,
-    topic: `machines/${serial}/umati/Consumption/Electricity/Main/AcActivePowerTotal`,
+    topic: `machines/${id}/umati/Consumption/Electricity/Main/AcActivePowerTotal`,
   },
 })
 

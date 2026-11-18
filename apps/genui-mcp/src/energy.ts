@@ -34,7 +34,7 @@ export function powerOf(statistics: Statistics | undefined, topic: string): Mach
   return { meanWatt: statistics.mean, peakWatt: statistics.max, values: statistics.count, unit: statistics.unit, topic }
 }
 
-/** The machine that imported the most first; a machine whose energy is not known last; else by serial number. */
+/** The machine that imported the most first; a machine whose energy is not known last; else by machine id. */
 export function byEnergy(a: MachineEnergy, b: MachineEnergy): number {
   const [ja, jb] = [a.energy.joule, b.energy.joule]
   if (ja === jb) return a.machine.localeCompare(b.machine)

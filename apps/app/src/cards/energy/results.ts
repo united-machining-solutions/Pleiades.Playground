@@ -17,7 +17,7 @@ export function energyShowOf(content: unknown): EnergyShow | null {
  * with the same machines.
  */
 export function machinesKey(machines: ReadonlyArray<string>): string {
-  // A serial number never contains `/`: the MQTT binding forbids it, a comma it allows.
+  // A machine id never contains `/`: the MQTT binding forbids it, a comma it allows.
   return machines.join("/")
 }
 

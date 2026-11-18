@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { SILENT_AFTER_SECONDS, instant, serialNumber } from "../machine/contract.ts"
+import { SILENT_AFTER_SECONDS, instant, machineId } from "../machine/contract.ts"
 
 // The contract of the energy card: how much energy each machine imported over the last hours, from
 // its meter, and how much power it drew, from its active power. Every value is in the unit of the
@@ -21,7 +21,7 @@ export const meterReading = z.object({
 export type MeterReading = z.infer<typeof meterReading>
 
 export const machineEnergy = z.object({
-  machine: serialNumber.describe("The serial number, which identifies the machine in every topic."),
+  machine: machineId.describe("The machine id, which identifies the machine in every topic."),
   energy: z.object({
     joule: z
       .number()
@@ -69,7 +69,7 @@ export type EnergyShow = z.infer<typeof energyShow>
 
 /** A line of the graph: the active power of one machine, on the instants of the result. */
 export const powerLine = z.object({
-  machine: serialNumber,
+  machine: machineId,
   topic: z.string().describe("The MQTT topic of the active power."),
   watt: z
     .array(z.number().nullable())

@@ -29,8 +29,8 @@ test("what does not keep the contract of the card is not drawn as one", () => {
   assert.equal(energyShowOf(undefined), null)
 })
 
-test("a serial number with a comma stays one machine on the way to the lines of the card", () => {
-  // The MQTT binding forbids only `/`, `+` and `#` in a serial number.
+test("a machine id with a comma stays one machine on the way to the lines of the card", () => {
+  // The MQTT binding forbids only `/`, `+` and `#` in a machine id.
   assert.deepEqual(machinesOf(machinesKey(["A,1", "P-04"])), ["A,1", "P-04"])
   assert.deepEqual(machinesOf(machinesKey([])), [])
 })

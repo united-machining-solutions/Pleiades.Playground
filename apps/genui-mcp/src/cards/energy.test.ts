@@ -36,7 +36,7 @@ test("the energy links the energy card, and its lines are for the card alone", a
   assert.equal(shown?._meta?.ui?.resourceUri, ENERGY_CARD_URI)
   assert.equal(shown?._meta?.ui?.visibility, undefined)
   assert.deepEqual(tools.find((tool) => tool.name === ENERGY_SERIES_TOOL)?._meta?.ui?.visibility, ["app"])
-  // Both take every serial number the MQTT binding allows.
+  // Both take every machine id the MQTT binding allows.
   for (const tool of [shown, tools.find((one) => one.name === ENERGY_SERIES_TOOL)]) {
     assert.equal(tool?.inputSchema?.properties?.machines?.items?.pattern, "^[^/+#]+$")
   }
