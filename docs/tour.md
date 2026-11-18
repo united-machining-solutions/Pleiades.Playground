@@ -242,7 +242,14 @@ show what holds now. The row under the answer then says "Saved as page" and link
 card, such as one in words only, has no button. The group "Pages" in the sidebar lists the pages of this browser
 that are not pinned, the newest first, and a page that is pinned from its head moves to the top of the sidebar,
 beside Home. "Edit" in its head moves a card up or down and removes one, with no language model; "Undo" in
-the toast puts a removed card back.
+the toast puts a removed card back. "Add a card" at the end of the page adds one by hand: choose what it shows,
+and for one machine which machine and how many hours.
+
+Ask the chat for a page, for example "Make me a page with all machines and P-04", and it proposes one. The model
+reads with its tools what there is to show and composes the page: a title, and the cards in their order, each
+with the machine and the hours it shows. It writes no value and cannot keep the page. The chat shows the
+proposal with its parts in words; "Preview" opens it with the values of now, and "Save to my pages" keeps it in
+this browser. What you asked for that no card shows, the model says in words.
 
 Ask the chat for a page, for example "Make me a page with all machines and P-04", and it proposes one. The model
 reads with its tools what there is to show and composes the page: a title, and the cards in their order, each

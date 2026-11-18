@@ -18,6 +18,11 @@ All notable changes are documented here. The format follows
 - Juice bar API: a drink carries its colour and the picture of a glass its author chose (`color`, `picture`),
   an ingredient its colour and whether its bottle runs low (`color`, `runsLow`). Colours that are not `#rrggbb`
   are left out.
+- Example app: "Add a card" at the end of a kept page in "Edit" adds a card by hand, with no language model:
+  the cards a page can hold, by what they show, and what the chosen one takes, read from its input schema
+  (a machine by its name, the hours of its history). The same card twice or a thirteenth is not added.
+- Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
+  no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
 - OPC UA adapter: a server without a node for `Identification.ManufacturerUri` is added if it gives
   `Identification.Manufacturer`: that name without any character but `A-Z`, `a-z` and `0-9` stands in for the
   `ManufacturerUri` and forms the machine id (`TRUMPF SE + Co. KG` gives `trumpfsecokg_<model>_<serial number>`).
@@ -29,8 +34,6 @@ All notable changes are documented here. The format follows
 - Example app: asked for a page, a dashboard or an overview, the chat proposes one with the tool of the app
   `app_page_propose`: a title and the parts, each a card with its arguments, which the app checks and the chat
   shows with "Save to my pages" and "Preview". The model composes the recipe and keeps nothing (ADR-0020).
-- Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
-  no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
 - Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
   each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
   draws them with the notification card.

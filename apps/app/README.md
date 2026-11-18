@@ -37,6 +37,14 @@ harness.
   "Remove", by hand and with no language model, and "Done" takes them away again; a change is kept at once,
   and no part is asked again because another one moved or went. A removed part is kept nowhere else, so the
   toast that says so has "Undo". The only part of a page stays: "Delete page" is the way to be rid of it.
+  "Add a card" at the end of a page that is edited adds one, also by hand: a dialog offers the cards a page
+  can hold, each by what it shows, and asks what the chosen one takes, as the input schema of its tool in the
+  backend says: a machine, chosen by its name from the machines Home lists, and the hours of a history in
+  their range. An optional argument left empty stays out, so the measurements without a machine are every
+  machine; the list of machines the energy card can take has no field, and that card shows every machine.
+  The card goes to the end and shows its values at once; the other parts are not asked again. The same card
+  with the same choices, a thirteenth part or a storage that says no adds nothing, and the dialog says why;
+  without an answer of the backend nothing can be added. An added card is removed like any other.
   A pinned page stands in the sidebar on the top level, beside
   Home; under it a group "Pages", which folds, lists the pages that are not pinned, the newest first, and
   there is no group where there is nothing to list. `/pages` lists them all and is reached through the
@@ -195,9 +203,13 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   and its size, which is all that is checked, also of a recipe from outside. `store.ts` keeps the pages in
   the `localStorage` of the browser under one key, `pleiades-playground.pages.v1`, and is the only way to
   them: `listPages`, `getPage`, `savePage`, `renamePage`, `pinPage`, `unpinPage`, `removePart`, `movePart`,
-  `putPartBack` (the undo of `removePart`), `deletePage`, and `usePages` for a component that follows every
-  change. `part-controls.tsx` is what "Edit" shows above a part, and `shown-parts.ts` gives each part of the
-  recipe as it is now the answer the loader already has for it. `link.ts` writes a recipe into one search
+  `putPartBack` (the undo of `removePart`), `addPart`, `deletePage`, and `usePages` for a component that
+  follows every change. `part-controls.tsx` is what "Edit" shows above a part, and `shown-parts.ts` gives each
+  part of the recipe as it is now the answer the loader already has for it. `add-card.tsx` is "Add a card"
+  and its dialog; `card-choices.ts` the server function behind it, which reads the tools of the backend with
+  their input schemas and the machines; `add-part.ts` what the form asks for a card, read from its schema (a
+  machine, a whole number in its range, never the time zone), the part it makes, and why a part is not added
+  (`cannotAdd`). A card with a required argument the form does not know is offered as off, with why. `link.ts` writes a recipe into one search
   parameter, `r`, and reads it back (`encodeRecipe`, `decodeRecipe`, `linkOf`): JSON as UTF-8 in base64url,
   at most `MAX_PARAM_LENGTH` (8,000) characters, and what is not exactly a recipe (`recipeOf`) is null.
   `share-page.tsx` is "Share" in the head of a kept page, `column.tsx` the column that a kept page and a page
