@@ -137,7 +137,7 @@ function publishing(published: Published, raised: ReadonlyArray<string> = []) {
           raisedAt: at,
           clearedAt: null,
         }))
-      return Response.json({ items })
+      return Response.json({ items, hasMore: false })
     }
     if (url.pathname === "/jobOrders") return Response.json({ items: [] })
     const start = Date.parse(url.searchParams.get("startTime") ?? "")

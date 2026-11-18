@@ -72,6 +72,7 @@ const alertPairsAnswer = z.object({
       clearedAt: z.string().nullable(),
     }),
   ),
+  hasMore: z.boolean(),
 })
 
 const jobOrdersAnswer = z.object({
@@ -215,30 +216,38 @@ export function levelOf(severity: Severity | null | undefined): NotificationLeve
 
 /**
  * The alerts that stood at some time between the two instants (raised before the end and not
- * cleared before the start), each with when it was cleared, or null while it stands.
+ * cleared before the start), each with when it was cleared, or null while it stands. The API
+ * answers newest first and with 1000 at most: `hasMore` says it had more, the oldest ones.
  */
-async function readAlertPairs(apis: Apis, from: Date, to: Date, machine?: string, severity?: Severity) {
+export async function readAlertPairs(apis: Apis, from: Date, to: Date, machine?: string, severity?: Severity) {
   const url = between(new URL("/alerts/pairs", apis.eventsUrl), ["from", "to"], from, to)
   url.searchParams.set("Take", "1000")
   if (machine !== undefined) url.searchParams.set("mId", machine)
   if (severity !== undefined) url.searchParams.set("severity", severity)
-  return (await getJson("Events API", url, alertPairsAnswer)).items
+  const { items, hasMore } = await getJson("Events API", url, alertPairsAnswer)
+  return { pairs: items, hasMore }
+}
+
+type AlertPair = Awaited<ReturnType<typeof readAlertPairs>>["pairs"][number]
+
+/** What an alert is, as every reader of the pairs names it. */
+function alertOf(pair: AlertPair) {
+  return {
+    correlationId: pair.alertId,
+    notificationId: pair.errorCode ?? "",
+    severity: pair.severity ?? null,
+    level: levelOf(pair.severity),
+    title: pair.message ?? "",
+    raisedAt: new Date(pair.raisedAt).toISOString(),
+  }
 }
 
 /** The alerts of every machine that were raised between the two instants and have not been cleared. */
 export async function readOpenNotifications(apis: Apis, from: Date, to: Date): Promise<Array<OpenNotification>> {
-  const pairs = await readAlertPairs(apis, from, to)
+  const { pairs } = await readAlertPairs(apis, from, to)
   return pairs
     .filter((pair) => pair.clearedAt === null && Date.parse(pair.raisedAt) >= from.getTime())
-    .map((pair) => ({
-      correlationId: pair.alertId,
-      machine: pair.mId,
-      notificationId: pair.errorCode ?? "",
-      severity: pair.severity ?? null,
-      level: levelOf(pair.severity),
-      title: pair.message ?? "",
-      raisedAt: new Date(pair.raisedAt).toISOString(),
-    }))
+    .map((pair) => ({ ...alertOf(pair), machine: pair.mId }))
 }
 
 /** From when to when an alert stood. `goneAt` is null as long as it has not been cleared. */
@@ -254,7 +263,7 @@ export async function readRaised(
 ): Promise<Array<Raised>> {
   // Only what was raised in the range, as the list of machines takes it: an alert that came up
   // before and still stands is not counted again, so the state and the history agree.
-  const pairs = await readAlertPairs(apis, from, to, machine, severity)
+  const { pairs } = await readAlertPairs(apis, from, to, machine, severity)
   return pairs.filter((pair) => Date.parse(pair.raisedAt) >= from.getTime()).map((pair) => ({
     raisedAt: new Date(pair.raisedAt).toISOString(),
     goneAt: pair.clearedAt === null ? null : new Date(pair.clearedAt).toISOString(),
@@ -427,4 +436,25 @@ export async function readStatistics(apis: Apis, topic: string, from: Date, to: 
     body: JSON.stringify([{ start: from.toISOString(), stop: to.toISOString() }]),
   })
   return new Map(Object.entries(statistics))
+}
+
+/** An alert as the Events API pairs it: when it was raised and when it was cleared, null while it stands. */
+export type AlertStanding = ReturnType<typeof alertOf> & { goneAt: string | null }
+
+/**
+ * The alerts of one machine that stood at some time between the two instants, each with the time
+ * it really came: one that came up before the range and still stands is among them. `hasMore` says
+ * the API had more than it returned.
+ */
+export async function readAlertsOf(
+  apis: Apis,
+  machine: string,
+  from: Date,
+  to: Date,
+): Promise<{ alerts: Array<AlertStanding>; hasMore: boolean }> {
+  const { pairs, hasMore } = await readAlertPairs(apis, from, to, machine)
+  return {
+    hasMore,
+    alerts: pairs.map((pair) => ({ ...alertOf(pair), goneAt: pair.clearedAt === null ? null : new Date(pair.clearedAt).toISOString() })),
+  }
 }
