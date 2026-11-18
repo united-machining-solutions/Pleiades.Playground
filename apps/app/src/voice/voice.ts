@@ -21,7 +21,7 @@ export type VoiceState = "idle" | "listening" | "thinking" | "speaking"
 /** The language the browser listens in and speaks. */
 export const VOICE_LANGUAGE = "de-DE"
 
-/** How fast Titan speaks: a little faster than the voices do by themselves, which sounded slow. */
+/** How fast the voice of the system speaks: a little faster, it sounded slow. Tom's voice keeps its own pace. */
 export const SPEECH_RATE = 1.2
 
 let state: VoiceState = "idle"
@@ -208,7 +208,6 @@ function speakWithSystem(sentence: string): Promise<void> {
 function play(sound: Blob): Promise<void> {
   const address = URL.createObjectURL(sound)
   const audio = new Audio(address)
-  audio.playbackRate = SPEECH_RATE
   return new Promise((resolve) => {
     const done = () => {
       hush = undefined
