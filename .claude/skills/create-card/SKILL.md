@@ -55,6 +55,12 @@ the language model its tools, and which file says what the app draws for which t
 - A card calls only the server it came from
   ([A card and its server](../../../docs/build-your-own.md#a-card-and-its-server)). What it needs from
   another source, its tool reads.
+- A card is base: it answers for any machine that follows the data model, from stored values, through the
+  contracts. No made-up data, no named person, nothing that only one demo needs. What a showcase wants drawn
+  for itself, it draws in its own folder of the example app, `apps/app/src/showcases/<name>/`, not in the
+  catalogue and not in the backend
+  ([ADR-0018](../../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). If the idea needs made-up data,
+  stop and say so.
 
 ## You touch
 

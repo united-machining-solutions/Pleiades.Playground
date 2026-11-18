@@ -132,17 +132,19 @@ read once by one server function, `getCharts` in
 [`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts); from then on the page is
 live from the broker, as Home is.
 
-The page "Where is My Job?" in the sidebar, <http://localhost:5600/where-is-my-job>, is a basis for
-discussion: how an order could be followed across the shop floor. It shows the machines of the stack from
-above, with their state, utilisation and job orders; a machine with what it did, does and what waits for it;
-and an order on its way. An order is every job order that names the same order number, read from the backend
-(`genui_job_order_list`) and kept live by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines, packing after them and
-the single part on its sheet have no source yet: the page draws them dashed, as the gaps to discuss. It has no
-picture in this tour.
+A stack started with `APP_SHOWCASES` set has one more page in the sidebar, "Where is My Job?",
+<http://localhost:5600/where-is-my-job>. It is a showcase, a basis for discussion: how an order could be
+followed across the shop floor. It shows the machines of the stack from above, with their state, utilisation
+and job orders; a machine with what it did, does and what waits for it; and an order on its way. An order is
+every job order that names the same order number, read from the backend (`genui_job_order_list`) and kept
+live by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines,
+packing after them and the single part on its sheet have no source yet: the page draws them dashed, as the
+gaps to discuss. It has no picture in this tour.
 
-**In the code:** [`apps/app/src/routes/where-is-my-job.tsx`](../apps/app/src/routes/where-is-my-job.tsx) is
-the page; the map and the panels live in [`apps/app/src/where-is-my-job/`](../apps/app/src/where-is-my-job/),
-and `floor.ts` there reads the job orders and groups them into orders.
+**In the code:** [`apps/app/src/routes/(showcases)/where-is-my-job.tsx`](<../apps/app/src/routes/(showcases)/where-is-my-job.tsx>)
+is the page; the map, the panels and `getFloor` live in
+[`apps/app/src/showcases/where-is-my-job/`](../apps/app/src/showcases/where-is-my-job/), and `floor.ts` there
+groups the job orders into orders.
 
 ## 3. The page of one machine
 
@@ -194,6 +196,15 @@ chat draws the card from the values of the tool, and the model sums it up in a f
 the tool's and the wording is the model's: the card says 6 minutes of running, the model "just under 7
 minutes". The stack had just started, so most of the 8 hours have no data. The card on the left is one minute
 newer than the one in the chat: the page reads again, an answer shows what was true when it was given.
+
+With an external documentation service configured as `docs` in `APP_MCP_SERVERS` and enabled under
+"Tools" in the message field, ask how to operate,
+maintain or program a machine. The chat searches its manuals and shows source references by filename and
+page label, with the physical PDF page also shown when it differs. Select one to open that physical PDF page. Use the page controls, zoom and **Find**
+to explore it; **Next match** moves between matching pages. The **Extracted text** tab shows the evidence
+used by chat. A replaced or unavailable source asks you to search again. Both views read documentation
+through MCP; the app has no direct connection to the documentation REST API.
+Documentation source references stay in the chat and are not cards for "Save as page".
 
 The panel works like a chat app on a phone: a list and a chat, with a way back. The head says what is open. In a
 chat it says the name of the chat, which is its first question, on one line and cut where it is too long; the

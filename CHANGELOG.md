@@ -7,18 +7,32 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: showcases. What is made for one demo or one fair lives in a folder of its own,
+  `apps/app/src/showcases/<name>/`, with its pages under `src/routes/(showcases)/`, and is built in only
+  where `APP_SHOWCASES` is set. The image `pleiades.playground.app` is the app alone, with nothing of a
+  showcase in it; the new image `pleiades.playground.app.showcases` is the same app built with all of
+  them, and `APP_SHOWCASES` in `.env` makes the stack take it. A showcase only adds: a test fails when a
+  file of the app reads from one or links to one of its pages. `AGENTS.md` and the skills `create-page`,
+  `create-card` and `build-your-own` ask whether a thing is base or a showcase
+  ([ADR-0018](docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)).
+- Documentation sources: original PDF viewer with paging, zoom and native/OCR page search, retrieved
+  through bounded MCP binary resources without adding PDFs to model context.
+- Example app: optional documentation MCP tools with clickable, revision-specific manual page sources in chat,
+  showing printed page labels alongside differing physical pages. Margo exposes the additional MCP server setting.
 - Margo app: Traefik serves the example app over HTTPS as well (setting *HTTPS port of Traefik*, 443), with the
   self-signed certificate it generates itself, and forwards `/mqtt` of that port to the broker's WebSocket, so
   that live values work over HTTPS. HTTP stays as it is.
 - Example app: the setting `MQTT_WSS_PATH` sends a page over HTTPS to the broker at that path of the page's
   origin, for a proxy in front of the app that forwards it to the broker.
-- Example app: the page `/where-is-my-job`, "Where is My Job?", in the sidebar, a basis for discussion of how
-  an order is followed across the shop floor. It shows the machines of the stack from above, one machine with
-  its job orders done, running and waiting, and one order on its way: every job order that names the same
-  order number. The values are those of the stack; programming, packing and the single part on its sheet have
-  no source yet and stand on the page as such. The page reads the job orders from the new tool
+- Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion of how an order is
+  followed across the shop floor. It shows the machines of the stack from above, one machine with its job
+  orders done, running and waiting, and one order on its way: every job order that names the same order
+  number. The values are those of the stack; programming, packing and the single part on its sheet have no
+  source yet and stand on the page as such. The page reads the job orders from the new tool
   `genui_job_order_list` of `genui-mcp`, the job orders on the lists of the machines from the Events API, so
   they stand also after a reload or a reconnect; a job order the planner took back before it ran is left out.
+  It is the first showcase: only a stack started with `APP_SHOWCASES` set has the page and its entry in the
+  sidebar.
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
@@ -40,6 +54,8 @@ All notable changes are documented here. The format follows
   room for actions on the right.
 - Energy card: `genui_energy_show` says how much energy machines imported over the last 1 to 24 hours, from
   their meters, with mean and peak power; the card draws their power as a graph (`genui_energy_series`).
+- Time series card: `genui_timeseries_show` draws any signal of any machine over 15 minutes to 24 hours, a line for each
+  pair of a machine and a signal, on two y axes at most; a person changes the range and the lines on the card.
 - Live values: the page `/live` of the example app draws a graph for each physical value over the last 15
   minutes, a line for each machine, and shows one machine or all of them. `genui-mcp` has the tools
   `genui_measurement_list`, the newest value of each quantity for every machine with the measurement card,

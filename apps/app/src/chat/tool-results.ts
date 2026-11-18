@@ -27,6 +27,8 @@ export type ChatTool = {
    * says it here.
    */
   cardOnly?: boolean
+  /** Whether a drawn result can be replayed as a saved GenUI page. Source references are chat-only. */
+  saveAsPage?: boolean
 }
 
 /** The two tools of the backend itself, with which a language model finds its way. */
