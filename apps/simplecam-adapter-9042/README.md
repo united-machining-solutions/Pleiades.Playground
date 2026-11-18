@@ -93,7 +93,25 @@ seconds. A stream that is silent for 35 seconds counts as lost.
 
 ## Run
 
-In the stack: `docker compose up -d --build`. A backend on this computer is reached as `host.docker.internal`.
+The adapter is an optional service of the stack, in the Compose profile `simplecam`: it needs a SimpleCAM backend,
+and without one it is a machine that stays in `CommunicationFault`. Start it with the profile:
+
+```bash
+docker compose --profile simplecam up -d --build
+```
+
+Or name the profile once in the private `.env`, next to `SIMPLECAM_SSE_URL`, and start as usual:
+
+```dotenv
+COMPOSE_PROFILES=simplecam
+SIMPLECAM_SSE_URL=http://host.docker.internal:5450/stream/machine-9042/state
+```
+
+A backend on the same computer is reached as `host.docker.internal`; for one on another computer, the URL names
+its address. That backend has to listen on its network address and not only on `localhost`, and the firewall of
+its computer has to let the port in. Keep that address in the `.env` and out of a commit.
+
+The adapter is not part of the Margo app: the app holds only services without a profile.
 
 Alone, with Node.js 26 and `pnpm install` done:
 

@@ -149,11 +149,6 @@ parameters:
     targets:
       - pointer: CARD_RESOURCE_DOMAINS
         components: ["default"]
-  simplecamSseUrl:
-    value: "http://host.docker.internal:5450/stream/machine-9042/state"
-    targets:
-      - pointer: SIMPLECAM_SSE_URL
-        components: ["default"]
   llmBaseUrl:
     value: ""
     targets:
@@ -271,15 +266,6 @@ configuration:
         - parameter: cardResourceDomains
           name: Card resource domains
           description: The origins a card may load the font of its host from, comma separated; none if empty.
-          schema: optionalText
-    - name: SimpleCAM
-      settings:
-        - parameter: simplecamSseUrl
-          name: SSE stream of the SimpleCAM backend
-          description: >-
-            Where the adapter of the machine 9042 reads its state. A backend on the device itself is
-            http://host.docker.internal:<port>/stream/machine-9042/state. Without a backend the machine shows as
-            "No data"; everything else works.
           schema: optionalText
     - name: Language model
       settings:

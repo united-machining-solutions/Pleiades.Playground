@@ -26,7 +26,7 @@ docker compose up -d --build --wait
 The command returns when the stack is ready, that is when every container reports healthy: the broker, the
 database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app, one
 simulator per machine, three cutting machines, each a simulator with its adapter, the OPC UA adapter with a
-simulated OPC UA machine, and the adapter of the SimpleCAM machine. To see the demo without building it, start it from the published images, see
+simulated OPC UA machine. To see the demo without building it, start it from the published images, see
 [Start](../README.md#start).
 
 ```bash
@@ -49,7 +49,6 @@ genui-mcp                Up 3 minutes (healthy)
 mongodb                  Up 3 minutes (healthy)
 opc-simulator            Up 3 minutes (healthy)
 opcua-adapter            Up 3 minutes (healthy)
-simplecam-adapter-9042   Up 3 minutes (healthy)
 simulator-m-02           Up 3 minutes (healthy)
 simulator-p-04           Up 3 minutes (healthy)
 simulator-p-07           Up 3 minutes (healthy)
@@ -80,10 +79,10 @@ T-01 and PU-01, are the `cutting-*` services: a simulator that speaks the telegr
 files, and an adapter that reads it and publishes the same tree, below `machines/trumpf_Laser2D_L-01/` and the like
 (see [`Cutting.Adapter`](../source/Pleiades.Playground.Cutting.Adapter/README.md)).
 
-The SimpleCAM machine 9042 is `simplecam-adapter-9042`: it reads the stream of the SimpleCAM backend that runs on
-this computer, outside of the stack, and publishes the same tree for it, below
-`machines/united-grinding_simplecam_9042/` (see [`simplecam-adapter-9042`](../apps/simplecam-adapter-9042/README.md)).
-Without that backend it shows as "No data" and says `CommunicationFault`.
+The SimpleCAM machine 9042 is optional: `simplecam-adapter-9042` reads the stream of a SimpleCAM backend that runs
+outside of the stack and publishes the same tree for it, below `machines/united-grinding_simplecam_9042/`. It
+starts only with the Compose profile `simplecam`, as it needs that backend (see
+[`simplecam-adapter-9042`](../apps/simplecam-adapter-9042/README.md)).
 
 The OPC UA machine, `opc-simulator`, is not on Home yet: it is added in the chat, see
 [Add a machine that speaks OPC UA](#add-a-machine-that-speaks-opc-ua).

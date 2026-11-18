@@ -363,9 +363,12 @@ services:
 
   # The SimpleCAM adapter: reads the state of the machine 9042 from the SSE stream of the SimpleCAM backend and
   # publishes it to the broker after the data model, as machines/united-grinding_simplecam_9042/umati/...
-  # It runs without the backend: it keeps trying to connect, and says so by `/health` only while it reaches the broker.
+  # It needs a SimpleCAM backend: without one it is a machine that stays in CommunicationFault and asks for the
+  # stream every five seconds. So it starts only with the profile: docker compose --profile simplecam up -d, or
+  # COMPOSE_PROFILES=simplecam in .env. It is not part of the Margo app.
   simplecam-adapter-9042:
     <<: *service
+    profiles: [simplecam]
     image: ghcr.io/united-machining-solutions/pleiades.playground.simplecam.adapter:${PLEIADES_VERSION:-dev}
     build:
       context: .
