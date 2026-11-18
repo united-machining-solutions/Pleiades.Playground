@@ -93,7 +93,7 @@ the request below.
 | | |
 |---|---|
 | Management API | <http://localhost:5560/machines>, on this computer only (`OPCUA_ADAPTER_BIND`) |
-| MCP endpoint | `http://opcua-adapter:8080/mcp` in the network of the stack; the app finds it by `OPCUA_MCP_URL` |
+| MCP endpoint | `http://opcua-adapter:8080/mcp` in the network of the stack; the app has it as the further server `opcua` of `APP_MCP_SERVERS`, and its API at the same address without `/mcp` |
 | Web UI of the simulator | <http://localhost:8090/> |
 | Liveness | `/healthcheck`, healthy while the adapter is connected to the broker |
 
@@ -142,7 +142,8 @@ publishes under the wrong number. The machine of `K09` is `A1121O0001` in the im
 
 Typing `/` in the chat field opens the list of commands; `/help` shows it as well. A command becomes a plain
 question to the model, so the person can also just ask. The OPC UA commands appear only when the app has the
-adapter (`OPCUA_MCP_URL`).
+adapter, `opcua=http://opcua-adapter:8080/mcp` in `APP_MCP_SERVERS`, the adapter answers, and the chat has not
+switched it off under "Tools".
 
 | Command | What it does | Tools the model calls | What the chat draws |
 |---|---|---|---|

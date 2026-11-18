@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import {
+  FURTHER_TIMEOUT_MS,
   furtherInstructions,
   furtherServers,
   isOnBy,
@@ -32,6 +33,9 @@ test("further servers join in their order, and the tools keep their names", () =
   assert.equal(servers.genui?.url, "http://genui-mcp:8080/mcp")
   assert.equal(servers.juicebar?.url, "http://juicebar-api:8080/mcp")
   assert.equal(servers.juicebar?.toolName({ name: "juicebar_status" }), "juicebar_status")
+  // A further server acts on a device and may take longer than the client's default; the backend keeps it.
+  assert.equal(servers.juicebar?.timeoutMs, FURTHER_TIMEOUT_MS)
+  assert.equal(servers.genui?.timeoutMs, undefined)
   assert.match(furtherInstructions(settings) ?? "", /ultimaker, juicebar/)
 })
 
@@ -189,4 +193,30 @@ test("documentation instructions and tools follow the live per-chat switch", () 
   assert.match(prompt(), /docs_read_page/)
   assert.doesNotMatch(prompt(), /juicebar/)
   assert.deepEqual(chat.prepareTools({ tools }).map(tool => tool.name), ["genui_machine_list", "docs_search", "docs_read_page"])
+})
+
+test("the OPC UA adapter is a further server like the others: its words and tools follow the switch", () => {
+  const settings = { APP_MCP_SERVERS: "opcua=http://opcua-adapter:8080/mcp,juicebar=http://juicebar/mcp" }
+  assert.deepEqual(Object.keys(mcpServers(settings)), ["genui", "opcua", "juicebar"])
+  assert.equal(mcpServers(settings).opcua?.timeoutMs, FURTHER_TIMEOUT_MS)
+  const values = new Map<string, unknown>()
+  const switches = serverSwitch(settings)
+  assert.deepEqual(switches.exposed, ["server.opcua", "server.juicebar"])
+  const chat = switches.forChat((key) => values.get(key))
+  const tools = [from("genui", "genui_machine_list"), from("opcua", "opcua_server_list"), from("juicebar", "juicebar_order")]
+  const [prompt] = chat.prompts
+  assert.match(prompt(), /opcua_get_skill_guide/)
+  assert.match(prompt(), /Never ask for a user name or a password/)
+  // The app draws cards for OPC UA, and nothing for the juice bar.
+  assert.match(prompt(), /draws nothing for the tools of juicebar/)
+  assert.equal(chat.prepareTools({ tools }).length, 3)
+
+  values.set("server.opcua", false)
+  assert.doesNotMatch(prompt(), /opcua/)
+  assert.match(prompt(), /The app draws nothing for these tools/)
+  assert.deepEqual(chat.prepareTools({ tools }).map((tool) => tool.name), ["genui_machine_list", "juicebar_order"])
+
+  values.set("server.opcua", true).set("server.juicebar", false)
+  assert.doesNotMatch(prompt(), /draws nothing|juicebar/)
+  assert.match(prompt(), /cards/)
 })

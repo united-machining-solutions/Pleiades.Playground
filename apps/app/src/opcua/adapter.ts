@@ -1,14 +1,22 @@
 import { createServerFn } from "@tanstack/react-start"
 
+import { furtherServers, opcua } from "../chat/mcp-servers.ts"
+
 // The steps of a person: adding a machine a scan proposed, removing one, and storing the user of a
 // server that wants one. They go to the management API of the OPC UA adapter from the server of the
 // app, never from the browser and never from the language model: no tool of the chat can do any of
 // them, and a password never enters the chat.
 
-/** Where the management API of the adapter answers, or undefined if the app has no adapter. */
+/**
+ * Where the management API of the adapter answers, or undefined if the app has no adapter. The adapter is
+ * the further server `opcua` of APP_MCP_SERVERS, and it serves its API where it serves its MCP server,
+ * without the `/mcp`: `opcua=http://opcua-adapter:8080/mcp` has its API at `http://opcua-adapter:8080`.
+ */
 export function adapterUrl(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  const url = env.OPCUA_ADAPTER_URL?.trim()
-  return url ? url.replace(/\/+$/, "") : undefined
+  const mcp = furtherServers(env)[opcua]
+  if (mcp === undefined) return undefined
+  const url = new URL(mcp)
+  return `${url.origin}${url.pathname.replace(/\/+$/, "").replace(/\/mcp$/, "")}`
 }
 
 /** What became of a click: done, or why not in a sentence. */
@@ -16,7 +24,7 @@ export type Outcome = { ok: true } | { ok: false; reason: string }
 
 async function send(path: string, method: "POST" | "PUT" | "DELETE", payload?: unknown): Promise<Outcome> {
   const base = adapterUrl()
-  if (!base) return { ok: false, reason: "The app has no OPC UA adapter (OPCUA_ADAPTER_URL is empty)." }
+  if (!base) return { ok: false, reason: "The app has no OPC UA adapter (APP_MCP_SERVERS names no opcua)." }
   try {
     const response = await fetch(`${base}${path}`, {
       method,
@@ -71,7 +79,8 @@ export const storeUser = createServerFn({ method: "POST" })
   .handler(({ data }) => send("/users", "PUT", data))
 
 /**
- * Whether the adapter answers. The chat offers the OPC UA commands only then. Asked at most every
+ * Whether the adapter answers. The chat offers the OPC UA commands only then, and only in a chat that
+ * has not switched it off. Asked at most every
  * half minute, and never for longer than a second, because the root of the app waits for it.
  */
 let known: { at: number; up: boolean } | undefined

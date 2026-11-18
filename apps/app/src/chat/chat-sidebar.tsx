@@ -88,6 +88,7 @@ import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { chatName, nameOfQuestion } from "./chat-name.ts"
 import { DictateButton } from "./dictate.tsx"
+import { opcua } from "./mcp-servers.ts"
 import { SaveAsPage } from "./save-as-page.tsx"
 import { chooseChatModel, fetchChatSettings, switchChatServer } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
@@ -240,7 +241,7 @@ function Start() {
       <Composer
         placeholder="Ask about the machines, or type / for commands"
         suggestions={suggestions}
-        commands={commandsFor(chatStatus.opcua)}
+        commands={commandsFor(chatStatus.opcua && !off.includes(opcua))}
         onSend={panel.ask}
         models={chatStatus.models}
         model={model}
@@ -503,7 +504,7 @@ function Conversation({ threadId }: { threadId: string }) {
       </div>
       <Composer
         placeholder={messages.length === 0 ? "Ask about the machines, or type / for commands" : "Ask a follow-up, or type /"}
-        commands={commandsFor(chatStatus.opcua)}
+        commands={commandsFor(chatStatus.opcua && !off.includes(opcua))}
         busy={isLoading}
         onSend={(question) => {
           setStopError(undefined)

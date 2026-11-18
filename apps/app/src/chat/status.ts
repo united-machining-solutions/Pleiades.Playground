@@ -12,7 +12,10 @@ import type { ListedServer } from "./server-list.ts"
 
 export type ChatStatus = {
   configured: boolean
-  /** Whether the OPC UA adapter answers: the chat offers its commands only then. */
+  /**
+   * Whether the further server `opcua`, the OPC UA adapter, is set up and answers: a chat that has it on
+   * offers its commands only then.
+   */
   opcua: boolean
   /** The models a chat can pick, by name. The first one answers until a chat picks another. */
   models: Array<string>

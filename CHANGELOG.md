@@ -318,6 +318,13 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Example app: the OPC UA adapter reaches the chat like the other MCP servers, as the entry
+  `opcua=http://opcua-adapter:8080/mcp` of `APP_MCP_SERVERS`; the app calls its API at the same address without
+  `/mcp`. "Tools" lists it with its state and its tools, a chat switches it off and on, and its instructions and
+  commands follow that switch. The settings `OPCUA_MCP_URL` and `OPCUA_ADAPTER_URL` are gone. Unset,
+  `APP_MCP_SERVERS` names the adapter of the stack, in the stack and in the Margo app; a deployment that sets
+  `APP_MCP_SERVERS` adds `opcua=http://opcua-adapter:8080/mcp` to its list. A further server now has two minutes
+  for a call instead of the client's one.
 - Example app: Home (`/`) shows where the machines stand, by site and hall; "Needs you" keeps what it showed first.
   The tiles of the running machines are gone. `/sites` leads to `/`.
 - Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
