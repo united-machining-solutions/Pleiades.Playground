@@ -15,7 +15,7 @@ import {
   XIcon,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import type { FormEvent, KeyboardEvent } from "react"
+import type { FormEvent, KeyboardEvent, ReactNode } from "react"
 
 import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
 import { Bubble, BubbleContent } from "@pleiades/ui/components/bubble"
@@ -41,6 +41,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
 } from "@pleiades/ui/components/message-scroller"
 import {
   Sidebar,
@@ -396,11 +397,12 @@ function Conversation({ threadId }: { threadId: string }) {
     <>
       <PanelHead title={chatName(entry, firstQuestion ?? asked)} back />
       <div className="min-h-0 flex-1">
-        {/* A new question settles near the top and the answer grows under it; a chat from before
-            opens at its last question. Without `autoScroll`: with it, the scroller keeps the question
-            at the top only while the answer fits, and then follows its end, so a card taller than the
-            panel, which comes in one piece, took the question out of sight at once. The button at the
-            foot leads to the end. */}
+        {/* A new question settles near the top and the answer grows under it, a long text as a tall
+            card; a chat from before opens at its last question. Without `autoScroll`: with it, the
+            scroller keeps the question at the top only while the answer fits, and then follows its
+            end, so a card taller than the panel, which comes in one piece, took the question out of
+            sight at once. The button at the foot leads to the end as it stands; an alert comes into
+            view by itself (`AlertItem`). */}
         <MessageScrollerProvider defaultScrollPosition="last-anchor">
           <MessageScroller>
             <MessageScrollerViewport>
@@ -463,40 +465,40 @@ function Conversation({ threadId }: { threadId: string }) {
                   </MessageScrollerItem>
                 )}
                 {error && (
-                  <MessageScrollerItem messageId="error">
+                  <AlertItem messageId="error">
                     <Alert>
                       <CircleAlertIcon />
                       <AlertTitle>The language model did not answer</AlertTitle>
                       <AlertDescription>{error.message}</AlertDescription>
                     </Alert>
-                  </MessageScrollerItem>
+                  </AlertItem>
                 )}
                 {switchError && (
-                  <MessageScrollerItem messageId="switch-error">
+                  <AlertItem messageId="switch-error">
                     <Alert>
                       <CircleAlertIcon />
                       <AlertTitle>The model was not changed</AlertTitle>
                       <AlertDescription>{switchError}</AlertDescription>
                     </Alert>
-                  </MessageScrollerItem>
+                  </AlertItem>
                 )}
                 {serverError && (
-                  <MessageScrollerItem messageId="server-error">
+                  <AlertItem messageId="server-error">
                     <Alert>
                       <CircleAlertIcon />
                       <AlertTitle>The tools of this chat</AlertTitle>
                       <AlertDescription>{serverError}</AlertDescription>
                     </Alert>
-                  </MessageScrollerItem>
+                  </AlertItem>
                 )}
                 {stopError && (
-                  <MessageScrollerItem messageId="stop-error">
+                  <AlertItem messageId="stop-error">
                     <Alert>
                       <CircleAlertIcon />
                       <AlertTitle>Stopping did not reach the server</AlertTitle>
                       <AlertDescription>{stopError}</AlertDescription>
                     </Alert>
-                  </MessageScrollerItem>
+                  </AlertItem>
                 )}
               </MessageScrollerContent>
             </MessageScrollerViewport>
@@ -562,6 +564,23 @@ function CallLine({ call }: { call: Call }) {
       </TraceCollapsibleContent>
     </TraceCollapsible>
   )
+}
+
+/**
+ * An item of the chat that holds an alert. It comes into view when it appears: a new question stays at
+ * the top of the panel while its answer grows under it, so an alert under a tall answer would stand
+ * below the fold, and the answer would look as if all went well. "nearest" moves the panel only as far
+ * as the alert needs, and not at all when it is in sight; the question no longer holds the top after
+ * that. `useMessageScroller` is the escape hatch the rules of the chat name for what the parts do not
+ * express (`.claude/skills/shadcn/rules/chat.md`).
+ */
+function AlertItem({ messageId, children }: { messageId: string; children: ReactNode }) {
+  const { scrollToMessage } = useMessageScroller()
+  // Once, when the alert appears; `scrollToMessage` stays the same while the chat is open.
+  useEffect(() => {
+    scrollToMessage(messageId, { align: "nearest" })
+  }, [messageId, scrollToMessage])
+  return <MessageScrollerItem messageId={messageId}>{children}</MessageScrollerItem>
 }
 
 /**
