@@ -76,24 +76,11 @@ builder.Services.AddHealthChecks()
     // evaluation, so a Degraded entry for "auth off" would re-assert a value that cannot change
     // while the process lives 8,640 times a day per service at a 10 s probe interval.
     .AddPleiadesAuthStatus();
-builder.Services.AddOpenApi(options =>
-{
-    options.AddDocumentTransformer((document, _, _) =>
-    {
-        document.Info = new()
-        {
-            Version = serviceInfo.Version,
-            Title = serviceInfo.Name,
-            Description = "Events REST API",
-            Contact = new()
-            {
-                Name = "Pleiades contributors"
-            }
-        };
-        return Task.CompletedTask;
-    });
-
-});
+// v1 describes every endpoint; "read" only the reading ones, as the gateway passes them (ADR-0017).
+builder.Services.AddOpenApi(options => options.AddDocumentTransformer(Describe("Events REST API")));
+builder.Services.AddPleiadesReadOnlyOpenApi(
+    FeaturePolicy.Read(EventsFeature.Name),
+    options => options.AddDocumentTransformer(Describe("Events REST API, the reading endpoints that the gateway passes")));
 
 var app = builder.Build();
 
@@ -140,6 +127,7 @@ app.MapPleiadesLiveness();
 app.MapPleiadesHealthChecks();
 
 app.MapOpenApi();
+app.UsePleiadesReadOnlySwaggerUI($"{serviceInfo.Name} - V {serviceInfo.Version} - reading");
 app.UsePleiadesSwaggerUI($"{serviceInfo.Name} - V {serviceInfo.Version}");
 
 app.MapGroup("machineEvents").WithTags("Machine Events").MapMachineEvents();
@@ -152,3 +140,19 @@ app.MapGroup("programExecutions").WithTags("Program Executions").MapProgramExecu
 app.MapPleiadesMcp().RequireFeatureRead(EventsFeature.Name);
 
 await app.RunAsync().ConfigureAwait(false);
+
+Func<OpenApiDocument, OpenApiDocumentTransformerContext, CancellationToken, Task> Describe(string description) =>
+    (document, _, _) =>
+    {
+        document.Info = new()
+        {
+            Version = serviceInfo.Version,
+            Title = serviceInfo.Name,
+            Description = description,
+            Contact = new()
+            {
+                Name = "Pleiades contributors"
+            }
+        };
+        return Task.CompletedTask;
+    };

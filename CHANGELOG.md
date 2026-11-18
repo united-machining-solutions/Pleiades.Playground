@@ -9,9 +9,13 @@ All notable changes are documented here. The format follows
 
 - Gateway (`gateway`, port 5590): the one REST entry for clients on other computers, such as the Oseon
   WorkstationConnector. Traefik passes the reading endpoints of the Timeseries API below `/timeseries` and of the
-  Events API below `/events`, and refuses everything else: every write, `/mcp`, the OpenAPI documents and the
-  Swagger UI. It answers on every address (`GATEWAY_BIND`); it is a network boundary, not a sign-in
+  Events API below `/events`, and refuses everything else: every write, `/mcp`, `/openapi/v1.json` and the Swagger
+  UI at the root. It answers on every address (`GATEWAY_BIND`); it is a network boundary, not a sign-in
   ([ADR-0017](docs/adr/0017-a-read-only-gateway-for-outside-clients.md)). The Margo app has it too.
+- Timeseries API, Events API: a second OpenAPI document, `/openapi/read.json`, with the reading operations only,
+  and a Swagger UI for it at `/docs/`. The gateway passes both, so a client on another computer sees the interface
+  it can use there, at `http://<host>:5590/timeseries/docs/` and `http://<host>:5590/events/docs/`. CI checks the
+  routes of the gateway against the document in both directions.
 
 - Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
   shows the shop floor from above, one machine with what it did, does and will do, and one part on its way

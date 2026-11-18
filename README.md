@@ -41,7 +41,7 @@ In PowerShell, set the variable first: `$env:PLEIADES_VERSION = "main"`. Or writ
 |---|---|---|
 | Timeseries API | <http://localhost:5500/> | Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp`. It answers on this computer only (`TIMESERIES_BIND`) |
 | Events API | <http://localhost:5510/> | Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp`. It answers on this computer only (`EVENTS_BIND`) |
-| Gateway | `http://<host>:5590/timeseries`, `http://<host>:5590/events` | The one entry for clients on other computers: the reading endpoints of the two APIs and nothing else, without sign-in; see [ADR-0017](docs/adr/0017-a-read-only-gateway-for-outside-clients.md) |
+| Gateway | `http://<host>:5590/timeseries`, `http://<host>:5590/events` | The one entry for clients on other computers: the reading endpoints of the two APIs and nothing else, without sign-in, described at `/timeseries/docs/` and `/events/docs/`; see [ADR-0017](docs/adr/0017-a-read-only-gateway-for-outside-clients.md) |
 | Sites API | <http://localhost:5540/> | Where the machines stand: Swagger UI, OpenAPI at `/openapi/v1.json`, MCP at `/mcp`. It answers on this computer only (`SITES_BIND`) |
 | MQTT broker | `localhost:1883` | Anonymous in the demo network |
 | Generative UI backend | <http://localhost:5520/mcp> | MCP server for displays, see [`apps/genui-mcp`](apps/genui-mcp/README.md) |
