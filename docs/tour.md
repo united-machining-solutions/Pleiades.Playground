@@ -64,7 +64,7 @@ timeseries-persistence   Up 3 minutes (healthy)
 | <http://localhost:5500/> | The Timeseries API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
-| <http://localhost:5611/>, `:5612`, `:5613` | The web pages of the three cutting machines, a 2D laser, a tube laser and a punching machine: their plan, their alarms and every telegram. They answer on this computer only. |
+| <http://localhost:5611/>, `:5612`, `:5613` | The web pages of the three cutting machines, a 2D laser, a tube laser and a punching machine: their plan, their alarms and every telegram. They answer on the network too, like the web UI of the OPC UA simulator. |
 | `localhost:1883` | The MQTT broker the simulators and adapters publish to. |
 | <http://localhost:5560/machines> | The OPC UA adapter: the machines added over OPC UA. It answers on this computer only. |
 | <http://localhost:8090/> | The web UI of the simulated OPC UA machine, A1121O0001. |
@@ -182,6 +182,15 @@ chat draws the card from the values of the tool, and the model sums it up in a f
 the tool's and the wording is the model's: the card says 6 minutes of running, the model "just under 7
 minutes". The stack had just started, so most of the 8 hours have no data. The card on the left is one minute
 newer than the one in the chat: the page reads again, an answer shows what was true when it was given.
+
+With an external documentation service configured as `docs` in `APP_MCP_SERVERS` and enabled under
+"Tools" in the message field, ask how to operate,
+maintain or program a machine. The chat searches its manuals and shows source references by filename and
+page label, with the physical PDF page also shown when it differs. Select one to open that physical PDF page. Use the page controls, zoom and **Find**
+to explore it; **Next match** moves between matching pages. The **Extracted text** tab shows the evidence
+used by chat. A replaced or unavailable source asks you to search again. Both views read documentation
+through MCP; the app has no direct connection to the documentation REST API.
+Documentation source references stay in the chat and are not cards for "Save as page".
 
 The panel works like a chat app on a phone: a list and a chat, with a way back. The head says what is open. In a
 chat it says the name of the chat, which is its first question, on one line and cut where it is too long; the

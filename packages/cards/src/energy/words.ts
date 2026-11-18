@@ -40,14 +40,6 @@ export function lastHours(hours: number): string {
 }
 
 /**
- * The pieces of a machine id between which a line may break where the card is narrow:
- * alcyone-machines_AX-400_P-04 breaks as alcyone-machines_|AX-400_|P-04.
- */
-export function machineIdPieces(id: string): Array<string> {
-  return id.split(/(?<=_)/)
-}
-
-/**
  * What the card says about its hours, in the time zone of the browser or the one named: "Last 8
  * hours, 08:00 to 16:00", and with the days where they cross midnight, "Last 24 hours, 17 Nov
  * 16:00 to 18 Nov 16:00".

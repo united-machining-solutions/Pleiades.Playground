@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { afterEach, mock, test } from "node:test"
 
-import { inPath, listTopics, readOpenNotifications, readStrings } from "./apis.ts"
+import { inPath, listTopics, readNewest, readOpenNotifications, readStatistics, readStrings, readTimelines } from "./apis.ts"
 
 const apis = { timeseriesUrl: "http://timeseries:8080", eventsUrl: "http://events:8080" }
 const from = new Date("2026-11-16T09:00:00.000Z")
@@ -60,4 +60,48 @@ test("an answer in another shape is named as such, not passed on", async () => {
 
   answering(() => new Response("<html>", { status: 200 }))
   await assert.rejects(listTopics(apis, from, to), /The Timeseries API did not answer/)
+})
+
+test("the newest value, or the first after a start: one reader, the sorting says which", async () => {
+  const { requested } = answering(() =>
+    Response.json({ series: [{ topic: "machines/P-04/x", unit: "watt", timestamps: [Date.parse("2026-11-16T09:01:00.000Z") * 1000], values: [5] }] }),
+  )
+  assert.deepEqual(await readNewest(apis, "baseUnitValues", "machines/P-04/x", to), { at: "2026-11-16T09:01:00.000Z", value: 5, unit: "watt" })
+  await readNewest(apis, "baseUnitValues", "machines/P-04/x", to, { from, sorting: "Ascending" })
+  assert.deepEqual(
+    requested.map((url) => [url.searchParams.get("startTime"), url.searchParams.get("sorting"), url.searchParams.get("limit")]),
+    [
+      ["1970-01-01T00:00:00.000Z", "Descending", "1"],
+      ["2026-11-16T09:00:00.000Z", "Ascending", "1"],
+    ],
+  )
+})
+
+test("the values of a topic, whole or thinned to a number of points: one reader", async () => {
+  const { requested } = answering(() => Response.json({ series: [] }))
+  await readTimelines(apis, "baseUnitValues", "machines/P-04/x", from, to)
+  await readTimelines(apis, "baseUnitValues", "machines/P-04/x", from, to, 480)
+  assert.deepEqual(
+    requested.map((url) => [url.searchParams.get("downsample"), url.searchParams.get("limit")]),
+    [
+      [null, null],
+      ["true", "480"],
+    ],
+  )
+})
+
+test("the statistics are asked for with a POST and fail as every other request does", async () => {
+  const sent: Array<RequestInit | undefined> = []
+  mock.method(globalThis, "fetch", async (_input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+    sent.push(init)
+    return new Response("no", { status: 503 })
+  })
+  mock.method(console, "error", () => {})
+  await assert.rejects(
+    readStatistics(apis, "machines/*/x", from, to),
+    /^Error: The Timeseries API answered 503 \(http:\/\/timeseries:8080\/statistics\/baseUnitValues\/topics\/machines%2F\*%2Fx\)\.$/,
+  )
+  assert.equal(sent[0]?.method, "POST")
+  assert.deepEqual(JSON.parse(String(sent[0]?.body)), [{ start: from.toISOString(), stop: to.toISOString() }])
+  assert.ok(sent[0]?.signal instanceof AbortSignal)
 })
