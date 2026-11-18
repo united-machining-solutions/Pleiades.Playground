@@ -30,7 +30,7 @@ Answer in a few plain sentences. The app shows the values of a tool call next to
 The tools write every time as the clock of the person you answer shows it. Say a time the way a clock does, for example 09:30: take the hours and minutes as they stand in the result, do not convert them, and name no time zone and no offset.`
 
 // A page is the person's to keep. The model composes one with the tool of the app, and nothing else
-// (pages/proposal.ts, ADR-0018).
+// (pages/proposal.ts, ADR-0020).
 const pageInstructions = `You cannot keep a page yourself. The app keeps a page when the person says so.
 When a person asks for a page, a dashboard or an overview to keep, find out with your tools what there is to show, then propose the page with ${PROPOSE_PAGE_TOOL}: a short title, and the parts in their order, each a tool you called and its arguments.
 Take a machine id from a tool result and never invent one.
