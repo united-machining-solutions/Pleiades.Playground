@@ -7,10 +7,19 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: showcases. What is made for one demo or one fair lives in a folder of its own,
+  `apps/app/src/showcases/<name>/`, with its pages under `src/routes/(showcases)/`, and is built in only
+  where `APP_SHOWCASES` is set. The image `pleiades.playground.app` is the app alone, with nothing of a
+  showcase in it; the new image `pleiades.playground.app.showcases` is the same app built with all of
+  them, and `APP_SHOWCASES` in `.env` makes the stack take it. A showcase only adds: a test fails when a
+  file of the app reads from one or links to one of its pages. `AGENTS.md` and the skills `create-page`,
+  `create-card` and `build-your-own` ask whether a thing is base or a showcase
+  ([ADR-0016](docs/adr/0016-a-showcase-is-built-in-on-request-and-only-adds.md)).
 - Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
   shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
   from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
-  entry in the sidebar.
+  entry in the sidebar. It is the first showcase: only a stack started with `APP_SHOWCASES` set has the
+  page.
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
