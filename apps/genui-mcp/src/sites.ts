@@ -83,7 +83,7 @@ export function sitesOf(
     sites: grouped,
     unplaced: list.machines
       .filter((one) => !placed.has(one.machine))
-      .map((one) => ({ machine: one.machine, state: stateOf(one, list.asOf), lastValueAt: one.lastValueAt, now: one }))
+      .map((one) => ({ machine: one.machine, state: stateOf(one, list.asOf), now: one }))
       .sort(byMachineId),
   }
 }

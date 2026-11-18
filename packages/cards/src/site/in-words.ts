@@ -16,9 +16,12 @@ export function machinesInWords(count: number): string {
   return `${count} ${count === 1 ? "machine" : "machines"}`
 }
 
-/** What a machine is, by its model and serial number: from its identification, or from its machine id. */
+/**
+ * What a machine is, by its model and serial number: from its identification, or from its machine id
+ * where it reported neither, as a source does that sends no identification.
+ */
 export function modelOf({ machine, now }: Pick<PlacedMachine, "machine" | "now">): string {
-  return now ? titleOf(now) : labelOf(machine)
+  return now && (now.identity.model || now.identity.serialNumber) ? titleOf(now) : labelOf(machine)
 }
 
 /** The title of a machine on a site: the name people know it by, or what it is. */

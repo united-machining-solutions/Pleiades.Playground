@@ -113,7 +113,7 @@ test("the machines of a site are grouped by hall, in the order of the site, and 
   // M-07 sends values and stands on no site: the one suggestion.
   assert.deepEqual(
     result.unplaced.map(({ now: _, ...rest }) => rest),
-    [{ machine: "M-07", state: "running", lastValueAt: secondsAgo(5) }],
+    [{ machine: "M-07", state: "running" }],
   )
   assert.equal(siteList.safeParse(result).success, true)
 })
@@ -142,8 +142,10 @@ test("a machine that went silent is still a suggestion, without data", () => {
   const result = sitesOf([], [], list([machine("M-05", { silentFor: 3600 })]))
   assert.deepEqual(
     result.unplaced.map(({ now: _, ...rest }) => rest),
-    [{ machine: "M-05", state: "no-data", lastValueAt: secondsAgo(3600) }],
+    [{ machine: "M-05", state: "no-data" }],
   )
+  // Its last sign of life is that of the machine.
+  assert.equal(result.unplaced[0]?.now.lastValueAt, secondsAgo(3600))
   assert.equal(result.machineCount, 0)
   assert.deepEqual(result.counts, [])
 })

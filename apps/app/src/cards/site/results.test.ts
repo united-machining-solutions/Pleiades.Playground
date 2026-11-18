@@ -46,7 +46,7 @@ const result = {
       ],
     },
   ],
-  unplaced: [{ machine: "taygeta-tools_TX-9_M-07", state: "running", lastValueAt: "2026-11-17T09:29:55.000Z", now }],
+  unplaced: [{ machine: "taygeta-tools_TX-9_M-07", state: "running", now }],
 }
 
 test("the JSON of genui_site_list becomes the sites with their machines", () => {
