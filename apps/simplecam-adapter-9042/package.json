@@ -1,26 +1,21 @@
 {
-  "name": "simplecam-adapter-9042",
-  "version": "1.0.0-v0.17.1",
-  "description": "SimpleCAM Machine 9042 Adapter - AG2 v0.17.1 (SSE → MQTT/CloudEvents)",
+  "name": "@pleiades/simplecam-adapter-9042",
+  "version": "0.0.1",
+  "private": true,
   "type": "module",
-  "main": "dist/index.js",
+  "description": "AG2 machine state adapter for SimpleCAM machine 9042 — consumes SSE from C++ backend and publishes to MQTT",
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "node --loader tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
-    "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "health": "curl http://localhost:3042/health"
+    "health": "curl -f http://localhost:3042/health || exit 1"
   },
-  "keywords": ["umati", "ag2", "mqtt", "sse", "simplecam"],
-  "author": "United Grinding",
-  "license": "MIT",
   "dependencies": {
-    "mqtt": "5.16.1"
+    "mqtt": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "26.6.6",
-    "typescript": "7.0.2",
-    "tsx": "^4.11.0"
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "tsx": "catalog:"
   }
 }

@@ -1,27 +1,38 @@
-# Build stage
+# Build stage: compile TypeScript
 FROM node:22-alpine AS builder
+WORKDIR /workspace
 
-WORKDIR /app
+# Install pnpm
+RUN npm install -g pnpm
 
-# Copy adapter
-COPY apps/simplecam-adapter-9042 .
+# Copy workspace files
+COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 
-# Install dependencies and build
-RUN npm install && \
-    npm run build
+# Copy adapter package
+COPY apps/simplecam-adapter-9042 apps/simplecam-adapter-9042/
 
-# Runtime stage
+# Install dependencies (frozen lockfile from workspace)
+RUN pnpm install --frozen-lockfile --filter=@pleiades/simplecam-adapter-9042
+
+# Build TypeScript
+WORKDIR /workspace/apps/simplecam-adapter-9042
+RUN pnpm build
+
+# Runtime stage: minimal image with compiled code
 FROM node:22-alpine
-
 WORKDIR /app
 
-# Copy built application from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json .
-COPY --from=builder /app/node_modules ./node_modules
+# Install pnpm for runtime
+RUN npm install -g pnpm
 
-# Prune to production dependencies
-RUN npm prune --omit=dev
+# Copy from builder
+COPY --from=builder /workspace/pnpm-workspace.yaml .
+COPY --from=builder /workspace/pnpm-lock.yaml .
+COPY --from=builder /workspace/apps/simplecam-adapter-9042/package.json .
+COPY --from=builder /workspace/apps/simplecam-adapter-9042/dist ./dist
+
+# Install only production dependencies for this filter
+RUN pnpm install --frozen-lockfile --filter=@pleiades/simplecam-adapter-9042 --prod
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
