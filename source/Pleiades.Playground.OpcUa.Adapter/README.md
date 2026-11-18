@@ -355,7 +355,10 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
   machine id is a level of every MQTT topic: `TRUMPF Werkzeugmaschinen SE + Co. KG` gives
   `TRUMPFWerkzeugmaschinenSECoKG`, the machine id `trumpfwerkzeugmaschinensecokg_<model>_<serial number>` and the
   prefix `x-trumpfwerkzeugmaschinensecokg` of the signals of the maker. That value is published as
-  `ManufacturerUri`, and the `ProductInstanceUri`, if the server gives none, is formed from it. The proposal
+  `ManufacturerUri`, and the `ProductInstanceUri`, if the server gives none, is formed from it. It departs from
+  the [machine id](../../contracts/mqtt/README.md#machine-id) of the binding, which takes the domain of the web
+  address and never the display name: the value is no web address then, and the id changes with the name of the
+  manufacturer. The proposal
   says so in `notices`, with the `machineId`; the card in the chat shows it under "Good to know", and the model
   is told to say it. Without both `ManufacturerUri` and `Manufacturer` the registration is refused.
 - `profiles`: the profiles of the data model the elements deliver whole. The adapter sets it from the
