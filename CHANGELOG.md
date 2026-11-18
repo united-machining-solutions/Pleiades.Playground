@@ -7,6 +7,8 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
+  no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
 - Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
   each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
   draws them with the notification card.
@@ -27,11 +29,15 @@ All notable changes are documented here. The format follows
   that live values work over HTTPS. HTTP stays as it is.
 - Example app: the setting `MQTT_WSS_PATH` sends a page over HTTPS to the broker at that path of the page's
   origin, for a proxy in front of the app that forwards it to the broker.
-- Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion with made-up data. It
-  shows the shop floor from above, one machine with what it did, does and will do, and one part on its way
-  from programming to packing, as three perspectives of one picture. It reads nothing from the stack and has no
-  entry in the sidebar. It is the first showcase: only a stack started with `APP_SHOWCASES` set has the
-  page.
+- Example app: the page `/where-is-my-job`, "Where is My Job?", a basis for discussion of how an order is
+  followed across the shop floor. It shows the machines of the stack from above, one machine with its job
+  orders done, running and waiting, and one order on its way: every job order that names the same order
+  number. The values are those of the stack; programming, packing and the single part on its sheet have no
+  source yet and stand on the page as such. The page reads the job orders from the new tool
+  `genui_job_order_list` of `genui-mcp`, the job orders on the lists of the machines from the Events API, so
+  they stand also after a reload or a reconnect; a job order the planner took back before it ran is left out.
+  It is the first showcase: only a stack started with `APP_SHOWCASES` set has the page and its entry in the
+  sidebar.
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
@@ -40,6 +46,8 @@ All notable changes are documented here. The format follows
   the machines that send values and stand on no site. It reads the Sites API at `SITES_API_URL`.
 - Site card: a machine on no site carries what it does now (`now`), as a placed one does, so a page can keep it
   live.
+- Example app: the page Sites (`/sites`) shows where the machines stand, by site and hall. The page of a
+  machine moved under it to `/sites/<machine id>`; `/machines/<machine id>` leads there.
 - Example app: the setting `APP_MCP_SERVERS` gives the chat the tools of further MCP servers, such as the
   optional Ultimaker service, as `name=address` separated by commas.
 - Example app: the button "Tools" in the message field of the chat lists the servers that give the chat

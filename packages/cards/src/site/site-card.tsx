@@ -16,8 +16,9 @@ import { clock, duration } from "../machine/format.ts"
 import { stateLabel } from "../machine/state.ts"
 import { StateSymbol } from "../machine/state-symbol.tsx"
 import { tell } from "../machine/tell.ts"
-import type { Hall, PlacedMachine, Site, SiteList, StateCount, UnplacedMachine } from "./contract.ts"
+import type { Hall, PlacedMachine, Site, SiteList, UnplacedMachine } from "./contract.ts"
 import { machinesInWords, modelOf, titleOfPlaced } from "./in-words.ts"
+import { StateCounts } from "./state-counts.tsx"
 
 /**
  * The site card: every site with its machines, hall by hall, and how many of them are in each
@@ -60,7 +61,7 @@ export function SiteCard({ site, asOf, source }: { site: Site; asOf: string; sou
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {site.counts.length > 0 && <Counts counts={site.counts} />}
+        {site.counts.length > 0 && <StateCounts counts={site.counts} />}
         {site.halls.map((hall) => (
           <HallList key={hall.name ?? ""} hall={hall} asOf={asOf} />
         ))}
@@ -71,20 +72,6 @@ export function SiteCard({ site, asOf, source }: { site: Site; asOf: string; sou
         {"{machineId}"}/umati/
       </CardFooter>
     </Card>
-  )
-}
-
-/** How many machines are in each state: the sign, the number and the word. */
-function Counts({ counts }: { counts: ReadonlyArray<StateCount> }) {
-  return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm" aria-label="Machines by state">
-      {counts.map(({ state, machines }) => (
-        <li key={state} className="flex items-center gap-1.5 tabular-nums">
-          <StateSymbol state={state} />
-          {machines} {stateLabel[state].toLowerCase()}
-        </li>
-      ))}
-    </ul>
   )
 }
 

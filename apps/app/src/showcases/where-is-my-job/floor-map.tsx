@@ -1,5 +1,6 @@
-import type { State } from "@pleiades/cards/machine/contract.ts"
-import { stateLabel } from "@pleiades/cards/machine/state.ts"
+import type { MachineShow, State } from "@pleiades/cards/machine/contract.ts"
+import { titleOf } from "@pleiades/cards/machine/in-words.ts"
+import { stateLabel, stateOf } from "@pleiades/cards/machine/state.ts"
 import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
 import { Badge } from "@pleiades/ui/components/badge"
 import { Button } from "@pleiades/ui/components/button"
@@ -7,29 +8,11 @@ import { Item, ItemContent, ItemFooter, ItemHeader, ItemMedia, ItemTitle } from 
 import { Meter } from "@pleiades/ui/components/meter"
 import { ScrollArea, ScrollBar } from "@pleiades/ui/components/scroll-area"
 import { cn } from "cn"
-import {
-  CodeXmlIcon,
-  CornerRightDownIcon,
-  Disc3Icon,
-  MartiniIcon,
-  PackageIcon,
-  StampIcon,
-  ZapIcon,
-} from "lucide-react"
+import { CodeXmlIcon, FactoryIcon, PackageIcon } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
-import { MAP_HEIGHT, MAP_WIDTH, TILE_HEIGHT, TILE_WIDTH, edges, juiceLabel, partAt, parts, stations } from "./data.ts"
-import type { Instant, Part, Station, StepKind } from "./data.ts"
-
-export const stepIcon: Record<StepKind, LucideIcon> = {
-  program: CodeXmlIcon,
-  laser: ZapIcon,
-  punch: StampIcon,
-  grind: Disc3Icon,
-  bend: CornerRightDownIcon,
-  pack: PackageIcon,
-  juice: MartiniIcon,
-}
+import { TILE_HEIGHT, TILE_WIDTH, conceptStations, connector, layout, pathOf, utilisation, waiting } from "./floor.ts"
+import type { FloorPage, Order, OrderState, Place } from "./floor.ts"
 
 /** The edge of a tile in the colour of its state, so the floor reads from afar. */
 const stripe: Record<State, string> = {
@@ -42,137 +25,189 @@ const stripe: Record<State, string> = {
 
 export type Lens = "load" | "queue"
 
-export function stateWord(station: Station, state: State) {
-  return (station.juice && juiceLabel[state]) || stateLabel[state]
+/** The marker on the tile where the chosen order stands, by its state. */
+const orderBadge: Record<OrderState, { label: string; variant: "default" | "destructive" | "secondary" }> = {
+  running: { label: "Order is here", variant: "default" },
+  waiting: { label: "Order waits here", variant: "default" },
+  interrupted: { label: "Order held up here", variant: "destructive" },
+  aborted: { label: "Order aborted here", variant: "destructive" },
+  ended: { label: "Order done here", variant: "secondary" },
+}
+
+/** A share as a whole percentage. */
+export function percent(share: number | null): string {
+  return share === null ? "–" : `${Math.round(share * 100)} %`
 }
 
 /**
- * The shop floor from above: a tile for every station, the lines of the material flow between them,
- * and under each tile the parts that are there. A chosen part draws its path: solid where it has
- * been, dashed where it is going.
+ * The shop floor from above: programming, a tile for every machine of the stack, packing. The stack
+ * knows no flow between the machines, so no line stands until an order is chosen: then its path is
+ * drawn, solid between the machines it has reached, dashed to those it waits for, dotted to the steps
+ * that publish nothing yet.
  */
 export function FloorMap({
-  instant,
+  page,
+  orders,
   lens,
   machine,
-  part,
+  order,
   onMachine,
-  onPart,
+  onOrder,
 }: {
-  instant: Instant
+  page: FloorPage
+  orders: ReadonlyArray<Order>
   lens: Lens
   machine: string | null
-  part: Part | null
+  order: Order | null
   onMachine: (id: string) => void
-  onPart: (id: string) => void
+  onOrder: (key: string) => void
 }) {
-  const pos = part ? part.pos[instant] : -1
-  const here = part ? partAt(part, instant) : null
-  const path: Record<string, "done" | "plan"> = {}
-  if (part) {
-    part.route.slice(1).forEach((to, index) => {
-      path[`${part.route[index]}>${to}`] = pos > index ? "done" : "plan"
-    })
-  }
-  const lines = Object.entries(edges)
-    .map(([key, segments]) => ({ key, segments, look: part ? (path[key] ?? "off") : "base" }))
-    // The path of the part is drawn last, over the other lines.
-    .sort((a, b) => Number(a.look === "done" || a.look === "plan") - Number(b.look === "done" || b.look === "plan"))
+  const { places, width, height } = layout(page.machines.map((one) => one.show.machine.machine))
+  const placeOf = Object.fromEntries(places.map((one) => [one.id, one])) as Record<string, Place>
+  const path = order ? pathOf(order) : []
+  const reached = order ? order.steps.filter((step) => step.result !== null).length : 0
 
   return (
     <ScrollArea className="rounded-lg border bg-muted/30">
       <div
         className="relative m-2 bg-[radial-gradient(var(--border)_1px,transparent_1px)] bg-size-[16px_16px]"
-        style={{ width: MAP_WIDTH, height: MAP_HEIGHT }}
+        style={{ width: width + 12, height: height + 8 }}
       >
-        {/* The lines of the flow: no component draws a line between two places, so these are our own. */}
-        {lines.map(({ key, segments, look }) =>
-          // A horizontal segment runs from `a` to `b` at height `c`; a vertical one stands at `a`
-          // and runs from `b` to `c`.
-          segments.map(([axis, a, b, c], index) => {
-            const width = look === "done" || look === "plan" ? 4 : 2
+        {/* The path of the chosen order: no component draws a line between two places, so these are our own. */}
+        {path.slice(1).map((to, index) => {
+          const from = path[index]!
+          const concept = from.startsWith("concept:") || to.startsWith("concept:")
+          // The machine `to` is step `index` of the order (step 0 follows programming).
+          const look = concept ? "concept" : index < reached ? "done" : "plan"
+          return connector(placeOf[from]!, placeOf[to]!).map(([axis, a, b, c], segment) => (
+            <span
+              key={`${index}-${segment}`}
+              aria-hidden
+              className={cn(
+                "absolute border-primary",
+                look === "plan" && "border-dashed",
+                look === "concept" && "border-dotted border-muted-foreground",
+              )}
+              style={
+                axis === "h"
+                  ? { left: a, top: c - 2, width: b - a, borderTopWidth: 4 }
+                  : { left: a - 2, top: b, height: c - b, borderLeftWidth: 4 }
+              }
+            />
+          ))
+        })}
+        {places.map((place) => {
+          if (place.id === conceptStations.program.id || place.id === conceptStations.pack.id) {
+            const concept = place.id === conceptStations.program.id ? conceptStations.program : conceptStations.pack
             return (
-              <span
-                key={`${key}-${index}`}
-                aria-hidden
-                className={cn(
-                  "absolute",
-                  look === "base" && "border-muted-foreground/60",
-                  look === "off" && "border-border",
-                  (look === "done" || look === "plan") && "border-primary",
-                  look === "plan" && "border-dashed",
-                )}
-                style={
-                  axis === "h"
-                    ? { left: a, top: c - width / 2, width: b - a, borderTopWidth: width }
-                    : { left: a - width / 2, top: b, height: c - b, borderLeftWidth: width }
-                }
+              <ConceptTile
+                key={place.id}
+                place={place}
+                name={concept.name}
+                icon={place.id === conceptStations.program.id ? CodeXmlIcon : PackageIcon}
               />
             )
-          }),
-        )}
-        {stations.map((station) => (
-          <StationTile
-            key={station.id}
-            station={station}
-            instant={instant}
-            lens={lens}
-            selected={!part && machine === station.id}
-            here={here === station.id}
-            dim={part !== null && !part.route.includes(station.id)}
-            chosenPart={part}
-            onOpen={() => onMachine(station.id)}
-            onPart={onPart}
-          />
-        ))}
+          }
+          const entry = page.machines.find((one) => one.show.machine.machine === place.id)!
+          const here = orders.filter((one) => one.at.machine === place.id && (one.state === "running" || one.state === "interrupted"))
+          return (
+            <MachineTile
+              key={place.id}
+              place={place}
+              show={entry.show}
+              asOf={page.asOf}
+              lens={lens}
+              queue={page.jobs[place.id]?.orders ? waiting(page.jobs[place.id]).length : null}
+              selected={!order && machine === place.id}
+              orderHere={order?.at.machine === place.id ? order : null}
+              dim={order !== null && !path.includes(place.id)}
+              here={here}
+              chosen={order?.key ?? null}
+              onOpen={() => onMachine(place.id)}
+              onOrder={onOrder}
+            />
+          )
+        })}
       </div>
       <ScrollBar orientation="horizontal" />
     </ScrollArea>
   )
 }
 
-function StationTile({
-  station,
-  instant,
+/** A step of every order that publishes nothing yet: it stands on the map, without values. */
+function ConceptTile({ place, name, icon: Icon }: { place: Place; name: string; icon: LucideIcon }) {
+  return (
+    <div className="absolute" style={{ left: place.x, top: place.y, width: TILE_WIDTH }}>
+      <Item
+        variant="outline"
+        size="sm"
+        className={cn("content-start gap-1.5 border-dashed bg-muted/40 pl-4", stripe["no-data"])}
+        style={{ height: TILE_HEIGHT }}
+      >
+        <ItemHeader>
+          <ItemMedia variant="icon">
+            <Icon />
+          </ItemMedia>
+          <ItemTitle className="mr-auto block min-w-0 truncate">{name}</ItemTitle>
+        </ItemHeader>
+        <ItemContent className="gap-0.5">
+          <span className="flex items-center gap-1.5 text-xs">
+            <StateSymbol state="no-data" />
+            No source yet
+          </span>
+          <span className="text-xs text-muted-foreground">Publishes nothing to the stack.</span>
+        </ItemContent>
+      </Item>
+    </div>
+  )
+}
+
+function MachineTile({
+  place,
+  show,
+  asOf,
   lens,
+  queue,
   selected,
-  here,
+  orderHere,
   dim,
-  chosenPart,
+  here,
+  chosen,
   onOpen,
-  onPart,
+  onOrder,
 }: {
-  station: Station
-  instant: Instant
+  place: Place
+  show: MachineShow
+  asOf: string
   lens: Lens
+  queue: number | null
   selected: boolean
-  here: boolean
+  orderHere: Order | null
   dim: boolean
-  chosenPart: Part | null
+  here: ReadonlyArray<Order>
+  chosen: string | null
   onOpen: () => void
-  onPart: (id: string) => void
+  onOrder: (key: string) => void
 }) {
-  const { state, load, queue } = station.at[instant]
-  const Icon = stepIcon[station.step]
-  const blocked = here && state === "alarm"
-  const big = station.juice ? `${load} %` : lens === "load" ? `${load} %` : String(queue)
-  const bigLabel = station.juice ? "fill level" : lens === "load" ? "utilisation" : "parts waiting"
-  const small = station.juice
-    ? `${queue} cocktails today`
-    : lens === "load"
-      ? `${queue} parts waiting`
-      : `${load} % utilisation`
-  // One tracked part as a marker, the chosen one if it is here; the rest of the queue as "+N".
-  // The queue already counts the tracked parts.
-  const atStation = station.juice ? [] : parts.filter((one) => partAt(one, instant) === station.id)
-  const tracked = (atStation.find((one) => one.id === chosenPart?.id) ?? atStation[0])
-  const more = Math.max(0, queue - (tracked ? 1 : 0))
+  const { machine } = show
+  const state = stateOf(machine, asOf)
+  const share = utilisation(show)
+  const big = lens === "load" ? percent(share) : queue === null ? "–" : String(queue)
+  const bigLabel = lens === "load" ? "producing" : "job orders waiting"
+  const job = machine.jobOrder
+  const small = job ? `${job.jobOrderId} · ${job.producedQuantity ?? "?"} of ${job.runsPlanned ?? "?"}` : "No job order"
+  const badge = orderHere ? orderBadge[orderHere.state] : null
+  // The ring stands where the order is or waits; one that is through or held up keeps its badge only.
+  const ring = selected || orderHere?.state === "running" || orderHere?.state === "waiting"
+  // One order as a marker, the chosen one if it is here; the rest as "+N".
+  const shown = here.find((one) => one.key === chosen) ?? here[0]
+  const more = Math.max(0, here.length - (shown ? 1 : 0)) + (queue ?? 0)
 
   return (
-    <div className="absolute flex flex-col gap-1.5" style={{ left: station.x, top: station.y, width: TILE_WIDTH }}>
-      {here && (
-        <Badge variant={blocked ? "destructive" : "default"} className="absolute -top-2.5 right-2 z-10">
-          {blocked ? "Part waits here" : "Part is here"}
+    <div className="absolute flex flex-col gap-1.5" style={{ left: place.x, top: place.y, width: TILE_WIDTH }}>
+      {badge && (
+        <Badge variant={badge.variant} className="absolute -top-2.5 right-2 z-10">
+          {badge.label}
         </Badge>
       )}
       <Item
@@ -182,25 +217,22 @@ function StationTile({
         className={cn(
           "cursor-pointer content-start gap-1.5 bg-card pl-4 text-left hover:bg-muted/50",
           stripe[state],
-          instant === "plan" && "border-dashed",
-          station.juice && "bg-muted/40",
           state === "alarm" && "border-destructive",
-          (selected || (here && !blocked)) && "border-primary ring-3 ring-primary/20",
+          ring && "border-primary ring-3 ring-primary/20",
           dim && "opacity-30",
         )}
         style={{ height: TILE_HEIGHT }}
       >
         <ItemHeader>
           <ItemMedia variant="icon">
-            <Icon />
+            <FactoryIcon />
           </ItemMedia>
-          <ItemTitle className="mr-auto block min-w-0 truncate">{station.name}</ItemTitle>
+          <ItemTitle className="mr-auto block min-w-0 truncate">{titleOf(machine)}</ItemTitle>
         </ItemHeader>
         <ItemContent className="gap-0.5">
           <span className="flex items-center gap-1.5 text-xs">
             <StateSymbol state={state} />
-            {instant === "plan" ? "Plan: " : ""}
-            {stateWord(station, state)}
+            {stateLabel[state]}
           </span>
           <span className="flex items-baseline gap-1">
             <span className="text-xl font-semibold tabular-nums">{big}</span>
@@ -208,54 +240,40 @@ function StationTile({
           </span>
         </ItemContent>
         <ItemFooter className="flex-col items-stretch gap-1">
-          <Meter value={load} aria-label={station.juice ? "Fill level" : "Utilisation"} />
-          <span className="flex items-center justify-between gap-1">
-            <span className="truncate text-xs text-muted-foreground">{small}</span>
-            <MakerLogo />
-          </span>
+          <Meter value={Math.round((share ?? 0) * 100)} aria-label="Producing" />
+          <span className="truncate text-xs text-muted-foreground tabular-nums">{small}</span>
         </ItemFooter>
       </Item>
-      {!station.juice && (
-        <div className="flex gap-1">
-          {tracked && (
-            <Button
-              variant={chosenPart?.id === tracked.id ? "default" : "outline"}
-              size="xs"
-              className={cn(
-                "w-16 rounded-full",
-                state === "alarm" && chosenPart?.id !== tracked.id && "border-destructive/50 text-destructive",
-                chosenPart && chosenPart.id !== tracked.id && "opacity-45",
-              )}
-              title={`${tracked.id} · ${tracked.name}`}
-              aria-label={`Open part ${tracked.id}`}
-              onClick={() => onPart(tracked.id)}
-            >
-              {tracked.id.slice(3)}
-            </Button>
-          )}
-          {more > 0 && (
-            <Button
-              variant="secondary"
-              size="xs"
-              className={cn("rounded-full", chosenPart && "opacity-45")}
-              title={`${more} more parts at ${station.name}`}
-              aria-label={`${more} more parts at ${station.name}`}
-              onClick={onOpen}
-            >
-              +{more}
-            </Button>
-          )}
-        </div>
-      )}
+      <div className="flex gap-1">
+        {shown && (
+          <Button
+            variant={chosen === shown.key ? "default" : "outline"}
+            size="xs"
+            className={cn(
+              "max-w-24 truncate rounded-full",
+              shown.state === "interrupted" && chosen !== shown.key && "border-destructive/50 text-destructive",
+              chosen && chosen !== shown.key && "opacity-45",
+            )}
+            title={`${shown.label} · ${shown.jobName ?? ""}`}
+            aria-label={`Open order ${shown.label}`}
+            onClick={() => onOrder(shown.key)}
+          >
+            {shown.label}
+          </Button>
+        )}
+        {more > 0 && (
+          <Button
+            variant="secondary"
+            size="xs"
+            className={cn("rounded-full", chosen && "opacity-45")}
+            title={`${more} more job orders at ${titleOf(machine)}`}
+            aria-label={`${more} more job orders at ${titleOf(machine)}`}
+            onClick={onOpen}
+          >
+            +{more}
+          </Button>
+        )}
+      </div>
     </div>
-  )
-}
-
-/** Room for the logo of the machine's maker, until there is one: a placeholder, not a component. */
-export function MakerLogo({ className }: { className?: string }) {
-  return (
-    <Badge variant="outline" className={cn("border-dashed text-[0.625rem] font-normal text-muted-foreground", className)}>
-      Logo
-    </Badge>
   )
 }

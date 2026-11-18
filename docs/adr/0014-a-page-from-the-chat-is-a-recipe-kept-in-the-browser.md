@@ -63,6 +63,9 @@ does.
   answers a request line and headers beyond 16 KiB with 431, with room for the cookies the browser sends.
 - A recipe from a link is input from outside, which the check of its shape and the list of tools on the
   server are for. It can still name any argument a tool takes.
+- The parts of a kept page are not only those the language model called in one answer: a person removes a part
+  and puts one in another order by hand, with no language model, and a page keeps one part at least. Such a
+  change, like a new title, is a new link; a link made before keeps the parts it had.
 - The arguments are kept as the language model chose them. A tool that changes its arguments can leave a
   part without an answer; the part then says why.
 

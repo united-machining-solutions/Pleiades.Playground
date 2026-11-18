@@ -7,6 +7,14 @@ import { randomId } from "../random-id.ts"
 
 export const NEW_CHAT = "new"
 
+/**
+ * The search a link to another page takes along: the open chat and nothing else. What one page chose,
+ * such as the hours of a machine or the page of a list, means nothing on another one.
+ */
+export function chatOf(search: { chat?: unknown }): { chat?: string } {
+  return typeof search.chat === "string" ? { chat: search.chat } : {}
+}
+
 /** The first question of a chat waits here until the panel of that chat takes it. */
 const firstQuestions = new Map<string, string>()
 /** The chat that was open last, so that opening the panel returns to it. */
