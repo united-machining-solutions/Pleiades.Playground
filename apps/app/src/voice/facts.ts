@@ -1,25 +1,28 @@
 // An answer of Titan, as the screen shows it next to Titan. The model writes one text (see the
 // instructions in chat/assistant.server.ts):
 //
-//   Drei Maschinen stehen. Am frischesten ist P-07: die Spindel ist zu heiß.
+//   P-04 steht, weil der Spindelantrieb ausgefallen ist.
+//   Empfehlung: Ruf die Instandhaltung an P-04.
 //
-//   - **P-07** | Steht | Die Spindel ist zu heiß, die Steuerung hat gestoppt (Alarm 2130). | seit 09:56
-//   - **M-02** | Steht | Derselbe Fehler, noch nicht behoben. | seit gestern 20:36
+//   - **P-04** | Der Spindelantrieb ist ausgefallen, der Auftrag wartet. | Instandhaltung rufen, Antrieb prüfen.
 //
-//   Übrigens: M-02 hat denselben Fehler seit gestern Abend offen.
+//   Übrigens: P-07 wird gerade eingerichtet.
 //
-//   Soll ich dir die Details von M-02 zeigen?
+//   Soll ich dir den Verlauf von P-04 zeigen?
 //
-// The sentences are said; the list is not read aloud, it is shown as a table. The hint ("Übrigens")
-// and the suggestion (the question at the end) are said and shown on their own as well.
+// The sentences are said: the headline, the recommendation, the hint and the question. The list is
+// not read aloud: each line gives the board (titan/board.ts) the problem of a machine in plain words
+// and its next step. Every figure on the board comes from the values, not from the model.
 
-/** One line of the list: what it is about, its state in a word, what is going on, since when. */
-export type Fact = { title?: string; status?: string; text: string; since?: string }
+/** One line of the list: the machine, its problem in plain words, and the next step. */
+export type Fact = { title?: string; text: string; step?: string }
 
 /** An answer, taken apart for the screen. */
 export type Briefing = {
-  /** The sentences that answer, without hint and suggestion. */
+  /** The sentences that answer, without recommendation, hint and suggestion. */
   summary: string
+  /** What to do, after "Empfehlung:". */
+  recommendation?: string
   facts: Array<Fact>
   /** The one thing nobody asked for, after "Übrigens". */
   hint?: string
@@ -44,20 +47,23 @@ function sentences(text: string): Array<string> {
   return (text.replace(/\s+/g, " ").match(/[^.!?…]+(?:[.!?…]+["“”»)]*|$)/g) ?? []).map((one) => one.trim()).filter(Boolean)
 }
 
-/** One line of the list as a fact: "**Title** | state | text | since", or "**Title**: text". */
+/** One line of the list as a fact: "**Title** | problem | next step", or "**Title**: text". */
 export function factOf(line: string): Fact | undefined {
   const content = plain(line.replace(/^\s{0,3}[-*+]\s+/, ""))
   if (!content) return undefined
   if (content.includes("|")) {
-    const [title, status, text, since] = content.split("|").map((cell) => cell.trim())
-    if (!text) return { text: [title, status].filter(Boolean).join(": ") }
-    return { title: title || undefined, status: status || undefined, text, since: since || undefined }
+    const [title, text, step] = content.split("|").map((cell) => cell.trim())
+    if (!text) return { text: title ?? "" }
+    return { title: title || undefined, text, step: step || undefined }
   }
   const titled = /^([^:]{1,40}):\s*(.+)$/.exec(content)
   return titled ? { title: titled[1]?.trim(), text: titled[2]?.trim() ?? "" } : { text: content }
 }
 
-/** Takes an answer apart: the summary, the facts of its list, the hint and the suggestion. */
+const RECOMMENDATION = /^empfehlung[:,]?\s*/i
+const HINT = /^übrigens[:,]?\s*/i
+
+/** Takes an answer apart: the summary, the recommendation, the facts of its list, the hint and the suggestion. */
 export function briefingOf(text: string): Briefing {
   const facts = text
     .split("\n")
@@ -67,15 +73,17 @@ export function briefingOf(text: string): Briefing {
       return fact ? [fact] : []
     })
   const said = sentences(withoutList(text))
+  let recommendation: string | undefined
   let hint: string | undefined
   let suggestion: string | undefined
   const summary: Array<string> = []
   for (const [index, sentence] of said.entries()) {
-    if (/^übrigens\b/i.test(sentence)) hint = sentence.replace(/^übrigens[:,]?\s*/i, "")
+    if (RECOMMENDATION.test(sentence)) recommendation = sentence.replace(RECOMMENDATION, "")
+    else if (HINT.test(sentence)) hint = sentence.replace(HINT, "")
     else if (index === said.length - 1 && sentence.endsWith("?") && index > 0) suggestion = sentence
     else summary.push(sentence)
   }
-  return { summary: summary.join(" "), facts, hint, suggestion }
+  return { summary: summary.join(" "), recommendation, facts, hint, suggestion }
 }
 
 /** Without the signs of markdown for emphasis and code. */

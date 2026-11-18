@@ -19,6 +19,9 @@ import type { Briefing } from "./facts.ts"
 export type Shown = { cards: ReadonlyArray<ReactNode>; briefing?: Briefing }
 
 const nothing: Shown = { cards: [] }
+
+/** The tool whose card the board of Titan replaces. */
+const MACHINE_LIST = "genui_machine_list"
 let shown: Shown = nothing
 const listeners = new Set<() => void>()
 
@@ -53,7 +56,10 @@ export function useShareCards(messages: ReadonlyArray<UIMessage>, isLoading: boo
     if (!last) return
     // A new question: what the answer before showed is gone.
     if (last.role !== "assistant") return setShown(nothing)
-    const cards = blocksOf(last.parts, isLoading, chatTools).flatMap((block) => (block.kind === "drawn" ? [block.node] : []))
+    // The list of machines is not shown again: the board of Titan shows the same, from the same values.
+    const listCalls = new Set(last.parts.flatMap((part) => (part.type === "tool-call" && part.name === MACHINE_LIST ? [part.id] : [])))
+    const parts = last.parts.filter((part) => !(part.type === "tool-result" && listCalls.has(part.toolCallId)))
+    const cards = blocksOf(parts, isLoading, chatTools).flatMap((block) => (block.kind === "drawn" ? [block.node] : []))
     // The text after the last tool call is the answer; a sentence before a call only says what comes.
     const texts = last.parts.flatMap((part) => (part.type === "text" && part.content.trim() !== "" ? [part.content] : []))
     const text = texts.at(-1)

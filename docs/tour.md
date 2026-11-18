@@ -254,10 +254,12 @@ same in two paragraphs.](images/tour/machine-card-in-host.png)
 with a cloud of glowing points that greets, listens and speaks German. A first click or press of the space bar
 starts it. Then say "Hey Titan" and the question, or "Hey Titan" alone and the question after its "Ja?";
 holding the space bar works too. Titan says "Moment." at once, and the question goes to the chat of stop 4.
-With the answer the screen splits: Titan stays on the left, with what it says written under it and its
-suggestion; on the right, black on white, stand its cards, and beside them the details, one row for each
-machine with the sign of its state, and the hint. Titan says only two or three sentences in plain words and
-does not read the details. "Hey Titan, Pause" or the key P pauses it; "Hey Titan" or the space bar wakes it.
+With the answer the screen splits like a brief. On the left Titan, and under it what it says: the headline in
+one sentence and its recommendation. On the right, black on white, the board, computed from the values and
+not by the model: how many machines need someone, then each of them with its problem in plain words, what it
+costs (the job order that waits) and the next step, then one line for each machine that runs as planned, and
+a card only when one was asked for. The board is in
+[`apps/app/src/titan/board.ts`](../apps/app/src/titan/board.ts). "Hey Titan, Pause" or the key P pauses it; "Hey Titan" or the space bar wakes it.
 It speaks only once started and while its tab is in front. Escape leaves the screen.
 
 Titan answers first, then adds at most one hint nobody asked for and one suggestion, and says plainly when

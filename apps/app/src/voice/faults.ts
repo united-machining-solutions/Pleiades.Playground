@@ -1,4 +1,5 @@
 import { serialOf } from "@pleiades/cards/machine/in-words.ts"
+import type { MachineList } from "@pleiades/cards/machine/contract.ts"
 import { openError } from "@pleiades/cards/machine/state.ts"
 import { useEffect, useRef, useState } from "react"
 
@@ -24,19 +25,21 @@ export type Fault = {
 /**
  * Calls `onFault` for each error that is raised while the page is open. The errors that are already
  * open when it opens are known, not new. Returns the machines that have an open error now, by
- * their serial numbers.
+ * their serial numbers, and the list of machines as it was read last, for the board of Titan.
  */
-export function useNewFaults(onFault: (fault: Fault) => void): ReadonlyArray<string> {
+export function useNewFaults(onFault: (fault: Fault) => void): { alarmed: ReadonlyArray<string>; list: MachineList | undefined } {
   const known = useRef<Set<string> | null>(null)
   const latest = useRef(onFault)
   latest.current = onFault
   const [alarmed, setAlarmed] = useState<ReadonlyArray<string>>([])
+  const [list, setList] = useState<MachineList>()
 
   useEffect(() => {
     let open = true
     const look = async () => {
       const answer = await getMachines().catch(() => null)
       if (!open || !answer?.values) return
+      setList(answer.values)
       const faults = answer.values.machines.flatMap((machine) => {
         const error = openError(machine)
         return error
@@ -60,7 +63,7 @@ export function useNewFaults(onFault: (fault: Fault) => void): ReadonlyArray<str
     }
   }, [])
 
-  return alarmed
+  return { alarmed, list }
 }
 
 /**
@@ -72,7 +75,7 @@ export function faultBriefing(fault: Fault, person: string | undefined): string 
   const who = person ?? "der Person vor dem Bildschirm"
   return [
     `[Meldung der Anlage, nicht von ${person ?? "der Person"}] Um ${at} hat die Maschine ${fault.machine} (Maschinen-ID ${fault.id}) einen Fehler gemeldet: „${fault.title}“ (Fehler ${fault.notificationId}).`,
-    `Sprich ${person ?? "die Person"} direkt an${person ? "" : ", ohne Namen,"} und sag ${who} in zwei kurzen Sätzen auf Deutsch, was los ist. Zeig dazu die Halle mit genui_shopfloor_show.`,
+    `Sprich ${person ?? "die Person"} direkt an${person ? "" : ", ohne Namen,"} und sag ${who} in einem kurzen Satz auf Deutsch, was los ist, und gib eine Empfehlung. Der Bildschirm zeigt den Stand aller Maschinen schon, zeig keine Karte.`,
     `Schlag einen sinnvollen nächsten Schritt vor und frag am Ende, ob du die Details der Maschine zeigen sollst. Erfinde keine Ursache, die die Daten nicht nennen.`,
   ].join(" ")
 }

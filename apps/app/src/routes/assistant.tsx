@@ -1,11 +1,6 @@
 import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router"
-import type { State } from "@pleiades/cards/machine/contract.ts"
-import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
-import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
-import { Card, CardContent, CardHeader, CardTitle } from "@pleiades/ui/components/card"
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@pleiades/ui/components/item"
-import { LightbulbIcon, SparklesIcon } from "lucide-react"
-import { Fragment, useEffect, useRef, useState } from "react"
+import { SparklesIcon } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import { pickModel, useChatPanel } from "@/chat/ask.ts"
 import {
@@ -22,11 +17,13 @@ import {
 import type { VoiceState } from "@/voice/voice.ts"
 import { faultBriefing, faultInWords, useNewFaults } from "@/voice/faults.ts"
 import type { Fault } from "@/voice/faults.ts"
-import type { Fact } from "@/voice/facts.ts"
 import { useShown } from "@/voice/shown.ts"
 import { loadRecognition } from "@/voice/transcribe.ts"
 import { isPause, useWakeWord } from "@/voice/wake.ts"
 import { greetingFor } from "@/voice/greeting.ts"
+import { boardOf } from "@/titan/board.ts"
+import type { Advice } from "@/titan/board.ts"
+import { BoardView } from "@/titan/board-view.tsx"
 import { usePresence } from "@/titan/faces/presence.ts"
 import { Cloud } from "@/voice/cloud.tsx"
 
@@ -41,9 +38,9 @@ import { Cloud } from "@/voice/cloud.tsx"
 //   "Hey Titan" or the space bar wakes it again. It still shows a new fault.
 // - Titan speaks only once it is started and only while its tab is in front: a tab left open in
 //   the background stays silent.
-// - With an answer, the screen splits: Titan on the left with what it says, on the right what it
-//   shows, black on white: its cards, and beside them the details of the answer, which are not
-//   read aloud, and the hint.
+// - With an answer, the screen splits: Titan on the left with what it says, the headline and the
+//   recommendation; on the right, black on white, the board: the state of the hall from the values,
+//   where to act with the problem, what it costs and the next step, and what runs as planned.
 // - Escape leaves the screen.
 //
 // The demo speaks German, so do the words of this page.
@@ -60,6 +57,11 @@ const ON_IT = "Moment."
 /** What Titan says when it pauses, and when it is back. */
 const PAUSING = "Ich mache Pause."
 const BACK = "Ich bin wieder da."
+
+/** A machine name such as M-02 is not broken at its hyphen: it takes one that does not break. */
+function unbroken(text: string): string {
+  return text.replace(/\b([A-Z]{1,4})-(\d)/g, "$1‑$2")
+}
 
 /** Whether the tab is in front, and so whether Titan may speak. */
 function useTabInFront(): boolean {
@@ -92,8 +94,8 @@ function Assistant() {
   const navigate = useNavigate()
   const state = useVoiceState()
   const { cards, briefing } = useShown()
-  /** With an answer to show, the screen splits. */
-  const split = cards.length > 0 || (briefing?.facts.length ?? 0) > 0
+  /** With an answer, the screen splits. */
+  const split = cards.length > 0 || Boolean(briefing?.summary)
   const inFront = useTabInFront()
   const [problem, setProblem] = useState<string>()
   /** What the speech recognition heard last, so the person sees what was asked. */
@@ -176,7 +178,7 @@ function Assistant() {
   const [alert, setAlert] = useState<Fault>()
   /** Who stands in front of the camera, by name if the face is known. */
   const [person, setPerson] = useState<string>()
-  const alarmed = useNewFaults((fault) => {
+  const { alarmed, list } = useNewFaults((fault) => {
     setAlert(fault)
     setHeard(undefined)
     setProblem(undefined)
@@ -325,37 +327,45 @@ function Assistant() {
     (overheard && `Gehört: „${overheard}“`) ??
     (wakeReady ? "Ich höre auf „Hey Titan“. „Hey Titan, Pause“ oder P pausiert." : undefined)
 
+  const board = useMemo(() => {
+    if (!list) return undefined
+    const advice = new Map<string, Advice>()
+    for (const fact of briefing?.facts ?? []) if (fact.title) advice.set(fact.title, { problem: fact.text, step: fact.step })
+    return boardOf(list, advice)
+  }, [list, briefing])
+
   return (
-    // The whole screen, over the app: black, with the cloud and the greeting. With an answer to
-    // show, it splits. On the left Titan, and under it what it says, like subtitles. On the right,
-    // black on white, what it shows: the cards, and beside them, on a wide screen, the details and
-    // the hint. What comes last is put beside or below, so it pushes nothing out of sight.
+    // The whole screen, over the app: black, with the cloud and the greeting. With an answer it
+    // splits. On the left Titan, and under it what it says: the headline, the recommendation, the
+    // question. On the right, black on white, the board (titan/board-view.tsx): the state of the hall
+    // from the values, where to act, what runs as planned, and what the answer drew.
     <div className="fixed inset-0 z-50 flex flex-col bg-black md:flex-row">
       <div
-        className={`relative flex min-h-0 shrink-0 flex-col items-center justify-center gap-8 px-6 py-10 text-center transition-all duration-500 ${split ? "md:w-2/5" : "flex-1"}`}
+        className={`relative flex min-h-0 shrink-0 flex-col items-center justify-center gap-8 px-8 py-10 text-center transition-all duration-500 ${split ? "md:w-2/5" : "flex-1"}`}
       >
         <div className={`flex items-center justify-center transition-all duration-500 ${paused ? "opacity-30" : ""} ${split ? "h-40 scale-[0.6]" : "h-72"}`}>
           <Cloud state={state} alarm={alarmed.length > 0} />
         </div>
-        <div className="flex max-w-xl flex-col gap-5">
+        <div className="flex max-w-xl flex-col gap-6">
           {alert && (
             <p className="text-2xl font-light text-balance text-state-alarm" role="alert">
               {alert.machine} · {alert.title}
             </p>
           )}
           {split && briefing?.summary ? (
-            <p className="text-2xl leading-snug font-light text-balance text-white/90 md:text-3xl">{briefing.summary}</p>
+            <p className="text-3xl leading-snug font-light text-balance text-white">{unbroken(briefing.summary)}</p>
           ) : (
             !alert && (
               <h1 className="text-3xl font-light tracking-wide text-balance text-white/90">{paused ? "Pause" : greetingFor(person, alarmed)}</h1>
             )
           )}
-          {split && briefing?.suggestion && (
-            <p className="text-lg font-light text-balance text-white/60">
-              <span className="mr-2 text-xs font-medium tracking-widest text-white/40 uppercase">Vorschlag</span>
-              {briefing.suggestion}
-            </p>
+          {split && briefing?.recommendation && (
+            <div className="flex flex-col gap-1 border-l-2 border-white/40 pl-4 text-left">
+              <span className="text-xs font-medium tracking-widest text-white/50 uppercase">Empfehlung</span>
+              <p className="text-xl font-light text-balance text-white/90">{unbroken(briefing.recommendation)}</p>
+            </div>
           )}
+          {split && briefing?.suggestion && <p className="text-lg font-light text-balance text-white/60">{unbroken(briefing.suggestion)}</p>}
           {heard && !split && <p className="text-lg font-light text-balance text-white/60">„{heard}“</p>}
           {!started && <p className="text-base font-light text-white/50">Leertaste drücken oder klicken, um Titan zu starten.</p>}
         </div>
@@ -363,28 +373,15 @@ function Assistant() {
         {line && <p className="absolute bottom-6 px-6 text-sm text-balance text-white/50">{line}</p>}
       </div>
       {split && (
-        <aside className="min-h-0 flex-1 overflow-y-auto bg-background p-6 text-left text-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-8 md:p-8">
-          {/* On a wide screen the details stand next to the cards, so everything is seen without scrolling. */}
-          <div className={`grid items-start gap-5 ${cards.length > 0 ? "xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]" : "mx-auto max-w-3xl"}`}>
-            {cards.length > 0 && (
-              <div className="flex min-w-0 flex-col gap-5">
+        <aside className="min-h-0 flex-1 overflow-y-auto bg-background p-6 text-left text-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-8 md:p-10">
+          <div className="mx-auto max-w-3xl">
+            {board ? (
+              <BoardView board={board} cards={cards} hint={briefing?.hint} />
+            ) : (
+              <div className="flex flex-col gap-5">
                 {cards.map((card, index) => (
-                  <div key={index} className="min-w-0 motion-safe:animate-in motion-safe:fade-in">
-                    {card}
-                  </div>
+                  <div key={index}>{card}</div>
                 ))}
-              </div>
-            )}
-            {briefing && (briefing.facts.length > 0 || briefing.hint) && (
-              <div className="flex min-w-0 flex-col gap-5 xl:sticky xl:top-0">
-                {briefing.facts.length > 0 && <Details facts={briefing.facts} alarmed={alarmed} />}
-                {briefing.hint && (
-                  <Alert className="motion-safe:animate-in motion-safe:fade-in">
-                    <LightbulbIcon />
-                    <AlertTitle>Übrigens</AlertTitle>
-                    <AlertDescription className="text-base">{briefing.hint}</AlertDescription>
-                  </Alert>
-                )}
               </div>
             )}
           </div>
@@ -394,61 +391,5 @@ function Assistant() {
         {paused ? "Pause." : said[state]}
       </p>
     </div>
-  )
-}
-
-/** The sign of a state the answer names in words, with the faults the page watches taking precedence. */
-function stateOfFact(fact: Fact, alarmed: ReadonlyArray<string>): State | "warning" | undefined {
-  if (fact.title && alarmed.includes(fact.title)) return "alarm"
-  const word = fact.status?.toLowerCase() ?? ""
-  if (/steht|alarm|störung|fehler/.test(word)) return "alarm"
-  if (/warn/.test(word)) return "warning"
-  if (/einricht|setup|rüst/.test(word)) return "setup"
-  if (/pause|gestoppt|aus\b/.test(word)) return "stopped"
-  if (/läuft|produziert|in betrieb/.test(word)) return "running"
-  if (/keine daten|offline/.test(word)) return "no-data"
-  return undefined
-}
-
-/**
- * The facts of an answer, so the eye finds what the ear could not keep: one row for each machine or
- * matter, with the sign of its state the app uses everywhere, the state in a word, since when, and
- * in one plain sentence what is going on. Built like the rows of the machines on Home.
- */
-function Details({ facts, alarmed }: { facts: ReadonlyArray<Fact>; alarmed: ReadonlyArray<string> }) {
-  return (
-    <Card className="gap-0 py-0 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2">
-      <CardHeader className="border-b py-4">
-        <CardTitle>Im Detail</CardTitle>
-      </CardHeader>
-      <CardContent className="px-0">
-        <ItemGroup className="gap-0">
-          {facts.map((fact, index) => {
-            const sign = stateOfFact(fact, alarmed)
-            return (
-              <Fragment key={`${index}-${fact.title ?? ""}`}>
-                {index > 0 && <ItemSeparator className="my-0" />}
-                <Item className="items-start rounded-none px-6">
-                  {sign && (
-                    <ItemMedia className="pt-1">
-                      <StateSymbol state={sign} label={fact.status} />
-                    </ItemMedia>
-                  )}
-                  <ItemContent className="gap-1">
-                    <ItemTitle className="text-base">
-                      {fact.title}
-                      {fact.title && fact.status && <span className="font-normal text-muted-foreground">·</span>}
-                      {fact.status && <span className="font-normal">{fact.status}</span>}
-                    </ItemTitle>
-                    <ItemDescription className="line-clamp-none text-base text-foreground/80">{fact.text}</ItemDescription>
-                    {fact.since && <p className="text-sm text-muted-foreground tabular-nums">{fact.since}</p>}
-                  </ItemContent>
-                </Item>
-              </Fragment>
-            )
-          })}
-        </ItemGroup>
-      </CardContent>
-    </Card>
   )
 }
