@@ -8,9 +8,25 @@ import type { Told } from "@pleiades/cards/machine/tell.ts"
 import { Badge } from "@pleiades/ui/components/badge"
 import { Link } from "@tanstack/react-router"
 import { ChevronRightIcon } from "lucide-react"
+import { Fragment } from "react"
 
 import { Button, buttonVariants } from "@pleiades/ui/components/button"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@pleiades/ui/components/item"
+
+import { chatOf } from "@/chat/ask.ts"
+
+/**
+ * A machine id that may break onto a new line after "_" as it does after "-", and nowhere else:
+ * `alcyone-machines_AX-400_P-04` keeps its parts whole.
+ */
+function Breakable({ text }: { text: string }) {
+  return text.split(/(?<=_)/).map((part, index) => (
+    <Fragment key={index}>
+      {index > 0 && <wbr />}
+      {part}
+    </Fragment>
+  ))
+}
 
 function Since({ told, asOf }: { told: Told; asOf: string }) {
   if (told.since === null) return null
@@ -36,21 +52,32 @@ const why: Partial<Record<State, (machine: string) => string>> = {
 /**
  * A machine that needs someone, or is in setup: one row of a list, with the way to its page.
  * With `onAsk`, a machine that needs someone offers the question why. The chat stays open while
- * the page changes.
+ * the page changes. With `name`, the name people know the machine by is its title, and what it
+ * is comes first in the line below. `what` says what it is where its values do not, as for a
+ * machine known by its id only. Without `linked`, the row does not lead to the page: a machine that
+ * sent no value in the last 24 hours has none.
  */
 export function MachineRow({
   machine,
   state,
   asOf,
   onAsk,
+  name,
+  what,
+  linked = true,
 }: {
   machine: Machine
   state: State
   asOf: string
   onAsk?: (question: string) => void
+  name?: string | null | undefined
+  what?: string | undefined
+  linked?: boolean
 }) {
   const told = tell(machine, state)
   const question = why[state]?.(machine.machine)
+  const kind = what ?? titleOf(machine)
+  const title = name || kind
   return (
     <Item role="listitem">
       {/* As tall as the first line, so the sign sits on it. */}
@@ -59,10 +86,16 @@ export function MachineRow({
       </ItemMedia>
       <ItemContent>
         <ItemTitle>
-          {titleOf(machine)}
+          {title}
           <Badge variant="outline">{stateLabel[state]}</Badge>
         </ItemTitle>
         <ItemDescription>
+          {name && (
+            <>
+              <Breakable text={kind} />
+              {" · "}
+            </>
+          )}
           <span className="text-foreground">{told.message}</span>
           {[told.detail, machine.program.value]
             .filter((more) => more && more !== told.message)
@@ -77,15 +110,17 @@ export function MachineRow({
           </Button>
         )}
         {/* A link that looks like the buttons next to it: it leads somewhere, so it stays a link. */}
-        <Link
-          to="/machines/$machine"
-          params={{ machine: machine.machine }}
-          search
-          className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-          aria-label={`Open ${titleOf(machine)}`}
-        >
-          <ChevronRightIcon />
-        </Link>
+        {linked && (
+          <Link
+            to="/sites/$machine"
+            params={{ machine: machine.machine }}
+            search={chatOf}
+            className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+            aria-label={`Open ${title}`}
+          >
+            <ChevronRightIcon />
+          </Link>
+        )}
       </ItemActions>
     </Item>
   )
@@ -105,7 +140,7 @@ export function MachineTile({ machine, asOf }: { machine: Machine; asOf: string 
         variant="outline"
         size="sm"
         // The chat stays open while the page changes.
-        render={<Link to="/machines/$machine" params={{ machine: machine.machine }} search />}
+        render={<Link to="/sites/$machine" params={{ machine: machine.machine }} search={chatOf} />}
         className="h-full items-start"
       >
         <ItemMedia variant="icon" className="h-5">

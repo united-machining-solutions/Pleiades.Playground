@@ -1,7 +1,8 @@
-import type { Machine, MachineList, State } from "@pleiades/cards/machine/contract.ts"
-import { stateOf, stateOrder } from "@pleiades/cards/machine/state.ts"
+import type { Machine, MachineList } from "@pleiades/cards/machine/contract.ts"
+import { stateOf } from "@pleiades/cards/machine/state.ts"
 import { SITES_SOURCE } from "@pleiades/cards/site/contract.ts"
-import type { Hall, PlacedMachine, SiteList, StateCount } from "@pleiades/cards/site/contract.ts"
+import { countsOf } from "@pleiades/cards/site/counts.ts"
+import type { Hall, PlacedMachine, SiteList } from "@pleiades/cards/site/contract.ts"
 
 import { readPlacements, readSites } from "./apis.ts"
 import type { Apis, Placement, StoredSite } from "./apis.ts"
@@ -10,14 +11,6 @@ import { listMachines } from "./machines.ts"
 // Where the machines stand: the sites and placements people entered in the Sites API, put
 // together with what every machine does now. The machines that send values and stand on no site
 // are the suggestions. Groups and counts are made here, a display only draws them.
-
-/** How many machines are in each state, in the order a display reads the states. */
-export function countsOf(states: ReadonlyArray<State>): Array<StateCount> {
-  return stateOrder.flatMap((state) => {
-    const machines = states.filter((one) => one === state).length
-    return machines > 0 ? [{ state, machines }] : []
-  })
-}
 
 const byMachineId = (a: { machine: string }, b: { machine: string }) => a.machine.localeCompare(b.machine)
 

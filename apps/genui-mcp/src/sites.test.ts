@@ -5,7 +5,7 @@ import type { Machine, MachineList } from "@pleiades/cards/machine/contract.ts"
 import { siteList } from "@pleiades/cards/site/contract.ts"
 
 import type { Placement, StoredSite } from "./apis.ts"
-import { countsOf, listSites, sitesOf } from "./sites.ts"
+import { listSites, sitesOf } from "./sites.ts"
 
 afterEach(() => mock.restoreAll())
 
@@ -165,14 +165,6 @@ test("a hall of a placement that the site does not name is shown after the halls
     result.sites[0]?.halls.map((hall) => hall.name),
     ["Hall 1", "Hall 2", "Hall 9"],
   )
-})
-
-test("counts leave out a state no machine is in", () => {
-  assert.deepEqual(countsOf(["no-data", "running", "no-data"]), [
-    { state: "running", machines: 1 },
-    { state: "no-data", machines: 2 },
-  ])
-  assert.deepEqual(countsOf([]), [])
 })
 
 const apis = { timeseriesUrl: "http://timeseries:8080", eventsUrl: "http://events:8080", sitesUrl: "http://sites:8080" }
