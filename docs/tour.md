@@ -102,7 +102,8 @@ broker, MQTT over WebSocket on port 9001, the moment a machine publishes it.
 
 People enter the sites, their halls and which machine stands where in the
 [Sites API](../source/Pleiades.Playground.Sites.Api/README.md), at <http://localhost:5540/>. A stack that has
-just started has none: Home says so in one line, and every machine stands under "On no site".
+just started has none: Home says so in one line, and every machine stands under "On no site". So it does
+while the Sites API does not answer, with a line that says the sites cannot be read now.
 
 ![Home: "3 machines on 2 sites", the search and the buttons All and Needs you, and the counts of all sites.
 North plant of Demo Manufacturing with 1 running and 1 stopped: Lathe 4 running in Hall 1, MM-120 M-02 stopped in

@@ -71,6 +71,7 @@ const list: SiteList = {
     { siteId: "west-plant", company: "Demo Manufacturing", name: "West plant", machineCount: 0, counts: [], halls: [{ name: "Hall W", machines: [] }] },
   ],
   unplaced: [{ machine: P07, state: "alarm", now: sending(P07, "TP-800", "P-07", "HOUSING-0815") }],
+  sitesError: null,
 }
 
 /** Each group as its site, and hall by hall the ids of the machines shown. */

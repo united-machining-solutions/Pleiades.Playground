@@ -25,7 +25,15 @@ import { StateCounts } from "./state-counts.tsx"
  * state; then the machines that send values and stand on no site. It draws the result of
  * `genui_site_list` and computes nothing but the wording.
  */
-export function SiteCards({ asOf, source, sites, unplaced }: SiteList) {
+export function SiteCards({ asOf, source, sites, unplaced, sitesError }: SiteList) {
+  if (sitesError !== null) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">The sites cannot be read now: the Sites API did not answer. Every machine that sends stands on no site.</p>
+        {unplaced.length > 0 && <UnplacedCard machines={unplaced} asOf={asOf} />}
+      </div>
+    )
+  }
   if (sites.length === 0 && unplaced.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">

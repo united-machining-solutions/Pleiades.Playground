@@ -1,8 +1,7 @@
-import { pageLinks } from "@pleiades/cards/shared/paging.ts"
-import { stateLabel } from "@pleiades/cards/machine/state.ts"
-import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
+import { Pages } from "@pleiades/cards/shared/pages.tsx"
 import type { SiteList, StateCount } from "@pleiades/cards/site/contract.ts"
 import { machinesInWords } from "@pleiades/cards/site/in-words.ts"
+import { StateCounts } from "@pleiades/cards/site/state-counts.tsx"
 import { Badge } from "@pleiades/ui/components/badge"
 import { Button } from "@pleiades/ui/components/button"
 import { Card } from "@pleiades/ui/components/card"
@@ -10,15 +9,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@pleiades/u
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@pleiades/ui/components/input-group"
 import { ItemGroup, ItemSeparator } from "@pleiades/ui/components/item"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@pleiades/ui/components/pagination"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
@@ -34,8 +24,8 @@ import { machineFilters } from "@/live/machines.ts"
 import { sitesAt, sitesWith } from "@/live/sites.ts"
 import { getSites } from "@/machines/get-machines.ts"
 import { MachineRow } from "@/machines/machine-item.tsx"
-import { changed, groupsOf, pageOf, pageOfSearch, showOf } from "@/sites/filter.ts"
-import type { Group, Row, SitesPage } from "@/sites/filter.ts"
+import { changed, emptyOf, groupsOf, pageOf, pageOfSearch, showOf, showOfToggle } from "@/sites/filter.ts"
+import type { Group, Row } from "@/sites/filter.ts"
 
 /** The sites are read once, from the backend; then what every machine on them does comes from the broker. */
 const live: Live<SiteList | null> = {
@@ -108,13 +98,15 @@ function Home() {
   const shown = pageOf(groups, search.page)
   const line = `${machinesInWords(list.machineCount)} on ${list.sites.length} ${list.sites.length === 1 ? "site" : "sites"} · ${liveness(connected, list.asOf)}`
   return (
-    <Page line={list.sites.length === 0 ? liveness(connected, list.asOf) : line}>
-      {/* Without sites the page stays as it is: one line says where they are entered, and every
-          machine stands under "On no site". */}
+    <Page line={list.sites.length === 0 ? `${machinesInWords(list.unplaced.length)} on no site · ${liveness(connected, list.asOf)}` : line}>
+      {/* Without sites the page stays as it is: one line says why, and every machine that sends
+          stands under "On no site", also while the Sites API does not answer. */}
       {list.sites.length === 0 && (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <MapPinOffIcon className="size-4 shrink-0" />
-          No site is entered yet. Enter sites and place the machines in the Sites API.
+          {list.sitesError === null
+            ? "No site is entered yet. Enter sites and place the machines in the Sites API."
+            : "The sites cannot be read now: the Sites API did not answer. Every machine that sends stands under \"On no site\"."}
         </p>
       )}
       <div ref={bar} className="scroll-mt-20">
@@ -122,8 +114,7 @@ function Home() {
       </div>
       {shown.groups.length === 0 ? (
         <Nothing
-          filtered={needs || query.trim() !== ""}
-          needsOnly={needs && query.trim() === ""}
+          {...emptyOf({ needs, query })}
           onShowAll={() => {
             setQuery("")
             void navigate({ to: ".", search: (previous) => changed(previous, { show: undefined }) })
@@ -137,22 +128,30 @@ function Home() {
         </div>
       )}
       {emptySites.length > 0 && shown.page === shown.pages && <EmptySites names={emptySites.map((site) => site.name)} />}
-      {shown.pages > 1 && <Pages view={shown} onPage={onPage} />}
+      {shown.pages > 1 && (
+        <Pages page={shown.page} pages={shown.pages} onPage={onPage} className="border-t pt-3">
+          <p className="text-sm text-muted-foreground tabular-nums">
+            Page {shown.page} of {shown.pages} · {shown.sites} {shown.sites === 1 ? "site" : "sites"}
+          </p>
+        </Pages>
+      )}
       <ValidPage asked={search.page} shown={shown.page} />
     </Page>
   )
 }
 
-/**
- * Why the list is empty: no machine sent a value yet, none needs someone, or none answers the search.
- * Where a filter is chosen, the way back to every machine.
- */
-function Nothing({ filtered, needsOnly, onShowAll }: { filtered: boolean; needsOnly: boolean; onShowAll: () => void }) {
-  const [title, description] = !filtered
-    ? ["No machine yet", "No machine published a value in the last 24 hours."]
-    : needsOnly
-      ? ["Nobody is needed", "No machine is in alarm, stopped or without data."]
-      : ["No machine matches", "No machine answers what is chosen."]
+/** Why the list is empty, and where a filter is chosen, the way back to every machine. */
+function Nothing({
+  title,
+  description,
+  clearable,
+  onShowAll,
+}: {
+  title: string
+  description: string
+  clearable: boolean
+  onShowAll: () => void
+}) {
   return (
     <Empty>
       <EmptyHeader>
@@ -162,7 +161,7 @@ function Nothing({ filtered, needsOnly, onShowAll }: { filtered: boolean; needsO
         <EmptyTitle>{title}</EmptyTitle>
         <EmptyDescription>{description}</EmptyDescription>
       </EmptyHeader>
-      {filtered && (
+      {clearable && (
         <EmptyContent>
           <Button onClick={onShowAll}>Show every machine</Button>
         </EmptyContent>
@@ -181,26 +180,6 @@ function Page({ line, children }: { line?: string; children: ReactNode }) {
       </div>
       {children}
     </div>
-  )
-}
-
-/**
- * How many machines are in each state, as the backend counted them: the sign, the number and the
- * word. In the head of a site it stands inside a button, so there it is made of spans.
- */
-function Counts({ counts, label, inButton = false }: { counts: ReadonlyArray<StateCount>; label?: string; inButton?: boolean }) {
-  const List = inButton ? "span" : "ul"
-  const Entry = inButton ? "span" : "li"
-  return (
-    <List className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" aria-label={inButton ? undefined : (label ?? "Machines by state")}>
-      {label && <Entry className="text-muted-foreground">{label}</Entry>}
-      {counts.map(({ state, machines }) => (
-        <Entry key={state} className="flex items-center gap-1.5 tabular-nums">
-          <StateSymbol state={state} />
-          {machines} {stateLabel[state].toLowerCase()}
-        </Entry>
-      ))}
-    </List>
   )
 }
 
@@ -239,16 +218,16 @@ function Filters({
           aria-label="Show"
           value={[needs ? "needs" : "all"]}
           onValueChange={(chosen) => {
-            const next = chosen[0] === "needs" ? "needs" : undefined
-            // Pressing the chosen one again changes nothing.
-            if ((next === "needs") !== needs) void navigate({ to: ".", search: (previous) => changed(previous, { show: next }) })
+            // Pressing the chosen one again gives an empty choice, which changes nothing.
+            const next = showOfToggle(chosen)
+            if (next !== null && (next === "needs") !== needs) void navigate({ to: ".", search: (previous) => changed(previous, { show: next }) })
           }}
         >
           <ToggleGroupItem value="all">All</ToggleGroupItem>
           <ToggleGroupItem value="needs">Needs you</ToggleGroupItem>
         </ToggleGroup>
       </div>
-      {counts.length > 0 && <Counts counts={counts} label="All sites" />}
+      {counts.length > 0 && <StateCounts counts={counts} label="All sites" />}
     </div>
   )
 }
@@ -269,7 +248,7 @@ function GroupSection({ group, asOf }: { group: Group; asOf: string }) {
           <span className="font-medium">{title}</span>
           <span className="text-sm text-muted-foreground">{group.site?.company ?? "Sent values in the last 24 hours"}</span>
           <span className="ml-auto flex flex-wrap items-center gap-3">
-            {group.counts && <Counts counts={group.counts} inButton />}
+            {group.counts && <StateCounts counts={group.counts} inButton />}
             <Badge variant="secondary" className="tabular-nums">
               {machinesInWords(group.machines)}
             </Badge>
@@ -298,7 +277,7 @@ function Rows({ rows, asOf }: { rows: ReadonlyArray<Row>; asOf: string }) {
         {rows.map((row, position) => (
           <Fragment key={row.machine.machine}>
             {position > 0 && <ItemSeparator className="my-0" />}
-            <MachineRow machine={row.machine} state={row.state} asOf={asOf} onAsk={ask} name={row.name} />
+            <MachineRow machine={row.machine} state={row.state} asOf={asOf} onAsk={ask} name={row.name} what={row.what} linked={row.linked} />
           </Fragment>
         ))}
       </ItemGroup>
@@ -306,61 +285,21 @@ function Rows({ rows, asOf }: { rows: ReadonlyArray<Row>; asOf: string }) {
   )
 }
 
-/** The sites without a machine, named once at the end, on the last page. */
+/** The sites without a machine, named once at the end, on the last page; their names fold. */
 function EmptySites({ names }: { names: ReadonlyArray<string> }) {
-  const [shown, setShown] = useState(false)
   return (
-    <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+    <Collapsible className="flex flex-col gap-1 text-sm text-muted-foreground">
       <p>
         {names.length} {names.length === 1 ? "site has" : "sites have"} no machine yet.{" "}
-        <Button variant="ghost" size="sm" onClick={() => setShown(!shown)}>
-          {shown ? "Hide them" : "Show them"}
-        </Button>
+        <CollapsibleTrigger render={<Button variant="ghost" size="sm" />} className="group/names">
+          <span className="group-data-[panel-open]/names:hidden">Show them</span>
+          <span className="hidden group-data-[panel-open]/names:inline">Hide them</span>
+        </CollapsibleTrigger>
       </p>
-      {shown && <p>{names.join(", ")}</p>}
-    </div>
-  )
-}
-
-/** Where the page lies among all, and the way to the others; built as the pages of the energy card. */
-function Pages({ view, onPage }: { view: SitesPage; onPage: (page: number) => void }) {
-  const go = (page: number) => (event: { preventDefault: () => void }) => {
-    event.preventDefault()
-    if (page >= 1 && page <= view.pages && page !== view.page) onPage(page)
-  }
-  const off = (disabled: boolean) => (disabled ? { "aria-disabled": true, tabIndex: -1, className: "pointer-events-none opacity-50" } : {})
-  const links = (neighbours: number) => (
-    <PaginationContent>
-      <PaginationItem>
-        <PaginationPrevious href="#" onClick={go(view.page - 1)} {...off(view.page === 1)} />
-      </PaginationItem>
-      {pageLinks(view.page, view.pages, neighbours).map((one, index) =>
-        one === "gap" ? (
-          <PaginationItem key={`gap-${index}`}>
-            <PaginationEllipsis />
-          </PaginationItem>
-        ) : (
-          <PaginationItem key={one}>
-            <PaginationLink href="#" isActive={one === view.page} onClick={go(one)}>
-              {one}
-            </PaginationLink>
-          </PaginationItem>
-        ),
-      )}
-      <PaginationItem>
-        <PaginationNext href="#" onClick={go(view.page + 1)} {...off(view.page === view.pages)} />
-      </PaginationItem>
-    </PaginationContent>
-  )
-  return (
-    <div className="@container/pages flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-      <p className="text-sm text-muted-foreground tabular-nums">
-        Page {view.page} of {view.pages} · {view.sites} {view.sites === 1 ? "site" : "sites"}
-      </p>
-      {/* Where the page is narrow, the links leave out the neighbours of the current page. */}
-      <Pagination className="mx-0 hidden w-auto @sm/pages:flex">{links(1)}</Pagination>
-      <Pagination className="mx-0 w-auto @sm/pages:hidden">{links(0)}</Pagination>
-    </div>
+      <CollapsibleContent>
+        <p>{names.join(", ")}</p>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
