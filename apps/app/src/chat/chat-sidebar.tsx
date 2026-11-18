@@ -65,7 +65,7 @@ import {
   TraceTitle,
 } from "@pleiades/ui/components/trace"
 
-import { commandsFor, completion, matching, readTyped, stepped, usage } from "@/opcua/commands.ts"
+import { commandsFor, completion, matching, readTyped, stepped, toolCommand, usage } from "@/opcua/commands.ts"
 import type { ChatCommand } from "@/opcua/commands.ts"
 import { keepOfAnswer } from "@/pages/from-answer.ts"
 
@@ -91,9 +91,10 @@ import { chatTools } from "./cards.tsx"
 import { UNNAMED_CHAT, chatName, nameOfQuestion } from "./chat-name.ts"
 import { DictateButton } from "./dictate.tsx"
 import { SaveAsPage } from "./save-as-page.tsx"
-import { chooseChatModel, fetchChatSettings, switchChatServer } from "./status.ts"
+import type { ListedServer } from "./server-list.ts"
+import { chooseChatModel, fetchChatSettings, getChatServers, switchChatServer } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
-import { toolLabel } from "./tool-results.ts"
+import { forModel, toolLabel } from "./tool-results.ts"
 import { ToolsMenu } from "./tools-menu.tsx"
 
 const root = getRouteApi("__root__")
@@ -634,23 +635,26 @@ function AnswerBlock({ block, thinking = false }: { block: Block; thinking?: boo
 }
 
 /**
- * The commands, under the field: all of them after /help, while a name is typed the ones that begin
- * with it. A command with an argument is put into the field to be completed; one without is sent.
- * One command is marked: the field keeps the focus and moves the mark with the arrow keys, and Tab
- * or Enter take the marked one (Composer). The field points to it with aria-activedescendant.
+ * The commands, under the field, and after them the tools of the MCP servers the chat has: all of them
+ * after /help, while a name is typed the ones it fits. A command with an argument is put into the field
+ * to be completed; one without is sent. One entry is marked: the field keeps the focus and moves the
+ * mark with the arrow keys, and Tab or Enter take the marked one (Composer). The field points to it with
+ * aria-activedescendant.
  */
 function CommandList({
   id,
   commands,
   marked,
-  title,
+  titled,
   onMark,
   onPick,
 }: {
   id: string
+  /** The commands of the chat first, then the tools: the order the arrow keys go. */
   commands: ReadonlyArray<ChatCommand>
   marked: number
-  title?: string
+  /** Whether each group says what it is: after /help, and wherever tools are in the list. */
+  titled: boolean
   onMark: (index: number) => void
   onPick: (command: ChatCommand) => void
 }) {
@@ -658,39 +662,55 @@ function CommandList({
   useEffect(() => {
     document.getElementById(`${id}-${marked}`)?.scrollIntoView({ block: "nearest" })
   }, [id, marked])
+  const split = commands.findIndex((command) => command.server !== undefined)
+  const groups = [
+    { title: "Commands", start: 0, entries: split < 0 ? commands : commands.slice(0, split) },
+    { title: "Tools", start: split, entries: split < 0 ? [] : commands.slice(split) },
+  ].filter((group) => group.entries.length > 0)
   // A ScrollArea of the design system for the scrolling part; its viewport is bounded, so it scrolls. Not a
   // Combobox: the list is filtered by what is typed into the message field itself, which a Combobox would
   // double with an input of its own.
   return (
     <ScrollArea className="[&>[data-slot=scroll-area-viewport]]:max-h-64">
-      {title && <span className="block px-2 pb-1 text-xs font-medium text-muted-foreground">{title}</span>}
-      <ItemGroup id={id} className="gap-0" role="listbox" aria-label="Commands">
-        {commands.map((command, index) => (
-          <Item
-            key={command.name}
-            id={`${id}-${index}`}
-            size="sm"
-            role="option"
-            aria-selected={index === marked}
-            // The field keeps the focus: a click must not take it, and Tab must not stop on an option.
-            render={
-              <button
-                type="button"
-                tabIndex={-1}
-                onMouseDown={(event) => event.preventDefault()}
-                onMouseMove={() => onMark(index)}
-                onClick={() => onPick(command)}
-              />
-            }
-            className="cursor-pointer text-left aria-selected:bg-muted"
-          >
-            <ItemContent>
-              <ItemTitle className="font-mono">{usage(command)}</ItemTitle>
-              <ItemDescription>{command.summary}</ItemDescription>
-            </ItemContent>
-          </Item>
+      <div id={id} role="listbox" aria-label="Commands and tools" className="flex flex-col gap-2">
+        {groups.map((group) => (
+          <ItemGroup key={group.title} className="gap-0" role="group" aria-label={group.title}>
+            {titled && (
+              <span aria-hidden className="block px-2 pb-1 text-xs font-medium text-muted-foreground">
+                {group.title}
+              </span>
+            )}
+            {group.entries.map((command, offset) => {
+              const index = group.start + offset
+              return (
+                <Item
+                  key={command.name}
+                  id={`${id}-${index}`}
+                  size="sm"
+                  role="option"
+                  aria-selected={index === marked}
+                  // The field keeps the focus: a click must not take it, and Tab must not stop on an option.
+                  render={
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onMouseMove={() => onMark(index)}
+                      onClick={() => onPick(command)}
+                    />
+                  }
+                  className="cursor-pointer text-left aria-selected:bg-muted"
+                >
+                  <ItemContent>
+                    <ItemTitle className="font-mono break-all">{usage(command)}</ItemTitle>
+                    <ItemDescription>{command.summary}</ItemDescription>
+                  </ItemContent>
+                </Item>
+              )
+            })}
+          </ItemGroup>
         ))}
-      </ItemGroup>
+      </div>
     </ScrollArea>
   )
 }
@@ -739,6 +759,27 @@ function Composer({
   const [marked, setMarked] = useState(0)
   const [closed, setClosed] = useState(false)
   const listId = useId()
+  // The tools of the MCP servers come into the list after the commands, so a person can name the tool
+  // the model should take. They are asked for when the list opens, as the panel "Tools" asks when it
+  // opens, so the list says what answers now. A server this chat switched off gives none, and neither
+  // does a tool only a card calls.
+  const [servers, setServers] = useState<ReadonlyArray<ListedServer>>([])
+  const listing = help || text.startsWith("/")
+  useEffect(() => {
+    if (!listing) return
+    let wanted = true
+    getChatServers().then(
+      (listed) => wanted && setServers(listed),
+      () => undefined,
+    )
+    return () => {
+      wanted = false
+    }
+  }, [listing])
+  const tools = servers
+    .filter((server) => server.reachable && !off.includes(server.name))
+    .flatMap((server) => forModel(server.tools, chatTools).map((tool) => toolCommand(server.name, tool)))
+  const all = [...commands, ...tools]
   const field = useRef<HTMLTextAreaElement>(null)
   // After "New chat", and in a chat its first question opened from the panel, the field takes the focus.
   useEffect(() => {
@@ -758,7 +799,7 @@ function Composer({
   // What was typed: a question goes out, a command becomes its question, /help shows the commands.
   const submit = (value: string) => {
     if (value.trim() === "" || busy) return
-    const typed = readTyped(value, commands)
+    const typed = readTyped(value, all)
     switch (typed.kind) {
       case "question":
         setText("")
@@ -791,7 +832,7 @@ function Composer({
       submit(`/${command.name}`)
     }
   }
-  const offered = closed ? [] : help ? commands : matching(text, commands)
+  const offered = closed ? [] : help ? all : [...matching(text, commands), ...matching(text, tools)]
   const current = Math.min(marked, Math.max(offered.length - 1, 0))
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -843,7 +884,7 @@ function Composer({
           id={listId}
           commands={offered}
           marked={current}
-          title={help ? "Commands" : undefined}
+          titled={help || offered.some((command) => command.server !== undefined)}
           onMark={setMarked}
           onPick={pick}
         />

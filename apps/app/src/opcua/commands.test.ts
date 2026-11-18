@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { commandsFor, completion, endpointOf, matching, readTyped, stepped, usage } from "./commands.ts"
+import { commandsFor, completion, endpointOf, matching, readTyped, stepped, toolCommand, usage } from "./commands.ts"
 
 const all = commandsFor(true)
 const withoutOpcUa = commandsFor(false)
@@ -81,6 +81,37 @@ test("Tab completes the marked command, and the list closes behind it", () => {
   assert.equal(completed, "/mapping ")
   assert.deepEqual(matching(completed, all), [], "the space closes the list")
   assert.equal(readTyped(`${completed}A02`, all).kind, "question", "the argument follows")
+})
+
+const show = toolCommand("genui", { name: "genui_machine_show", summary: "Show one machine." })
+const list = toolCommand("genui", { name: "genui_machine_list", summary: "" })
+const withTools = [...all, show, list]
+
+test("a tool of a server is a command that asks the model to take it, with or without what for", () => {
+  assert.deepEqual(readTyped("/genui_machine_show A1121O0001", withTools), {
+    kind: "question",
+    text: "Use the tool genui_machine_show: A1121O0001",
+  })
+  assert.deepEqual(readTyped("/genui_machine_list", withTools), { kind: "question", text: "Use the tool genui_machine_list." })
+  assert.equal(usage(show), "/genui_machine_show [what for]")
+  assert.equal(show.summary, "Show one machine.")
+  assert.equal(list.summary, "A tool of genui.", "a tool that says nothing names its server")
+})
+
+test("a tool is found by a part of its name too, after the names that begin with it", () => {
+  assert.deepEqual(
+    matching("/machine", withTools).map((command) => command.name),
+    ["machines", "genui_machine_show", "genui_machine_list"],
+  )
+  assert.deepEqual(
+    matching("/machine_sh", withTools).map((command) => command.name),
+    ["genui_machine_show"],
+  )
+  assert.deepEqual(
+    matching("/genui_", withTools).map((command) => command.name),
+    ["genui_machine_show", "genui_machine_list"],
+  )
+  assert.deepEqual(matching("/achine", withTools), [], "a part is found from its beginning only")
 })
 
 test("the arrow keys go round the list", () => {
