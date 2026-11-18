@@ -450,6 +450,12 @@ consumer that ends the alarms of an earlier run at the start of the next one doe
 - The adapter orders the endpoints of a server itself: encryption before signing only, then the strength of
   the policy. A registration that names a weaker endpoint than the strongest one is refused, unless
   `endpoint.allowWeaker` is true. That is the decision of a person, never a default.
+- The card of `opcua_endpoint_rank` shows the endpoint the adapter takes in one line, and folds the others
+  away behind "n more endpoints", since a person cannot choose one there. Without unfolding, the card says
+  one thing more: that the server also accepts sessions without security, if one of the others has none.
+  Choosing a weaker endpoint in the card, for example after the strongest one failed, is not built yet;
+  until then nothing in the app sets `endpoint.allowWeaker`. The rule is `endpointSummary` in
+  `apps/app/src/cards/opcua/results.ts`.
 - The certificate a server presents at the registration is the one the machine is known by. If it presents
   another one later, the adapter does not connect and says so in `lastError`.
 - The adapter is one OPC UA client, with one certificate in `/data/pki`. A server that does not accept unknown
@@ -466,8 +472,8 @@ consumer that ends the alarms of an earlier run at the start of the next one doe
     | The server offers | `needsUser` | `acceptsUser` | The card |
     | --- | --- | --- | --- |
     | A user name on an encrypted endpoint, no anonymous session | true | true | Asks for user name and password before the scan can go on; once stored, "change the user" |
-    | A user name on an encrypted endpoint, and an anonymous session | false | true | The endpoints, with "Log in with a user instead" (folded) |
-    | Anonymous sessions only, or a user name only on endpoints that sign or have no security | – | false | The endpoints, no form |
+    | A user name on an encrypted endpoint, and an anonymous session | false | true | The endpoint the adapter takes, with "Log in with a user instead" (folded) |
+    | Anonymous sessions only, or a user name only on endpoints that sign or have no security | – | false | The endpoint the adapter takes, no form |
 
     A server with anonymous sessions only, the opc-simulator among them, has no form, by design. To see it,
     configure a user on the server. The rule is `userStep` in `apps/app/src/cards/opcua/results.ts`.

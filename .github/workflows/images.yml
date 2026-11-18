@@ -64,6 +64,9 @@ jobs:
           - image: pleiades.playground.genui.mcp
             context: .
             file: apps/genui-mcp/Dockerfile
+          - image: pleiades.playground.simplecam.adapter
+            context: .
+            file: apps/simplecam-adapter-9042/Dockerfile
           - image: pleiades.playground.app
             context: .
             file: apps/app/Dockerfile
