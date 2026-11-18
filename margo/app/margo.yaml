@@ -109,6 +109,21 @@ parameters:
     targets:
       - pointer: GENUI_MCP_PORT
         components: ["default"]
+  opcuaAdapterBind:
+    value: "127.0.0.1"
+    targets:
+      - pointer: OPCUA_ADAPTER_BIND
+        components: ["default"]
+  opcuaAdapterPort:
+    value: 5560
+    targets:
+      - pointer: OPCUA_ADAPTER_PORT
+        components: ["default"]
+  opcSimulatorUiPort:
+    value: 8090
+    targets:
+      - pointer: OPC_SIMULATOR_UI_PORT
+        components: ["default"]
   dataRetention:
     value: "30.00:00:00"
     targets:
@@ -196,6 +211,19 @@ configuration:
           schema: port
         - parameter: genuiMcpPort
           name: Port of the generative UI MCP server
+          schema: port
+        - parameter: opcuaAdapterBind
+          name: Address of the OPC UA adapter
+          description: >-
+            The address the management API of the OPC UA adapter answers on. 127.0.0.1 keeps it on the device;
+            0.0.0.0 opens it to the network. Adding and removing a machine needs no sign-in, so open it only to a
+            network you control.
+          schema: bindAddress
+        - parameter: opcuaAdapterPort
+          name: Port of the OPC UA adapter
+          schema: port
+        - parameter: opcSimulatorUiPort
+          name: Port of the web UI of the simulated OPC UA machine
           schema: port
     - name: Data
       settings:

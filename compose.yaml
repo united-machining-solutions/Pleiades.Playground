@@ -329,6 +329,10 @@ services:
       # address of MQTT_WS_URL for a broker behind a proxy.
       MQTT_WS_PORT: ${MQTT_WS_PORT:-9001}
       MQTT_WS_URL: ${MQTT_WS_URL:-}
+      # The OPC UA adapter. While it does not answer, the chat leaves its tools and commands out; empty,
+      # the chat has no OPC UA.
+      OPCUA_MCP_URL: ${OPCUA_MCP_URL-http://opcua-adapter:8080/mcp}
+      OPCUA_ADAPTER_URL: ${OPCUA_ADAPTER_URL-http://opcua-adapter:8080}
       # The chat needs a language model; everything else works without one. The models come from a LiteLLM
       # gateway: the app offers those it marks for chat, and dictation takes the first it marks for speech
       # to text.
@@ -374,6 +378,57 @@ services:
       # Small parts, machine id merope-microtec_MM-120_M-02.
       Config__SpecOutput__ScenarioName: small-parts
 
+  # OPC UA: machines that speak OPC UA, added in the chat.
+  #
+  #   opc-simulator ──OPC UA──▶ opcua-adapter ──MQTT──▶ broker
+  #                                   └──REST, delete a removed machine──▶ timeseries-api, events-api
+  #
+  # The adapter runs every machine that is registered with it, from the registrations in its volume.
+  # See source/Pleiades.Playground.OpcUa.Adapter/README.md.
+  opcua-adapter:
+    <<: *service
+    image: ghcr.io/united-machining-solutions/pleiades.playground.opcua.adapter:${PLEIADES_VERSION:-dev}
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.OpcUa.Adapter/Dockerfile
+    ports:
+      # Whoever reaches this port can add and remove machines: it has no sign-in. So it answers on
+      # this computer only, unless OPCUA_ADAPTER_BIND opens it to the network.
+      - "${OPCUA_ADAPTER_BIND:-127.0.0.1}:${OPCUA_ADAPTER_PORT:-5560}:8080"
+    depends_on:
+      broker:
+        condition: service_healthy
+      timeseries-persistence:
+        condition: service_healthy
+      events-persistence:
+        condition: service_healthy
+    environment:
+      <<: *logging-env
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: opcua-adapter
+      Config__DataDirectory: /data
+    volumes:
+      - opcua_adapter_data:/data
+
+  # A machine to try the adapter with: the TRUMPF OPC UA simulator with a TruMatic, definition K09, as
+  # umati publishes it. It is not registered with the adapter: a person adds it in the chat,
+  # /discover A1121O0001. OPC_SIMULATOR_IMAGE names another image of it, for example one built on this
+  # computer.
+  opc-simulator:
+    image: ${OPC_SIMULATOR_IMAGE:-ghcr.io/umati/trumpf/edge/opc-simulator:1.4.0-alpha3}
+    restart: unless-stopped
+    # The name the server announces in its endpoints and carries in its certificate, and the machine
+    # of the definition.
+    hostname: A1121O0001
+    command: ["run", "-c", "/opt/opcsim/samples/definitions/K09.simulation.yaml"]
+    ports:
+      # The web UI of the simulator. Its OPC UA port, 4840, is reached inside the demo network only.
+      - "${OPC_SIMULATOR_UI_PORT:-8090}:8080"
+    volumes:
+      - opc_simulator_pki:/data/pki
+
 volumes:
   ultimaker_data:
   mongodb_data:
+  opcua_adapter_data:
+  opc_simulator_pki:
