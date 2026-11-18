@@ -1,4 +1,4 @@
-import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router"
+import { Outlet, createFileRoute, getRouteApi, useChildMatches, useNavigate } from "@tanstack/react-router"
 import { Kbd } from "@pleiades/ui/components/kbd"
 import { SparklesIcon } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
@@ -82,8 +82,14 @@ const root = getRouteApi("__root__")
 
 export const Route = createFileRoute("/(showcases)/titan")({
   staticData: { nav: { title: "Titan", icon: SparklesIcon } },
-  component: Assistant,
+  component: TitanPage,
 })
+
+// The pages below Titan, as /titan/faces, are children of this route: one of them shows instead of Titan.
+function TitanPage() {
+  const below = useChildMatches()
+  return below.length > 0 ? <Outlet /> : <Assistant />
+}
 
 /** For a screen reader: what the cloud shows by moving. */
 const said: Record<VoiceState, string> = {
