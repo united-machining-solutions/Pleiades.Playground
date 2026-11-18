@@ -397,8 +397,11 @@ function Conversation({ threadId }: { threadId: string }) {
       <PanelHead title={chatName(entry, firstQuestion ?? asked)} back />
       <div className="min-h-0 flex-1">
         {/* A new question settles near the top and the answer grows under it; a chat from before
-            opens at its last question. */}
-        <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor">
+            opens at its last question. Without `autoScroll`: with it, the scroller keeps the question
+            at the top only while the answer fits, and then follows its end, so a card taller than the
+            panel, which comes in one piece, took the question out of sight at once. The button at the
+            foot leads to the end. */}
+        <MessageScrollerProvider defaultScrollPosition="last-anchor">
           <MessageScroller>
             <MessageScrollerViewport>
               <MessageScrollerContent aria-busy={isLoading} className="gap-6 p-4">
