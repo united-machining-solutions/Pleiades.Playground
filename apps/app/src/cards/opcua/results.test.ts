@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { machineListOf, mappingOf, needingALook, proposalOf, securityOf, serverListOf, shownValue, userStep } from "./results.ts"
+import { machineListOf, mappingOf, needingALook, proposalOf, securityOf, serverListOf, shownProfiles, shownValue, userStep } from "./results.ts"
 
 const server = {
   serialNumber: "A0280O0001",
@@ -82,4 +82,25 @@ test("the endpoints card asks for a user only where the server takes one", () =>
   assert.equal(userStep({ needsUser: false, acceptsUser: true }), "optional")
   assert.equal(userStep({ needsUser: true, acceptsUser: false }), "none")
   assert.equal(userStep({}), "none")
+})
+
+test("the core is shown always, and of the other profiles those a server offers", () => {
+  const check = (name: string, fulfilled: boolean, offered: boolean, mandatory = false) => ({
+    name,
+    mandatory,
+    fulfilled,
+    offered,
+    missing: fulfilled ? [] : ["x"],
+    instances: [],
+  })
+  const shown = shownProfiles([
+    check("Core", false, true, true),
+    check("MonitoringExtended", true, true),
+    check("ChannelMonitoring", false, true),
+    check("Spindle", false, false),
+  ])
+  assert.equal(shown.core?.name, "Core")
+  assert.deepEqual(shown.fulfilled.map((one) => one.name), ["MonitoringExtended"])
+  assert.deepEqual(shown.incomplete.map((one) => one.name), ["ChannelMonitoring"])
+  assert.deepEqual(shownProfiles(undefined), { core: undefined, fulfilled: [], incomplete: [] })
 })

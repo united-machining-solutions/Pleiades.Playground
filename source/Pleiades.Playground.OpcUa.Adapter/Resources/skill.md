@@ -81,32 +81,51 @@ browsing each from scratch.
 
 ## The elements
 
-The paths are those of the MQTT binding of this platform. `M` is mandatory in the profile Core, `C` is
-mandatory if the machine has the function.
+The paths are those of the MQTT binding of this platform. The profiles are those of the data model,
+specification 0.17.0. **Core** is mandatory, every element of it: the adapter adds no machine without the
+whole core. Of every other profile the adapter publishes the elements only if the profile is complete; a
+profile with instances (a channel, a spindle, a measuring point) is published for each complete instance,
+and a measuring point needs `Main`. Map what the server offers; the adapter decides what is complete.
 
 | Path | Profile | Kind | Unit | Where it usually is |
 |---|---|---|---|---|
-| `Identification.Manufacturer` | Core M | Text | | `Identification/Manufacturer` of the machine |
-| `Identification.SerialNumber` | Core M | Text | | `Identification/SerialNumber`; its value is the `serialNumber` of the registration |
-| `Identification.ProductInstanceUri` | Core M | Text | | `Identification/ProductInstanceUri` |
-| `State.MachineryItemState` | Core M | Text | | `MachineryItemState/CurrentState/Number` (OPC 40001-1): 0 NotAvailable, 1 OutOfService, 2 NotExecuting, 3 Executing |
-| `State.MachineryOperationMode` | Core M | Text | | `MachineryOperationMode/CurrentState/Number` (OPC 40001-1): 0 None, 1 Maintenance, 2 Setup, 3 Processing |
-| `OperationCounters.PowerOnDuration` | Core M | Number | `second` | `OperationCounters/PowerOnDuration`, a Duration in milliseconds: scale 0.001 |
-| `State.FeedOverride` | Core C | Number | `one` | `Monitoring/MachineTool/FeedOverride`, usually percent: scale 0.01 |
-| `Channel[n].ChannelState` | Core C | Text | | `Monitoring/<channel>/ChannelState`: 0 Active, 1 Interrupted, 2 Reset |
-| `OperationCounters.PartsProducedInLifetime` | Core C | Number | `one` | `OperationCounters/PartsProducedInLifetime` |
-| `Channel[n].ChannelMode` | Channel | Text | | `Monitoring/<channel>/ChannelMode`, an enumeration |
-| `Channel[n].FeedOverride` | Channel | Number | `one` | `Monitoring/<channel>/FeedOverride`, usually percent |
-| `Channel[n].RapidOverride` | Channel | Number | `one` | `Monitoring/<channel>/RapidOverride` |
-| `Channel[n].Name` | Channel | Text | | `Monitoring/<channel>/Name` |
+| `Identification.Manufacturer` | Core | Text | | `Identification/Manufacturer` of the machine |
+| `Identification.SerialNumber` | Core | Text | | `Identification/SerialNumber`; its value is the `serialNumber` of the registration |
+| `Identification.ProductInstanceUri` | Core | Text | | `Identification/ProductInstanceUri` |
+| `Identification.ManufacturerUri` | Core | Text | | `Identification/ManufacturerUri` |
+| `Identification.Model` | Core | Text | | `Identification/Model` |
+| `Identification.ProductCode` | Core | Text | | `Identification/ProductCode` |
+| `Identification.YearOfConstruction` | Core | Number | `one` | `Identification/YearOfConstruction`, a UInt16 year |
+| `State.MachineryItemState` | Core | Text | | `MachineryItemState/CurrentState/Number` (OPC 40001-1): 0 NotAvailable, 1 OutOfService, 2 NotExecuting, 3 Executing |
+| `State.MachineryOperationMode` | Core | Text | | `MachineryOperationMode/CurrentState/Number` (OPC 40001-1): 0 None, 1 Maintenance, 2 Setup, 3 Processing |
+| `State.FeedOverride` | Core | Number | `one` | `Monitoring/MachineTool/FeedOverride`, usually percent: scale 0.01 |
+| `OperationCounters.PowerOnDuration` | Core | Number | `second` | `OperationCounters/PowerOnDuration`, a Duration in milliseconds: scale 0.001 |
+| `Notification.ActiveAlerts` | Core | | | Not an element: the alarm subscription, `alerts`. Without `alerts` the core is not fulfilled |
+| `Identification.HardwareRevision` | IdentificationExtended | Text | | `Identification/HardwareRevision` |
+| `Identification.MonthOfConstruction` | IdentificationExtended | Number | `one` | `Identification/MonthOfConstruction`, 1 to 12 |
+| `Identification.InitialOperationDate` | IdentificationExtended | Text | | `Identification/InitialOperationDate` |
+| `Identification.DeviceClass` | IdentificationExtended | Text | | `Identification/DeviceClass` |
+| `Identification.AssetId` | IdentificationExtended | Text | | `Identification/AssetId` |
+| `Identification.ComponentName` | IdentificationExtended | Text | | `Identification/ComponentName` |
+| `Identification.Location` | IdentificationExtended | Text | | `Identification/Location` |
+| `OperationCounters.PartsProducedInLifetime` | MonitoringExtended | Number | `one` | `OperationCounters/PartsProducedInLifetime` |
+| `OperationCounters.OperationDuration` | MonitoringExtended | Number | `second` | `OperationCounters/OperationDuration` |
+| `State.IsWarmUp` | MonitoringExtended | Boolean | | `Monitoring/MachineTool/IsWarmUp` |
+| `Channel[n].ChannelState` | ChannelMonitoring | Text | | `Monitoring/<channel>/ChannelState`: 0 Active, 1 Interrupted, 2 Reset |
+| `Channel[n].FeedOverride` | ChannelMonitoring | Number | `one` | `Monitoring/<channel>/FeedOverride`, usually percent |
+| `Channel[n].ChannelMode` | ChannelMonitoring | Text | | `Monitoring/<channel>/ChannelMode`, an enumeration |
+| `Channel[n].RapidOverride` | ChannelMonitoring | Number | `one` | `Monitoring/<channel>/RapidOverride` |
+| `Channel[n].Name` | ChannelMonitoring | Text | | `Monitoring/<channel>/Name` |
 | `Spindle[n].IsRotating` | Spindle | Boolean | | `Monitoring/<spindle>/IsRotating` |
 | `Spindle[n].Override` | Spindle | Number | `one` | `Monitoring/<spindle>/Override`, usually percent |
-| `Production.ActiveProgram` | Production | Text | | `Production/ActiveProgram/Name` |
-| `OperationCounters.OperationDuration` | MonitoringExtended | Number | `second` | `OperationCounters/OperationDuration` |
-| `Identification.Model` | IdentificationExtended | Text | | `Identification/Model` |
-| `Identification.SoftwareRevision` | IdentificationExtended | Text | | `Identification/SoftwareRevision` |
-| `Consumption.Electricity[Main].AcActivePowerTotal` | Energy | Number | `watt` | the energy meter of the machine |
-| `Consumption.Electricity[Main].AcActiveEnergyTotalImportHp` | Energy | Number | `joule` | the energy meter: watt hours times 3600 |
+| `Spindle[n].IsUsedAsAxis` | Spindle | Boolean | | `Monitoring/<spindle>/IsUsedAsAxis` |
+| `Spindle[n].Name` | Spindle | Text | | `Monitoring/<spindle>/Name` |
+| `Consumption.Electricity[Main].AcActivePowerTotal` | EnergyElectricity | Number | `watt` | the energy meter of the machine |
+| `Consumption.Electricity[Main].AcActiveEnergyTotalImportHp` | EnergyElectricity | Number | `joule` | the energy meter: watt hours times 3600 |
+| `Production.ActiveProgram` | none | Text | | `Production/ActiveProgram/Name` |
+| `Identification.SoftwareRevision` | none | Text | | `Identification/SoftwareRevision` |
+
+An element of no profile, the last two above, is published as it is.
 
 `n` is the number of the channel or the spindle, from 1. A value the table does not name, and that is worth
 having, goes into the area `vendor` with a path of your choice in the same form, `Group.Element`.
@@ -131,12 +150,14 @@ those elements yourself, or leave them in `missing`.
 **A machine in `urn:umati2:datamodel:opcua`** (with or without the prefix of a gateway, for example
 `urn:Z0009A0033:TRUMPF:UAInterfaces/urn:umati2:datamodel:opcua`) is the data model itself: its node `s=Machine`
 holds one variable per element, named by the path of the element. The adapter maps it whole:
-`Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`, `.Model`, `.SoftwareRevision`,
+`Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`, `.ManufacturerUri`, `.Model`,
+`.ProductCode`, `.YearOfConstruction`, `.SoftwareRevision`,
 `State.MachineryItemState` and `State.MachineryOperationMode` (members of the structure `State.Status`),
 `State.FeedOverride` and `OperationCounters.PowerOnDuration`. For such a machine do not browse or read the
-tree. Propose with `machineNode` set to the `node` of `opcua_machine_list`, the `serialNumber`, the profiles
-`Core` and `IdentificationExtended`, and `elements` empty; add only what the adapter does not set. Put
-`Notification.ActiveAlerts` in `missing`: it is a list. `Connection.State` and `Connection.Heartbeat` of that
+tree. Propose with `machineNode` set to the `node` of `opcua_machine_list`, the `serialNumber` and `elements`
+empty; add only what the adapter does not set. `Notification.ActiveAlerts` of that tree is a list, not an
+element: for the core, find the alarm event type of the server and set `alerts`, or put it in `missing`, and
+the machine is not added. `Connection.State` and `Connection.Heartbeat` of that
 tree are the connection of the source to the machine, not values of the machine: leave them out. An element
 the server does not fill is moved to `missing` by the adapter.
 
@@ -158,11 +179,12 @@ the server does not fill is moved to `missing` by the adapter.
     unclear, so the person can decide.
 - **Evidence.** One sentence per element: the browse path of the node, its unit or enumeration, and why it is
   this element.
-- **Missing.** Every element of Core that the server does not offer goes into `missing` with the reason. A
-  mandatory one that is neither mapped nor derived makes the proposal fail: derive it or do not name the
-  profile Core.
-- **Profiles.** Name a profile only if you mapped its elements: `Core`, `Channel`, `Spindle`, `Production`,
-  `Energy`, `IdentificationExtended`, `MonitoringExtended`.
+- **Missing.** Every element of a profile that the server does not offer goes into `missing` with the reason.
+  An element of the core that is neither mapped nor derived makes the proposal fail: the machine is not added.
+  Tell the person which ones the core lacks.
+- **Profiles.** Leave `profiles` out. The adapter names the profiles whose elements are all mapped, and
+  publishes no element of a profile that is not complete. The proposal says, profile by profile, what is
+  complete and what is lacking (`conformance`); say it to the person.
 
 ## Every server is different
 
@@ -189,7 +211,6 @@ This example is the TRUMPF simulator. Its shape is the same for every server; it
   "serialNumber": "A0280O0001",
   "displayName": "TruLaser, hall 2",
   "modelVersion": "0.8.0",
-  "profiles": ["Core", "Channel"],
   "endpoint": { "url": "opc.tcp://192.168.1.20:4840", "securityMode": "SignAndEncrypt", "securityPolicy": "Aes256_Sha256_RsaPss" },
   "elements": [
     { "path": "Identification.Manufacturer", "kind": "Text", "match": "Direct",

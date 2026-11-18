@@ -18,6 +18,12 @@ internal sealed record RegistrationOutcome(
     IReadOnlyList<RankedEndpoint>? Endpoints,
     ProbeResult? Probe)
 {
+    /// <summary>
+    /// The registration as it was checked, with the known mappings and the profiles applied, also
+    /// when it was refused. Null if it was refused before that.
+    /// </summary>
+    public MachineRegistration? Tried { get; init; }
+
     /// <summary>Whether the machine is registered now.</summary>
     public bool Registered => Registration is not null && Problems.Count == 0;
 }
@@ -242,12 +248,13 @@ internal sealed class MachineSupervisor : BackgroundService
             registration = registration with { Endpoint = registration.Endpoint with { User = storedUser.User } };
         }
 
-        // What the adapter knows of a namespace is not left to the scan.
-        registration = KnownMappings.Apply(registration);
+        // What the adapter knows of a namespace is not left to the scan. A profile that is not
+        // complete is not published, and the profiles are the ones that are complete.
+        registration = DataModelProfiles.Apply(KnownMappings.Apply(registration), out _);
         var problems = RegistrationValidator.Validate(registration);
         if (problems.Count > 0)
         {
-            return new RegistrationOutcome(null, problems, null, null);
+            return new RegistrationOutcome(null, problems, null, null) { Tried = registration };
         }
 
         // The strongest endpoint the server offers is taken, unless a person decided otherwise.
@@ -263,7 +270,7 @@ internal sealed class MachineSupervisor : BackgroundService
                 : registration.Endpoint.User is null
                     ? "endpoint: the server offers no such endpoint for a session without a user."
                     : "endpoint: the server offers no such endpoint for a session with a user name.";
-            return new RegistrationOutcome(null, [problem], endpoints, null);
+            return new RegistrationOutcome(null, [problem], endpoints, null) { Tried = registration };
         }
 
         if ((!chosen.Recommended || chosen.Weak) && !registration.Endpoint.AllowWeaker)
@@ -273,7 +280,7 @@ internal sealed class MachineSupervisor : BackgroundService
                 null,
                 [$"endpoint: the server offers {best.SecurityMode} with {best.SecurityPolicy}, which is stronger. Take it, or set endpoint.allowWeaker if a person decided for the weaker one."],
                 endpoints,
-                null);
+                null) { Tried = registration };
         }
 
         var probe = await _probe.ProbeAsync(registration, cancellationToken).ConfigureAwait(false);
@@ -283,27 +290,33 @@ internal sealed class MachineSupervisor : BackgroundService
         if (absent.Count > 0)
         {
             probe = probe with { Elements = [.. probe.Elements.Where(element => !(element.Area == "umati" && absent.Contains(element.Path)))] };
-            var lacking = RegistrationValidator.Validate(registration);
-            if (lacking.Count > 0)
-            {
-                return new RegistrationOutcome(null, lacking, endpoints, probe);
-            }
         }
 
-        if (probe.NotFound.Count > 0)
+        // An element that left makes its profile incomplete; the core decides whether the machine is added.
+        var before = registration.Elements;
+        registration = DataModelProfiles.Apply(registration, out var checks);
+        if (registration.Elements.Count != before.Count)
         {
-            return new RegistrationOutcome(
-                null,
-                [.. probe.NotFound.Select(element => $"elements[{element.Path}]: the server has no node {element.Node}.")],
-                endpoints,
-                probe);
+            probe = probe with { Elements = [.. probe.Elements.Where(element => registration.Elements.Any(kept => kept.Area == element.Area && kept.Path == element.Path))] };
+        }
+
+        var refused = new List<string>();
+        refused.AddRange(probe.NotFound.Select(element => $"elements[{element.Path}]: the server has no node {element.Node}."));
+        if (DataModelProfiles.CoreProblem(checks) is { } core)
+        {
+            refused.Add(core);
+        }
+
+        if (refused.Count > 0)
+        {
+            return new RegistrationOutcome(null, refused, endpoints, probe) { Tried = registration };
         }
 
         // On a server of several machines the registration has to be the machine it says it is.
         var mismatch = MachineChecks.Problems(registration, probe.Machines, probe.SerialNumber);
         if (mismatch.Count > 0)
         {
-            return new RegistrationOutcome(null, mismatch, endpoints, probe);
+            return new RegistrationOutcome(null, mismatch, endpoints, probe) { Tried = registration };
         }
 
         // The certificate the server presents now is the one this machine is known by from here on.
@@ -344,7 +357,7 @@ internal sealed class MachineSupervisor : BackgroundService
     {
         var outcome = await RegisterAsync(registration, dryRun: true, cancellationToken).ConfigureAwait(false);
         var stored = Find(registration.SerialNumber)?.Registration;
-        var tried = outcome.Registration ?? KnownMappings.Apply(registration);
+        var tried = outcome.Registration ?? outcome.Tried ?? DataModelProfiles.Apply(KnownMappings.Apply(registration), out _);
         var rows = outcome.Probe is null ? [] : Views.Rows(tried, outcome.Probe);
         var endpoint = Views.Endpoint(tried.Endpoint) with
         {
@@ -358,7 +371,8 @@ internal sealed class MachineSupervisor : BackgroundService
             registration.SerialNumber,
             registration.DisplayName,
             endpoint,
-            registration.Profiles,
+            tried.Profiles,
+            DataModelProfiles.Check(tried),
             outcome.Problems,
             outcome.Probe is null ? null : MappingReview.Summary(rows),
             rows,

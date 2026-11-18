@@ -24,6 +24,22 @@ export type MappingSummary = {
   needsAttention: boolean
 }
 
+/**
+ * Whether a machine delivers a profile of the data model whole (spec v0.17.0). The core is mandatory: a
+ * machine without it is not added. Of another profile only a complete one is published.
+ */
+export type ProfileCheck = {
+  name: string
+  mandatory: boolean
+  fulfilled: boolean
+  /** At least one element of the profile is mapped. */
+  offered: boolean
+  /** The elements that are not mapped. */
+  missing: Array<string>
+  /** For a profile with instances (channels, spindles, measuring points): the complete ones. */
+  instances: Array<string>
+}
+
 export type Server = {
   serialNumber: string
   displayName?: string
@@ -31,6 +47,8 @@ export type Server = {
   state: "Connecting" | "Connected" | "Disconnected"
   lastError?: string
   profiles: Array<string>
+  /** Each profile, the core first. Absent from an adapter that does not check them. */
+  conformance?: Array<ProfileCheck>
   mapping: MappingSummary
   needsRescan: boolean
   scannedAt?: string
@@ -74,6 +92,8 @@ export type Proposal = {
   displayName?: string
   endpoint: Endpoint
   profiles: Array<string>
+  /** Each profile, the core first. Absent from an adapter that does not check them. */
+  conformance?: Array<ProfileCheck>
   problems: Array<string>
   summary?: MappingSummary
   rows: Array<MappingRow>
@@ -199,6 +219,21 @@ export function machineListOf(content: unknown): MachineList | null {
     )
     ? (value as MachineList)
     : null
+}
+
+/** The core and the profiles worth showing: the core, and every profile that maps at least one element. */
+export function shownProfiles(checks: ReadonlyArray<ProfileCheck> | undefined): {
+  core?: ProfileCheck
+  fulfilled: Array<ProfileCheck>
+  incomplete: Array<ProfileCheck>
+} {
+  const all = Array.isArray(checks) ? checks : []
+  const others = all.filter((check) => !check.mandatory)
+  return {
+    core: all.find((check) => check.mandatory),
+    fulfilled: others.filter((check) => check.fulfilled),
+    incomplete: others.filter((check) => !check.fulfilled && check.offered),
+  }
 }
 
 /** The rows a person has to look at: everything that is not plainly fine. */

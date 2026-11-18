@@ -72,16 +72,23 @@ internal static class MappingReview
             rows.Add(new MappingRow(missing.Path, "umati", MappingState.Missing, null, missing.Reason, null, null));
         }
 
-        // A mandatory element of Core that is neither mapped nor explained is missing all the same.
-        if (registration.Profiles.Contains("Core", StringComparer.Ordinal))
+        // An element of the core that is neither mapped nor explained is missing all the same.
+        foreach (var (path, source) in DataModelProfiles.Core.Elements)
         {
-            foreach (var path in RegistrationValidator.CoreMandatory)
+            if (source == ProfileSource.Adapter || rows.Any(row => row.Area == "umati" && row.Path == path))
             {
-                if (!rows.Any(row => row.Area == "umati" && row.Path == path))
-                {
-                    rows.Add(new MappingRow(path, "umati", MappingState.Missing, null, "Mandatory in the profile Core, and not mapped.", null, null));
-                }
+                continue;
             }
+
+            if (source == ProfileSource.Alerts && registration.Alerts is not null)
+            {
+                continue;
+            }
+
+            var detail = source == ProfileSource.Alerts
+                ? "Mandatory in the core: the registration subscribes no alarms (alerts)."
+                : "Mandatory in the core, and not mapped.";
+            rows.Add(new MappingRow(path, "umati", MappingState.Missing, null, detail, null, null));
         }
 
         return [.. rows.OrderBy(row => Order(row.State))];

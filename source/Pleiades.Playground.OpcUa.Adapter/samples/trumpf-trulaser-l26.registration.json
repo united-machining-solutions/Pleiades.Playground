@@ -4,10 +4,7 @@
   "displayName": "Sample: TRUMPF TruLaser of the TRUMPF OPC UA simulator, definition L26",
   "modelVersion": "0.8.0",
   "profiles": [
-    "Core",
-    "Channel",
-    "Production",
-    "Energy"
+    "EnergyElectricity"
   ],
   "endpoint": {
     "url": "opc.tcp://opc-simulator:4840",
@@ -80,51 +77,6 @@
       "evidence": "5:Monitoring/5:MachineTool/5:FeedOverride, AnalogUnitRange with EURange 0..100: percent, so times 0.01."
     },
     {
-      "path": "Channel[1].ChannelState",
-      "kind": "Text",
-      "node": "nsu=http://trumpf.com/UA/MachineTool/;i=3027",
-      "map": {
-        "0": "Active",
-        "1": "Interrupted",
-        "2": "Reset"
-      },
-      "match": "Direct",
-      "evidence": "5:Monitoring/Channel1/5:ChannelState, enumeration ChannelState of OPC 40501-1, read from its EnumValues."
-    },
-    {
-      "path": "Channel[1].ChannelMode",
-      "kind": "Text",
-      "node": "nsu=http://trumpf.com/UA/MachineTool/;i=3026",
-      "map": {
-        "0": "Automatic",
-        "1": "MdaMdi",
-        "2": "JogManual",
-        "3": "JogIncrement",
-        "4": "TeachingHandle",
-        "5": "Remote",
-        "6": "Reference",
-        "7": "Other"
-      },
-      "match": "Direct",
-      "evidence": "5:Monitoring/Channel1/5:ChannelMode, enumeration ChannelMode of OPC 40501-1."
-    },
-    {
-      "path": "Channel[1].FeedOverride",
-      "kind": "Number",
-      "unit": "one",
-      "node": "nsu=http://trumpf.com/UA/MachineTool/;i=3030",
-      "scale": 0.01,
-      "match": "Direct",
-      "evidence": "5:Monitoring/Channel1/5:FeedOverride, EURange 0..100: percent, so times 0.01."
-    },
-    {
-      "path": "Channel[1].Name",
-      "kind": "Text",
-      "node": "nsu=http://trumpf.com/UA/MachineTool/;i=3031",
-      "match": "Direct",
-      "evidence": "5:Monitoring/Channel1/5:Name."
-    },
-    {
       "path": "Production.ActiveProgram",
       "kind": "Text",
       "node": "nsu=http://trumpf.com/UA/MachineTool/;i=3012",
@@ -166,6 +118,18 @@
   },
   "missing": [
     {
+      "path": "Identification.ManufacturerUri",
+      "reason": "The MachineTool instance of this server has no such node; its namespace urn:umati2:datamodel:opcua has one."
+    },
+    {
+      "path": "Identification.ProductCode",
+      "reason": "The MachineTool instance of this server has no such node; its namespace urn:umati2:datamodel:opcua has one."
+    },
+    {
+      "path": "Identification.YearOfConstruction",
+      "reason": "The MachineTool instance of this server has no such node; its namespace urn:umati2:datamodel:opcua has one."
+    },
+    {
       "path": "OperationCounters.PartsProducedInLifetime",
       "reason": "Conditional, and the condition does not hold: the server counts parts per program (TRUMPF CurrentQuantity), not over the lifetime of the machine."
     },
@@ -174,8 +138,20 @@
       "reason": "The server has no job management, and the MQTT binding of this repository publishes no list values."
     },
     {
-      "path": "Notification.ActiveAlerts",
-      "reason": "Not a value in the MQTT binding: the alarms travel as notification events, see alerts."
+      "path": "Channel[1].ChannelState",
+      "reason": "Not published: the profile ChannelMonitoring is not complete, it lacks Channel[1].RapidOverride."
+    },
+    {
+      "path": "Channel[1].ChannelMode",
+      "reason": "Not published: the profile ChannelMonitoring is not complete, it lacks Channel[1].RapidOverride."
+    },
+    {
+      "path": "Channel[1].FeedOverride",
+      "reason": "Not published: the profile ChannelMonitoring is not complete, it lacks Channel[1].RapidOverride."
+    },
+    {
+      "path": "Channel[1].Name",
+      "reason": "Not published: the profile ChannelMonitoring is not complete, it lacks Channel[1].RapidOverride."
     }
   ],
   "discovery": {

@@ -232,6 +232,14 @@ All notable changes are documented here. The format follows
   item state and the operation mode as the members of the structure `State.Status`, which the adapter
   decodes. An element the server does not fill is moved to `missing`. A machine a server shows twice, in that
   namespace and by the root of its TRUMPF interface, is listed once.
+- OPC UA adapter: the core and the profiles of the data model, specification 0.17.0, on the paths of today's
+  MQTT binding. A machine is added only if it fulfils the core whole: 13 elements, among them
+  `Identification.ManufacturerUri`, `.Model`, `.ProductCode`, `.YearOfConstruction`, `State.FeedOverride` and
+  the alarms, which come from `alerts`. Of `IdentificationExtended`, `MonitoringExtended`, `ChannelMonitoring`,
+  `Spindle` and `EnergyElectricity` only a complete profile, or a complete channel, spindle or measuring point,
+  is published; the elements of an incomplete one go to `missing`. The adapter names the profiles itself. The
+  proposal card and the list of the added servers in the chat show whether the core is fulfilled and which
+  profiles are complete, and the answers carry it as `conformance`.
 
 ### Changed
 
@@ -320,6 +328,11 @@ All notable changes are documented here. The format follows
 - Stack: the image of the simulator is built once, by `simulator-p-04`, and no longer once per simulator.
 - Stack: the OPC UA simulator runs the image `1.4.0-alpha3` instead of `1.3.1`, still definition `K09`, machine
   `A1121O0001`. That image is built for amd64 only; on arm64, `OPC_SIMULATOR_IMAGE` names another one.
+- OPC UA adapter: a registration that names the profiles `Core` without the 13 elements of the core of the
+  specification 0.17.0 is refused; a machine added before keeps running and the list says what it lacks. The
+  example registration of `K09` maps `ManufacturerUri`, `ProductCode` and `YearOfConstruction` and fulfils
+  the core. Its channel values are no longer published: the simulator has no `RapidOverride`, so
+  `ChannelMonitoring` is not complete. The example of `L26` does not fulfil the core.
 - `README.md` starts the stack with `--wait` and shows the two lines that enable the chat. The development
   setup has three more known issues: a download that breaks off, `pnpm` through the path, and a key that
   `docker compose restart` does not pick up.

@@ -20,8 +20,10 @@ A machine with an OPC UA server becomes a machine of the platform like the simul
 
 1. A person names a machine or the address of an OPC UA server in the chat of the example app.
 2. The chat scans the server with the OPC UA MCP tools, finds the endpoint with the best security, and
-   matches its nodes to the data model (at least the profile Core).
-3. The person reviews the proposal, sees what is unclear or derived, and adds the machine with a click.
+   matches its nodes to the data model.
+3. The person reviews the proposal, sees whether the machine fulfils the core of the data model, which
+   profiles are complete, and what is unclear or derived, and adds the machine with a click. A machine
+   without the whole core is not added ([Core and profiles](#core-and-profiles)).
 4. From then on the adapter runs the machine from the stored registration alone: after a full restart,
    without the MCP tools and without a language model, until the machine is removed.
 5. On request the chat scans an added server again and shows what changed, for example new profiles.
@@ -35,7 +37,8 @@ A machine with an OPC UA server becomes a machine of the platform like the simul
 | How a person starts a discovery, lists servers, reviews a mapping | In the chat only, no new page. Slash commands with `/help` guide the person |
 | Who adds and removes a machine | A person, with a button on a card in the chat. No tool of the MCP server adds or removes one |
 | How a machine is added and removed | The management API of the adapter; the registrations live in its volume |
-| Lists of Core (`Notification.ActiveAlerts`, `Production.JobOrders`) | By the MQTT binding: alarms as notification events, job orders not published |
+| Core and profiles | Those of the data model, specification 0.17.0, on the paths of the MQTT binding of today. The whole core or no machine; of another profile only a complete one is published |
+| Lists (`Notification.ActiveAlerts`, `Production.JobOrders`) | By the MQTT binding: alarms as notification events, job orders not published |
 | Test server | The TRUMPF OPC UA simulator: in the stack definition `K09`, machine `A1121O0001`; first tried with definition `L26`, machine `A0280O0001` |
 | Optional or not | Part of the stack, locally, in CI and in the deployment: no compose profile |
 
@@ -105,8 +108,11 @@ The simulator, its machines and the example registrations are TRUMPF-specific:
 [`samples/trumpf-trumatic-k09.registration.json`](samples/trumpf-trumatic-k09.registration.json) for the
 TruMatic `A1121O0001` of definition `K09`, the one in the stack, and
 [`samples/trumpf-trulaser-l26.registration.json`](samples/trumpf-trulaser-l26.registration.json) for the
-TruLaser `A0280O0001` of definition `L26`, the first one scanned. The two differ only in the machine: every
-definition of the simulator has the same nodes. The simulator serves the address space of a TRUMPF machine:
+TruLaser `A0280O0001` of definition `L26`, the first one scanned. The two differ in the machine and in the
+identification: the MachineTool instance of `K09` has `ManufacturerUri`, `ProductCode` and
+`YearOfConstruction`, the one of `L26` has not, so the example of `L26` does not fulfil the core and is refused.
+In the image `1.4.0-alpha3` both definitions also serve the namespace `urn:umati2:datamodel:opcua`, which has
+the whole core but the alarms ([A machine in `urn:umati2:datamodel:opcua`](#a-machine-in-urnumati2datamodelopcua)). The simulator serves the address space of a TRUMPF machine:
 a MachineTool instance after
 OPC 40501-1 in the namespace `http://trumpf.com/UA/MachineTool/`, and beside it the TRUMPF interface
 `http://trumpf.com/TRUMPF-Interfaces/` with the power-on time, the energy meter and the alarm type
@@ -257,7 +263,8 @@ adapter maps the machine whole ([`Mapping/Umati2DataModel.cs`](Mapping/Umati2Dat
 
 | Element | Node | How |
 |---|---|---|
-| `Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`, `.Model`, `.SoftwareRevision` | `s=Identification.<Element>` | as it is, `Direct` |
+| `Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`, `.ManufacturerUri`, `.Model`, `.ProductCode`, `.SoftwareRevision` | `s=Identification.<Element>` | as it is, `Direct` |
+| `Identification.YearOfConstruction` | `s=Identification.YearOfConstruction` | a UInt16 year, in `one` |
 | `State.FeedOverride` | `s=State.FeedOverride` | a Double in `one`, no scale |
 | `OperationCounters.PowerOnDuration` | `s=OperationCounters.PowerOnDuration` | a Double in `second`, no scale |
 | `State.MachineryItemState` | `s=State.Status`, member `MachineryItemState` | 0 NotAvailable, 1 OutOfService, 2 NotExecuting, 3 Executing |
@@ -266,15 +273,21 @@ adapter maps the machine whole ([`Mapping/Umati2DataModel.cs`](Mapping/Umati2Dat
 `State.Status` is a structure, `DataType.Status`, of two enumerations. The adapter decodes its binary
 encoding itself ([`Mapping/KnownStructures.cs`](Mapping/KnownStructures.cs)) and reads no type definitions from
 the server; the element names the member in `field`. An element of the table that the server does not have is
-moved to `missing` when the registration is tried, instead of refusing it. Not mapped: `Notification.ActiveAlerts`,
-a list of `DataType.Alert`, which the binding does not publish, and `Connection.State` and `Connection.Heartbeat`,
+moved to `missing` when the registration is tried, instead of refusing it; a missing element of the core
+refuses it all the same ([Core and profiles](#core-and-profiles)). `ManufacturerUri`, `ProductCode` and
+`YearOfConstruction` were not on the gateway of the edge device; the simulator `1.4.0-alpha3` has them. Not
+mapped: `Notification.ActiveAlerts`, a list of `DataType.Alert`, which the binding does not publish: the core
+takes the alarms from `alerts` instead, so such a machine is added only with the alarm event type of its server
+in `alerts`. Not mapped either: `Connection.State` and `Connection.Heartbeat`,
 the connection of the source on the edge device to the machine, not values of the machine. The model of the
 machine is its own `Identification.Model`, so the TRUMPF rule above does not apply.
 
 Such a server may show the same machine twice: in this namespace and by the root of its TRUMPF interface.
 `/endpoints/machines` lists it once, by its node in `urn:umati2:datamodel:opcua`, with the namespaces of both. A
-registration needs nothing but its machine:
-[`samples/trumpf-trulaser-umati2-gateway.registration.json`](samples/trumpf-trulaser-umati2-gateway.registration.json).
+registration needs nothing but its machine and its alarms:
+[`samples/trumpf-trulaser-umati2-gateway.registration.json`](samples/trumpf-trulaser-umati2-gateway.registration.json)
+names the machine only. The alarm event type of that gateway is not known, so the sample does not fulfil the
+core and is refused until `alerts` is set.
 
 A registration that is stored already keeps its mapping until it is replaced: `/rescan` proposes the change.
 A rule is code with a unit test ([`KnownMappingsTest.cs`](../Pleiades.Playground.OpcUa.Adapter.Test/KnownMappingsTest.cs)).
@@ -306,12 +319,11 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
 
 ## The registration
 
-[`samples/trumpf-trulaser-l26.registration.json`](samples/trumpf-trulaser-l26.registration.json) is a complete one. Its parts:
+[`samples/trumpf-trumatic-k09.registration.json`](samples/trumpf-trumatic-k09.registration.json) is a complete one. Its parts:
 
 - `serialNumber`: the machine id in every topic. It is the value of `Identification.SerialNumber`.
-- `profiles`: the profiles of the data model the elements cover. For `Core` its mandatory values must be
-  there: the three of the identification, `State.MachineryItemState`, `State.MachineryOperationMode` and
-  `OperationCounters.PowerOnDuration`.
+- `profiles`: the profiles of the data model the elements deliver whole. The adapter sets it from the
+  elements; what a proposal names is replaced ([Core and profiles](#core-and-profiles)).
 - `endpoint`: the URL, `securityMode` and `securityPolicy`. `serverCertificateThumbprint` is filled in by
   the adapter at the first connect, and `user` from the user a person stored for the server; never a password.
 - `machineNode`: the object of the machine, as `opcua_machine_list` names it. Required on a server of several
@@ -328,7 +340,41 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
   - `match` is `Direct`, `Derived` or `Unclear`: how sure the scan is.
   - `evidence` says why this node was matched. It is for the person who reviews the registration.
 - `alerts`: the event type of an alarm and the field with the code of the maker.
-- `missing`: what the discovery looked for and did not find, with the reason.
+- `missing`: what the discovery looked for and did not find, with the reason, and the elements of a profile
+  that is not complete, which the adapter does not publish.
+
+## Core and profiles
+
+The adapter checks every registration against the core and the profiles of the data model, specification
+0.17.0 (§5 and §6 of `spec/spec.md` of the data model), on the paths the MQTT binding uses today
+([`Mapping/DataModelProfiles.cs`](Mapping/DataModelProfiles.cs)). The binding still follows the data model
+0.8.0 ([`contracts/datamodel`](../../contracts/datamodel/README.md)); its topics change in a pull request of
+their own.
+
+- **Core.** Mandatory, every element: `Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`,
+  `.ManufacturerUri`, `.Model`, `.ProductCode`, `.YearOfConstruction`, `State.MachineryItemState` and
+  `State.MachineryOperationMode` (the snapshot `State.Status` of the specification), `State.FeedOverride`,
+  `OperationCounters.PowerOnDuration`, and `Notification.ActiveAlerts`, which the binding carries as the alarm
+  events of the subscription in `alerts`. `Connection.State` and `Connection.Heartbeat` the adapter publishes
+  itself. An element counts if it is mapped, also as `Derived` or `Unclear`; one in `missing` does not. A
+  registration without the whole core is refused with what it lacks.
+- **Profiles.** `IdentificationExtended`, `MonitoringExtended`, `ChannelMonitoring`, `Spindle` and
+  `EnergyElectricity`. A profile is published only if all its elements are mapped; otherwise its elements go
+  to `missing` with the reason, and nothing of it reaches the broker. Of a profile with instances, a channel, a
+  spindle or a measuring point, each complete instance is published; `EnergyElectricity` needs the measuring
+  point `Main`.
+- **Not checked.** The profiles of lists and events the binding cannot carry: `Components`, `Stacklight`,
+  `JobMonitoring`, `WorkMasterMonitoring` and `AlertsEvents`; and `EnergyCompressedAir`, whose
+  `MassFlowRate` is in kilogram per second, a unit the binding does not have.
+- **Elements of no profile**, `Production.ActiveProgram`, `Identification.SoftwareRevision` and every value
+  in the area `vendor`, are published as they are.
+
+The proposal card in the chat and the list of the added servers show it: `Core fulfilled` or `Core not
+fulfilled`, a badge per complete profile, and what an incomplete one lacks. The answers carry it as
+`conformance`, one entry per profile with `fulfilled`, `offered`, `missing` and the complete `instances`.
+`profiles` names the complete ones. A machine added before the core was checked keeps running from its
+registration; the list shows what it lacks, and `/rescan` proposes a registration that fulfils it, or says
+why it cannot.
 
 ## What the adapter publishes
 
@@ -339,8 +385,7 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
 | `Connection.Heartbeat` | `umati/Connection/Heartbeat` | Every ten seconds while the machine is registered, also while it does not answer. |
 | Alarms | `events/notifications` | An alarm condition of the server that becomes active is `Raised`, one that ends is `Reset`, both with the same correlation id. Severity 667 and above is an error, 334 and above a warning. |
 
-The lists of the profile Core, `Notification.ActiveAlerts` and `Production.JobOrders`, are no values in the
-binding. The alarms travel as notification events; the job orders are not published.
+The lists `Notification.ActiveAlerts` and `Production.JobOrders` are no values in the binding. The alarms travel as notification events; the job orders are not published.
 
 After a reconnect, and after a restart of the adapter, the server is asked for the conditions that still stand
 (`ConditionRefresh`). An alarm that went while nobody listened is reset then, so none stays open for ever.

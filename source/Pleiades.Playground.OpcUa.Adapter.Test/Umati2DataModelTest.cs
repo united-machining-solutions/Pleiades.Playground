@@ -34,6 +34,8 @@ public class Umati2DataModelTest
         Assert.IsTrue(applied.Elements.All(element => element.Match == MatchKind.Direct));
         Assert.IsTrue(applied.Elements.All(element => element.Evidence!.StartsWith("Known mapping of the adapter for urn:umati2:datamodel:opcua", StringComparison.Ordinal)));
         Assert.IsEmpty(RegistrationValidator.Validate(applied));
+        var withAlerts = applied with { Alerts = new AlertRegistration { EventType = "i=2915" } };
+        Assert.IsNull(DataModelProfiles.CoreProblem(DataModelProfiles.Check(withAlerts)), "With an alarm subscription the namespace gives the whole core.");
     }
 
     [TestMethod]
@@ -156,7 +158,7 @@ public class Umati2DataModelTest
 
         var without = Umati2DataModel.WithoutAbsent(applied, [("umati", "OperationCounters.PowerOnDuration")], out _);
 
-        Assert.Contains("OperationCounters.PowerOnDuration", string.Join(" ", RegistrationValidator.Validate(without)));
+        CollectionAssert.Contains(DataModelProfiles.CoreOf(DataModelProfiles.Check(without)).Missing.ToArray(), "OperationCounters.PowerOnDuration");
     }
 
     [TestMethod]

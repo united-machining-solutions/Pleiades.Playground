@@ -82,19 +82,35 @@ public class EndpointRankingTest
 [TestClass]
 public class RegistrationValidatorTest
 {
-    private static MachineRegistration Sample() =>
+    private static MachineRegistration Sample(string file = "trumpf-trumatic-k09.registration.json") =>
         JsonSerializer.Deserialize<MachineRegistration>(
-            File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "trumpf-trulaser-l26.registration.json")),
+            File.ReadAllText(Path.Combine(AppContext.BaseDirectory, file)),
             RegistrationJson.Options)!;
 
     [TestMethod]
-    public void The_registration_that_ships_as_an_example_is_valid_and_covers_core()
+    public void The_registration_that_ships_as_an_example_is_valid_and_fulfils_core()
     {
         var sample = Sample();
 
         Assert.IsEmpty(RegistrationValidator.Validate(sample));
-        CollectionAssert.Contains(sample.Profiles.ToArray(), "Core");
-        Assert.AreEqual("A0280O0001", sample.SerialNumber);
+        Assert.AreEqual("A1121O0001", sample.SerialNumber);
+        var applied = DataModelProfiles.Apply(KnownMappings.Apply(sample), out var checks);
+        Assert.IsNull(DataModelProfiles.CoreProblem(checks));
+        CollectionAssert.AreEqual(sample.Profiles.ToArray(), applied.Profiles.ToArray(), "The sample names the profiles the adapter finds.");
+        Assert.HasCount(sample.Elements.Count + 1, applied.Elements, "Only the model, by the known mapping, is added.");
+    }
+
+    [TestMethod]
+    public void The_example_of_L26_lacks_what_its_MachineTool_instance_does_not_have()
+    {
+        var sample = Sample("trumpf-trulaser-l26.registration.json");
+
+        Assert.IsEmpty(RegistrationValidator.Validate(sample));
+        var checks = DataModelProfiles.Check(KnownMappings.Apply(sample));
+
+        CollectionAssert.AreEqual(
+            new[] { "Identification.ManufacturerUri", "Identification.ProductCode", "Identification.YearOfConstruction" },
+            DataModelProfiles.CoreOf(checks).Missing.ToArray());
     }
 
     [TestMethod]
@@ -109,6 +125,10 @@ public class RegistrationValidatorTest
         Assert.IsEmpty(RegistrationValidator.Validate(applied));
         Assert.HasCount(Umati2DataModel.Rules.Count, applied.Elements);
         Assert.AreEqual("Notification.ActiveAlerts", applied.Missing.Single().Path);
+        CollectionAssert.AreEqual(
+            new[] { DataModelProfiles.ActiveAlertsPath },
+            DataModelProfiles.CoreOf(DataModelProfiles.Check(applied)).Missing.ToArray(),
+            "Without an alarm subscription the core lacks its alarms.");
     }
 
     [TestMethod]
@@ -117,10 +137,11 @@ public class RegistrationValidatorTest
         var sample = Sample();
         var without = sample with { Elements = [.. sample.Elements.Where(element => element.Path != "OperationCounters.PowerOnDuration")] };
 
-        var problems = RegistrationValidator.Validate(without);
+        var problem = DataModelProfiles.CoreProblem(DataModelProfiles.Check(KnownMappings.Apply(without)));
 
-        Assert.HasCount(1, problems);
-        StringAssert.Contains(problems[0], "OperationCounters.PowerOnDuration", StringComparison.Ordinal);
+        Assert.IsNotNull(problem);
+        StringAssert.Contains(problem, "OperationCounters.PowerOnDuration", StringComparison.Ordinal);
+        Assert.IsEmpty(RegistrationValidator.Validate(without), "The validator checks the form; the core is checked against the server.");
     }
 
     [TestMethod]

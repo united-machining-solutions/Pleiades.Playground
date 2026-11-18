@@ -24,8 +24,11 @@ internal sealed record MachineRegistration
     /// <summary>The version of the data model the elements were matched against.</summary>
     public string? ModelVersion { get; init; }
 
-    /// <summary>The profiles of the data model the elements cover, for example <c>Core</c>.</summary>
-    [Description("The profiles of the data model the elements cover: Core, and any of Channel, Spindle, Production, Energy, IdentificationExtended, MonitoringExtended.")]
+    /// <summary>
+    /// The profiles of the data model the elements deliver whole, for example <c>Core</c>. The adapter
+    /// sets it from the elements (<see cref="Mapping.DataModelProfiles"/>); what a proposal names is replaced.
+    /// </summary>
+    [Description("Leave out. The adapter names the profiles whose elements are all mapped: Core, IdentificationExtended, MonitoringExtended, ChannelMonitoring, Spindle, EnergyElectricity.")]
     public IReadOnlyList<string> Profiles { get; init; } = [];
 
     /// <summary>The server and the security it is reached with.</summary>

@@ -43,6 +43,7 @@ import {
   rankedEndpointsOf,
   securityOf,
   serverListOf,
+  shownProfiles,
   shownValue,
   userStep,
 } from "./results.ts"
@@ -52,6 +53,7 @@ import type {
   MappingState,
   MappingSummary,
   Mapping,
+  ProfileCheck,
   Proposal,
   RankedEndpoints,
   Server,
@@ -90,6 +92,72 @@ function Counts({ summary }: { summary: MappingSummary }) {
           </Badge>
         ))}
     </span>
+  )
+}
+
+/** A profile with the instances it publishes: "ChannelMonitoring 1, 2". */
+function profileName(check: ProfileCheck): string {
+  return check.instances.length > 0 ? `${check.name} ${check.instances.join(", ")}` : check.name
+}
+
+/**
+ * The core and the profiles of the data model at a glance: whether the core is fulfilled, the profiles that
+ * are complete, and those the server offers in part, which are not published.
+ */
+function ProfileBadges({ checks }: { checks?: ReadonlyArray<ProfileCheck> }) {
+  const { core, fulfilled, incomplete } = shownProfiles(checks)
+  if (!core) return null
+  return (
+    <span className="flex flex-wrap gap-1">
+      <Badge variant={core.fulfilled ? "secondary" : "destructive"}>
+        {core.fulfilled ? <CircleCheckIcon data-icon="inline-start" /> : <CircleAlertIcon data-icon="inline-start" />}
+        {core.fulfilled ? "Core fulfilled" : "Core not fulfilled"}
+      </Badge>
+      {fulfilled.map((check) => (
+        <Badge key={check.name} variant="outline">
+          {profileName(check)}
+        </Badge>
+      ))}
+      {incomplete.map((check) => (
+        <Badge key={check.name} variant="ghost">
+          {check.name} incomplete
+        </Badge>
+      ))}
+    </span>
+  )
+}
+
+/** What the core lacks, and which profiles are not published for what they lack. */
+function ProfileGaps({ checks }: { checks?: ReadonlyArray<ProfileCheck> }) {
+  const { core, incomplete } = shownProfiles(checks)
+  if (!core) return null
+  return (
+    <>
+      {!core.fulfilled && (
+        <Alert variant="destructive">
+          <CircleAlertIcon />
+          <AlertTitle>The core of the data model is not fulfilled</AlertTitle>
+          <AlertDescription>
+            A machine is added only with every element of the core. Not mapped: {core.missing.join(", ")}.
+          </AlertDescription>
+        </Alert>
+      )}
+      {incomplete.length > 0 && (
+        <Alert>
+          <CircleAlertIcon />
+          <AlertTitle>Profiles that are not published</AlertTitle>
+          <AlertDescription>
+            <ul>
+              {incomplete.map((check) => (
+                <li key={check.name}>
+                  {check.name} lacks {check.missing.join(", ")}.
+                </li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+    </>
   )
 }
 
@@ -214,6 +282,7 @@ function ServerRow({ server }: { server: Server }) {
             <span className="block">One session with {server.sessionSharedWith?.join(", ")}</span>
           )}
         </ItemDescription>
+        <ProfileBadges checks={server.conformance} />
         <Counts summary={server.mapping} />
       </ItemContent>
       <ItemActions>{removed?.ok ? null : <RemoveServer server={server} onRemoved={setRemoved} />}</ItemActions>
@@ -369,9 +438,11 @@ function ShownProposal({ values }: { values: Proposal }) {
             <span className="block break-all">Server certificate {values.endpoint.certificateThumbprint}</span>
           )}
         </CardDescription>
+        <ProfileBadges checks={values.conformance} />
         {values.summary && <Counts summary={values.summary} />}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        <ProfileGaps checks={values.conformance} />
         {!values.accepted && (
           <Alert variant="destructive">
             <CircleAlertIcon />

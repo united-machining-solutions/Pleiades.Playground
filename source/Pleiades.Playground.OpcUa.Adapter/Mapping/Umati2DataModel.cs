@@ -45,13 +45,19 @@ internal static class Umati2DataModel
     /// The elements the namespace gives, with the identifier of their node. Each was verified on the
     /// gateway of an edge device on 2026-11-17: the data type, the unit in the description of the node
     /// (<c>Unit: one (C62)</c>, <c>Unit: second (SEC)</c>), and the enumerations of <c>DataType.Status</c>.
+    /// <c>ManufacturerUri</c>, <c>ProductCode</c> and <c>YearOfConstruction</c> were not on that
+    /// gateway; they are in the core of the specification 0.17.0 and set by their path, so a server
+    /// that has them delivers them, and one that has not moves them to <c>missing</c>.
     /// </summary>
     public static IReadOnlyList<ElementRegistration> Rules { get; } =
     [
         Text("Identification.Manufacturer"),
         Text("Identification.SerialNumber"),
         Text("Identification.ProductInstanceUri"),
+        Text("Identification.ManufacturerUri"),
         Text("Identification.Model"),
+        Text("Identification.ProductCode"),
+        Year("Identification.YearOfConstruction"),
         Text("Identification.SoftwareRevision"),
         Status("State.MachineryItemState", "MachineryItemState", ItemStates),
         Status("State.MachineryOperationMode", "MachineryOperationMode", OperationModes),
@@ -173,6 +179,16 @@ internal static class Umati2DataModel
         Node = "s=" + path,
         Match = MatchKind.Direct,
         Evidence = EvidenceStart + $"the node s={path} is the element, a Double in {unit} as its description says.",
+    };
+
+    private static ElementRegistration Year(string path) => new()
+    {
+        Path = path,
+        Kind = ValueKind.Number,
+        Unit = "one",
+        Node = "s=" + path,
+        Match = MatchKind.Direct,
+        Evidence = EvidenceStart + $"the node s={path} is the element, a year of four digits.",
     };
 
     private static ElementRegistration Status(string path, string field, IReadOnlyDictionary<string, string> map) => new()

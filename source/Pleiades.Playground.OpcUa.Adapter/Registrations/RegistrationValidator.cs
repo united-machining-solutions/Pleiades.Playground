@@ -4,20 +4,10 @@ namespace Pleiades.Playground.OpcUa.Adapter.Registrations;
 
 /// <summary>
 /// Checks a registration before it is stored: everything that can be said without a connection.
+/// Whether it delivers the core of the data model is checked by <see cref="DataModelProfiles"/>.
 /// </summary>
 internal static class RegistrationValidator
 {
-    /// <summary>The elements of the profile Core that are values in the MQTT binding and mandatory.</summary>
-    public static IReadOnlyList<string> CoreMandatory { get; } =
-    [
-        "Identification.Manufacturer",
-        "Identification.SerialNumber",
-        "Identification.ProductInstanceUri",
-        "State.MachineryItemState",
-        "State.MachineryOperationMode",
-        "OperationCounters.PowerOnDuration",
-    ];
-
     /// <summary>The problems of a registration. Empty means it can be stored.</summary>
     public static IReadOnlyList<string> Validate(MachineRegistration registration)
     {
@@ -59,17 +49,6 @@ internal static class RegistrationValidator
         foreach (var element in registration.Elements)
         {
             Check(element, seen, problems);
-        }
-
-        if (registration.Profiles.Contains("Core", StringComparer.Ordinal))
-        {
-            var missing = CoreMandatory
-                .Where(path => !registration.Elements.Any(element => element.Area == "umati" && element.Path == path))
-                .ToList();
-            if (missing.Count > 0)
-            {
-                problems.Add($"profiles: Core is named, but its mandatory elements are missing: {string.Join(", ", missing)}.");
-            }
         }
 
         if (registration.Alerts is { } alerts)

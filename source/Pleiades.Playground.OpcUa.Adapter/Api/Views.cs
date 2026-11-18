@@ -21,7 +21,8 @@ internal sealed record EndpointView(string Url, SecurityMode SecurityMode, strin
 /// <param name="Endpoint">Where it is and how the session is secured.</param>
 /// <param name="State"><c>Connecting</c>, <c>Connected</c> or <c>Disconnected</c>.</param>
 /// <param name="LastError">Why it is not connected.</param>
-/// <param name="Profiles">The profiles of the data model it delivers.</param>
+/// <param name="Profiles">The profiles of the data model it delivers whole, the core among them if it is complete.</param>
+/// <param name="Conformance">Each profile of the data model: whether it is complete, and what it lacks. The core first.</param>
 /// <param name="Mapping">How many elements are in which state.</param>
 /// <param name="NeedsRescan">A registered node is gone from the server: scan it again.</param>
 /// <param name="ScannedAt">When the server was last scanned.</param>
@@ -34,6 +35,7 @@ internal sealed record ServerView(
     string State,
     string? LastError,
     IReadOnlyList<string> Profiles,
+    IReadOnlyList<ProfileCheck> Conformance,
     MappingSummary Mapping,
     bool NeedsRescan,
     DateTimeOffset? ScannedAt,
@@ -115,7 +117,8 @@ internal sealed record MachineListView(string Url, RankedEndpointView? Endpoint,
 /// <param name="SerialNumber">The machine.</param>
 /// <param name="DisplayName">A name for people.</param>
 /// <param name="Endpoint">The endpoint and the certificate the server presented.</param>
-/// <param name="Profiles">The profiles the proposal covers.</param>
+/// <param name="Profiles">The profiles the proposal delivers whole: only their elements are published.</param>
+/// <param name="Conformance">Each profile of the data model: whether it is complete, and what it lacks. The core first; without it the machine is not added.</param>
 /// <param name="Problems">Why the proposal was not accepted, one reason each.</param>
 /// <param name="Summary">How many elements are in which state.</param>
 /// <param name="Rows">Every element with the value its node gave, what needs a look first.</param>
@@ -129,6 +132,7 @@ internal sealed record ProposalView(
     string? DisplayName,
     EndpointView Endpoint,
     IReadOnlyList<string> Profiles,
+    IReadOnlyList<ProfileCheck> Conformance,
     IReadOnlyList<string> Problems,
     MappingSummary? Summary,
     IReadOnlyList<MappingRow> Rows,
@@ -157,13 +161,16 @@ internal static class Views
                 element.Status,
                 NodeFound: !IsNodeGone(element.Status),
                 element.Value))]);
+        // Checked again on every view: a registration stored before the core was enforced shows what it lacks.
+        var conformance = DataModelProfiles.Check(registration);
         var server = new ServerView(
             registration.SerialNumber,
             registration.DisplayName,
             Endpoint(registration.Endpoint),
             status.State,
             status.LastError,
-            registration.Profiles,
+            [.. conformance.Where(check => check.Fulfilled).Select(check => check.Name)],
+            conformance,
             MappingReview.Summary(rows),
             status.NeedsRescan,
             registration.Discovery?.At,
