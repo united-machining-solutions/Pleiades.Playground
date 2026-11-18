@@ -1,5 +1,6 @@
 import type { ChatTool } from "../chat/tool-results.ts"
 import { keyOfPart } from "./from-answer.ts"
+import { drawingTool } from "./parts.ts"
 import { pageToolNames } from "./proposal.ts"
 import { MAX_PARTS } from "./recipe.ts"
 import type { RecipePart } from "./recipe.ts"
@@ -19,10 +20,11 @@ export type CardArgument =
   | { name: string; kind: "whole"; required: boolean; min?: number; max?: number; description?: string }
 
 /**
- * A card a person can add: the tool of a page, the arguments the form asks for in the order of the
- * schema, and the required ones it cannot ask for. A card with any of those is not to be added here.
+ * A card a person can add: the tool of a page, what it shows in words (`part` of its entry in the
+ * chat's list), the arguments the form asks for in the order of the schema, and the required ones it
+ * cannot ask for. A card with any of those is not to be added here.
  */
-export type CardChoice = { tool: string; asks: Array<CardArgument>; cannotAsk: Array<string> }
+export type CardChoice = { tool: string; shows: string; asks: Array<CardArgument>; cannotAsk: Array<string> }
 
 /** What a person filled in for each argument: a machine id, a whole number, or nothing. */
 export type Filled = Record<string, string | number | null | undefined>
@@ -85,8 +87,9 @@ export function argumentsOf(inputSchema: unknown): Pick<CardChoice, "asks" | "ca
 
 /**
  * The cards a person can add to a page: the tools a page can call (`pageToolNames`), in the order of
- * the chat's list, each with what the form asks for it. A tool the backend does not list is left
- * out: it has no schema, and calling it would give no answer.
+ * the chat's list, each with what it shows and what the form asks for it. A tool the backend does not
+ * list is left out: it has no schema, and calling it would give no answer. So is a tool without words
+ * for what it shows: a person chooses a card by what it shows, never by the name of its tool.
  */
 export function cardChoicesOf(
   listed: ReadonlyArray<{ name: string; inputSchema?: unknown }>,
@@ -94,8 +97,20 @@ export function cardChoicesOf(
 ): Array<CardChoice> {
   return pageToolNames(tools).flatMap((tool) => {
     const one = listed.find((each) => each.name === tool)
-    return one ? [{ tool, ...argumentsOf(one.inputSchema) }] : []
+    const shows = drawingTool(tool, tools)?.part
+    return one && shows ? [{ tool, shows, ...argumentsOf(one.inputSchema) }] : []
   })
+}
+
+/**
+ * Why a card cannot be added here, or null if it can: it takes an argument the form cannot ask for,
+ * or it needs a machine and the machines cannot be read now (`noMachines`, the sentence that says why).
+ */
+export function whyOff(card: CardChoice, noMachines: string | null): string | null {
+  if (card.cannotAsk.length > 0) return `It takes ${card.cannotAsk.join(", ")}, which this form cannot ask for.`
+  const needsMachine = card.asks.some((argument) => argument.kind === "machine" && argument.required)
+  if (needsMachine && noMachines !== null) return `It needs a machine, and the machines cannot be read now. ${noMachines}`
+  return null
 }
 
 /** What a field of the form is called: "Machine", "Hours". */

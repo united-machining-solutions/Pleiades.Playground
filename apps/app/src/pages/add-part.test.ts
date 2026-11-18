@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { ChatTool } from "../chat/tool-results.ts"
-import { argumentsOf, cannotAdd, cardChoicesOf, labelOf, partOf } from "./add-part.ts"
+import { argumentsOf, cannotAdd, cardChoicesOf, labelOf, partOf, whyOff } from "./add-part.ts"
 import type { CardChoice } from "./add-part.ts"
 import { MAX_PARTS } from "./recipe.ts"
 
@@ -40,6 +40,7 @@ const tools: ReadonlyArray<ChatTool> = [
 
 const show: CardChoice = {
   tool: "genui_machine_show",
+  shows: "One machine and its last hours",
   asks: [
     { name: "machine", kind: "machine", required: true },
     { name: "hours", kind: "whole", required: false, min: 1, max: 24, description: "How many hours back the history goes. 8 if omitted." },
@@ -50,9 +51,22 @@ const show: CardChoice = {
 test("the cards a person can add are the tools a page can call that the backend lists, in the order of the chat", () => {
   assert.deepEqual(cardChoicesOf(listed, tools), [
     show,
-    { tool: "genui_machine_list", asks: [], cannotAsk: [] },
-    { tool: "genui_measurement_list", asks: [{ name: "machine", kind: "machine", required: false }], cannotAsk: [] },
+    { tool: "genui_machine_list", shows: "Every machine and what it does now", asks: [], cannotAsk: [] },
+    {
+      tool: "genui_measurement_list",
+      shows: "What the machines measure now",
+      asks: [{ name: "machine", kind: "machine", required: false }],
+      cannotAsk: [],
+    },
   ])
+})
+
+test("a card without words for what it shows is not offered: a person never chooses a tool by its name", () => {
+  const nameless = tools.map((tool) => (tool.name === "genui_machine_list" ? { ...tool, part: undefined } : tool))
+  assert.deepEqual(
+    cardChoicesOf(listed, nameless).map((card) => card.tool),
+    ["genui_machine_show", "genui_measurement_list"],
+  )
 })
 
 test("a new card that takes the arguments of today needs no line here", () => {
@@ -63,6 +77,7 @@ test("a new card that takes the arguments of today needs no line here", () => {
   }
   assert.deepEqual(cardChoicesOf([...listed, energy], more).at(-1), {
     tool: "genui_energy_show",
+    shows: "The energy of one machine",
     asks: [
       { name: "machine", kind: "machine", required: true },
       { name: "days", kind: "whole", required: true, min: 1, max: 7 },
@@ -96,7 +111,7 @@ test("a schema that is not one asks for nothing", () => {
 })
 
 test("a card the form cannot fill makes no part, and says what it needs", () => {
-  const sites = { tool: "genui_site_show", asks: [], cannotAsk: ["site"] }
+  const sites = { tool: "genui_site_show", shows: "One site", asks: [], cannotAsk: ["site"] }
   assert.deepEqual(partOf(sites, {}), { part: null, problems: { site: "This card needs site, which this form cannot ask for." } })
 })
 
@@ -110,10 +125,10 @@ test("the part of a card has its arguments in the order of the schema, without t
     problems: null,
   })
   // An optional machine left empty is every machine: the tool takes no machine then.
-  const measurements: CardChoice = { tool: "genui_measurement_list", asks: [{ name: "machine", kind: "machine", required: false }], cannotAsk: [] }
+  const measurements: CardChoice = { tool: "genui_measurement_list", shows: "Measurements", asks: [{ name: "machine", kind: "machine", required: false }], cannotAsk: [] }
   assert.deepEqual(partOf(measurements, {}), { part: { tool: "genui_measurement_list", args: {} }, problems: null })
   // What the form does not ask for does not go into the part.
-  assert.deepEqual(partOf({ tool: "genui_machine_list", asks: [], cannotAsk: [] }, { timeZone: "Europe/Zurich" }), {
+  assert.deepEqual(partOf({ tool: "genui_machine_list", shows: "Machines", asks: [], cannotAsk: [] }, { timeZone: "Europe/Zurich" }), {
     part: { tool: "genui_machine_list", args: {} },
     problems: null,
   })
@@ -126,7 +141,7 @@ test("a required argument left empty, or a number out of its range, says why", (
   })
   assert.deepEqual(partOf(show, { machine: "P-04", hours: 2.5 }).problems, { hours: "A whole number from 1 to 24." })
   assert.deepEqual(partOf(show, { machine: 4, hours: "8" }).problems, { machine: "Choose a machine.", hours: "A whole number." })
-  const days: CardChoice = { tool: "t", asks: [{ name: "days", kind: "whole", required: true, min: 1 }], cannotAsk: [] }
+  const days: CardChoice = { tool: "t", shows: "Days", asks: [{ name: "days", kind: "whole", required: true, min: 1 }], cannotAsk: [] }
   assert.deepEqual(partOf(days, {}).problems, { days: "Give a whole number." })
   assert.deepEqual(partOf(days, { days: 0 }).problems, { days: "A whole number, 1 or more." })
 })
@@ -150,4 +165,14 @@ test("a page that shows the same part, or is full, says why nothing is added", (
   )
   const full = Array.from({ length: MAX_PARTS }, (_, at) => ({ tool: "genui_machine_show", args: { machine: `M-${at}` } }))
   assert.equal(cannotAdd(full, { tool: "genui_site_list", args: {} }), `A page holds at most ${MAX_PARTS} parts. Remove one to add another.`)
+})
+
+test("a card is off where the form cannot ask what it takes, or it needs a machine and there are none to choose", () => {
+  assert.equal(whyOff(show, null), null)
+  const machines = "The Events API answered 404."
+  assert.equal(whyOff(show, machines), `It needs a machine, and the machines cannot be read now. ${machines}`)
+  // A machine that may stay out is every machine then: the card stays on.
+  const measurements: CardChoice = { tool: "genui_measurement_list", shows: "Measurements", asks: [{ name: "machine", kind: "machine", required: false }], cannotAsk: [] }
+  assert.equal(whyOff(measurements, machines), null)
+  assert.equal(whyOff({ tool: "genui_site_show", shows: "One site", asks: [], cannotAsk: ["site", "hall"] }, null), "It takes site, hall, which this form cannot ask for.")
 })
