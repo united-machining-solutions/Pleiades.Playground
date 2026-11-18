@@ -492,6 +492,20 @@ pick, and a button that orders it at once; the glass then fills while the machin
 the machine, without a language model. No tour screenshot was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).
 
+## Optional: Titan, an assistant you talk to
+
+Titan is not part of the six stops either. A stack with `APP_SHOWCASES` set has the page
+<http://localhost:5600/titan>: a dark screen with a cloud of points. A click or the space bar starts it. Then
+hold the space bar, ask "Welche Maschine steht?" and let go, or say "Hey Titan" and the question. Titan
+says "Moment." at once and answers aloud, in German, from the values of the stack; the screen shows the answer
+in one sentence, what to do, and the machine it is about. The space bar interrupts it, P pauses it, Escape
+leaves.
+
+Titan needs the language model of stop 4, and of the same gateway a transcription model to listen. With a
+speech model at the gateway it speaks with that voice, else with a voice of the browser. Everything it hears
+goes to the gateway: its guide, [`apps/app/src/showcases/titan`](../apps/app/src/showcases/titan/README.md),
+says what that means in a room and how it works. No tour screenshot was taken of it.
+
 ## Retaking the screenshots
 
 One command takes the screenshots from the running stack and writes them under
