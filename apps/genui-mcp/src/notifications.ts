@@ -2,15 +2,17 @@ import { HORIZON_SECONDS, NOTIFICATIONS_PATH } from "@pleiades/cards/machine/con
 import { NOTIFICATION_ROWS } from "@pleiades/cards/notification/contract.ts"
 import type { LevelTotal, NotificationEntry, NotificationList } from "@pleiades/cards/notification/contract.ts"
 
-import { readAlertsOf } from "./apis.ts"
+import { listTopics, readAlertsOf } from "./apis.ts"
 import type { AlertStanding, Apis } from "./apis.ts"
+import { machineOf } from "./machines.ts"
 import { secondsBefore } from "./time.ts"
 
 // The warnings and errors of one machine, each with when it came, when it went and how long it
 // stood. The Events API answers with the alerts that stood at some time in the range, each with the
 // time it really came, so one that came up before the range and still stands is among them. As the
 // list of machines names no alert that is older than 24 hours and has not been cleared, neither does
-// this: the two say the same about what stands.
+// this. The list of machines reads the alerts of all machines in one page of 1000 and so may miss
+// open ones where more stood in 24 hours; this reads one machine and lists them (see the guide).
 
 /** How many hours back the list goes, if nobody asks for more or less. */
 export const NOTIFICATION_HOURS = 8
@@ -42,9 +44,16 @@ function inOrder(entries: Array<NotificationEntry>): Array<NotificationEntry> {
   )
 }
 
-/** What the notifications of one level add up to: how many, and how long they stood in total. */
-function totalOf(entries: ReadonlyArray<NotificationEntry>, asOf: string): LevelTotal {
-  const seconds = entries.reduce((sum, entry) => sum + (Date.parse(entry.goneAt ?? asOf) - Date.parse(entry.raisedAt)) / 1000, 0)
+/**
+ * What the notifications of one level add up to: how many, and how long they stood in the range,
+ * each from its raise or the start of the range, whichever is later, to its clear or now. The whole
+ * duration of an alert is the one of its row; a total of a range holds only the range.
+ */
+function totalOf(entries: ReadonlyArray<NotificationEntry>, from: string, asOf: string): LevelTotal {
+  const seconds = entries.reduce((sum, entry) => {
+    const [start, end] = [Math.max(Date.parse(entry.raisedAt), Date.parse(from)), Math.min(Date.parse(entry.goneAt ?? asOf), Date.parse(asOf))]
+    return sum + Math.max(0, end - start) / 1000
+  }, 0)
   return { count: entries.length, seconds }
 }
 
@@ -61,7 +70,15 @@ export async function listNotifications(
   const from = secondsBefore(now, hours * 3600).toISOString()
   const horizon = secondsBefore(now, HORIZON_SECONDS).toISOString()
   const topic = `machines/${machine}/${NOTIFICATIONS_PATH}`
-  const { alerts, hasMore } = await readAlertsOf(apis, machine, new Date(from), now)
+  const [topics, { alerts, hasMore }] = await Promise.all([
+    listTopics(apis, new Date(horizon), now),
+    readAlertsOf(apis, machine, new Date(from), now),
+  ])
+  // An id that no machine published a value under is no machine: an empty list would read as an all-clear.
+  const known = [...new Set(topics.flatMap((one) => machineOf(one) ?? []))].sort()
+  if (!known.includes(machine)) {
+    throw new Error(`No machine "${machine}" published a value in the last 24 hours. Machines that did: ${known.join(", ") || "none"}.`)
+  }
 
   const found = alerts
     // An alert that stands and came up before the horizon is none the list of machines names.
@@ -79,8 +96,8 @@ export async function listNotifications(
     open,
     gone: found.length - open,
     levels: {
-      error: totalOf(found.filter((entry) => entry.level === "Error"), asOf),
-      warning: totalOf(found.filter((entry) => entry.level === "Warning"), asOf),
+      error: totalOf(found.filter((entry) => entry.level === "Error"), from, asOf),
+      warning: totalOf(found.filter((entry) => entry.level === "Warning"), from, asOf),
     },
     omitted: found.length - listed.length,
     hasMore,

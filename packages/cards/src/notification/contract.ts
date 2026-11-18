@@ -33,15 +33,17 @@ export const levelTotal = z.object({
   count: z.number().int().describe("How many notifications of this level stood in the range, among those the Events API returned."),
   seconds: z
     .number()
-    .describe("How long they stood in total, in seconds: each from `raisedAt` to `goneAt`, or to `asOf` where it has not been cleared."),
+    .describe(
+      "How long they stood in the range, added up, in seconds: each from `raisedAt` or `from`, whichever is later, to `goneAt`, or to `asOf` where it has not been cleared. The part before `from` is not in it.",
+    ),
 })
 export type LevelTotal = z.infer<typeof levelTotal>
 
 /**
  * The notification card: the alerts that stood on one machine at any time between `from` and
  * `asOf`. An alert that was raised before `from` and has not been cleared, or was cleared after
- * `from`, stands in the range, and says so (`beforeRange`). It is not cut at `from`: its duration is
- * its whole one. An alert that has not been cleared and was raised more than 24 hours before `asOf`
+ * `from`, stands in the range, and says so (`beforeRange`). A row is not cut at `from`: its duration is
+ * its whole one. The totals of the levels are cut: they hold the time in the range only. An alert that has not been cleared and was raised more than 24 hours before `asOf`
  * is not listed, as the list of machines names none that old.
  */
 export const notificationList = z.object({

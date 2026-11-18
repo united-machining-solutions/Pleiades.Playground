@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { afterEach, mock, test } from "node:test"
 
-import { inPath, listTopics, readAlertsOf, readNewest, readOpenNotifications, readStatistics, readStrings, readTimelines } from "./apis.ts"
+import { inPath, listTopics, readAlertPairs, readAlertsOf, readNewest, readOpenNotifications, readStatistics, readStrings, readTimelines } from "./apis.ts"
 
 const apis = { timeseriesUrl: "http://timeseries:8080", eventsUrl: "http://events:8080" }
 const from = new Date("2026-11-16T09:00:00.000Z")
@@ -106,15 +106,24 @@ test("the statistics are asked for with a POST and fail as every other request d
   assert.ok(sent[0]?.signal instanceof AbortSignal)
 })
 
-test("the alerts of a machine are asked for newest first, with the most the API gives", async () => {
+test("the alerts of a machine are asked for with the most the API gives, newest first as it sorts them", async () => {
   const { requested } = answering(() => Response.json({ items: [], hasMore: false }))
   await readAlertsOf(apis, "alcyone machines_AX-400_P-04", from, to)
   const [url] = requested
   assert.equal(url?.pathname, "/alerts/pairs")
   assert.deepEqual(
-    ["mId", "Take", "Sorting", "from", "to"].map((name) => url?.searchParams.get(name)),
-    ["alcyone machines_AX-400_P-04", "1000", "Descending", from.toISOString(), to.toISOString()],
+    ["mId", "Take", "from", "to"].map((name) => url?.searchParams.get(name)),
+    ["alcyone machines_AX-400_P-04", "1000", from.toISOString(), to.toISOString()],
   )
+})
+
+test("the alerts of every machine and of one are one reader, and both say whether the API had more", async () => {
+  const pair = { mId: "m", alertId: "a", errorCode: "1", message: "x", severity: "Failure", raisedAt: "2026-11-16T09:00:00Z", clearedAt: null }
+  answering(() => Response.json({ items: [pair], hasMore: true }))
+  const { pairs, hasMore } = await readAlertPairs(apis, from, to)
+  assert.deepEqual([pairs.length, hasMore], [1, true])
+  answering(() => Response.json({ items: [pair] }))
+  await assert.rejects(readAlertPairs(apis, from, to), /The Events API answered in a shape/)
 })
 
 test("an alert is read with its error code, message and category, and a failure is an error", async () => {

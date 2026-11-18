@@ -1,3 +1,4 @@
+import { writtenOn } from "../energy/words.ts"
 import { lasting, written } from "../machine/format.ts"
 import type { NotificationEntry, NotificationList } from "./contract.ts"
 
@@ -7,21 +8,19 @@ import type { NotificationEntry, NotificationList } from "./contract.ts"
 
 export type Time = (instant: string) => string
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
 /**
  * An instant as the result writes it: the time of day, and the day too where it is not the day of
  * `asOf`, because the card reaches back 24 hours: 09:05, or 15 Nov 21:40.
  */
 export function stamped(instant: string, asOf: string): string {
-  if (instant.slice(0, 10) === asOf.slice(0, 10)) return written(instant)
-  const month = MONTHS[Number(instant.slice(5, 7)) - 1] ?? ""
-  return `${Number(instant.slice(8, 10))} ${month} ${written(instant)}`
+  return writtenOn(instant, instant.slice(0, 10) !== asOf.slice(0, 10), written)
 }
 
 /** How long something stood: seconds where it is under a minute, because an alert often stands for seconds. */
 export function span(seconds: number): string {
-  return seconds < 60 ? `${Math.round(seconds)} s` : lasting(seconds * 1000)
+  // The unit changes where the rounded number does, so 59.5 s reads 1 min and never 60 s.
+  const whole = Math.round(seconds)
+  return whole < 60 ? `${whole} s` : lasting(whole * 1000)
 }
 
 /**
@@ -46,12 +45,14 @@ export function levelsInWords({ levels }: Pick<NotificationList, "levels">): str
   return parts.join(" and ")
 }
 
-/** How long the alerts of each level stood in total: Errors 12 min in total, warnings 5 min in total. */
+/**
+ * How long the alerts of each level stood in the range, in total: In the range, errors stood 12 min
+ * in total, warnings 5 min in total. Only the time in the range counts, not the whole duration of an alert.
+ */
 export function totalsInWords({ levels }: Pick<NotificationList, "levels">): string {
-  const parts = [
-    levels.error.count > 0 ? `errors ${span(levels.error.seconds)} in total` : "",
-    levels.warning.count > 0 ? `warnings ${span(levels.warning.seconds)} in total` : "",
-  ].filter(Boolean)
-  const said = parts.join(", ")
-  return said.charAt(0).toUpperCase() + said.slice(1)
+  const parts: Array<[name: string, seconds: number]> = []
+  if (levels.error.count > 0) parts.push(["errors", levels.error.seconds])
+  if (levels.warning.count > 0) parts.push(["warnings", levels.warning.seconds])
+  const said = parts.map(([name, seconds], position) => `${name}${position === 0 ? " stood" : ""} ${span(seconds)} in total`)
+  return `In the range, ${said.join(", ")}`
 }

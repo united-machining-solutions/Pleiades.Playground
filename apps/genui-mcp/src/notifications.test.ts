@@ -21,12 +21,17 @@ type Alert = {
 /**
  * An Events API that holds `alerts` and answers `/alerts/pairs` as the real one does: the alerts
  * that stood at some time between `from` and `to` (raised before the end, not cleared before the
- * start), newest first, at most `Take`, and whether there were more.
+ * start), newest first, at most `Take`, and whether there were more. The Timeseries API names the
+ * machines that published a value, `machines`: the machine of the test only if nothing else is said.
  */
-function serve(alerts: Array<Alert>, options: { total?: number } = {}): Array<URL> {
+function serve(alerts: Array<Alert>, options: { total?: number; machines?: Array<string> } = {}): Array<URL> {
   const requested: Array<URL> = []
   mock.method(globalThis, "fetch", async (input: Parameters<typeof fetch>[0]) => {
     const url = new URL(String(input))
+    if (url.pathname === "/topics") {
+      const machines = options.machines ?? [P04]
+      return Response.json({ baseUnitTopics: machines.map((machine) => `machines/${machine}/activePower`), stringTopics: [], booleanTopics: [] })
+    }
     requested.push(url)
     const [from, to] = [url.searchParams.get("from") ?? "", url.searchParams.get("to") ?? ""]
     const machine = url.searchParams.get("mId")
@@ -98,7 +103,7 @@ test("a failure is an error and every other category a warning, with its error c
 })
 
 test("the alerts of the one machine are asked for between the start of the range and now, under the machine id", async () => {
-  const requested = serve([])
+  const requested = serve([], { machines: ["alcyone machines_AX-400_P-04"] })
   const list = await listNotifications(apis, "alcyone machines_AX-400_P-04", 1, now)
   assert.equal(requested.length, 1)
   const [url] = requested
@@ -170,10 +175,45 @@ test("the list holds at most 50 notifications, those that have not gone first, a
   assert.equal(list.notifications[1]?.correlationId, "g59")
 })
 
-test("a machine without alerts gets an empty list, not an error", async () => {
-  serve([alert("a", "Failure", 60, null, "alcyone-machines_AX-400_P-05")])
+test("a machine that published values and has no alerts gets an empty list", async () => {
+  const P05 = "alcyone-machines_AX-400_P-05"
+  serve([alert("a", "Failure", 60, null, P05)], { machines: [P04, P05] })
   const list = await listNotifications(apis, P04, 8, now)
   assert.deepEqual([list.total, list.hasMore, list.notifications], [0, false, []])
+})
+
+test("a machine that published nothing in the last 24 hours is refused, with the machines that did, not answered with an all-clear", async () => {
+  serve([], { machines: [P04, "alcyone-machines_AX-400_P-05"] })
+  // The label of a machine, not its id, is what a person or a model may mistype.
+  await assert.rejects(
+    listNotifications(apis, "P-04", 8, now),
+    /^Error: No machine "P-04" published a value in the last 24 hours. Machines that did: alcyone-machines_AX-400_P-04, alcyone-machines_AX-400_P-05.$/,
+  )
+})
+
+test("the machines are looked for over the same 24 hours the list of machines looks at", async () => {
+  const topics: Array<URL> = []
+  mock.method(globalThis, "fetch", async (input: Parameters<typeof fetch>[0]) => {
+    const url = new URL(String(input))
+    if (url.pathname === "/topics") topics.push(url)
+    return url.pathname === "/topics"
+      ? Response.json({ baseUnitTopics: [`machines/${P04}/activePower`] })
+      : Response.json({ items: [], hasMore: false })
+  })
+  await listNotifications(apis, P04, 1, now)
+  assert.deepEqual([topics[0]?.searchParams.get("startTime"), topics[0]?.searchParams.get("stopTime")], [ago(24 * 60), now.toISOString()])
+})
+
+test("the totals count only the time in the range: one raised before it and cleared inside it adds the part after the start", async () => {
+  // 8 hours range. "a" came 10 days ago and went an hour ago; "b" came 9 hours ago and has not gone.
+  serve([alert("a", "Failure", 10 * 24 * 60, 60), alert("b", "OffSpec", 9 * 60, null), alert("c", "Failure", 30, 10)])
+  const { levels, notifications } = await listNotifications(apis, P04, 8, now)
+  // 8 hours minus the last hour is 7 hours, and 20 minutes of "c".
+  assert.deepEqual(levels.error, { count: 2, seconds: 7 * 3600 + 1200 })
+  // All 8 hours of the range.
+  assert.deepEqual(levels.warning, { count: 1, seconds: 8 * 3600 })
+  // A row keeps the whole duration of its alert.
+  assert.equal(notifications.find((one) => one.correlationId === "a")?.durationSeconds, (10 * 24 * 60 - 60) * 60)
 })
 
 test("each level adds up how long its alerts stood, those that have not gone until now", async () => {

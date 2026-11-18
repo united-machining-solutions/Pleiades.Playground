@@ -22,7 +22,7 @@ const shownAsCard =
 const notificationListTool = toolDefinition({
   name: "genui_notification_list",
   description:
-    "List the warnings and errors of one machine over the last hours: each alert once, with when it was raised, when it was cleared and how long it stood, or that it has not gone. Those that have not gone come first. The result says it in a few lines and carries the values of the notification card. Name the machine; which machines have open alerts now is in genui_machine_list.",
+    "List the warnings and errors of one machine over the last hours: each alert once, with when it was raised, when it was cleared and how long it stood, or that it has not gone. Those that have not gone come first. The result says it in a few lines and carries the values of the notification card. Name the machine by its id, as genui_machine_list gives it: an id that no machine published a value under is refused. Which machines have open alerts now is in genui_machine_list.",
   inputSchema: z.object({
     machine: machineId.describe(
       "The machine id, <manufacturer>_<model>_<serial number>, for example alcyone-machines_AX-400_P-04. genui_machine_list names every machine with its id.",
@@ -51,8 +51,10 @@ each alert once, the ones that have not gone first, then the others with the new
 machine by its id (\`machine\`) and pass the \`timeZone\` of the person you answer, if you know it.
 
 - \`raisedAt\` and \`goneAt\` are when the alert came and when it was cleared. \`goneAt\` is null as long
-  as it stands: \`open\` is true. An alert that has not gone is one of \`notifications\` of the machine in
-  \`genui_machine_list\`, and the two say the same about it.
+  as it stands: \`open\` is true. An alert that has not gone is, as a rule, also one of \`notifications\`
+  of the machine in \`genui_machine_list\`. Where the two differ, this list is the one to trust for one
+  machine: the list of machines reads the alerts of every machine in one page of 1000 and, where more
+  stood in 24 hours, may miss open ones.
 - \`notificationId\` is the error code of the manufacturer, \`title\` its message, \`severity\` its category
   after NAMUR NE 107. A \`Failure\` is an error (\`level\`), every other category a warning.
 - \`durationSeconds\` is how long it stood, in seconds, from \`raisedAt\` to \`goneAt\`: its whole
@@ -61,14 +63,17 @@ machine by its id (\`machine\`) and pass the \`timeZone\` of the person you answ
   since when.
 - \`beforeRange\` is true for an alert that was raised before the range and stood into it. It keeps
   its real \`raisedAt\`.
-- An alert that has not gone and was raised more than 24 hours before \`asOf\` is not listed, as it is
-  not among \`notifications\` of \`genui_machine_list\`: an empty list does not rule it out.
+- An alert that has not gone and was raised more than 24 hours before \`asOf\` is not listed, as the
+  list of machines names none that old either: an empty list does not rule it out.
+- A \`machine\` that no machine published a value under in the last 24 hours is refused, with the ids
+  that did. Take the id from \`genui_machine_list\`; the label of a machine, such as \`P-04\`, is not one.
 - \`hasMore\` is true if the Events API had more alerts than it returned, 1000 at most, the oldest
   missing. The counts are then lower bounds: say "at least".
 - \`notifications\` holds at most 50. \`total\`, \`open\`, \`gone\` and \`omitted\` count all that were
-  found. \`levels\` has the count and the total time of the errors and of the warnings, in seconds: each
-  alert from \`raisedAt\` to \`goneAt\`, or to \`asOf\` while it has not gone. Say a total as it is, and do not
-  add up durations yourself.
+  found. \`levels\` has the count and the time of the errors and of the warnings in the range, in
+  seconds, added up: each alert from \`raisedAt\` or \`from\`, whichever is later, to \`goneAt\`, or to
+  \`asOf\` while it has not gone. The part of an alert before \`from\` is not in it, so a total never
+  exceeds the range times the count. Say a total as it is, and do not add up durations yourself.
 `
 
 export const notificationCard = card({

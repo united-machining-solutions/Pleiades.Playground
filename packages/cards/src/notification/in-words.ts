@@ -28,10 +28,13 @@ export function notificationListInWords(list: NotificationList): string {
     return hasMore ? `${none} The Events API had more than it returned, so older ones may be missing.` : none
   }
   const counted = `${hasMore ? "at least " : ""}${levelsInWords(list)}${open > 0 ? `, ${open} open` : ""}`
-  const lines = [`${machine}, ${written(from)} to ${written(asOf)}: ${counted}.`]
-  lines.push(...notifications.slice(0, NAMED).map((one) => `- ${entryInWords(one, asOf)}`))
-  const unnamed = total - Math.min(notifications.length, NAMED)
-  if (unnamed > 0) lines.push(`${unnamed} more are on the card.${omitted > 0 ? ` ${omitted} of them are not in the result.` : ""}`)
+  const lines = [`${machine}, ${stamped(from, asOf)} to ${written(asOf)}: ${counted}.`]
+  const named = notifications.slice(0, NAMED)
+  lines.push(...named.map((one) => `- ${entryInWords(one, asOf)}`))
+  // The rows the card holds and the words do not name, and apart from them those the result holds no row of.
+  const onCard = notifications.length - named.length
+  if (onCard > 0) lines.push(`${onCard} more are on the card.`)
+  if (omitted > 0) lines.push(`${omitted} more are not listed, neither here nor on the card.`)
   lines.push(`${totalsInWords(list)}.`)
   if (hasMore) lines.push("The Events API had more alerts than it returned: the oldest are missing and the counts are lower bounds.")
   return lines.join("\n")

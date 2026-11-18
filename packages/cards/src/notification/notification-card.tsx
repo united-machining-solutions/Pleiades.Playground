@@ -1,7 +1,8 @@
-import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@pleiades/ui/components/item"
 import { Fragment } from "react"
 
+import { cardRange } from "../energy/words.ts"
 import { clock } from "../machine/format.ts"
 import { labelOf } from "../machine/in-words.ts"
 import { StateSymbol } from "../machine/state-symbol.tsx"
@@ -66,6 +67,7 @@ export function NotificationCard(list: NotificationList) {
         <CardTitle className="min-w-0 font-semibold group-data-[size=sm]/card:text-base">
           <Breakable text={labelOf(machine)} />
         </CardTitle>
+        <CardDescription>{cardRange(from, asOf, Math.round((Date.parse(asOf) - Date.parse(from)) / 3_600_000))}</CardDescription>
         {total > 0 && (
           <CardAction className="max-w-40 text-right text-xs text-muted-foreground tabular-nums">
             {hasMore && "at least "}
@@ -89,7 +91,7 @@ export function NotificationCard(list: NotificationList) {
           <ItemGroup className="gap-0 rounded-lg border has-data-[size=sm]:gap-0">
             {notifications.map((entry, position) => (
               <Fragment key={entry.correlationId}>
-                {position > 0 && <ItemSeparator className="my-0 h-px" />}
+                {position > 0 && <ItemSeparator className="my-0" />}
                 <Notification entry={entry} asOf={asOf} />
               </Fragment>
             ))}
@@ -97,7 +99,7 @@ export function NotificationCard(list: NotificationList) {
         )}
       </CardContent>
       <CardFooter className="block text-xs text-muted-foreground">
-        {omitted > 0 && <p>{omitted} older notifications are not listed.</p>}
+        {omitted > 0 && <p>{omitted} more notifications are not listed.</p>}
         {hasMore && total > 0 && (
           <p>The Events API had more than it returned: the oldest are missing, so the counts are lower bounds.</p>
         )}
