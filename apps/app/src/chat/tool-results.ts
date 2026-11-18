@@ -29,11 +29,12 @@ export type ChatTool = {
    */
   cardOnly?: boolean
   /**
-   * Only the chat calls this tool: a page never holds it as a part, although the chat draws its
-   * result. The proposal of a page is one (pages/proposal.ts), and so are the cards of a server a page
-   * does not ask, which asks the generative UI backend alone (pages/call-part.ts).
+   * Whether a drawn result can be replayed as a saved GenUI page. `false`: the chat draws it, and a
+   * page never holds it as a part. Source references are such, the proposal of a page
+   * (pages/proposal.ts), and the cards of a server a page does not ask: a page asks the generative UI
+   * backend alone (pages/call-part.ts).
    */
-  chatOnly?: boolean
+  saveAsPage?: boolean
   /**
    * What a part of a page with this tool shows, in a few words. The chat names the parts of a page
    * it proposes with it; a tool without it is named by its name. "Add a card" on a page offers only a

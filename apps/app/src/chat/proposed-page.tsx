@@ -31,7 +31,7 @@ export function proposalTool(tools: () => ReadonlyArray<ChatTool>): ChatTool {
       done: "Proposed a page",
       failed: "Failed to propose a page",
     },
-    chatOnly: true,
+    saveAsPage: false,
     draw(content) {
       const recipe = proposedRecipe(content)
       return recipe && <ProposedPage recipe={recipe} tools={tools()} />

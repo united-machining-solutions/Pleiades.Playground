@@ -35,7 +35,7 @@ const tools: ReadonlyArray<ChatTool> = [
   { name: "genui_measurement_list", part: "What the machines measure now", draw: () => "measurements" },
   { name: "genui_site_list", part: "Every site and its machines", draw: () => "sites" },
   { name: "genui_span_list", cardOnly: true, draw: () => "band" },
-  { name: "app_page_propose", chatOnly: true, draw: () => "proposal" },
+  { name: "app_page_propose", saveAsPage: false, draw: () => "proposal" },
 ]
 
 const show: CardChoice = {

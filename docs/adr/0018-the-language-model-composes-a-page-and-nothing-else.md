@@ -34,7 +34,8 @@ A page should still be what ADR-0014 makes it: a title and the parts in their or
 - The chat draws the result as a proposal: the title, the parts in words, "Save to my pages" and "Preview".
   Keeping goes through `savePage`, as "Save as page" does. "Preview" opens the recipe at `/pages/open`, where a
   shared link opens: there is no second preview.
-- The proposal is no part of a page. The tool is marked `chatOnly` in the chat's list: the chat draws its
+- The proposal is no part of a page. The tool is marked `saveAsPage: false` in the chat's list, as the
+  source references of the manuals are ([ADR-0019](0019-documentation-sources-in-chat.md)): the chat draws its
   result, a page never calls it, and "Save as page" does not keep it.
 - The instructions of the model say that it cannot keep a page, that it finds out with its tools what there is
   to show before it proposes one, that a machine id comes from a tool result, and that it says what was asked
@@ -52,7 +53,7 @@ tools again.
 - The app checks the names of the tools and the shape of the arguments, not what the arguments mean. A part
   with an argument the tool does not take, or with a machine the backend does not know, says so when the page
   is opened; "Preview" shows it before the page is kept.
-- A card whose tool a page cannot call is marked `chatOnly` as well, and is then offered as no part. The cards
+- A card whose tool a page cannot call is marked `saveAsPage: false` as well, and is then offered as no part. The cards
   of the OPC UA adapter are such: a page asks the generative UI backend alone, which has no `opcua_*` tool.
 - A card names the parts of a proposed page with `part` in the chat's list, a few words. A card without it is
   named by its tool.

@@ -14,7 +14,7 @@ const tools: ReadonlyArray<ChatTool> = [
   { name: "genui_machine_list", part: "Every machine and what it does now", draw: () => "list" },
   { name: "genui_machine_show", part: "One machine and its last hours", draw: () => "card" },
   { name: "genui_span_list", cardOnly: true, draw: () => "band" },
-  { name: PROPOSE_PAGE_TOOL, chatOnly: true, draw: () => "proposal" },
+  { name: PROPOSE_PAGE_TOOL, saveAsPage: false, draw: () => "proposal" },
 ]
 
 const list = { tool: "genui_machine_list" }
