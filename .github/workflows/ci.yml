@@ -223,8 +223,8 @@ jobs:
           fi
       - name: The Margo app has the broker configuration of the stack
         run: |
-          if ! diff -u stacks/broker/mosquitto.conf <(tail -n +3 margo/compose/broker/mosquitto.conf); then
-            echo "::error file=margo/compose/broker/mosquitto.conf::differs from stacks/broker/mosquitto.conf below its two lines of header"
+          if ! diff -u stacks/broker/mosquitto.conf <(docker compose config --format json | jq -j '.configs.mosquitto.content'); then
+            echo "::error file=margo/compose/compose.yaml::the config mosquitto differs from stacks/broker/mosquitto.conf"
             exit 1
           fi
       # The images of this pull request, not those of main: built from compose.yaml and tagged :main, the tag the
