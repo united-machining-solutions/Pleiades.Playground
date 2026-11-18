@@ -37,10 +37,25 @@ internal static class MachineEndpoints
         app.MapGet("/machines", List);
         app.MapGet("/machines/{serialNumber}", Show);
         app.MapGet("/machines/{serialNumber}/mapping", Mapping);
-        app.MapPut("/machines/{serialNumber}", Register);
-        app.MapDelete("/machines/{serialNumber}", Remove);
-        app.MapPost("/drafts/{draftId}/commit", Commit);
+        app.MapPut("/machines/{serialNumber}", Register)
+            .WithSummary("Registers a machine, or replaces its registration, and starts it")
+            .WithDescription(RefusalDescription);
+        app.MapDelete("/machines/{serialNumber}", Remove)
+            .WithSummary("Removes a machine and takes its retained messages back from the broker")
+            .WithDescription(
+                "204 when removed; 404 if no such machine is added; 503 if the broker cannot be reached, so that the " +
+                "retained messages of the machine cannot be taken back: the machine then stays added.");
+        app.MapPost("/drafts/{draftId}/commit", Commit)
+            .WithSummary("Registers what a proposal of the chat holds")
+            .WithDescription(RefusalDescription);
     }
+
+    private const string RefusalDescription =
+        "A refused registration answers with its reasons in problems: 400 if it is malformed; 409 once the server " +
+        "has answered, if the registration does not fit it, is not the machine it says it is, or if the server gives " +
+        "no value for Identification.ManufacturerUri, Model or SerialNumber, the parts of the machine id " +
+        "(identity: ...); 502 if the server does not answer. A core the machine does not deliver whole is no reason: " +
+        "what it lacks is declared not available.";
 
     /// <summary>Whether an exception says that the OPC UA server, not the request, is the problem.</summary>
     public static bool IsServerFault(Exception exception) =>

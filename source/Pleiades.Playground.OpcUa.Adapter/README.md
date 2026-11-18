@@ -320,16 +320,17 @@ prefix of a gateway; both are open.
 | `GET /users` | The servers with a stored user, without the passwords. |
 | `DELETE /users?url=opc.tcp://host:4840` | Forgets the user of a server. |
 | `PUT /machines/{SerialNumber}?dryRun=true` | Tries a registration: connects, reads every node once, and answers with each raw and converted value. Nothing is stored or published. |
-| `PUT /machines/{SerialNumber}` | Registers the machine, or replaces its registration, and starts it. |
-| `POST /drafts/{draftId}/commit` | Registers what a proposal of the chat holds. The button on the proposal sends it; a draft works once and is kept for 30 minutes. |
+| `PUT /machines/{SerialNumber}` | Registers the machine, or replaces its registration, and starts it. `409` with `identity: …` if the server gives no value for `Identification.ManufacturerUri`, `.Model` or `.SerialNumber`, the parts of the machine id. |
+| `POST /drafts/{draftId}/commit` | Registers what a proposal of the chat holds. The button on the proposal sends it; a draft works once and is kept for 30 minutes. Refused as `PUT /machines/{SerialNumber}` is. |
 | `GET /machines` | The registered machines with their state, and the machines each shares its session with. |
 | `GET /machines/{SerialNumber}` | One machine: its registration, the last value of every element, the alarms that stand. |
 | `GET /machines/{SerialNumber}/mapping` | The mapping review of one machine, element by element. |
 | `DELETE /machines/{SerialNumber}` | Removes the machine and takes its retained messages back from the broker. `204`; `404` if no such machine is added; `503` if the broker cannot be reached, so that its retained messages cannot be taken back: the machine then stays added, and the removal can be tried again. |
 
-A registration is refused with the reasons, one per line of `problems`: `400` if it is malformed, `409` if it
-does not fit its server, is not the machine it says it is or does not fulfil the core (checked once the server
-has answered), `502` if the server does not answer.
+A registration is refused with the reasons, one per line of `problems`: `400` if it is malformed; `409` once the
+server has answered, if the registration does not fit it (a node the server does not have), is not the machine it
+says it is, or if the server gives no value for a part of the machine id (`identity: …`); `502` if the server does
+not answer. A core the machine does not deliver whole is no reason: what it lacks is declared not available.
 
 The API has no sign-in. Whoever reaches its port can add and remove machines, so the port answers on this
 computer only unless `OPCUA_ADAPTER_BIND` opens it.
@@ -344,10 +345,11 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
 - `serialNumber`: the value of `Identification.SerialNumber`, how the adapter and its API name the machine.
 - `identity`: `manufacturer`, `manufacturerUri`, `model` and `productInstanceUri` as the server gave them when
   the machine was added, and the `machineId` formed from them, the level below `machines/` of every topic. The
-  adapter fills it in; a registration without it learns it from the values of the machine. It needs
-  `Manufacturer` and `ProductInstanceUri`; a `ManufacturerUri` or `Model` the server has no value for makes its
-  part of the machine id `unknown`, as the binding says. It stays, so the machine keeps its topics whatever its
-  server says later.
+  adapter fills it in; a registration without it, from before, learns it from the values of the machine and is
+  published from then on. `ManufacturerUri`, `Model` and the serial number are required: a registration whose
+  server gives no value for one of them is refused (`409`). A missing `Manufacturer` is the domain of the
+  `ManufacturerUri`, a missing `ProductInstanceUri` is formed as the binding forms it. It stays, so the machine
+  keeps its topics whatever its server says later.
 - `profiles`: the profiles of the data model the elements deliver whole. The adapter sets it from the
   elements; what a proposal names is replaced ([Core and profiles](#core-and-profiles)).
 - `endpoint`: the URL, `securityMode` and `securityPolicy`. `serverCertificateThumbprint` is filled in by
