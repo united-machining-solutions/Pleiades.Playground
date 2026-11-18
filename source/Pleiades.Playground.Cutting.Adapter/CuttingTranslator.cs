@@ -95,17 +95,18 @@ internal sealed partial class CuttingTranslator(
 
     /// <summary>
     /// The machine is gone. When it said so itself (<c>src9_server_disconnect</c>), it is known to be off:
-    /// <c>NotAvailable</c>, and no alarm of it stands any more. When it only stopped answering, its state is unknown, which the binding expresses with
-    /// <c>Connection.State</c> alone (<see cref="IPublisher.LostAsync"/>). A held state goes first.
+    /// <c>NotAvailable</c>, no program runs and no alarm of it stands any more. When it only stopped answering, its
+    /// state is unknown, which the binding expresses with <c>Connection.State</c> alone
+    /// (<see cref="IPublisher.LostAsync"/>); what the adapter knows of its program stands, for the machine may go
+    /// on with it. A held state goes first.
     /// </summary>
     public IReadOnlyList<Publication> Disconnected(bool machineSwitchedOff)
     {
         List<Publication> result = [.. Release(asHalt: true)];
-        _programActive = false;
-        _programKnown = false;
         if (machineSwitchedOff)
         {
             var now = Now;
+            result.AddRange(ProgramGone(now));
             result.AddRange(ClearAlarms(now));
             result.Add(Status("NotAvailable", now));
         }
@@ -113,6 +114,27 @@ internal sealed partial class CuttingTranslator(
         return Ordered(result);
     }
 
+    /// <summary>
+    /// The machine announced itself (<c>src9_server_connect</c>): it has started anew, so no program of before runs
+    /// and no alarm of before stands. Its state follows once it is connected again. A held state goes first.
+    /// </summary>
+    public IReadOnlyList<Publication> Restarted()
+    {
+        var now = Now;
+        return Ordered([.. Release(asHalt: true), .. ProgramGone(now), .. ClearAlarms(now)]);
+    }
+
+    /// <summary>No program runs any more, without an end the machine said: the channel is reset.</summary>
+    private List<Publication> ProgramGone(DateTimeOffset at)
+    {
+        var known = _programKnown || _lastTimestamp.ContainsKey(Paths.ChannelState);
+        _programActive = false;
+        _programKnown = false;
+        _program = string.Empty;
+        return known
+            ? [new ValuePublication(Paths.ChannelState, "Reset", at), new ValuePublication(_programPath, null, at)]
+            : [];
+    }
     /// <summary>The held state, once its time has come and no program notification took it; else nothing.</summary>
     public IReadOnlyList<Publication> Due()
     {

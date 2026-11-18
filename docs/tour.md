@@ -24,8 +24,8 @@ docker compose up -d --build --wait
 ```
 
 The command returns when the stack is ready, that is when every container reports healthy: the broker, the
-database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app and
-one simulator per machine. To see the demo without building it, start it from the published images, see
+database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app,
+one simulator per machine, and three cutting machines, each a simulator with its adapter. To see the demo without building it, start it from the published images, see
 [Start](../README.md#start).
 
 ```bash
@@ -36,6 +36,12 @@ docker compose ps --format "table {{.Service}}	{{.Status}}"
 SERVICE                  STATUS
 app                      Up 3 minutes (healthy)
 broker                   Up 3 minutes (healthy)
+cutting-adapter-laser-2d Up 3 minutes (healthy)
+cutting-adapter-punch    Up 3 minutes (healthy)
+cutting-adapter-tube     Up 3 minutes (healthy)
+cutting-laser-2d         Up 3 minutes (healthy)
+cutting-punch            Up 3 minutes (healthy)
+cutting-tube             Up 3 minutes (healthy)
 events-api               Up 3 minutes (healthy)
 events-persistence       Up 3 minutes (healthy)
 genui-mcp                Up 3 minutes (healthy)
@@ -55,14 +61,18 @@ timeseries-persistence   Up 3 minutes (healthy)
 | <http://localhost:5500/> | The Timeseries API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
-| `localhost:1883` | The MQTT broker the simulators publish to. |
+| <http://localhost:5611/>, `:5612`, `:5613` | The web pages of the three cutting machines, a 2D laser, a tube laser and a punching machine: their plan, their alarms and every telegram. They answer on this computer only. |
+| `localhost:1883` | The MQTT broker the simulators and adapters publish to. |
 
 **In the code:** [`compose.yaml`](../compose.yaml) is the stack, [`.env.example`](../.env.example) names every
 port and setting. The three simulated machines, P-04, P-07 and M-02, are the three `simulator-*` services.
 Each publishes after the umati data model, below `machines/<manufacturer>_<model>_<serial number>/` (for P-04
 `machines/alcyone-machines_AX-400_P-04/`): manifest, values, its stack light, and job orders, program executions
 and alerts as CloudEvents. It is described in
-[`contracts/mqtt`](../contracts/mqtt/README.md#machines-the-binding-of-the-data-model).
+[`contracts/mqtt`](../contracts/mqtt/README.md#machines-the-binding-of-the-data-model). The cutting machines, L-01,
+T-01 and PU-01, are the `cutting-*` services: a simulator that speaks the telegram protocol of the machine through
+files, and an adapter that reads it and publishes the same tree, below `machines/trumpf_Laser2D_L-01/` and the like
+(see [`Cutting.Adapter`](../source/Pleiades.Playground.Cutting.Adapter/README.md)).
 
 The persistence services store the values as they come, in the units of the model, and the CloudEvents as they
 came; the APIs put job orders, program executions and alerts together from them when they are read.

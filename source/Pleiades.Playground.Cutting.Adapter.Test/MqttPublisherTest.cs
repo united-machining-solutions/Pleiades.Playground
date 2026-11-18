@@ -130,6 +130,30 @@ public sealed class MqttPublisherTest
     }
 
     [TestMethod]
+    public async Task AnAlertClearedWhileLost_GoesOutAfterTheValuesWithTheNextRunning()
+    {
+        using var client = new RecordingManagedMqttClient();
+        using var publisher = Publisher(client);
+        var translator = new CuttingTranslator(CuttingTranslatorTest.Identity, TimeZoneInfo.Utc, new FixedTime(Now));
+        await publisher.StartAsync();
+        await publisher.ReachedAsync(translator.Connected());
+        await publisher.SaidAsync(translator.Translate(CuttingNotification.Create(CuttingNotifications.CurrentAlarms, "1", "4711", "Text", "")));
+        await publisher.LostAsync();
+        client.Take();
+
+        await publisher.SaidAsync(translator.Disconnected(machineSwitchedOff: true));
+        Assert.IsEmpty(client.Take(), "Neither the event nor the list goes out while the machine is lost.");
+
+        await publisher.ReachedAsync(translator.Connected());
+        var messages = client.Take();
+        var list = messages.FindIndex(m => m.Topic == Root + "umati/Notification/ActiveAlerts");
+        var running = messages.FindLastIndex(m => m.Topic == Root + "umati/Connection/State");
+        var cleared = messages.FindIndex(m => m.Topic == Root + "events/notifications");
+        Assert.IsTrue(list >= 0 && running > list && cleared > running, string.Join(", ", messages.Select(m => m.Topic)));
+        Assert.AreEqual("Notification.AlertCleared", (string?)RecordingManagedMqttClient.Json(messages[cleared])["type"]);
+    }
+
+    [TestMethod]
     public async Task AnAlertWhileTheBrokerIsAway_GoesOutAfterTheConnectSequence()
     {
         using var client = new RecordingManagedMqttClient(connected: false);

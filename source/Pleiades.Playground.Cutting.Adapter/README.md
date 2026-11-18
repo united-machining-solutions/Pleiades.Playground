@@ -60,7 +60,7 @@ number>`, formed from `Config__ManufacturerUri`, `Config__Model` and `Config__Se
 `"available": false`: the protocol does not give them. The events carry `source` (the `ProductInstanceUri`) and a
 `sequence` that counts from 1 per start of the adapter; while the broker is away they wait in a bounded outbox
 (10 000, the oldest dropped first) and go out after the connect sequence. An alarm still raised when the machine
-switches off is cleared with it; one raised when the adapter itself restarts gets no `AlertCleared`: a consumer sees
+switches off or starts anew is cleared with it, and so is its program; one raised when the adapter itself restarts gets no `AlertCleared`: a consumer sees
 the new start by the prefix of `sequence` and reads `ActiveAlerts` again.
 
 **Halt or end?** The machine sends `MaschineSteht` whenever a program ends, is aborted or halts, and

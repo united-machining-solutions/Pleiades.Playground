@@ -35,6 +35,10 @@ internal sealed partial class AdapterWorker(
     private readonly SemaphoreSlim _machineAnnounced = new(0);
     private volatile bool _connected;
     private int _missed;
+
+    // Counts the announcements and switch-offs of the machine, under the gate: a reply to SRC9CONN that one of them
+    // overtook is no connection.
+    private int _epoch;
     private bool _wrongNumberLogged;
     private CancellationToken _stopping;
 
@@ -143,6 +147,7 @@ internal sealed partial class AdapterWorker(
 
     private async Task ConnectAsync(CancellationToken cancellationToken)
     {
+        var epoch = Volatile.Read(ref _epoch);
         var reply = await session.RequestAsync(CuttingCommands.Connect, [HostVersion], Config.ReplyTimeout, cancellationToken)
             .ConfigureAwait(false);
         if (reply is null)
@@ -153,10 +158,25 @@ internal sealed partial class AdapterWorker(
             return;
         }
 
-        _connected = true;
+        var connected = false;
+        await PublishAsync(async p =>
+        {
+            if (epoch != _epoch)
+            {
+                // The machine announced itself or switched off meanwhile: this reply is of before.
+                return;
+            }
+
+            connected = _connected = true;
+            await p.ReachedAsync(translator.Connected()).ConfigureAwait(false);
+        }).ConfigureAwait(false);
+        if (!connected)
+        {
+            return;
+        }
+
         Interlocked.Exchange(ref _missed, 0);
         LogConnected(Config.SerialNumber, reply[^1].Fields.Count);
-        await PublishAsync(p => p.ReachedAsync(translator.Connected())).ConfigureAwait(false);
 
         var info = await session.RequestAsync(CuttingCommands.MachineInfo, [Config.MachineNumber], Config.ReplyTimeout, cancellationToken)
             .ConfigureAwait(false);
@@ -201,16 +221,23 @@ internal sealed partial class AdapterWorker(
             case CuttingNotifications.ServerConnect:
                 // A machine that starts (again) wants the host to connect anew (§2.5).
                 LogMachineAnnounced(Config.SerialNumber);
-                _connected = false;
-                // Not reached until it answers SRC9CONN again; until then its values are not current.
-                await PublishAsync(p => p.LostAsync()).ConfigureAwait(false);
+                // Not reached until it answers SRC9CONN again; until then its values are not current. It started
+                // anew: what ran before is over, and goes out with the next Running.
+                await PublishAsync(async p =>
+                {
+                    _epoch++;
+                    _connected = false;
+                    await p.LostAsync().ConfigureAwait(false);
+                    await p.SaidAsync(translator.Restarted()).ConfigureAwait(false);
+                }).ConfigureAwait(false);
                 _machineAnnounced.Release();
                 break;
             case CuttingNotifications.ServerDisconnect:
                 LogMachineSwitchedOff(Config.SerialNumber);
-                _connected = false;
                 await PublishAsync(async p =>
                 {
+                    _epoch++;
+                    _connected = false;
                     await p.SaidAsync(translator.Disconnected(machineSwitchedOff: true)).ConfigureAwait(false);
                     await p.LostAsync().ConfigureAwait(false);
                 }).ConfigureAwait(false);
