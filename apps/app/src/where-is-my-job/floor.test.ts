@@ -3,7 +3,7 @@ import { test } from "node:test"
 
 import type { JobOrderEntry, MachineShow } from "@pleiades/cards/machine/contract.ts"
 
-import { unknownMachine } from "../../live/machines.ts"
+import { unknownMachine } from "../live/machines.ts"
 
 import {
   TILE_HEIGHT,

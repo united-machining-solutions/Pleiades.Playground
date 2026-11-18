@@ -15,12 +15,12 @@ import { useMemo, useState } from "react"
 import { NoAnswer } from "@/components/no-answer.tsx"
 import { liveness, useLive, useRetry } from "@/hooks/use-live.ts"
 import type { Live } from "@/hooks/use-live.ts"
-import { getFloor } from "@/showcases/where-is-my-job/get-floor.ts"
-import { floorAt, floorFilters, floorOf, floorWith, ordersOf } from "@/showcases/where-is-my-job/floor.ts"
-import type { FloorPage, Order } from "@/showcases/where-is-my-job/floor.ts"
-import { FloorMap } from "@/showcases/where-is-my-job/floor-map.tsx"
-import type { Lens } from "@/showcases/where-is-my-job/floor-map.tsx"
-import { FloorPanel, MachinePanel, OrderPanel, OrdersTable } from "@/showcases/where-is-my-job/panels.tsx"
+import { getFloor } from "@/where-is-my-job/get-floor.ts"
+import { floorAt, floorFilters, floorOf, floorWith, ordersOf } from "@/where-is-my-job/floor.ts"
+import type { FloorPage, Order } from "@/where-is-my-job/floor.ts"
+import { FloorMap } from "@/where-is-my-job/floor-map.tsx"
+import type { Lens } from "@/where-is-my-job/floor-map.tsx"
+import { FloorPanel, MachinePanel, OrderPanel, OrdersTable } from "@/where-is-my-job/panels.tsx"
 
 /** Read once from the backend, the job orders among them; then every value comes from the broker. */
 const live: Live<FloorPage | null> = {
@@ -36,11 +36,9 @@ const live: Live<FloorPage | null> = {
  * programming before the machines, the packing after them, and a part by its sheet and position,
  * stands on the page as such. The chat does not know the page.
  *
- * It is a showcase: the page is only in a build with the showcases (APP_SHOWCASES), and the folder
- * `(showcases)` adds nothing to its address. Its entry in the sidebar is named here, so it stands
- * there only in such a build; the app alone has neither the page nor the entry.
+ * It is a page of the app, with its entry in the sidebar: it reads only values the stack has.
  */
-export const Route = createFileRoute("/(showcases)/where-is-my-job")({
+export const Route = createFileRoute("/where-is-my-job")({
   staticData: { nav: { title: "Where is My Job?", icon: PackageSearchIcon } },
   loader: () => getFloor().catch((error: unknown) => ({ values: null, error: String(error) })),
   component: WhereIsMyJob,
