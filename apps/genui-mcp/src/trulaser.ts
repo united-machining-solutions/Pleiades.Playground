@@ -1,43 +1,56 @@
 import {
+  ALERT_SEVERITIES,
+  CARD_SIGNALS,
   CONDITION_GUIDE,
   CONDITION_GUIDE_PATH,
+  CONNECTION_PATH,
   DEVICES_PATH,
-  LANES,
+  EXECUTION_LANE,
   LANE_SLOTS,
+  REQUEST_ACTIVE_LANE,
   SIGNAL_PATHS,
-  UNITS_LANE,
-  deviceLaneKey,
-  laneValueOf,
+  STATUS_LANES,
+  alertLaneKey,
+  deviceLane,
   sequenceOf,
   statusOf,
-  unitsOf,
 } from "@pleiades/cards/trulaser/contract.ts"
 import type {
+  Alert,
   ConditionKey,
   ConditionTile,
   Device,
+  JobOrder,
   Lane,
-  LaneRead,
+  LaneSource,
   LaneSpan,
   Signal,
   SignalKind,
   SignalName,
+  TimelineView,
+  TrulaserCollision,
+  TrulaserConditions,
+  TrulaserDevices,
+  TrulaserJobOrder,
   TrulaserSeries,
-  TrulaserShow,
+  TrulaserStatus,
+  TrulaserTechnology,
   TrulaserTimeline,
 } from "@pleiades/cards/trulaser/contract.ts"
 
-import { EVER, listTopics, readNewest, readStrings, readTimelines } from "./apis.ts"
-import type { Apis, Sample } from "./apis.ts"
+import { EVER, listTopics, readAlertSpans, readJobOrders, readNewest, readStrings, readTimelines } from "./apis.ts"
+import type { AlertSpan, Apis, JobOrderEntry, Sample } from "./apis.ts"
 import { HORIZON_SECONDS, machineOf } from "./machines.ts"
 import { secondsBefore } from "./time.ts"
 
-// What a TRUMPF laser cutting machine reports through its edge component: the values of now, the
-// timelines of its states and automation devices, and the values of one tile of the condition guide
-// over time. Nothing is converted: a display writes the units.
+// What a TRUMPF laser cutting machine reports, one answer for each card, by the names of the umati data
+// model: State.Status, Notification.ActiveAlerts, JobMonitoring.JobOrders and
+// WorkMasterMonitoring.ProgramExecution, read from their topics and from the Events API. What the model
+// does not know comes from the extension of TRUMPF below oem/Dalle/. Nothing is converted: a display
+// writes the units.
 
-/** The topic every machine with an edge component publishes: by it a TruLaser is found. */
-const MARK = SIGNAL_PATHS.itemState.path
+/** The topic every machine with the extension of the edge component publishes: by it a TruLaser is found. */
+const MARK = "oem/Dalle/MachineState/ItemState"
 
 /** The machines that published the signals of an edge component in the last 24 hours, sorted. */
 export async function listTrulasers(apis: Apis, now = new Date()): Promise<Array<string>> {
@@ -70,6 +83,114 @@ export async function readSignal(apis: Apis, topic: string, kind: SignalKind, to
   return { value: newest?.value ?? null, unit: kind === "flag" ? null : (newest?.unit ?? null), at: newest?.at ?? null, topic }
 }
 
+/** What every card says about its machine: which one, its serial number, and as of when. */
+async function aboutOf(apis: Apis, asked: string | undefined, now: Date) {
+  const machine = await trulaserOf(apis, asked, now)
+  const serial = await readSignal(apis, `machines/${machine}/umati/Identification/SerialNumber`, "text", now)
+  return { asOf: now.toISOString(), machine, serialNumber: typeof serial.value === "string" ? serial.value : null }
+}
+
+/** The newest values of the signals a card shows, by their names. */
+async function readSignals<const TNames extends ReadonlyArray<SignalName>>(
+  apis: Apis,
+  machine: string,
+  names: TNames,
+  now: Date,
+): Promise<{ [K in TNames[number]]: Signal }> {
+  const read = await Promise.all(
+    names.map((name) => readSignal(apis, `machines/${machine}/${SIGNAL_PATHS[name].path}`, SIGNAL_PATHS[name].kind, now)),
+  )
+  return Object.fromEntries(names.map((name, index) => [name, read[index]!])) as { [K in TNames[number]]: Signal }
+}
+
+/**
+ * When the adapter started, each time, between two instants: `umati/Connection/State` became
+ * `Initializing`. A new start begins a new list of alerts, so an alert of a start before that was never
+ * cleared no longer stands.
+ */
+async function adapterStarts(apis: Apis, machine: string, from: Date, to: Date): Promise<Array<number>> {
+  const topic = `machines/${machine}/${CONNECTION_PATH}`
+  const [series] = (await readStrings(apis, topic, from, to)).filter((one) => one.topic === topic)
+  return (series?.samples ?? []).filter((one) => one.value === "Initializing").map((one) => Date.parse(one.at))
+}
+
+/** Until when an alert stood: its clear, else the next start of the adapter after its raise, else `to`. */
+export function alertEnd(alert: Pick<AlertSpan, "raisedAt" | "clearedAt">, starts: ReadonlyArray<number>, to: number): number {
+  if (alert.clearedAt !== null) return Date.parse(alert.clearedAt)
+  const raised = Date.parse(alert.raisedAt)
+  return starts.find((start) => start > raised) ?? to
+}
+
+const severityRank = (severity: string | null) => {
+  const rank = ALERT_SEVERITIES.indexOf((severity ?? "") as (typeof ALERT_SEVERITIES)[number])
+  return rank < 0 ? ALERT_SEVERITIES.length : rank
+}
+
+/** The alerts that stand now, the most urgent first and the newest first within a category. */
+export function activeAlertsOf(alerts: ReadonlyArray<AlertSpan>, starts: ReadonlyArray<number>, now: number): Array<Alert> {
+  return alerts
+    .filter((one) => alertEnd(one, starts, Infinity) === Infinity && Date.parse(one.raisedAt) <= now)
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity) || b.raisedAt.localeCompare(a.raisedAt))
+    .map((one) => ({
+      Id: one.alertId,
+      ErrorCode: one.errorCode,
+      Message: one.message,
+      Severity: one.severity,
+      SeverityValue: one.severityValue,
+      SourceName: one.sourceName,
+      Time: one.raisedAt,
+    }))
+}
+
+/** State.Status and Notification.ActiveAlerts now. */
+export async function showStatus(apis: Apis, asked?: string, now = new Date()): Promise<TrulaserStatus> {
+  const about = await aboutOf(apis, asked, now)
+  const dayBefore = secondsBefore(now, HORIZON_SECONDS)
+  const [signals, alerts, starts] = await Promise.all([
+    readSignals(apis, about.machine, CARD_SIGNALS.status, now),
+    readAlertSpans(apis, about.machine, dayBefore, now),
+    adapterStarts(apis, about.machine, dayBefore, now),
+  ])
+  const cause = signals.changeCauseValue.value
+  return {
+    ...about,
+    signals,
+    sequence: sequenceOf(typeof cause === "string" ? cause : null),
+    activeAlerts: activeAlertsOf(alerts, starts, now.getTime()),
+  }
+}
+
+/** A job order of the Events API as the contract names its fields. */
+function jobOrderOf(entry: JobOrderEntry): JobOrder {
+  return {
+    JobOrderID: entry.jobOrderId,
+    State: entry.state,
+    StateSince: entry.lastChange,
+    JobName: entry.jobName,
+    WorkMasterID: entry.workMasterId,
+    StartTime: entry.startTime,
+    EndTime: entry.endTime,
+    RunsCompleted: entry.runsCompleted,
+    JobResult: entry.jobResult,
+  }
+}
+
+/** The job order that runs or is interrupted, else the newest one. */
+export function currentJobOrder(entries: ReadonlyArray<JobOrderEntry>): JobOrderEntry | null {
+  return entries.find((one) => one.state === "Running" || one.state === "Interrupted") ?? entries[0] ?? null
+}
+
+/** JobMonitoring.JobOrders and WorkMasterMonitoring.ProgramExecution now. */
+export async function showJobOrder(apis: Apis, asked?: string, now = new Date()): Promise<TrulaserJobOrder> {
+  const about = await aboutOf(apis, asked, now)
+  const [signals, jobs] = await Promise.all([
+    readSignals(apis, about.machine, CARD_SIGNALS.jobOrder, now),
+    readJobOrders(apis, about.machine),
+  ])
+  const current = currentJobOrder(jobs)
+  return { ...about, jobOrder: current && jobOrderOf(current), signals }
+}
+
 /** The automation devices of a machine, by the topics of their type, in the order of their index. */
 async function readDevices(apis: Apis, machine: string, now: Date): Promise<Array<Device>> {
   const base = `machines/${machine}/${DEVICES_PATH}`
@@ -90,6 +211,28 @@ async function readDevices(apis: Apis, machine: string, now: Date): Promise<Arra
   )
 }
 
+/** AutomationDeviceRequestStates of the extension now. */
+export async function showDevices(apis: Apis, asked?: string, now = new Date()): Promise<TrulaserDevices> {
+  const about = await aboutOf(apis, asked, now)
+  const [signals, devices] = await Promise.all([
+    readSignals(apis, about.machine, CARD_SIGNALS.devices, now),
+    readDevices(apis, about.machine, now),
+  ])
+  return { ...about, signals, devices }
+}
+
+/** LaserTechnology of the extension now. */
+export async function showTechnology(apis: Apis, asked?: string, now = new Date()): Promise<TrulaserTechnology> {
+  const about = await aboutOf(apis, asked, now)
+  return { ...about, signals: await readSignals(apis, about.machine, CARD_SIGNALS.technology, now) }
+}
+
+/** CollisionData of the extension now. */
+export async function showCollision(apis: Apis, asked?: string, now = new Date()): Promise<TrulaserCollision> {
+  const about = await aboutOf(apis, asked, now)
+  return { ...about, signals: await readSignals(apis, about.machine, CARD_SIGNALS.collision, now) }
+}
+
 /** One tile of the condition guide: its value, the name next to it, its flags, and what they say together. */
 async function readTile(apis: Apis, machine: string, tile: (typeof CONDITION_GUIDE)[number], now: Date): Promise<ConditionTile> {
   const at = (path: string) => `machines/${machine}/${CONDITION_GUIDE_PATH}/${path}`
@@ -106,48 +249,52 @@ async function readTile(apis: Apis, machine: string, tile: (typeof CONDITION_GUI
   return { key: tile.key, label: tile.label, shown: tile.shown, value, detail, flags, status: statusOf(flags) }
 }
 
-/** What a TruLaser does now: every value of the card, each the newest of its topic. */
-export async function showTrulaser(apis: Apis, asked?: string, now = new Date()): Promise<TrulaserShow> {
-  const machine = await trulaserOf(apis, asked, now)
-  const names = Object.keys(SIGNAL_PATHS) as Array<SignalName>
-  const [read, serialNumber, devices, conditionGuide] = await Promise.all([
-    Promise.all(
-      names.map((name) => readSignal(apis, `machines/${machine}/${SIGNAL_PATHS[name].path}`, SIGNAL_PATHS[name].kind, now)),
-    ),
-    readSignal(apis, `machines/${machine}/umati/Identification/SerialNumber`, "text", now),
-    readDevices(apis, machine, now),
-    Promise.all(CONDITION_GUIDE.map((tile) => readTile(apis, machine, tile, now))),
-  ])
-  const signals = Object.fromEntries(names.map((name, index) => [name, read[index]!])) as Record<SignalName, Signal>
-  const cause = signals.changeCauseValue.value
-  return {
-    asOf: now.toISOString(),
-    machine,
-    serialNumber: typeof serialNumber.value === "string" ? serialNumber.value : null,
-    signals,
-    sequence: sequenceOf(typeof cause === "string" ? cause : null),
-    unitsInMalfunction: unitsOf(signals.unitsInMalfunction.value),
-    devices,
-    conditionGuide,
-  }
+/** ConditionGuide of the extension now. */
+export async function showConditions(apis: Apis, asked?: string, now = new Date()): Promise<TrulaserConditions> {
+  const about = await aboutOf(apis, asked, now)
+  return { ...about, tiles: await Promise.all(CONDITION_GUIDE.map((tile) => readTile(apis, about.machine, tile, now))) }
 }
+
+/** How long after the start of a span a detail may come and still count as the one it began with. */
+const DETAIL_SLACK_MS = 1000
 
 /**
  * The values of a topic as spans without a gap between `from` and `to`. A value holds until the next
  * one; the value that held at `from` is the newest one before it, if there is one. Where two values
- * in a row show the same, they are one span.
+ * in a row are the same, they are one span. Each span carries the details that held when it began.
  */
-export function laneSpans(samples: ReadonlyArray<Sample>, read: LaneRead, from: string, to: string): Array<LaneSpan> {
+export function laneSpans(
+  samples: ReadonlyArray<Sample>,
+  from: string,
+  to: string,
+  details: ReadonlyArray<{ name: string; samples: ReadonlyArray<Sample> }> = [],
+  labelFrom: string | null = null,
+): Array<LaneSpan> {
   const start = Date.parse(from)
   const end = Date.parse(to)
+  const sorted = details.map((one) => ({ name: one.name, samples: [...one.samples].sort((a, b) => a.at.localeCompare(b.at)) }))
+  const detailsAt = (at: number) =>
+    sorted.map(({ name, samples: list }) => {
+      let value: string | null = null
+      for (const sample of list) {
+        if (Date.parse(sample.at) > at + DETAIL_SLACK_MS) break
+        value = sample.value
+      }
+      return { name, value }
+    })
   const spans: Array<LaneSpan> = []
   let value: string | null = null
   let at = start
   const close = (until: number) => {
     if (until <= at) return
     const last = spans.at(-1)
-    if (last && last.value === value) last.to = new Date(until).toISOString()
-    else spans.push({ from: new Date(at).toISOString(), to: new Date(until).toISOString(), value })
+    if (last && last.value === value) {
+      last.to = new Date(until).toISOString()
+      return
+    }
+    const shown = detailsAt(at)
+    const label = labelFrom === null ? null : (shown.find((one) => one.name === labelFrom)?.value ?? null)
+    spans.push({ from: new Date(at).toISOString(), to: new Date(until).toISOString(), value, label, details: shown })
   }
   for (const sample of [...samples].sort((a, b) => a.at.localeCompare(b.at))) {
     const time = Date.parse(sample.at)
@@ -156,7 +303,7 @@ export function laneSpans(samples: ReadonlyArray<Sample>, read: LaneRead, from: 
       close(time)
       at = time
     }
-    value = laneValueOf(read, sample.value)
+    value = sample.value === "" ? null : sample.value
   }
   close(end)
   return spans
@@ -164,7 +311,8 @@ export function laneSpans(samples: ReadonlyArray<Sample>, read: LaneRead, from: 
 
 /**
  * The same spans in at most `slots`, for a lane that has no room for more: the time is cut into that
- * many equal slots, and each shows the value that lasted longest in it. Spans that fit stay as they are.
+ * many equal slots, and each shows the value that lasted longest in it, with the details and label of
+ * its longest span. Spans that fit stay as they are.
  */
 export function thinnedLane(spans: ReadonlyArray<LaneSpan>, slots: number): Array<LaneSpan> {
   const [first, last] = [spans[0], spans.at(-1)]
@@ -173,51 +321,153 @@ export function thinnedLane(spans: ReadonlyArray<LaneSpan>, slots: number): Arra
   const end = Date.parse(last.to)
   const width = (end - start) / slots
   const edge = (slot: number) => (slot >= slots ? end : start + slot * width)
-  const lasted = Array.from({ length: slots }, () => new Map<string | null, number>())
+  type Lasted = { lasting: number; longest: number; span: LaneSpan }
+  const lasted = Array.from({ length: slots }, () => new Map<string | null, Lasted>())
   for (const span of spans) {
     const [from, to] = [Date.parse(span.from), Date.parse(span.to)]
     const firstSlot = Math.min(slots - 1, Math.floor((from - start) / width))
     const lastSlot = Math.min(slots - 1, Math.max(firstSlot, Math.ceil((to - start) / width) - 1))
     for (let slot = firstSlot; slot <= lastSlot; slot++) {
       const share = Math.max(0, Math.min(to, edge(slot + 1)) - Math.max(from, edge(slot)))
-      lasted[slot]!.set(span.value, (lasted[slot]!.get(span.value) ?? 0) + share)
+      const before = lasted[slot]!.get(span.value)
+      if (before === undefined) lasted[slot]!.set(span.value, { lasting: share, longest: share, span })
+      else {
+        before.lasting += share
+        if (share > before.longest) [before.longest, before.span] = [share, span]
+      }
     }
   }
   const thin: Array<LaneSpan> = []
   lasted.forEach((slot, index) => {
-    let value: string | null = null
-    let longest = -1
-    for (const [one, lasting] of slot) {
-      if (lasting > longest) [value, longest] = [one, lasting]
-    }
+    let chosen: Lasted | undefined
+    for (const one of slot.values()) if (chosen === undefined || one.lasting > chosen.lasting) chosen = one
     const until = new Date(edge(index + 1)).toISOString()
     const before = thin.at(-1)
-    if (before && before.value === value) before.to = until
-    else thin.push({ from: new Date(edge(index)).toISOString(), to: until, value })
+    if (before && chosen && before.value === chosen.span.value && before.label === chosen.span.label) before.to = until
+    else if (chosen) thin.push({ ...chosen.span, from: new Date(edge(index)).toISOString(), to: until })
   })
   return thin
 }
 
-/** The spans of the units lane in which a unit was in malfunction. */
-export function malfunctionsOf(spans: ReadonlyArray<LaneSpan>): TrulaserTimeline["malfunctions"] {
-  return spans.flatMap((span) => (span.value === null ? [] : [{ from: span.from, to: span.to, units: span.value }]))
+/** The alerts of the window as spans, one lane for each category that occurred, clipped to the window. */
+export function alertLanes(
+  alerts: ReadonlyArray<AlertSpan>,
+  starts: ReadonlyArray<number>,
+  from: number,
+  to: number,
+  topic: string,
+): Array<Lane> {
+  const lanes: Array<Lane> = []
+  for (const severity of ALERT_SEVERITIES) {
+    const spans = alerts
+      .filter((one) => one.severity === severity)
+      .flatMap((one) => {
+        const begin = Math.max(from, Date.parse(one.raisedAt))
+        const end = Math.min(to, alertEnd(one, starts, to))
+        if (end <= begin) return []
+        return [
+          {
+            from: new Date(begin).toISOString(),
+            to: new Date(end).toISOString(),
+            value: severity,
+            label: one.sourceName || null,
+            details: [
+              { name: "ErrorCode", value: one.errorCode || null },
+              { name: "Message", value: one.message || null },
+              { name: "SourceName", value: one.sourceName || null },
+            ],
+          },
+        ]
+      })
+      .sort((a, b) => a.from.localeCompare(b.from))
+    if (spans.length === 0) continue
+    lanes.push({
+      key: alertLaneKey(severity),
+      group: lanes.length === 0 ? "Notification.ActiveAlerts" : null,
+      label: severity,
+      topic,
+      details: [],
+      labelFrom: null,
+      overlaps: true,
+      spans,
+    })
+  }
+  return lanes
+}
+
+/** The job orders of the window as spans from their start to their end, each called by its id. */
+export function jobOrderLane(entries: ReadonlyArray<JobOrderEntry>, from: number, to: number, topic: string): Lane {
+  const spans = entries
+    .flatMap((one) => {
+      if (one.startTime === null) return []
+      const begin = Math.max(from, Date.parse(one.startTime))
+      const end = Math.min(to, one.endTime === null ? to : Date.parse(one.endTime))
+      if (end <= begin) return []
+      return [
+        {
+          from: new Date(begin).toISOString(),
+          to: new Date(end).toISOString(),
+          value: one.endTime === null ? one.state : "Running",
+          label: one.jobOrderId,
+          details: [
+            { name: "JobOrderID", value: one.jobOrderId },
+            { name: "JobName", value: one.jobName },
+            { name: "WorkMasterID", value: one.workMasterId },
+            { name: "State", value: one.state },
+            { name: "RunsCompleted", value: one.runsCompleted === null ? null : String(one.runsCompleted) },
+            { name: "JobResult", value: one.jobResult },
+          ],
+        },
+      ]
+    })
+    .sort((a, b) => a.from.localeCompare(b.from))
+  return {
+    key: "jobOrders",
+    group: "JobMonitoring.JobOrders",
+    label: "JobOrder",
+    topic,
+    details: [],
+    labelFrom: null,
+    overlaps: true,
+    spans,
+  }
 }
 
 /** How many hours the timelines and the charts look back, if nobody asks, and at most. */
 export const TIMELINE_DEFAULT_HOURS = 1
 export const MOST_TIMELINE_HOURS = 24
 
-/** The text values of one topic between two instants, with the newest one before `from` first. */
-async function readLane(apis: Apis, topic: string, from: Date, to: Date): Promise<Array<Sample>> {
+/** The values of one topic between two instants as text, with the newest one before `from` first. */
+async function readLane(apis: Apis, topic: string, kind: "text" | "flag", from: Date, to: Date): Promise<Array<Sample>> {
+  if (kind === "flag") {
+    const [before, [during]] = await Promise.all([
+      readNewest(apis, "booleanValues", topic, from),
+      readTimelines(apis, "booleanValues", topic, from, to),
+    ])
+    return [...(before ? [before] : []), ...(during?.samples ?? [])].map((one) => ({ at: one.at, value: String(one.value) }))
+  }
   const [before, during] = await Promise.all([readStrings(apis, topic, EVER, from, 1), readStrings(apis, topic, from, to)])
   const of = (series: Awaited<ReturnType<typeof readStrings>>) => series.find((one) => one.topic === topic)?.samples ?? []
   return [...of(before), ...of(during)]
 }
 
-/** The timelines of a TruLaser over the last hours: a lane for each state, run and automation device. */
+/** The lanes of a view that the Timeseries store holds. */
+async function sourcesOf(apis: Apis, machine: string, view: TimelineView, now: Date): Promise<Array<LaneSource>> {
+  if (view === "jobOrder") return [EXECUTION_LANE]
+  const devices = await readDevices(apis, machine, now)
+  const type = (one: Device) => (typeof one.type.value === "string" ? one.type.value : null)
+  if (view === "devices") return [REQUEST_ACTIVE_LANE, ...devices.map((one) => deviceLane(one.index, type(one), null))]
+  return [
+    ...STATUS_LANES,
+    ...devices.map((one, index) => deviceLane(one.index, type(one), index === 0 ? "AutomationDeviceRequestStates" : null)),
+  ]
+}
+
+/** The timelines of a view of a TruLaser over the last hours. */
 export async function listTimeline(
   apis: Apis,
   asked: string,
+  view: TimelineView = "status",
   hours = TIMELINE_DEFAULT_HOURS,
   slots = LANE_SLOTS,
   now = new Date(),
@@ -225,23 +475,48 @@ export async function listTimeline(
   const machine = await trulaserOf(apis, asked, now)
   const from = secondsBefore(now, hours * 3600)
   const [fromText, toText] = [from.toISOString(), now.toISOString()]
-  const devices = await readDevices(apis, machine, now)
-  const wanted: Array<{ key: string; label: string; topic: string; read: LaneRead }> = [
-    ...LANES.map((one) => ({ ...one, topic: `machines/${machine}/${SIGNAL_PATHS[one.signal].path}` })),
-    ...devices.map((one) => ({
-      key: deviceLaneKey(one.index),
-      label: typeof one.type.value === "string" ? one.type.value : `Device ${one.index + 1}`,
-      topic: one.state.topic,
-      read: "as-is" as const,
-    })),
-    { ...UNITS_LANE, topic: `machines/${machine}/${SIGNAL_PATHS.unitsInMalfunction.path}` },
-  ]
-  const full = await Promise.all(
-    wanted.map(async (one) => ({ ...one, spans: laneSpans(await readLane(apis, one.topic, from, now), one.read, fromText, toText) })),
+  const [start, end] = [from.getTime(), now.getTime()]
+  const topic = (path: string) => `machines/${machine}/${path}`
+  const [sources, alerts, starts, jobs] = await Promise.all([
+    sourcesOf(apis, machine, view, now),
+    readAlertSpans(apis, machine, from, now),
+    adapterStarts(apis, machine, secondsBefore(from, HORIZON_SECONDS), now),
+    view === "jobOrder" ? readJobOrders(apis, machine) : Promise.resolve([]),
+  ])
+  const stored = await Promise.all(
+    sources.map(async (source): Promise<Lane> => {
+      const [samples, details] = await Promise.all([
+        readLane(apis, topic(source.path), source.kind, from, now),
+        Promise.all(
+          source.details.map(async (one) => ({ name: one.name, samples: await readLane(apis, topic(one.path), "text", from, now) })),
+        ),
+      ])
+      return {
+        key: source.key,
+        group: source.group,
+        label: source.label,
+        topic: topic(source.path),
+        details: source.details.map((one) => ({ name: one.name, topic: topic(one.path) })),
+        labelFrom: source.labelFrom,
+        overlaps: false,
+        spans: thinnedLane(laneSpans(samples, fromText, toText, details, source.labelFrom), slots),
+      }
+    }),
   )
-  const units = full.find((one) => one.key === UNITS_LANE.key)?.spans ?? []
-  const lanes: Array<Lane> = full.map(({ key, label, topic, spans }) => ({ key, label, topic, spans: thinnedLane(spans, slots) }))
-  return { machine, from: fromText, to: toText, lanes, malfunctions: malfunctionsOf(units) }
+  const lanes =
+    view === "status"
+      ? [...stored, ...alertLanes(alerts, starts, start, end, topic("events/notifications"))]
+      : view === "jobOrder"
+        ? [jobOrderLane(jobs, start, end, topic("events/jobs")), ...stored]
+        : stored
+  const failures = alerts
+    .filter((one) => one.severity === "Failure")
+    .flatMap((one) => {
+      const begin = Math.max(start, Date.parse(one.raisedAt))
+      const stop = Math.min(end, alertEnd(one, starts, end))
+      return stop > begin ? [{ from: new Date(begin).toISOString(), to: new Date(stop).toISOString(), source: one.sourceName }] : []
+    })
+  return { machine, view, from: fromText, to: toText, lanes, failures }
 }
 
 /** The values of one tile of the condition guide over the last hours, for its chart. */

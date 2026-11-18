@@ -1,16 +1,18 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { SIGNAL_PATHS } from "@pleiades/cards/trulaser/contract.ts"
-import type { Signal, TrulaserShow, TrulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
+import { CARD_SIGNALS, SIGNAL_PATHS } from "@pleiades/cards/trulaser/contract.ts"
+import type { Cockpit, Signal, SignalName, TrulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
 
 import { trulaserAt, trulaserFilters, trulaserWith } from "./trulaser.ts"
+import type { TrulaserLive } from "./trulaser.ts"
 
 const M = "trumpf_PLL01_L1649A-STARLINER"
 const topic = (path: string) => `machines/${M}/${path}`
 const at = (clock: string) => `2026-11-18T${clock}.000Z`
-const message = (timestamp: string, value: unknown, unit?: string) =>
-  JSON.stringify({ timestamp, value, ...(unit ? { unit } : {}) })
+const message = (timestamp: string, value: unknown) => JSON.stringify({ timestamp, value })
+const event = (type: string, time: string, data: Record<string, unknown>) =>
+  JSON.stringify({ specversion: "1.0", id: "x", source: "s", type, time, data })
 /** The clock of the server in these tests: after every value they send. */
 const NOW = Date.parse(at("10:00:00"))
 
@@ -20,81 +22,95 @@ const signal = (path: string, value: Signal["value"] = null, unit: string | null
   at: value === null ? null : at("09:00:00"),
   topic: topic(path),
 })
+const signals = <TNames extends ReadonlyArray<SignalName>>(names: TNames) =>
+  Object.fromEntries(names.map((name) => [name, signal(SIGNAL_PATHS[name].path)])) as { [K in TNames[number]]: Signal }
 
-const guide = "oem/Dalle/ConditionGuide"
-const values: TrulaserShow = {
-  asOf: at("09:00:00"),
-  machine: M,
-  serialNumber: "L1649A-STARLINER",
-  signals: Object.fromEntries(
-    Object.entries(SIGNAL_PATHS).map(([name, { path }]) => [name, signal(path)]),
-  ) as TrulaserShow["signals"],
-  sequence: null,
-  unitsInMalfunction: [],
-  devices: [],
-  conditionGuide: [
-    {
-      key: "cutFluidLevel",
-      label: "Cut fluid level",
-      shown: "percent",
-      value: signal(`${guide}/CutFluidLevel/LevelInPercent`, 0.85, "one"),
-      detail: null,
-      flags: [
-        { level: "error", signal: signal(`${guide}/CutFluidLevel/LevelErrorReached`, false) },
-        { level: "warning", signal: signal(`${guide}/CutFluidLevel/LevelWarningReached`, false) },
-      ],
-      status: "ok",
-    },
-  ],
+const about = { asOf: at("09:00:00"), machine: M, serialNumber: "L1649A-STARLINER" }
+const cockpit: Cockpit = {
+  status: { ...about, signals: signals(CARD_SIGNALS.status), sequence: null, activeAlerts: [] },
+  jobOrder: { ...about, jobOrder: null, signals: signals(CARD_SIGNALS.jobOrder) },
+  devices: { ...about, signals: signals(CARD_SIGNALS.devices), devices: [] },
+  technology: { ...about, signals: signals(CARD_SIGNALS.technology) },
+  collision: { ...about, signals: signals(CARD_SIGNALS.collision) },
+  conditions: { ...about, tiles: [] },
 }
 
-const units = topic(SIGNAL_PATHS.unitsInMalfunction.path)
-const item = topic(SIGNAL_PATHS.itemState.path)
+const status = topic("umati/State/Status")
+const itemState = topic(SIGNAL_PATHS.itemState.path)
+const signalName = topic(SIGNAL_PATHS.changeCauseSignal.path)
 const timeline: TrulaserTimeline = {
   machine: M,
+  view: "status",
   from: at("09:00:00"),
   to: at("09:01:00"),
   lanes: [
-    { key: "itemState", label: "Item state", topic: item, spans: [{ from: at("09:00:00"), to: at("09:01:00"), value: "Executing" }] },
-    { key: "unitsInMalfunction", label: "Units in malfunction", topic: units, spans: [{ from: at("09:00:00"), to: at("09:01:00"), value: null }] },
+    {
+      key: "itemState",
+      group: "State.Status",
+      label: "MachineryItemState",
+      topic: itemState,
+      details: [{ name: "ChangeCause.SignalName", topic: signalName }],
+      labelFrom: null,
+      overlaps: false,
+      spans: [
+        { from: at("09:00:00"), to: at("09:01:00"), value: "Executing", label: null, details: [{ name: "ChangeCause.SignalName", value: "NcCycleActive" }] },
+      ],
+    },
   ],
-  malfunctions: [],
+  failures: [],
 }
+const live: TrulaserLive = { cockpit, timeline }
 
-test("the page hears every signal of the edge component and the laser", () => {
-  assert.deepEqual(trulaserFilters(M), [`machines/${M}/oem/Dalle/#`, `machines/${M}/oem/Mos/Laser1/LaserEmissionOn`])
-})
-
-test("a value of the broker takes its place in the card, and the tile reads its flags again", () => {
-  const live = trulaserWith({ values, timeline }, topic(`${guide}/CutFluidLevel/LevelErrorReached`), message(at("09:01:00"), true), NOW)
-  assert.equal(live.values.conditionGuide[0]?.status, "error")
-  const cause = trulaserWith(
-    live,
-    topic(SIGNAL_PATHS.changeCauseValue.path),
-    message(at("09:01:00"), "SequenceStateAndBlockingCause { SequenceState = Active, BlockingCause = Operator }"),
-    NOW,
-  )
-  assert.deepEqual(cause.values.sequence, { sequenceState: "Active", blockingCause: "Operator" })
-})
-
-test("a value of a lane starts a new span, and one that shows the same does not", () => {
-  const same = trulaserWith({ values, timeline }, item, message(at("09:00:30"), "Executing"), NOW)
-  assert.equal(same.timeline?.lanes[0]?.spans.length, 1)
-  const changed = trulaserWith({ values, timeline }, item, message(at("09:00:30"), "NotExecuting"), NOW)
-  assert.deepEqual(changed.timeline?.lanes[0]?.spans, [
-    { from: at("09:00:00"), to: at("09:00:30"), value: "Executing" },
-    { from: at("09:00:30"), to: at("09:01:00"), value: "NotExecuting" },
+test("the page hears the state, the program execution, the alerts and job orders, and the extension", () => {
+  assert.deepEqual(trulaserFilters(M), [
+    `machines/${M}/oem/Dalle/#`,
+    `machines/${M}/umati/State/Status`,
+    `machines/${M}/umati/WorkMasterMonitoring/ProgramExecution`,
+    `machines/${M}/events/notifications`,
+    `machines/${M}/events/jobs`,
   ])
 })
 
-test("a unit in malfunction opens a stripe, the clock stretches it, and its end closes it", () => {
-  let live = trulaserWith({ values, timeline }, units, message(at("09:01:00"), "NcCycleActive"), NOW)
-  assert.deepEqual(live.values.unitsInMalfunction, ["NcCycleActive"])
-  assert.deepEqual(live.timeline?.malfunctions, [{ from: at("09:01:00"), to: at("09:01:00"), units: "NcCycleActive" }])
-  live = trulaserAt(live, at("09:01:05"))
-  assert.equal(live.timeline?.malfunctions[0]?.to, at("09:01:05"))
-  assert.equal(live.timeline?.lanes[0]?.spans.at(-1)?.to, at("09:01:05"))
-  live = trulaserWith(live, units, message(at("09:01:07"), ""), NOW)
-  assert.deepEqual(live.timeline?.malfunctions, [{ from: at("09:01:00"), to: at("09:01:07"), units: "NcCycleActive" }])
-  assert.deepEqual(live.values.unitsInMalfunction, [])
+test("the snapshot State.Status takes its place in the card and starts a span, the ChangeCause is its detail", () => {
+  const changed = trulaserWith(live, status, message(at("09:00:30"), { MachineryItemState: "NotExecuting", MachineryOperationMode: "Setup" }), NOW)
+  assert.equal(changed.cockpit.status.signals.itemState.value, "NotExecuting")
+  assert.equal(changed.cockpit.status.signals.operationMode.value, "Setup")
+  const caused = trulaserWith(changed, signalName, message("2026-11-18T09:00:30.010Z", "PalletChange"), NOW)
+  assert.deepEqual(caused.timeline?.lanes[0]?.spans.at(-1), {
+    from: at("09:00:30"),
+    to: at("09:01:00"),
+    value: "NotExecuting",
+    label: null,
+    details: [{ name: "ChangeCause.SignalName", value: "PalletChange" }],
+  })
+})
+
+const failure = { Id: "a1", ErrorCode: "DALLE-UNIT-PalletChange", Message: "Unit in malfunction: PalletChange", Severity: "Failure", SeverityValue: 800, SourceName: "PalletChange", Time: at("09:01:00") }
+
+test("a raised Failure stands in the card and opens a lane and a stripe, its clear closes them", () => {
+  let state = trulaserWith(live, topic("events/notifications"), event("Notification.AlertRaised", at("09:01:00"), failure), NOW)
+  assert.deepEqual(state.cockpit.status.activeAlerts.map((one) => one.SourceName), ["PalletChange"])
+  assert.equal(state.timeline?.lanes.at(-1)?.key, "alertsFailure")
+  assert.deepEqual(state.timeline?.failures, [{ from: at("09:01:00"), to: at("09:01:00"), source: "PalletChange" }])
+  state = trulaserAt(state, at("09:01:05"))
+  assert.equal(state.timeline?.failures[0]?.to, at("09:01:05"))
+  assert.equal(state.timeline?.lanes.at(-1)?.spans[0]?.to, at("09:01:05"))
+  state = trulaserWith(state, topic("events/notifications"), event("Notification.AlertCleared", at("09:01:07"), failure), NOW)
+  assert.deepEqual(state.cockpit.status.activeAlerts, [])
+  assert.deepEqual(state.timeline?.failures, [{ from: at("09:01:00"), to: at("09:01:07"), source: "PalletChange" }])
+  assert.equal(state.timeline?.lanes.at(-1)?.spans[0]?.to, at("09:01:07"))
+})
+
+test("a job order that starts becomes the one of the card, and its result counts the runs", () => {
+  const entry = { JobOrderID: "cc7f", State: "Running", StateSince: at("09:00:10"), JobName: "ProductionPlanRun cc7f", WorkMasterID: "unknown" }
+  let state = trulaserWith(live, topic("events/jobs"), event("JobMonitoring.JobOrderStarted", at("09:00:10"), entry), NOW)
+  assert.equal(state.cockpit.jobOrder.jobOrder?.JobOrderID, "cc7f")
+  assert.equal(state.cockpit.jobOrder.jobOrder?.StartTime, at("09:00:10"))
+  state = trulaserWith(state, topic("events/jobs"), event("JobMonitoring.JobOrderChanged", at("09:00:11"), { ...entry, WorkMasterID: "PLL_SHEET_0001" }), NOW)
+  assert.equal(state.cockpit.jobOrder.jobOrder?.WorkMasterID, "PLL_SHEET_0001")
+  state = trulaserWith(state, topic("events/jobs"), event("JobMonitoring.JobOrderResultChanged", at("09:09:00"), { JobOrderID: "cc7f", RunsCompleted: 1, JobResult: "Unknown", EndTime: null }), NOW)
+  assert.equal(state.cockpit.jobOrder.jobOrder?.RunsCompleted, 1)
+  state = trulaserWith(state, topic("events/jobs"), event("JobMonitoring.JobOrderEnded", at("09:30:00"), { ...entry, State: "Ended", StateSince: at("09:30:00") }), NOW)
+  assert.equal(state.cockpit.jobOrder.jobOrder?.State, "Ended")
+  assert.equal(state.cockpit.jobOrder.jobOrder?.StartTime, at("09:00:10"))
 })

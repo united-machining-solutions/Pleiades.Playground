@@ -2,40 +2,49 @@ import { z } from "zod"
 
 import { instant, machineId } from "../machine/contract.ts"
 
-// The contract of the TruLaser card: what a TRUMPF laser cutting machine reports through the signals of
-// its edge component, below `machines/{machineId}/oem/Dalle/`, and the laser of its control below
-// `oem/Mos/`. Every value names the topic it comes from.
+// The contracts of the TruLaser cards. They name what they show as the umati data model 0.17.1 does, and
+// read it from its elements below `machines/{machineId}/umati/` and from the events of the model: the
+// state (State.Status), the alerts (Notification.ActiveAlerts), the job order (JobMonitoring.JobOrders)
+// and its program execution (WorkMasterMonitoring.ProgramExecution). What the model does not know comes
+// from the extension of TRUMPF, `x-trumpf-com.Dalle.*` below `oem/Dalle/`: the change cause, the requests
+// of the automation devices, the laser technology, the collision data and the condition guide. Each card
+// answers one question and is its own tool. Every value names the topic it comes from.
 
-/** Where the signals of the edge component are published, below `machines/{machineId}/`. */
+/** Where the extension of TRUMPF publishes the signals of the edge component, below `machines/{machineId}/`. */
 export const TRULASER_PREFIX = "oem/Dalle"
 
+/** The name of the extension in the manifest of the machine. */
+export const EXTENSION = "x-trumpf-com.Dalle"
+
+/** Text, a number with its unit, or a yes or no. */
+export type SignalKind = "text" | "number" | "flag"
+
 /**
- * Where each single value of the card is published, below `machines/{machineId}/`, and whether it is
- * text, a number or a yes or no.
+ * Where each single value of the cards is published, below `machines/{machineId}/`, and whether it is
+ * text, a number or a yes or no. Below `umati/` an element of the model, below `oem/` the extension.
  */
 export const SIGNAL_PATHS = {
-  itemState: { path: "oem/Dalle/MachineState/ItemState", kind: "text" },
-  operationMode: { path: "oem/Dalle/MachineState/OperationMode", kind: "text" },
+  manufacturer: { path: "umati/Identification/Manufacturer", kind: "text" },
+  model: { path: "umati/Identification/Model", kind: "text" },
+  itemState: { path: "umati/State/Status/MachineryItemState", kind: "text" },
+  operationMode: { path: "umati/State/Status/MachineryOperationMode", kind: "text" },
+  executionId: { path: "umati/WorkMasterMonitoring/ProgramExecution/ExecutionId", kind: "text" },
+  activeWorkMaster: { path: "umati/WorkMasterMonitoring/ProgramExecution/ActiveWorkMaster", kind: "text" },
+  executionState: { path: "umati/WorkMasterMonitoring/ProgramExecution/State", kind: "text" },
+  executionStartTime: { path: "umati/WorkMasterMonitoring/ProgramExecution/StartTime", kind: "text" },
+  executionJobOrderId: { path: "umati/WorkMasterMonitoring/ProgramExecution/JobOrderID", kind: "text" },
   changeCauseSignal: { path: "oem/Dalle/MachineState/ChangeCause/SignalName", kind: "text" },
   changeCauseValue: { path: "oem/Dalle/MachineState/ChangeCause/SignalValue", kind: "text" },
-  unitsInMalfunction: { path: "oem/Dalle/MachineState/UnitsInMalfunctionList", kind: "text" },
   deviceRequestActive: {
     path: "oem/Dalle/MachineState/AutomationDeviceRequestStates/DeviceRequestStatusActive",
     kind: "flag",
   },
-  productionPlanRunState: { path: "oem/Dalle/ProductionPlanRun/ProductionPlanRunState", kind: "text" },
-  productionPlanRunId: { path: "oem/Dalle/ProductionPlanRun/ProductionPlanRunId", kind: "text" },
-  programName: { path: "oem/Dalle/ProgramRun/ProgramName", kind: "text" },
-  programRunState: { path: "oem/Dalle/ProgramRun/ProgramRunState", kind: "text" },
-  programRunId: { path: "oem/Dalle/ProgramRun/ProgramRunId", kind: "text" },
-  programRunPlanId: { path: "oem/Dalle/ProgramRun/ProductionPlanRunId", kind: "text" },
   collisionState: { path: "oem/Dalle/CollisionData/DetectionState", kind: "text" },
   collisionProgram: { path: "oem/Dalle/CollisionData/ProgramName", kind: "text" },
   collisionBlockPrevious: { path: "oem/Dalle/CollisionData/NcBlockGroup/0/Previous", kind: "text" },
   collisionBlockCurrent: { path: "oem/Dalle/CollisionData/NcBlockGroup/0/Current", kind: "text" },
   collisionBlockNext: { path: "oem/Dalle/CollisionData/NcBlockGroup/0/Next", kind: "text" },
   nozzleCollisionStop: { path: "oem/Dalle/CollisionData/ProcessingOptics/0/NozzleCollisionStop", kind: "flag" },
-  laserOn: { path: "oem/Mos/Laser1/LaserEmissionOn", kind: "flag" },
   technologyStatus: { path: "oem/Dalle/LaserTechnology/DataProviderStatus", kind: "text" },
   technologyKey: { path: "oem/Dalle/LaserTechnology/LaserParameterSets/0/KeyName", kind: "text" },
   technologyParent: { path: "oem/Dalle/LaserTechnology/LaserParameterSets/0/Parent", kind: "text" },
@@ -44,8 +53,24 @@ export const SIGNAL_PATHS = {
 } as const satisfies Record<string, { path: string; kind: SignalKind }>
 export type SignalName = keyof typeof SIGNAL_PATHS
 
-/** Text, a number with its unit, or a yes or no. */
-export type SignalKind = "text" | "number" | "flag"
+/** The single values each card shows. */
+export const CARD_SIGNALS = {
+  status: ["manufacturer", "model", "itemState", "operationMode", "changeCauseSignal", "changeCauseValue"],
+  jobOrder: ["executionId", "activeWorkMaster", "executionState", "executionStartTime", "executionJobOrderId"],
+  devices: ["deviceRequestActive"],
+  technology: ["technologyStatus", "technologyKey", "technologyParent", "technologyNozzle", "technologySetStatus"],
+  collision: [
+    "collisionState",
+    "collisionProgram",
+    "collisionBlockPrevious",
+    "collisionBlockCurrent",
+    "collisionBlockNext",
+    "nozzleCollisionStop",
+  ],
+} as const satisfies Record<string, ReadonlyArray<SignalName>>
+
+/** Where the state of the connection of the adapter is published: a new start of it begins a new list of alerts. */
+export const CONNECTION_PATH = "umati/Connection/State"
 
 /** Where the request states of the automation devices are published: one folder for each device, counted from 0. */
 export const DEVICES_PATH = "oem/Dalle/MachineState/AutomationDeviceRequestStates/DeviceRequestStatuses"
@@ -68,7 +93,7 @@ export type Shown = "percent" | "millibar" | "microsiemens"
 export const CONDITION_GUIDE = [
   {
     key: "cutFluidLevel",
-    label: "Cut fluid level",
+    label: "CutFluidLevel",
     value: "CutFluidLevel/LevelInPercent",
     shown: "percent",
     errors: ["CutFluidLevel/LevelErrorReached"],
@@ -76,7 +101,7 @@ export const CONDITION_GUIDE = [
   },
   {
     key: "coolLinePressureTank",
-    label: "Cool line pressure tank",
+    label: "CoolLineLevelPressureTank",
     value: "CoolLineLevelPressureTank/LevelInPercent",
     shown: "percent",
     errors: ["CoolLineLevelPressureTank/ErrorLevelReached"],
@@ -84,7 +109,7 @@ export const CONDITION_GUIDE = [
   },
   {
     key: "coolLineRefillTank",
-    label: "Cool line refill tank",
+    label: "CoolLineLevelRefillTank",
     value: "CoolLineLevelRefillTank/LevelInPercent",
     shown: "percent",
     errors: ["CoolLineLevelRefillTank/ErrorLevelReached"],
@@ -92,7 +117,7 @@ export const CONDITION_GUIDE = [
   },
   {
     key: "coolLinePressure",
-    label: "Cool line pressure",
+    label: "CoolLinePressureInPassiveState",
     value: "CoolLinePressureInPassiveState/PressureInMBar",
     shown: "millibar",
     errors: ["CoolLineThresholdsExceeded/ErrorLowerPressureLimitExceeded"],
@@ -103,7 +128,7 @@ export const CONDITION_GUIDE = [
   },
   {
     key: "coolLineIonExchanger",
-    label: "Cool line ion exchanger",
+    label: "CoolLineIonExchanger",
     value: "CoolLineIonExchanger/ConductanceInMicroSiemens",
     shown: "microsiemens",
     errors: ["CoolLineIonExchanger/ErrorConductanceThresholdExceeded"],
@@ -111,7 +136,7 @@ export const CONDITION_GUIDE = [
   },
   {
     key: "gasSupply",
-    label: "Gas supply",
+    label: "GasSupplyPressuresInPassiveState[0]",
     value: "GasSupplyPressuresInPassiveState/Pressures/0/PressureInMBar",
     detail: "GasSupplyPressuresInPassiveState/Pressures/0/GasType",
     shown: "millibar",
@@ -124,7 +149,7 @@ export const CONDITION_GUIDE = [
   {
     // The thresholds of the cutting gas are published for the first gas only.
     key: "cuttingGas1",
-    label: "Cutting gas 1",
+    label: "CuttingGasInfeedPressuresInPassiveState[0]",
     value: "CuttingGasInfeedPressuresInPassiveState/Pressures/0/PressureInMBar",
     detail: "CuttingGasInfeedPressuresInPassiveState/Pressures/0/GasType",
     shown: "millibar",
@@ -136,7 +161,7 @@ export const CONDITION_GUIDE = [
   },
   {
     key: "cuttingGas2",
-    label: "Cutting gas 2",
+    label: "CuttingGasInfeedPressuresInPassiveState[1]",
     value: "CuttingGasInfeedPressuresInPassiveState/Pressures/1/PressureInMBar",
     detail: "CuttingGasInfeedPressuresInPassiveState/Pressures/1/GasType",
     shown: "millibar",
@@ -145,7 +170,7 @@ export const CONDITION_GUIDE = [
   },
   {
     key: "lubricantLevel",
-    label: "Lubricant level",
+    label: "LubricantLevels[0]",
     value: "LubricantLevels/LubricantLevels/0/LevelInPercent",
     detail: "LubricantLevels/LubricantLevels/0/ContainerName",
     shown: "percent",
@@ -177,11 +202,16 @@ export const signal = z.object({
 })
 export type Signal = z.infer<typeof signal>
 
+/** The signals of one card, by their names. */
+function signalsOf<const TNames extends ReadonlyArray<SignalName>>(names: TNames) {
+  return z.object(Object.fromEntries(names.map((name) => [name, signal])) as { [K in TNames[number]]: typeof signal })
+}
+
 /** What the change cause says: the state of the sequence that caused the change, and what blocks it. */
 export type Sequence = { sequenceState: string; blockingCause: string | null }
 
 /**
- * The value of a change cause as the edge component writes it, for example
+ * The SignalValue of a change cause as the edge component writes it, for example
  * `SequenceStateAndBlockingCause { SequenceState = Active, BlockingCause = Operator }`. Null if it is
  * not of that shape: then the text stands as it is.
  */
@@ -191,12 +221,6 @@ export function sequenceOf(text: string | null): Sequence | null {
   if (state === undefined) return null
   const blocking = /BlockingCause = (\w+)/.exec(text)?.[1]
   return { sequenceState: state, blockingCause: blocking === undefined || blocking === "None" ? null : blocking }
-}
-
-/** The units in malfunction, as the edge component lists them: separated by commas, none if empty. */
-export function unitsOf(list: string | number | boolean | null): Array<string> {
-  if (typeof list !== "string") return []
-  return list.split(",").flatMap((one) => one.trim() || [])
 }
 
 /** What the threshold flags of a tile say together: the worst that is raised, `ok` if none, null if it has none. */
@@ -216,7 +240,7 @@ export function statusOf(flags: ReadonlyArray<Flag>): TileStatus {
 
 export const conditionTile = z.object({
   key: conditionKey,
-  label: z.string(),
+  label: z.string().describe("The name of the signal in the extension."),
   shown: z.enum(["percent", "millibar", "microsiemens"]).describe("How a display writes the value."),
   value: signal,
   detail: signal.nullable().describe("The gas or the container the value is about, or null."),
@@ -227,39 +251,136 @@ export type ConditionTile = z.infer<typeof conditionTile>
 
 export const device = z.object({
   index: z.number().int().describe("The place of the device in the list of the machine, from 0."),
-  type: signal.describe("What the device does, for example HandlingLoad."),
-  state: signal.describe("The state of its request: Active, Idle or Invalid."),
+  type: signal.describe("What the device does: HandlingLoad, HandlingUnload, Sorting, Separating or Palletizing."),
+  state: signal.describe("The state of its request: Active, Scheduled, Idle, Error or Invalid."),
   errorCode: signal,
 })
 export type Device = z.infer<typeof device>
 
-/** The TruLaser card: what the machine does now, why, and the state of its media. */
-export const trulaserShow = z.object({
+/** The categories of an alert after NAMUR NE 107, from the most urgent. */
+export const ALERT_SEVERITIES = ["Failure", "CheckFunction", "OffSpec", "MaintenanceRequired"] as const
+export const alertSeverity = z.enum(ALERT_SEVERITIES)
+
+/** An entry of Notification.ActiveAlerts: an alert that stands. */
+export const alert = z.object({
+  Id: z.string(),
+  ErrorCode: z.string(),
+  Message: z.string(),
+  Severity: alertSeverity.nullable().describe("The category after NAMUR NE 107."),
+  SeverityValue: z.number().nullable(),
+  SourceName: z.string().describe("Where the alert comes from: for a unit in malfunction, the unit."),
+  Time: instant.describe("Since when the alert stands."),
+})
+export type Alert = z.infer<typeof alert>
+
+/** An entry of JobMonitoring.JobOrders with what came of it so far (JobMonitoring.JobOrderResults). */
+export const jobOrder = z.object({
+  JobOrderID: z.string(),
+  State: z.string().describe("NotAllowedToStart, AllowedToStart, Running, Interrupted, Ended or Aborted."),
+  StateSince: instant.nullable(),
+  JobName: z.string().nullable(),
+  WorkMasterID: z.string().nullable(),
+  StartTime: instant.nullable(),
+  EndTime: instant.nullable(),
+  RunsCompleted: z.number().nullable(),
+  JobResult: z.string().nullable(),
+})
+export type JobOrder = z.infer<typeof jobOrder>
+
+/** What every card says about the machine it is about. */
+const about = {
   asOf: instant,
   machine: machineId.describe("The machine id, which identifies the machine in every topic."),
-  serialNumber: z.string().nullable().describe("The serial number from umati/Identification/SerialNumber."),
-  signals: z.record(z.enum(Object.keys(SIGNAL_PATHS) as [SignalName, ...Array<SignalName>]), signal),
+  serialNumber: z.string().nullable().describe("Identification.SerialNumber."),
+}
+
+/**
+ * State.Status and Notification.ActiveAlerts: what the machine does now, what caused it (the ChangeCause of
+ * the extension), and the alerts that stand, a unit in malfunction among them.
+ */
+export const trulaserStatus = z.object({
+  ...about,
+  signals: signalsOf(CARD_SIGNALS.status),
   sequence: z
     .object({ sequenceState: z.string(), blockingCause: z.string().nullable() })
     .nullable()
-    .describe("The change cause read: the state of the sequence and what blocks it, or null if it says neither."),
-  unitsInMalfunction: z.array(z.string()).describe("The units in malfunction now, from `signals.unitsInMalfunction`."),
-  devices: z.array(device).describe("The automation devices and the states of their requests."),
-  conditionGuide: z.array(conditionTile).describe("The tiles of the condition guide, in the order of `CONDITION_GUIDE`."),
+    .describe("The SignalValue of the change cause read: SequenceState and BlockingCause, or null if it says neither."),
+  activeAlerts: z
+    .array(alert)
+    .describe("Notification.ActiveAlerts since the adapter started, the most urgent first: what the events of the alerts say stands."),
 })
-export type TrulaserShow = z.infer<typeof trulaserShow>
+export type TrulaserStatus = z.infer<typeof trulaserStatus>
+
+/** JobMonitoring.JobOrders and WorkMasterMonitoring.ProgramExecution: the job order and the program execution in it. */
+export const trulaserJobOrder = z.object({
+  ...about,
+  jobOrder: jobOrder.nullable().describe("The job order that runs or is interrupted, else the newest one, or null."),
+  signals: signalsOf(CARD_SIGNALS.jobOrder),
+})
+export type TrulaserJobOrder = z.infer<typeof trulaserJobOrder>
+
+/** AutomationDeviceRequestStates of the extension: the request of each automation device now. */
+export const trulaserDevices = z.object({
+  ...about,
+  signals: signalsOf(CARD_SIGNALS.devices),
+  devices: z.array(device).describe("The automation devices in the order of their index."),
+})
+export type TrulaserDevices = z.infer<typeof trulaserDevices>
+
+/** LaserTechnology of the extension: the laser parameter set the machine cuts with. */
+export const trulaserTechnology = z.object({ ...about, signals: signalsOf(CARD_SIGNALS.technology) })
+export type TrulaserTechnology = z.infer<typeof trulaserTechnology>
+
+/** CollisionData of the extension: the collision detection and the NC blocks around the last detection. */
+export const trulaserCollision = z.object({ ...about, signals: signalsOf(CARD_SIGNALS.collision) })
+export type TrulaserCollision = z.infer<typeof trulaserCollision>
+
+/** ConditionGuide of the extension: the levels and pressures of the media, with their thresholds. */
+export const trulaserConditions = z.object({
+  ...about,
+  tiles: z.array(conditionTile).describe("The tiles in the order of `CONDITION_GUIDE`."),
+})
+export type TrulaserConditions = z.infer<typeof trulaserConditions>
+
+/** Every card of a TruLaser, as a page lays them out. */
+export type Cockpit = {
+  status: TrulaserStatus
+  jobOrder: TrulaserJobOrder
+  devices: TrulaserDevices
+  technology: TrulaserTechnology
+  collision: TrulaserCollision
+  conditions: TrulaserConditions
+}
+
+/** What a span shows on hover besides its value: another value that held when it began. */
+export const spanDetail = z.object({ name: z.string(), value: z.string().nullable() })
+export type SpanDetail = z.infer<typeof spanDetail>
 
 /** A stretch of time with one value of a lane. Null where nothing is known. */
-export const laneSpan = z.object({ from: instant, to: instant, value: z.string().nullable() })
+export const laneSpan = z.object({
+  from: instant,
+  to: instant,
+  value: z.string().nullable(),
+  label: z.string().nullable().describe("What the span is called in the lane, if not its value: the work master."),
+  details: z.array(spanDetail).describe("The values of the lane's `details` that held when the span began."),
+})
 export type LaneSpan = z.infer<typeof laneSpan>
 
 export const lane = z.object({
   key: z.string(),
+  group: z.string().nullable().describe("The element of the model or the extension the lane belongs to, on its first lane."),
   label: z.string(),
-  topic: z.string().describe("The MQTT topic the values come from."),
-  spans: z.array(laneSpan).describe("The values between `from` and `to`, oldest first and without a gap."),
+  topic: z.string().describe("The MQTT topic the values come from; for a lane of events the topic of the events."),
+  details: z.array(z.object({ name: z.string(), topic: z.string() })).describe("Where the details of its spans come from."),
+  labelFrom: z.string().nullable().describe("The name of the detail a span is called by, if any."),
+  overlaps: z.boolean().describe("True for a lane whose spans may overlap: alerts, which stand side by side."),
+  spans: z.array(laneSpan).describe("The values between `from` and `to`, oldest first; without a gap unless `overlaps`."),
 })
 export type Lane = z.infer<typeof lane>
+
+/** Which timelines: of the status, of the job orders, or of the automation devices. */
+export const timelineView = z.enum(["status", "jobOrder", "devices"])
+export type TimelineView = z.infer<typeof timelineView>
 
 /** How many hours the timelines can look back. */
 export const TIMELINE_HOURS = [1, 8, 16, 24] as const
@@ -267,18 +388,18 @@ export const TIMELINE_HOURS = [1, 8, 16, 24] as const
 export const LANE_SLOTS = 900
 
 /**
- * The timelines of the card: what the machine state, the change cause, the runs and every automation
- * device did between two instants, one lane each on the same time axis, and when a unit was in
- * malfunction. They grow with time, so a language model does not read them: the card asks for them.
+ * The timelines of a view: one lane for each value on the same time axis, and when an alert of the category
+ * Failure stood. They grow with time, so a language model does not read them: the card asks for them.
  */
 export const trulaserTimeline = z.object({
   machine: machineId,
+  view: timelineView,
   from: instant,
   to: instant,
   lanes: z.array(lane),
-  malfunctions: z
-    .array(z.object({ from: instant, to: instant, units: z.string() }))
-    .describe("When units were in malfunction, and which. Never thinned: a short one is kept as it is."),
+  failures: z
+    .array(z.object({ from: instant, to: instant, source: z.string() }))
+    .describe("When an alert of the category Failure stood, and its SourceName. Never thinned."),
 })
 export type TrulaserTimeline = z.infer<typeof trulaserTimeline>
 
@@ -298,44 +419,127 @@ export const trulaserSeries = z.object({
 })
 export type TrulaserSeries = z.infer<typeof trulaserSeries>
 
-/** How the values of a lane are read from its topic. */
-export type LaneRead = "as-is" | "sequence" | "units"
+/** A lane as the backend reads it from the Timeseries store: its topic below the machine and its details. */
+export type LaneSource = {
+  key: string
+  group: string | null
+  label: string
+  path: string
+  kind: "text" | "flag"
+  details: ReadonlyArray<{ name: string; path: string }>
+  labelFrom: string | null
+}
 
-/**
- * The lanes of the timelines that are not an automation device, in the order the card shows them.
- * The devices follow the runs, one lane each, and the units in malfunction come last.
- */
-export const LANES = [
-  { key: "itemState", label: "Item state", signal: "itemState", read: "as-is" },
-  { key: "operationMode", label: "Operation mode", signal: "operationMode", read: "as-is" },
-  { key: "changeCause", label: "Change cause", signal: "changeCauseSignal", read: "as-is" },
-  { key: "sequence", label: "Sequence", signal: "changeCauseValue", read: "sequence" },
-  { key: "programRun", label: "Program run", signal: "programRunState", read: "as-is" },
-  { key: "productionPlan", label: "Production plan", signal: "productionPlanRunState", read: "as-is" },
-] as const satisfies ReadonlyArray<{ key: string; label: string; signal: SignalName; read: LaneRead }>
+const changeCause = [
+  { name: "ChangeCause.SignalName", path: SIGNAL_PATHS.changeCauseSignal.path },
+  { name: "ChangeCause.SignalValue", path: SIGNAL_PATHS.changeCauseValue.path },
+]
 
-/** The lane of the units in malfunction. */
-export const UNITS_LANE = {
-  key: "unitsInMalfunction",
-  label: "Units in malfunction",
-  signal: "unitsInMalfunction",
-  read: "units",
-} as const
+/** The lanes of State.Status, with the ChangeCause of the extension on hover. */
+export const STATUS_LANES: ReadonlyArray<LaneSource> = [
+  { key: "itemState", group: "State.Status", label: "MachineryItemState", path: SIGNAL_PATHS.itemState.path, kind: "text", details: changeCause, labelFrom: null },
+  { key: "operationMode", group: null, label: "MachineryOperationMode", path: SIGNAL_PATHS.operationMode.path, kind: "text", details: changeCause, labelFrom: null },
+]
 
-/** The key of the lane of an automation device. */
-export const deviceLaneKey = (index: number) => `device${index}`
+/** The lane of WorkMasterMonitoring.ProgramExecution: its State, called by its ActiveWorkMaster. */
+export const EXECUTION_LANE: LaneSource = {
+  key: "programExecution",
+  group: "WorkMasterMonitoring.ProgramExecution",
+  label: "State",
+  path: SIGNAL_PATHS.executionState.path,
+  kind: "text",
+  details: [
+    { name: "ActiveWorkMaster", path: SIGNAL_PATHS.activeWorkMaster.path },
+    { name: "ExecutionId", path: SIGNAL_PATHS.executionId.path },
+    { name: "JobOrderID", path: SIGNAL_PATHS.executionJobOrderId.path },
+    { name: "StartTime", path: SIGNAL_PATHS.executionStartTime.path },
+  ],
+  labelFrom: "ActiveWorkMaster",
+}
 
-/**
- * What a value of a topic shows in its lane. The change cause shows the state of its sequence and,
- * if one blocks it, what. The units in malfunction show their list, nothing where it is empty.
- */
-export function laneValueOf(read: LaneRead, value: string | null): string | null {
-  if (value === null) return null
-  if (read === "units") return unitsOf(value).join(", ") || null
-  if (read === "sequence") {
-    const sequence = sequenceOf(value)
-    if (sequence === null) return value
-    return sequence.blockingCause ? `${sequence.sequenceState}, blocked: ${sequence.blockingCause}` : sequence.sequenceState
+/** The lane of whether any request of the automation is active. */
+export const REQUEST_ACTIVE_LANE: LaneSource = {
+  key: "deviceRequestActive",
+  group: "AutomationDeviceRequestStates",
+  label: "DeviceRequestStatusActive",
+  path: SIGNAL_PATHS.deviceRequestActive.path,
+  kind: "flag",
+  details: [],
+  labelFrom: null,
+}
+
+/** The lane of one automation device: the state of its request, with its error code on hover. */
+export function deviceLane(index: number, type: string | null, group: string | null): LaneSource {
+  return {
+    key: `device${index}`,
+    group,
+    label: type ?? `Device ${index + 1}`,
+    path: `${DEVICES_PATH}/${index}/State`,
+    kind: "text",
+    details: [{ name: "ErrorCode", path: `${DEVICES_PATH}/${index}/ErrorCode` }],
+    labelFrom: null,
   }
-  return value
+}
+
+/** The key of the lane of the alerts of one category. */
+export const alertLaneKey = (severity: string) => `alerts${severity}`
+
+/** A detail as a person reads it: a SignalValue of a change cause as its SequenceState and BlockingCause. */
+export function detailText(detail: SpanDetail): string | null {
+  if (detail.value === null || detail.value === "") return null
+  if (!detail.name.endsWith("SignalValue")) return detail.value
+  const fields = signalValueFields(detail.value)
+  return fields ? fields.map((one) => `${one.name} ${one.value}`).join(" · ") : detail.value
+}
+
+/** `HANDLING_LOAD` as `HandlingLoad`, the way the edge component writes the values of its own outputs. */
+function pascalOf(snake: string): string {
+  return snake
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join("")
+}
+
+/**
+ * A value of a message as the edge component writes the values of its outputs: an enumeration
+ * `DEVICE_REQUEST_STATE_ACTIVE` without the name of its type, as `Active`. The type is the name of the
+ * field (`deviceType`: `DEVICE_TYPE_SORTING` is `Sorting`), or the part up to `_STATE_`.
+ */
+export function enumText(field: string, value: string): string {
+  if (!/^[A-Z][A-Z0-9_]*$/.test(value)) return value
+  const type = `${field.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase()}_`
+  const state = value.indexOf("_STATE_")
+  const rest = value.startsWith(type) ? value.slice(type.length) : state >= 0 ? value.slice(state + "_STATE_".length) : value
+  return pascalOf(rest)
+}
+
+/**
+ * The SignalValue of a change cause as named fields, the way a person reads it. A sequence is its
+ * SequenceState and BlockingCause. A message that caused the change, such as the request of an
+ * automation device, comes as JSON: its fields without its time stamp, enumerations written as the edge
+ * component writes them. Null for any other text: it stands as it is.
+ */
+export function signalValueFields(text: string | null): Array<{ name: string; value: string }> | null {
+  if (text === null) return null
+  const sequence = sequenceOf(text)
+  if (sequence) {
+    return [
+      { name: "SequenceState", value: sequence.sequenceState },
+      { name: "BlockingCause", value: sequence.blockingCause ?? "None" },
+    ]
+  }
+  let message: unknown
+  try {
+    message = JSON.parse(text)
+  } catch {
+    return null
+  }
+  if (typeof message !== "object" || message === null || Array.isArray(message)) return null
+  const fields = Object.entries(message).flatMap(([field, value]) => {
+    if (field === "utcTimestamp" || !["string", "number", "boolean"].includes(typeof value)) return []
+    const name = field.charAt(0).toUpperCase() + field.slice(1)
+    return [{ name, value: typeof value === "string" ? enumText(field, value) : String(value) }]
+  })
+  return fields.length > 0 ? fields : null
 }

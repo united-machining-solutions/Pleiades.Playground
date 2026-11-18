@@ -1,5 +1,5 @@
 import { TIMELINE_HOURS } from "@pleiades/cards/trulaser/contract.ts"
-import { TrulaserCard } from "@pleiades/cards/trulaser/trulaser-card.tsx"
+import { TrulaserCockpit } from "@pleiades/cards/trulaser/trulaser-cards.tsx"
 import { trulaserTitle } from "@pleiades/cards/trulaser/words.ts"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { createFileRoute } from "@tanstack/react-router"
@@ -7,13 +7,13 @@ import { ScanLineIcon } from "lucide-react"
 import { useMemo } from "react"
 import type { ReactNode } from "react"
 
-import { useReadSeries } from "@/cards/trulaser/shown-trulaser.tsx"
+import { useReadSeries, useReadTimeline } from "@/cards/trulaser/shown-trulaser.tsx"
 import { NoAnswer } from "@/components/no-answer.tsx"
 import { liveness, useLive, useRetry } from "@/hooks/use-live.ts"
 import type { Live } from "@/hooks/use-live.ts"
 import { trulaserAt, trulaserFilters, trulaserWith } from "@/live/trulaser.ts"
 import type { TrulaserLive } from "@/live/trulaser.ts"
-import { getTrulaser, getTrulaserTimeline } from "@/machines/get-machines.ts"
+import { getTrulaserCockpit, getTrulaserTimeline } from "@/machines/get-machines.ts"
 import type { Answer } from "@/machines/get-machines.ts"
 
 type Hours = (typeof TIMELINE_HOURS)[number]
@@ -23,12 +23,14 @@ function hoursOf(asked: unknown): Hours | undefined {
   return TIMELINE_HOURS.find((one) => one === Number(asked))
 }
 
-/** The values and the timelines, read once; from then on the broker keeps them up to date. */
+/** Every card and the history of the status, read once; from then on the broker keeps them up to date. */
 async function load(machine: string | undefined, hours: Hours): Promise<Answer<TrulaserLive>> {
-  const answer = await getTrulaser({ data: machine === undefined ? {} : { machine } })
+  const answer = await getTrulaserCockpit({ data: machine === undefined ? {} : { machine } })
   if (answer.values === null) return answer
-  const timeline = await getTrulaserTimeline({ data: { machine: answer.values.machine, hours } }).catch(() => null)
-  return { values: { values: answer.values, timeline }, error: null }
+  const timeline = await getTrulaserTimeline({ data: { machine: answer.values.status.machine, view: "status", hours } }).catch(
+    () => null,
+  )
+  return { values: { cockpit: answer.values, timeline }, error: null }
 }
 
 export const Route = createFileRoute("/trulaser")({
@@ -48,7 +50,7 @@ function Trulaser() {
   const answer = Route.useLoaderData()
   const { last: hours = 1 } = Route.useSearch()
   const navigate = Route.useNavigate()
-  const machine = answer.values?.values.machine ?? ""
+  const machine = answer.values?.cockpit.status.machine ?? ""
   const live = useMemo<Live<TrulaserLive | null>>(
     () => ({
       filters: machine ? trulaserFilters(machine) : [],
@@ -58,6 +60,7 @@ function Trulaser() {
     [machine],
   )
   const { values: state, connected } = useLive(answer.values, live)
+  const readTimeline = useReadTimeline(machine)
   const readSeries = useReadSeries(machine, hours)
   useRetry(answer.values === null)
 
@@ -68,13 +71,18 @@ function Trulaser() {
       </Page>
     )
   }
+  const { status } = state.cockpit
   return (
-    <Page title={trulaserTitle(state.values)} line={liveness(connected, state.values.asOf)}>
-      <TrulaserCard
-        values={state.values}
+    <Page
+      title={trulaserTitle(status)}
+      line={`Model ${String(status.signals.model.value ?? "–")} · ${status.machine} · ${liveness(connected, status.asOf)}`}
+    >
+      <TrulaserCockpit
+        cockpit={state.cockpit}
         timeline={state.timeline}
         hours={hours}
         onHours={(next) => void navigate({ search: (previous) => ({ ...previous, last: hoursOf(next) }) })}
+        readTimeline={readTimeline}
         readSeries={readSeries}
       />
     </Page>

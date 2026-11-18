@@ -1,16 +1,27 @@
 import { written } from "../machine/format.ts"
-import type { ConditionTile, Shown, Signal, TrulaserShow } from "./contract.ts"
+import { signalValueFields } from "./contract.ts"
+import type {
+  ConditionTile,
+  Shown,
+  Signal,
+  TrulaserCollision,
+  TrulaserConditions,
+  TrulaserDevices,
+  TrulaserJobOrder,
+  TrulaserStatus,
+  TrulaserTechnology,
+} from "./contract.ts"
 
-// The TruLaser card in words: how a value is written, and the card as lines for a reader that does
-// not see it. A language model reads those lines as the result of the tool.
+// The TruLaser cards in words: how a value is written, and each card as lines for a reader that does
+// not see it. A language model reads those lines as the result of the tool. The names are those of the
+// data model, and of the extension of TRUMPF where the model has none.
 
-/** The title of the card: TruLaser and the serial number, or the machine id where there is none. */
-export function trulaserTitle({ serialNumber, machine }: Pick<TrulaserShow, "serialNumber" | "machine">): string {
+type About = { serialNumber: string | null; machine: string; asOf: string }
+
+/** The name of the machine: TruLaser and the serial number, or the machine id where there is none. */
+export function trulaserTitle({ serialNumber, machine }: Pick<About, "serialNumber" | "machine">): string {
   return `TruLaser ${serialNumber ?? machine}`
 }
-
-/** The sign a display writes after a value of the condition guide. */
-export const shownUnit: Record<Shown, string> = { percent: "%", millibar: "mbar", microsiemens: "µS" }
 
 /**
  * A stored value as a display writes it: a fraction in `one` as percent, a pressure in `pascal` as
@@ -38,25 +49,75 @@ export function signalText(signal: Signal): string {
   return String(signal.value)
 }
 
-/** The card in words. */
-export function trulaserShowInWords(shown: TrulaserShow): string {
-  const { signals, sequence, unitsInMalfunction, devices, conditionGuide } = shown
-  const cause = signals.changeCauseSignal.value
-    ? `${signalText(signals.changeCauseSignal)}${
-        sequence ? ` (sequence ${sequence.sequenceState}${sequence.blockingCause ? `, blocked by ${sequence.blockingCause}` : ""})` : ""
-      }`
-    : "unknown"
-  const active = devices.filter((one) => one.state.value === "Active").map((one) => signalText(one.type))
-  const raised = conditionGuide.filter((one) => one.status === "error" || one.status === "warning")
+const read = (about: About) => `Read at ${written(about.asOf)}.`
+
+/** State.Status and Notification.ActiveAlerts in words. */
+export function trulaserStatusInWords(status: TrulaserStatus): string {
+  const { signals, activeAlerts } = status
+  const cause = signals.changeCauseValue.value
+  const fields = signalValueFields(typeof cause === "string" ? cause : null)
+  const value = fields ? fields.map((one) => `${one.name} ${one.value}`).join(", ") : signalText(signals.changeCauseValue)
+  const alerts = activeAlerts.map((one) => `${one.Severity ?? "no category"} ${one.ErrorCode} from ${one.SourceName} (${one.Message})`)
   return [
-    `${trulaserTitle(shown)} (${shown.machine}): ${signalText(signals.itemState)}, operation mode ${signalText(signals.operationMode)}. Change cause: ${cause}.`,
-    unitsInMalfunction.length > 0 ? `Units in malfunction: ${unitsInMalfunction.join(", ")}.` : "No unit is in malfunction.",
-    `Program ${signalText(signals.programName)}: ${signalText(signals.programRunState)}. Production plan: ${signalText(signals.productionPlanRunState)}.`,
-    `Automation requests: ${active.length > 0 ? `active for ${active.join(", ")}` : "none active"} (${devices.length} devices).`,
-    `Collision detection: ${signalText(signals.collisionState)}${signals.collisionState.at ? ` since ${written(signals.collisionState.at)}` : ""}.`,
-    raised.length > 0
-      ? `Condition guide: ${raised.map((one) => `${one.label} ${tileValue(one)} (${one.status})`).join(", ")}.`
-      : "Condition guide: no threshold raised.",
-    `Read at ${written(shown.asOf)}.`,
+    `${trulaserTitle(status)} (${status.machine}, Model ${signalText(signals.model)}): State.Status MachineryItemState ${signalText(signals.itemState)}, MachineryOperationMode ${signalText(signals.operationMode)}.`,
+    `ChangeCause (extension): SignalName ${signalText(signals.changeCauseSignal)}, ${value}.`,
+    alerts.length > 0 ? `Notification.ActiveAlerts: ${alerts.join("; ")}.` : "Notification.ActiveAlerts: none.",
+    read(status),
+  ].join("\n")
+}
+
+/** JobMonitoring.JobOrders and WorkMasterMonitoring.ProgramExecution in words. */
+export function trulaserJobOrderInWords(jobOrder: TrulaserJobOrder): string {
+  const { signals } = jobOrder
+  const job = jobOrder.jobOrder
+  return [
+    job
+      ? `${trulaserTitle(jobOrder)}: JobOrder ${job.JobOrderID} ${job.State}${job.StateSince ? ` since ${written(job.StateSince)}` : ""}, ${job.RunsCompleted ?? 0} runs completed.`
+      : `${trulaserTitle(jobOrder)}: no JobOrder.`,
+    `ProgramExecution ${signalText(signals.executionId)}: ActiveWorkMaster ${signalText(signals.activeWorkMaster)}, State ${signalText(signals.executionState)}, JobOrderID ${signalText(signals.executionJobOrderId)}.`,
+    read(jobOrder),
+  ].join("\n")
+}
+
+/** AutomationDeviceRequestStates in words. */
+export function trulaserDevicesInWords(devices: TrulaserDevices): string {
+  const states = devices.devices.map(
+    (one) => `${signalText(one.type)} ${signalText(one.state)}${one.errorCode.value && one.errorCode.value !== "NoError" && one.errorCode.value !== "Invalid" ? ` (${signalText(one.errorCode)})` : ""}`,
+  )
+  return [
+    `${trulaserTitle(devices)}: DeviceRequestStatusActive ${signalText(devices.signals.deviceRequestActive)}.`,
+    `AutomationDeviceRequestStates (extension): ${states.join(", ") || "none"}.`,
+    read(devices),
+  ].join("\n")
+}
+
+/** LaserTechnology in words. */
+export function trulaserTechnologyInWords(technology: TrulaserTechnology): string {
+  const { signals } = technology
+  return [
+    `${trulaserTitle(technology)}: LaserTechnology (extension) DataProviderStatus ${signalText(signals.technologyStatus)}.`,
+    `LaserParameterSet ${signalText(signals.technologyKey)}, Nozzle ${signalText(signals.technologyNozzle)}, Status ${signalText(signals.technologySetStatus)}.`,
+    read(technology),
+  ].join("\n")
+}
+
+/** CollisionData in words. */
+export function trulaserCollisionInWords(collision: TrulaserCollision): string {
+  const { signals } = collision
+  const since = signals.collisionState.at ? ` since ${written(signals.collisionState.at)}` : ""
+  return [
+    `${trulaserTitle(collision)}: CollisionData (extension) DetectionState ${signalText(signals.collisionState)}${since}, NozzleCollisionStop ${signalText(signals.nozzleCollisionStop)}.`,
+    `Program ${signalText(signals.collisionProgram)}, NC block ${signalText(signals.collisionBlockCurrent)}.`,
+    read(collision),
+  ].join("\n")
+}
+
+/** ConditionGuide in words: what is raised, and every value. */
+export function trulaserConditionsInWords(conditions: TrulaserConditions): string {
+  const raised = conditions.tiles.filter((one) => one.status === "error" || one.status === "warning")
+  return [
+    `${trulaserTitle(conditions)}: ConditionGuide (extension) ${raised.length > 0 ? `raised: ${raised.map((one) => `${one.label} (${one.status})`).join(", ")}` : "no threshold raised"}.`,
+    conditions.tiles.map((one) => `${one.label} ${tileValue(one)}`).join(", ") + ".",
+    read(conditions),
   ].join("\n")
 }

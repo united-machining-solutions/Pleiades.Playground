@@ -1,31 +1,39 @@
-import type { ConditionKey, TrulaserShow } from "@pleiades/cards/trulaser/contract.ts"
+import type { ConditionKey, TimelineView, TrulaserStatus } from "@pleiades/cards/trulaser/contract.ts"
 import type { Timeline } from "@pleiades/cards/trulaser/timelines.tsx"
-import { TrulaserCard } from "@pleiades/cards/trulaser/trulaser-card.tsx"
+import { HistoryCard, StatusCard } from "@pleiades/cards/trulaser/trulaser-cards.tsx"
 import { useCallback, useEffect, useState } from "react"
 
 import { getTrulaserSeries, getTrulaserTimeline } from "@/machines/get-machines.ts"
 
 /**
- * The timelines of a TruLaser for the hours asked for. They are not part of the values, because a
- * language model reads those: whoever draws the card asks for them, again when the hours change.
+ * The timelines of a view of a TruLaser for the hours asked for. They are not part of the values of a
+ * card, because a language model reads those: whoever draws the card asks for them.
  */
-export function useTrulaserTimeline(machine: string, hours: number, again: unknown = null): Timeline {
+export function useTrulaserTimeline(machine: string, view: TimelineView, hours: number): Timeline {
   const [timeline, setTimeline] = useState<Timeline>()
   useEffect(() => {
     let wanted = true
     setTimeline(undefined)
-    getTrulaserTimeline({ data: { machine, hours } }).then(
+    getTrulaserTimeline({ data: { machine, view, hours } }).then(
       (read) => wanted && setTimeline(read),
       () => wanted && setTimeline(null),
     )
     return () => {
       wanted = false
     }
-  }, [machine, hours, again])
+  }, [machine, view, hours])
   return timeline
 }
 
-/** How the card reads the values of one tile of the condition guide, for its chart. */
+/** How a card reads the timelines of a view when it opens them. */
+export function useReadTimeline(machine: string) {
+  return useCallback(
+    (view: TimelineView, hours: number) => getTrulaserTimeline({ data: { machine, view, hours } }).catch(() => null),
+    [machine],
+  )
+}
+
+/** How the ConditionGuide card reads the values of one tile, for its chart. */
 export function useReadSeries(machine: string, hours: number) {
   return useCallback(
     (key: ConditionKey) => getTrulaserSeries({ data: { machine, key, hours } }).catch(() => null),
@@ -33,13 +41,14 @@ export function useReadSeries(machine: string, hours: number) {
   )
 }
 
-/**
- * The TruLaser card for the values of a tool result, as a chat has them. The card asks for its
- * timelines and the charts of its tiles itself.
- */
-export function ShownTrulaser({ values }: { values: TrulaserShow }) {
+/** State.Status for a tool result in the chat, with its history below, which the card asks for itself. */
+export function ShownTrulaserStatus({ status }: { status: TrulaserStatus }) {
   const [hours, setHours] = useState(1)
-  const timeline = useTrulaserTimeline(values.machine, hours)
-  const readSeries = useReadSeries(values.machine, hours)
-  return <TrulaserCard values={values} timeline={timeline} hours={hours} onHours={setHours} readSeries={readSeries} />
+  const timeline = useTrulaserTimeline(status.machine, "status", hours)
+  return (
+    <div className="flex flex-col gap-3">
+      <StatusCard status={status} />
+      <HistoryCard timeline={timeline} hours={hours} onHours={setHours} />
+    </div>
+  )
 }

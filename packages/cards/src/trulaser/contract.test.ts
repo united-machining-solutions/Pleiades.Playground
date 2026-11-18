@@ -1,10 +1,10 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { laneValueOf, sequenceOf, statusOf, unitsOf } from "./contract.ts"
+import { detailText, enumText, sequenceOf, signalValueFields, statusOf } from "./contract.ts"
 import type { Flag } from "./contract.ts"
 
-test("the change cause is read as the state of its sequence and what blocks it", () => {
+test("the SignalValue of a change cause is read as its SequenceState and BlockingCause", () => {
   assert.deepEqual(sequenceOf("SequenceStateAndBlockingCause { SequenceState = Active, BlockingCause = Operator }"), {
     sequenceState: "Active",
     blockingCause: "Operator",
@@ -17,18 +17,39 @@ test("the change cause is read as the state of its sequence and what blocks it",
   assert.equal(sequenceOf(null), null)
 })
 
-test("the units in malfunction are a list separated by commas, none where it is empty", () => {
-  assert.deepEqual(unitsOf("NcCycleActive, LoadMasterCenterSheetLoad"), ["NcCycleActive", "LoadMasterCenterSheetLoad"])
-  assert.deepEqual(unitsOf(""), [])
-  assert.deepEqual(unitsOf(null), [])
+test("on hover a SignalValue says its SequenceState and BlockingCause, any other detail itself", () => {
+  const value = "SequenceStateAndBlockingCause { SequenceState = Active, BlockingCause = InternalMalfunction }"
+  assert.equal(detailText({ name: "ChangeCause.SignalValue", value }), "SequenceState Active · BlockingCause InternalMalfunction")
+  assert.equal(detailText({ name: "ChangeCause.SignalValue", value: "1" }), "1")
+  assert.equal(detailText({ name: "ActiveWorkMaster", value: "PLL_SHEET_0001" }), "PLL_SHEET_0001")
+  assert.equal(detailText({ name: "ErrorCode", value: null }), null)
 })
 
-test("a lane shows the sequence in words, and nothing where no unit is in malfunction", () => {
-  const blocked = "SequenceStateAndBlockingCause { SequenceState = Active, BlockingCause = Other }"
-  assert.equal(laneValueOf("sequence", blocked), "Active, blocked: Other")
-  assert.equal(laneValueOf("units", ""), null)
-  assert.equal(laneValueOf("units", "NcCycleActive"), "NcCycleActive")
-  assert.equal(laneValueOf("as-is", "Executing"), "Executing")
+test("a request of a device that caused the change reads as its fields, as the edge component writes them", () => {
+  const message =
+    '{ "utcTimestamp": "2026-11-18T12:44:42.972Z", "deviceType": "DEVICE_TYPE_HANDLING_LOAD", "deviceDescription": "LiftMaster", "state": "DEVICE_REQUEST_STATE_ACTIVE", "errorCode": "ERROR_CODE_NO_ERROR" }'
+  assert.deepEqual(signalValueFields(message), [
+    { name: "DeviceType", value: "HandlingLoad" },
+    { name: "DeviceDescription", value: "LiftMaster" },
+    { name: "State", value: "Active" },
+    { name: "ErrorCode", value: "NoError" },
+  ])
+  assert.equal(
+    detailText({ name: "ChangeCause.SignalValue", value: message }),
+    "DeviceType HandlingLoad · DeviceDescription LiftMaster · State Active · ErrorCode NoError",
+  )
+})
+
+test("a SignalValue of another shape stands as it is", () => {
+  assert.deepEqual(signalValueFields("SequenceStateAndBlockingCause { SequenceState = Idle, BlockingCause = None }"), [
+    { name: "SequenceState", value: "Idle" },
+    { name: "BlockingCause", value: "None" },
+  ])
+  assert.equal(signalValueFields("1"), null)
+  assert.equal(signalValueFields("[1, 2]"), null)
+  assert.equal(signalValueFields("{}"), null)
+  assert.equal(enumText("state", "PRODUCTION_PLAN_STATE_RUNNING"), "Running")
+  assert.equal(enumText("deviceDescription", "LiftMaster"), "LiftMaster")
 })
 
 const flag = (level: Flag["level"], value: boolean | null): Flag => ({

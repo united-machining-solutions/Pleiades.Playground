@@ -1,9 +1,26 @@
 import { applyHostFonts, useApp } from "@modelcontextprotocol/ext-apps/react"
 import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps/react"
-import { trulaserSeries, trulaserShow, trulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
-import type { ConditionKey, TrulaserSeries, TrulaserShow } from "@pleiades/cards/trulaser/contract.ts"
+import {
+  trulaserCollision,
+  trulaserConditions,
+  trulaserDevices,
+  trulaserJobOrder,
+  trulaserSeries,
+  trulaserStatus,
+  trulaserTechnology,
+  trulaserTimeline,
+} from "@pleiades/cards/trulaser/contract.ts"
+import type { ConditionKey, TimelineView, TrulaserSeries, TrulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
 import type { Timeline } from "@pleiades/cards/trulaser/timelines.tsx"
-import { TrulaserCard } from "@pleiades/cards/trulaser/trulaser-card.tsx"
+import {
+  CollisionCard,
+  ConditionsCard,
+  DevicesCard,
+  HistoryCard,
+  JobOrderCard,
+  StatusCard,
+  TechnologyCard,
+} from "@pleiades/cards/trulaser/trulaser-cards.tsx"
 import { useCallback, useEffect, useState } from "react"
 import type { ReactNode } from "react"
 import { createRoot } from "react-dom/client"
@@ -11,30 +28,41 @@ import { createRoot } from "react-dom/client"
 import { TRULASER_SERIES_TOOL, TRULASER_TIMELINE_TOOL } from "../src/cards/trulaser.names.ts"
 import "./styles.css"
 
-// The TruLaser card as an MCP App: the file a host loads from ui://genui/trulaser and shows with a
-// result of genui_trulaser_show. The host sends that result. This file checks it against the
-// contract of the card and draws the card, the same component the example application draws.
+// The TruLaser cards as an MCP App: the file a host loads from ui://genui/trulaser and shows with a
+// result of any of the six tools of the cards. The host sends that result. This file finds the card
+// whose contract it keeps and draws it, the same component the example application draws.
 
-type Shown = { values: TrulaserShow } | { note: string }
+type Result = { isError?: boolean; content?: ReadonlyArray<unknown>; structuredContent?: unknown }
 
-/** What to draw for a result: the card, or a sentence if the result holds no card. */
-function shownFor(result: { isError?: boolean; content?: ReadonlyArray<unknown>; structuredContent?: unknown }): Shown {
-  const values = trulaserShow.safeParse(result.structuredContent)
-  if (values.success) return { values: values.data }
+/** The card a result keeps the contract of, or a sentence if it keeps none. */
+function shownFor(result: Result) {
+  const values = result.structuredContent
+  const status = trulaserStatus.safeParse(values)
+  if (status.success) return { card: "status" as const, values: status.data }
+  const jobOrder = trulaserJobOrder.safeParse(values)
+  if (jobOrder.success) return { card: "jobOrder" as const, values: jobOrder.data }
+  const devices = trulaserDevices.safeParse(values)
+  if (devices.success) return { card: "devices" as const, values: devices.data }
+  const technology = trulaserTechnology.safeParse(values)
+  if (technology.success) return { card: "technology" as const, values: technology.data }
+  const collision = trulaserCollision.safeParse(values)
+  if (collision.success) return { card: "collision" as const, values: collision.data }
+  const conditions = trulaserConditions.safeParse(values)
+  if (conditions.success) return { card: "conditions" as const, values: conditions.data }
   // A tool that failed says why in its first block of text.
   const [first] = result.content ?? []
   const said = typeof first === "object" && first !== null && "text" in first ? first.text : undefined
-  return { note: result.isError && typeof said === "string" ? said : "This result is not a TruLaser card." }
+  return { card: "note" as const, note: result.isError && typeof said === "string" ? said : "This result is not a TruLaser card." }
 }
+type Shown = ReturnType<typeof shownFor>
 
 /**
- * The timelines. They are not part of the result, because a language model reads that: the card
- * asks the server for them, through the host. Null if they are not to be had, for example where a
- * host lets no card call a tool. The card then stands without them.
+ * The timelines of a view, through the host. They are not part of a result, because a language model
+ * reads that. Null if they are not to be had, for example where a host lets no card call a tool.
  */
-async function timelineOf(app: App, machine: string, hours: number): Promise<Timeline> {
+async function timelineOf(app: App, machine: string, view: TimelineView, hours: number): Promise<TrulaserTimeline | null> {
   try {
-    const result = await app.callServerTool({ name: TRULASER_TIMELINE_TOOL, arguments: { machine, hours } })
+    const result = await app.callServerTool({ name: TRULASER_TIMELINE_TOOL, arguments: { machine, view, hours } })
     const read = trulaserTimeline.safeParse(result.structuredContent)
     return read.success ? read.data : null
   } catch {
@@ -43,9 +71,9 @@ async function timelineOf(app: App, machine: string, hours: number): Promise<Tim
 }
 
 /** The values of one tile over time, for its chart, through the host. */
-async function seriesOf(app: App, machine: string, key: ConditionKey, hours: number): Promise<TrulaserSeries | null> {
+async function seriesOf(app: App, machine: string, key: ConditionKey): Promise<TrulaserSeries | null> {
   try {
-    const result = await app.callServerTool({ name: TRULASER_SERIES_TOOL, arguments: { machine, key, hours } })
+    const result = await app.callServerTool({ name: TRULASER_SERIES_TOOL, arguments: { machine, key, hours: 1 } })
     const read = trulaserSeries.safeParse(result.structuredContent)
     return read.success ? read.data : null
   } catch {
@@ -66,7 +94,7 @@ function Trulaser() {
   const [hours, setHours] = useState(1)
   const [timeline, setTimeline] = useState<Timeline>()
   const { app, isConnected, error } = useApp({
-    appInfo: { name: "pleiades-trulaser-card", version: "0.1.0" },
+    appInfo: { name: "pleiades-trulaser-card", version: "0.2.0" },
     capabilities: {},
     // Before the handshake, so that no result is missed.
     onAppCreated(created) {
@@ -78,26 +106,50 @@ function Trulaser() {
     if (app && isConnected) takeFont(app.getHostContext())
   }, [app, isConnected])
 
-  const machine = shown && "values" in shown ? shown.values.machine : null
+  const machine = shown && shown.card !== "note" ? shown.values.machine : null
+  // State.Status shows its history below it, which the card asks for itself.
   useEffect(() => {
-    if (!app || machine === null) return
+    if (!app || machine === null || shown?.card !== "status") return
     let wanted = true
     setTimeline(undefined)
-    void timelineOf(app, machine, hours).then((read) => wanted && setTimeline(read))
+    void timelineOf(app, machine, "status", hours).then((read) => wanted && setTimeline(read))
     return () => {
       wanted = false
     }
-  }, [app, machine, hours])
+  }, [app, machine, hours, shown?.card])
+  const readTimeline = useCallback(
+    (view: TimelineView, asked: number) => (app && machine !== null ? timelineOf(app, machine, view, asked) : Promise.resolve(null)),
+    [app, machine],
+  )
   const readSeries = useCallback(
-    (key: ConditionKey) => (app && machine !== null ? seriesOf(app, machine, key, hours) : Promise.resolve(null)),
-    [app, machine, hours],
+    (key: ConditionKey) => (app && machine !== null ? seriesOf(app, machine, key) : Promise.resolve(null)),
+    [app, machine],
   )
 
   if (error) return <Note>No host answered: {error.message}</Note>
   // Nothing to show until the host sends the result.
   if (!shown) return null
-  if (!("values" in shown)) return <Note>{shown.note}</Note>
-  return <TrulaserCard values={shown.values} timeline={timeline} hours={hours} onHours={setHours} readSeries={readSeries} />
+  switch (shown.card) {
+    case "status":
+      return (
+        <div className="flex flex-col gap-3">
+          <StatusCard status={shown.values} />
+          <HistoryCard timeline={timeline} hours={hours} onHours={setHours} />
+        </div>
+      )
+    case "jobOrder":
+      return <JobOrderCard jobOrder={shown.values} readTimeline={readTimeline} />
+    case "devices":
+      return <DevicesCard devices={shown.values} readTimeline={readTimeline} />
+    case "technology":
+      return <TechnologyCard technology={shown.values} />
+    case "collision":
+      return <CollisionCard collision={shown.values} />
+    case "conditions":
+      return <ConditionsCard conditions={shown.values} hours={1} readSeries={readSeries} />
+    case "note":
+      return <Note>{shown.note}</Note>
+  }
 }
 
 function Note({ children }: { children: ReactNode }) {

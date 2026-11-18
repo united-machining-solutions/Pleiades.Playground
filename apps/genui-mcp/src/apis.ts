@@ -340,3 +340,101 @@ export async function readTimelines(
       .sort((a, b) => a.at.localeCompare(b.at)),
   }))
 }
+
+const alertHistoryAnswer = z.object({
+  items: z.array(
+    z.object({
+      alertId: z.string(),
+      errorCode: z.string().nullish(),
+      message: z.string().nullish(),
+      severity: severityAnswer.nullish(),
+      severityValue: z.number().nullish(),
+      sourceName: z.string().nullish(),
+      raisedAt: z.string(),
+      clearedAt: z.string().nullable(),
+    }),
+  ),
+})
+
+/** An alert of one machine as the Events API pairs its raise and its clear. */
+export type AlertSpan = {
+  alertId: string
+  errorCode: string
+  message: string
+  severity: Severity | null
+  severityValue: number | null
+  sourceName: string
+  raisedAt: string
+  /** Null as long as it stands. */
+  clearedAt: string | null
+}
+
+/** The alerts of one machine that stood at some time between the two instants, with their source. */
+export async function readAlertSpans(apis: Apis, machine: string, from: Date, to: Date): Promise<Array<AlertSpan>> {
+  const url = between(new URL("/alerts/pairs", apis.eventsUrl), ["from", "to"], from, to)
+  url.searchParams.set("Take", "1000")
+  url.searchParams.set("mId", machine)
+  const { items } = await getJson("Events API", url, alertHistoryAnswer)
+  return items.map((one) => ({
+    alertId: one.alertId,
+    errorCode: one.errorCode ?? "",
+    message: one.message ?? "",
+    severity: one.severity ?? null,
+    severityValue: one.severityValue ?? null,
+    sourceName: one.sourceName ?? "",
+    raisedAt: new Date(one.raisedAt).toISOString(),
+    clearedAt: one.clearedAt === null ? null : new Date(one.clearedAt).toISOString(),
+  }))
+}
+
+const jobOrderHistoryAnswer = z.object({
+  items: z.array(
+    z.object({
+      jobOrderId: z.string(),
+      state: z.string(),
+      lastChange: z.string(),
+      firstSeen: z.string().nullish(),
+      jobName: z.string().nullish(),
+      workMasterId: z.string().nullish(),
+      startTime: z.string().nullish(),
+      endTime: z.string().nullish(),
+      runsCompleted: z.number().nullish(),
+      jobResult: z.string().nullish(),
+    }),
+  ),
+})
+
+/** A job order of one machine as the Events API keeps it from its events: the entry and its result. */
+export type JobOrderEntry = {
+  jobOrderId: string
+  state: string
+  lastChange: string
+  jobName: string | null
+  workMasterId: string | null
+  startTime: string | null
+  endTime: string | null
+  runsCompleted: number | null
+  jobResult: string | null
+}
+
+/** The job orders of one machine the Events API knows, the newest change first. */
+export async function readJobOrders(apis: Apis, machine: string): Promise<Array<JobOrderEntry>> {
+  const url = new URL("/jobOrders", apis.eventsUrl)
+  url.searchParams.set("mId", machine)
+  url.searchParams.set("Take", "1000")
+  const { items } = await getJson("Events API", url, jobOrderHistoryAnswer)
+  const at = (text: string | null | undefined) => (text ? new Date(text).toISOString() : null)
+  return items
+    .map((one) => ({
+      jobOrderId: one.jobOrderId,
+      state: one.state,
+      lastChange: new Date(one.lastChange).toISOString(),
+      jobName: one.jobName ?? null,
+      workMasterId: one.workMasterId ?? null,
+      startTime: at(one.startTime),
+      endTime: at(one.endTime),
+      runsCompleted: one.runsCompleted ?? null,
+      jobResult: one.jobResult ?? null,
+    }))
+    .sort((a, b) => b.lastChange.localeCompare(a.lastChange))
+}

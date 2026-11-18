@@ -1,6 +1,6 @@
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
 import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
-import type { ConditionKey, TrulaserSeries, TrulaserShow, TrulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
+import type { Cockpit, ConditionKey, TimelineView, TrulaserSeries, TrulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
 import type { server } from "@pleiades/genui-mcp"
 import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
@@ -181,26 +181,36 @@ export const getSpans = createServerFn({ method: "GET" })
     return answer.values
   })
 
-/** What a TruLaser does now: the values of the TruLaser card. Without `machine`, the first TruLaser. */
-export const getTrulaser = createServerFn({ method: "GET" })
+/** Every card of a TruLaser, over one connection. Without `machine`, the first TruLaser. */
+export const getTrulaserCockpit = createServerFn({ method: "GET" })
   .validator((request: { machine?: string }) => request)
   .handler(
-    ({ data: { machine } }): Promise<Answer<TrulaserShow>> =>
+    ({ data: { machine } }): Promise<Answer<Cockpit>> =>
       ask(async (backend) => {
-        const result = await backend.callTool("genui_trulaser_show", machine === undefined ? {} : { machine })
-        if (result.isError || !result.structuredContent) {
-          throw new Refused(textOf(result) ?? "genui_trulaser_show returned no values.")
+        const input = machine === undefined ? {} : { machine }
+        const need = <TValues,>(name: string, result: { isError?: boolean; structuredContent?: TValues }): TValues => {
+          if (result.isError || !result.structuredContent) throw new Refused(textOf(result) ?? `${name} returned no values.`)
+          return result.structuredContent
         }
-        return result.structuredContent
+        // The status first: it finds the machine, and says so if there is none.
+        const status = need("genui_trulaser_status", await backend.callTool("genui_trulaser_status", input))
+        const [jobOrder, devices, technology, collision, conditions] = await Promise.all([
+          backend.callTool("genui_trulaser_joborder", input).then((result) => need("genui_trulaser_joborder", result)),
+          backend.callTool("genui_trulaser_devices", input).then((result) => need("genui_trulaser_devices", result)),
+          backend.callTool("genui_trulaser_technology", input).then((result) => need("genui_trulaser_technology", result)),
+          backend.callTool("genui_trulaser_collision", input).then((result) => need("genui_trulaser_collision", result)),
+          backend.callTool("genui_trulaser_conditions", input).then((result) => need("genui_trulaser_conditions", result)),
+        ])
+        return { status, jobOrder, devices, technology, collision, conditions }
       }),
   )
 
 /**
- * The timelines of the TruLaser card over the last hours. They are not among its values, because a
- * language model reads those. Null if they are not to be had: the card stands without them.
+ * The timelines of a view of a TruLaser over the last hours. They are not among the values of a card,
+ * because a language model reads those. Null if they are not to be had: the card stands without them.
  */
 export const getTrulaserTimeline = createServerFn({ method: "GET" })
-  .validator((request: { machine: string; hours: number }) => request)
+  .validator((request: { machine: string; view: TimelineView; hours: number }) => request)
   .handler(async ({ data }): Promise<TrulaserTimeline | null> => {
     const answer = await ask(async (backend) => {
       // The name is checked against the tools of the backend: if it changes there, this fails to compile.
