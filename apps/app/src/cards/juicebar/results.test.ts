@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { drinksOf, glassOf, ingredientsOf, isFizzy, orderOf, orderable, shortName, stageOf } from "./results.ts"
+import { drinksOf, glassOf, ingredientsOf, isFizzy, orderOf, orderable, shortName, stageOf, whyNoOrder } from "./results.ts"
 import type { Drink } from "./results.ts"
 
 /** Two drinks as juicebar_drinks_list returns them, from the machine of the demo on 18 Nov 2026. */
@@ -103,4 +103,17 @@ test("an order is in the queue until the pumps run, then mixing, then ready", ()
   assert.equal(stageOf({ ...placed, state: "productionFinished", progressFraction: 1 }), "ready")
   assert.equal(stageOf({ ...placed, state: "error" }), "failed")
   assert.equal(orderOf("The juice bar refused the order."), null)
+})
+
+test("an order without a number is refused only where the juice bar said so; else it may stand in the machine", () => {
+  assert.equal(whyNoOrder({ reason: "3 orders wait at the juice bar; the limit is 3. Try again when one is made.", answered: true }), "refused")
+  assert.equal(whyNoOrder({ reason: "Ordering is switched off in this service (JUICEBAR_ENABLE_ORDERING).", answered: true }), "refused")
+  assert.equal(
+    whyNoOrder({
+      reason: "The juice bar did not answer the order. Whether it was placed is unknown: read the status before ordering again.",
+      answered: true,
+    }),
+    "unsure",
+  )
+  assert.equal(whyNoOrder({ reason: "The juice bar did not answer: REQUEST_TIMEOUT.", answered: false }), "unsure")
 })

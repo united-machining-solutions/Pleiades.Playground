@@ -67,6 +67,16 @@ export function orderOf(content: unknown): Order | null {
   return parsed.success ? parsed.data : null
 }
 
+/**
+ * Why an order got no number. `refused`: the juice bar answered and placed nothing, so ordering again is
+ * safe. `unsure`: no answer came, or the service itself does not know whether the machine took the order
+ * (its words, source/Pleiades.Playground.JuiceBar.Api/MixerClient.cs, CreateOrderAsync): a second order may
+ * make a second drink.
+ */
+export function whyNoOrder(failure: { reason: string; answered: boolean }): "refused" | "unsure" {
+  return failure.answered && !/whether it was placed is unknown/i.test(failure.reason) ? "refused" : "unsure"
+}
+
 /** Where an order stands, as the card shows it. */
 export type Stage = "queued" | "mixing" | "ready" | "failed"
 
