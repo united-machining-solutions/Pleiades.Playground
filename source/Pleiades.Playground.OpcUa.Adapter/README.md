@@ -58,10 +58,11 @@ there again after every restart, as long as the volume `/data` is.
      │  cards: server list, mapping, proposal          ├─ opcua_ua_*  (OPC UA MCP library: find, connect, browse, read)
      │                                                 └─ opcua_server_list, opcua_mapping_show, opcua_endpoint_rank,
      │                                                    opcua_machine_list, opcua_registration_propose
-     └─ button "Add machine" / "Remove" ──REST──▶ opcua-adapter /drafts/{id}/commit, /machines/{serialNumber}
+     └─ button "Add the machine" / "Remove" ──REST──▶ opcua-adapter /drafts/{id}/commit, /machines/{serialNumber}
 
   opcua-adapter ──OPC UA (SignAndEncrypt)──▶ OPC UA server of the machine
   opcua-adapter ──MQTT──▶ broker ──▶ timeseries and events persistence ──▶ the app shows the machine
+  opcua-adapter ──REST, delete a removed machine──▶ timeseries-api, events-api
 ```
 
 The scan and the running machine are one OPC UA client application with one certificate in `/data/pki`, so a
@@ -139,9 +140,9 @@ adapter (`OPCUA_MCP_URL`).
 |---|---|---|---|
 | `/help` | Lists the commands with a sentence each, without asking the model | none | the list of commands |
 | `/opcua` | Lists the added OPC UA servers with endpoint, security, state and mapping health | `opcua_server_list` | server list card, with a Remove button per server |
-| `/discover <machine or opc.tcp://host:port>` | Scans a server and proposes a registration for each machine it serves | `opcua_endpoint_rank`, `opcua_machine_list`, `opcua_ua_*`, `opcua_registration_propose` | the machines of the server, and a proposal card per machine, each with the button "Add machine" |
+| `/discover <machine or opc.tcp://host:port>` | Scans a server and proposes a registration for each machine it serves | `opcua_endpoint_rank`, `opcua_machine_list`, `opcua_ua_*`, `opcua_registration_propose` | the machines of the server, and a proposal card per machine, each with the button "Add the machine" |
 | `/mapping <serial number>` | Shows mismatches and unclear mappings of one machine | `opcua_mapping_show` | mapping card, what needs a look first |
-| `/rescan <serial number>` | Scans an added server again and says what would change | as `/discover` | proposal card with the changes, with the button "Replace registration" |
+| `/rescan <serial number>` | Scans an added server again and says what would change | as `/discover` | proposal card with the changes, with the button "Replace the registration" |
 
 Removal is the Remove button on the server list, behind a confirmation. It removes the machine completely, its
 stored values and notifications too ([Restart, removal, a server that changed](#restart-removal-a-server-that-changed)).
@@ -236,7 +237,7 @@ registration before it is checked, proposed or stored, from the chat and from `P
 element a rule covers is set by the rule, whatever the scan proposed for it, and is no longer missing.
 Applying the rules twice changes nothing more.
 
-There is one rule so far:
+Besides mapping a machine in `urn:umati2:datamodel:opcua` whole (below), there is one rule so far:
 
 | When the node of | is in the namespace | the element | is |
 |---|---|---|---|
@@ -310,10 +311,11 @@ prefix of a gateway; both are open.
 | `GET /machines` | The registered machines with their state, and the machines each shares its session with. |
 | `GET /machines/{SerialNumber}` | One machine: its registration, the last value of every element, the alarms that stand. |
 | `GET /machines/{SerialNumber}/mapping` | The mapping review of one machine, element by element. |
-| `DELETE /machines/{SerialNumber}` | Removes the machine and then deletes its stored values and notifications. Answers how many, `{ "valuesDeleted", "eventsDeleted" }`; `502` with the reasons if a store did not delete, the machine is removed all the same. |
+| `DELETE /machines/{SerialNumber}` | Removes the machine and then deletes its stored values and notifications. Answers how many, `{ "valuesDeleted", "eventsDeleted", "problems": [] }`; `404` if no such machine is added; `502` with the reasons if a store did not delete or the adapter knows no `Config:TimeseriesApi:Uri` or `Config:EventsApi:Uri`. The machine is removed all the same. |
 
 A registration is refused with the reasons, one per line of `problems`: `400` if it is malformed, `409` if it
-does not fit its server or is not the machine it says it is, `502` if the server does not answer.
+does not fit its server, is not the machine it says it is or does not fulfil the core (checked once the server
+has answered), `502` if the server does not answer.
 
 The API has no sign-in. Whoever reaches its port can add and remove machines, so the port answers on this
 computer only unless `OPCUA_ADAPTER_BIND` opens it.
@@ -336,11 +338,14 @@ computer only unless `OPCUA_ADAPTER_BIND` opens it.
   - `node` carries its namespace as a URI, `nsu=http://example.com/;i=42`. An index, `ns=2;i=42`, is refused:
     it may change when the server restarts.
   - `scale` and `offset` convert a number once, to the SI unit: 0.01 for percent, 3600 for hours.
+  - `field` names the member of a structure the adapter decodes, for example `MachineryItemState` of
+    `State.Status`. The adapter sets it; a scan leaves it out.
   - `map` turns a raw value into a text, for an enumeration or a state that is derived; `mapDefault` is the
     text for every other value.
   - `match` is `Direct`, `Derived` or `Unclear`: how sure the scan is.
   - `evidence` says why this node was matched. It is for the person who reviews the registration.
-- `alerts`: the event type of an alarm and the field with the code of the maker.
+- `alerts`: the event type of an alarm and the field with the code of the maker; `notifier`, the object whose
+  events are subscribed, is the Server object if left out. Without `alerts` the core is not fulfilled.
 - `missing`: what the discovery looked for and did not find, with the reason, and the elements of a profile
   that is not complete, which the adapter does not publish.
 
@@ -372,7 +377,8 @@ their own.
 
 The proposal card in the chat and the list of the added servers show it: `Core fulfilled` or `Core not
 fulfilled`, a badge per complete profile, and what an incomplete one lacks. The answers carry it as
-`conformance`, one entry per profile with `fulfilled`, `offered`, `missing` and the complete `instances`.
+`conformance`, one entry per profile with `name`, `mandatory`, `fulfilled`, `offered`, `missing` and the complete
+`instances`.
 `profiles` names the complete ones. A machine added before the core was checked keeps running from its
 registration; the list shows what it lacks, and `/rescan` proposes a registration that fulfils it, or says
 why it cannot.
@@ -456,7 +462,7 @@ What the scan of the TRUMPF simulator found, and what it did not. Another server
 
 | Element | Source |
 |---|---|
-| Identification, `State.FeedOverride`, `Channel[1]`, `Production.ActiveProgram` | The MachineTool instance, as OPC 40501-1 names them. |
+| Identification, `State.FeedOverride`, `Channel[1]`, `Production.ActiveProgram` | The MachineTool instance, as OPC 40501-1 names them. `Channel[1]` is found but not published: it has no `RapidOverride`, so the profile ChannelMonitoring is not complete and its elements are in `missing`. |
 | `State.MachineryItemState`, `State.MachineryOperationMode` | Derived: the server has neither building block. From the state of the active program and from `OperationMode`. |
 | `OperationCounters.PowerOnDuration`, electrical power and energy | The interface of the maker: hours, kilowatt and kilowatt hours, converted. |
 | `OperationCounters.PartsProducedInLifetime` | Not there: the server counts parts per program only. |
@@ -465,7 +471,9 @@ What the scan of the TRUMPF simulator found, and what it did not. Another server
 
 - The adapter connects to the simulator with SignAndEncrypt and `Aes256_Sha256_RsaPss`, the strongest of seven
   endpoints. A weaker endpoint is refused with 409, an unknown node too.
-- All 15 elements of the example registration read Good and are stored with their SI units. The machine
+- Before the core was checked, all 15 elements of the example registration then read Good and were stored with
+  their SI units. Today the sample has 14: its four channel elements are in `missing`, and `ManufacturerUri`,
+  `ProductCode` and `YearOfConstruction` are new; the known mapping adds `Identification.Model`. The machine
   appears in the example app beside the simulated ones, with its alarms.
 - Restart of the adapter: the machine comes back from the volume in about a second, without the MCP tools.
 - Loss of the server: the machine goes Disconnected and is Connected again a few seconds after the server is back.
@@ -474,17 +482,24 @@ What the scan of the TRUMPF simulator found, and what it did not. Another server
   namespace `urn:umati2:datamodel:opcua`): 13 topics stored, the removal answered after 9 seconds with 19
   values deleted, and 12 seconds later no topic of the machine was left.
 - The MCP endpoint of the adapter: an encrypted scan session through the hosted library, a proposal with 2
-  derived and 2 unclear elements, a commit that works once and answers 404 the second time.
+  derived and 2 unclear elements (before the known mapping added `Identification.Model` as a third derived one),
+  a commit that works once and answers 404 the second time.
 - The default endpoint: in the stack the adapter resolves `A1121O0001` and gets the endpoints of
-  `opc.tcp://A1121O0001:4840`; the example registration of `K09` registers it and its values are stored.
+  `opc.tcp://A1121O0001:4840`; the example registration of `K09`, which names the service `opc-simulator:4840`,
+  registers the same server and its values are stored. With the simulator `1.4.0-alpha3` its dry run fulfils the
+  core (2026-11-18): `ManufacturerUri`, `ProductCode` and `YearOfConstruction` are there but read
+  `BadWaitingForInitialData`, so the review shows them as unclear.
 - Behind a gateway, the UaGateway `opcgateway` of TRUMPF with two simulators, `L26` (`A0280O0001`) and `K09`
   (`A1121O0001`): the list names both by their MachineTool instances, with serial number, manufacturer, model and
-  product instance URI read on the gateway. Both registrations read all 15 elements Good, and both machines run
+  product instance URI read on the gateway. Before the core was checked, both registrations read all their
+  elements Good, and both machines run
   on one session of the adapter (one session in the session list of the gateway), their values and alarms each
   under their own serial number. A registration without `machineNode`, with a node of the other machine, or with
   the serial number of the other machine is refused with 409. Removing the first machine keeps the session, and
-  the other machine goes on publishing; removing the second closes it.
-- Checks: the solution builds and its tests pass, the 85 of the adapter among them; `pnpm typecheck`,
+  the other machine goes on publishing; removing the second closes it. Today both would be refused: `L26` lacks
+  three elements of the identification, and behind the prefix of the gateway the known mapping of
+  `Identification.Model` does not apply, so a registration there has to map the model itself.
+- Checks: the solution builds and its tests pass, the 131 of the adapter among them; `pnpm typecheck`,
   `pnpm test` and `pnpm build` pass with the chat commands and cards.
 
 - A user, against the UaGateway, against the K09 simulator and against a simulator that wants a user: the

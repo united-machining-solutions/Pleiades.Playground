@@ -248,10 +248,12 @@ reads which models the settings name, `cards.tsx` lists what the app draws for w
 
 Type `/` in the chat field: the list of commands opens, and `/help` explains them. Ask
 `/discover A1121O0001`, and the model scans the OPC UA server of the simulated machine, matches its nodes to
-the data model and shows a proposal: the endpoint with the strongest security, every element with its value,
-and what is derived, unclear or missing. The machine is added only when you press "Add machine" on the
-proposal; from then on it is on Home like the others, also after a restart. `/opcua` lists the added servers,
-with a button to remove one, and `/mapping A1121O0001` shows what needs a look.
+the data model and shows a proposal: the endpoint with the strongest security, whether the machine fulfils
+the core of the data model and which profiles are complete, every element with its value, and what is
+derived, unclear or missing. A machine without the whole core cannot be added. Otherwise it is added when you
+press "Add machine" on the proposal; from then on it is on Home like the others, also after a restart.
+`/opcua` lists the added servers with their core and profiles, and a button that removes a machine together
+with its stored values and notifications; `/mapping A1121O0001` shows what needs a look.
 
 **In the code:** [`apps/app/src/opcua/`](../apps/app/src/opcua) holds the commands and the cards of the chat,
 and the adapter is [`source/Pleiades.Playground.OpcUa.Adapter`](../source/Pleiades.Playground.OpcUa.Adapter/README.md).

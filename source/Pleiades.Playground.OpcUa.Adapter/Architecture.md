@@ -41,6 +41,10 @@ The example has two machines behind a gateway and one machine with an OPC UA ser
   OPC UA servers
 ```
 
+Not drawn: when a machine is removed, the adapter calls the REST APIs of the timeseries and of the events
+directly, `DELETE /machines/{serial}` and `DELETE /notificationEvents/machines/{serial}`, to delete what the
+machine published.
+
 | Part | Code | What it does |
 |---|---|---|
 | `MachineSupervisor` | [`MachineSupervisor.cs`](MachineSupervisor.cs) | Loads the registrations at start, adds, replaces and removes machines at run time, checks a registration against its server and against the core and the profiles of the data model ([`Mapping/DataModelProfiles.cs`](Mapping/DataModelProfiles.cs)). |
@@ -92,15 +96,17 @@ and the certificate of the adapter.
 | Password of the user of a server | `secrets/credentials.json`, one entry per server address, readable by the adapter only (the folder `0700`, the file `0600`) | [`CredentialStore`](Registrations/CredentialStore.cs), when a person enters a user on the card in the chat (`PUT /users`) and the server accepted it | On every connect with that user, by the running machines and by a scan; never sent back |
 | Certificate of the server, pinned | `machines/<serial>.json`, `endpoint.serverCertificateThumbprint` (SHA-1) | The adapter, from the certificate the server presented at the registration | On every connect: another certificate is refused, the machine says why in `lastError` |
 | Machine on a server of several machines | `machines/<serial>.json`, `machineNode` | The registration | By the checks of a new registration, and by the alarm filter |
-| Nodes, units, conversions, alarm type | `machines/<serial>.json`, `elements`, `alerts` | The registration | When the machine is attached to its session |
+| Nodes, units, conversions, alarm type | `machines/<serial>.json`, `elements`, `alerts` | The registration, with the elements of the known mappings the adapter adds | When the machine is attached to its session |
+| Profiles delivered, and the elements of profiles that are not complete | `machines/<serial>.json`, `profiles`, `missing` | The adapter, from the check of the core and the profiles, when it stores the registration | Checked again for the server list and the mapping review |
 | Namespaces of the server at the scan | `machines/<serial>.json`, `discovery.namespaces` | The adapter, when it stores the registration | By a person who compares a rescan |
 | Alarms that stand | `alerts/<serial>.json` | [`AlertStore`](Registrations/AlertStore.cs), on every change | At start, so an alarm that ended while the adapter was down is reset |
 | Certificate of the adapter, the client certificate of every session | `pki/certs`, `pki/private`, one RSA certificate and ECC ones (NistP256, NistP384, BrainpoolP256r1, BrainpoolP384r1) | The OPC UA stack, at the first start, if there is none | On every connect and every scan |
 | Application name and URI of the adapter | Not a file: `Pleiades Playground OPC UA Adapter` and `Config:ApplicationUri` (`urn:pleiades:playground:opcua:adapter`) | [`Program.cs`](Program.cs), at every start | They are in the certificate the stack creates |
 
 The file name of a machine is its serial number, escaped as a URI. The registration is the
-[sample](samples/trumpf-trumatic-k09.registration.json) in form, with the thumbprint and the namespaces the
-adapter added.
+[sample](samples/trumpf-trumatic-k09.registration.json) in form, with the thumbprint, the namespaces, the
+profiles and the elements of the known mappings the adapter added. Removing a machine deletes its file, its
+standing alarms, and through the REST APIs its stored values and notifications.
 
 What is not kept:
 

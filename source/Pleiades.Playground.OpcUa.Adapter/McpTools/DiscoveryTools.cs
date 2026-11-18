@@ -105,7 +105,7 @@ internal sealed class DiscoveryTools(MachineSupervisor supervisor)
          "problems, correct the registration and propose again. For a machine that is added already the result " +
          "says what would change (changes). Read opcua_get_skill_guide before the first proposal.")]
     public async Task<ProposalView> Propose(
-        [Description("The registration: endpoint, profiles, one element per value, alerts, and what is missing.")] MachineRegistration registration,
+        [Description("The registration: endpoint, one element per value, alerts, and what is missing. The adapter names the profiles.")] MachineRegistration registration,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(registration);

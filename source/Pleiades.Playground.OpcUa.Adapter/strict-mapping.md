@@ -118,17 +118,18 @@ tells which of them the server has.
 
 | Element | Node | Kind, unit, map |
 |---|---|---|
-| `Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`, `.Model`, `.SoftwareRevision` | `s=Identification.<Element>` | Text |
+| `Identification.Manufacturer`, `.SerialNumber`, `.ProductInstanceUri`, `.ManufacturerUri`, `.Model`, `.ProductCode`, `.SoftwareRevision` | `s=Identification.<Element>` | Text |
+| `Identification.YearOfConstruction` | `s=Identification.YearOfConstruction` | Number, `one`, no scale |
 | `State.MachineryItemState` | `s=State.Status`, field `MachineryItemState` | Text, map 0 NotAvailable, 1 OutOfService, 2 NotExecuting, 3 Executing |
 | `State.MachineryOperationMode` | `s=State.Status`, field `MachineryOperationMode` | Text, map 0 None, 1 Maintenance, 2 Setup, 3 Processing |
 | `State.FeedOverride` | `s=State.FeedOverride` | Number, `one`, no scale |
 | `OperationCounters.PowerOnDuration` | `s=OperationCounters.PowerOnDuration` | Number, `second`, no scale |
 
-Only elements verified on the server are rules. `ManufacturerUri`, `ProductCode` and `YearOfConstruction` are
-not elements of the binding; the scan may add them under `vendor`. The guide of the model
-([`Resources/skill.md`](Resources/skill.md)) says: propose with `machineNode`, `serialNumber`, the profiles `Core`
-and `IdentificationExtended`, `elements` empty, `Notification.ActiveAlerts` in `missing`, and leave
-`Connection.*` of the tree out. The sample is
+`ManufacturerUri`, `ProductCode` and `YearOfConstruction` were not on the gateway of the edge device; they are
+rules since the core of the specification 0.17.0 asks for them, and the simulator `1.4.0-alpha3` has them. The
+guide of the model ([`Resources/skill.md`](Resources/skill.md)) says: propose with `machineNode`, `serialNumber`
+and `elements` empty, set `alerts` for the alarms of the core, and leave `Connection.*` of the tree out; the
+adapter names the profiles ([Core and profiles](README.md#core-and-profiles)). The sample is
 [`samples/trumpf-trulaser-umati2-gateway.registration.json`](samples/trumpf-trulaser-umati2-gateway.registration.json).
 
 **Where it differs from the plan below.**
