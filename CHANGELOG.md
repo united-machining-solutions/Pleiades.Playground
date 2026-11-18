@@ -14,6 +14,17 @@ All notable changes are documented here. The format follows
   the model or the extension, and is a tool of `genui-mcp` of its own (`genui_trulaser_status`,
   `genui_trulaser_joborder`, `genui_trulaser_devices`, `genui_trulaser_technology`,
   `genui_trulaser_collision`, `genui_trulaser_conditions`), which the chat shows as a card.
+- Example app: the drink card of the juice bar. For the result of `juicebar_drinks_list` the chat draws the
+  drinks whose bottles do not warn, each in the glass its author chose in the marketplace, filled with its
+  colour; a person picks one, and its button orders it at once, without a question of the language model.
+  The card follows the order and shows the glass waiting for the start button of the machine, filling while
+  the pumps run, and full, with an umbrella. Without motion the glass shows the same, still.
+- Example app: the showcase page `/juice-bar`, the same drink card on a page of its own, for a screen next to
+  the machine at a fair: a guest picks and orders without a language model. It reads the card of the machine
+  every half minute. Only a build with `APP_SHOWCASES` has it.
+- Juice bar API: a drink carries its colour and the picture of a glass its author chose (`color`, `picture`),
+  an ingredient its colour and whether its bottle runs low (`color`, `runsLow`). Colours that are not `#rrggbb`
+  are left out.
 - Example app: "Add a card" at the end of a kept page in "Edit" adds a card by hand, with no language model:
   the cards a page can hold, by what they show, and what the chosen one takes, read from its input schema
   (a machine by its name, the hours of its history). The same card twice or a thirteenth is not added.

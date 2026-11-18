@@ -2,9 +2,18 @@ using Pleiades.Playground.Mqtt.Extensions.Machines;
 
 namespace Pleiades.Playground.JuiceBar.Api;
 
-internal sealed record DrinkComponent(string Id, string? Name);
+/// <summary>
+/// An ingredient of a drink. <paramref name="Color"/> is the colour the marketplace shows it in, as <c>#rrggbb</c>.
+/// <paramref name="RunsLow"/> says that the bottle of its pump warns; null while the warnings are not known.
+/// </summary>
+internal sealed record DrinkComponent(string Id, string? Name, string? Color = null, bool? RunsLow = null);
 
-internal sealed record Drink(string Id, string Title, string? Description, IReadOnlyList<DrinkComponent> Components);
+/// <summary>
+/// A drink of the card. <paramref name="Color"/> and <paramref name="Picture"/> are what its author chose in the
+/// marketplace: a colour as <c>#rrggbb</c>, and the picture of a glass, named by the id its drawing gives it.
+/// </summary>
+internal sealed record Drink(string Id, string Title, string? Description, IReadOnlyList<DrinkComponent> Components,
+    string? Color = null, string? Picture = null);
 
 /// <summary>One pump of the machine. The bottle volume is the configured size of a full bottle, not a level.</summary>
 internal sealed record Pump(int Number, string? ComponentId, string? ComponentName, double? BottleVolumeCubicMetre,
