@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node --watch src/index.ts",
     "start": "node src/index.ts",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test": "node --test"
   },
   "dependencies": {
     "mqtt": "catalog:"
