@@ -8,18 +8,18 @@ configuration. What the adapter does and why is in the [README](README.md).
 The example has two machines behind a gateway and one machine with an OPC UA server of its own:
 
 ```text
-  OPC UA servers
-  ┌────────────────────────────────────────────┐   ┌────────────────────────────┐
-  │ gateway opc.tcp://opcgateway:11878         │   │ server of one machine      │
-  │  ┌──────────────────┐ ┌──────────────────┐ │   │  ┌──────────────────────┐  │
-  │  │ A0280O0001       │ │ A1121O0001       │ │   │  │ M3                   │  │
-  │  │ TruLaser, i=3000 │ │ TruMatic, i=3000 │ │   │  │ opc.tcp://M3:4840    │  │
-  │  └──────────────────┘ └──────────────────┘ │   │  └──────────────────────┘  │
-  └─────────────────────┬──────────────────────┘   └─────────────┬──────────────┘
-                        │ one session, SignAndEncrypt            │ one session
-  ┌─────────────────────┼────────────────────────────────────────┼──────────────┐
-  │ opcua-adapter       │   MachineSupervisor, SessionPool       │              │
-  │  ┌──────────────────┴──────────────────────────┐   ┌─────────┴────────────┐ │
+  ┌────────────────────────────────────────────────────┐   ┌────────────────────┐
+  │ MQTT broker                                        ├──▶│ timeseries         │
+  │  machines/{serial}/umati/<Group>/<Element>         │   │ values, connection │
+  │  machines/{serial}/vendor/<Group>/<Element>        │   └────────────────────┘
+  │  machines/{serial}/umati/Connection/State          │   ┌────────────────────┐
+  │  machines/{serial}/umati/Connection/Heartbeat      ├──▶│ events             │
+  │  machines/{serial}/events/notifications            │   │ alarms             │
+  └─────────────────────┬──────────────────────────────┘   └────────────────────┘
+                        ▲ publish by the MQTT binding
+  ┌─────────────────────┴───────────────────────────────────────────────────────┐
+  │ opcua-adapter           MachineSupervisor, SessionPool                      │
+  │  ┌─────────────────────────────────────────────┐   ┌──────────────────────┐ │
   │  │ SharedSession opcgateway:11878              │   │ SharedSession M3     │ │
   │  │  ┌───────────────────┐ ┌───────────────────┐│   │  ┌─────────────────┐ │ │
   │  │  │ MachineConnection │ │ MachineConnection ││   │  │MachineConnection│ │ │
@@ -27,17 +27,18 @@ The example has two machines behind a gateway and one machine with an OPC UA ser
   │  │  │ own subscription  │ │ own subscription  ││   │  │ own subscription│ │ │
   │  │  │ heartbeat, alarms │ │ heartbeat, alarms ││   │  │heartbeat, alarms│ │ │
   │  │  └───────────────────┘ └───────────────────┘│   │  └─────────────────┘ │ │
-  │  └─────────────────────────────────────────────┘   └──────────────────────┘ │
-  └─────────────────────┬───────────────────────────────────────────────────────┘
-                        │ publish by the MQTT binding
-  ┌─────────────────────┴──────────────────────────────┐   ┌────────────────────┐
-  │ MQTT broker                                        ├──▶│ timeseries         │
-  │  machines/{serial}/umati/<Group>/<Element>         │   │ values, connection │
-  │  machines/{serial}/vendor/<Group>/<Element>        │   └────────────────────┘
-  │  machines/{serial}/umati/Connection/State          │   ┌────────────────────┐
-  │  machines/{serial}/umati/Connection/Heartbeat      ├──▶│ events             │
-  │  machines/{serial}/events/notifications            │   │ alarms             │
-  └────────────────────────────────────────────────────┘   └────────────────────┘
+  │  └──────────────────┬──────────────────────────┘   └─────────┬────────────┘ │
+  │                     │                                        │              │
+  └─────────────────────┼────────────────────────────────────────┼──────────────┘
+                        │ one session, SignAndEncrypt            │ one session
+  ┌─────────────────────┴──────────────────────┐   ┌─────────────┴──────────────┐
+  │ gateway opc.tcp://opcgateway:11878         │   │ server of one machine      │
+  │  ┌──────────────────┐ ┌──────────────────┐ │   │  ┌──────────────────────┐  │
+  │  │ A0280O0001       │ │ A1121O0001       │ │   │  │ M3                   │  │
+  │  │ TruLaser, i=3000 │ │ TruMatic, i=3000 │ │   │  │ opc.tcp://M3:4840    │  │
+  │  └──────────────────┘ └──────────────────┘ │   │  └──────────────────────┘  │
+  └────────────────────────────────────────────┘   └────────────────────────────┘
+  OPC UA servers
 ```
 
 | Part | Code | What it does |
