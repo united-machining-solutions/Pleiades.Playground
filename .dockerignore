@@ -10,6 +10,8 @@
 !NOTICE
 !apps
 !packages
+# The catalog refers to the tarballs in vendor/ with file:, so the install needs them.
+!vendor
 **/node_modules
 **/.output
 **/.tanstack

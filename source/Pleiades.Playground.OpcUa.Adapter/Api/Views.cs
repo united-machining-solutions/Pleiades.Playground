@@ -126,6 +126,8 @@ internal sealed record MachineListView(string Url, RankedEndpointView? Endpoint,
 /// <param name="Rows">Every element with the value its node gave, what needs a look first.</param>
 /// <param name="Replaces">True if the machine is added already: the proposal would replace its registration.</param>
 /// <param name="Changes">What would change against the stored registration.</param>
+/// <param name="MachineId">The machine id the machine would publish under, or null if the proposal was not accepted.</param>
+/// <param name="Notices">What the person should know, though nothing is wrong: for example a machine id whose manufacturer is not the web address of the manufacturer.</param>
 internal sealed record ProposalView(
     bool Accepted,
     string? DraftId,
@@ -139,11 +141,24 @@ internal sealed record ProposalView(
     MappingSummary? Summary,
     IReadOnlyList<MappingRow> Rows,
     bool Replaces,
-    RegistrationChanges? Changes);
+    RegistrationChanges? Changes,
+    string? MachineId,
+    IReadOnlyList<string> Notices);
 
 /// <summary>Builds the answers from what the adapter holds.</summary>
 internal static class Views
 {
+    /// <summary>What the person should know of an identity, one sentence each: none for a server that gave all of it.</summary>
+    public static IReadOnlyList<string> Notices(IdentityRegistration? identity) =>
+        identity is { ManufacturerUriFromManufacturer: true }
+            ?
+            [
+                $"Identification.ManufacturerUri: the server has no node for it, so the manufacturer \"{identity.Manufacturer}\" " +
+                $"without its special characters, \"{identity.ManufacturerUri}\", stands in for it. The machine publishes as " +
+                $"{identity.MachineId}.",
+            ]
+            : [];
+
     public static EndpointView Endpoint(EndpointRegistration endpoint) =>
         new(endpoint.Url, endpoint.SecurityMode, endpoint.SecurityPolicy, endpoint.ServerCertificateThumbprint, endpoint.User);
 

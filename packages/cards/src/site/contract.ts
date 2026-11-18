@@ -72,6 +72,12 @@ export const siteList = z.object({
   source: z.literal(SITES_SOURCE),
   machineCount: z.number().int().min(0).describe("How many machines stand on a site, on all sites together."),
   counts,
+  sending: z.number().int().min(0).describe("How many machines on a site send values now: every one that is not without data."),
+  needsYou: z
+    .number()
+    .int()
+    .min(0)
+    .describe("How many machines on a site need someone now: in alarm, stopped or without data."),
   sites: z.array(site).describe("Every site, by site id."),
   unplaced: z
     .array(unplacedMachine)

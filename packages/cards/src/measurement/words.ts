@@ -17,6 +17,8 @@ export const quantityLabel: Record<Quantity, string> = {
 /** The sign of a unit of the MQTT binding, and how many decimals a value in it is written with. */
 const units: Record<string, { sign: string; decimals: number }> = {
   watt: { sign: "W", decimals: 0 },
+  // Not a unit of the wire: a display writes watt as kilowatts where it says so (timeseries/words.ts).
+  kilowatt: { sign: "kW", decimals: 1 },
   joule: { sign: "J", decimals: 0 },
   wattHour: { sign: "Wh", decimals: 0 },
   degreeCelsius: { sign: "°C", decimals: 1 },

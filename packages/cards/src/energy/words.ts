@@ -13,7 +13,8 @@ export function inKilowattHours(value: number, unit: string | null): number | nu
   return per === undefined ? null : value / per
 }
 
-function number(value: number, decimals: number): string {
+/** A number in the decimals given, as the cards write numbers: 1,234.50. */
+export function number(value: number, decimals: number): string {
   return new Intl.NumberFormat("en-GB", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value)
 }
 

@@ -345,6 +345,8 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       GENUI_MCP_URL: http://genui-mcp:8080/mcp
+      # Where Home places machines on sites and takes them off: the REST endpoints of the Sites API.
+      SITES_API_URL: http://sites-api:8080
       # The MCP servers of optional services whose tools the chat has too, see .env.example.
       APP_MCP_SERVERS: ${APP_MCP_SERVERS:-}
       # Where the browser hears live values at the broker: the host of the page and this port, or the whole
@@ -355,11 +357,19 @@ services:
       # the chat has no OPC UA.
       OPCUA_MCP_URL: ${OPCUA_MCP_URL-http://opcua-adapter:8080/mcp}
       OPCUA_ADAPTER_URL: ${OPCUA_ADAPTER_URL-http://opcua-adapter:8080}
+      # The page "OSACA cell": the broker it listens to, and the simulation it loads the 3D model from and
+      # starts the job on, see .env.example. Without OSACA_SIM_URL the page shows the values, not the model.
+      OSACA_MQTT_URL: ${OSACA_MQTT_URL:-mqtt://broker:1883}
+      OSACA_SIM_URL: ${OSACA_SIM_URL:-}
       # The chat needs a language model; everything else works without one. The models come from a LiteLLM
       # gateway: the app offers those it marks for chat, and dictation takes the first it marks for speech
       # to text.
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      # The app registers at the Pleiades Hub, at the broker of this stack; an empty HUB_MQTT_URL switches
+      # that off. HUB_APP_URL is the address under which a browser reaches the app.
+      HUB_MQTT_URL: ${HUB_MQTT_URL-mqtt://broker:1883}
+      HUB_APP_URL: ${HUB_APP_URL:-http://localhost:${APP_PORT:-5600}/}
 
   # The SimpleCAM adapter: reads the state of the machine 9042 from the SSE stream of the SimpleCAM backend and
   # publishes it to the broker after the data model, as machines/united-grinding_simplecam_9042/umati/...

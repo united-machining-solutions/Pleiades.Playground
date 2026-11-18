@@ -3,8 +3,10 @@ import { useNavigate } from "@tanstack/react-router"
 import { randomId } from "../random-id.ts"
 
 // The chat is the panel on the right. Whether it is open, and with which chat, is in the URL:
-// no `chat` is closed, `chat=new` is the start of the panel, anything else is the thread of a chat.
+// no `chat` is closed, `chat=all` is the list of the chats, `chat=new` a new chat that has no question
+// yet, anything else is the thread of a chat.
 
+export const CHAT_LIST = "all"
 export const NEW_CHAT = "new"
 
 /**
@@ -47,18 +49,24 @@ export function pickedModel(models: ReadonlyArray<string>): string | undefined {
   return lastModel !== undefined && models.includes(lastModel) ? lastModel : models[0]
 }
 
-/** Whether a press in the panel changed its view: then the heading of the new view takes the focus. */
-let pressed = false
+/**
+ * Where the focus goes in the view a press in the panel led to: its heading, or its field. "All chats"
+ * and the link of a chat lead to a view to look at, "New chat" and a question asked in the panel to a
+ * field to write in. On a page load nothing was pressed, and the focus stays where it was.
+ */
+export type Focus = "heading" | "field"
 
-export function markPress() {
-  pressed = true
+let pressed: Focus | undefined
+
+export function markPress(focus: Focus = "heading") {
+  pressed = focus
 }
 
-/** Whether a press in the panel changed its view, once: the next head to ask gets `false`. */
-export function takePress(): boolean {
-  const was = pressed
-  pressed = false
-  return was
+/** Whether a press asked for this focus, once: the view that takes it clears it, any other leaves it. */
+export function takePress(focus: Focus): boolean {
+  if (pressed !== focus) return false
+  pressed = undefined
+  return true
 }
 
 /** The further servers switched off last, so that the next chat begins without their tools. */
@@ -85,11 +93,16 @@ export function useChatPanel() {
   const show = (chat: string | undefined) => void navigate({ to: ".", search: chat ? { chat } : {} })
   return {
     /** Open the panel where it was left. */
-    open: () => show(lastThread ?? NEW_CHAT),
+    open: () => show(lastThread ?? CHAT_LIST),
     close: () => show(undefined),
     /** The list of the panel: the chats so far, and the field that begins a new one. */
     showList: () => {
       markPress()
+      show(CHAT_LIST)
+    },
+    /** A new chat with no question yet, its field ready to write in. */
+    newChat: () => {
+      markPress("field")
       show(NEW_CHAT)
     },
     /** A new chat that begins with this question. */

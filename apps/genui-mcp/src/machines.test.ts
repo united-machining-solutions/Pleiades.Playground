@@ -260,3 +260,36 @@ test("a machine whose heartbeat stopped has no data, whatever it reported before
   assert.equal(machine?.connection.value, "Running")
   assert.equal(machine && stateOf(machine, list.asOf), "no-data")
 })
+
+test("one machine is listed as the whole fleet lists it, without reading the others", async () => {
+  publishing({
+    "machines/P-04/umati/Connection/State": [{ at: hoursAgo(2), value: "Running" }],
+    "machines/P-04/umati/State/Status/MachineryItemState": [{ at: hoursAgo(2), value: "Executing" }],
+    "machines/P-04/umati/Connection/Heartbeat": heartbeats(3),
+    "machines/M-02/umati/Connection/State": [{ at: hoursAgo(1), value: "Running" }],
+    "machines/M-02/umati/Connection/Heartbeat": heartbeats(1),
+  })
+  const fleet = await listMachines(apis, now)
+  // Every read of `calls` is a copy of the calls so far.
+  const calls = () => (globalThis.fetch as unknown as { mock: { calls: Array<{ arguments: [unknown] }> } }).mock.calls
+  const before = calls().length
+
+  const one = await listMachines(apis, now, "P-04")
+  assert.deepEqual(one.machines, fleet.machines.filter((machine) => machine.machine === "P-04"))
+
+  const urls = calls().slice(before).map((call) => new URL(String(call.arguments[0])))
+  const read = urls.map((url) => decodeURIComponent(url.pathname)).filter((path) => path.startsWith("/timeseries/"))
+  assert.ok(read.length > 0)
+  assert.ok(read.every((path) => path.includes("/machines/P-04/")), read.join("\n"))
+  for (const url of urls.filter((one) => one.pathname === "/alerts/pairs" || one.pathname === "/jobOrders")) {
+    assert.equal(url.searchParams.get("mId"), "P-04", url.pathname)
+  }
+})
+
+test("a machine that is not there names the machines there are, though it was read alone", async () => {
+  publishing({
+    "machines/P-04/umati/Connection/State": [{ at: hoursAgo(1), value: "Running" }],
+    "machines/P-04/umati/Connection/Heartbeat": heartbeats(1),
+  })
+  await assert.rejects(showMachine(apis, "Z-99", 1, now), /No machine "Z-99" published a value in the last 24 hours. Machines that did: P-04./)
+})

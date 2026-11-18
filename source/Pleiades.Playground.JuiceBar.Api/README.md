@@ -48,7 +48,7 @@ reaches the service only while sign-in is off.
 
 | Route | |
 |---|---|
-| `GET /drinks` | The drinks the machine can mix now. |
+| `GET /drinks` | The drinks the machine can mix now, each with its colour, the picture of a glass its author chose, and its ingredients, each with its colour and whether its bottle runs low (see below). |
 | `GET /drinks/{id}` | One drink. |
 | `GET /status` | Connection, production state, progress, queue, pumps and warnings. For a machine that is switched off: not connected, and no pumps. |
 | `GET /orders/{orderNumber}` | One order with its state and its place in the queue. |
@@ -76,6 +76,11 @@ Add `juicebar=http://juicebar-api:8080/mcp` to `APP_MCP_SERVERS` in `.env`, and 
 is, and orders a drink when a person asks for one. The chat has no sign-in, so everyone who reaches the app
 can order then.
 
+For the result of `juicebar_drinks_list` the chat draws the drink card: the drinks whose bottles do not warn,
+each in its glass, one to pick, and a button that orders it. The button orders at once, without a question
+of the language model, over the same MCP server; the card then follows the order (`juicebar_order_get`, once a
+second) and shows the glass waiting for the start button, filling while the pumps run, and full.
+
 ## Values
 
 SI units, in the answers of REST and MCP and on the broker.
@@ -84,6 +89,15 @@ SI units, in the answers of REST and MCP and on the broker.
 - `bottleVolumeCubicMetre` is the configured size of a full bottle; the machine keeps it in millilitre. It is
   not a fill level: the machine measures none. `amountWarning` says that a bottle runs low.
 - States are the words of MixerControl, unchanged: `waitingOrder`, `waitingStart`, `processingOrder`, ...
+- A drink and an ingredient carry the colour the marketplace shows them in, as `#rrggbb`; a colour in any
+  other form is left out. Anyone in the network of the machine can publish a recipe, so a display takes these
+  values as they are checked here, never as markup.
+- `picture` names the picture of a glass the author of a drink chose in the marketplace, by the id of the
+  first group of its SVG (`GET /api/drinks/{id}/image` of MixerControl, read once per drink): `AkiSchorle` is
+  the one a recipe gets without a choice, `_22` a cocktail glass, `_63` a margarita glass, `_2` and `_6` a
+  long drink with a straw. The service does not interpret it.
+- `runsLow` of an ingredient is the `amountWarning` of the pump that holds its bottle; null while the warnings
+  are not known, because the machine sends them only over its socket.
 
 ## On the broker
 
