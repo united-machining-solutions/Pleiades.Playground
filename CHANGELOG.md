@@ -39,8 +39,7 @@ All notable changes are documented here. The format follows
   source yet and stand on the page as such. The page reads the job orders from the new tool
   `genui_job_order_list` of `genui-mcp`, the job orders on the lists of the machines from the Events API, so
   they stand also after a reload or a reconnect; a job order the planner took back before it ran is left out.
-  It is the first showcase: only a stack started with `APP_SHOWCASES` set has the page and its entry in the
-  sidebar.
+  It is a page of the app with its entry in the sidebar, not a showcase: it shows only values the stack has.
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
