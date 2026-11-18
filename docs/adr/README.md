@@ -10,7 +10,7 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | ADR | Title | Status |
 |---|---|---|
 | [0001](0001-monorepo-layout.md) | Monorepo layout: `source/`, `apps/`, `packages/`, `contracts/` | accepted |
-| [0002](0002-si-units-joule-and-one.md) | SI units on the wire: energy in joule, fractions in `one` | accepted |
+| [0002](0002-si-units-joule-and-one.md) | SI units on the wire: energy in joule, fractions in `one` | accepted, amended by 0017 |
 | [0003](0003-naming.md) | Names: `Pleiades.Playground.<Area>.<Part>` | accepted |
 | [0004](0004-licence-and-contributions.md) | Apache-2.0, CC BY 4.0 and DCO | accepted |
 | [0005](0005-data-model-as-submodule.md) | The data model is a submodule, the binding is ours | superseded by 0006 |
@@ -25,3 +25,4 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0014](0014-a-page-from-the-chat-is-a-recipe-kept-in-the-browser.md) | A page from the chat is a recipe, kept in the browser | proposed |
 | [0015](0015-the-binding-of-machines-follows-the-data-model.md) | The tree of machines on the broker follows the data model exactly | proposed |
 | [0016](0016-blazor-for-the-page-of-a-dotnet-service.md) | A .NET service draws its own page with Blazor (an exception for the cutting simulator only) | rejected |
+| [0017](0017-the-words-of-a-tool-result-are-a-display.md) | The words of a tool result may name the unit people use | proposed |
