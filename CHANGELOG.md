@@ -534,6 +534,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Example app and generative UI backend: the demo stays quick with many machines. Live values draws its graphs
+  at most twice a second and only the graphs whose values changed, instead of all of them for every message of
+  the broker. `genui_machine_show` reads the one machine it shows instead of the whole fleet, so Charts, which asks
+  for every machine, no longer grows with the square of the machines. A kept page or one opened from a link stands
+  at once and draws each part when its answer comes. The server of the app keeps one connection to the backend.
 - OPC UA adapter: the alarms of a machine in `urn:umati2:datamodel:opcua` reach
   `umati/Notification/ActiveAlerts` and `events/notifications`. The adapter reads the list
   `Notification.ActiveAlerts` of that namespace, decodes `DataType.Alert` itself and raises and clears an alert

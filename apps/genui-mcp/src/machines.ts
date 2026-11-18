@@ -101,7 +101,12 @@ function newest(instants: ReadonlyArray<string | null>): string | null {
   )
 }
 
-export async function listMachines(apis: Apis, now = new Date()): Promise<MachineList> {
+/**
+ * What every machine does now; with `only`, what that one machine does, read without the others: a
+ * page that shows each machine asks for each, and reading the whole fleet for each would grow with
+ * the square of the machines.
+ */
+export async function listMachines(apis: Apis, now = new Date(), only?: string): Promise<MachineList> {
   const windowStart = secondsBefore(now, WINDOW_SECONDS)
   // The values just before the window say what held and whether the machine was there where it begins.
   const readFrom = secondsBefore(windowStart, SILENT_AFTER_SECONDS)
@@ -109,15 +114,17 @@ export async function listMachines(apis: Apis, now = new Date()): Promise<Machin
 
   const [topics, open, jobOrders, ...series] = await Promise.all([
     listTopics(apis, horizon, now),
-    readOpenNotifications(apis, horizon, now),
-    readRunningJobOrders(apis),
-    ...names.map((name) => readValues(name)(apis, `machines/*/${paths[name]}`, readFrom, now)),
+    readOpenNotifications(apis, horizon, now, only),
+    readRunningJobOrders(apis, only),
+    ...names.map((name) => readValues(name)(apis, `machines/${only ?? "*"}/${paths[name]}`, readFrom, now)),
   ])
   const inWindow = Object.fromEntries(names.map((name, index) => [name, series[index] ?? []])) as Record<
     ReadingName,
     Array<Series>
   >
-  const machineIds = [...new Set(topics.flatMap((topic) => machineOf(topic) ?? []))].sort()
+  const machineIds = [...new Set(topics.flatMap((topic) => machineOf(topic) ?? []))]
+    .filter((id) => only === undefined || id === only)
+    .sort()
 
   const machines = await Promise.all(
     machineIds.map(async (id): Promise<Machine> => {
@@ -238,10 +245,12 @@ export async function showMachine(
   now = new Date(),
 ): Promise<MachineShow> {
   const from = secondsBefore(now, hours * 60 * 60)
-  const [list, spans] = await Promise.all([listMachines(apis, now), readSpans(apis, machine, from, now)])
+  const [list, spans] = await Promise.all([listMachines(apis, now, machine), readSpans(apis, machine, from, now)])
   const found = list.machines.find((one) => one.machine === machine)
   if (!found) {
-    const known = list.machines.map((one) => one.machine).join(", ") || "none"
+    // The list was read for this machine only; the machines there are come from the topics.
+    const topics = await listTopics(apis, secondsBefore(now, HORIZON_SECONDS), now)
+    const known = [...new Set(topics.flatMap((topic) => machineOf(topic) ?? []))].sort().join(", ") || "none"
     throw new Error(`No machine "${machine}" published a value in the last 24 hours. Machines that did: ${known}.`)
   }
   return {

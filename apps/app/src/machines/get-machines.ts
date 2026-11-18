@@ -20,6 +20,7 @@ import {
   TRULASER_SERIES_TOOL,
   TRULASER_TIMELINE_TOOL,
 } from "./card-tools.ts"
+import { Refused, keptClient } from "./kept-client.ts"
 
 // The values come from the generative UI backend. These functions run on the server of the app:
 // the browser never talks to the backend itself.
@@ -33,23 +34,20 @@ function connect() {
   return createMCPClient<typeof server>({ transport: { type: "http", url } })
 }
 
-/** A tool that answered, but without values. Its message is the sentence the backend gave as the reason. */
-export class Refused extends Error {}
+export { Refused }
+
+/** The one connection of the server of the app to the backend, kept between questions. */
+const backend = keptClient(connect)
 
 /**
- * Asks the backend and closes the connection again. If there are no values, the error is a
- * sentence that names who did not answer: the backend names its APIs, this function the backend.
+ * Asks the backend on the kept connection. If there are no values, the error is a sentence that
+ * names who did not answer: the backend names its APIs, this function the backend.
  */
 export async function ask<TValues>(
   read: (backend: Awaited<ReturnType<typeof connect>>) => Promise<TValues>,
 ): Promise<Answer<TValues>> {
   try {
-    const backend = await connect()
-    try {
-      return { values: await read(backend), error: null }
-    } finally {
-      await backend.close()
-    }
+    return { values: await backend(read), error: null }
   } catch (error) {
     if (error instanceof Refused) return { values: null, error: error.message }
     return { values: null, error: `The generative UI backend did not answer: ${reasonOf(error)}.` }

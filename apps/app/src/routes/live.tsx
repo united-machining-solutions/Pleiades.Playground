@@ -1,12 +1,13 @@
 import { clock } from "@pleiades/cards/machine/format.ts"
 import { labelOf } from "@pleiades/cards/machine/in-words.ts"
+import type { MachineMeasurements, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import { MeasurementGraph } from "@pleiades/cards/measurement/measurement-graph.tsx"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { createFileRoute } from "@tanstack/react-router"
 import { GaugeIcon } from "lucide-react"
-import { useMemo } from "react"
+import { memo, useMemo } from "react"
 import type { ReactNode } from "react"
 
 import { NoAnswer } from "@/components/no-answer.tsx"
@@ -117,18 +118,68 @@ function LiveValues() {
       </ToggleGroup>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,28rem),1fr))] gap-3">
         {quantities.map((one) => (
-          <MeasurementGraph
+          <QuantityGraph
             key={one.quantity}
-            series={{ ...one, lines: one.lines.filter((line) => shown.includes(line.machine)), from, to, instants }}
-            // Every machine, chosen or not, so that each keeps its colour.
+            quantity={one}
+            from={from}
+            to={to}
+            instants={instants}
             machines={machines}
-            current={now.filter((measured) => shown.includes(measured.machine))}
+            shown={shown}
+            current={now}
           />
         ))}
       </div>
     </Page>
   )
 }
+
+type QuantityGraphProps = {
+  quantity: MeasurementSeries["quantities"][number]
+  from: string
+  to: string
+  instants: MeasurementSeries["instants"]
+  machines: ReadonlyArray<string>
+  shown: ReadonlyArray<string>
+  current: ReadonlyArray<MachineMeasurements>
+}
+
+/** What the title of a graph says now: the value of its quantity at each machine. */
+function nowOf(current: ReadonlyArray<MachineMeasurements>, quantity: string): string {
+  return current
+    .map((one) => {
+      const measured = one.measurements.find((measurement) => measurement.quantity === quantity)
+      return measured ? `${one.machine}=${String(measured.value)}|${measured.at}|${measured.stale}` : ""
+    })
+    .join(";")
+}
+
+/**
+ * One graph. A message or a tick of the clock changes one quantity at a time, or none: a graph
+ * whose line, hours and values of now stay as they were is not drawn again, and one whose values of
+ * now changed draws its title again but not its lines (`MeasurementGraph`). Drawing all of them for
+ * every message kept the browser busy most of the time.
+ */
+const QuantityGraph = memo(
+  function QuantityGraph({ quantity, from, to, instants, machines, shown, current }: QuantityGraphProps) {
+    return (
+      <MeasurementGraph
+        series={{ ...quantity, lines: quantity.lines.filter((line) => shown.includes(line.machine)), from, to, instants }}
+        // Every machine, chosen or not, so that each keeps its colour.
+        machines={machines}
+        current={current.filter((measured) => shown.includes(measured.machine))}
+      />
+    )
+  },
+  (before, after) =>
+    before.quantity === after.quantity &&
+    before.from === after.from &&
+    before.to === after.to &&
+    before.instants === after.instants &&
+    before.machines.join() === after.machines.join() &&
+    before.shown.join() === after.shown.join() &&
+    nowOf(before.current, before.quantity.quantity) === nowOf(after.current, after.quantity.quantity),
+)
 
 function Page({ line, children }: { line?: string; children: ReactNode }) {
   return (
