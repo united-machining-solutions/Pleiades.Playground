@@ -75,11 +75,12 @@ async function round(
   messages: ReadonlyArray<unknown>,
   emit: (event: TurnEvent) => void,
   signal: AbortSignal,
+  last: boolean,
 ): Promise<{ text: string; calls: Array<Call> }> {
   const answer = await fetch(`${models.baseURL}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${models.apiKey}` },
-    body: JSON.stringify({ model: models.chat, stream: true, max_tokens: MOST_TOKENS, messages, tools: TITAN_TOOLS, ...atOnce(models.chat) }),
+    body: JSON.stringify({ model: models.chat, stream: true, max_tokens: MOST_TOKENS, messages, tools: TITAN_TOOLS, ...(last ? { tool_choice: "none" } : {}), ...atOnce(models.chat) }),
     signal,
   })
   if (!answer.ok || !answer.body) throw new Error(`The gateway answered ${answer.status}`)
@@ -131,7 +132,8 @@ export async function answer(
   try {
     const messages: Array<unknown> = [{ role: "system", content: instructionsOf(await hallNow(), timeZone) }, ...conversation]
     for (let asked = 0; asked < MOST_ROUNDS; asked++) {
-      const { text, calls } = await round(models, messages, emit, signal)
+      // In the last round the model has no tool left: it answers with what it read.
+      const { text, calls } = await round(models, messages, emit, signal, asked === MOST_ROUNDS - 1)
       if (calls.length === 0) break
       messages.push({
         role: "assistant",

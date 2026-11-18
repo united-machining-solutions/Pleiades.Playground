@@ -8,6 +8,7 @@ import type { Conversation } from "@/showcases/titan/conversation.ts"
 import "@/showcases/titan/titan.css"
 import {
   canListen,
+  closeMicrophone,
   listen,
   remembering,
   sayNext,
@@ -166,10 +167,20 @@ function Assistant() {
   // Answers are read aloud once Titan is started, while it does not pause and its tab is in front.
   const mayTalk = started && !paused && inFront
   latest.current.mayTalk = mayTalk
+  useEffect(() => setVoiceEnabled(mayTalk), [mayTalk])
+  // Behind another tab Titan falls silent at once; in a pause it still says that it pauses.
   useEffect(() => {
-    setVoiceEnabled(mayTalk)
-    return () => setVoiceEnabled(false)
-  }, [mayTalk])
+    if (!inFront) stopSpeaking()
+  }, [inFront])
+  // The page is left: nothing sounds on, and the microphone is let go.
+  useEffect(
+    () => () => {
+      setVoiceEnabled(false)
+      stopSpeaking()
+      closeMicrophone()
+    },
+    [],
+  )
 
   const pause = () => {
     setPaused(true)

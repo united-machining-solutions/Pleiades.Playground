@@ -47,10 +47,12 @@ export function useVoiceState(): VoiceState {
   )
 }
 
-/** Turns reading aloud on or off. Turning it off stops what is being read. */
+/**
+ * Turns reading answers aloud on or off. What sounds now goes on: Titan still says that it pauses. To
+ * fall silent at once, call `stopSpeaking`.
+ */
 export function setVoiceEnabled(on: boolean) {
   enabled = on
-  if (!on) stopSound()
 }
 
 export function voiceEnabled(): boolean {
@@ -138,6 +140,11 @@ function stopSound() {
  */
 export function sayNext(text: string): Promise<void> {
   for (const sentence of sentencesOf(text)) queue.push({ sentence })
+  // The sentence that is next is made as soon as it is known, also when it arrives while another sounds:
+  // otherwise each sentence of an answer that still arrives would wait for its sound after the one before.
+  const voice = currentVoice()
+  const next = queue[0]
+  if (voice && next) next.sound ??= make(voice, next.sentence)
   saying ??= sayQueue(turn)
   return saying
 }
@@ -315,6 +322,18 @@ export async function listen(): Promise<string> {
   } finally {
     setState(thinking ? "thinking" : "idle")
   }
+}
+
+/**
+ * Lets go of the microphone: the page is left. A recording that runs is ended, and the browser no longer
+ * shows the microphone as in use.
+ */
+export function closeMicrophone() {
+  stopWanted = true
+  if (recorder?.state === "recording") recorder.stop()
+  recorder = undefined
+  microphone?.getTracks().forEach((track) => track.stop())
+  microphone = undefined
 }
 
 /** Ends the recording, as when the key is let go: what was said is recognised then. */

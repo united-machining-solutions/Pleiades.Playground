@@ -57,9 +57,19 @@ export const TITAN_TOOLS: ReadonlyArray<ToolDefinition> = [
   },
 ]
 
+/** The day and the time as the person's clock shows them; a time zone the browser made up is left out. */
+function clockOf(now: Date, timeZone: string | undefined): string {
+  const format = { weekday: "long", hour: "2-digit", minute: "2-digit" } as const
+  try {
+    return now.toLocaleString("de-DE", { ...format, timeZone })
+  } catch {
+    return now.toLocaleString("de-DE", format)
+  }
+}
+
 /** The instructions of a turn: Titan's, the time, and the hall as it is now. */
 export function instructionsOf(hall: string | undefined, timeZone: string | undefined, now = new Date()): string {
-  const clock = now.toLocaleString("de-DE", { timeZone, weekday: "long", hour: "2-digit", minute: "2-digit" })
+  const clock = clockOf(now, timeZone)
   return [
     titanInstructions,
     `It is ${clock}.`,
@@ -69,15 +79,30 @@ export function instructionsOf(hall: string | undefined, timeZone: string | unde
   ].join("\n\n")
 }
 
-/** The conversation a browser sent, as far as it is one: the roles and texts, the last twenty. */
+/** The largest body of a turn the server reads: the conversation below fits many times over. */
+export const MOST_BODY_BYTES = 256 * 1024
+/** The last messages of a conversation that go to the model, */
+const MOST_MESSAGES = 20
+/** each cut to this many characters: a spoken question or answer is far shorter, */
+const MOST_CHARACTERS_EACH = 2_000
+/** and all of them together to this many, about 3 000 tokens: the oldest are left out first. */
+const MOST_CHARACTERS = 12_000
+
+/**
+ * The conversation a browser sent, as far as it is one: the roles and texts of its last messages, bounded
+ * each and as a whole, since the route has no sign-in and every turn is paid for. Undefined unless it ends
+ * with a question.
+ */
 export function conversationOf(body: unknown): Array<TurnMessage> | undefined {
   const sent = (body as { messages?: unknown } | null)?.messages
   if (!Array.isArray(sent)) return undefined
-  const messages = sent.flatMap((one: { role?: unknown; content?: unknown } | null) =>
+  const messages = sent.slice(-MOST_MESSAGES).flatMap((one: { role?: unknown; content?: unknown } | null) =>
     (one?.role === "user" || one?.role === "assistant") && typeof one.content === "string" && one.content.trim() !== ""
-      ? [{ role: one.role, content: one.content.slice(0, 4_000) } as TurnMessage]
+      ? [{ role: one.role, content: one.content.slice(0, MOST_CHARACTERS_EACH) } as TurnMessage]
       : [],
   )
   if (messages.at(-1)?.role !== "user") return undefined
-  return messages.slice(-20)
+  let size = messages.reduce((sum, one) => sum + one.content.length, 0)
+  while (messages.length > 1 && size > MOST_CHARACTERS) size -= (messages.shift() as TurnMessage).content.length
+  return messages
 }

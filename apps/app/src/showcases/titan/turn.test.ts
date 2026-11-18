@@ -24,3 +24,16 @@ test("Titan has four tools of the generative UI backend, by their names there", 
     ["genui_machine_list", "genui_machine_show", "genui_notification_list", "genui_energy_show"],
   )
 })
+
+test("a conversation is bounded: its last messages, each cut, and the oldest left out when it is too long", () => {
+  const long = "a".repeat(5_000)
+  const many = Array.from({ length: 30 }, (_, index) => ({ role: index % 2 === 0 ? "user" : "assistant", content: long }))
+  const kept = conversationOf({ messages: [...many, { role: "user", content: "Und jetzt?" }] }) ?? []
+  assert.equal(kept.at(-1)?.content, "Und jetzt?")
+  assert.ok(kept.every((one) => one.content.length <= 2_000))
+  assert.ok(kept.reduce((sum, one) => sum + one.content.length, 0) <= 12_000)
+})
+
+test("a time zone that is none does not stop the turn", () => {
+  assert.match(instructionsOf("P-04 stands.", "Not/AZone", new Date("2026-11-19T09:30:00Z")), /It is /)
+})

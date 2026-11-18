@@ -1,5 +1,5 @@
 // An answer of Titan, as the screen shows it next to Titan. The model writes one text (see the
-// instructions in chat/assistant.server.ts):
+// instructions in persona.ts):
 //
 //   P-04 steht, weil der Spindelantrieb ausgefallen ist.
 //   Empfehlung: Ruf die Instandhaltung an P-04.

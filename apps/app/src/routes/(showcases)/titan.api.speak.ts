@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 
+import { readBodyText } from "@/chat/body.ts"
 import { titanModels } from "@/showcases/titan/gateway.server.ts"
 import { MAX_SENTENCE, speakableText } from "@/showcases/titan/voice/speech.ts"
 
@@ -15,7 +16,14 @@ const VOICE = "alloy"
 async function speak({ request }: { request: Request }) {
   const models = await titanModels()
   if (!models?.speech) return Response.json({ error: "No speech model at the gateway" }, { status: 503 })
-  const body = (await request.json().catch(() => undefined)) as { text?: unknown } | undefined
+  // A sentence is at most MAX_SENTENCE characters; a body far over that did not come from the page.
+  const sent = await readBodyText(request, 16 * 1024)
+  let body: { text?: unknown } | undefined
+  try {
+    body = sent === null ? undefined : (JSON.parse(sent) as { text?: unknown })
+  } catch {
+    body = undefined
+  }
   const text = speakableText(body?.text)
   if (text === undefined) {
     return Response.json({ error: `Send { text }, one sentence of at most ${MAX_SENTENCE} characters` }, { status: 400 })
@@ -24,7 +32,7 @@ async function speak({ request }: { request: Request }) {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${models.apiKey}` },
     body: JSON.stringify({ model: models.speech, input: text, voice: VOICE, response_format: "wav" }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.any([request.signal, AbortSignal.timeout(30_000)]),
   }).catch((error: unknown) => error as Error)
   if (answer instanceof Error) {
     const cause = (answer as { cause?: { code?: string } }).cause?.code

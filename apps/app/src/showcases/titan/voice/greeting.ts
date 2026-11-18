@@ -1,5 +1,5 @@
-// What Titan says when someone steps in front of the camera: by name if the face is known, and
-// straight to the point if a machine stands still with an error.
+// What Titan says when it is started: by name if it is given one, and straight to the point if a
+// machine stands still with an error.
 
 /** "P-04", "P-04 und P-07", "M-02, P-04 und P-07". */
 export function machinesInWords(machines: ReadonlyArray<string>): string {

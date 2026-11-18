@@ -57,7 +57,7 @@ export function atOnce(model: string): Record<string, unknown> {
 const RETRY_AFTER_MS = 30_000
 let kept: { key: string; models: Promise<TitanModels | undefined>; until: number } | undefined
 
-/** Titan's models, asked once and kept; a gateway that did not answer is asked again after half a minute. */
+/** Titan's models, asked once and kept; a gateway that did not answer, or has no chat model, is asked again after half a minute. */
 export function titanModels(env: Env = process.env): Promise<TitanModels | undefined> {
   const key = JSON.stringify([env.LLM_BASE_URL, env.LLM_API_KEY])
   if (kept && kept.key === key && Date.now() < kept.until) return kept.models
@@ -65,7 +65,8 @@ export function titanModels(env: Env = process.env): Promise<TitanModels | undef
   const mine = { key, models, until: Infinity }
   kept = mine
   void models.then((found) => {
-    if (found === undefined) mine.until = Date.now() + RETRY_AFTER_MS
+    // Also a gateway that answered without a model for chat: it may list one a moment later.
+    if (found?.chat === undefined) mine.until = Date.now() + RETRY_AFTER_MS
   })
   return models
 }

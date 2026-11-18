@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router"
 
+import { readBodyText } from "@/chat/body.ts"
 import { titanModels } from "@/showcases/titan/gateway.server.ts"
 import { answer } from "@/showcases/titan/turn.server.ts"
-import { conversationOf } from "@/showcases/titan/turn.ts"
+import { MOST_BODY_BYTES, conversationOf } from "@/showcases/titan/turn.ts"
 import type { TurnEvent } from "@/showcases/titan/turn.ts"
 
 // A turn of the conversation with Titan (showcases/titan/turn.server.ts): the browser sends the
@@ -16,7 +17,14 @@ async function turn({ request }: { request: Request }) {
   const models = await titanModels()
   const chat = models?.chat
   if (!models || !chat) return Response.json({ error: "No language model at the gateway" }, { status: 503 })
-  const body = (await request.json().catch(() => undefined)) as { timeZone?: unknown } | undefined
+  const sent = await readBodyText(request, MOST_BODY_BYTES)
+  if (sent === null) return Response.json({ error: "The conversation is too large" }, { status: 413 })
+  let body: { timeZone?: unknown } | undefined
+  try {
+    body = JSON.parse(sent) as { timeZone?: unknown }
+  } catch {
+    body = undefined
+  }
   const conversation = conversationOf(body)
   if (!conversation) return Response.json({ error: "Send { messages }, the last one a question" }, { status: 400 })
   const timeZone = typeof body?.timeZone === "string" ? body.timeZone : undefined
