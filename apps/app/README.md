@@ -49,8 +49,9 @@ harness.
 - **Chat** is the panel on the right. It works like a chat app on a phone: a list and a chat, with a way
   back. The list, headed "Chats", shows the chats so far and, below them, the field that begins a new
   chat, with questions to begin with. A chat says in its head what it is called, on one line and cut where it
-  is too long, and "All chats" at the left of the head leads back to the list; there is no "New chat" in a
-  chat, a new one begins in the field of the list. A chat is called by its first question, up to 80
+  is too long, and "All chats" at the left of the head leads back to the list. "New chat", the plus in the head
+  of the list and of every chat, opens a new chat with no question yet, its field ready to write in; after the
+  first question the field of the chat keeps the cursor. A chat is called by its first question, up to 80
   characters, which the panel shows from the moment it is asked. Without a language model the head says
   "Chat". The panel opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
@@ -269,7 +270,8 @@ APP_SHOWCASES=true pnpm --filter @pleiades/app build
   which also cancels the turn in the harness (`createHarnessClient(...).cancel()`), and holds its head:
   the title of the view, or in a chat a way back and the name of the chat; `chat-name.ts` next to it says
   what a chat is called (`chatName`, `nameOfQuestion`), `ask.ts` which chat the panel shows, in the URL
-  (`?chat=`: `new` is the list), and where the first question of a new chat waits,
+  (`?chat=`: `all` is the list, `new` a new chat with no question yet), and where the first question of a new
+  chat waits,
   `save-as-page.tsx` the row under an answer with "Save as page" (chrome of the app, never part of a card),
   `propose-page.ts` the one tool of the app the model gets, `app_page_propose`, and `proposed-page.tsx` the
   proposal the chat draws for its result,

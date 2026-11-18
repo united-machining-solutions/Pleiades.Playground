@@ -318,6 +318,10 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Example app: "New chat" is back in the head of the chat panel, as a plus in the list and in every chat. It
+  opens a new chat with no question yet and the cursor in its field; the list stays behind "All chats". After
+  the first question asked in the panel, the field of the new chat keeps the cursor, so the next question
+  follows without a click. In the URL the list is `?chat=all` now, and `?chat=new` is the new chat.
 - Example app: Home (`/`) shows where the machines stand, by site and hall; "Needs you" keeps what it showed first.
   The tiles of the running machines are gone. `/sites` leads to `/`.
 - Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
