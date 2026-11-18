@@ -50,7 +50,7 @@ const why: Partial<Record<State, (machine: string) => string>> = {
 }
 
 /**
- * A machine that needs someone, or is in setup: one row of a list, with the way to its page.
+ * A machine: one row of a list, with the way to its page.
  * With `onAsk`, a machine that needs someone offers the question why. The chat stays open while
  * the page changes. With `name`, the name people know the machine by is its title, and what it
  * is comes first in the line below. `what` says what it is where its values do not, as for a
@@ -123,35 +123,5 @@ export function MachineRow({
         )}
       </ItemActions>
     </Item>
-  )
-}
-
-/**
- * A running machine: a small tile that leads to its page. An open warning shows as a sign on it,
- * the machine keeps running.
- */
-export function MachineTile({ machine, asOf }: { machine: Machine; asOf: string }) {
-  const told = tell(machine, "running")
-  const warned = told.detail !== ""
-  return (
-    <li>
-      {/* Tiles of one row are equally tall: keep the content at the top, where the sign is. */}
-      <Item
-        variant="outline"
-        size="sm"
-        // The chat stays open while the page changes.
-        render={<Link to="/sites/$machine" params={{ machine: machine.machine }} search={chatOf} />}
-        className="h-full items-start"
-      >
-        <ItemMedia variant="icon" className="h-5">
-          <StateSymbol state={warned ? "warning" : "running"} label={warned ? "Warning" : stateLabel.running} />
-        </ItemMedia>
-        <ItemContent>
-          <ItemTitle>{titleOf(machine)}</ItemTitle>
-          <ItemDescription>{warned ? told.detail : told.message}</ItemDescription>
-        </ItemContent>
-        <Since told={told} asOf={asOf} />
-      </Item>
-    </li>
   )
 }
