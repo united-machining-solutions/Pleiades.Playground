@@ -71,6 +71,12 @@ jobs:
           - image: pleiades.playground.app
             context: .
             file: apps/app/Dockerfile
+          # The same app, built with its showcases: pages made for one demo or one fair. The image above has
+          # nothing of them in it (docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md).
+          - image: pleiades.playground.app.showcases
+            context: .
+            file: apps/app/Dockerfile
+            build-args: SHOWCASES=true
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-qemu-action@v4
@@ -111,6 +117,7 @@ jobs:
             VERSION=${{ steps.version.outputs.value }}
             REVISION=${{ github.sha }}
             SOURCE=${{ github.server_url }}/${{ github.repository }}
+            ${{ matrix.build-args }}
           sbom: true
           provenance: mode=max
       # GitHub stores attestations for public repositories only (private ones need an enterprise plan).

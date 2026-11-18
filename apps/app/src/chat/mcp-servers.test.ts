@@ -56,6 +56,14 @@ test("what was left out is named, without its address, so a typing mistake shows
   assert.deepEqual(leftOut({}), [])
 })
 
+test("the optional docs server keeps its tools and adds evidence instructions", () => {
+  const settings = { APP_MCP_SERVERS: "docs=http://127.0.0.1:3202/mcp" }
+  assert.equal(mcpServers(settings).docs?.toolName({ name: "docs_search" }), "docs_search")
+  assert.match(furtherInstructions(settings) ?? "", /docs_read_page/)
+  assert.match(furtherInstructions(settings) ?? "", /filename and page/)
+  assert.doesNotMatch(furtherInstructions({ APP_MCP_SERVERS: "other=http://other/mcp" }) ?? "", /docs_search/)
+})
+
 const two = { APP_MCP_SERVERS: "ultimaker=http://ultimaker-api:8080/mcp,juicebar=http://juicebar-api:8080/mcp" }
 const names = ["ultimaker", "juicebar"]
 
@@ -153,4 +161,32 @@ test("the servers a chat switched off are read from what the harness says about 
   assert.deepEqual(switchedOffOf({}), [])
   assert.deepEqual(switchedOffOf(null), [])
   assert.deepEqual(switchedOffOf({ config: "not a list" }), [])
+})
+
+
+test("documentation instructions and tools follow the live per-chat switch", () => {
+  const settings = { APP_MCP_SERVERS: "docs=http://docs/mcp,juicebar=http://juicebar/mcp" }
+  const values = new Map<string, unknown>()
+  const chat = serverSwitch(settings).forChat(key => values.get(key))
+  const tools = [from("genui", "genui_machine_list"), from("docs", "docs_search"), from("docs", "docs_read_page"), from("juicebar", "juicebar_order")]
+  const [prompt] = chat.prompts
+  assert.match(prompt(), /docs_read_page/)
+  assert.match(prompt(), /filename and page/)
+  assert.doesNotMatch(prompt(), /draws nothing/)
+  assert.equal(chat.prepareTools({ tools }).length, 4)
+
+  values.set("server.docs", false)
+  assert.doesNotMatch(prompt(), /docs_search|docs_read_page|documentation source/)
+  assert.match(prompt(), /juicebar/)
+  assert.deepEqual(chat.prepareTools({ tools }).map(tool => tool.name), ["genui_machine_list", "juicebar_order"])
+
+  values.set("server.juicebar", false)
+  assert.match(prompt(), /switched off in this chat/)
+  assert.doesNotMatch(prompt(), /docs_search|docs_read_page/)
+  assert.deepEqual(chat.prepareTools({ tools }).map(tool => tool.name), ["genui_machine_list"])
+
+  values.set("server.docs", true)
+  assert.match(prompt(), /docs_read_page/)
+  assert.doesNotMatch(prompt(), /juicebar/)
+  assert.deepEqual(chat.prepareTools({ tools }).map(tool => tool.name), ["genui_machine_list", "docs_search", "docs_read_page"])
 })

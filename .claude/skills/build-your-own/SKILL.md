@@ -103,6 +103,10 @@ what you assumed. For example:
   settings and a second view, and say that they can come next.
 - **What it leaves out.** Say the limit that matters: how far back it looks, what is not counted. The
   machines of the demo are simulated: if their values cannot answer the question for real, say that too.
+- **A showcase.** If the idea is for one demo or one fair, or needs made-up data, a named person, a camera
+  or a microphone, it is a showcase and not a page of the stack: say that the app alone will not have it,
+  and that it shows in a stack started with `APP_SHOWCASES=true`. `create-page` has how it is built.
+  A card is never a showcase.
 - **Nothing to build.** Give the answer itself if you have read it, and say where to see it: the address to
   open, or the question to ask the chat. Then ask whether that is what they were looking for.
 - **A source.** It is the bigger build, so say more: the stack does not have the data, a new source needs the

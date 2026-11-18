@@ -9,22 +9,24 @@ import { createFileRoute } from "@tanstack/react-router"
 import { MessageSquareWarningIcon } from "lucide-react"
 import { useState } from "react"
 
-import { instantOf, instants, parts, stationById } from "@/where-is-my-job/data.ts"
-import type { Instant } from "@/where-is-my-job/data.ts"
-import { FloorMap } from "@/where-is-my-job/floor-map.tsx"
-import type { Lens } from "@/where-is-my-job/floor-map.tsx"
-import { FloorPanel, MachinePanel, PartPanel, PartsTable } from "@/where-is-my-job/panels.tsx"
+import { instantOf, instants, parts, stationById } from "@/showcases/where-is-my-job/data.ts"
+import type { Instant } from "@/showcases/where-is-my-job/data.ts"
+import { FloorMap } from "@/showcases/where-is-my-job/floor-map.tsx"
+import type { Lens } from "@/showcases/where-is-my-job/floor-map.tsx"
+import { FloorPanel, MachinePanel, PartPanel, PartsTable } from "@/showcases/where-is-my-job/panels.tsx"
 
 /**
  * Where is My Job? A basis for discussion, not a page of the stack: it reads nothing from the
- * backend, and every value comes from the made-up shop floor in `src/where-is-my-job/data.ts`. It
- * shows the shop floor from above, one machine, and one part on its way, as three perspectives of
- * one picture. The chat does not know it.
+ * backend, and every value comes from the made-up shop floor in
+ * `src/showcases/where-is-my-job/data.ts`. It shows the shop floor from above, one machine, and one
+ * part on its way, as three perspectives of one picture. The chat does not know it.
  *
- * It names no entry in the sidebar, so the demo does not show made-up data next to the pages of the
- * stack: it is reached by its address, /where-is-my-job, and the breadcrumb calls it by its crumb.
+ * It is a showcase: the page is only in a build with the showcases (APP_SHOWCASES), and the folder
+ * `(showcases)` adds nothing to its address. It names no entry in the sidebar either, so a demo does
+ * not show made-up data next to the pages of the stack: it is reached by its address,
+ * /where-is-my-job, and the breadcrumb calls it by its crumb.
  */
-export const Route = createFileRoute("/where-is-my-job")({
+export const Route = createFileRoute("/(showcases)/where-is-my-job")({
   staticData: { crumb: "Where is My Job?" },
   component: WhereIsMyJob,
 })

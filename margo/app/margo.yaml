@@ -159,6 +159,11 @@ parameters:
     targets:
       - pointer: LLM_API_KEY
         components: ["default"]
+  appMcpServers:
+    value: ""
+    targets:
+      - pointer: APP_MCP_SERVERS
+        components: ["default"]
 
 configuration:
   sections:
@@ -274,6 +279,14 @@ configuration:
         - parameter: llmApiKey
           name: API key of the LiteLLM gateway
           description: The key the gateway gave you. It stays on the device.
+          schema: optionalText
+        - parameter: appMcpServers
+          name: Further MCP servers
+          description: >-
+            Further MCP servers for the chat, as name=address, separated by commas. Use an address the app
+            reaches from its container. For the documentation app on this device:
+            docs=http://host.docker.internal:3202/mcp. Its MCP listener and published port must be reachable
+            from this container; a port published only on host loopback may not be reachable on Linux.
           schema: optionalText
   schema:
     - name: port

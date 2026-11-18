@@ -3,6 +3,7 @@ import { test } from "node:test"
 
 import type { UIMessage } from "@tanstack/ai-react"
 
+import { blocksOf } from "../chat/blocks.ts"
 import { jsonOf } from "../chat/tool-results.ts"
 import type { ChatTool } from "../chat/tool-results.ts"
 import { callsOfAnswer, keepOfAnswer, recipeOfAnswer } from "./from-answer.ts"
@@ -285,4 +286,12 @@ test("an answer is only what follows its own question", () => {
   ]
   assert.deepEqual(keepOfAnswer(messages, 2, tools, false)?.recipe.parts, [{ tool: "genui_machine_show", args: { machine: "P-04" } }])
   assert.deepEqual(keepOfAnswer(messages, 5, tools, false)?.recipe.parts, [{ tool: "genui_machine_show", args: { machine: "P-07" } }])
+})
+
+test("documentation references stay visible in chat but are not replayed as GenUI saved-page parts", () => {
+  const allTools: ReadonlyArray<ChatTool> = [...tools, { name: "docs_search", draw: () => "documentation source references", saveAsPage: false }]
+  const docs = [call("docs", "docs_search", { query: "CYCLE832" }), result("docs", '{"hits":[]}')]
+  assert.equal(blocksOf(docs, false, allTools).some(block => block.kind === "drawn" && block.node === "documentation source references"), true)
+  assert.equal(recipeOfAnswer("What does the manual say?", docs, allTools), null)
+  assert.deepEqual(callsOfAnswer([...docs, ...oneCard()], allTools), [{ tool: "genui_machine_show", args: { machine: "P-04" } }])
 })
