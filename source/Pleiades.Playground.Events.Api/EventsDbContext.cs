@@ -16,6 +16,6 @@ internal sealed class EventsDbContext(IMongoClient client, IOptions<MongoDbSetti
     private readonly IMongoDatabase _database = client.GetDatabase(options.Value.DatabaseName);
 
     /// <inheritdoc />
-    public IMongoCollection<NotificationEventDao> NotificationEvents
-        => _database.GetCollection<NotificationEventDao>(_settings.NotificationEventCollection);
+    public IMongoCollection<MachineEventDao> MachineEvents
+        => _database.GetCollection<MachineEventDao>(_settings.MachineEventCollection);
 }

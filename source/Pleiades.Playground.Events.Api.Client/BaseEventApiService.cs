@@ -49,7 +49,10 @@ public abstract class BaseEventApiService(HttpClient httpClient)
         }
         else
         {
-            throw new PleiadesEventPersistenceException($"{response.StatusCode} - writing to db failed: {response.Content}");
+            throw new PleiadesEventPersistenceException($"{response.StatusCode} - writing to db failed: {response.Content}")
+            {
+                StatusCode = response.StatusCode,
+            };
         }
     }
 

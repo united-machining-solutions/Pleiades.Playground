@@ -1,31 +1,21 @@
-import { applyHostFonts, useApp } from "@modelcontextprotocol/ext-apps/react"
-import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps/react"
+import { useApp } from "@modelcontextprotocol/ext-apps/react"
+import type { App } from "@modelcontextprotocol/ext-apps/react"
 import { machineShow, spanList } from "@pleiades/cards/machine/contract.ts"
 import type { MachineShow } from "@pleiades/cards/machine/contract.ts"
 import { MachineCard } from "@pleiades/cards/machine/machine-card.tsx"
 import type { Spans } from "@pleiades/cards/machine/state-band.tsx"
 import { useEffect, useState } from "react"
-import type { ReactNode } from "react"
 import { createRoot } from "react-dom/client"
 
 import { SPAN_LIST_TOOL } from "../src/cards/machine.names.ts"
+import { Note, takeFont } from "./host.tsx"
+import { shownFor } from "./shown.ts"
+import type { Shown } from "./shown.ts"
 import "./styles.css"
 
 // The machine card as an MCP App: the file a host loads from ui://genui/machine and shows with a
 // result of genui_machine_show. The host sends that result. This file checks it against the
 // contract of the card and draws the card, the same component the example application draws.
-
-type Shown = { values: MachineShow } | { note: string }
-
-/** What to draw for a result: the card, or a sentence if the result holds no card. */
-function shownFor(result: { isError?: boolean; content?: ReadonlyArray<unknown>; structuredContent?: unknown }): Shown {
-  const values = machineShow.safeParse(result.structuredContent)
-  if (values.success) return { values: values.data }
-  // A tool that failed says why in its first block of text.
-  const [first] = result.content ?? []
-  const said = typeof first === "object" && first !== null && "text" in first ? first.text : undefined
-  return { note: result.isError && typeof said === "string" ? said : "This result is not a machine card." }
-}
 
 /**
  * The spans of the band. They are not part of the result, because a language model reads that:
@@ -46,16 +36,8 @@ async function spansOf(app: App, { machine, history }: MachineShow): Promise<Spa
   }
 }
 
-/** The font of the host, so the card reads like the conversation around it. The colours stay the card's own. */
-function takeFont(context: McpUiHostContext | undefined) {
-  const fonts = context?.styles?.css?.fonts
-  if (fonts) applyHostFonts(fonts)
-  const sans = context?.styles?.variables?.["--font-sans"]
-  if (sans) document.documentElement.style.setProperty("--font-sans", sans)
-}
-
 function Machine() {
-  const [shown, setShown] = useState<Shown>()
+  const [shown, setShown] = useState<Shown<MachineShow>>()
   const [spans, setSpans] = useState<Spans>()
   const { app, isConnected, error } = useApp({
     appInfo: { name: "pleiades-machine-card", version: "0.1.0" },
@@ -63,7 +45,7 @@ function Machine() {
     // Before the handshake, so that no result is missed.
     onAppCreated(created) {
       created.addEventListener("toolresult", (result) => {
-        const next = shownFor(result)
+        const next = shownFor(result, machineShow, "a machine card")
         setShown(next)
         setSpans(undefined)
         if ("values" in next) void spansOf(created, next.values).then(setSpans)
@@ -79,10 +61,6 @@ function Machine() {
   // Nothing to show until the host sends the result.
   if (!shown) return null
   return "values" in shown ? <MachineCard {...shown.values} spans={spans} /> : <Note>{shown.note}</Note>
-}
-
-function Note({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-muted-foreground">{children}</p>
 }
 
 createRoot(document.getElementById("root")!).render(

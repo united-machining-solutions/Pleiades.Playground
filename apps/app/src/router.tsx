@@ -7,7 +7,10 @@ import type { Crumb, NavEntry } from "@/components/nav.ts"
 import { routeTree } from "./routeTree.gen"
 
 export function getRouter() {
-  return createRouter({ routeTree, scrollRestoration: true })
+  // `search.strict`: a link to a page carries the search that page validates and nothing else. The
+  // links of the app keep the chat open by carrying the search along; without this, the recipe of a
+  // page opened from a link (`/pages/open?r=`) would stay in the address of every page after it.
+  return createRouter({ routeTree, scrollRestoration: true, search: { strict: true } })
 }
 
 declare module "@tanstack/react-router" {

@@ -17,7 +17,6 @@
     <ProjectReference Include="..\Pleiades.Playground.Common.Pagination\Pleiades.Playground.Common.Pagination.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.Common.Json\Pleiades.Playground.Common.Json.csproj" />
     <ProjectReference Include="..\Pleiades.Playground.Common.RestApi\Pleiades.Playground.Common.RestApi.csproj" />
-    <ProjectReference Include="..\Pleiades.Playground.Notification.DataTransferObjects\Pleiades.Playground.Notification.DataTransferObjects.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,4 +1,5 @@
 import { Skeleton } from "@pleiades/ui/components/skeleton"
+import { timeTicks } from "../shared/time-ticks.ts"
 import type { MachineShow, Span, State } from "./contract.ts"
 import { clock, lasting } from "./format.ts"
 import { stateLabel } from "./state.ts"
@@ -8,12 +9,35 @@ import { StateSymbol } from "./state-symbol.tsx"
  * How a state looks as a band on a time axis. Never colour alone: an alarm and missing data are
  * hatched, a stop and setup carry an edge.
  */
-const band: Record<State, string> = {
+export const stateBand: Record<State, string> = {
   running: "bg-state-running",
   alarm: "band-alarm",
   stopped: "bg-state-stopped shadow-[inset_0_0_0_1px_var(--state-stopped-edge)]",
   setup: "bg-state-setup shadow-[inset_0_0_0_1px_var(--state-setup-edge)]",
   "no-data": "band-no-data",
+}
+
+/** How many times stand under a band at most: it is narrower than a graph. */
+const BAND_TIMES = 6
+
+/**
+ * The full hours or quarter hours under the band, each where it lies on it. A time too close to an
+ * end is left out, so it is not cut off; the ends are written above the band.
+ */
+function BandTimes({ from, to }: { from: string; to: string }) {
+  const [start, end] = [Date.parse(from), Date.parse(to)]
+  const placed = timeTicks(start, end, BAND_TIMES)
+    .map((at) => ({ at, share: (at - start) / (end - start) }))
+    .filter(({ share }) => share > 0.04 && share < 0.96)
+  return (
+    <div aria-hidden className="relative h-4 text-xs text-muted-foreground tabular-nums">
+      {placed.map(({ at, share }) => (
+        <span key={at} className="absolute -translate-x-1/2" style={{ left: `${share * 100}%` }}>
+          {clock(new Date(at).toISOString())}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 /**
@@ -44,12 +68,13 @@ export function StateBand({ history, spans }: { history: MachineShow["history"];
           {spans.map((span) => (
             <div
               key={span.from}
-              className={band[span.state]}
+              className={stateBand[span.state]}
               style={{ flexGrow: Date.parse(span.to) - Date.parse(span.from), flexBasis: 0 }}
             />
           ))}
         </div>
       )}
+      {spans && <BandTimes from={history.from} to={history.to} />}
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground tabular-nums">
         {history.totals.map(({ state, seconds }) => (
           <li key={state} className="flex items-center gap-1.5">

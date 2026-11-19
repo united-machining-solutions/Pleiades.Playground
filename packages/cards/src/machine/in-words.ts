@@ -13,17 +13,48 @@ function sinceWhen({ since, atLeast }: Told, asOf: string): string {
   return ` since ${atLeast ? "before " : ""}${written(since)}, ${atLeast ? "at least " : ""}${duration(since, asOf)}`
 }
 
+/** A machine in a title: its model and serial number, or its id where it reported neither. */
+export function titleOf(machine: Machine): string {
+  return [machine.identity.model, machine.identity.serialNumber].filter(Boolean).join(" ") || machine.machine
+}
+
+/**
+ * A machine in a label where only its id is known, as in a legend of measurements: its model and
+ * serial number, the last two parts of a machine id of the binding, `<manufacturer>_<model>_<serial
+ * number>`, in which `_` separates the parts and occurs in none. So `alcyone-machines_AX-400_P-04` is
+ * "AX-400 P-04", as `titleOf` writes it from the identification. An id of another shape stays as it is.
+ */
+export function labelOf(machineId: string): string {
+  const parts = machineId.split("_")
+  return parts.length === 3 && parts.every(Boolean) ? `${parts[1]} ${parts[2]}` : machineId
+}
+
+/** A machine by what it is, its manufacturer, model and serial number, and its id. */
+export function nameOf(machine: Machine): string {
+  const { manufacturer, model, serialNumber } = machine.identity
+  const named = [manufacturer, model, serialNumber].filter(Boolean).join(" ")
+  return named ? `${named} (${machine.machine})` : machine.machine
+}
+
+/** A job order with its quantity: `4711/01, 3 of 12`. */
+export function jobOrderInWords(jobOrder: NonNullable<Machine["jobOrder"]>): string {
+  const of = jobOrder.runsPlanned ? ` of ${jobOrder.runsPlanned}` : ""
+  const produced = jobOrder.producedQuantity === null ? "" : `, ${jobOrder.producedQuantity}${of}`
+  return `${jobOrder.jobOrderId}${produced}${jobOrder.state === "Interrupted" ? ", interrupted" : ""}`
+}
+
 /** What one machine does now, in a line. */
 export function machineInWords(machine: Machine, asOf: string): string {
   const state = stateOf(machine, asOf)
   const told = tell(machine, state, written)
   const warning = openWarning(machine)
-  const sentences = [`${machine.machine}: ${stateLabel[state]}${sinceWhen(told, asOf)}`]
-  // A running machine has nothing the matter: its program follows.
+  const sentences = [`${nameOf(machine)}: ${stateLabel[state]}${sinceWhen(told, asOf)}`]
+  // A running machine has nothing the matter: its work master follows.
   if (state !== "running") sentences.push(told.detail ? `${told.message} (${told.detail})` : told.message)
   else if (warning) sentences.push(`Warning: ${warning.title}`)
-  // Without data the program would be the last known one, not the present.
-  if (state !== "no-data" && machine.program.value) sentences.push(`Program ${machine.program.value}`)
+  // Without data the work master would be the last known one, not the present.
+  if (state !== "no-data" && machine.program.value) sentences.push(`Work master ${machine.program.value}`)
+  if (state !== "no-data" && machine.jobOrder) sentences.push(`Job order ${jobOrderInWords(machine.jobOrder)}`)
   return `${sentences.join(". ")}.`
 }
 

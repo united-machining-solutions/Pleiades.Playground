@@ -39,6 +39,22 @@ internal static class EventToolArguments
         throw new McpException($"Invalid {parameterName} '{value}'. Allowed values: {string.Join(", ", Enum.GetNames<T>())}.");
     }
 
+    /// <summary>
+    /// Parses an optional filter that must be one of a few names (case-insensitive); blank means "no filter".
+    /// Returns the name as written in <paramref name="allowed"/>.
+    /// </summary>
+    public static string? ParseName(string? value, string parameterName, IReadOnlyList<string> allowed)
+    {
+        ArgumentNullException.ThrowIfNull(allowed);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return allowed.FirstOrDefault(n => n.Equals(value.Trim(), StringComparison.OrdinalIgnoreCase))
+            ?? throw new McpException($"Invalid {parameterName} '{value}'. Allowed values: {string.Join(", ", allowed)}.");
+    }
+
     /// <summary>Parses the sort direction; blank means the default, descending.</summary>
     public static Sorting ParseSorting(string? value)
     {

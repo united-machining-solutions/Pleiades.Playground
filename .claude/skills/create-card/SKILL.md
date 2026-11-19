@@ -55,6 +55,12 @@ the language model its tools, and which file says what the app draws for which t
 - A card calls only the server it came from
   ([A card and its server](../../../docs/build-your-own.md#a-card-and-its-server)). What it needs from
   another source, its tool reads.
+- A card is base: it answers for any machine that follows the data model, from stored values, through the
+  contracts. No made-up data, no named person, nothing that only one demo needs. What a showcase wants drawn
+  for itself, it draws in its own folder of the example app, `apps/app/src/showcases/<name>/`, not in the
+  catalogue and not in the backend
+  ([ADR-0018](../../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). If the idea needs made-up data,
+  stop and say so.
 
 ## You touch
 
@@ -75,7 +81,11 @@ the language model its tools, and which file says what the app draws for which t
   changes with an issue first: on your own branch add the name, and say in your hand-over that the pull
   request needs the issue.
 - `apps/app/src/cards/<name>/chat.tsx`: new, the card in the chat: what a call of each of its tools is called,
-  what the chat draws for a result, and which tool only a card calls. Next to it, as in `src/cards/machine/`:
+  what the chat draws for a result, which tool only a card calls, and in a few words what a part of a page
+  with the tool shows (`part`), with which the chat names it in a page it proposes and a person finds it under
+  "Add a card" on a page. That dialog asks what the input schema of the tool takes, if it knows it: `machine`,
+  a whole number in a range; a required argument of another kind keeps the card from being added by hand.
+  Next to it, as in `src/cards/machine/`:
   what checks a result against the contract, with tests. If the card fetches a series with a tool only the
   card calls, the name of that tool goes into `apps/app/src/machines/card-tools.ts` and its server function
   next to the others in `get-machines.ts`: the card folder imports from `src/machines/`, never the other way.
@@ -107,8 +117,8 @@ that the tour does not show the card yet. A page that shows the card all the tim
    Look at what an API really returns before you compute from it: in its Swagger UI (the Timeseries API at
    <http://localhost:5500/>, the Events API at <http://localhost:5510/>) or with a GET of your own. Two
    things the Events API does: a list ends after `Take` entries, 100 if omitted and 1000 at most, and says
-   so with `hasMore`; and a pair of "raised" and "gone" can come without a duration, because the
-   notification has not gone yet or because the window you asked for cut it. Decide what your figure does
+   so with `hasMore`; and an alert of `/alerts/pairs` can come without `clearedAt` and a duration, because it
+   has not been cleared yet. Decide what your figure does
    with these, and say it in the contract. Where another card shows the same thing, the two must not
    contradict each other.
 4. Write the component with the inferred type of the contract as its properties. Build it from the shadcn/ui

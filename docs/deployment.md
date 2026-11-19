@@ -10,7 +10,8 @@ The deployment is optional and off by default. Whoever only wants to see the dem
 ## How it goes
 
 1. A pull request is merged into `main`.
-2. "Images" builds the seven images and tags them `main` and `sha-<commit>`.
+2. "Images" builds the service images, including the cutting simulator and adapter and the optional Ultimaker
+   and juice bar services, and tags them `main` and `sha-<commit>`.
 3. "Deploy" runs after it on a runner of your own, on the computer that runs the stack. It checks out the
    commit, pulls the images tagged `sha-<commit>` and runs `docker compose up -d --no-build --wait`.
 
@@ -28,6 +29,23 @@ The stack keeps its data: the project name is fixed, so its volumes stay from on
   |---|---|
   | `.env` | The settings of [`.env.example`](../.env.example): ports, `APP_BIND`, the address and the key of the LiteLLM gateway. It is never part of a commit. |
   | `compose.override.yaml` | Optional. What only this computer needs, for example the network of a reverse proxy. |
+
+  The app of the stack registers at the Pleiades Hub by default, with the address
+  `http://localhost:<APP_PORT>/`. That address is right only for a browser on the same computer. On a
+  computer that others reach, set `HUB_APP_URL` in `.env` to the address their browsers use, or switch the
+  registration off with `HUB_MQTT_URL=`: see
+  [`apps/app`: In the demo stack](../apps/app/README.md#in-the-demo-stack).
+
+The live pages of the example app hear the broker from the browser, MQTT over WebSocket. On a demo that people
+open from other computers, the browser has to reach it:
+
+- Over plain HTTP the browser reaches the broker at the host of the page and `MQTT_WS_PORT` (9001), which the
+  stack publishes. Nothing is to set.
+- Behind a reverse proxy with HTTPS, a page may not open `ws://`, and the broker speaks no TLS on that port:
+  give the proxy a route to port 9001 of the service `broker`, in `compose.override.yaml`, and name its address
+  in `.env`, `MQTT_WS_URL=wss://broker.demo.example.com/`. Without it the pages say "not live, no connection to
+  the broker" and show what held when they were opened. The broker takes anonymous clients, to publish as well:
+  give the route to no wider network than the port has.
 
 ## What the repository needs
 
@@ -60,3 +78,98 @@ PLEIADES_VERSION=main docker compose --env-file /path/to/.env up -d --no-build -
 ```
 
 "Deploy" can also be started by hand, under Actions, for the newest commit of `main`.
+
+## Enable the Ultimaker services
+
+Both `ultimaker-api` (CuraEngine, REST and MCP) and `ultimaker-telemetry` (printer to MQTT) are
+defined in the root Compose file under the optional `ultimaker` profile. The Images workflow
+publishes both to GHCR with the same commit tags as the other services. A feature-branch push
+does not publish deployment images; merge to main first, or build the branch locally.
+
+Set these values in the deployment computer's private `.env` in DEPLOY_DIR:
+
+```dotenv
+COMPOSE_PROFILES=ultimaker
+ULTIMAKER_PRINTER_URL=http://ultimaker.local/
+ULTIMAKER_SERIAL_NUMBER=UM3-01
+ULTIMAKER_ENABLE_PRINTING=false
+```
+
+Replace the example printer URL with the actual reachable address. Compose reads COMPOSE_PROFILES
+from the same --env-file used by the deployment workflow, so no workflow edit or override file is
+needed to enable the services. Leave it empty on computers without this printer. Telemetry waits
+for the existing broker and time-series persistence; it does not need pairing or print permission.
+
+To deploy both from images after they have been published:
+
+```bash
+PLEIADES_VERSION=main docker compose --env-file /path/to/.env pull
+PLEIADES_VERSION=main docker compose --env-file /path/to/.env up -d --no-build --wait
+```
+
+To build the feature branch before it is merged:
+
+```bash
+docker compose --profile ultimaker up -d --build --wait ultimaker-api ultimaker-telemetry
+```
+
+The API listens on host loopback port 5530 by default. For remote MCP access, use the deployment's
+reverse proxy and configure the existing Ultimaker authentication settings; do not expose the
+anonymous local-development setting to an untrusted network. See the
+[API guide](../source/Pleiades.Playground.Ultimaker.Api/README.md) and
+[telemetry guide](../source/Pleiades.Playground.Ultimaker.Telemetry/README.md).
+
+The named `ultimaker_data` volume preserves models, slices, pairing credentials and submission
+records across deployments of the same Compose project. A new server has a new volume and must
+be paired through its API with approval on the printer display. Starting the stack never pairs,
+enables printing or starts a print automatically.
+
+## Enable the juice bar service
+
+`juicebar-api` (REST, MCP and the state of the machine on MQTT) is defined in the root Compose file under
+the optional `juicebar` profile. The Images workflow publishes it with the same commit tags as the other
+services. It needs a machine that runs MixerControl and that the deployment computer reaches.
+
+Set these values in the private `.env` of the deployment computer in DEPLOY_DIR:
+
+```dotenv
+COMPOSE_PROFILES=juicebar
+JUICEBAR_URL=http://juicebar.local:3000/
+JUICEBAR_SERIAL_NUMBER=JUICEBAR-01
+JUICEBAR_ENABLE_ORDERING=true
+APP_MCP_SERVERS=juicebar=http://juicebar-api:8080/mcp
+```
+
+Replace the example address with the one of the machine. Profiles combine with a comma, and so do the
+entries of `APP_MCP_SERVERS`: `COMPOSE_PROFILES=ultimaker,juicebar`. Leave both without the juice bar on a
+computer that does not reach one: the service starts and stays healthy without the machine, but the chat
+would offer tools that only answer with an error.
+
+`JUICEBAR_ENABLE_ORDERING=true` lets the service place orders at the real machine; it never starts the
+production, a person presses the start button. `false` makes it read-only. `APP_MCP_SERVERS` gives the chat
+of the example app the tools of the service, the one for ordering among them, and the chat has no sign-in:
+everyone who reaches the app can then order. Leave the entry out to keep the chat away from the machine.
+
+The service listens on host loopback port 5550 by default. Before `JUICEBAR_BIND` opens it to a network,
+switch sign-in on with `JUICEBAR_AUTH_ENABLED=true` and the three `JUICEBAR_AUTH_*` values; the chat of the
+example app sends no token and does not reach the service then. See the
+[service guide](../source/Pleiades.Playground.JuiceBar.Api/README.md).
+
+## Show the showcases
+
+The example app has two images. `pleiades.playground.app` is the app alone. `pleiades.playground.app.showcases`
+is the same app built with its showcases, pages made for one demo or one fair, which may show made-up data
+([ADR-0018](adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). The Images workflow publishes both
+with the same commit tags.
+
+A demo that shows them sets one value in the private `.env` of the deployment computer in DEPLOY_DIR:
+
+```dotenv
+APP_SHOWCASES=true
+```
+
+The stack then runs the second image. Any value switches them on, `false` too; to run the app alone, leave
+the value empty. It is read when the image is pulled, not while the app runs.
+
+The [Margo app](../margo/README.md) has no such setting: it always runs the app alone, since bart takes the
+name of an image as it stands. A device that is to show a showcase runs `compose.yaml` instead.

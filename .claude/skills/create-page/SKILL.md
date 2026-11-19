@@ -44,6 +44,28 @@ Read, in this order:
    page. With `.md` at the end of its address it comes whole, with its examples. Use the CLI this workspace
    pins, as here, also where the skill of shadcn/ui writes `shadcn@latest`.
 
+## A page of the stack, or a showcase
+
+Decide before the first file, and say which it is in your hand-over
+([ADR-0018](../../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)).
+
+- A page of the stack shows what the backend answers, for any machine. It is what this recipe builds, and
+  nothing below changes for it.
+- A showcase is a page for one demo, one fair or one story: made-up data, a named person, a camera or a
+  microphone, the wording of one customer. It is in a build only where `APP_SHOWCASES` is set: the app
+  alone, and its image, have nothing of it. Its route file is
+  `apps/app/src/routes/(showcases)/<name>.tsx`, written as `createFileRoute("/(showcases)/<name>")`; the
+  brackets add nothing to the address, so the page answers at `/<name>`. A page belongs to the showcase
+  its name begins with: a second page is `<name>.<more>.tsx` or stands below `<name>/`. A server route of
+  a showcase stands in the same folder. Everything else it needs lives in `apps/app/src/showcases/<name>/`. It
+  changes no shared file, no file outside reads from its folder, and no other page links to it:
+  `pnpm --filter @pleiades/app test` fails if one does. To see the page, start the development server
+  with the showcases: `APP_SHOWCASES=true` in the shell that runs `pnpm --filter @pleiades/app dev`. In
+  the stack it is `APP_SHOWCASES=true` in `.env`, then `docker compose up -d --build --wait --no-deps app`.
+
+If you cannot tell, it is a showcase. A showcase can become a page of the stack later; the other way round
+takes a page away from everyone.
+
 ## You touch
 
 - `apps/app/src/routes/<name>.tsx`: new, the page. It names its own entry in the sidebar, see step 6. No
@@ -89,7 +111,17 @@ tour.
    Counting the rows you draw is wording too, as Home counts its machines. Adding up values, comparing
    machines or putting things in a new order is not: that answer is missing, so stop and take
    `create-card`. Keep the order the tool returned.
-5. If the values change, read them again the way Home does, with `useLive()`.
+5. If the values change, do not read them again on a clock: keep the page live from the broker, the way
+   Home does, with `useLive(loaded, live)` of `src/hooks/use-live.ts`. `live` names the topic filters of
+   the values the page shows and what a message and the clock do to them; the functions for machines and
+   for measurements are in `src/live/`, and the topics come from the contracts of `@pleiades/cards`
+   (`READING_PATHS`, `QUANTITY_PATHS`). They name a value as the store keeps it. The broker carries most of
+   them the same way; a snapshot such as `umati/State/Status` is one message there and a value per field in
+   the store, a list such as the job orders is one message with the whole list, and an alert is a CloudEvent:
+   `valuesOf`, `brokerPathsOf`, `listOf` and `alertOf` of `src/live/messages.ts` read them. A page whose
+   values are not among those needs functions of its own
+   there, with tests, by the rules the tool of the backend reads the stored values with. If the read in the
+   loader failed, `useRetry()` asks again. See ADR-0013.
 6. Give the page its entry in the sidebar, in the route itself:
    `staticData: { nav: { title: "Warnings", icon: TriangleAlertIcon } }`, with an icon of `lucide-react`,
    as `src/routes/index.tsx` does for Home. The sidebar reads its entries from the routes and marks the
@@ -100,7 +132,7 @@ tour.
    The breadcrumb of the header comes from the same place and needs no file of yours. A page with an entry
    is called by the title of its entry there. A page without one stands behind the entry it is under, and
    says what it is called with `staticData: { crumb }`: a text, or a function of the parameters of the
-   route, as `src/routes/machines.$machine.tsx` does it.
+   route, as `src/routes/sites.$machine.tsx` does it.
 
 The page looks like the pages that are there: the same title, the same spacing, the light theme.
 
