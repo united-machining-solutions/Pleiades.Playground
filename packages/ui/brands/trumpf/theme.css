@@ -17,12 +17,12 @@
   --secondary-foreground: #285172;
   --muted: #f3f6f8;
   --muted-foreground: #5e5e5e;
-  --accent: #f3fafd;
+  --accent: #e7ecf0;
   --accent-foreground: #285172;
   --border: #d5dde3;
   --input: #a1a1a1;
   --ring: #51a7eb;
-  --radius: 0;
+  --radius: 0rem;
   --sidebar: #ffffff;
   --sidebar-foreground: #000000;
   --sidebar-primary: #285172;

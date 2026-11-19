@@ -16,7 +16,7 @@ colors:
   blue2: "#51a7eb"
 typography:
   body:
-    fontFamily: "Open Sans", sans-serif
+    fontFamily: '"Open Sans", sans-serif'
 rounded:
   base: 0
 ---
@@ -38,11 +38,12 @@ navigation. The values come from the UIC tokens (`references/tokens.css`, `compo
   captions.
 - **Blue4** `#285172` (`tr-blue4`, `fill-primary`), with white text: the primary content button, the one
   action of a view.
-- **Grey1** `#e7ecf0` (`tr-grey1`), with blue4 text: every other filled button, and the tag.
+- **Grey1** `#e7ecf0` (`tr-grey1`), with blue4 text: every other filled button, the tag, and the item
+  under the pointer or the keyboard in a menu.
 - **Surface raised** `#f3f6f8` (`fill-highlighted-neutral-opaque`): quiet surfaces, a skeleton, the track of
   a tab list.
-- **Active tint** `#f3fafd`, with blue4 text: the highlight under the pointer in a menu (General States,
-  active).
+- **Active tint** `#f3fafd`: in the UIC the highlight under the pointer in a menu (General States,
+  active). This brand does not use it, see below.
 - **Border subtle** `#d5dde3`: lines and dividers. **Grey2** `#a1a1a1` (`border-default`): the outline of a
   field.
 - **Blue2** `#51a7eb` (`tr-blue2`): the focus ring. The UIC uses it for hover, focus and selected borders,
@@ -51,13 +52,15 @@ navigation. The values come from the UIC tokens (`references/tokens.css`, `compo
   surface, the active page in grey1 with blue4 text, blue4 for what is primary in them, border subtle as
   their line.
 
-Pairs of text on their surface: white on blue4 8.4:1, blue4 on grey1 7.0:1, blue4 on the active tint 7.9:1,
-text secondary on surface raised 6.0:1. All reach 4.5:1. The
+Pairs of text on their surface: white on blue4 8.4:1, blue4 on grey1 7.0:1, text secondary on surface
+raised 6.0:1. All reach 4.5:1. The
 outline of a field, grey2 on white, reaches 2.6:1, under the 3:1 a line that marks a control should have:
 it is the value of the UIC, kept as it is.
 
-What was chosen here and is not a UIC value: the UIC states the hover text of a General State as `tr-blue3`
-`#177ac9`; on the active tint it reaches only 4.3:1, so the accent text is blue4.
+What was chosen here and is not a UIC value: the accent, the mark of the item under the pointer or the
+keyboard in a menu, a select or a combobox, is grey1, not the active tint. The active tint on the white of a
+menu is 1.06:1, and the marked item could not be told from the others. The UIC states the hover text of a
+General State as `tr-blue3` `#177ac9`; on grey1 it reaches only 3.8:1, so the accent text is blue4.
 
 ## Typography
 
