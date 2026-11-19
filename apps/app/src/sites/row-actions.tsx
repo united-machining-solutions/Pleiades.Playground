@@ -22,8 +22,9 @@ import { failed, told, useReread } from "./use-place.ts"
 export type RowMachine = { machine: string; title: string; what: string }
 
 /**
- * A button that opens "Add machine": in the head of the page, under an empty list, or as "Review and
- * add" in the bar. Both open the same list of the machines that send and stand on no site.
+ * A button that opens "Add a machine", in the head of the page or under an empty list: one machine a person
+ * means. As "Review and add" in the bar it opens "Assign machines to a site": the machines that send and
+ * stand on no site, as many as go to one place.
  */
 export function AddMachine({
   list,
@@ -38,7 +39,7 @@ export function AddMachine({
         {!review && <PlusIcon data-icon="inline-start" />}
         {children}
       </Button>
-      <PlaceDialog open={open} onOpenChange={setOpen} mode={{ kind: "add" }} list={list} />
+      <PlaceDialog open={open} onOpenChange={setOpen} mode={{ kind: review ? "assign" : "add" }} list={list} />
     </>
   )
 }

@@ -6,7 +6,7 @@ import type { Slice } from "@pleiades/cards/shared/paging.ts"
 import type { SiteList } from "@pleiades/cards/site/contract.ts"
 import { modelOf, titleOfPlaced } from "@pleiades/cards/site/in-words.ts"
 
-import { identityOfId, machineIdOf, machineIdPart, makerPartOf } from "./machine-id.ts"
+import { identityOfId } from "./machine-id.ts"
 import type { Identity, Maker } from "./machine-id.ts"
 import { placedInWords } from "./placements.ts"
 import { placeInWords, problemOfId } from "./placing.ts"
@@ -197,12 +197,23 @@ const machinesInWords = (count: number) => (count === 1 ? "1 machine" : `${count
  * "Add 2 machines to North plant · Hall 1", "Add 3 and move 1 to North plant", "Move 1 machine to South plant";
  * where the site is new (`newSite`), `where` is its hall or none.
  */
-export function addInWords(count: number, where: string | null, moves = 0, newSite: string | null = null): string {
-  if (count === 0) return "Add machines"
+export function addInWords(count: number, where: string | null, moves = 0, newSite: string | null = null, verb: "Add" | "Assign" = "Add"): string {
+  if (count === 0) return `${verb} machines`
   const to = where === null ? "" : ` to ${where}`
   const adds = count - moves
-  const words = moves === 0 ? `Add ${machinesInWords(count)}${to}` : adds === 0 ? `Move ${machinesInWords(moves)}${to}` : `Add ${adds} and move ${moves}${to}`
+  const words = moves === 0 ? `${verb} ${machinesInWords(count)}${to}` : adds === 0 ? `Move ${machinesInWords(moves)}${to}` : `${verb} ${adds} and move ${moves}${to}`
   // A new site is made first: "Create West plant and add 2 machines to Hall 1".
+  return newSite === null ? words : `Create ${newSite} and ${words.charAt(0).toLowerCase()}${words.slice(1)}`
+}
+
+/**
+ * The button of the form that adds one machine: "Add MFP 7 to North plant · Hall 2", "Move Lathe 4 to South
+ * plant", "Create West plant and add MFP 7 to Hall 1"; "Add machine" while it is not known which.
+ */
+export function addOneInWords(name: string, where: string | null, move: boolean, newSite: string | null = null): string {
+  const what = name.trim() || "machine"
+  const to = where === null ? "" : ` to ${where}`
+  const words = `${move ? "Move" : "Add"} ${what}${to}`
   return newSite === null ? words : `Create ${newSite} and ${words.charAt(0).toLowerCase()}${words.slice(1)}`
 }
 
@@ -378,59 +389,24 @@ export function chosenWithAll(chosen: ReadonlySet<string>, found: ReadonlyArray<
 }
 
 /**
- * A machine a person named by a name only, as "MFP 7": the name, the ids it may mean, and what a person says
- * it is, its manufacturer, model and serial number, from which its id is formed (machine-id.ts). It is added
- * while `chosen`, once its id is one.
+ * Where "Add a machine" starts from what it is handed: the first machine handed in by its id, chosen where it
+ * sends or stands on a site, else its id split into the fields of what it is; or the first machine named by a
+ * name, the name typed in the field and what is known of it in the fields, with the machines it may mean.
  */
-export type Named = Identity & { name: string; meant: ReadonlyArray<string>; chosen: boolean }
-
-const NO_IDENTITY: Identity = { manufacturer: "", model: "", serialNumber: "" }
-
-/**
- * The machines a form starts with named by a name only, chosen: with what the chat heard of each, its
- * manufacturer, model and serial number, or with a whole id it was handed, which fills the three fields.
- */
-export function namedOf(start: PlaceStart | undefined, makers: ReadonlyArray<Maker>): Array<Named> {
-  return (start?.named ?? [])
-    .map((one) => {
-      const said = { manufacturer: one.manufacturer ?? "", model: one.model ?? "", serialNumber: one.serialNumber ?? "" }
-      const given = Object.values(said).some((part) => part.trim() !== "") ? said : (identityOfId(one.machine ?? "", makers) ?? NO_IDENTITY)
-      return { name: one.name.trim(), meant: [...one.meant], chosen: true, ...given }
-    })
-    .filter((one) => one.name !== "")
-}
-
-/** A named machine with the fields of a machine near it, which a person chose from "Did you mean". */
-export function namedMeaning(named: Named, machine: string, makers: ReadonlyArray<Maker>): Named {
-  return { ...named, ...(identityOfId(machine, makers) ?? NO_IDENTITY) }
-}
-
-/** What keeps a named machine from being added, field by field; nothing where its id is one. */
-export type NamedProblems = { manufacturer?: string; model?: string; serialNumber?: string }
-
-/** Why the fields of a named machine give no id yet, field by field. */
-export function problemsOfNamed(named: Named, makers: ReadonlyArray<Maker>): NamedProblems {
-  return {
-    ...(makerPartOf(named.manufacturer, makers) === "" && { manufacturer: "Say who made it." }),
-    ...(machineIdPart(named.model.trim()) === "" && { model: "Say its model." }),
-    ...(machineIdPart(named.serialNumber.trim()) === "" && { serialNumber: "Say its serial number." }),
+export function oneStartOf(
+  start: PlaceStart | undefined,
+  findable: ReadonlyArray<Candidate>,
+  makers: ReadonlyArray<Maker>,
+): { query: string; pick: Candidate | null; identity: Identity | null; meant: Array<string> } {
+  const machine = start?.machines?.map((one) => one.trim()).find((one) => one !== "")
+  if (machine !== undefined) {
+    const pick = findable.find((one) => one.machine === machine) ?? null
+    if (pick) return { query: pick.what, pick, identity: null, meant: [] }
+    return { query: machine, pick: null, identity: identityOfId(machine, makers) ?? null, meant: [] }
   }
-}
-
-/** The id a named machine links to, formed from its fields; undefined while one is missing. */
-export function idOfNamed(named: Named, makers: ReadonlyArray<Maker>): string | undefined {
-  return machineIdOf(named, makers)
-}
-
-/** The named machines that are added, each with its id: those chosen whose id is one. */
-export function namedReady(named: ReadonlyArray<Named>, makers: ReadonlyArray<Maker>): Array<Named & { id: string }> {
-  return named.flatMap((one) => {
-    const id = one.chosen ? idOfNamed(one, makers) : undefined
-    return id === undefined ? [] : [{ ...one, id }]
-  })
-}
-
-/** Whether a named machine keeps the form from sending: chosen, and its id none yet. */
-export function namedMissing(named: ReadonlyArray<Named>, makers: ReadonlyArray<Maker>): boolean {
-  return named.some((one) => one.chosen && idOfNamed(one, makers) === undefined)
+  const named = start?.named?.find((one) => one.name.trim() !== "")
+  if (named === undefined) return { query: "", pick: null, identity: null, meant: [] }
+  const said = { manufacturer: named.manufacturer ?? "", model: named.model ?? "", serialNumber: named.serialNumber ?? "" }
+  const heard = Object.values(said).some((part) => part.trim() !== "") ? said : (identityOfId(named.machine ?? "", makers) ?? null)
+  return { query: named.name.trim(), pick: null, identity: heard, meant: [...named.meant] }
 }

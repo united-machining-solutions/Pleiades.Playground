@@ -4,30 +4,24 @@ import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
 import { Pages } from "@pleiades/cards/shared/pages.tsx"
 import { SmoothHeight } from "@pleiades/cards/shared/smooth-height.tsx"
 import type { SiteList } from "@pleiades/cards/site/contract.ts"
-import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
 import { Badge } from "@pleiades/ui/components/badge"
 import { Button } from "@pleiades/ui/components/button"
 import { Checkbox } from "@pleiades/ui/components/checkbox"
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@pleiades/ui/components/field"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@pleiades/ui/components/input-group"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@pleiades/ui/components/item"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@pleiades/ui/components/tooltip"
-import { MapPinIcon, PlusIcon, SearchIcon, TriangleAlertIcon } from "lucide-react"
+import { PlusIcon, SearchIcon } from "lucide-react"
 import { useState } from "react"
 import type { KeyboardEvent } from "react"
 
-import { choiceOfAll, chosenWithAll, fieldsOf, idOfNamed, isMachineId, matches, meantBy, namedMeaning, pickerPageOf, problemsOfNamed, whereInWords } from "./choosing.ts"
-import type { Candidate, Named, NamedProblems } from "./choosing.ts"
-import { IdentityFields } from "./identity-fields.tsx"
-import type { Maker } from "./machine-id.ts"
-import { typedMachineOf } from "./unplaced.ts"
+import { choiceOfAll, chosenWithAll, fieldsOf, matches, meantBy, pickerPageOf, whereInWords } from "./choosing.ts"
+import type { Candidate } from "./choosing.ts"
 
-// The machines "Add machine" offers, as a list a person searches: each with what tells it apart, a box
-// to choose it, as many as go to one place. A query that finds none and has the shape of a machine id
-// names the machines it is close to ("Did you mean"), and adds the id without data only on purpose. A
-// machine that stands on a site already is moved: its row says so, and where it stands now. A machine named
-// by a name only, as "MFP 7", gets a row of its own where a person gives it its id; without data is a way
-// like any other. Where the form lists the chosen machines alone, the whole list opens on request.
+// The machines "Assign machines to a site" offers, the suggestions: those that sent data in the last 24
+// hours and stand on no site, as a list a person searches, each with what tells it apart and a box to choose
+// it, as many as go to one place, seven a page. A query that finds none names the machines it is close to
+// ("Did you mean"). A machine handed in that stands on a site already is moved: its row says so, and where
+// it stands now. Where the form lists the chosen machines alone, the whole list opens on request.
 
 /** When a machine last sent a value, in words for its row and for the search. */
 function lastInWords(candidate: Candidate, asOf: string): { at: string; ago: string } | null {
@@ -74,64 +68,6 @@ function Row({ candidate, asOf }: { candidate: Candidate; asOf: string }) {
   )
 }
 
-/**
- * A machine named by a name only: the name with "No data", and what it is in three fields, from which the app
- * forms its id. A machine near the name fills the fields with a click ("Did you mean").
- */
-function NamedRow({
-  id,
-  named,
-  candidates,
-  makers,
-  tried,
-  onChange,
-}: {
-  id: string
-  named: Named
-  candidates: ReadonlyArray<Candidate>
-  makers: ReadonlyArray<Maker>
-  tried: boolean
-  onChange: (change: Partial<Named>) => void
-}) {
-  const problems = named.chosen ? problemsOfNamed(named, makers) : {}
-  // A field says what is missing once a person sent the form, or typed in it.
-  const shown = Object.fromEntries(
-    (Object.keys(problems) as Array<keyof NamedProblems>).filter((field) => tried || named[field].trim() !== "").map((field) => [field, problems[field]]),
-  )
-  return (
-    <Item variant="outline" size="sm" className="items-start">
-      <Checkbox aria-label={`Add ${named.name}`} checked={named.chosen} onCheckedChange={(on) => onChange({ chosen: on })} className="mt-0.5" />
-      <ItemContent className="min-w-0 gap-2">
-        <ItemTitle>
-          {named.name}
-          <Tooltip>
-            <TooltipTrigger render={<Badge variant="outline" tabIndex={0} />}>No data</TooltipTrigger>
-            <TooltipContent>Sent no data yet; its data finds it once it sends.</TooltipContent>
-          </Tooltip>
-        </ItemTitle>
-        <IdentityFields
-          id={id}
-          value={named}
-          onChange={onChange}
-          problems={shown}
-          machineId={named.chosen ? idOfNamed(named, makers) : undefined}
-          disabled={!named.chosen}
-        />
-        {named.chosen && named.meant.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground">Did you mean</span>
-            {named.meant.map((machine) => (
-              <Button key={machine} type="button" variant="outline" size="xs" onClick={() => onChange(namedMeaning(named, machine, makers))}>
-                {candidates.find((one) => one.machine === machine)?.what ?? machine}
-              </Button>
-            ))}
-          </div>
-        )}
-      </ItemContent>
-    </Item>
-  )
-}
-
 /** Moves the focus to the box of the row above or below, as the arrow keys do in a list. */
 function onArrows(event: KeyboardEvent<HTMLElement>) {
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return
@@ -146,9 +82,8 @@ function onArrows(event: KeyboardEvent<HTMLElement>) {
 
 /**
  * The search, the list with its boxes, and what a query that finds nothing says. `candidates` are the
- * machines of the list and those a person added by id; `chosen` their ids. `named` are the machines named
- * by a name only. With `listed` "chosen" only the chosen and named machines show, until a person opens
- * the whole list.
+ * machines of the list and those handed in; `chosen` their ids. With `listed` "chosen" only the chosen
+ * machines show, until a person opens the whole list.
  */
 export function MachinePicker({
   id,
@@ -158,14 +93,8 @@ export function MachinePicker({
   query,
   onQuery,
   onChosen,
-  onAddById,
   missing,
   listed = "all",
-  named = [],
-  makers = [],
-  onNamed,
-  onAddNamed,
-  tried = false,
 }: {
   id: string
   list: SiteList
@@ -174,19 +103,8 @@ export function MachinePicker({
   query: string
   onQuery: (query: string) => void
   onChosen: (chosen: ReadonlySet<string>) => void
-  /** Adds a typed id to the list, chosen: a machine without data, or one that stands on a site, to be moved. */
-  onAddById: (machine: string) => void
   missing: boolean
   listed?: "chosen" | "all" | undefined
-  named?: ReadonlyArray<Named> | undefined
-  /** The manufacturers that send, offered for a machine named by a name. */
-  makers?: ReadonlyArray<Maker> | undefined
-  /** Changes the named machine at `index`: its id, or whether it is added. */
-  onNamed?: ((index: number, change: Partial<Named>) => void) | undefined
-  /** Adds a machine by the name a person searched for, to give it its id. */
-  onAddNamed?: ((name: string) => void) | undefined
-  /** Whether the form was sent once, so a named machine without its id says so. */
-  tried?: boolean | undefined
 }) {
   const typed = query.trim()
   const [page, setPage] = useState(1)
@@ -200,8 +118,6 @@ export function MachinePicker({
     setPage(1)
     onQuery(next)
   }
-  // A typed id that no machine of the list has: one on a site already, or one that sent nothing lately.
-  const byId = isMachineId(typed) && !candidates.some((one) => one.machine === typed) ? typedMachineOf(list, typed) : undefined
   const meant = shown.length === 0 ? meantBy(typed, candidates.filter((one) => !chosen.has(one.machine))) : []
 
   const toggle = (machine: string, on: boolean) => {
@@ -213,23 +129,10 @@ export function MachinePicker({
   // "Choose all" takes every machine the search found, on every page.
   const toggleShown = (on: boolean) => onChosen(chosenWithAll(chosen, shown, on))
 
-  const namedRows = named.map((one, index) => (
-    <NamedRow
-      key={`${one.name}-${index}`}
-      id={`${id}-named-${index}`}
-      named={one}
-      candidates={candidates}
-      makers={makers}
-      tried={tried}
-      onChange={(change) => onNamed?.(index, change)}
-    />
-  ))
-
   if (!opened) {
     return (
       <FieldSet data-picker data-invalid={missing || undefined} className="gap-3">
         <FieldLegend className="sr-only">Machines</FieldLegend>
-        {namedRows}
         {shown.length > 0 && (
           <div className="flex flex-col gap-2" onKeyDown={onArrows}>
             {shown.map((one) => (
@@ -254,7 +157,6 @@ export function MachinePicker({
   return (
     <FieldSet data-picker data-invalid={missing || undefined} className="gap-3">
       <FieldLegend className="sr-only">Machines</FieldLegend>
-      {namedRows}
       <InputGroup>
         <InputGroupInput
           id={`${id}-search`}
@@ -332,14 +234,8 @@ export function MachinePicker({
       {shown.length === 0 && candidates.length === 0 && typed === "" && (
         <FieldDescription>No machine sent data in the last 24 hours without standing on a site. Type the id of one that has not sent data yet.</FieldDescription>
       )}
-      {shown.length === 0 && typed !== "" && !byId && (
+      {shown.length === 0 && typed !== "" && (
         <FieldDescription>No machine that sent data in the last 24 hours matches “{typed}”.</FieldDescription>
-      )}
-      {/* A name that finds nothing is a machine to add by its name: a person gives it its id below. */}
-      {shown.length === 0 && typed !== "" && !isMachineId(typed) && onAddNamed && (
-        <Button type="button" variant="outline" size="sm" className="max-w-full self-start" onClick={() => onAddNamed(typed)}>
-          <span className="truncate">Add “{typed}” without data</span>
-        </Button>
       )}
 
       {meant.length > 0 && (
@@ -374,36 +270,6 @@ export function MachinePicker({
             ))}
           </ItemGroup>
         </div>
-      )}
-
-      {byId?.kind === "placed" && (
-        <Alert>
-          <MapPinIcon />
-          <AlertTitle>It stands on {byId.siteName} now.</AlertTitle>
-          <AlertDescription>
-            <p>Chosen here, it is moved to the place below.</p>
-            <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => onAddById(typed)}>
-              Move it here
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-      {byId?.kind === "unknown" && (
-        <Alert>
-          <TriangleAlertIcon />
-          <AlertTitle>
-            No data from <span className="break-all">{typed}</span> in the last 24 hours.
-          </AlertTitle>
-          <AlertDescription>
-            <p>
-              {meant.length > 0 ? "It may be mistyped: did you mean a machine above? " : ""}
-              Added without data, it shows “No data” on Home until it sends.
-            </p>
-            <Button type="button" variant="outline" size="sm" className="mt-2 max-w-full" onClick={() => onAddById(typed)}>
-              <span className="truncate">Add {typed} without data</span>
-            </Button>
-          </AlertDescription>
-        </Alert>
       )}
 
       {missing && <FieldError>Choose at least one machine.</FieldError>}

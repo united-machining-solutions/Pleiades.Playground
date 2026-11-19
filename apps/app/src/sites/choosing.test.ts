@@ -9,6 +9,7 @@ import {
   MEANT_AT_MOST,
   NO_HALL,
   addInWords,
+  addOneInWords,
   addedInWords,
   candidateById,
   candidatesOf,
@@ -21,15 +22,10 @@ import {
   madeInWords,
   makeInWords,
   matches,
-  idOfNamed,
-  namedMeaning,
-  namedMissing,
-  namedOf,
-  namedReady,
   meantBy,
+  oneStartOf,
   pickerPageOf,
   placedCandidatesOf,
-  problemsOfNamed,
   siteChoicesOf,
   startMachinesOf,
   startPlaceOf,
@@ -378,56 +374,41 @@ const makers = [
   { name: "Alcyone Machine Works", part: "alcyone-machines" },
 ]
 
-test("a machine named by a name only waits for what it is, and is added once its id is formed", () => {
-  const named = namedOf({ named: [{ name: " MFP 7 ", meant: [L01] }, { name: " ", meant: [] }] }, makers)
-  assert.deepEqual(named, [{ name: "MFP 7", meant: [L01], chosen: true, manufacturer: "", model: "", serialNumber: "" }])
-  const mfp = named[0]!
-  assert.deepEqual(problemsOfNamed(mfp, makers), {
-    manufacturer: "Say who made it.",
-    model: "Say its model.",
-    serialNumber: "Say its serial number.",
-  })
-  assert.equal(namedMissing(named, makers), true)
-  assert.deepEqual(namedReady(named, makers), [])
-
-  const said = { ...mfp, manufacturer: "Acme Tools", model: "MFP", serialNumber: "7" }
-  assert.deepEqual(problemsOfNamed(said, makers), {})
-  assert.equal(idOfNamed(said, makers), "acme-tools_MFP_7")
-  assert.equal(namedMissing([said], makers), false)
-  assert.deepEqual(
-    namedReady([said], makers).map((one) => one.id),
-    ["acme-tools_MFP_7"],
-  )
-  // Taken out, it neither waits nor is added.
-  assert.equal(namedMissing([{ ...mfp, chosen: false }], makers), false)
-  assert.deepEqual(namedOf(undefined, makers), [])
-})
-
-test("what the chat heard of a machine fills its fields; a whole id does where nothing else was heard", () => {
-  assert.deepEqual(namedOf({ named: [{ name: "MFP 7", meant: [], manufacturer: "Trumpf", model: "TruPunch 5000", serialNumber: "A1234" }] }, makers), [
-    { name: "MFP 7", meant: [], chosen: true, manufacturer: "Trumpf", model: "TruPunch 5000", serialNumber: "A1234" },
-  ])
-  assert.deepEqual(namedOf({ named: [{ name: "MFP 7", meant: [], machine: "trumpf_TruPunch-5000_A1234", from: "TRUMPF · TruPunch 5000 · A1234" }] }, makers), [
-    { name: "MFP 7", meant: [], chosen: true, manufacturer: "TRUMPF", model: "TruPunch-5000", serialNumber: "A1234" },
-  ])
-  // An id of another shape fills nothing.
-  assert.deepEqual(namedOf({ named: [{ name: "MFP 7", meant: [], machine: "mfp7" }] }, makers)[0], {
-    name: "MFP 7",
+test("\"Add a machine\" starts with the machine handed in, chosen, or with what is known of one named by a name", () => {
+  const findable = [...candidates, ...placedCandidatesOf(placedList).values()]
+  assert.deepEqual(oneStartOf(undefined, findable, makers), { query: "", pick: null, identity: null, meant: [] })
+  const sending = oneStartOf({ machines: [L01] }, findable, makers)
+  assert.deepEqual([sending.query, sending.pick?.machine, sending.identity], ["Laser2D L-01", L01, null])
+  const placed = oneStartOf({ machines: ["alcyone-machines_AX-400_P-04"] }, findable, makers)
+  assert.deepEqual([placed.pick?.standsOn?.siteId, placed.query], ["north-plant", "Lathe 4"])
+  assert.deepEqual(oneStartOf({ machines: ["trumpf_TruPunch-5000_A1234"] }, findable, makers), {
+    query: "trumpf_TruPunch-5000_A1234",
+    pick: null,
+    identity: { manufacturer: "TRUMPF", model: "TruPunch-5000", serialNumber: "A1234" },
     meant: [],
-    chosen: true,
-    manufacturer: "",
-    model: "",
-    serialNumber: "",
   })
-  // The manufacturer in any case gives the same id.
-  for (const manufacturer of ["TRUMPF", "Trumpf", "trumpf"]) {
-    assert.equal(idOfNamed({ name: "MFP 7", meant: [], chosen: true, manufacturer, model: "TruPunch 5000", serialNumber: "A1234" }, makers), "trumpf_TruPunch-5000_A1234")
-  }
+  assert.deepEqual(oneStartOf({ named: [{ name: " MFP 7 ", meant: [L01], manufacturer: "Trumpf", model: "TruPunch 5000", serialNumber: "A1234" }] }, findable, makers), {
+    query: "MFP 7",
+    pick: null,
+    identity: { manufacturer: "Trumpf", model: "TruPunch 5000", serialNumber: "A1234" },
+    meant: [L01],
+  })
+  assert.deepEqual(oneStartOf({ named: [{ name: "MFP 7", meant: [], machine: "trumpf_TruPunch-5000_A1234" }] }, findable, makers).identity, {
+    manufacturer: "TRUMPF",
+    model: "TruPunch-5000",
+    serialNumber: "A1234",
+  })
+  // Nothing known of it but its name: the fields follow what is typed.
+  assert.equal(oneStartOf({ named: [{ name: "MFP 7", meant: [] }] }, findable, makers).identity, null)
 })
 
-test("a machine chosen from \"Did you mean\" fills the fields with its id", () => {
-  const mfp = namedOf({ named: [{ name: "Laser 2D L1", meant: [L01] }] }, makers)[0]!
-  const meant = namedMeaning(mfp, L01, makers)
-  assert.deepEqual([meant.manufacturer, meant.model, meant.serialNumber], ["TRUMPF", "Laser2D", "L-01"])
-  assert.equal(idOfNamed(meant, makers), L01)
+test("the buttons say what is done to how many machines, and where", () => {
+  assert.equal(addInWords(4, "North plant · Hall 1", 0, null, "Assign"), "Assign 4 machines to North plant · Hall 1")
+  assert.equal(addInWords(0, null, 0, null, "Assign"), "Assign machines")
+  assert.equal(addInWords(3, "North plant", 1, null, "Assign"), "Assign 2 and move 1 to North plant")
+  assert.equal(addInWords(2, "Hall 1", 0, "West plant", "Assign"), "Create West plant and assign 2 machines to Hall 1")
+  assert.equal(addOneInWords("MFP 7", "North plant · Hall 2", false), "Add MFP 7 to North plant · Hall 2")
+  assert.equal(addOneInWords("Lathe 4", "South plant", true), "Move Lathe 4 to South plant")
+  assert.equal(addOneInWords("MFP 7", "Hall 1", false, "West plant"), "Create West plant and add MFP 7 to Hall 1")
+  assert.equal(addOneInWords(" ", null, false), "Add machine")
 })

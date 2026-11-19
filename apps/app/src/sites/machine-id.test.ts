@@ -4,7 +4,7 @@ import { test } from "node:test"
 import type { UnplacedMachine } from "@pleiades/cards/site/contract.ts"
 
 import { unknownMachine } from "../live/machines.ts"
-import { identityInWords, identityOfId, machineIdOf, machineIdPart, makerPartOf, makersOf } from "./machine-id.ts"
+import { identityFromTyped, identityInWords, identityOfId, machineIdOf, machineIdPart, makerPartOf, makersOf, problemsOfIdentity } from "./machine-id.ts"
 
 const makers = [
   { name: "TRUMPF", part: "trumpf" },
@@ -81,4 +81,26 @@ test("a machine id gives back what the machine is, and what it is reads in words
   assert.equal(identityOfId("acme__7", makers), undefined)
   assert.equal(identityInWords({ manufacturer: "TRUMPF", model: "TruPunch 5000", serialNumber: "A1234" }), "TRUMPF · TruPunch 5000 · A1234")
   assert.equal(identityInWords({ manufacturer: "TRUMPF", model: " ", serialNumber: "A1234" }), "TRUMPF · A1234")
+})
+
+test("what a person typed to find a machine fills its fields where it says something", () => {
+  assert.deepEqual(identityFromTyped("trumpf_TruPunch-5000_A1234", makers), { manufacturer: "TRUMPF", model: "TruPunch-5000", serialNumber: "A1234" })
+  assert.deepEqual(identityFromTyped("TRUMPF TruPunch 5000 A1234", makers), { manufacturer: "TRUMPF", model: "TruPunch 5000", serialNumber: "A1234" })
+  assert.deepEqual(identityFromTyped("alcyone machine works AX-500 P-09", makers), {
+    manufacturer: "Alcyone Machine Works",
+    model: "AX-500",
+    serialNumber: "P-09",
+  })
+  assert.deepEqual(identityFromTyped("MFP 7", makers), { manufacturer: "", model: "MFP", serialNumber: "7" })
+  assert.deepEqual(identityFromTyped("Trumpf", makers), { manufacturer: "TRUMPF", model: "", serialNumber: "" })
+  assert.deepEqual(identityFromTyped("Lathe", makers), { manufacturer: "", model: "Lathe", serialNumber: "" })
+  assert.deepEqual(identityFromTyped("  ", makers), { manufacturer: "", model: "", serialNumber: "" })
+})
+
+test("the fields of a machine say what is missing", () => {
+  assert.deepEqual(problemsOfIdentity({ manufacturer: "", model: " ", serialNumber: "7" }, makers), {
+    manufacturer: "Say who made it.",
+    model: "Say its model.",
+  })
+  assert.deepEqual(problemsOfIdentity({ manufacturer: "Acme", model: "MFP", serialNumber: "7" }, makers), {})
 })

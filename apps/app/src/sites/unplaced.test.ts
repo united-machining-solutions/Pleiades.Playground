@@ -4,7 +4,7 @@ import { test } from "node:test"
 import type { SiteList, UnplacedMachine } from "@pleiades/cards/site/contract.ts"
 
 import { unknownMachine } from "../live/machines.ts"
-import { NAMED, headInWords, namesInWords, namesOf, typedMachineOf, unplacedInWords, unreadableInWords } from "./unplaced.ts"
+import { NAMED, headInWords, namesInWords, namesOf, unplacedInWords, unreadableInWords } from "./unplaced.ts"
 
 const P07 = "taygeta-precision_TP-800_P-07"
 const L01 = "trumpf_Laser2D_L-01"
@@ -76,14 +76,4 @@ test("the line under the title, in the singular where a count is one", () => {
   const sites = (count: number) => list.sites.concat(list.sites).slice(0, count)
   assert.equal(headInWords({ machineCount: 1, sites: sites(1), sending: 1, needsYou: 1 }), "1 machine at 1 site · 1 sends data now · 1 needs you")
   assert.equal(headInWords({ machineCount: 3, sites: sites(2), sending: 2, needsYou: 0 }), "3 machines at 2 sites · 2 send data now · 0 need you")
-})
-
-test("a machine id a person typed: on a site already, sending, unknown, or no id", () => {
-  assert.deepEqual(typedMachineOf(list, P04), { kind: "placed", siteName: "North plant" })
-  assert.deepEqual(typedMachineOf(list, L01), { kind: "sending", machine: unplaced(L01) })
-  assert.deepEqual(typedMachineOf(list, "alcyone-machines_AX-400_M-09"), { kind: "unknown" })
-  const invalid = typedMachineOf(list, "a/b")
-  assert.equal(invalid.kind, "invalid")
-  assert.match(invalid.kind === "invalid" ? invalid.problem : "", /'\/'/)
-  assert.equal(typedMachineOf(list, "").kind, "invalid")
 })

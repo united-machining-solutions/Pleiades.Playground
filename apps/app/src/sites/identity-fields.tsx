@@ -1,14 +1,12 @@
 import { Field, FieldError, FieldGroup } from "@pleiades/ui/components/field"
 import { Input } from "@pleiades/ui/components/input"
 
-import type { Identity } from "./machine-id.ts"
+import type { Identity, IdentityProblems } from "./machine-id.ts"
 
 // What a machine is, in three plain fields side by side: its manufacturer, model and serial number, as the
 // data model names them. Narrow, they stand one below the other. Their placeholders name them, and so do
 // their labels for a screen reader; a field that is missing says so below it. The id formed from them, where
 // one is passed, stands small below, without words around it.
-
-export type IdentityProblems = { manufacturer?: string | undefined; model?: string | undefined; serialNumber?: string | undefined }
 
 const FIELDS: ReadonlyArray<{ key: keyof Identity; label: string }> = [
   { key: "manufacturer", label: "Manufacturer" },

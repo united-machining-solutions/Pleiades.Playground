@@ -7,8 +7,8 @@ import type { PlaceStart } from "./choosing.ts"
 import { PlaceForm } from "./place-form.tsx"
 import type { PlaceMode } from "./place-form.tsx"
 
-// The dialog of "Add machine", "Move" and of making a site or hall alone: a title, and the form of
-// place-form.tsx with a Cancel. It closes when the form is done.
+// The dialog of "Add a machine", "Assign machines to a site", "Move" and of making a site or hall alone: a
+// title, and the form of place-form.tsx with a Cancel. It closes when the form is done.
 
 export function PlaceDialog({
   open,
@@ -30,12 +30,22 @@ export function PlaceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         // A long form scrolls inside the dialog, so its button stays within reach.
-        className={cn("max-h-[calc(100svh-2rem)] overflow-y-auto", mode.kind === "add" ? "sm:max-w-2xl" : "sm:max-w-lg")}
+        className={cn("max-h-[calc(100svh-2rem)] overflow-y-auto", mode.kind === "assign" ? "sm:max-w-2xl" : mode.kind === "add" ? "sm:max-w-xl" : "sm:max-w-lg")}
         // "Add hall" of a site starts in the field of the hall: the site is chosen already.
         initialFocus={() => (mode.kind === "site" && start?.site ? document.querySelector<HTMLElement>("[data-slot=dialog-content] input[id$='-hall']") : true)}
       >
         <DialogHeader>
-          <DialogTitle>{mode.kind === "move" ? `Move ${mode.title}` : mode.kind === "site" ? (handed ? `Add hall to ${handed.name}` : "Add site") : "Add machines"}</DialogTitle>
+          <DialogTitle>
+            {mode.kind === "move"
+              ? `Move ${mode.title}`
+              : mode.kind === "site"
+                ? handed
+                  ? `Add hall to ${handed.name}`
+                  : "Add site"
+                : mode.kind === "assign"
+                  ? "Assign machines to a site"
+                  : "Add a machine"}
+          </DialogTitle>
           <DialogDescription>
             {mode.kind === "move"
               ? "Choose where it stands now. Its values and notifications stay as they are."
@@ -43,7 +53,9 @@ export function PlaceDialog({
                 ? handed
                   ? "Type the name of the new hall."
                   : "Type the name of the new site, and its first hall if it has one. A site of the list gets a new hall here too."
-                : "Machines that sent data in the last 24 hours and stand on no site. Choose the ones that go to one place."}
+                : mode.kind === "assign"
+                  ? "Machines that sent data in the last 24 hours and stand on no site. Choose the ones that go to one place."
+                  : "Find the machine, or say what it is, and where it stands."}
           </DialogDescription>
         </DialogHeader>
         {/* The form is drawn anew each time the dialog opens, so it starts from the place used last. */}

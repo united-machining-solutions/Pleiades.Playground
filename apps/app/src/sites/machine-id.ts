@@ -104,3 +104,44 @@ export function identityInWords(identity: Identity): string {
     .filter(Boolean)
     .join(" · ")
 }
+
+/** What keeps the fields of a machine from giving an id, field by field; nothing where they give one. */
+export type IdentityProblems = { manufacturer?: string; model?: string; serialNumber?: string }
+
+/** Why the fields of a machine give no id yet, field by field. */
+export function problemsOfIdentity(identity: Identity, makers: ReadonlyArray<Maker> = []): IdentityProblems {
+  return {
+    ...(makerPartOf(identity.manufacturer, makers) === "" && { manufacturer: "Say who made it." }),
+    ...(machineIdPart(identity.model.trim()) === "" && { model: "Say its model." }),
+    ...(machineIdPart(identity.serialNumber.trim()) === "" && { serialNumber: "Say its serial number." }),
+  }
+}
+
+/**
+ * The fields of a machine from what a person typed to find it, where that says something: a machine id
+ * split into its parts; or words, of which a manufacturer that sends may come first, the last word the serial
+ * number and the words before it the model. "TRUMPF TruPunch 5000 A1234" is TRUMPF, TruPunch 5000, A1234;
+ * "MFP 7" is model MFP, serial number 7.
+ */
+export function identityFromTyped(typed: string, makers: ReadonlyArray<Maker> = []): Identity {
+  const text = typed.trim()
+  const fromId = text.includes("_") ? identityOfId(text, makers) : undefined
+  if (fromId) return fromId
+  let words = text.split(/\s+/).filter(Boolean)
+  let manufacturer = ""
+  // The longest name of a manufacturer that sends, at the start of the words.
+  for (const maker of [...makers].sort((a, b) => b.name.length - a.name.length)) {
+    for (const name of [maker.name, maker.part]) {
+      const named = name.split(/\s+/)
+      if (named.length <= words.length && named.every((word, at) => word.toLowerCase() === words[at]!.toLowerCase())) {
+        manufacturer = maker.name
+        words = words.slice(named.length)
+        break
+      }
+    }
+    if (manufacturer) break
+  }
+  if (words.length === 0) return { manufacturer, model: "", serialNumber: "" }
+  if (words.length === 1) return { manufacturer, model: words[0]!, serialNumber: "" }
+  return { manufacturer, model: words.slice(0, -1).join(" "), serialNumber: words.at(-1)! }
+}

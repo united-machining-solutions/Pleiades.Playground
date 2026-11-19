@@ -425,11 +425,12 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
-- Home: "Add machine" and "Review and add" open one list of the machines that sent data in the last 24 hours,
-  searched by name, manufacturer, state, id and last data, seven a page, and several go to one site and hall
-  at once. A typed id or name that sent nothing offers only near machines ("Did you mean") and is added
-  without data on request; a machine on a site is moved from there. Sites and halls are made while typing,
-  "Add site" and "Add hall" make them alone, and the next add starts at the place used last.
+- Home: "Add machine" adds the one machine a person means: found among those that send, or on a site and
+  moved, else said by its manufacturer, model and serial number, its id formed by ADR-0015, after only near
+  machines were offered ("Did you mean"). "Review and add" assigns the machines that sent data in the last 24
+  hours from a list, searched by name, manufacturer, state, id and last data, seven a page, several at once to
+  one site and hall. Sites and halls are made while typing, "Add site" and "Add hall" make them alone, and both
+  dialogs start at the place used last.
 - Home and the machine card in the chat: the whole row of a machine leads to its page; its buttons stay clicks
   of their own, and the keyboard meets one link a row.
 - Machine page: while it opens, every part shows a grey placeholder of its form and size, so nothing moves when
