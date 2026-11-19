@@ -241,7 +241,11 @@ internal static class ScanConnect
         Content = [new TextContentBlock { Text = text }],
     };
 
-    /// <summary>The arguments of a connect call with the security of <paramref name="endpoint"/>, the policy as its URI.</summary>
+    /// <summary>
+    /// The arguments of a connect call with the security of <paramref name="endpoint"/>. The policy goes by its short
+    /// name, <c>Basic256Sha256</c>: the library matches only that, although its tool says "Policy URI"; with the URI no
+    /// endpoint matches (<c>BadNotFound</c>).
+    /// </summary>
     public static Dictionary<string, JsonElement> WithSecurity(IDictionary<string, JsonElement> arguments, OfferedEndpoint endpoint)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -249,7 +253,7 @@ internal static class ScanConnect
         return new Dictionary<string, JsonElement>(arguments, StringComparer.Ordinal)
         {
             ["securityMode"] = JsonSerializer.SerializeToElement(endpoint.SecurityMode.ToString()),
-            ["securityPolicy"] = JsonSerializer.SerializeToElement(EndpointRanking.PolicyUri(endpoint.SecurityPolicy)),
+            ["securityPolicy"] = JsonSerializer.SerializeToElement(endpoint.SecurityPolicy),
         };
     }
 

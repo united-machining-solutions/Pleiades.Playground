@@ -120,7 +120,7 @@ public class ScanConnectFilterTest
             TestContext.CancellationToken);
 
         Assert.AreEqual("SignAndEncrypt", passed!.Arguments!["securityMode"].GetString());
-        Assert.AreEqual(EndpointRanking.PolicyUri("Aes256_Sha256_RsaPss"), passed.Arguments["securityPolicy"].GetString());
+        Assert.AreEqual("Aes256_Sha256_RsaPss", passed.Arguments["securityPolicy"].GetString(), "The library matches the short name of a policy, not its URI.");
         Assert.AreEqual("Anonymous", passed.Arguments["authType"].GetString());
         Assert.IsFalse(passed.Arguments.ContainsKey("password"));
         Assert.AreEqual("scan", passed.Arguments["name"].GetString());
@@ -140,7 +140,7 @@ public class ScanConnectFilterTest
             TestContext.CancellationToken);
 
         Assert.AreEqual("None", passed!.Arguments!["securityMode"].GetString());
-        Assert.AreEqual(EndpointRanking.PolicyUri("None"), passed.Arguments["securityPolicy"].GetString());
+        Assert.AreEqual("None", passed.Arguments["securityPolicy"].GetString(), "The library matches the short name of a policy, not its URI.");
     }
 
     [TestMethod]
@@ -200,7 +200,7 @@ public class ScanConnectFilterTest
             TestContext.CancellationToken);
 
         Assert.AreEqual("SignAndEncrypt", passed!.Arguments!["securityMode"].GetString(), "A password never goes over an endpoint without encryption.");
-        Assert.AreEqual(EndpointRanking.PolicyUri("Aes256_Sha256_RsaPss"), passed.Arguments["securityPolicy"].GetString());
+        Assert.AreEqual("Aes256_Sha256_RsaPss", passed.Arguments["securityPolicy"].GetString(), "The library matches the short name of a policy, not its URI.");
     }
 
     [TestMethod]
