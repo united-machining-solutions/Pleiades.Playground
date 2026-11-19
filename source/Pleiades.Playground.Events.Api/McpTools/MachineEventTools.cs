@@ -125,9 +125,13 @@ internal sealed class MachineEventTools(IMachineEventRepository repository)
          "master, runs planned), the result (start and end time, produced and good quantity, runs completed, " +
          "jobResult), how many program executions they had and their electric energy in watt hours. Answers 'which " +
          "job orders did the machine end today, with how many parts and how much energy?'. The time range filters on " +
-         "the last change. Returns paged results.")]
+         "the last change. One entry per machine and job order: a job that passes several machines has the same " +
+         "jobOrderId on each, so filter by jobOrderId (or orderNumber) to see it on every machine; " +
+         "events_job_query puts them together as one job. Returns paged results.")]
     public async Task<PagedResponse<JobOrderDtoV1>> QueryJobOrders(
         [Description(MachineDescription)] string? mId = null,
+        [Description("Job order id, on every machine that has it, e.g. '4711/01'")] string? jobOrderId = null,
+        [Description("Order number of the ERP: one of the orderNumbers of the job order, e.g. 'SO-4711'")] string? orderNumber = null,
         [Description("State filter, e.g. Running, Ended or Aborted")] string? state = null,
         [Description("Earliest last change (ISO 8601)")] DateTime? fromDate = null,
         [Description("Latest last change (ISO 8601)")] DateTime? toDate = null,
@@ -137,10 +141,32 @@ internal sealed class MachineEventTools(IMachineEventRepository repository)
         CancellationToken cancellationToken = default)
     {
         var page = EventToolArguments.Page(skip, take);
-        var jobOrders = await MachineEvents.ReadJobOrdersAsync(repository, mId, state, fromDate, toDate, cancellationToken).ConfigureAwait(false);
+        var jobOrders = await MachineEvents.ReadJobOrdersAsync(
+            repository, new JobOrderQuery(mId, jobOrderId, orderNumber, state, fromDate, toDate), cancellationToken).ConfigureAwait(false);
         var (items, totalCount) = MachineEventViews.Page(
             jobOrders, j => j.LastChange, new PagedRequest(page.Skip, page.Take, EventToolArguments.ParseSorting(sortDirection)));
         return new PagedResponse<JobOrderDtoV1>(items, totalCount, page.Skip, page.Take);
+    }
+
+    [McpServerTool(Name = "events_job_query", ReadOnly = true),
+     Description(
+         "Show one job across the machines it passes, by its job order id (the id of the MES, the same on every " +
+         "machine). Each machine with a job order of that id is a step, sorted by start: its state, start and end, " +
+         "duration in seconds, produced and good quantity, and the program executions of the step with their " +
+         "duration, parts and electric energy in watt hours; waitingSecondsBefore is the time between the end of the " +
+         "step before and its start (negative when they overlap, null if not known). position says where the job " +
+         "stands now: Running or Interrupted on a machine, Waiting before its first step, Between two steps, Ended " +
+         "or Aborted, with the machine (mId) and stepIndex. Answers 'where is job 4711/01 now, and how long did it " +
+         "wait between the machines?'. Returns null if no machine has the job order.")]
+    public async Task<JobDtoV1?> QueryJob(
+        [Description("Job order id, e.g. '4711/01'. Find one with events_job_orders_query (also by orderNumber).")] string jobOrderId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(jobOrderId))
+        {
+            throw new McpException("jobOrderId is required, e.g. '4711/01'.");
+        }
+        return await MachineEvents.ReadJobAsync(repository, jobOrderId.Trim(), cancellationToken).ConfigureAwait(false);
     }
 
     [McpServerTool(Name = "events_program_executions_query", ReadOnly = true),

@@ -9,7 +9,7 @@ the server is the source of truth for tool names and parameters.
 | Server | URL | Tools |
 |---|---|---|
 | Timeseries | `http://localhost:5500/mcp` | `timeseries_topics_query`, `timeseries_baseunit_query`, `timeseries_string_query`, `timeseries_boolean_query`, `timeseries_statistics_query` |
-| Events | `http://localhost:5510/mcp` | `events_machine_events_query`, `events_sequence_gaps_query`, `events_active_alerts_query`, `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query`, `events_program_executions_query` |
+| Events | `http://localhost:5510/mcp` | `events_machine_events_query`, `events_sequence_gaps_query`, `events_active_alerts_query`, `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query`, `events_job_query`, `events_program_executions_query` |
 | Sites | `http://localhost:5540/mcp` | `sites_site_list`, `sites_placement_list`, read-only: placing a machine is REST only |
 | Generative UI | `http://localhost:5520/mcp` | `genui_energy_show`, `genui_job_order_list`, `genui_machine_list`, `genui_machine_show`, `genui_measurement_list`, `genui_notification_list`, `genui_site_list`, `genui_timeseries_show`, and for cards `genui_energy_series`, `genui_span_list`, `genui_measurement_series`, `genui_timeseries_series` and `genui_timeseries_signals` |
 | Ultimaker (optional) | `http://localhost:5530/mcp` | Profile selection, STL storage, slicing, validation, artifacts and explicit printer pairing/start; see [contract](../ultimaker/README.md) |

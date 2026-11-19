@@ -20,8 +20,19 @@ The Events API keeps the CloudEvents of the machines as they came, each with the
   `/machineEvents/gaps` names the counts of `sequence` that never arrived, per machine and group.
 - `/alerts/active`, `/alerts/pairs` (each `AlertRaised` with its `AlertCleared`, by the `Id` of the alert) and
   `/alerts/statistics` (by severity after NAMUR NE 107).
-- `/jobOrders`: the last state of each job order with its last result; `/jobOrders/{mId}/{jobOrderId}` adds its
-  history and its program executions (a job order id may contain `/`).
+- `/jobOrders`: the last state of each job order with its last result, one per machine and job order id, filtered
+  by machine, job order id (`jobOrderId`, on every machine that has it), order number of the ERP (`orderNumber`,
+  one of `OrderNumbers`), state and last change; `/jobOrders/{mId}/{jobOrderId}` adds its history and its
+  program executions (a job order id may contain `/`).
+- `/jobs/{jobOrderId}`: one job across the machines it passes. A job carries the same `JobOrderID` on every
+  machine, the id of the MES; each machine with a job order of that id is a step, with its state, start, end,
+  duration, quantities and the sums of its program executions, sorted by start, then planned start, then first
+  seen. `waitingSecondsBefore` is the time from the end of the step before to its start (negative when the two
+  overlap, null when a time is not known), and `position` says where the job stands: `Running` or `Interrupted`
+  on a machine, `Waiting` before its first start, `Between` two steps, `Ended` or `Aborted`. An id that stood on
+  a machine before, as a simulator counts its ids anew after a restart, counts there only from its last
+  `JobOrderAdded` (or the first event after a `JobOrderRemoved`) on, and its program executions only from the
+  start of that step on.
 - `/programExecutions`: `ProgramExecutionStarted` paired with its `ProgramExecutionEnded` or
   `ProgramExecutionAborted`, with the sums of the end.
 
