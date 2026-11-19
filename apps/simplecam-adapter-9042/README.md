@@ -82,7 +82,7 @@ machine does not.
 
 | Variable | Default | What |
 |---|---|---|
-| `SIMPLECAM_SSE_URL` | `http://host.docker.internal:5450/stream/machine-9042/state` in the stack | The SSE stream of the backend |
+| `SIMPLECAM_SSE_URL` | `http://CLNBXWLSL3.hub0000.ums.internal:5450/stream/machine-9042/state` in the stack, for the hackathon only; `http://host.docker.internal:5450/stream/machine-9042/state` for a backend on this computer, set in `.env` | The SSE stream of the backend |
 | `SIMPLECAM_MANUFACTURER` | `United Grinding` | The name of the manufacturer, until the stream says it |
 | `SIMPLECAM_MANUFACTURER_URI` | `https://www.united-grinding.com` | The manufacturer in the machine id: its domain without `www.` and its top-level domain |
 | `SIMPLECAM_MODEL` | `simplecam` | The model in the machine id |
