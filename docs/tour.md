@@ -498,6 +498,31 @@ pick, and a button that orders it at once; the glass then fills while the machin
 the machine, without a language model. No tour screenshot was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).
 
+## Optional: a TruLaser
+
+A TRUMPF laser cutting machine is not part of the six stops either: none of the simulators of the stack is
+one. A stack with `APP_SHOWCASES` set has the page <http://localhost:5600/trulaser>, in the sidebar as
+"TruLaser", which shows such a machine once one publishes to the broker: a machine whose edge component
+(DALLE) publishes the signals of its extension below `machines/{MachineId}/oem/Dalle/`. Without one the page
+says that no TruLaser published.
+
+With one, look at how the page names what it shows: each card says whether it reads an element of the data
+model (`umati 0.17.1`) or the extension of TRUMPF.
+
+- **State.Status**: `MachineryItemState` and `MachineryOperationMode`, the `ChangeCause` of the extension
+  that put the machine there, and `Notification.ActiveAlerts`; a unit in malfunction is an alert of the
+  category Failure, with the unit as `SourceName`.
+- **History**: the state, the requests of the automation devices and the alerts on one time axis. Hover a
+  span for its `ChangeCause`, an error code or the source of an alert; a Failure crosses every lane.
+- **JobOrder**: the entry of `JobMonitoring.JobOrders` that runs and the
+  `WorkMasterMonitoring.ProgramExecution` in it. "Open over time" shows the job orders and their program
+  executions, each called by its work master.
+- **AutomationDeviceRequestStates**, **LaserTechnology**, **CollisionData** and **ConditionGuide**: the
+  extension. A tile of the ConditionGuide opens a chart of its value.
+
+It is a showcase: everything of it is in [`apps/app/src/showcases/trulaser`](../apps/app/src/showcases/trulaser/README.md)
+and its route. No tour screenshot shows the page: the stack the screenshots are taken from has no TruLaser.
+
 ## Optional: Titan, an assistant you talk to
 
 Titan is not part of the six stops either. A stack with `APP_SHOWCASES` set has the page

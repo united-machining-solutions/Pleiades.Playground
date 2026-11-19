@@ -347,6 +347,9 @@ services:
       GENUI_MCP_URL: http://genui-mcp:8080/mcp
       # Where Home places machines on sites and takes them off: the REST endpoints of the Sites API.
       SITES_API_URL: http://sites-api:8080
+      # The showcase TruLaser (APP_SHOWCASES) reads its values from the data services itself.
+      TIMESERIES_API_URL: http://timeseries-api:8080
+      EVENTS_API_URL: http://events-api:8080
       # The MCP servers of optional services whose tools the chat has too, see .env.example.
       APP_MCP_SERVERS: ${APP_MCP_SERVERS:-}
       # Where the browser hears live values at the broker: the host of the page and this port, or the whole
