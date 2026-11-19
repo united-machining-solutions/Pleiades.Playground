@@ -418,6 +418,10 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Example app: Live values with all machines shows only the graphs of a value some machine published, and
+  next to the title of a graph at most one value of now, where a single machine measures it; more stand
+  only as lines. Where machines are there and none published such a value, the page says so. With one machine
+  chosen, the page is as before.
 - Example app: "New chat" is back in the head of the chat panel, as a plus in the list and in every chat. It
   opens a new chat with no question yet and the cursor in its field; the list stays behind "All chats". After
   the first question asked in the panel, the field of the new chat keeps the cursor, so the next question
