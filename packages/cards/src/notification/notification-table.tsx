@@ -29,6 +29,31 @@ function Head() {
   )
 }
 
+/** The head of the table while its notifications are read: the same cells, grey where the names stand. */
+function HeadSkeleton() {
+  return (
+    <TableHeader>
+      <TableRow className="hover:bg-transparent">
+        <TableHead className="w-8">
+          <Skeleton className="size-3.5 rounded-full" />
+        </TableHead>
+        <TableHead>
+          <Skeleton className="h-3.5 w-16" />
+        </TableHead>
+        <TableHead className="text-right @lg/alarms:w-28">
+          <Skeleton className="ml-auto h-3.5 w-11" />
+        </TableHead>
+        <TableHead className="hidden w-28 @lg/alarms:table-cell">
+          <Skeleton className="h-3.5 w-12" />
+        </TableHead>
+        <TableHead className="hidden w-24 text-right @lg/alarms:table-cell">
+          <Skeleton className="ml-auto h-3.5 w-14" />
+        </TableHead>
+      </TableRow>
+    </TableHeader>
+  )
+}
+
 /** A line as tall as a line of text of its size, so a placeholder takes the room of the text. */
 function Line({ className, children }: { className: string; children: ReactNode }) {
   return <div className={`flex items-center ${className}`}>{children}</div>
@@ -80,12 +105,12 @@ export function NotificationTable({ notifications, time, turn }: { notifications
   )
 }
 
-/** The table while its notifications are read: its head, and rows of the height of a row with a code. */
+/** The table while its notifications are read: a grey head, and rows of the height of a row with a code. No word of it stands before the values do. */
 export function NotificationTableSkeleton({ rows }: { rows: number }) {
   return (
     <div className="@container/alarms" aria-hidden>
       <Table>
-        <Head />
+        <HeadSkeleton />
         <TableBody>
           {Array.from({ length: rows }, (_, row) => (
             <TableRow key={row} className="hover:bg-transparent">

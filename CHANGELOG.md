@@ -7,14 +7,18 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- OPC UA adapter: a person chooses the security of the sessions to a server under "Choose the security" on
+  the endpoints card of the chat, a weaker endpoint or `None` included. Before `None` is taken the card shows
+  a destructive warning; the endpoint taken, the proposal and the list of servers warn too. The adapter keeps
+  the choice per server (`PUT`, `GET` and `DELETE /security`) and takes it for the scan and for every
+  registration proposed after; the model never chooses. Every session of the scan is anonymous first: the
+  stored user logs in only where the endpoint takes no anonymous session, or the server refuses it.
 - Example app: "Where is My Job?" stands the machines by their step of manufacturing, in clusters in the order
   of DIN 8580 (printing, cutting, turning, milling, grinding, forming, joining). The step comes from
   `Identification.DeviceClass`, else from words of the model; the panel "Arrange" corrects it, kept in the
   browser. A tile has an icon for its step and the logo or name of its manufacturer. The perspectives stand
   below the map in one column, the list of orders shows those in circulation by default. The machine card of
-  the generative UI backend has `identity.deviceClass` (optional). The showcase "What if" (only with
-  `APP_SHOWCASES`) is the same page at `/what-if`, with made-up orders WI-… across the clusters; "Real orders"
-  turns them off. The page of the app shows the real orders in every build.
+  the generative UI backend has `identity.deviceClass` (optional).
 - Documentation answer and conflict cards with verbatim warnings, independently linked safety pages, package-wide source review and PDF quote highlighting.
 - Example app: a machine added over OPC UA in the chat goes on a site too, so Home shows it: on the only
   site there is, or on the one a person chooses on the proposal where there are several. A toast says it,
@@ -443,6 +447,11 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Example app: "Where is My Job?" is a showcase, only in a build with `APP_SHOWCASES`: at `/where-is-my-job`
+  and in the sidebar, it opens with made-up orders WI-… across the clusters, and "Real orders" turns them off.
+  The page "What if" at `/what-if` is gone, and so is the page of the app without the made-up orders: the
+  application alone has no "Where is My Job?".
+
 - Documentation answers use cards exclusively; retired the previous prose/source-list presentation.
 - Example app: a part of a page asks the server that has its tool, not only `genui-mcp`: the OPC UA adapter for
   `opcua_*`, an entry of `APP_MCP_SERVERS` for its tools. The drink card of the juice bar, the added OPC UA
@@ -455,6 +464,8 @@ All notable changes are documented here. The format follows
   the values come. The tiles of now stand without a card around them, and the machine card leaves out the line
   that only repeats what the control reports. A machine on a site that sent nothing for 24 hours shows
   "No data in the last 24 hours" instead of an error.
+- Machine page: while it opens, nothing of it is written yet. The titles, the labels of the tiles and the head of
+  the alarm table are grey placeholders too, and a reader of the screen hears "Loading" until the data comes.
 - Notification card: the alerts stand as a table, in the chat too: level, message with its code, raised,
   cleared and duration; where the card is narrow, the last two stand under the message. The sums at the foot
   are left out; the note on alerts not listed stands under the table, and the foot names when the card was

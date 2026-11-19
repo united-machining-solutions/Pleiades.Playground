@@ -108,16 +108,33 @@ export type Proposal = {
   notices?: Array<string>
 }
 
+/** The security of an endpoint: its mode and the short name of its policy. */
+export type Security = { securityMode: SecurityMode; securityPolicy: string }
+
+export type RankedEndpoint = Security & {
+  /** The one the adapter takes: the strongest, or the one a person chose. */
+  recommended: boolean
+  /** Without encryption, or with a policy that is no longer considered safe. */
+  weak: boolean
+  /** A session here logs in with the stored user: the endpoint takes no anonymous session. Absent from an older adapter. */
+  withUser?: boolean
+}
+
 export type RankedEndpoints = {
   url: string
   certificateThumbprint?: string
-  endpoints: Array<{ securityMode: SecurityMode; securityPolicy: string; recommended: boolean; weak: boolean }>
+  /** Strongest first. */
+  endpoints: Array<RankedEndpoint>
   /** The server accepts no session without a user. */
   needsUser?: boolean
   /** The server accepts a user name and a password on an encrypted endpoint. */
   acceptsUser?: boolean
   /** The user a person stored for this server. */
   user?: string
+  /** The security a person chose and the adapter keeps, also while the server does not offer it; absent without one. */
+  chosen?: Security
+  /** The adapter takes the chosen security now; false while the server does not offer it. */
+  chosenInEffect?: boolean
 }
 
 /** A machine an OPC UA server serves, as `opcua_machine_list` gives it. */
@@ -135,7 +152,7 @@ export type ServedMachine = {
 
 export type MachineList = {
   url: string
-  endpoint?: { securityMode: SecurityMode; securityPolicy: string; recommended: boolean; weak: boolean }
+  endpoint?: RankedEndpoint
   gateway: boolean
   machines: Array<ServedMachine>
 }
@@ -301,18 +318,69 @@ export function securityOf(endpoint: Pick<Endpoint, "securityMode" | "securityPo
   return endpoint.user ? `${security}, user ${endpoint.user}` : security
 }
 
+/** The key of a security, `SignAndEncrypt/Aes256_Sha256_RsaPss`: what the choice on the endpoints card names. */
+export function securityKey(security: Security): string {
+  return `${security.securityMode}/${security.securityPolicy}`
+}
+
 /**
- * What the endpoints card shows: the endpoint the adapter takes, the others the server offers (folded,
- * since a person cannot choose one there), and whether one of them has no security at all.
+ * What the endpoints card shows: the endpoint the adapter takes, the strongest the server offers, whether a person
+ * chose the one taken, a choice the adapter keeps but does not take now (the server does not offer it), the others
+ * (folded), and whether one of them has no security at all.
  */
-export function endpointSummary(values: Pick<RankedEndpoints, "endpoints">): {
-  used?: RankedEndpoints["endpoints"][number]
-  others: RankedEndpoints["endpoints"]
+export function endpointSummary(values: Pick<RankedEndpoints, "endpoints" | "chosen" | "chosenInEffect">): {
+  used?: RankedEndpoint
+  strongest?: RankedEndpoint
+  chosen: boolean
+  dormant?: Security
+  others: Array<RankedEndpoint>
   unsecured: boolean
 } {
   const used = values.endpoints.find((one) => one.recommended) ?? values.endpoints[0]
   const others = values.endpoints.filter((one) => one !== used)
-  return { used, others, unsecured: others.some((one) => one.securityMode === "None") }
+  const chosen =
+    used !== undefined &&
+    values.chosen !== undefined &&
+    values.chosenInEffect !== false &&
+    securityKey(values.chosen) === securityKey(used)
+  const dormant = values.chosen !== undefined && !chosen ? values.chosen : undefined
+  return { used, strongest: values.endpoints[0], chosen, dormant, others, unsecured: others.some((one) => one.securityMode === "None") }
+}
+
+/** What a person is told before and after choosing a security: how bad it is, and why. */
+export type SecurityWarning = { severity: "danger" | "caution"; title: string; text: string }
+
+/**
+ * The warning a security deserves, or none for an encrypted endpoint with a policy that is still safe. None is
+ * the strongest warning: nothing is signed or encrypted, and the adapter cannot tell its machine from another box
+ * at the same address.
+ */
+export function securityWarning(security: Security & { weak?: boolean }): SecurityWarning | undefined {
+  if (security.securityMode === "None") {
+    return {
+      severity: "danger",
+      title: "No security",
+      text:
+        "Nothing between the adapter and the machine is signed or encrypted: anyone on that network can read the values, " +
+        "change them on the way or pretend to be the machine. Choose it only on a network you trust, for example to try a " +
+        "machine whose server does not trust the adapter yet, and go back to an encrypted endpoint once it does.",
+    }
+  }
+  if (security.securityMode === "Sign") {
+    return {
+      severity: "caution",
+      title: "Signed only",
+      text: "The values cannot be changed on the way, but anyone on that network can read them.",
+    }
+  }
+  if (security.weak) {
+    return {
+      severity: "caution",
+      title: "An old policy",
+      text: `${security.securityPolicy} is no longer considered safe. Choose a stronger endpoint if the server offers one.`,
+    }
+  }
+  return undefined
 }
 
 /** What the endpoints card asks of the person about a user: nothing, to enter one, or that one may be entered. */
