@@ -24,7 +24,8 @@ harness.
   machine, live. A choice above the graphs shows one machine or all of them, and stays in the URL
   (`?machine=`). With all of them, a value no machine published has no graph, and the value of now stands
   next to the title of a graph only where a single machine measures it. With one machine chosen, every signal
-  it published in the last 24 hours has a graph of its own, found anew each time the machine is chosen.
+  it published in the last 24 hours has a graph of its own, found anew each time the machine is chosen. A
+  button at the top right of a graph shows it enlarged; its X closes it.
 - **Pages** (`/pages`) are what a person keeps of the chat, in this browser. "Save as page" under an answer
   of the chat makes one: all the cards of that answer, in their order, titled with the question. It stands
   under an answer that has ended and for which the chat drew a card, and needs no language model: the app

@@ -152,7 +152,8 @@ The sidebar leads to a second overview, **Live values** (<http://localhost:5600/
 physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
 a line for each machine. A choice above the graphs shows all machines or one. With all of them, a value no
 machine published has no graph; with one, every signal that machine publishes gets a graph of its own,
-whatever it is. It has no picture in this tour.
+whatever it is. The arrows at the top right of a graph show it enlarged, and its X closes it again. It has no
+picture in this tour.
 
 **In the code:** [`apps/app/src/routes/live.tsx`](../apps/app/src/routes/live.tsx) is the page,
 [`packages/cards/src/measurement/measurement-graph.tsx`](../packages/cards/src/measurement/measurement-graph.tsx)

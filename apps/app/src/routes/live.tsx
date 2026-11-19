@@ -2,14 +2,17 @@ import { clock } from "@pleiades/cards/machine/format.ts"
 import { labelOf } from "@pleiades/cards/machine/in-words.ts"
 import type { MachineMeasurements, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import { MeasurementGraph } from "@pleiades/cards/measurement/measurement-graph.tsx"
+import { quantityLabel } from "@pleiades/cards/measurement/words.ts"
 import { MOST_LINES } from "@pleiades/cards/timeseries/contract.ts"
 import type { SeriesLine, TimeseriesSeries } from "@pleiades/cards/timeseries/contract.ts"
 import { signalLabel } from "@pleiades/cards/timeseries/words.ts"
+import { Button } from "@pleiades/ui/components/button"
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@pleiades/ui/components/dialog"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { createFileRoute } from "@tanstack/react-router"
-import { GaugeIcon } from "lucide-react"
+import { GaugeIcon, Maximize2Icon } from "lucide-react"
 import { memo, useMemo } from "react"
 import type { ReactNode } from "react"
 
@@ -216,17 +219,45 @@ function SignalGraph({ line, page, machines }: { line: SeriesLine; page: Signals
   const { from, to, instants } = page.series
   const unit = line.kind === "yesNo" ? null : (line.unit ?? "one")
   const newest = page.newest[line.topic]
+  const title = signalLabel(line.path)
   return (
-    <MeasurementGraph
-      series={{ quantity: line.path, unit, lines: [line], from, to, instants }}
-      title={signalLabel(line.path)}
-      machines={machines}
-      current={
-        newest === undefined
-          ? []
-          : [{ machine: line.machine, measurements: [{ quantity: line.path, value: newest.value, unit, stale: silentNow(page) }] }]
-      }
-    />
+    <Enlargeable title={title}>
+      {(enlarged) => (
+        <MeasurementGraph
+          series={{ quantity: line.path, unit, lines: [line], from, to, instants }}
+          title={title}
+          machines={machines}
+          current={
+            newest === undefined
+              ? []
+              : [{ machine: line.machine, measurements: [{ quantity: line.path, value: newest.value, unit, stale: silentNow(page) }] }]
+          }
+          {...enlarged}
+        />
+      )}
+    </Enlargeable>
+  )
+}
+
+/**
+ * A graph with a button at its top right that shows it enlarged, over the page. The enlarged graph has
+ * an X at its top right that closes it, and the page is as it was. Both stay live.
+ */
+function Enlargeable({ title, children }: { title: string; children: (enlarged: { action?: ReactNode; large?: boolean }) => ReactNode }) {
+  return (
+    <Dialog>
+      {children({
+        action: (
+          <DialogTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Enlarge ${title}`} />}>
+            <Maximize2Icon />
+          </DialogTrigger>
+        ),
+      })}
+      <DialogContent className="gap-0 p-0 sm:max-w-[min(calc(100%-2rem),80rem)]">
+        <DialogTitle className="sr-only">{title}</DialogTitle>
+        {children({ large: true })}
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -261,13 +292,18 @@ function nowOf(current: ReadonlyArray<MachineMeasurements>, quantity: string): s
 const QuantityGraph = memo(
   function QuantityGraph({ quantity, from, to, instants, machines, shown, chosen, current }: QuantityGraphProps) {
     return (
-      <MeasurementGraph
-        series={{ ...quantity, lines: quantity.lines.filter((line) => shown.includes(line.machine)), from, to, instants }}
-        // Every machine, chosen or not, so that each keeps its colour.
-        machines={machines}
-        // With all machines at most one value of now stands next to the title (live/shown.ts).
-        current={nowNextToTitle(current, shown, quantity.quantity, chosen)}
-      />
+      <Enlargeable title={quantityLabel[quantity.quantity]}>
+        {(enlarged) => (
+          <MeasurementGraph
+            series={{ ...quantity, lines: quantity.lines.filter((line) => shown.includes(line.machine)), from, to, instants }}
+            // Every machine, chosen or not, so that each keeps its colour.
+            machines={machines}
+            // With all machines at most one value of now stands next to the title (live/shown.ts).
+            current={nowNextToTitle(current, shown, quantity.quantity, chosen)}
+            {...enlarged}
+          />
+        )}
+      </Enlargeable>
     )
   },
   (before, after) =>

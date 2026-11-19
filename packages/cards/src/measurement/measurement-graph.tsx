@@ -1,7 +1,8 @@
 import { memo } from "react"
+import type { ReactNode } from "react"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@pleiades/ui/components/card"
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@pleiades/ui/components/chart"
 import type { ChartConfig } from "@pleiades/ui/components/chart"
 import { clock } from "../machine/format.ts"
@@ -27,17 +28,23 @@ type Now = { machine: string; measurements: ReadonlyArray<Pick<Measurement, "val
  *
  * `machines` names every machine of the page in a fixed order: a machine keeps its colour in every
  * graph, also in one where it has no line. `title` names a graph of another signal than a quantity.
+ * `action` stands at the top right of the card, such as a button that enlarges it; `large` draws the
+ * lines as high as most of the screen, for a graph that is enlarged.
  */
 export function MeasurementGraph({
   series,
   title,
   machines,
   current,
+  action,
+  large = false,
 }: {
   series: QuantitySeries
   title?: string
   machines: ReadonlyArray<string>
   current: ReadonlyArray<Now>
+  action?: ReactNode
+  large?: boolean
 }) {
   const { quantity, unit, lines } = series
   const now = current.flatMap((one) => {
@@ -64,6 +71,7 @@ export function MeasurementGraph({
             ))}
           </CardDescription>
         )}
+        {action && <CardAction>{action}</CardAction>}
       </CardHeader>
       <CardContent>
         {lines.length === 0 ? (
@@ -71,7 +79,7 @@ export function MeasurementGraph({
             No machine published this value between {clock(series.from)} and {clock(series.to)}.
           </p>
         ) : (
-          <Lines series={series} machines={machines} />
+          <Lines series={series} machines={machines} large={large} />
         )}
       </CardContent>
     </Card>
@@ -84,7 +92,7 @@ export function MeasurementGraph({
  * often, and drawing them is what takes the time.
  */
 const Lines = memo(
-  function Lines({ series, machines }: { series: QuantitySeries; machines: ReadonlyArray<string> }) {
+  function Lines({ series, machines, large }: { series: QuantitySeries; machines: ReadonlyArray<string>; large: boolean }) {
     const { unit, lines } = series
     const yesOrNo = unit === null
     const keyOf = (machine: string) => `m${machines.indexOf(machine)}`
@@ -109,7 +117,7 @@ const Lines = memo(
     const valueText = (value: number) => (yesOrNo ? (value ? "yes" : "no") : measuredValue({ value, unit }))
 
     return (
-      <ChartContainer config={config} className="aspect-auto h-48 w-full">
+      <ChartContainer config={config} className={large ? "aspect-auto h-[60vh] w-full" : "aspect-auto h-48 w-full"}>
         <LineChart accessibilityLayer data={rows} margin={{ left: 0, right: 12 }}>
           <CartesianGrid vertical={false} />
           <XAxis
@@ -176,5 +184,6 @@ const Lines = memo(
     before.series.instants === after.series.instants &&
     before.series.lines.length === after.series.lines.length &&
     before.series.lines.every((line, index) => line === after.series.lines[index]) &&
-    before.machines.join() === after.machines.join(),
+    before.machines.join() === after.machines.join() &&
+    before.large === after.large,
 )
