@@ -110,8 +110,9 @@ A machine does not show up on Home by itself: people put it on a site. A machine
 hours and stands on no site is named in a bar above the list, a few by name and how many more. "Review and add"
 and "Add machine" at the top of the page open the same dialog: the machines that sent data, seven a page, found
 by name, manufacturer, state, id or when they last sent. Several are chosen at once and go to one site and hall,
-which start where this browser added machines last. A machine that sent nothing is added by its id or by its
-name, on request, and shows "No data" until it sends; an id or name close to a machine that sends offers that
+which start where this browser added machines last. A machine that sent nothing is added on request, by its
+name with its manufacturer, model and serial number, from which the app forms its id, and shows "No data" until
+it sends; an id or name close to a machine that sends offers that
 machine first ("Did you mean"), so a typing error does not stay without data. A machine on a site that is
 chosen there is moved. A site or hall is made while its name is typed; "Add site" at the end of the sites makes
 one alone, and "Add hall" in the menu "⋯" of the head of a site adds a hall to it. The menu "⋯" of a row moves

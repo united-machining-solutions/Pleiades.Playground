@@ -270,8 +270,8 @@ export function whereOf(site: SiteChoice, hall: HallChoice, company: string): Pi
 export type PlaceStart = {
   machines?: ReadonlyArray<string> | undefined
   /**
-   * Machines named by a name only, each with the ids it may mean: a person gives each its id. An id formed
-   * already from what a person said of the machine stands in the field, with where it comes from (`from`).
+   * Machines named by a name only, each with the ids it may mean: a person says what each is. An id formed
+   * already from what a person said of the machine fills its fields; `from` is kept for the caller and not shown.
    */
   named?: ReadonlyArray<{ name: string; meant: ReadonlyArray<string>; machine?: string | undefined; from?: string | undefined }> | undefined
   /** null: no place yet, a person chooses one; left out: the place used last. */
@@ -364,39 +364,158 @@ export function chosenWithAll(chosen: ReadonlySet<string>, found: ReadonlyArray<
   return next
 }
 
+/** A manufacturer whose machines send: the name it gives itself, and the first part of the ids of its machines. */
+export type Maker = { name: string; part: string }
+
+/** The longest part of a machine id, as the binding cuts it (MachineBinding.MachineIdPartLength). */
+const ID_PART_LENGTH = 64
+
 /**
- * A machine a person named by a name only, as "MFP 7": the name, the ids it may mean, and the id a person
- * gives it, which links it to its data. It is added while `chosen`, once its id is one.
+ * One part of a machine id, by the rule of the binding (ADR-0015, MachineBinding.MachineIdPart): ä, ö, ü and
+ * ß written out, other accents dropped, every character but A-Z, a-z, 0-9 and - a -, several - one, none at
+ * either end, at most 64 characters. "TruPunch 5000" is TruPunch-5000. Nothing typed is an empty part.
  */
-export type Named = { name: string; meant: ReadonlyArray<string>; machine: string; chosen: boolean; from?: string | undefined }
+export function machineIdPart(text: string): string {
+  const written = text
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/Ä/g, "Ae")
+    .replace(/Ö/g, "Oe")
+    .replace(/Ü/g, "Ue")
+    .replace(/ß/g, "ss")
+    .normalize("NFD")
+    .replace(/\p{Mn}/gu, "")
+  return written
+    .replace(/[^A-Za-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, ID_PART_LENGTH)
+    .replace(/-$/, "")
+}
+
+/** The manufacturers of the machines that send and of those on a site, each once, in the order of the list. */
+export function makersOf(list: Pick<SiteList, "unplaced" | "sites">): Array<Maker> {
+  const machines = [
+    ...list.unplaced.map((one) => ({ machine: one.machine, name: one.now.identity.manufacturer })),
+    ...list.sites.flatMap((site) =>
+      site.halls.flatMap((hall) => hall.machines.map((one) => ({ machine: one.machine, name: one.now?.identity.manufacturer ?? null }))),
+    ),
+  ]
+  const makers = new Map<string, Maker>()
+  for (const { machine, name } of machines) {
+    const part = manufacturerOfId(machine)
+    if (part === "") continue
+    const known = makers.get(part)
+    // The name a manufacturer gives itself wins over the part of its ids, where a machine reports it.
+    if (!known || (known.name === part && name)) makers.set(part, { name: name || part, part })
+  }
+  return [...makers.values()]
+}
+
+/**
+ * The first part of a machine id from the manufacturer a person typed: the part of a manufacturer that sends,
+ * found by its name or its part; else from a web address as the binding forms it, its domain without www. and
+ * top-level domain, every dot a -; else the name, written as a part, in lower case as a domain is.
+ */
+export function makerPartOf(typed: string, makers: ReadonlyArray<Maker>): string {
+  const text = typed.trim()
+  const lower = text.toLowerCase()
+  const known = makers.find((one) => one.name.toLowerCase() === lower || one.part.toLowerCase() === lower)
+  if (known) return known.part
+  if (/^([a-z]+:\/\/)?[^\s/]+\.[a-z]{2,}(\/.*)?$/i.test(text)) {
+    const host = lower.replace(/^[a-z]+:\/\//, "").split("/")[0]!.replace(/^www\./, "")
+    const domain = host.slice(0, host.lastIndexOf("."))
+    return machineIdPart(domain.replace(/\./g, "-"))
+  }
+  return machineIdPart(text).toLowerCase()
+}
+
+/** What a person says a machine is: who made it, its model and its serial number. */
+export type MachineParts = { manufacturer: string; model: string; serial: string }
+
+/** The machine id of what a person said, by ADR-0015; undefined while a part is missing. */
+export function machineIdFrom(parts: MachineParts, makers: ReadonlyArray<Maker>): string | undefined {
+  const pieces = [makerPartOf(parts.manufacturer, makers), machineIdPart(parts.model.trim()), machineIdPart(parts.serial.trim())]
+  return pieces.every((one) => one !== "") ? pieces.join("_") : undefined
+}
+
+/** The parts of a machine id, for the fields: the manufacturer by the name it gives itself where it sends. */
+export function partsOfId(machine: string, makers: ReadonlyArray<Maker>): MachineParts | undefined {
+  const parts = machine.trim().split("_")
+  if (parts.length !== 3 || parts.some((one) => one === "")) return undefined
+  const [part, model, serial] = parts as [string, string, string]
+  return { manufacturer: makers.find((one) => one.part === part)?.name ?? part, model, serial }
+}
+
+/**
+ * A machine a person named by a name only, as "MFP 7": the name, the ids it may mean, and what a person says
+ * it is, its manufacturer, model and serial number, from which its id is formed; or, for those who know it,
+ * the id itself (`byId`, in `machine`). It is added while `chosen`, once its id is one.
+ */
+export type Named = MachineParts & { name: string; meant: ReadonlyArray<string>; chosen: boolean; byId: boolean; machine: string }
 
 /**
  * The machines a form starts with named by a name only, chosen: without an id yet, or with one formed from
- * what a person said of the machine (`from`, as "TRUMPF · TruPunch 5000 · A1234"), which stays a person's to change.
+ * what a person said of the machine, which fills the three fields and stays a person's to change.
  */
-export function namedOf(start: PlaceStart | undefined): Array<Named> {
+export function namedOf(start: PlaceStart | undefined, makers: ReadonlyArray<Maker>): Array<Named> {
   return (start?.named ?? [])
     .map((one) => {
       const machine = one.machine?.trim() ?? ""
-      const from = machine !== "" ? one.from?.trim() || undefined : undefined
-      return { name: one.name.trim(), meant: [...one.meant], machine, chosen: true, ...(from && { from }) }
+      const parts = partsOfId(machine, makers)
+      return {
+        name: one.name.trim(),
+        meant: [...one.meant],
+        chosen: true,
+        // An id of another shape stays as it is, in the field of the id.
+        byId: machine !== "" && parts === undefined,
+        machine,
+        ...(parts ?? { manufacturer: "", model: "", serial: "" }),
+      }
     })
     .filter((one) => one.name !== "")
 }
 
-/** Why the id given to a machine named by a name is none yet, or undefined where it is one. */
-export function problemOfNamed(machine: string): string | undefined {
-  const typed = machine.trim()
-  if (typed === "") return "Type its machine id: manufacturer_model_serial."
-  return problemOfId(typed, "machine id") ?? (isMachineId(typed) ? undefined : "A machine id has three parts joined by _: manufacturer_model_serial.")
+/** A named machine with the fields of a machine near it, whose id a person chose from "Did you mean". */
+export function namedMeaning(named: Named, machine: string, makers: ReadonlyArray<Maker>): Named {
+  const parts = partsOfId(machine, makers)
+  return parts ? { ...named, ...parts, byId: false, machine } : { ...named, byId: true, machine }
 }
 
-/** The named machines that are added: those chosen whose id is one. */
-export function namedReady(named: ReadonlyArray<Named>): Array<Named> {
-  return named.filter((one) => one.chosen && problemOfNamed(one.machine) === undefined)
+/** What keeps a named machine from being added, field by field; nothing where its id is one. */
+export type NamedProblems = { manufacturer?: string; model?: string; serial?: string; machine?: string }
+
+/** Why the fields of a named machine give no id yet, field by field. */
+export function problemsOfNamed(named: Named, makers: ReadonlyArray<Maker>): NamedProblems {
+  if (named.byId) {
+    const typed = named.machine.trim()
+    if (typed === "") return { machine: "Type its machine id: manufacturer_model_serial." }
+    const problem = problemOfId(typed, "machine id") ?? (isMachineId(typed) ? undefined : "A machine id has three parts joined by _: manufacturer_model_serial.")
+    return problem ? { machine: problem } : {}
+  }
+  return {
+    ...(makerPartOf(named.manufacturer, makers) === "" && { manufacturer: "Say who made it." }),
+    ...(machineIdPart(named.model.trim()) === "" && { model: "Say its model." }),
+    ...(machineIdPart(named.serial.trim()) === "" && { serial: "Say its serial number." }),
+  }
+}
+
+/** The id a named machine links to: the one typed, or the one formed from its fields; undefined while none. */
+export function idOfNamed(named: Named, makers: ReadonlyArray<Maker>): string | undefined {
+  if (Object.keys(problemsOfNamed(named, makers)).length > 0) return undefined
+  return named.byId ? named.machine.trim() : machineIdFrom(named, makers)
+}
+
+/** The named machines that are added, each with its id: those chosen whose id is one. */
+export function namedReady(named: ReadonlyArray<Named>, makers: ReadonlyArray<Maker>): Array<Named & { id: string }> {
+  return named.flatMap((one) => {
+    const id = one.chosen ? idOfNamed(one, makers) : undefined
+    return id === undefined ? [] : [{ ...one, id }]
+  })
 }
 
 /** Whether a named machine keeps the form from sending: chosen, and its id none yet. */
-export function namedMissing(named: ReadonlyArray<Named>): boolean {
-  return named.some((one) => one.chosen && problemOfNamed(one.machine) !== undefined)
+export function namedMissing(named: ReadonlyArray<Named>, makers: ReadonlyArray<Maker>): boolean {
+  return named.some((one) => one.chosen && idOfNamed(one, makers) === undefined)
 }

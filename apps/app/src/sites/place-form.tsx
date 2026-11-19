@@ -15,6 +15,7 @@ import {
   candidatesOf,
   fromOf,
   makeInWords,
+  makersOf,
   meantBy,
   namedMissing,
   namedOf,
@@ -85,6 +86,7 @@ export function PlaceForm({
   const listed = useMemo(() => siteChoicesOf(list), [list])
   const fromList = useMemo(() => candidatesOf(list), [list])
   const placedOnes = useMemo(() => placedCandidatesOf(list), [list])
+  const makers = useMemo(() => makersOf(list), [list])
   // Where the form starts is read once, when it is drawn; the list may change under it afterwards.
   const [first] = useState(() => {
     const handed = mode.kind === "move" ? { site: { siteId: mode.placed.siteId }, hall: mode.placed.hall } : start
@@ -95,7 +97,7 @@ export function PlaceForm({
     }
   })
   const [more, setMore] = useState<ReadonlyArray<Candidate>>(first.machines.more)
-  const [named, setNamed] = useState<ReadonlyArray<Named>>(() => (mode.kind === "add" ? namedOf(start) : []))
+  const [named, setNamed] = useState<ReadonlyArray<Named>>(() => (mode.kind === "add" ? namedOf(start, makers) : []))
   const [chosen, setChosen] = useState<ReadonlySet<string>>(first.machines.chosen)
   const [query, setQuery] = useState("")
   const [made, setMade] = useState<SiteChoice | null>(first.place.site?.siteId === null ? first.place.site : null)
@@ -122,7 +124,7 @@ export function PlaceForm({
   // A machine to move that stands at the place chosen already has nothing to do, and is not sent.
   const picked = candidates.filter((one) => chosen.has(one.machine) && !standsAt(one, site, hall))
   const moves = picked.filter((one) => one.standsOn !== null).length
-  const ready = namedReady(named)
+  const ready = namedReady(named, makers)
   const count = picked.length + ready.length
   // Handed no place, the form asks for one from the start, and sends nothing until it has one.
   const placeAsked = mode.kind === "add" && start?.site === null
@@ -131,7 +133,7 @@ export function PlaceForm({
   const making = mode.kind === "site" ? makeInWords(site, hall) : null
   const one = mode.kind === "move" || (mode.kind === "add" && picked.length + named.filter((each) => each.chosen).length === 1)
   const missing = {
-    machines: tried && mode.kind === "add" && count === 0 && !namedMissing(named),
+    machines: tried && mode.kind === "add" && count === 0 && !namedMissing(named, makers),
     site: (tried || placeAsked) && site === null,
     company: tried && site !== null && site.siteId === null && company.trim() === "",
     // Making alone needs something new: a site, or a hall of a site that is there.
@@ -156,7 +158,7 @@ export function PlaceForm({
         : [
             ...picked.map((candidate) => ({ request: { machine: candidate.machine, ...place, displayName: name, from: fromOf(candidate) }, what: candidate.what })),
             // A machine named by its name is known by it, also where several go at once.
-            ...ready.map((each) => ({ request: { machine: each.machine.trim(), ...place, displayName: one ? name : each.name, from: null }, what: each.name })),
+            ...ready.map((each) => ({ request: { machine: each.id, ...place, displayName: one ? name : each.name, from: null }, what: each.name })),
           ]
     const outcome = await onPlace(machines)
     if (!outcome.ok) return outcome.reason
@@ -171,7 +173,7 @@ export function PlaceForm({
     const incomplete =
       site === null ||
       (site.siteId === null && company.trim() === "") ||
-      (mode.kind === "add" && (count === 0 || namedMissing(named))) ||
+      (mode.kind === "add" && (count === 0 || namedMissing(named, makers))) ||
       (mode.kind === "site" && making === null)
     if (incomplete) return
     setBusy(true)
@@ -231,11 +233,12 @@ export function PlaceForm({
             missing={missing.machines}
             listed={shows}
             named={named}
+            makers={makers}
             tried={tried}
             onNamed={(index, change) => setNamed((before) => before.map((each, at) => (at === index ? { ...each, ...change } : each)))}
             onAddNamed={(name) => {
               const meant = meantBy(name, candidates).map((each) => each.machine)
-              setNamed((before) => [...before, { name, meant, machine: "", chosen: true }])
+              setNamed((before) => [...before, { name, meant, chosen: true, byId: false, machine: "", manufacturer: "", model: "", serial: "" }])
               // The only machine of the form is known by the name it was added by.
               if (displayName === "" && count === 0) setDisplayName(name)
               setQuery("")

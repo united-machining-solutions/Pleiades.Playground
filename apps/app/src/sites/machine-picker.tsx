@@ -8,7 +8,8 @@ import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/ale
 import { Badge } from "@pleiades/ui/components/badge"
 import { Button } from "@pleiades/ui/components/button"
 import { Checkbox } from "@pleiades/ui/components/checkbox"
-import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@pleiades/ui/components/field"
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@pleiades/ui/components/combobox"
+import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@pleiades/ui/components/field"
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@pleiades/ui/components/input-group"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@pleiades/ui/components/item"
 import { Input } from "@pleiades/ui/components/input"
@@ -16,8 +17,8 @@ import { MapPinIcon, PlusIcon, SearchIcon, TriangleAlertIcon } from "lucide-reac
 import { useState } from "react"
 import type { KeyboardEvent } from "react"
 
-import { choiceOfAll, chosenWithAll, fieldsOf, isMachineId, matches, meantBy, pickerPageOf, problemOfNamed, whereInWords } from "./choosing.ts"
-import type { Candidate, Named } from "./choosing.ts"
+import { choiceOfAll, chosenWithAll, fieldsOf, idOfNamed, isMachineId, matches, meantBy, namedMeaning, partsOfId, pickerPageOf, problemsOfNamed, whereInWords } from "./choosing.ts"
+import type { Candidate, Maker, Named, NamedProblems } from "./choosing.ts"
 import { typedMachineOf } from "./unplaced.ts"
 
 // The machines "Add machine" offers, as a list a person searches: each with what tells it apart, a box
@@ -73,61 +74,155 @@ function Row({ candidate, asOf }: { candidate: Candidate; asOf: string }) {
 }
 
 /**
- * A machine named by a name only: the name, that it sent no data, the field of its id, and the machines
- * the name may mean, whose id a click puts into the field.
+ * Why the text of the field of the manufacturer changes, where it is what a person typed or chose. When the list
+ * closes, the Combobox clears a text that is no entry of it ("input-clear"): a new manufacturer is such a text.
+ */
+const KEPT_REASONS = new Set(["input-change", "clear-press", "item-press"])
+
+/**
+ * A machine named by a name only: the name, that it sent no data yet, and what it is, its manufacturer, model
+ * and serial number, from which the app forms its id; the id shows quietly below, and a person who knows it
+ * types the id instead. A machine near the name sets the fields with a click ("Did you mean").
  */
 function NamedRow({
   id,
   named,
   candidates,
+  makers,
   tried,
   onChange,
 }: {
   id: string
   named: Named
   candidates: ReadonlyArray<Candidate>
+  makers: ReadonlyArray<Maker>
   tried: boolean
   onChange: (change: Partial<Named>) => void
 }) {
-  const problem = problemOfNamed(named.machine)
-  const shown = named.chosen && problem !== undefined && (tried || named.machine.trim() !== "")
+  const problems = named.chosen ? problemsOfNamed(named, makers) : {}
+  // A field says what is missing once a person sent the form, or typed in it.
+  const shown = (field: keyof NamedProblems, typed: string) => (tried || typed.trim() !== "" ? problems[field] : undefined)
+  const linked = named.chosen ? idOfNamed(named, makers) : undefined
+  const makerItems = makers.map((one) => one.name)
   return (
     <Item variant="outline" size="sm" className="items-start">
-      <Checkbox
-        aria-label={`Add ${named.name}`}
-        checked={named.chosen}
-        onCheckedChange={(on) => onChange({ chosen: on })}
-        className="mt-0.5"
-      />
+      <Checkbox aria-label={`Add ${named.name}`} checked={named.chosen} onCheckedChange={(on) => onChange({ chosen: on })} className="mt-0.5" />
       <ItemContent className="gap-3">
         <div className="flex flex-col gap-1">
           <ItemTitle>
             {named.name}
             <Badge variant="outline">No data</Badge>
           </ItemTitle>
-          <ItemDescription>No data from it in the last 24 hours; it shows “No data” until it sends.</ItemDescription>
+          <ItemDescription>{named.name} has sent no data yet. Say what it is, and its data will find it once it sends.</ItemDescription>
         </div>
-        <Field data-invalid={shown || undefined} data-disabled={!named.chosen || undefined}>
-          <FieldLabel htmlFor={id}>Machine id</FieldLabel>
-          <Input
-            id={id}
-            value={named.machine}
-            spellCheck={false}
-            autoComplete="off"
-            placeholder="manufacturer_model_serial"
-            disabled={!named.chosen}
-            aria-invalid={shown || undefined}
-            onChange={(event) => onChange({ machine: event.target.value })}
-          />
-          {named.from && <FieldDescription className="text-foreground">From {named.from}</FieldDescription>}
-          <FieldDescription>manufacturer_model_serial, as the machine publishes it: this links it to its data.</FieldDescription>
-          {shown && <FieldError>{problem}</FieldError>}
-        </Field>
+        {named.byId ? (
+          <Field data-invalid={Boolean(shown("machine", named.machine)) || undefined} data-disabled={!named.chosen || undefined}>
+            <FieldLabel htmlFor={`${id}-machine`}>Machine id</FieldLabel>
+            <Input
+              id={`${id}-machine`}
+              value={named.machine}
+              spellCheck={false}
+              autoComplete="off"
+              placeholder="manufacturer_model_serial"
+              disabled={!named.chosen}
+              aria-invalid={Boolean(shown("machine", named.machine)) || undefined}
+              onChange={(event) => onChange({ machine: event.target.value })}
+            />
+            {shown("machine", named.machine) && <FieldError>{shown("machine", named.machine)}</FieldError>}
+          </Field>
+        ) : (
+          <FieldGroup className="grid gap-3 sm:grid-cols-3">
+            <Field data-invalid={Boolean(shown("manufacturer", named.manufacturer)) || undefined} data-disabled={!named.chosen || undefined}>
+              <FieldLabel htmlFor={`${id}-manufacturer`}>Manufacturer</FieldLabel>
+              {/* The manufacturers that send are offered; any other is typed. */}
+              <Combobox
+                items={makerItems}
+                inputValue={named.manufacturer}
+                // What a person types, or the manufacturer chosen, is the value; the field is not reset when the list closes.
+                onInputValueChange={(next: string, details: { reason: string }) => {
+                  if (KEPT_REASONS.has(details.reason)) onChange({ manufacturer: next })
+                }}
+                disabled={!named.chosen}
+              >
+                <ComboboxInput
+                  id={`${id}-manufacturer`}
+                  className="w-full"
+                  showTrigger={makerItems.length > 0}
+                  autoComplete="off"
+                  disabled={!named.chosen}
+                  aria-invalid={Boolean(shown("manufacturer", named.manufacturer)) || undefined}
+                />
+                <ComboboxContent>
+                  <ComboboxEmpty>A new manufacturer: keep typing.</ComboboxEmpty>
+                  <ComboboxList>
+                    {(item: string) => (
+                      <ComboboxItem key={item} value={item}>
+                        {item}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxContent>
+              </Combobox>
+              {shown("manufacturer", named.manufacturer) && <FieldError>{shown("manufacturer", named.manufacturer)}</FieldError>}
+            </Field>
+            <Field data-invalid={Boolean(shown("model", named.model)) || undefined} data-disabled={!named.chosen || undefined}>
+              <FieldLabel htmlFor={`${id}-model`}>Model</FieldLabel>
+              <Input
+                id={`${id}-model`}
+                value={named.model}
+                autoComplete="off"
+                disabled={!named.chosen}
+                aria-invalid={Boolean(shown("model", named.model)) || undefined}
+                onChange={(event) => onChange({ model: event.target.value })}
+              />
+              {shown("model", named.model) && <FieldError>{shown("model", named.model)}</FieldError>}
+            </Field>
+            <Field data-invalid={Boolean(shown("serial", named.serial)) || undefined} data-disabled={!named.chosen || undefined}>
+              <FieldLabel htmlFor={`${id}-serial`}>Serial number</FieldLabel>
+              <Input
+                id={`${id}-serial`}
+                value={named.serial}
+                autoComplete="off"
+                disabled={!named.chosen}
+                aria-invalid={Boolean(shown("serial", named.serial)) || undefined}
+                onChange={(event) => onChange({ serial: event.target.value })}
+              />
+              {shown("serial", named.serial) && <FieldError>{shown("serial", named.serial)}</FieldError>}
+            </Field>
+          </FieldGroup>
+        )}
+        {named.chosen && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="text-xs text-muted-foreground">
+              {linked ? (
+                <>
+                  Links to data from <span className="break-all">{linked}</span>
+                </>
+              ) : named.byId ? (
+                "The id as the machine publishes it: manufacturer_model_serial."
+              ) : (
+                "Its id is formed from these three, as the machine publishes it."
+              )}
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() =>
+                named.byId
+                  ? onChange({ byId: false, ...(partsOfId(named.machine, makers) ?? {}) })
+                  : onChange({ byId: true, machine: linked ?? named.machine })
+              }
+            >
+              {named.byId ? "Say manufacturer, model and serial number instead" : "Enter id instead"}
+            </Button>
+          </div>
+        )}
         {named.chosen && named.meant.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">Did you mean</span>
             {named.meant.map((machine) => (
-              <Button key={machine} type="button" variant="outline" size="xs" onClick={() => onChange({ machine })}>
+              <Button key={machine} type="button" variant="outline" size="xs" onClick={() => onChange(namedMeaning(named, machine, makers))}>
                 {candidates.find((one) => one.machine === machine)?.what ?? machine}
               </Button>
             ))}
@@ -168,6 +263,7 @@ export function MachinePicker({
   missing,
   listed = "all",
   named = [],
+  makers = [],
   onNamed,
   onAddNamed,
   tried = false,
@@ -184,6 +280,8 @@ export function MachinePicker({
   missing: boolean
   listed?: "chosen" | "all" | undefined
   named?: ReadonlyArray<Named> | undefined
+  /** The manufacturers that send, offered for a machine named by a name. */
+  makers?: ReadonlyArray<Maker> | undefined
   /** Changes the named machine at `index`: its id, or whether it is added. */
   onNamed?: ((index: number, change: Partial<Named>) => void) | undefined
   /** Adds a machine by the name a person searched for, to give it its id. */
@@ -222,6 +320,7 @@ export function MachinePicker({
       id={`${id}-named-${index}`}
       named={one}
       candidates={candidates}
+      makers={makers}
       tried={tried}
       onChange={(change) => onNamed?.(index, change)}
     />
