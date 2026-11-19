@@ -425,6 +425,13 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Home: "Add machine" and "Review and add" open one list of the machines that sent data in the last 24 hours,
+  searched by name, manufacturer, state, id and last data, seven a page, and several go to one site and hall
+  at once. A typed id or name that sent nothing offers only near machines ("Did you mean") and is added
+  without data on request; a machine on a site is moved from there. Sites and halls are made while typing,
+  "Add site" and "Add hall" make them alone, and the next add starts at the place used last.
+- Home and the machine card in the chat: the whole row of a machine leads to its page; its buttons stay clicks
+  of their own, and the keyboard meets one link a row.
 - Machine page: while it opens, every part shows a grey placeholder of its form and size, so nothing moves when
   the values come. The tiles of now stand without a card around them, and the machine card leaves out the line
   that only repeats what the control reports. A machine on a site that sent nothing for 24 hours shows
@@ -620,6 +627,7 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Home: on a narrow page the head of a site no longer lies over the chat below it.
 - Example app: `/discover` takes a mistyped or shortened address as the address it is. `opc.tcp//host:port`
   became `opc.tcp://opc.tcp//host:port:4840`, a machine name with the default port; a mistyped `opc.tcp` at
   the start, also `opc.tcp:host:port`, is now written right, and `host:port` or `host:port/path` without a
