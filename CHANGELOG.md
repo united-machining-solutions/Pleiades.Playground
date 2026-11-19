@@ -14,6 +14,14 @@ All notable changes are documented here. The format follows
   the model or the extension, and is a tool of `genui-mcp` of its own (`genui_trulaser_status`,
   `genui_trulaser_joborder`, `genui_trulaser_devices`, `genui_trulaser_technology`,
   `genui_trulaser_collision`, `genui_trulaser_conditions`), which the chat shows as a card.
+- Example app: the showcase page `/titan`, an assistant you talk to, from the umati hackathon. Hold the space
+  bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the one thing
+  the answer is about. It has a conversation of its own, made for speaking: the hall as it is now stands in
+  its instructions, so most questions need no tool call, and it says at once that it heard and announces a
+  lookup. Listening, the conversation and the voice come from the gateway at `LLM_BASE_URL` alone; a speech
+  model named `titan/...` there gives Titan a voice of its own. Only a build with `APP_SHOWCASES` has it, and
+  nothing outside `apps/app/src/showcases/titan/` and its routes changed. Its guide,
+  `apps/app/src/showcases/titan/README.md`, says what leaves the room.
 - Example app: the list under the chat field that `/` opens offers the tools of the MCP servers the chat
   has, after its commands, and works from the keyboard, as in other chats. `/genui_machine_show M-02` asks
   the model to answer with that tool; it is a request, not a call, so the model still fills in the
@@ -562,6 +570,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- SimpleCAM adapter: an alert goes out with a `Severity` of NAMUR NE 107 and the field names of the data model. The
+  backend had said `Warning`, which no consumer knows, and one such entry in the Events API left the machine page of
+  the example app without any machine ("No answer from the backend"). `Warning` and every other unknown word now
+  say `MaintenanceRequired`, `Error`, `Fault`, `Alarm` and `Critical` say `Failure`, and `Text`, `Source` and
+  `Timestamp` go out as `Message`, `SourceName` and `Time`, so that the alert has its text on the page.
 - Example app and generative UI backend: the demo stays quick with many machines. Live values draws its graphs
   at most twice a second and only the graphs whose values changed, instead of all of them for every message of
   the broker. `genui_machine_show` reads the one machine it shows instead of the whole fleet, so Charts, which asks

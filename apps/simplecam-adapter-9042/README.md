@@ -69,7 +69,12 @@ gap. The list goes out before the events that change it. While the broker is awa
 
 An entry is told from the others by its `Id`; one without an `Id` is not reported. The other fields are
 the ones the data model names: `ErrorCode`, `Message`, `Severity`, `SeverityValue`, `Time` and `SourceName`. They
-go out as the backend says them. **The SimpleCAM backend sends an empty list at present**, so the adapter has
+go out as the backend says them, with two exceptions that keep a page of the stack alive: `Severity` is one of the
+four categories of NAMUR NE 107 (`Failure`, `CheckFunction`, `OffSpec`, `MaintenanceRequired`), as no consumer
+knows another one, and a field the backend has named `Text`, `Source` or `Timestamp` goes out as `Message`,
+`SourceName` or `Time`. A backend that says a fault in its own words (`Error`, `Fault`, `Alarm`, `Critical`) says
+`Failure`; every other word, `Warning` among them, and a missing one say `MaintenanceRequired`. The list and the
+events agree. **The SimpleCAM backend sends an empty list at present**, so the adapter has
 published no event yet: its tests and a run against a stream that raises and clears alerts show the events, a
 machine does not.
 
