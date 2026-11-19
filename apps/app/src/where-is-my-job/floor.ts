@@ -245,6 +245,20 @@ export function ordersOf(machines: ReadonlyArray<string>, jobs: FloorPage["jobs"
     .sort((a, b) => urgency[a.state] - urgency[b.state] || a.label.localeCompare(b.label))
 }
 
+/** Where an order is in its life: on its way across the floor, not started yet, or through. */
+export type OrderPhase = "moving" | "waiting" | "through"
+
+/**
+ * The phase of an order. It is on its way while a machine works on it or holds it up, and also
+ * between two machines: one step has started, the next waits. It waits while none of its steps has
+ * started, and is through when it ended or was aborted.
+ */
+export function phaseOf(order: Order): OrderPhase {
+  if (order.state === "running" || order.state === "interrupted") return "moving"
+  if (order.state === "ended" || order.state === "aborted") return "through"
+  return order.steps.some((step) => step.result?.start) ? "moving" : "waiting"
+}
+
 /**
  * The places of the shop floor besides the machines: steps of an order that publish nothing yet.
  * They stand on the map so the path of an order reads from its start to its end.
@@ -262,27 +276,53 @@ const ROWS = 3
 
 export type Place = { id: string; x: number; y: number }
 
+/** Machines of one step of manufacturing, which stand side by side. */
+export type Cluster = { id: string; name: string; machines: ReadonlyArray<string> }
+
+/** A cluster on the map: its name stands above its columns, from `x` over `width`. */
+export type ClusterPlace = { id: string; name: string; x: number; width: number }
+
+/** The height of the line with the names of the clusters, above the tiles. */
+export const CLUSTER_HEADER = 28
+
 /**
- * Where each tile stands: programming at the left, the machines in columns of three in the order
- * the backend listed them, packing at the right. The machines stand in no flow: the stack knows
- * none. The flow is the path of an order, drawn when one is chosen.
+ * Where each tile stands: programming at the left, packing at the right, and between them the
+ * machines in columns of three. Without clusters they stand in the order the backend listed them.
+ * With clusters each cluster has columns of its own, the clusters in the order given, its name
+ * above. The machines stand in no flow: the stack knows none. The flow is the path of an order,
+ * drawn when one is chosen.
  */
-export function layout(machines: ReadonlyArray<string>): { places: ReadonlyArray<Place>; width: number; height: number } {
-  const rows = Math.min(ROWS, Math.max(1, machines.length))
-  const columns = Math.max(1, Math.ceil(machines.length / ROWS))
-  const middle = ((rows - 1) * (TILE_HEIGHT + GAP_Y)) / 2
+export function layout(
+  machines: ReadonlyArray<string>,
+  clusters?: ReadonlyArray<Cluster>,
+): { places: ReadonlyArray<Place>; clusters: ReadonlyArray<ClusterPlace>; width: number; height: number } {
+  const groups = clusters ?? [{ id: "", name: "", machines }]
+  const top = clusters ? CLUSTER_HEADER : 0
+  const largest = Math.max(1, ...groups.map((one) => one.machines.length))
+  const rows = Math.min(ROWS, largest)
+  const middle = top + ((rows - 1) * (TILE_HEIGHT + GAP_Y)) / 2
   const column = (index: number) => index * (TILE_WIDTH + GAP_X)
-  const places: Array<Place> = [
-    { id: conceptStations.program.id, x: 0, y: middle },
-    ...machines.map((id, index) => ({
-      id,
-      x: column(1 + Math.floor(index / ROWS)),
-      y: (index % ROWS) * (TILE_HEIGHT + GAP_Y),
-    })),
-    { id: conceptStations.pack.id, x: column(columns + 1), y: middle },
-  ]
+  const places: Array<Place> = [{ id: conceptStations.program.id, x: 0, y: middle }]
+  const named: Array<ClusterPlace> = []
+  let next = 1
+  for (const group of groups) {
+    if (group.machines.length === 0) continue
+    const columns = Math.ceil(group.machines.length / ROWS)
+    group.machines.forEach((id, index) =>
+      places.push({ id, x: column(next + Math.floor(index / ROWS)), y: top + (index % ROWS) * (TILE_HEIGHT + GAP_Y) }),
+    )
+    named.push({ id: group.id, name: group.name, x: column(next), width: column(columns) - GAP_X })
+    next += columns
+  }
+  next = Math.max(next, 2)
+  places.push({ id: conceptStations.pack.id, x: column(next), y: middle })
   // The last row keeps its gap below: the markers stand there, and a line may run under them.
-  return { places, width: column(columns + 2) - GAP_X, height: rows * (TILE_HEIGHT + GAP_Y) }
+  return {
+    places,
+    clusters: clusters ? named : [],
+    width: column(next + 1) - GAP_X,
+    height: top + rows * (TILE_HEIGHT + GAP_Y),
+  }
 }
 
 /** A straight piece of a line: horizontal from `a` to `b` at height `c`, or vertical at `a` from `b` to `c`. */

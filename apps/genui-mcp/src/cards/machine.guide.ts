@@ -5,7 +5,7 @@ export const machineGuide = `## Machines
 \`genui_machine_list\` lists every machine that published a value in the last 24 hours. Pass the
 \`timeZone\` of the person you answer, if you know it. A machine is named by its id (\`machine\`),
 \`<manufacturer>_<model>_<serial number>\`, the level after \`machines/\` in every topic; name it to a
-person by its \`identity\`: manufacturer, model and serial number.
+person by its \`identity\`: manufacturer, model, serial number and, where the machine names it, its device class.
 
 - \`connection\`: \`umati/Connection/State\`, the state of the adapter. Anything but \`Running\`
   (\`Initializing\`, \`CommunicationFault\`, \`Shutdown\`) means the other readings are the last known
