@@ -233,7 +233,8 @@ internal sealed class OpcUaClient : ISessionConnector
         catch (ServiceResultException exception) when (RefusalPolicy.IsRejectedCertificate(exception.StatusCode)
             || RefusalPolicy.IsUntrustedClient(exception.StatusCode))
         {
-            throw new ServerCertificateRejectedException(RejectedCertificate(endpoint.Url, exception), exception);
+            throw new ServerCertificateRejectedException(
+                RejectedCertificate(endpoint.Url, exception, $"{endpoint.SecurityMode} with {endpoint.SecurityPolicy}"), exception);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -242,29 +243,48 @@ internal sealed class OpcUaClient : ISessionConnector
     }
 
     /// <summary>What a person reads when the certificate check with a server failed.</summary>
-    internal static string RejectedCertificate(string url, ServiceResultException exception)
+    /// <param name="url">The address of the server.</param>
+    /// <param name="exception">The refusal.</param>
+    /// <param name="security">The security of the endpoint, for example <c>SignAndEncrypt with Basic256Sha256</c>, or null.</param>
+    internal static string RejectedCertificate(string url, ServiceResultException exception, string? security = null)
     {
         var status = StatusCode.LookupSymbolicId(exception.StatusCode.Code) ?? exception.StatusCode.ToString();
+        var text = exception.LocalizedText.Text is { Length: > 0 } localized ? localized : exception.Message;
         if (RefusalPolicy.IsUntrustedClient(exception.StatusCode))
         {
-            return UntrustedClient(url, status);
+            return RefusedClient(url, status, RefusalPolicy.ReasonIn(text, status), security);
         }
 
-        var reason = exception.LocalizedText.Text is { Length: > 0 } text ? text : exception.Message;
-        return $"The certificate check with the server at {url} failed with {status}: {reason} " +
+        return $"The certificate check with the server at {url} failed with {status}: {text} " +
             "Trying again does not help until the certificate of the server is fixed, or the server trusts the certificate of the adapter.";
     }
 
     /// <summary>
-    /// What a person reads when the server refused the adapter without its reason (<paramref name="status"/>): it
-    /// most likely does not trust the certificate of the adapter yet, and says how to trust it.
+    /// What a person reads when the server refused the adapter (<paramref name="status"/>), with the words of the server
+    /// if it gave any. A server is to refuse without its reason (OPC UA Part 4, 7.38.2), and then it most likely does
+    /// not trust the certificate of the adapter yet: the text says how to trust it. If the server says that it cannot
+    /// handle the security of the endpoint, trusting does not help, and the text says to choose another security.
     /// </summary>
-    internal static string UntrustedClient(string url, string status) =>
-        $"The server at {url} refused the adapter with {status}: it most likely does not trust the certificate of " +
-        "the adapter yet. Trust it once on the server: the server keeps it among its rejected certificates as " +
-        $"\"{ApplicationName} [<thumbprint>].der\"; move it to its trusted certificates (for a UaGateway from " +
-        "pki/pkiserver/rejected to pki/pkiserver/trusted/certs), or accept it in the configuration of the server. " +
-        "Then try again; a running machine connects again by itself.";
+    /// <param name="url">The address of the server.</param>
+    /// <param name="status">The symbolic name of the status.</param>
+    /// <param name="reason">What the server said, or null.</param>
+    /// <param name="security">The security of the endpoint, for example <c>SignAndEncrypt with Basic256Sha256</c>, or null.</param>
+    internal static string RefusedClient(string url, string status, string? reason = null, string? security = null)
+    {
+        var said = reason is null ? string.Empty : $" The server said: \"{reason}\".";
+        if (RefusalPolicy.IsUnsupportedSecurity(reason))
+        {
+            return $"The server at {url} refused the session with {status}: it offers {security ?? "the security of this endpoint"}, " +
+                $"but cannot handle it.{said} Trusting a certificate does not help. A person chooses another security on the " +
+                "endpoints card of opcua_endpoint_rank (\"Choose the security\"), for example the next one in the list; then try again.";
+        }
+
+        return $"The server at {url} refused the adapter with {status}: it most likely does not trust the certificate of " +
+            $"the adapter yet.{said} Trust it once on the server: the server keeps it among its rejected certificates as " +
+            $"\"{ApplicationName} [<thumbprint>].der\"; move it to its trusted certificates (for a UaGateway from " +
+            "pki/pkiserver/rejected to pki/pkiserver/trusted/certs), or accept it in the configuration of the server. " +
+            "Then try again; a running machine connects again by itself.";
+    }
 
     /// <inheritdoc />
     async Task<IEndpointSession> ISessionConnector.ConnectAsync(EndpointRegistration endpoint, CancellationToken cancellationToken)

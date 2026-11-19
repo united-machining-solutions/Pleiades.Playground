@@ -522,6 +522,13 @@ consumer that ends the alarms of an earlier run at the start of the next one doe
   yet: the chat, the REST API and `lastError` say so, and how to trust it (for the UaGateway see
   [A gateway on the development computer](#a-gateway-on-the-development-computer)). A running machine still
   tries again on its own back-off, so a certificate fixed or trusted on the server is picked up.
+- Some servers give a reason with `BadSecurityChecksFailed` all the same. The adapter passes the server's words
+  on in every case. If they say the server cannot handle the security of the endpoint, a signature algorithm or
+  a policy it does not expect, the message names the endpoint and tells the person to choose another security
+  on the endpoints card instead of trusting a certificate. A server that offers `Aes256_Sha256_RsaPss` but cannot
+  verify an RSA-PSS signature answers "Unexpected SignatureData algorithm …rsa-pss-sha256", for example; another
+  policy, `Basic256Sha256` say, works there. The rules are `ReasonIn` and `IsUnsupportedSecurity` in
+  [`OpcUa/RefusalPolicy.cs`](OpcUa/RefusalPolicy.cs).
 - **A server that wants a user.** A session is anonymous, or logs in with a user name and a password that a
   person stored for the server. One user per server; a user certificate is not supported.
   - The person enters user name and password in the card of `opcua_endpoint_rank`, and only there: a turn of

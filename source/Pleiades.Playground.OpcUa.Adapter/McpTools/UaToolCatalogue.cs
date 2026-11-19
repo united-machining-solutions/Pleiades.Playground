@@ -198,7 +198,7 @@ internal static class ScanConnect
             if (anonymous)
             {
                 call.Arguments = Anonymous(WithSecurity(arguments, used.Endpoint));
-                return WithTrustHint(await next(call, cancellationToken).ConfigureAwait(false), url);
+                return WithTrustHint(await next(call, cancellationToken).ConfigureAwait(false), url, used.Endpoint);
             }
 
             if (offer.UserEndpointAfter(used) is not { } withUser)
@@ -222,7 +222,7 @@ internal static class ScanConnect
         }
 
         call.Arguments = WithUser(WithSecurity(arguments, used.Endpoint), credential);
-        return WithTrustHint(Redacted(await next(call, cancellationToken).ConfigureAwait(false), credential.Password), url);
+        return WithTrustHint(Redacted(await next(call, cancellationToken).ConfigureAwait(false), credential.Password), url, used.Endpoint);
     }
 
     /// <summary>What the model reads when the server takes no session without a user, and no user is stored.</summary>
@@ -268,33 +268,80 @@ internal static class ScanConnect
     }
 
     /// <summary>
-    /// The result of a connect that the server refused because it does not trust the adapter, with what a person
-    /// does about it. The library tells only the status (<c>BadSecurityChecksFailed</c>); the model then has the
-    /// reason and the remedy to tell the person. Every other result stays as it is.
+    /// The result of a connect that the server refused (<c>BadSecurityChecksFailed</c>, <c>BadCertificateUntrusted</c>),
+    /// with the likely cause and what a person does about it: trust the certificate of the adapter, or, if the server
+    /// says it cannot handle the security of the endpoint, choose another one. The library gives the status and the
+    /// words of the server; the model then has the cause and the remedy to tell the person. Every other result stays
+    /// as it is.
     /// </summary>
-    public static CallToolResult WithTrustHint(CallToolResult result, string url)
+    /// <param name="result">The result of the connect tool.</param>
+    /// <param name="url">The address of the server.</param>
+    /// <param name="security">The endpoint the connect used, or null if the adapter did not set it.</param>
+    public static CallToolResult WithTrustHint(CallToolResult result, string url, OfferedEndpoint? security = null)
     {
         ArgumentNullException.ThrowIfNull(result);
-        if (result.IsError != true)
+        var texts = result.Content.OfType<TextContentBlock>().Select(block => block.Text).ToList();
+
+        // The library reports a failed connect as JSON with "error": true, without setting IsError.
+        if (result.IsError != true && !texts.Any(ReportsError))
         {
             return result;
         }
 
-        var status = result.Content.OfType<TextContentBlock>()
-            .Select(block => UntrustedStatusIn(block.Text))
-            .FirstOrDefault(found => found is not null);
-        if (status is null)
+        var refusal = texts.Select(RefusalIn).FirstOrDefault(found => found is not null);
+        if (refusal is not var (status, reason))
         {
             return result;
         }
 
-        result.Content = [.. result.Content, new TextContentBlock { Text = OpcUaClient.UntrustedClient(url, status) }];
+        var hint = OpcUaClient.RefusedClient(
+            url, status, reason, security is null ? null : $"{security.SecurityMode} with {security.SecurityPolicy}");
+        result.Content = [.. result.Content, new TextContentBlock { Text = hint }];
+        result.IsError = true;
         return result;
     }
 
-    private static string? UntrustedStatusIn(string text) =>
-        new[] { nameof(Opc.Ua.StatusCodes.BadSecurityChecksFailed), nameof(Opc.Ua.StatusCodes.BadCertificateUntrusted) }
+    /// <summary>Whether a text of a tool result is the JSON of a failure of the library: <c>"error": true</c>.</summary>
+    private static bool ReportsError(string text)
+    {
+        try
+        {
+            using var json = JsonDocument.Parse(text);
+            return json.RootElement.ValueKind == JsonValueKind.Object
+                && json.RootElement.TryGetProperty("error", out var error)
+                && error.ValueKind == JsonValueKind.True;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>The status of a refusal in the text of a tool result, with the words of the server, if it is one.</summary>
+    private static (string Status, string? Reason)? RefusalIn(string text)
+    {
+        var status = new[] { nameof(Opc.Ua.StatusCodes.BadSecurityChecksFailed), nameof(Opc.Ua.StatusCodes.BadCertificateUntrusted) }
             .FirstOrDefault(status => text.Contains(status, StringComparison.Ordinal));
+        return status is null ? null : (status, RefusalPolicy.ReasonIn(MessageIn(text), status, quotedOnly: true));
+    }
+
+    /// <summary>The <c>message</c> of a tool result the library wrote as JSON, else the text as it is.</summary>
+    private static string MessageIn(string text)
+    {
+        try
+        {
+            using var json = JsonDocument.Parse(text);
+            return json.RootElement.ValueKind == JsonValueKind.Object
+                && json.RootElement.TryGetProperty("message", out var message)
+                && message.ValueKind == JsonValueKind.String
+                ? message.GetString() ?? text
+                : text;
+        }
+        catch (JsonException)
+        {
+            return text;
+        }
+    }
 
     private static string EndpointOf(IDictionary<string, JsonElement>? arguments) =>
         arguments is not null && arguments.TryGetValue("endpointUrl", out var url) && url.ValueKind == JsonValueKind.String
