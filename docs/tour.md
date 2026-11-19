@@ -319,7 +319,8 @@ card, such as one in words only, has no button. The group "Pages" in the sidebar
 that are not pinned, the newest first, and a page that is pinned from its head moves to the top of the sidebar,
 beside Home. "Edit" in its head moves a card up or down and removes one, with no language model; "Undo" in
 the toast puts a removed card back. "Add a card" at the end of the page adds one by hand: choose what it shows,
-and for one machine which machine and how many hours.
+and for one machine which machine and how many hours. The card of another server of the chat, such as the drink
+card of the [juice bar](#optional-a-juice-bar), is kept the same way: the page asks that server when it opens.
 
 Ask the chat for a page, for example "Make me a page with all machines and P-04", and it proposes one. The model
 reads with its tools what there is to show and composes the page: a title, and the cards in their order, each
@@ -337,7 +338,8 @@ A page is private to the browser that keeps it, and the stack has no sign-in, so
 link that carries the recipe: which answers, for which machines and hours, and no value. Open it in a private
 window to see what a colleague sees: the page with the values of now, no chat and no language model needed,
 and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for, or
-whose server it does not have, such as the juice bar, says so, and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
+whose server it does not have, such as the juice bar, says so, and the rest of the page is whole. A link that
+was cut off when it was copied says that it holds no page.
 
 Ask about the alarms of a machine, for example "Which warnings and errors did P-04 have today?", and the chat
 draws the notification card of the tool `genui_notification_list`: a table with each warning and error, when it
@@ -537,8 +539,7 @@ The service publishes the state of the machine to the broker. Its machine id def
 to the simulated machines. With
 `juicebar=http://juicebar-api:8080/mcp` in `APP_MCP_SERVERS`, the chat answers what the bar can mix and
 orders a drink when asked. Asked what the bar has, it draws the drink card: each drink in its glass, one to
-pick, and a button that orders it at once; the glass then fills while the machine mixes. "Save as page" under such an answer keeps the drink card
-as a page, which shows what the bar can mix each time it is opened and can be pinned. A stack with
+pick, and a button that orders it at once; the glass then fills while the machine mixes. A stack with
 `APP_SHOWCASES` set has the same card as a page of its own, <http://localhost:5600/juice-bar>, for a screen next to
 the machine, without a language model. No tour screenshot was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).

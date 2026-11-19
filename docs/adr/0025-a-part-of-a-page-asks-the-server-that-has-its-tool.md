@@ -62,8 +62,8 @@ stack lacks that server, and whether a tool that writes, ordering a drink for on
 ## Consequences
 
 - The drink card can be kept with "Save as page" or from a proposal, pinned, and shared by a link; opened, it
-  shows what the bar can mix then. The showcase page `/juice-bar` is no longer the only way to have the card
-  without a chat. Whether it stays is a question for that showcase, not for this record.
+  shows what the bar can mix then. A kept page does what the showcase page `/juice-bar` was made for, the card
+  on a screen next to the machine without a chat, and holds other parts beside it.
 - A link travels between stacks. On a stack without the juice bar, the drink card of such a page says that the
   server is missing, and the other parts show.
 - The way by name holds only while the name of an entry is the prefix of its tools: an entry
@@ -88,5 +88,5 @@ stack lacks that server, and whether a tool that writes, ordering a drink for on
 - **Tools of `genui-mcp` that read the juice bar (`genui_juicebar_*`).** A page would keep to one server, but the
   generative UI backend is base, a juice bar a special device (ADR-0018), and every further server would need a
   copy of its tools there.
-- **A showcase page for each card of a further server**, as `/juice-bar` is. It needs code for each card and
-  holds no other part.
+- **A showcase page for each card of a further server**, the way of `/juice-bar`. It needs code for each card
+  and holds no other part.
