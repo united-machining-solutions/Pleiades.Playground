@@ -33,6 +33,7 @@ export function sitesOf(
       machine: placement.machineId,
       displayName: placement.displayName,
       placedAt: placement.placedAt,
+      position: placement.position ?? null,
       state: now === null ? "no-data" : stateOf(now, list.asOf),
       now,
     }

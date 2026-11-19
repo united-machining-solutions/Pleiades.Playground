@@ -16,6 +16,21 @@ All notable changes are documented here. The format follows
   and a profile marked incomplete what it lacks; pressed again, the list closes. The proposal shows no table
   until a chip is pressed. On the mapping of `/mapping`, the chips of the numbers filter its table the same
   way. The list of servers of `/opcua` has the numbers but not the elements, so its chips stay as they are.
+- Example app: the showcase page `/trulaser`, a cockpit of a TRUMPF laser cutting machine named as the umati
+  data model names it: `State.Status` with `Notification.ActiveAlerts` and its history on one time axis, the
+  `JobOrder` with its `ProgramExecution`, and from the TRUMPF extension (`oem/Dalle/`) the requests of the
+  automation devices, the laser technology, the collision data and the condition guide. Each card says whether
+  it shows the model or the extension. Only a build with `APP_SHOWCASES` has it; it reads the Timeseries API
+  and the Events API from the server of the app, which gets `TIMESERIES_API_URL` and `EVENTS_API_URL` for
+  it, and nothing outside `apps/app/src/showcases/trulaser/` and its route changed.
+- Sites API, generative UI backend and example app: a machine has a position in its hall, and the page
+  `/halls` draws every hall as a plan seen from above. `PUT /placements/{machineId}/position` takes the middle
+  of the machine, `x` and `y` in metre from the upper left corner of the plan, and `DELETE` takes it away; the
+  position stays while the machine stays in its hall. `GET /placements`, `sites_placement_list` and
+  `genui_site_list` return it as `position`, null while nobody said. On the plan a machine stands at its
+  position with its state, live; one without waits in rows, with a dashed edge. A hall has no size of its own:
+  its plan is as large as its machines need. A person drags a machine on the plan to where it stands, or moves
+  it with the arrow keys, and the app keeps the position, to half a metre.
 - Example app: the showcase page `/titan`, an assistant you talk to, from the umati hackathon. Hold the space
   bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the
   conversation to scroll through, each answer with the card its tool gave. It has a conversation of its own, made for speaking: the hall as it is now stands in
@@ -404,6 +419,10 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Example app: Live values with all machines shows only the graphs of a value some machine published, and
+  next to the title of a graph at most one value of now, where a single machine measures it; more stand
+  only as lines. Where machines are there and none published such a value, the page says so. With one machine
+  chosen, the page is as before.
 - Example app: "New chat" is back in the head of the chat panel, as a plus in the list and in every chat. It
   opens a new chat with no question yet and the cursor in its field; the list stays behind "All chats". After
   the first question asked in the panel, the field of the new chat keeps the cursor, so the next question

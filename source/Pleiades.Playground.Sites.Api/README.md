@@ -11,6 +11,11 @@ these, on Home of the [example app](../../apps/app/README.md) or here; no machin
   [MQTT binding](../../contracts/mqtt/README.md#machine-id), `<manufacturer>_<model>_<serial number>`, the same id
   the other APIs, the MCP tools and the example app name a machine by. A machine stands on
   one site at most; putting it on another site moves it.
+- A placement in a hall may have a **position**: where in the hall the machine stands, on the plan of the hall
+  seen from above. It is the middle of the machine, `x` to the right and `y` down, in metre from the upper left
+  corner of the plan, each from 0 to 1000. A hall has no size of its own: its plan is as large as the positions
+  in it need. The position stays while the machine stays in its hall, and goes when it is moved to another hall
+  or site.
 
 ## Start
 
@@ -29,6 +34,8 @@ answers on this computer only unless `SITES_BIND` opens it, because writing need
 | `GET /placements` | Every machine on a site, by machine id |
 | `PUT /placements/{machineId}` | 201 placed, 200 moved or changed; 400 invalid, unknown site or hall |
 | `DELETE /placements/{machineId}` | 204; 404 when the machine stood on no site |
+| `PUT /placements/{machineId}/position` | 200 with the placement; 400 invalid, or the machine is in no hall; 404 when the machine stands on no site |
+| `DELETE /placements/{machineId}/position` | 204, also when it had none; 404 when the machine stands on no site |
 
 `placedAt` is the time the machine was put on its current site; moving it within the site keeps it.
 
@@ -47,6 +54,8 @@ curl -X PUT http://localhost:5540/sites/north-plant -H 'Content-Type: applicatio
   -d '{"company":"Demo Manufacturing","name":"North plant","halls":["Hall 1","Hall 2"]}'
 curl -X PUT http://localhost:5540/placements/merope-microtec_MM-120_M-02 -H 'Content-Type: application/json' \
   -d '{"siteId":"north-plant","hall":"Hall 2","displayName":"M-02"}'
+curl -X PUT http://localhost:5540/placements/merope-microtec_MM-120_M-02/position -H 'Content-Type: application/json' \
+  -d '{"x":12.5,"y":4}'
 curl http://localhost:5540/placements
 ```
 
