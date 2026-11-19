@@ -74,6 +74,43 @@ export interface Manifest {
 export type Alert = Record<string, unknown> & { Id: string | number }
 
 export const ACTIVE_ALERTS = "Notification.ActiveAlerts"
+
+/** The four severities of NAMUR NE 107. The data model and every consumer know these and no other: one other value breaks a page. */
+export const SEVERITIES = ["Failure", "CheckFunction", "OffSpec", "MaintenanceRequired"] as const
+export type Severity = (typeof SEVERITIES)[number]
+
+/**
+ * The severity of an entry as the model names it. The four stay, whatever their case or separators. A backend that
+ * says a fault in its own words ("Error", "Fault", "Alarm", "Critical") says `Failure`. Every other word, among them
+ * "Warning" and "Info", and a missing one say `MaintenanceRequired`: a thing that wants attention without the
+ * machine being out of order.
+ */
+export function severityOf(node: unknown): Severity {
+  const key = typeof node === "string" ? node.toLowerCase().replace(/[\s_-]/g, "") : ""
+  const known = SEVERITIES.find((severity) => severity.toLowerCase() === key)
+  if (known) return known
+  return ["error", "fault", "alarm", "critical", "fatal"].includes(key) ? "Failure" : "MaintenanceRequired"
+}
+
+// What the SimpleCAM backend has said for the fields the model names `Message`, `SourceName` and `Time`.
+const FIELD_ALIASES = { Text: "Message", Source: "SourceName", Timestamp: "Time" } as const
+
+/**
+ * An entry as the model says it: the severity is one of the four, and a field the backend says with another name
+ * (`Text`, `Source`, `Timestamp`) has the name of the model, unless the entry has that one itself. Nothing else is
+ * added or changed, and an entry that is in this shape stays as it is.
+ */
+export function normalizeAlert(alert: Alert): Alert {
+  const result: Record<string, unknown> = { ...alert }
+  for (const [alias, name] of Object.entries(FIELD_ALIASES)) {
+    if (!(alias in result)) continue
+    if (!(name in result)) result[name] = result[alias]
+    delete result[alias]
+  }
+  result.Severity = severityOf(result.Severity)
+  return result as Alert
+}
+
 export const ALERT_EVENTS = ["Notification.AlertRaised", "Notification.AlertChanged", "Notification.AlertCleared"] as const
 export type AlertEventType = (typeof ALERT_EVENTS)[number]
 
@@ -192,6 +229,16 @@ export function activityReadings(status: Reading, prefix: string, timestamp: str
  * identification as plain values) or one element. What lies beside `value`, `path` and `timestamp` is not read.
  */
 export function readingsOf(data: unknown): Reading[] {
+  return rawReadingsOf(data).map(withModelAlerts)
+}
+
+/** The list of alerts goes out, and makes its events, in the shape of the model: see `normalizeAlert`. */
+function withModelAlerts(reading: Reading): Reading {
+  if (reading.path !== ACTIVE_ALERTS || !Array.isArray(reading.value)) return reading
+  return { ...reading, value: reading.value.map((entry: unknown) => (isAlert(entry) ? normalizeAlert(entry) : entry)) }
+}
+
+function rawReadingsOf(data: unknown): Reading[] {
   const found: Reading[] = []
   const walk = (node: unknown): void => {
     if (!isRecord(node)) return

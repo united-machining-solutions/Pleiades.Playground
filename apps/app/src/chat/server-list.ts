@@ -9,6 +9,8 @@ import { backend, mcpServers } from "./mcp-servers.ts"
 
 export type ServerTool = {
   name: string
+  /** What the tool does: the first sentence of its description, else its title, else nothing. */
+  summary: string
   /**
    * The tool can start or change something: the server does not say that it only reads
    * (`annotations.readOnlyHint`). A hint of the server, shown as one. It is no boundary.
@@ -29,7 +31,17 @@ export type ListedServer = {
 type Settings = Record<string, string | undefined>
 
 /** What a server listed, as the client library hands it on: a name and what the server says about the tool. */
-type Listed = ReadonlyArray<{ name: string; metadata?: { mcp?: { annotations?: { readOnlyHint?: boolean } } } }>
+type Listed = ReadonlyArray<{
+  name: string
+  description?: string
+  metadata?: { mcp?: { title?: string; annotations?: { readOnlyHint?: boolean } } }
+}>
+
+/** The first sentence of a description, for the list of commands of the chat, which has room for little. */
+export function firstSentence(description: string | undefined): string {
+  const line = (description ?? "").trim().split("\n")[0]?.trim() ?? ""
+  return /^.*?[.!?](?=\s|$)/.exec(line)?.[0] ?? line
+}
 
 /** Asks one server for its tools. Rejects if it does not answer. */
 export type AskServer = (url: string) => Promise<Listed>
@@ -42,6 +54,7 @@ export function listedServer(name: string, listed: Listed | undefined): ListedSe
     reachable: listed !== undefined,
     tools: (listed ?? []).map((tool) => ({
       name: tool.name,
+      summary: firstSentence(tool.description) || (tool.metadata?.mcp?.title ?? ""),
       changes: tool.metadata?.mcp?.annotations?.readOnlyHint !== true,
     })),
   }

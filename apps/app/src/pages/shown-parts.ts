@@ -9,7 +9,7 @@ import type { RecipePart } from "./recipe.ts"
 export type ShownPart<TAnswered> = { key: string; part: RecipePart; answered: TAnswered | undefined }
 
 /** What a part asks: its tool and its arguments, as JSON. The arguments keep their order from the store. */
-function asks(part: RecipePart): string {
+export function asks(part: RecipePart): string {
   return `${part.tool} ${JSON.stringify(part.args)}`
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react"
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
+import type { ReactNode } from "react"
+import { Area, AreaChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
 
 import { Button } from "@pleiades/ui/components/button"
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@pleiades/ui/components/card"
@@ -26,11 +27,12 @@ import { categoryColour } from "../shared/colour.ts"
 import { MachineName } from "../shared/machine-name.tsx"
 import { axisScale } from "../shared/scale.ts"
 import { SmoothHeight } from "../shared/smooth-height.tsx"
+import { timeTicks } from "../shared/time-ticks.ts"
 import { MOST_LINES, MOST_UNITS, TIMESERIES_RANGES } from "./contract.ts"
 import type { SeriesLine, SignalKind, TimeseriesRange, TimeseriesSeries, TimeseriesShow, TimeseriesSignals } from "./contract.ts"
 import { NO_AXES, axesFor, lastValue, matchesSearch, nextColour } from "./view.ts"
 import type { Axes } from "./view.ts"
-import { rangeLabel, signalLabel, tickNumber } from "./words.ts"
+import { displayed, rangeLabel, signalLabel, tickNumber } from "./words.ts"
 
 /** Asks for the lines of the card: whoever draws the card passes it, the host or the application. Null if they are not to be had. */
 export type AskSeries = (ask: { lines: Array<{ machine: string; signal: string }>; range: TimeseriesRange; to?: string }) => Promise<TimeseriesSeries | null>
@@ -52,8 +54,11 @@ const same = (a: { machine: string; path: string }, b: { machine: string; path: 
 /** "Last hour", "Last 15 minutes". */
 const rangeTitle: Record<TimeseriesRange, string> = { "15m": "Last 15 minutes", "1h": "Last hour", "8h": "Last 8 hours", "24h": "Last 24 hours" }
 
-/** What an axis is called: the sign of its unit, or the unit where it has none. */
-const axisName = (unit: string) => unitSign(unit) || unit
+/** What an axis is called: the sign of the unit it is shown in, kW for watt, or the unit where it has none. */
+const axisName = (unit: string) => {
+  const shown = displayed(unit).unit ?? unit
+  return unitSign(shown) || shown
+}
 
 /**
  * The time series card: signals of machines over a range, a line for each pair of a machine and a
@@ -62,12 +67,29 @@ const axisName = (unit: string) => unitSign(unit) || unit
  * as of the moment it was read. Numbers stand on two y axes at most, one unit each, a unit always
  * on the same side; a yes or no is a lane below. A line keeps its colour while others come and go.
  * The card computes nothing but the wording and where to place what the backend computed.
+ *
+ * `bare` draws the graph alone, for a page that puts it into a card of its own and shows the lines
+ * it chose: without frame and head, without the lines listed below it and the way to add one. The
+ * range and the end are those of `values`, and when the page hands in new ones, the card reads its
+ * lines again and keeps drawing the old ones until the new are there.
  */
-export function TimeseriesCard({ values, askSeries, askSignals }: { values: TimeseriesShow; askSeries: AskSeries; askSignals: AskSignals }) {
+export function TimeseriesCard({
+  values,
+  askSeries,
+  askSignals,
+  bare = false,
+}: {
+  values: TimeseriesShow
+  askSeries: AskSeries
+  askSignals: AskSignals
+  bare?: boolean
+}) {
   const [drawn, setDrawn] = useState<Array<Drawn>>(() => values.lines.map((line, index) => ({ machine: line.machine, path: line.path, colour: index + 1 })))
-  const [range, setRange] = useState<TimeseriesRange>(values.range)
+  const [chosenRange, setRange] = useState<TimeseriesRange>(values.range)
   // The first read ends where the words of the result end; every later one ends now.
-  const [until, setUntil] = useState<string | undefined>(values.to)
+  const [chosenUntil, setUntil] = useState<string | undefined>(values.to)
+  const range = bare ? values.range : chosenRange
+  const until = bare ? values.to : chosenUntil
   const [series, setSeries] = useState<TimeseriesSeries | null>()
   const [reading, setReading] = useState(false)
   const [notice, setNotice] = useState<string>()
@@ -147,22 +169,18 @@ export function TimeseriesCard({ values, askSeries, askSignals }: { values: Time
     const read = shown?.lines.find((one) => same(one, line))
     return read ? [{ ...line, read }] : []
   })
-  return (
-    <Card size="sm">
-      {/* The range stands right of the title; where the card is too narrow for both, below it, still on the right. */}
-      <CardHeader className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <CardTitle className="font-semibold group-data-[size=sm]/card:text-base">Time series</CardTitle>
-        <CardAction className="ml-auto">
-          <RangeChoice range={range} onChange={(next) => change(() => setRange(next))} />
-        </CardAction>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <SmoothHeight>
-          <div className="flex flex-col gap-3" aria-busy={reading}>
-            <TimeseriesGraph series={series} lines={lines} axes={axes.current} sync={sync} />
-            <Lanes series={shown} lines={lines} axes={axes.current} sync={sync} />
-          </div>
-        </SmoothHeight>
+  const graph = (
+    <SmoothHeight>
+      <div className="flex flex-col gap-3" aria-busy={reading}>
+        <TimeseriesGraph series={series} lines={lines} axes={axes.current} sync={sync} />
+        <Lanes series={shown} lines={lines} axes={axes.current} sync={sync} />
+      </div>
+    </SmoothHeight>
+  )
+  if (bare) return graph
+  const content = (
+    <>
+        {graph}
         <Legend
           drawn={drawn}
           series={shown}
@@ -185,7 +203,18 @@ export function TimeseriesCard({ values, askSeries, askSignals }: { values: Time
             if (free !== null) change(() => setDrawn((all) => [...all, { ...pair, colour: free }]))
           }}
         />
-      </CardContent>
+    </>
+  )
+  return (
+    <Card size="sm">
+      {/* The range stands right of the title; where the card is too narrow for both, below it, still on the right. */}
+      <CardHeader className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <CardTitle className="font-semibold group-data-[size=sm]/card:text-base">Time series</CardTitle>
+        <CardAction className="ml-auto">
+          <RangeChoice range={range} onChange={(next) => change(() => setRange(next))} />
+        </CardAction>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">{content}</CardContent>
     </Card>
   )
 }
@@ -225,45 +254,59 @@ type ReadLine = Drawn & { read: SeriesLine }
 const sideOf = (line: ReadLine, axes: Axes): "left" | "right" => (line.read.unit !== null && line.read.unit === axes.right ? "right" : "left")
 
 /** The rows of a graph: one for each instant of the series, with the value of each line there. */
-function rowsOf(series: TimeseriesSeries, lines: ReadonlyArray<ReadLine>, asNumber: (value: number | boolean | null | undefined) => number | null) {
+function rowsOf(
+  series: TimeseriesSeries,
+  lines: ReadonlyArray<ReadLine>,
+  asNumber: (value: number | boolean | null | undefined, line: ReadLine) => number | null,
+) {
   return series.instants.map((at, index) => ({
     at: Date.parse(at),
-    ...Object.fromEntries(lines.map((line) => [keyOf(line), asNumber(line.read.values[index])])),
+    ...Object.fromEntries(lines.map((line) => [keyOf(line), asNumber(line.read.values[index], line)])),
   }))
 }
 
+/** A value of a line in the unit it is shown in: kilowatts for watt. */
+const shownValue = (value: number | boolean | null | undefined, line: ReadLine) =>
+  typeof value === "number" ? value * displayed(line.read.unit).factor : null
+
+/** How tall the graph is, and a sentence that stands in its place. */
+const GRAPH_HEIGHT = "h-56"
+
 /** The numbers, on one or two y axes, each labelled with its unit. */
 function TimeseriesGraph({ series, lines, axes, sync }: { series: TimeseriesSeries | null | undefined; lines: ReadonlyArray<ReadLine>; axes: Axes; sync: string }) {
-  if (series === undefined) return <Skeleton className="h-48 w-full" />
-  if (series === null) return <p className="flex h-48 items-center justify-center text-sm text-muted-foreground">The lines could not be read.</p>
+  if (series === undefined) return <Skeleton className={`${GRAPH_HEIGHT} w-full`} />
+  if (series === null) return <Centred>The lines could not be read.</Centred>
   const numbers = lines.filter((line) => line.read.kind === "number" && line.read.unit !== null && line.read.note === null)
   if (numbers.length === 0) {
     if (lines.some((line) => line.read.kind === "yesNo")) return null
-    return <p className="flex h-48 items-center justify-center text-sm text-muted-foreground">No line has a value in this range.</p>
+    return <Centred>No line has a value in this range.</Centred>
   }
   const config = Object.fromEntries(
     numbers.map((line) => [keyOf(line), { label: `${labelOf(line.machine)} · ${signalLabel(line.path)}`, color: colourOf(line.colour) }]),
   ) satisfies ChartConfig
-  const unitOf = new Map(numbers.map((line) => [keyOf(line), line.read.unit]))
-  const rows = rowsOf(series, numbers, (value) => (typeof value === "number" ? value : null))
+  const unitOf = new Map(numbers.map((line) => [keyOf(line), displayed(line.read.unit).unit]))
+  const rows = rowsOf(series, numbers, shownValue)
   const scaleOf = (side: "left" | "right") =>
-    axisScale(numbers.filter((line) => sideOf(line, axes) === side).flatMap((line) => line.read.values.map((value) => (typeof value === "number" ? value : null))))
+    axisScale(numbers.filter((line) => sideOf(line, axes) === side).flatMap((line) => line.read.values.map((value) => shownValue(value, line))))
   const left = axes.left !== null ? scaleOf("left") : null
   const right = axes.right !== null ? scaleOf("right") : null
+  const [from, to] = [Date.parse(series.from), Date.parse(series.to)]
   return (
     <figure className="flex flex-col gap-1">
+      {/* The unit of each axis stands above it. */}
       <figcaption className="flex justify-between text-xs text-muted-foreground">
-        <span>{axes.left !== null && `${axisName(axes.left)}, left axis`}</span>
-        <span>{axes.right !== null && `${axisName(axes.right)}, right axis`}</span>
+        <span>{axes.left !== null && axisName(axes.left)}</span>
+        <span>{axes.right !== null && axisName(axes.right)}</span>
       </figcaption>
-      <ChartContainer config={config} className="aspect-auto h-48 w-full">
-        <LineChart accessibilityLayer data={rows} syncId={sync} margin={{ left: 0, right: 0 }}>
+      <ChartContainer config={config} className={`aspect-auto ${GRAPH_HEIGHT} w-full`}>
+        <AreaChart accessibilityLayer data={rows} syncId={sync} margin={{ left: 0, right: 0 }}>
           <CartesianGrid vertical={false} />
           <XAxis
             dataKey="at"
             type="number"
             scale="time"
-            domain={[Date.parse(series.from), Date.parse(series.to)]}
+            domain={[from, to]}
+            ticks={timeTicks(from, to)}
             tickFormatter={(at: number) => clock(new Date(at).toISOString())}
             tickLine={false}
             axisLine={false}
@@ -281,7 +324,7 @@ function TimeseriesGraph({ series, lines, axes, sync }: { series: TimeseriesSeri
             tickMargin={4}
             domain={left ? left.domain : ["auto", "auto"]}
             ticks={left?.ticks}
-            tickFormatter={(value: number) => tickNumber(value, axes.left, left?.step)}
+            tickFormatter={(value: number) => tickNumber(value, displayed(axes.left).unit, left?.step)}
           />
           <YAxis
             yAxisId="right"
@@ -293,7 +336,7 @@ function TimeseriesGraph({ series, lines, axes, sync }: { series: TimeseriesSeri
             tickMargin={4}
             domain={right ? right.domain : ["auto", "auto"]}
             ticks={right?.ticks}
-            tickFormatter={(value: number) => tickNumber(value, axes.right, right?.step)}
+            tickFormatter={(value: number) => tickNumber(value, displayed(axes.right).unit, right?.step)}
           />
           <ChartTooltip
             content={
@@ -318,22 +361,30 @@ function TimeseriesGraph({ series, lines, axes, sync }: { series: TimeseriesSeri
             }
           />
           {numbers.map((line) => (
-            <Line
+            <Area
               key={keyOf(line)}
               yAxisId={sideOf(line, axes)}
               dataKey={keyOf(line)}
               // A value holds until the next one: the line steps, it does not slope.
               type="stepAfter"
               stroke={`var(--color-${keyOf(line)})`}
+              // A light area under each line, lighter where lines lie over each other.
+              fill={`var(--color-${keyOf(line)})`}
+              fillOpacity={numbers.length === 1 ? 0.15 : 0.06}
               strokeWidth={1.5}
               dot={false}
               isAnimationActive={false}
             />
           ))}
-        </LineChart>
+        </AreaChart>
       </ChartContainer>
     </figure>
   )
+}
+
+/** A sentence where the graph would stand, as tall as the graph. */
+function Centred({ children }: { children: ReactNode }) {
+  return <p className={`flex ${GRAPH_HEIGHT} items-center justify-center text-sm text-muted-foreground`}>{children}</p>
 }
 
 /** A lane for each yes or no: up while yes, down while no, none where the machine was silent. */
@@ -381,7 +432,9 @@ function described(line: Drawn, read: SeriesLine | undefined, axes: Axes): strin
 function newestOf(read: SeriesLine | undefined): { text: string; current: boolean } | null {
   const last = read === undefined ? null : lastValue(read.values)
   if (read === undefined || last === null) return null
-  return { text: measuredValue({ value: last.value, unit: read.unit }), current: last.current }
+  const shown = displayed(read.unit)
+  const value = typeof last.value === "number" ? last.value * shown.factor : last.value
+  return { text: measuredValue({ value, unit: shown.unit }), current: last.current }
 }
 
 /** The newest value of a line as the legend writes it. */

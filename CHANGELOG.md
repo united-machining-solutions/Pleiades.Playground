@@ -7,6 +7,48 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: the showcase page `/titan`, an assistant you talk to, from the umati hackathon. Hold the space
+  bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the
+  conversation to scroll through, each answer with the card its tool gave. It has a conversation of its own, made for speaking: the hall as it is now stands in
+  its instructions, so most questions need no tool call, and it says at once that it heard and announces a
+  lookup. A Haiku model is asked not to think first, and a turn the model ends without a word is shown
+  as a problem. A new fault it says by itself, but never over the person or an answer, and at most one a minute.
+  Listening, the conversation and the voice come from the gateway at `LLM_BASE_URL` alone; a speech
+  model named `titan/...` there gives Titan a voice of its own. Its button "Tools" switches a further MCP
+  server of `APP_MCP_SERVERS` on for it, of which Titan takes the tools that only read: asked what the juice
+  bar can mix, it shows the drink card. Only a build with `APP_SHOWCASES` has it, and
+  nothing outside `apps/app/src/showcases/titan/` and its routes changed. Its guide,
+  `apps/app/src/showcases/titan/README.md`, says what leaves the room.
+- Example app: the list under the chat field that `/` opens offers the tools of the MCP servers the chat
+  has, after its commands, and works from the keyboard, as in other chats. `/genui_machine_show M-02` asks
+  the model to answer with that tool; it is a request, not a call, so the model still fills in the
+  arguments. A server the chat has switched off under "Tools" gives none, and neither does a tool only a
+  card calls. A part of a name finds the tool too (`/machine`). One entry is marked; the arrow keys move
+  the mark, Tab writes it into the field, Enter takes it and Escape closes the list. The field keeps the
+  focus and points to the marked entry for screen readers.
+- MQTT binding, draft 0.3.0: a third first level, `hub/`, beside `machines` and `sites`. It carries the
+  registration of apps at the Pleiades Hub (repository `umati/pleiades-hub`), the page that shows the apps of
+  a Pleiades system under one header. The binding only reserves the level and says who owns it: the topics
+  below it and their payloads are defined by the contract of the hub. Its messages are not values, so
+  envelope, units and content types do not apply to them. Nothing changes below `machines` and `sites`.
+- The example app registers at the Pleiades Hub. For the server of the app it is opt-in: with
+  `HUB_MQTT_URL` set to the broker, it registers one app when it starts, "Playground", with a description in
+  English and German and an icon of its own, and `HUB_APP_URL` names the address under which a browser
+  reaches the app. Without `HUB_MQTT_URL` nothing connects and the app behaves as before. The demo stack
+  sets both variables: its app registers at the broker of the stack, with the address
+  `http://localhost:5600/`, which follows `APP_PORT`. An empty `HUB_MQTT_URL` in `.env` switches the
+  registration off, and `HUB_APP_URL` there names another address; both stand in `.env.example`. The hub
+  itself is not part of the stack. The SDK of the hub, `@pleiades/hub-sdk`, is not on npmjs.org: it is
+  checked in as a tarball under `vendor/`, and the catalog refers to it with `file:`. ADR-0021 records the
+  decision and the deviation from "npmjs.org is the only registry". The settings are in
+  `apps/app/README.md`. The tarball is version 0.1.2, licensed under Apache-2.0, which brings the guide
+  `register-an-app.md`, and the skill `register-hub-app`, a copy from the hub's repository, leads an agent to it.
+- Example app: machines are added to a site and taken off it on Home, as in the mock. A bar names the machines
+  that sent data in the last 24 hours and stand on no site, with "Review and add"; "Add machine" also takes one by
+  its id. The menu of a row moves a machine or removes it, and "Undo" in the toast takes a change back.
+  `genui_site_list` counts how many machines on the sites send and how many need someone.
+- Sites API: a write of a site may name a condition. `If-None-Match: *` makes it only where there is none,
+  `If-Match` with the `etag` of the site changes or removes only the site that was read; 412 otherwise.
 - Example app: the drink card of the juice bar. For the result of `juicebar_drinks_list` the chat draws the
   drinks whose bottles do not warn, each in the glass its author chose in the marketplace, filled with its
   colour; a person picks one, and its button orders it at once, without a question of the language model.
@@ -41,6 +83,12 @@ All notable changes are documented here. The format follows
   simulation.
 - Example app: "Edit" in the head of a kept page moves its parts up and down and removes one, by hand and with
   no language model; "Undo" in the toast puts a removed part back, and the only part of a page stays.
+- Page of a machine: under the title where the machine stands, and below the machine card three sections as the
+  mock has them: Now, live tiles of its power, energy, spindle and feed; Alarms & warnings; Power and energy over
+  the chosen hours. Other hours read the sections again without loading the page again; a section that gets no
+  answer says so and asks again on its own, one question at a time. The page draws the cards without their feet
+  and topic lines, the chat with them. It reads the measurements of its machine only, and the alarms once after a
+  burst of alerts.
 - Notification card: `genui_notification_list` lists the warnings and errors of one machine over the last hours,
   each with when it was raised, when it was cleared and how long it stood, or that it has not gone, and the chat
   draws them with the notification card.
@@ -347,6 +395,17 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Example app: "New chat" is back in the head of the chat panel, as a plus in the list and in every chat. It
+  opens a new chat with no question yet and the cursor in its field; the list stays behind "All chats". After
+  the first question asked in the panel, the field of the new chat keeps the cursor, so the next question
+  follows without a click. In the URL the list is `?chat=all` now, and `?chat=new` is the new chat.
+- Notification card: all notifications or those of one level, errors or warnings, ten a page, those that stand
+  first, with the pagination of the energy card; the counts at the head and the sums at the foot follow the level.
+- Time series and energy card: power in kilowatts with an area under its line, a taller graph, and times on full
+  hours and quarter hours; the energy table has columns for the meter, kWh, Avg kW and Peak kW. The machine card
+  writes the times under its band. This holds in the chat as well, which draws the same cards.
+- Generative UI backend: `genui_measurement_series` takes an optional `machine`, as `genui_measurement_list` does,
+  and then reads the values and signs of life of that machine only.
 - Example app: Home (`/`) shows where the machines stand, by site and hall; "Needs you" keeps what it showed first.
   The tiles of the running machines are gone. `/sites` leads to `/`.
 - Cutting simulators: their web pages (ports 5611 to 5613) answer on the network too, not only on this
@@ -515,6 +574,16 @@ All notable changes are documented here. The format follows
   A server that refuses the adapter with `BadSecurityChecksFailed` is told as a server that most likely does
   not trust the certificate of the adapter yet, with where to trust it; the scan's `opcua_ua_connect` adds the
   same hint to its error. (#179, #192)
+- SimpleCAM adapter: an alert goes out with a `Severity` of NAMUR NE 107 and the field names of the data model. The
+  backend had said `Warning`, which no consumer knows, and one such entry in the Events API left the machine page of
+  the example app without any machine ("No answer from the backend"). `Warning` and every other unknown word now
+  say `MaintenanceRequired`, `Error`, `Fault`, `Alarm` and `Critical` say `Failure`, and `Text`, `Source` and
+  `Timestamp` go out as `Message`, `SourceName` and `Time`, so that the alert has its text on the page.
+- Example app and generative UI backend: the demo stays quick with many machines. Live values draws its graphs
+  at most twice a second and only the graphs whose values changed, instead of all of them for every message of
+  the broker. `genui_machine_show` reads the one machine it shows instead of the whole fleet, so Charts, which asks
+  for every machine, no longer grows with the square of the machines. A kept page or one opened from a link stands
+  at once and draws each part when its answer comes. The server of the app keeps one connection to the backend.
 - OPC UA adapter: the alarms of a machine in `urn:umati2:datamodel:opcua` reach
   `umati/Notification/ActiveAlerts` and `events/notifications`. The adapter reads the list
   `Notification.ActiveAlerts` of that namespace, decodes `DataType.Alert` itself and raises and clears an alert
@@ -524,6 +593,12 @@ All notable changes are documented here. The format follows
   `TcMachineAlarmType` with `AlarmIdentifier` if its registration names no alarms and its server has that type,
   and the TRUMPF interface counts as its own namespace. A server without the list or the type moves
   `Notification.ActiveAlerts` to `missing`. A stored registration takes this on `/rescan` (issue 180).
+- `app`: a new question in the chat stays at the top of the panel and its answer grows under it, also when the
+  answer is a card taller than the panel. Until now the chat ran to the end of such an answer at once, so the
+  question and the head of the card were out of sight; with the machines of the stack today, the cards of power
+  and energy or of the measurements of all machines are that tall. A long text no longer pulls the panel along
+  either: it grows under its question too, and the button at the foot leads to its end as it stands. An alert
+  under an answer, such as "The language model did not answer", comes into view by itself.
 - `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page

@@ -12,10 +12,13 @@ import {
   identityReadings,
   isAlert,
   machineId,
+  normalizeAlert,
   readingsOf,
   sequenceOf,
+  severityOf,
   topicOf,
   unavailablePaths,
+  type Alert,
 } from "./binding.ts"
 
 const PREFIX = "x-united-grinding-com"
@@ -172,6 +175,46 @@ test("only an object with an Id is an alert", () => {
   assert.equal(isAlert({ Message: "no id" }), false)
   assert.equal(isAlert(null), false)
   assert.equal(isAlert("A-1"), false)
+})
+
+test("the severity is one of the four of NE 107, whatever the backend says", () => {
+  for (const severity of ["Failure", "CheckFunction", "OffSpec", "MaintenanceRequired"]) assert.equal(severityOf(severity), severity)
+  assert.equal(severityOf("offspec"), "OffSpec")
+  assert.equal(severityOf("check_function"), "CheckFunction")
+  assert.equal(severityOf("Maintenance Required"), "MaintenanceRequired")
+  for (const word of ["Error", "fault", "ALARM", "Critical"]) assert.equal(severityOf(word), "Failure")
+  // The backend has said "Warning": no consumer knows it, and a page that read it was left without any machine.
+  for (const word of ["Warning", "Info", "", "unheard-of", undefined, null, 3]) assert.equal(severityOf(word), "MaintenanceRequired")
+})
+
+test("an entry has the names of the model, and a field the backend names otherwise is renamed", () => {
+  // As the backend said it for a printer that did not answer.
+  const printer = { Id: "A-2", Severity: "Warning", Source: "printer", Text: "Printer not reachable", Timestamp: "2026-11-18T16:54:33.503Z" }
+  assert.deepEqual(normalizeAlert(printer), {
+    Id: "A-2",
+    Severity: "MaintenanceRequired",
+    SourceName: "printer",
+    Message: "Printer not reachable",
+    Time: "2026-11-18T16:54:33.503Z",
+  })
+  // A field of the model wins over its other name, and an entry in the shape of the model stays as it is.
+  assert.deepEqual(normalizeAlert({ Id: 1, Message: "kept", Text: "dropped" }), { Id: 1, Message: "kept", Severity: "MaintenanceRequired" })
+  assert.deepEqual(normalizeAlert(overheat), overheat)
+  assert.deepEqual(normalizeAlert(door), door)
+  assert.deepEqual(normalizeAlert(normalizeAlert(printer)), normalizeAlert(printer))
+})
+
+test("the list of alerts is read in the shape of the model, and its other elements are left alone", () => {
+  const state = {
+    notification: { activeAlerts: { path: "Notification.ActiveAlerts", timestamp: "t", value: [{ Id: "A-1", Severity: "Warning", Text: "x" }, "no id"] } },
+    state: { status: { path: "State.Status", timestamp: "t", value: { Severity: "Warning" } } },
+  }
+  const [alerts, status] = readingsOf(state)
+  assert.deepEqual(alerts?.value, [{ Id: "A-1", Severity: "MaintenanceRequired", Message: "x" }, "no id"])
+  assert.deepEqual(status?.value, { Severity: "Warning" })
+  // A change of such a list is an event with the severity of the model.
+  const next = (alerts?.value as Alert[]).filter(isAlert)
+  assert.deepEqual(alertChanges([], next).map((change) => change.alert.Severity), ["MaintenanceRequired"])
 })
 
 test("the sequence is the start of the adapter and a count of twelve digits", () => {

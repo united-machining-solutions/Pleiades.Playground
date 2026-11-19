@@ -1,14 +1,14 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { listServers, listedServer } from "./server-list.ts"
+import { firstSentence, listServers, listedServer } from "./server-list.ts"
 
 const readOnly = { mcp: { annotations: { readOnlyHint: true } } }
 
 test("a server that answered is listed with its tools, and a tool that does not say it only reads is marked", () => {
   const server = listedServer("ultimaker", [
-    { name: "ultimaker_printer_status", metadata: readOnly },
-    { name: "ultimaker_print_start", metadata: { mcp: { annotations: { readOnlyHint: false } } } },
+    { name: "ultimaker_printer_status", description: "The state of the printer. And more.", metadata: readOnly },
+    { name: "ultimaker_print_start", metadata: { mcp: { title: "Start a print", annotations: { readOnlyHint: false } } } },
     { name: "ultimaker_says_nothing" },
   ])
   assert.deepEqual(server, {
@@ -16,11 +16,18 @@ test("a server that answered is listed with its tools, and a tool that does not 
     builtIn: false,
     reachable: true,
     tools: [
-      { name: "ultimaker_printer_status", changes: false },
-      { name: "ultimaker_print_start", changes: true },
-      { name: "ultimaker_says_nothing", changes: true },
+      { name: "ultimaker_printer_status", summary: "The state of the printer.", changes: false },
+      { name: "ultimaker_print_start", summary: "Start a print", changes: true },
+      { name: "ultimaker_says_nothing", summary: "", changes: true },
     ],
   })
+})
+
+test("a tool is summed up by the first sentence of its description", () => {
+  assert.equal(firstSentence("Show one machine: what it does now, as in genui_machine_list. Use it for one."), "Show one machine: what it does now, as in genui_machine_list.")
+  assert.equal(firstSentence("Lists the jobs\nwith their state."), "Lists the jobs")
+  assert.equal(firstSentence("Version 1.2 of the list, without an end"), "Version 1.2 of the list, without an end")
+  assert.equal(firstSentence(undefined), "")
 })
 
 test("a server that did not answer is listed as not reachable, without tools", () => {

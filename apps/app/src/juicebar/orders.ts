@@ -2,7 +2,8 @@ import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
 import { furtherServers } from "@/chat/mcp-servers.ts"
-import { reasonOf, textOf } from "@/machines/get-machines.ts"
+import { textOf } from "@/machines/get-machines.ts"
+import { reasonOf } from "@/reason.ts"
 
 // The order of a person: the drink card orders and follows its order on the server of the app, over
 // the same MCP server of the juice bar the chat has (APP_MCP_SERVERS, the entry `juicebar`). The
