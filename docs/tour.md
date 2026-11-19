@@ -336,8 +336,8 @@ this browser. What you asked for that no card shows, the model says in words.
 A page is private to the browser that keeps it, and the stack has no sign-in, so "Share" in its head gives a
 link that carries the recipe: which answers, for which machines and hours, and no value. Open it in a private
 window to see what a colleague sees: the page with the values of now, no chat and no language model needed,
-and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for says so,
-and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
+and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for, or
+whose server it does not have, such as the juice bar, says so, and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
 
 Ask about the alarms of a machine, for example "Which warnings and errors did P-04 have today?", and the chat
 draws the notification card of the tool `genui_notification_list`: a table with each warning and error, when it
@@ -537,7 +537,8 @@ The service publishes the state of the machine to the broker. Its machine id def
 to the simulated machines. With
 `juicebar=http://juicebar-api:8080/mcp` in `APP_MCP_SERVERS`, the chat answers what the bar can mix and
 orders a drink when asked. Asked what the bar has, it draws the drink card: each drink in its glass, one to
-pick, and a button that orders it at once; the glass then fills while the machine mixes. A stack with
+pick, and a button that orders it at once; the glass then fills while the machine mixes. "Save as page" under such an answer keeps the drink card
+as a page, which shows what the bar can mix each time it is opened and can be pinned. A stack with
 `APP_SHOWCASES` set has the same card as a page of its own, <http://localhost:5600/juice-bar>, for a screen next to
 the machine, without a language model. No tour screenshot was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).

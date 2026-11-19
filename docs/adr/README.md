@@ -22,14 +22,15 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0011](0011-a-brand-is-a-block-of-theme-tokens.md) | A brand is a block of theme tokens, switched by one attribute | proposed |
 | [0012](0012-headless-ultimaker-tool-service.md) | Headless Ultimaker 3 slicing and explicit print operations | proposed |
 | [0013](0013-live-values-from-the-broker.md) | Live values reach the browser from the broker | proposed |
-| [0014](0014-a-page-from-the-chat-is-a-recipe-kept-in-the-browser.md) | A page from the chat is a recipe, kept in the browser | proposed |
+| [0014](0014-a-page-from-the-chat-is-a-recipe-kept-in-the-browser.md) | A page from the chat is a recipe, kept in the browser | proposed, amended by 0025 |
 | [0015](0015-the-binding-of-machines-follows-the-data-model.md) | The tree of machines on the broker follows the data model exactly | proposed |
 | [0016](0016-blazor-for-the-page-of-a-dotnet-service.md) | A .NET service draws its own page with Blazor (an exception for the cutting simulator only) | rejected |
 | [0017](0017-the-words-of-a-tool-result-are-a-display.md) | The words of a tool result may name the unit people use | proposed |
 | [0018](0018-a-showcase-is-built-in-on-request-and-only-adds.md) | A showcase is built in on request and only adds | proposed |
 | [0019](0019-documentation-sources-in-chat.md) | Documentation sources and original PDFs in chat through MCP | proposed |
-| [0020](0020-the-language-model-composes-a-page-and-nothing-else.md) | The language model composes a page, and nothing else | proposed |
+| [0020](0020-the-language-model-composes-a-page-and-nothing-else.md) | The language model composes a page, and nothing else | proposed, amended by 0025 |
 | [0021](0021-hub-registration.md) | The example app registers at the Pleiades Hub, with the SDK as a vendored tarball | proposed |
 | [0022](0022-documentation-answer-cards.md) | Verified documentation answer cards alongside legacy sources | proposed |
 | [0023](0023-documentation-conflict-review.md) | Distinct documentation conflict and review states | proposed |
 | [0024](0024-documentation-cards-only.md) | Documentation answers use cards exclusively | proposed |
+| [0025](0025-a-part-of-a-page-asks-the-server-that-has-its-tool.md) | A part of a page asks the server that has its tool | proposed |

@@ -3,6 +3,8 @@ import { createMCPClient } from "@tanstack/ai-mcp"
 import { createServerFn } from "@tanstack/react-start"
 
 import { chatTools } from "@/chat/cards.tsx"
+import { backend, mcpServers, serverOfTool } from "@/chat/mcp-servers.ts"
+import { within } from "@/chat/server-list.ts"
 import type { Answer } from "@/machines/get-machines.ts"
 import { listMachines } from "@/machines/get-machines.ts"
 import { choicesOf } from "@/machines/switcher.ts"
@@ -11,11 +13,12 @@ import { reasonOf } from "@/reason.ts"
 
 import { cardChoicesOf } from "./add-part.ts"
 import type { CardChoice } from "./add-part.ts"
+import { pageToolNames } from "./proposal.ts"
 
 // What "Add a card" on a kept page offers, read on the server of the app as the other reads are: the
-// browser never talks to the generative UI backend itself. The backend lists its tools with their
-// input schemas, and the app reads from there what each card takes (add-part.ts); the machines are
-// those Home lists, by the name the app shows for a machine everywhere.
+// browser never talks to a server of the chat itself. The servers list their tools with their input
+// schemas, and the app reads from there what each card takes (add-part.ts); the machines are those
+// Home lists, by the name the app shows for a machine everywhere.
 
 /**
  * The cards a person can add, and the machines to choose from in the order the backend gave them, or
@@ -34,21 +37,42 @@ export const getCardChoices = createServerFn({ method: "GET" }).handler(async ()
   return { values: { cards: cardChoicesOf(listed.values, chatTools), machines }, error: null }
 })
 
-/** The tools of the backend with their input schemas. */
-async function listTools(): Promise<Answer<Array<{ name: string; inputSchema?: unknown }>>> {
+type Listed = Array<{ name: string; inputSchema?: unknown }>
+
+/** The tools of one server with their input schemas. Rejects if it does not answer. */
+async function toolsOf(url: string): Promise<Listed> {
+  const client = await createMCPClient({ transport: { type: "http", url } })
   try {
-    const backend = await createMCPClient({
-      transport: { type: "http", url: process.env.GENUI_MCP_URL ?? "http://localhost:5520/mcp" },
-    })
-    try {
-      const tools = await backend.tools()
-      return { values: tools.map(({ name, inputSchema }) => ({ name, inputSchema })), error: null }
-    } finally {
-      await backend.close()
-    }
-  } catch (error) {
-    return { values: null, error: `The generative UI backend did not answer: ${reasonOf(error)}.` }
+    const tools = await client.tools()
+    return tools.map(({ name, inputSchema }) => ({ name, inputSchema }))
+  } finally {
+    await client.close()
   }
+}
+
+/** A further server that takes longer than this to list its tools does not answer, as far as the form goes. */
+const FURTHER_WITHIN_MS = 2_000
+
+/**
+ * The tools with their input schemas of the servers a page asks (ADR-0025): the backend, and each other
+ * server of the chat that has a tool a page can hold. Without the backend nothing can be added; another
+ * server that does not answer leaves out only its cards.
+ */
+async function listTools(): Promise<Answer<Listed>> {
+  const further = new Set(
+    pageToolNames(chatTools).flatMap((tool) => {
+      const server = serverOfTool(tool)
+      return server.url !== undefined && server.name !== backend ? [server.url] : []
+    }),
+  )
+  const [own, ...others] = await Promise.allSettled([
+    toolsOf(mcpServers()[backend]?.url ?? ""),
+    ...[...further].map((url) => within(toolsOf(url), FURTHER_WITHIN_MS)),
+  ])
+  if (own?.status !== "fulfilled") {
+    return { values: null, error: `The generative UI backend did not answer: ${reasonOf(own?.reason)}.` }
+  }
+  return { values: [...own.value, ...others.flatMap((one) => (one.status === "fulfilled" ? one.value : []))], error: null }
 }
 
 /** The machines as Home lists them, checked against the contract of the list: a backend of another version may differ. */

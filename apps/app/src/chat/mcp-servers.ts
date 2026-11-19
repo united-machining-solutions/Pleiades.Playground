@@ -55,6 +55,43 @@ export function mcpServers(settings: Settings = process.env): Record<string, Ser
   return servers
 }
 
+/** The name of the OPC UA adapter among the servers of the chat. A setting of its own names it, not APP_MCP_SERVERS. */
+export const opcua = "opcua"
+
+/** The address of the OPC UA adapter, or undefined where the app has none (OPCUA_MCP_URL empty). */
+export function opcuaUrl(settings: Settings = process.env): string | undefined {
+  return settings.OPCUA_MCP_URL?.trim() || undefined
+}
+
+/**
+ * The server a tool goes to, as the chat has it: its address and who it is in words, or, where this app has no
+ * such server, the sentence that says so. `name` is the server's name.
+ */
+export type ToolServer = { name: string; url: string; who: string } | { name: string; url?: undefined; missing: string }
+
+/**
+ * The server of a tool, by its name. Every server of the chat names its tools with its own name and `_` before
+ * them (`genui_machine_show`, `opcua_server_list`, `juicebar_drinks_list`), and the chat keeps the names as they
+ * are; the model is told so (`furtherInstructions`). So the name before the first `_` is the server: the
+ * generative UI backend, the OPC UA adapter where OPCUA_MCP_URL is set, or a server of APP_MCP_SERVERS. The
+ * address of OPCUA_MCP_URL stands before an entry `opcua` of APP_MCP_SERVERS, as in the chat.
+ */
+export function serverOfTool(tool: string, settings: Settings = process.env): ToolServer {
+  const at = tool.indexOf("_")
+  const name = at > 0 ? tool.slice(0, at) : tool
+  const adapter = name === opcua ? opcuaUrl(settings) : undefined
+  if (adapter) return { name, url: adapter, who: "the OPC UA adapter" }
+  const url = mcpServers(settings)[name]?.url
+  if (url) return { name, url, who: name === backend ? "the generative UI backend" : `the server ${name}` }
+  return {
+    name,
+    missing:
+      name === opcua
+        ? `It asks the OPC UA adapter for ${tool}, and this app has none: OPCUA_MCP_URL is empty.`
+        : `It asks the server ${name} for ${tool}, and this app has no such server: APP_MCP_SERVERS does not name it.`,
+  }
+}
+
 const switchPrefix = "server."
 
 /**
