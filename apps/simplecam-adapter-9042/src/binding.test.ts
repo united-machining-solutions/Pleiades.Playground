@@ -11,6 +11,8 @@ import {
   extensionPrefix,
   identityReadings,
   isAlert,
+  isJob,
+  jobReadings,
   machineId,
   normalizeAlert,
   readingsOf,
@@ -112,7 +114,8 @@ test("the manifest holds the whole of Core before the stream has said anything",
   assert.equal(manifest.modelVersion, "0.17.1")
   assert.deepEqual(manifest.profiles, ["Core"])
   assert.equal(manifest.heartbeatInterval, 10)
-  assert.equal(manifest.elements.length, 16)
+  // The 16 of before and the six signals of the layers and the job.
+  assert.equal(manifest.elements.length, 22)
   // An element that has not come yet is no "not available": only what the machine lacks for good is.
   assert.deepEqual(unavailablePaths(manifest), [
     "Identification.ProductCode",
@@ -275,6 +278,72 @@ test("where the backend says no job, the three are null; progress stays between 
   assert.equal(activityReadings(over, PREFIX, READ)[2].value, 1)
   const [under] = readingsOf(status({ jobName: "x", progressPercent: -3 }))
   assert.equal(activityReadings(under, PREFIX, READ)[2].value, 0)
+})
+
+// The jobs as the backend sends them (ADR-0022, P-37): a slicing job, and a print the backend sent to the printer.
+const slicing = { CurrentLayer: 37, JobId: "1763546400-3", Kind: "Slicing", Name: "slicing", ProgressPercent: 26, Start: "2026-11-19T10:02:12.507Z", State: "Running", TotalLayers: 142 }
+const printing = { JobId: "1763546400-4", Kind: "Printing", Name: "Nadel-Beatrice", ProgressPercent: 6, Start: "2026-11-19T10:05:00.000Z", State: "Running", TotalLayers: 210 }
+const production = (activeJob: unknown, jobHistory?: unknown) => ({
+  production: {
+    activeJob: { path: "Production.ActiveJob", timestamp: "2026-11-19T10:02:13.110Z", value: activeJob },
+    ...(jobHistory === undefined ? {} : { jobHistory: { path: "Production.JobHistory", timestamp: "2026-11-19T10:02:14.911Z", value: jobHistory } }),
+  },
+})
+
+test("the jobs of the stream are the group production, and only a job with an id is a job", () => {
+  const readings = readingsOf(production(slicing, [{ ...slicing, State: "Ended", End: "2026-11-19T10:02:14.911Z" }]))
+  assert.deepEqual(readings.map((reading) => reading.path), ["Production.ActiveJob", "Production.JobHistory"])
+  assert.equal(isJob(readings[0]?.value), true)
+  assert.equal(isJob(readingsOf(production(null))[0]?.value), false)
+  assert.equal(isJob({ Name: "no id" }), false)
+  assert.equal(isJob({ JobId: "" }), false)
+  assert.equal(isJob("1763546400-3"), false)
+})
+
+test("a print is the active work master with the progress of the job; a slicing job is no work master", () => {
+  const [reading] = readingsOf(status({ context: "printing", jobName: "from the status", progressPercent: 1 }))
+  // The job wins where it names the same thing.
+  assert.deepEqual(activityReadings(reading, PREFIX, READ, printing).map((one) => one.value), ["Nadel-Beatrice", "printing", 0.06])
+  // Slicing is what the machine does, it is not the work master of the machine: the status stays the source of that.
+  assert.deepEqual(activityReadings(reading, PREFIX, READ, slicing).map((one) => one.value), ["from the status", "printing", 0.26])
+  assert.equal(activityReadings(undefined, PREFIX, READ, slicing)[0]?.value, null)
+  // Without a job, the readings are those of the status alone, as before.
+  assert.deepEqual(activityReadings(reading, PREFIX, READ), activityReadings(reading, PREFIX, READ, null))
+  assert.deepEqual(activityReadings(reading, PREFIX, READ).map((one) => one.value), ["from the status", "printing", 0.01])
+})
+
+test("the layer and the job are signals of the manufacturer, null where the machine does not say them", () => {
+  const [reading] = readingsOf(status({ context: "slicing", currentLayer: 5, totalLayers: 9 }))
+  assert.deepEqual(jobReadings(reading, slicing, PREFIX, READ), [
+    { path: `${PREFIX}.Activity.CurrentLayer`, value: 37, timestamp: READ },
+    { path: `${PREFIX}.Activity.TotalLayers`, value: 142, timestamp: READ },
+    { path: `${PREFIX}.Job.Id`, value: "1763546400-3", timestamp: READ },
+    { path: `${PREFIX}.Job.Kind`, value: "Slicing", timestamp: READ },
+    { path: `${PREFIX}.Job.State`, value: "Running", timestamp: READ },
+    { path: `${PREFIX}.Job.Start`, value: "2026-11-19T10:02:12.507Z", timestamp: READ },
+  ])
+  // A print on the Ultimaker has no current layer: it stays null, and is not made up from the progress.
+  assert.deepEqual(jobReadings(undefined, printing, PREFIX, READ).map((one) => one.value), [null, 210, "1763546400-4", "Printing", "Running", "2026-11-19T10:05:00.000Z"])
+  // Layers the status says beside it are taken where the job says none.
+  assert.deepEqual(jobReadings(reading, null, PREFIX, READ).map((one) => one.value), [5, 9, null, null, null, null])
+  // Idle, and before the backend has said a job: nothing runs.
+  assert.deepEqual(jobReadings(undefined, null, PREFIX, READ).map((one) => one.value), [null, null, null, null, null, null])
+  assert.deepEqual(jobReadings(undefined, undefined, PREFIX, READ).map((one) => one.value), [null, null, null, null, null, null])
+  // What is not a count of layers or a time is not taken.
+  const odd = { JobId: "x", CurrentLayer: -1, TotalLayers: 2.5, Start: "yesterday", Kind: "" }
+  assert.deepEqual(jobReadings(undefined, odd, PREFIX, READ).map((one) => one.value), [null, null, "x", null, null, null])
+})
+
+test("the manifest names the layer and the job signals with their type", () => {
+  const manifest = buildManifest(ID, "urn:united-grinding:simplecam:9042", deliveredElements(PREFIX), 10)
+  const element = (path: string) => manifest.elements.find((one) => one.path === path)
+  for (const path of ["Activity.CurrentLayer", "Activity.TotalLayers"]) assert.equal(element(`${PREFIX}.${path}`)?.type, "number")
+  for (const path of ["Job.Id", "Job.Kind", "Job.State", "Job.Start"]) {
+    assert.equal(element(`${PREFIX}.${path}`)?.type, "string")
+    assert.equal(element(`${PREFIX}.${path}`)?.timestampSource, "adapter")
+  }
+  // The model has no element for the jobs of the backend: they are no element of `umati`, and the history is not published.
+  assert.equal(manifest.elements.some((one) => one.path.startsWith("Production.")), false)
 })
 
 test("the manifest says what a signal of the manufacturer is", () => {

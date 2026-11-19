@@ -7,6 +7,13 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- SimpleCAM adapter: the jobs of the backend. The stream of the SimpleCAM backend says the running job in the group
+  `production` (`Production.ActiveJob`, with `JobId`, `Name`, `Kind`, `State`, `Start`, `ProgressPercent`,
+  `CurrentLayer` and `TotalLayers`). The adapter makes the active work master (the name of a running print), the
+  progress and two new signals of the manufacturer for the layers (`oem/Activity/CurrentLayer`, `TotalLayers`) and
+  four for the job (`oem/Job/Id`, `Kind`, `State`, `Start`) from it, in step with the status; the group itself is not
+  published below `umati/`. The history of jobs (`Production.JobHistory`) is not published yet.
+
 - Juice bar API and example app: the use of the ingredients. `juicebar_consumption_get` and `GET /consumption`
   say in how many sold drinks each ingredient on a pump was, in the last hours (8 if not asked) and since the
   start, the most used first, and name the least used one, the one to take off a pump first. The counts come
