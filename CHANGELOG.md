@@ -422,8 +422,7 @@ All notable changes are documented here. The format follows
 - Machine page: while it opens, every part shows a grey placeholder of its form and size, so nothing moves when
   the values come. The tiles of now stand without a card around them, and the machine card leaves out the line
   that only repeats what the control reports. A machine on a site that sent nothing for 24 hours shows
-  "No data in the last 24 hours" instead of an error, and its alarms and warnings where the Events API still
-  has some, one that is still open among them.
+  "No data in the last 24 hours" instead of an error.
 - Notification card: the alerts stand as a table, in the chat too: level, message with its code, raised,
   cleared and duration; where the card is narrow, the last two stand under the message. The sums at the foot
   are left out; the note on alerts not listed stands under the table, and the foot names when the card was

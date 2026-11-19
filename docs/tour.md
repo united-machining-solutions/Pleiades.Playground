@@ -230,8 +230,7 @@ While the page opens, every part of it shows a grey placeholder of its form and 
 values come; a section whose backend does not answer says so and asks again, while the others stand. Choose
 other hours, and the page stays: the card and the sections that depend on the hours are read again and change
 when their answers are there. A machine on a site that has published nothing for 24 hours, over a weekend say,
-keeps its page: its name and place, and "No data in the last 24 hours" in the card and the sections; alarms
-and warnings it still has, an open one among them, stay listed.
+keeps its page: its name and place, and "No data in the last 24 hours" in the card and the sections.
 
 **In the code:** [`apps/app/src/routes/sites.$machine.tsx`](../apps/app/src/routes/sites.%24machine.tsx)
 is the page, [`machines.$machine.tsx`](../apps/app/src/routes/machines.%24machine.tsx) leads the old address to it, and the choice of the hours and the list of the switcher are in

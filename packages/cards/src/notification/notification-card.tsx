@@ -78,8 +78,8 @@ function LevelToggle({
  * table for each, the ones that have not gone first. A row says when the alert was raised, when it was
  * cleared or that it is still open, and how long it stood. It draws the result of
  * `genui_notification_list` and computes nothing but the wording. Under the table it says when
- * the list is shorter than the counts in the head: how many notifications are not listed, and that the
- * Events API had more than it returned. Its foot names when it was read and from which topic, as the
+ * the list is shorter than the counts in the head: how many notifications of the level chosen are not
+ * listed, and that the Events API had more than it returned. Its foot names when it was read and from which topic, as the
  * other cards do, so its rows can be traced to the broker. The sums of the levels stand in the words of
  * the result, for a language model, not on the card.
  *
@@ -92,7 +92,7 @@ function LevelToggle({
  * its own and names the machine and the hours there: the counts then stand above the notifications.
  */
 export function NotificationCard({ bare = false, ...list }: NotificationList & { bare?: boolean }) {
-  const { machine, asOf, from, topic, notifications, omitted, hasMore, open, total } = list
+  const { machine, asOf, from, topic, notifications, hasMore, open, total } = list
   const [level, setLevel] = useState<LevelChoice>("all")
   const [page, setPage] = useState(1)
   const listed = ofLevel(notifications, level)
@@ -122,10 +122,21 @@ export function NotificationCard({ bare = false, ...list }: NotificationList & {
       }}
     />
   )
-  const empty = (
+  // The head counts every notification of the level in the range; the table lists what the tool
+  // returned of them. Where the two differ, the card says so: "60 warnings" would stand over "1–10 of
+  // 50" with no word on the rest, and a level whose notifications all lie beyond the list would read as
+  // if it had none.
+  const notShown = shownTotal - listed.length
+  const notListed = (notShown > 0 || hasMore) && (
+    <p className="text-xs text-muted-foreground">
+      {notShown > 0 && `${notShown} ${notShown === 1 ? "notification is" : "notifications are"} not listed here.`}
+      {notShown > 0 && hasMore && " "}
+      {hasMore && "The Events API had more than it returned: the oldest are missing, so the counts are lower bounds."}
+    </p>
+  )
+  const none = shownTotal === 0 && (
     <p className="text-sm text-muted-foreground">
       {bare ? "Nothing in this range." : `No ${noneOf[level]} stood between ${stamp(from, asOf)} and ${clock(asOf)}.`}
-      {hasMore && " The Events API had more than it returned, so older ones may be missing."}
     </p>
   )
   const pages = view.pages > 1 && (
@@ -138,18 +149,12 @@ export function NotificationCard({ bare = false, ...list }: NotificationList & {
   // A row for each notification, with a column each for when it was raised, when it was cleared and how
   // long it stood; where the card is narrow, as in the chat, the last two stand under the message.
   const rows = <NotificationTable notifications={view.notifications} time={(instant) => stamp(instant, asOf)} turn={`${level}:${view.page}`} />
-  // The head counts every notification of the range; the table lists what the tool returned. Where the
-  // two differ, the card says so, or "60 warnings" would stand over "1–10 of 50" with no word on the rest.
-  const notListed = (omitted > 0 || (hasMore && total > 0)) && (
-    <p className="text-xs text-muted-foreground">
-      {omitted > 0 && `${omitted} more ${omitted === 1 ? "notification is" : "notifications are"} not listed.`}
-      {omitted > 0 && hasMore && " "}
-      {hasMore && total > 0 && "The Events API had more than it returned: the oldest are missing, so the counts are lower bounds."}
-    </p>
-  )
   const content =
     listed.length === 0 ? (
-      empty
+      <div className="flex flex-col gap-3">
+        {none}
+        {notListed}
+      </div>
     ) : (
       <div className="flex flex-col gap-3">
         <SmoothHeight>{rows}</SmoothHeight>
