@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 
+import { piecesOf } from "./pieces.ts"
 import { transcribe } from "./transcribe.ts"
 import { MICROPHONE } from "./voice.ts"
 import { RECORDING_RATE, wavOf } from "./wav.ts"
@@ -7,7 +8,7 @@ import { RECORDING_RATE, wavOf } from "./wav.ts"
 // "Hey Titan": the assistant page listens all the time, without a key.
 //
 // The microphone is watched in the browser: only when someone speaks is a short piece of sound kept,
-// with a little of what came just before, so the "Hey" is not cut off. That piece is recognised like
+// with a little of what came just before, so the "Hey" is not cut off (pieces.ts). That piece is recognised like
 // a question (transcribe.ts, the hub). If it begins with the name of Titan, what follows is the
 // question. "Hey Titan" alone wakes Titan up: the next thing said within a few seconds is the question.
 //
@@ -46,30 +47,11 @@ export function isPause(question: string): boolean {
   return PAUSE.test(question.replace(/[^\p{L}\s]/gu, " ").replace(/\s+/g, " ").trim())
 }
 
-/** Sound louder than this is speech: a root mean square of the samples, between 0 and 1. */
-export const SPEECH_LEVEL = 0.02
-/** This long quiet ends what is said. */
-const QUIET_MS = 700
-/** Speech is this many times louder than the noise of the room. */
-const NOISE_FACTOR = 3
-/** A piece shorter than this is a noise, not a word. */
-const SHORTEST_MS = 400
-/** The longest piece: a question, not a speech. */
-const LONGEST_MS = 8_000
-/** Kept from before the voice began. */
-const BEFORE_MS = 400
 /** After "Hey Titan" alone, the next piece is the question if it comes within this. */
 export const AWAKE_MS = 8_000
 
 const RATE = RECORDING_RATE
 const BLOCK = 2_048
-
-/** The root mean square of a block of samples. */
-export function levelOf(samples: Float32Array): number {
-  let sum = 0
-  for (const sample of samples) sum += sample * sample
-  return Math.sqrt(sum / Math.max(samples.length, 1))
-}
 
 export type WakeOptions = {
   /**
@@ -107,13 +89,8 @@ export function useWakeWord(options: WakeOptions) {
     let closed = false
     let context: AudioContext | undefined
     let stream: MediaStream | undefined
-    /** The blocks of the piece that is being said, and those just before it. */
-    let before: Array<Float32Array> = []
-    let piece: Array<Float32Array> | undefined
-    let quietSince = 0
     // A piece is heard while another is being recognised, so a call is not lost in the noise of a room.
-    /** The level of the noise of the room. */
-    let noise = SPEECH_LEVEL / NOISE_FACTOR
+    let pieces = piecesOf(RATE)
     let awakeUntil = 0
     let rate = RATE
 
@@ -121,7 +98,7 @@ export function useWakeWord(options: WakeOptions) {
     let recognising = 0
     let busy = false
     const tellBusy = () => {
-      const now = piece !== undefined || recognising > 0
+      const now = pieces.speaking() || recognising > 0
       if (now === busy) return
       busy = now
       latest.current.onBusy?.(now)
@@ -155,41 +132,13 @@ export function useWakeWord(options: WakeOptions) {
 
     const onBlock = (block: Float32Array) => {
       if (!latest.current.enabled) {
-        piece = undefined
-        before = []
+        pieces.drop()
         tellBusy()
         return
       }
-      const level = levelOf(block)
-      // The noise of the room, followed slowly while nobody speaks: speech is clearly louder than it.
-      const speech = level > Math.max(SPEECH_LEVEL, noise * NOISE_FACTOR)
-      if (!speech && !piece) noise = noise * 0.97 + level * 0.03
-      const blockMs = (block.length / rate) * 1000
-      if (!piece) {
-        before.push(block)
-        while (before.length * blockMs > BEFORE_MS) before.shift()
-        if (speech) {
-          piece = [...before]
-          before = []
-          quietSince = 0
-          tellBusy()
-        }
-        return
-      }
-      piece.push(block)
-      quietSince = speech ? 0 : quietSince + blockMs
-      const length = piece.length * blockMs
-      if (quietSince < QUIET_MS && length < LONGEST_MS) return
-      const done = piece
-      piece = undefined
-      if (length - quietSince < SHORTEST_MS) return tellBusy()
-      const samples = new Float32Array(done.reduce((sum, one) => sum + one.length, 0))
-      let at = 0
-      for (const one of done) {
-        samples.set(one, at)
-        at += one.length
-      }
-      void recognise(samples)
+      const samples = pieces.take(block)
+      tellBusy()
+      if (samples) void recognise(samples)
     }
 
     void (async () => {
@@ -199,6 +148,7 @@ export function useWakeWord(options: WakeOptions) {
         context = new AudioContext({ sampleRate: RATE })
         // What the browser really records at, where it does not give what was asked for.
         rate = context.sampleRate
+        pieces = piecesOf(rate)
         const source = context.createMediaStreamSource(stream)
         // A ScriptProcessor is old but needs no module file, and a block of 128 ms is fine here.
         const processor = context.createScriptProcessor(BLOCK, 1, 1)
