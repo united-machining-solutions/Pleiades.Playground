@@ -1,4 +1,6 @@
 import { jsonOf } from "../../chat/tool-results.ts"
+import { placedInWords } from "../../sites/placements.ts"
+import type { AddedOutcome, SitesOutcome } from "../../sites/placing.ts"
 
 // The answers of the OPC UA adapter (source/Pleiades.Playground.OpcUa.Adapter/Api/Views.cs), as a
 // chat has them in the result of a tool call. Each is checked before it is drawn: what does not
@@ -241,6 +243,41 @@ export function shownProfiles(checks: ReadonlyArray<ProfileCheck> | undefined): 
   }
 }
 
+/** What a chip of a card chooses: the rows of one state, or the elements a profile lacks. */
+export type RowChoice = { state: MappingState } | { profile: string }
+
+/** Whether two choices are the same chip. No choice is the same as no choice. */
+export function sameChoice(one: RowChoice | null | undefined, other: RowChoice | null | undefined): boolean {
+  if (!one || !other) return !one && !other
+  if ("state" in one) return "state" in other && one.state === other.state
+  return "profile" in other && one.profile === other.profile
+}
+
+/**
+ * The rows a chosen chip shows. For a profile, the elements it lacks in the order it names them; one that has no
+ * row of its own (the scan did not list it) is shown as missing, without a reason.
+ */
+export function chosenRows(
+  rows: ReadonlyArray<MappingRow>,
+  choice: RowChoice,
+  checks: ReadonlyArray<ProfileCheck> | undefined,
+): Array<MappingRow> {
+  if ("state" in choice) return rows.filter((row) => row.state === choice.state)
+  const check = checks?.find((one) => one.name === choice.profile)
+  if (!check) return []
+  return check.missing.map(
+    (path) => rows.find((row) => row.area === "umati" && row.path === path) ?? { path, area: "umati", state: "Missing" },
+  )
+}
+
+/**
+ * The rows in doubt: a node that does not fit (mismatch) or a match that is a guess (unclear). The proposal shows
+ * them before a chip is pressed, since adding the machine would take them as they are.
+ */
+export function inDoubt(rows: ReadonlyArray<MappingRow>): Array<MappingRow> {
+  return rows.filter((row) => row.state === "Mismatch" || row.state === "Unclear")
+}
+
 /** The rows a person has to look at: everything that is not plainly fine. */
 export function needingALook(rows: ReadonlyArray<MappingRow>): Array<MappingRow> {
   return rows.filter((row) => row.state !== "Ok")
@@ -283,4 +320,38 @@ export function userStep(values: Pick<RankedEndpoints, "needsUser" | "acceptsUse
   if (!values.acceptsUser) return "none"
   if (values.needsUser && !values.user) return "required"
   return "optional"
+}
+
+/** Where Home shows an added machine, as a person reads it after the click, and what to do where it shows none. */
+function whereAdded(sites: SitesOutcome | undefined, placed: AddedOutcome | undefined): string {
+  if (placed?.ok) return placed.already ? `It stood on ${placed.siteName} already, and stays there.` : "Its values appear on Home within seconds."
+  if (placed) return `It is on no site: ${placed.reason} Put it on one with Add machine on Home.`
+  if (sites?.ok) return "There is no site yet: put it on one with Add machine on Home."
+  if (sites) return `It is on no site: ${sites.reason}`
+  return "Put it on a site with Add machine on Home."
+}
+
+/**
+ * The toast after a proposal was added: "A1121O0001 added · North plant", as Home says it of a machine it put on
+ * a site, or the machine alone and why it is on no site. A registration that replaces one says so.
+ */
+export function addedInWords(
+  proposal: Pick<Proposal, "serialNumber" | "replaces">,
+  sites: SitesOutcome | undefined,
+  placed: AddedOutcome | undefined,
+): { title: string; description: string | undefined } {
+  if (proposal.replaces) return { title: `Registration of ${proposal.serialNumber} replaced`, description: undefined }
+  const title = placed?.ok ? placedInWords(proposal.serialNumber, placed.siteName, null, false) : `${proposal.serialNumber} added`
+  return { title, description: whereAdded(sites, placed) }
+}
+
+/** What the card says once the proposal was added: where the machine went, or why it is on no site. */
+export function doneInWords(
+  proposal: Pick<Proposal, "serialNumber" | "replaces">,
+  sites: SitesOutcome | undefined,
+  placed: AddedOutcome | undefined,
+): string {
+  if (proposal.replaces) return `The registration of ${proposal.serialNumber} is replaced.`
+  if (placed?.ok && !placed.already) return `${proposal.serialNumber} is added on ${placed.siteName}. Its values appear on Home within seconds.`
+  return `${proposal.serialNumber} is added. ${whereAdded(sites, placed)}`
 }
