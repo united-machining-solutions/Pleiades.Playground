@@ -103,3 +103,32 @@ test("an order is on its way while it runs, is held up or is between two machine
   assert.equal(phaseOf(order("ended", [step(true)])), "through")
   assert.equal(phaseOf(order("aborted", [step(true)])), "through")
 })
+
+test("a machine that welds or bends is no cutting machine, even with a laser or a tube", () => {
+  assert.equal(stepOf(who("Laser welding machine"), undefined).id, "joining")
+  assert.equal(stepOf(who("Tube bender"), undefined).id, "forming")
+  assert.equal(stepOf(who(null, "TubeBend 3000"), undefined).id, "forming")
+  assert.equal(stepOf(who(null, "Tube bender TB-60"), undefined).id, "forming")
+  assert.equal(stepOf(who(null, "TruLaser Weld 5000"), undefined).id, "joining")
+  assert.equal(stepOf(who(null, "Bend5130"), undefined).id, "forming")
+  // Cutting stays cutting.
+  assert.equal(stepOf(who("Laser cutting machine"), undefined).id, "cutting")
+  assert.equal(stepOf(who(null, "TruTube 5000"), undefined).id, "cutting")
+})
+
+test("printing is additive or 3D, not every Druck", () => {
+  assert.equal(stepOf(who("Die casting machine (Druckguss)"), undefined).id, "none")
+  assert.equal(stepOf(who("3D-Drucker"), undefined).id, "printing")
+  assert.equal(stepOf(who("Additive manufacturing system"), undefined).id, "printing")
+  assert.equal(stepOf(who("3D printer"), undefined).id, "printing")
+})
+
+test("a logo only for a manufacturer that is the one it names, not for one with a like word", async () => {
+  const { makerOf } = await import("./makers.ts")
+  for (const other of ["Jungheinrich AG", "Hans Jung GmbH", "Walter AG", "Blohm + Voss", "Trumpfheller GmbH"]) {
+    assert.equal(makerOf(other)?.logo, null, other)
+  }
+  for (const ours of ["Blohm Jung GmbH", "WALTER Maschinenbau GmbH", "Schaudt Mikrosa GmbH", "Ewag AG", "UNITED GRINDING Group", "Mägerle AG Maschinenfabrik"]) {
+    assert.equal(makerOf(ours)?.logo, "/manufacturers/united-grinding.png", ours)
+  }
+})

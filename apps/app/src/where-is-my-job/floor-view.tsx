@@ -18,7 +18,7 @@ import type { Floor } from "@/where-is-my-job/get-floor.ts"
 import type { Answer } from "@/machines/get-machines.ts"
 import { floorAt, floorFilters, floorOf, floorWith, ordersOf } from "@/where-is-my-job/floor.ts"
 import type { FloorPage, Order } from "@/where-is-my-job/floor.ts"
-import { floorExtras } from "@/where-is-my-job/extras.ts"
+import type { FloorExtra } from "@/where-is-my-job/extras.ts"
 import { FloorMap } from "@/where-is-my-job/floor-map.tsx"
 import type { Lens } from "@/where-is-my-job/floor-map.tsx"
 import { FloorPanel, MachinePanel, OrderPanel, OrdersTable } from "@/where-is-my-job/panels.tsx"
@@ -42,13 +42,18 @@ const passes = (order: Order | null, machine: string) => order !== null && order
 const title = "Where is My Job?"
 
 /**
- * The page "Where is My Job?" as a view of what the loader read. Where a showcase offers more to lay
- * onto the shop floor (`floorExtras`), the page opens with the first of it, and a switch above the
- * map turns it off.
+ * The page "Where is My Job?" as a view of what the loader read. Where a page gives more to lay onto
+ * the shop floor (`extras`, a showcase on a page of its own), the view opens with the first of it, and
+ * a switch above the map turns it off. The page of the app gives none.
  */
-export function FloorView({ answer }: { answer: Answer<Floor> | { values: null; error: string } }) {
-  const extras = floorExtras()
-  // Where a showcase offers more, the page opens with it: that is what the demo is about.
+export function FloorView({
+  answer,
+  extras = [],
+}: {
+  answer: Answer<Floor> | { values: null; error: string }
+  extras?: ReadonlyArray<FloorExtra>
+}) {
+  // Where a page gives more, the view opens with it: that is what the demo is about.
   const [extraId, setExtraId] = useState<string>(extras[0]?.id ?? "real")
   const extra = extras.find((one) => one.id === extraId) ?? null
   const decorate = extra?.decorate

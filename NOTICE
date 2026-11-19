@@ -19,6 +19,11 @@ They are used in the example application with the agreement of United Machining 
 TRUMPF is a trademark of the TRUMPF group and is not covered by the licences of this repository. The brand
 under packages/ui/brands/trumpf/ is used in the example application with the agreement of TRUMPF.
 
+The logos under apps/app/public/manufacturers/ are trademarks of their owners and are not covered by the
+licences of this repository: trumpf.svg of the TRUMPF group, united-grinding.png of the UNITED GRINDING
+Group. They are used in the example application with the agreement of TRUMPF and of the UNITED GRINDING
+Group.
+
 Third-party container images referenced by compose.yaml (MQTT broker, database) are distributed under
 their own licences and are not part of this repository.
 

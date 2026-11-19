@@ -180,8 +180,9 @@ circulation. An order is every job order that names the same order number, read 
 (`genui_job_order_list`) and kept live by the retained lists `JobMonitoring/JobOrders` and
 `JobOrderResults`. Programming before the machines, packing after them and the single part on its sheet have
 no source yet: the page draws them dashed, as the gaps to discuss. No source of the stack sends an order across
-machines yet; a build with `APP_SHOWCASES` opens the page with the switch "What if", made-up orders WI-… across
-the clusters, and "Real orders" turns it off. It has no picture in this tour.
+machines yet; a stack with `APP_SHOWCASES` set has the page <http://localhost:5600/what-if>, in the sidebar
+as "What if": the same page with made-up orders WI-… across the clusters, and "Real orders" turns them off.
+It has no picture in this tour.
 
 **In the code:** [`apps/app/src/routes/where-is-my-job.tsx`](../apps/app/src/routes/where-is-my-job.tsx)
 is the page; the map, the panels and `getFloor` live in

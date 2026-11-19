@@ -13,7 +13,8 @@ All notable changes are documented here. The format follows
   browser. A tile has an icon for its step and the logo or name of its manufacturer. The perspectives stand
   below the map in one column, the list of orders shows those in circulation by default. The machine card of
   the generative UI backend has `identity.deviceClass` (optional). The showcase "What if" (only with
-  `APP_SHOWCASES`) lays made-up orders WI-… across the clusters, on by default, switched on the page.
+  `APP_SHOWCASES`) is the same page at `/what-if`, with made-up orders WI-… across the clusters; "Real orders"
+  turns them off. The page of the app shows the real orders in every build.
 - Bending machine, started with the stack: a simulator of a press brake that reports through RCI telegram files, with a
   web page, and one adapter per machine that publishes it after the binding of machines (data model 0.17.1) as
   `trumpf_5085_AE325085TB46`: identification, `State/Status`, `Notification/ActiveAlerts` with `AlertRaised` and

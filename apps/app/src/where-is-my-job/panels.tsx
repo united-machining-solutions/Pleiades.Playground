@@ -273,7 +273,7 @@ export function MachinePanel({
           <p className="text-sm text-muted-foreground">No job order ended in the shift the machine keeps.</p>
         ) : (
           <ItemGroup className="gap-1.5">
-            {done.slice(0, 5).map(({ job, result }) => (
+            {done.slice(0, LISTED).map(({ job, result }) => (
               <Item
                 key={job.jobOrderId}
                 variant="outline"
@@ -289,6 +289,7 @@ export function MachinePanel({
             ))}
           </ItemGroup>
         )}
+        <More count={done.length} />
       </section>
       <section className="flex flex-col gap-1.5">
         <h3 className={heading}>Waiting</h3>
@@ -296,7 +297,7 @@ export function MachinePanel({
           <p className="text-sm text-muted-foreground">No job order is released.</p>
         ) : (
           <ItemGroup className="gap-1.5">
-            {queue.slice(0, 5).map((job) => (
+            {queue.slice(0, LISTED).map((job) => (
               <Item
                 key={job.jobOrderId}
                 variant="outline"
@@ -314,10 +315,30 @@ export function MachinePanel({
             ))}
           </ItemGroup>
         )}
+        <More count={queue.length} />
       </section>
       </div>
     </div>
   )
+}
+
+/** How many job orders a list of the machine panel shows; it says how many more there are. */
+const LISTED = 5
+
+/** The line under a list that shows only the first LISTED of `count`. */
+function More({ count }: { count: number }) {
+  return count > LISTED ? <p className="text-xs text-muted-foreground">and {count - LISTED} more</p> : null
+}
+
+/** What the order is known by, and whether the stack has it: the sheet and the box have no source yet. */
+function knownAs(order: Order): Array<{ label: string; value: string | null }> {
+  return [
+    { label: "Order number", value: order.number },
+    { label: "Job order", value: order.steps.map((one) => one.job.jobOrderId).join(", ") },
+    { label: "Work master", value: order.at.job.workMaster },
+    { label: "Sheet · position", value: null },
+    { label: "Box", value: null },
+  ]
 }
 
 /** How much of its history the machine was producing, and how many job orders wait for it. */
@@ -398,6 +419,22 @@ export function OrderPanel({
         </div>
       )}
       </div>
+      {/* What the order is known by: the gaps of the page, the sheet and the box, stand dashed. */}
+      <section className="flex flex-col gap-1.5 md:col-span-3">
+        <h3 className={heading}>Known as</h3>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {knownAs(order).map(({ label, value }) => (
+            <Badge
+              key={label}
+              variant={value ? "secondary" : "outline"}
+              className={cn("h-auto flex-col items-start py-1", !value && "border-dashed")}
+            >
+              <span className="text-[0.625rem] font-normal text-muted-foreground">{label}</span>
+              {value ?? "no source yet"}
+            </Badge>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }

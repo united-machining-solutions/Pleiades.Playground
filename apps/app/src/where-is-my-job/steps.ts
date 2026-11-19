@@ -29,22 +29,30 @@ export type StepSource = "deviceClass" | "model" | "person" | "none"
 
 export type MachineStep = { id: StepId | "none"; name: string; source: StepSource }
 
-/** Words of a device class, in English or German, and the step they mean. The first that matches counts. */
+/**
+ * Words of a device class, in English or German, and the step they mean. The first that matches counts:
+ * joining and forming before cutting, as a laser or a tube also welds and bends ("laser welding
+ * machine", "tube bender"). Printing is additive or 3D, not every "Druck": a die casting machine is
+ * a "Druckgussmaschine".
+ */
 const DEVICE_CLASS_WORDS: ReadonlyArray<readonly [RegExp, StepId]> = [
   [/grind|schleif/i, "grinding"],
   [/lathe|turning|dreh/i, "turning"],
   [/machining cent|milling|fräs|fraes/i, "milling"],
-  [/laser|punch|cutting|stanz|schneid/i, "cutting"],
-  [/bend|press brake|forming|biege|umform/i, "forming"],
   [/weld|joining|schweiß|schweiss|füge/i, "joining"],
-  [/additive|3d print|printer|druck/i, "printing"],
+  [/bend|press brake|forming|biege|umform/i, "forming"],
+  [/laser|punch|cutting|stanz|schneid/i, "cutting"],
+  [/additiv|3d[ -]?(print|druck)|printer|drucker/i, "printing"],
 ]
 
-/** Words of a model where the device class is missing: families of machines whose step is clear. */
+/**
+ * Words of a model where the device class is missing: families of machines whose step is clear. Bending
+ * and welding first, for the same reason: TubeBend bends, TruLaser Weld welds.
+ */
 const MODEL_WORDS: ReadonlyArray<readonly [RegExp, StepId]> = [
-  [/laser|punch|trumatic|trupunch|tube/i, "cutting"],
   [/bend/i, "forming"],
   [/weld/i, "joining"],
+  [/laser|punch|trumatic|trupunch|tube/i, "cutting"],
   [/^um\d|ultimaker/i, "printing"],
 ]
 
