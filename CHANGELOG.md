@@ -14,6 +14,12 @@ All notable changes are documented here. The format follows
   below the map in one column, the list of orders shows those in circulation by default. The machine card of
   the generative UI backend has `identity.deviceClass` (optional). The showcase "What if" (only with
   `APP_SHOWCASES`) lays made-up orders WI-… across the clusters, on by default, switched on the page.
+- Margo app: the example app registers at the Pleiades Hub, as in `compose.yaml`, with the section
+  *Pleiades Hub* of the settings. *Register at the Pleiades Hub* (`HUB_REGISTRATION`, on by default) switches
+  the registration off, since a Margo client may leave an empty broker out and the default would come back;
+  the server of the app takes `HUB_REGISTRATION=false` everywhere. *Broker of the hub* is the broker of the
+  stack by default, and *Address of the example app for the hub* is Traefik under *Host name of the app*,
+  over HTTP, so the hub links to the address a browser on the network uses once Traefik is opened to it.
 - Example app: the showcase page `/trulaser`, a cockpit of a TRUMPF laser cutting machine named as the umati
   data model names it: `State.Status` with `Notification.ActiveAlerts` and its history on one time axis, the
   `JobOrder` with its `ProgramExecution`, and from the TRUMPF extension (`oem/Dalle/`) the requests of the
@@ -414,9 +420,21 @@ All notable changes are documented here. The format follows
   attribute of all candidates in one call and uses it to choose between them, to tell what a node of the maker
   means, and as the unit of a node without `EngineeringUnits`. A description that contradicts the element, or
   disagrees with the `EngineeringUnits`, makes the match `Unclear`.
+- The brand TRUMPF (`packages/ui/brands/trumpf`): the colours, square corners and Open Sans of the TRUMPF
+  UX UI Community design system. Its `DESIGN.md` names what the design system asks for that a brand
+  cannot do.
 
 ### Changed
 
+- Example app: the microphone of the chat field can be held. Hold it while you speak and let go, as on a
+  tablet, and what was said goes into the field; a tap starts and ends the recording as before. The recording
+  starts as the finger goes down, so the first word is heard. While it records, the second line of the field
+  shows bars that move with the voice, the time and what ends it, where the finger does not cover it. The
+  recorder is the app's own now, so that the bars read the stream that records.
+- Example app: Live values with all machines shows only the graphs of a value some machine published, and
+  next to the title of a graph at most one value of now, where a single machine measures it; more stand
+  only as lines. Where machines are there and none published such a value, the page says so. With one machine
+  chosen, the page is as before.
 - Example app: "New chat" is back in the head of the chat panel, as a plus in the list and in every chat. It
   opens a new chat with no question yet and the cursor in its field; the list stays behind "All chats". After
   the first question asked in the panel, the field of the new chat keeps the cursor, so the next question
@@ -589,6 +607,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Example app: `/discover` takes a mistyped or shortened address as the address it is. `opc.tcp//host:port`
+  became `opc.tcp://opc.tcp//host:port:4840`, a machine name with the default port; a mistyped `opc.tcp` at
+  the start, also `opc.tcp:host:port`, is now written right, and `host:port` or `host:port/path` without a
+  scheme gets `opc.tcp://` and no second port. Only
+  a name alone, for example `A1121O0001`, still means `opc.tcp://<name>:4840`.
 - `opcua-adapter`: a rejected certificate is reported with its reason instead of a timeout. A server whose
   certificate does not carry the ApplicationUri it announces was told in the chat as "did not open a session
   within 30 seconds"; the reason was only in the log. A connect now stops on the first certificate error and
@@ -621,6 +644,14 @@ All notable changes are documented here. The format follows
   and energy or of the measurements of all machines are that tall. A long text no longer pulls the panel along
   either: it grows under its question too, and the button at the foot leads to its end as it stands. An alert
   under an answer, such as "The language model did not answer", comes into view by itself.
+- `genui-mcp`: a tool about one machine takes the machine as people call it, its serial number (`P-04`) or its
+  model and serial number (`AX-400 P-04`), as well as its id. A language model had to call `genui_machine_list`
+  first to learn the id, and the chat drew that list, every machine, above nearly every answer. A name that fits
+  several machines is refused with their ids; an id always means its own machine.
+- `app`: the chat draws the list of all machines only where the answer calls no other tool after it. A model
+  that reads the list to find a machine, and then asks about that machine, leaves it a step, "Read the
+  machines", which opens to the list; "Save as page" does not keep it either. While the answer
+  is coming, the list waits until it is clear which of the two it is.
 - `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page

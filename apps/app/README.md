@@ -22,7 +22,8 @@ harness.
   `genui_site_list`, and needs no language model.
 - **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
   machine, live. A choice above the graphs shows one machine or all of them, and stays in the URL
-  (`?machine=`).
+  (`?machine=`). With all of them, a value no machine published has no graph, and the value of now stands
+  next to the title of a graph only where a single machine measures it.
 - **Pages** (`/pages`) are what a person keeps of the chat, in this browser. "Save as page" under an answer
   of the chat makes one: all the cards of that answer, in their order, titled with the question. It stands
   under an answer that has ended and for which the chat drew a card, and needs no language model: the app
@@ -69,7 +70,9 @@ harness.
   "Chat". The panel opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
-  of a tool call itself: a card of the catalogue, or a list with the same rows as Home. An answer is drawn
+  of a tool call itself: a card of the catalogue, or a list with the same rows as Home. The list of all
+  machines is drawn only where the answer calls no other tool after it: a model that read it to find a
+  machine leaves it a step that opens to the list (`lookup` in `src/chat/tool-results.ts`). An answer is drawn
   from its markdown, and its times are those of your clock: the browser sends its time zone along with a
   question, and the server adds it to the tool calls. Whether the panel is open, and with which chat, is in
   the URL (`?chat=`), and the page stays where it is: you chat about what you see. Everything about the chat
@@ -151,10 +154,14 @@ device, set `APP_BIND=0.0.0.0`, and only in a network you trust.
 
 ## Dictation
 
-With a speech-to-text model at the gateway, the chat field has a microphone. Press it, speak, press it
-again: a spinner shows while the model writes down what was said, and the text goes into the field, after
-what is already there. It is sent like a typed question, when you send it. After two minutes the recording
-stops by itself and is written down the same way. The model hears the language itself. It also gets the
+With a speech-to-text model at the gateway, the chat field has a microphone. Tap it, speak, tap it again;
+or hold it while you speak and let go, as on a tablet. A press shorter than 0.4 s is a tap
+(`dictation-press.ts`); Enter or the space bar on the microphone is a tap too. While it records, the second
+line of the field says so, on the left, where a finger on the microphone does not cover it: bars that move
+with the loudness of the microphone (`dictation-level.ts`), the time, and what ends the recording, "Let go to
+finish" or "Tap ■ to finish". Then it says that the model writes down what was said, and the text goes into
+the field, after what is already there. It is sent like a typed question, when you send it. After two minutes
+the recording stops by itself and is written down the same way. The model hears the language itself. It also gets the
 names of the machines from the backend as its prompt, their serial numbers, models and machine ids, so that
 it writes "P-04" as the stack spells it.
 
@@ -163,11 +170,15 @@ of the hackathon `openai/gpt-transcribe`. The gateway passes it on as OpenAI's a
 (`POST /audio/transcriptions`). Where the gateway lists none, the field has no microphone, and the chat works
 as before.
 
-The browser records (`useAudioRecorder` of TanStack AI) and sends the recording to `/api/transcribe`, which
+The browser records (`recorder.ts`) and sends the recording to `/api/transcribe`, which
 calls the model with the key of the gateway (`generateTranscription`). The route reads at most 32 MiB, as the
 agent harness does, and answers a larger request with 413. A browser lets a page use the
 microphone only over https or on `localhost`; elsewhere the microphone says so when pressed. The recording
-is not kept.
+is not kept, and a field that goes with another chat lets go of the microphone, also of one the browser is
+still opening. The recorder is our own and
+not `useAudioRecorder` of TanStack AI: the bars read the level from the stream that records, and that
+recorder keeps its stream to itself. A second request for the microphone would mute the first one in Safari
+on iOS ([WebKit bug 179363](https://bugs.webkit.org/show_bug.cgi?id=179363)), on the tablet dictation is held on.
 
 ## Develop
 
@@ -196,7 +207,9 @@ MQTT, at the broker of this repository, with the SDK `@pleiades/hub-sdk` from th
 
 For the server the registration is opt-in. With `HUB_MQTT_URL` set, the server of the app registers when it
 starts, with one app. Without the variable, or with an empty one, nothing connects, and the app behaves as
-before. The demo stack sets the variable, see [In the demo stack](#in-the-demo-stack).
+before. `HUB_REGISTRATION=false` switches the registration off as well, whatever `HUB_MQTT_URL` says: the
+Margo app needs that switch, because a Margo client may leave an empty setting out of the environment, see
+[margo/README.md](../../margo/README.md#pleiades-hub). The demo stack sets the variable, see [In the demo stack](#in-the-demo-stack).
 
 The start is a plugin of Nitro, the server under TanStack Start: `src/hub/plugin.ts`, which `vite.config.ts`
 names. Nitro runs it once when the server starts, in development and in the built server, so the app is in
@@ -205,6 +218,7 @@ the hub before anyone opens a page.
 | Variable | Default of the server | In the demo stack | Meaning |
 |---|---|---|---|
 | `HUB_MQTT_URL` | empty: no registration | `mqtt://broker:1883`, the broker of the stack | The MQTT broker at which the app registers: an `mqtt`, `mqtts`, `ws` or `wss` URL. In development the broker of this repository's stack, `mqtt://localhost:1883` |
+| `HUB_REGISTRATION` | empty: `HUB_MQTT_URL` decides | not set | `false` switches the registration off; `true` or empty leaves it to `HUB_MQTT_URL`; any other value is an error at the start |
 | `HUB_APP_URL` | `http://localhost:3000/` | `http://localhost:5600/`, with the port of `APP_PORT` | The address under which a user's browser reaches the app: an absolute `http` or `https` URL, or a path that starts with `/`, such as `/playground/`, which the hub resolves against its own address. It should end with `/`, because the icon link is relative to it. Ignored without `HUB_MQTT_URL` |
 
 With `HUB_MQTT_URL` set, an invalid value of either variable is an error at the start. The built server
@@ -421,7 +435,8 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   `save-as-page.tsx` the row under an answer with "Save as page" (chrome of the app, never part of a card),
   `propose-page.ts` the one tool of the app the model gets, `app_page_propose`, and `proposed-page.tsx` the
   proposal the chat draws for its result,
-  `dictate.tsx` the microphone in its field and `dictation.server.ts` the model behind it,
+  `dictate.tsx` the microphone in its field and its line, `recorder.ts` the recording and `dictation.server.ts`
+  the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for
   which tool, its server which tools a language model does not get, and the proposal of a page which tools a
   page can call. `tool-results.ts` says what a card may say about a tool, `blocks.ts` turns an answer into blocks, and `answer.tsx` draws what the model writes

@@ -17,7 +17,7 @@ import { listTopicKinds, readNewest, readStatistics, readTimelines } from "./api
 import type { Apis, Newest, Timeline, TopicKinds } from "./apis.ts"
 import { silences, silentBetween } from "./liveness.ts"
 import type { Stretch } from "./liveness.ts"
-import { machineOf } from "./machines.ts"
+import { machineNamed, machineOf } from "./machines.ts"
 import { slotted } from "./measurements.ts"
 import { secondsBefore } from "./time.ts"
 
@@ -90,14 +90,16 @@ function onceByTopic<TLine extends { topic: string }>(lines: ReadonlyArray<TLine
 
 /**
  * The lines asked for, resolved against what the machines published in the last 24 hours. A
- * machine that published nothing, a signal it does not have and a text are refused, with the words
- * of what there is instead: a language model reads them and asks again.
+ * machine is named by its id or as people call it (`machineNamed`). A machine that published
+ * nothing, a signal it does not have and a text are refused, with the words of what there is
+ * instead: a language model reads them and asks again.
  */
 export function resolveLines(asked: ReadonlyArray<AskedLine>, published: Map<string, Map<string, Carried>>): Array<Resolved> {
-  const lines = asked.map((one): Resolved => {
+  const known = [...published.keys()].sort()
+  const lines = asked.map((line): Resolved => {
+    const one = { ...line, machine: machineNamed(known, line.machine) }
     const signals = published.get(one.machine)
     if (signals === undefined) {
-      const known = [...published.keys()].sort()
       throw new Error(`No machine "${one.machine}" published a value in the last 24 hours. Machines that did: ${known.join(", ") || "none"}.`)
     }
     const path = resolveSignal(one.signal, signals)

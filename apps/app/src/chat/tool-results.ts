@@ -30,6 +30,13 @@ export type ChatTool = {
    */
   cardOnly?: boolean
   /**
+   * A language model also calls this tool on its way to an answer, to look up what there is, such as
+   * the machines and their ids. Its result is drawn only where the answer calls no other tool after
+   * it: where it does, the result was a step, and its line among the steps opens to the card. While the
+   * answer is still coming and nothing has followed the result yet, the card waits there too.
+   */
+  lookup?: boolean
+  /**
    * Whether a drawn result can be replayed as a saved GenUI page. `false`: the chat draws it, and a
    * page never holds it as a part. Source references are such, the proposal of a page
    * (pages/proposal.ts), and the cards of a server a page does not ask: a page asks the generative UI

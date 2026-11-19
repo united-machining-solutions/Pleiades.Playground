@@ -1,6 +1,6 @@
 import { ENERGY_HOURS, ENERGY_SLOTS, MOST_ENERGY_HOURS, energySeries, energyShow } from "@pleiades/cards/energy/contract.ts"
 import { energyShowInWords } from "@pleiades/cards/energy/in-words.ts"
-import { instant, machineId } from "@pleiades/cards/machine/contract.ts"
+import { MACHINE_NAMING, instant, machineId } from "@pleiades/cards/machine/contract.ts"
 import { toolDefinition } from "@tanstack/ai"
 import { z } from "zod"
 
@@ -21,10 +21,10 @@ export { ENERGY_CARD_URI, ENERGY_SERIES_TOOL }
 const shownAsCard =
   "Where the host shows MCP Apps, the person already sees this result as the energy card: the energy of each machine as a bar with mean and peak power, and the power over these hours as a graph. Then a sentence or two is the whole answer. Do not list the values again."
 
-const machines = z
-  .array(machineId.describe("The machine id of a machine, for example alcyone-machines_AX-400_P-04. genui_machine_list names every machine with its id."))
-  .min(1)
-  .optional()
+const machines = z.array(machineId.describe(MACHINE_NAMING)).min(1).optional()
+
+/** A card names the machines by the ids of a result. */
+const machineIds = z.array(machineId.describe("The machine id: `machine` of a machine of genui_energy_show.")).min(1).optional()
 
 const energyShowTool = toolDefinition({
   name: "genui_energy_show",
@@ -56,7 +56,7 @@ const energySeriesTool = toolDefinition({
   inputSchema: z.object({
     from: instant.describe("Where the lines begin: `from` of genui_energy_show."),
     to: instant.describe(`Where they end: \`to\` of genui_energy_show. At most ${MOST_ENERGY_HOURS} hours after \`from\`.`),
-    machines: machines.describe("The machines to draw, in the order of their colours. Every machine that published active power if omitted."),
+    machines: machineIds.describe("The machines to draw, in the order of their colours. Every machine that published active power if omitted."),
     slots: z
       .number()
       .int()

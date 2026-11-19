@@ -21,7 +21,11 @@ Timeseries API itself are `timeseries_*`, without the prefix, and return its sto
 
 The generative UI server is not an API of its own: it reads the three servers above over REST and returns what
 a display needs, each value with the topic or notification it comes from. Its results are answers, not raw
-data: the text of a result says in words what the values are, so its tools need no call before them.
+data: the text of a result says in words what the values are, so its tools need no call before them. A tool
+about one machine takes the machine id or what people call the machine, its serial number (`P-04`) or its
+model and serial number (`AX-400 P-04`), so nobody lists the machines first to learn an id. A name that fits
+several machines is refused with their ids; an id always means its own machine. A tool that only a card calls
+is given the ids of a result.
 `genui_machine_show` links the machine card, the resource `ui://genui/machine`: a host that shows MCP Apps
 draws the result with it. What a language model reads of a result is short; a series, such as the states of
 a machine over the last hours, is fetched by the card itself with a tool that only a card calls

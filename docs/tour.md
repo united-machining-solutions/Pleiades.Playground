@@ -150,8 +150,8 @@ the plan [`packages/cards/src/site/hall-plan.tsx`](../packages/cards/src/site/ha
 
 The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
 physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
-a line for each machine. A choice above the graphs shows one machine or all of them. It has no picture in
-this tour.
+a line for each machine. A choice above the graphs shows one machine or all of them; with all of them, a
+value no machine published has no graph. It has no picture in this tour.
 
 **In the code:** [`apps/app/src/routes/live.tsx`](../apps/app/src/routes/live.tsx) is the page,
 [`packages/cards/src/measurement/measurement-graph.tsx`](../packages/cards/src/measurement/measurement-graph.tsx)
@@ -257,7 +257,9 @@ The picture shows one chat, with a language model configured. The question was "
 last 8 hours?". The chat lists each step of the model, "Read the guide of the backend" and "Read the machine";
 a step opens to what its tool gave back. Whenever the answer is coming and nothing in it moves, before the
 first step and after a step until the next one or the text comes, a running line "Thinking" stands there. The
-chat draws the card from the values of the tool, and the model sums it up in a few sentences. The numbers are
+chat draws the card from the values of the tool, and the model sums it up in a few sentences. Where the model
+reads the list of all machines only to find one and then calls another tool, the list stays a step, "Read the
+machines", which opens to the list. The numbers are
 the tool's and the wording is the model's: the card says 6 minutes of running, the model "just under 7
 minutes". The stack had just started, so most of the 8 hours have no data. The card on the left is one minute
 newer than the one in the chat: the page reads again, an answer shows what was true when it was given.
@@ -352,8 +354,10 @@ The three questions above are suggestions to begin with.
 While an answer comes, send turns into stop: it ends the answer, what came so far stays, and the next
 question can go.
 
-With a speech-to-text model at the gateway, the field also has a microphone: press it, speak, press it
-again, and what was said stands in the field, to send like a typed question. The gateway decides which model
+With a speech-to-text model at the gateway, the field also has a microphone: tap it, speak, tap it again,
+or hold it while you speak and let go, and what was said stands in the field, to send like a typed question.
+While it records, bars at the left of the field move with your voice, beside the time and what ends the
+recording. The gateway decides which model
 writes it down, see [Dictation](../apps/app/README.md#dictation). The picture of the answer shows the microphone
 at the right of the field.
 

@@ -163,6 +163,21 @@ parameters:
     targets:
       - pointer: APP_MCP_SERVERS
         components: ["default"]
+  hubRegistration:
+    value: true
+    targets:
+      - pointer: HUB_REGISTRATION
+        components: ["default"]
+  hubMqttUrl:
+    value: "mqtt://broker:1883"
+    targets:
+      - pointer: HUB_MQTT_URL
+        components: ["default"]
+  hubAppUrl:
+    value: ""
+    targets:
+      - pointer: HUB_APP_URL
+        components: ["default"]
 
 configuration:
   sections:
@@ -287,6 +302,28 @@ configuration:
             docs=http://host.docker.internal:3202/mcp. Its MCP listener and published port must be reachable
             from this container; a port published only on host loopback may not be reachable on Linux.
           schema: optionalText
+    - name: Pleiades Hub
+      settings:
+        - parameter: hubRegistration
+          name: Register at the Pleiades Hub
+          description: >-
+            The example app tells the Pleiades Hub on the device that it is there, so the hub lists it. Off: the
+            app does not register.
+          schema: boolean
+        - parameter: hubMqttUrl
+          name: Broker of the hub
+          description: >-
+            The MQTT broker at which the example app registers at the Pleiades Hub, as the app reaches it from
+            its container. Empty: the broker of this app, where the hub on the device looks.
+          schema: optionalText
+        - parameter: hubAppUrl
+          name: Address of the example app for the hub
+          description: >-
+            The address under which a browser reaches the example app; the hub opens the app there. Empty:
+            through Traefik, http://<Host name of the app>:<HTTP port of Traefik>/, which needs Address of
+            Traefik open to the network for a browser on another computer. Set it when a browser reaches the app
+            under another address. It should end with a slash.
+          schema: optionalText
   schema:
     - name: port
       dataType: integer
@@ -308,3 +345,6 @@ configuration:
     - name: optionalText
       dataType: string
       allowEmpty: true
+    - name: boolean
+      dataType: boolean
+      allowEmpty: false
