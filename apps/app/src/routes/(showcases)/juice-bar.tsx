@@ -1,6 +1,6 @@
 import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
 import { createFileRoute, useRouter } from "@tanstack/react-router"
-import { TriangleAlertIcon } from "lucide-react"
+import { CupSodaIcon, TriangleAlertIcon } from "lucide-react"
 import { useEffect } from "react"
 
 import { DrinkPicker } from "@/cards/juicebar/chat.tsx"
@@ -14,11 +14,11 @@ import { readDrinks } from "@/showcases/juice-bar/drinks.ts"
  * takes its drinks off the page.
  *
  * It is a showcase: the page is only in a build with the showcases (APP_SHOWCASES), and the folder
- * `(showcases)` adds nothing to its address. It names no entry in the sidebar: it is reached by its
- * address, /juice-bar.
+ * `(showcases)` adds nothing to its address. It names its entry in the sidebar itself, as every page does,
+ * so the entry is there exactly where the page is.
  */
 export const Route = createFileRoute("/(showcases)/juice-bar")({
-  staticData: { crumb: "Juice bar" },
+  staticData: { nav: { title: "Juice bar", icon: CupSodaIcon } },
   loader: () => readDrinks(),
   component: JuiceBar,
 })

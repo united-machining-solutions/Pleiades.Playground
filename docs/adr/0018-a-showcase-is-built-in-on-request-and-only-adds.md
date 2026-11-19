@@ -54,6 +54,8 @@ My Job?" drew it for itself, in a comment: made-up data, so no entry in the side
   can choose the image there, and a release is base. A device that is to show a showcase runs
   `compose.yaml` with the setting, or would need a Margo app of its own, which this record does not ask for.
 - A page for a demo costs one folder and one route file, and nobody else's page changes with it.
+- A page of a showcase names its entry in the sidebar in its own route, as every page does. The rows of the
+  sidebar of the base stay as they are: a build without the showcases has neither the page nor its entry.
 - The showcases stay in the repository, next to the application they show. Whoever copies the repository
   has their folders and can delete them; whoever pulls the image of the application never had them.
 - A package that only a showcase needs still stands in the `package.json` of the application and is
