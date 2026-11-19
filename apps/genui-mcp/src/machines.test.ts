@@ -4,7 +4,7 @@ import { afterEach, mock, test } from "node:test"
 import { stateOf } from "@pleiades/cards/machine/state.ts"
 
 import { silences } from "./liveness.ts"
-import { currentRun, listMachines, machineOf, showMachine } from "./machines.ts"
+import { currentRun, listMachines, machineNamed, machineOf, showMachine } from "./machines.ts"
 import { fromMicroseconds } from "./time.ts"
 
 const topic = "machines/P-04/umati/State/Status/MachineryItemState"
@@ -21,6 +21,35 @@ test("the machine is the topic level after machines/", () => {
   assert.equal(machineOf(topic), "P-04")
   assert.equal(machineOf("machines/M-02/events/notifications"), "M-02")
   assert.equal(machineOf("somewhere/else"), undefined)
+})
+
+const known = ["alcyone-machines_AX-400_P-04", "merope-microtec_MM-120_M-02", "taygeta-precision_TP-800_P-07", "trumpf_Laser2D_L-01"]
+
+test("a machine is named by its id, or as people call it: its serial number, or its model and serial number", () => {
+  assert.equal(machineNamed(known, "alcyone-machines_AX-400_P-04"), "alcyone-machines_AX-400_P-04")
+  assert.equal(machineNamed(known, "P-04"), "alcyone-machines_AX-400_P-04")
+  assert.equal(machineNamed(known, "p-07"), "taygeta-precision_TP-800_P-07")
+  assert.equal(machineNamed(known, "AX-400 P-04"), "alcyone-machines_AX-400_P-04")
+  assert.equal(machineNamed(known, " MM-120_M-02 "), "merope-microtec_MM-120_M-02")
+  assert.equal(machineNamed(known, "Laser2D"), "trumpf_Laser2D_L-01")
+})
+
+test("a part of a word or words out of their order name no machine: the name comes back as it is", () => {
+  assert.equal(machineNamed(known, "P"), "P")
+  assert.equal(machineNamed(known, "P-4"), "P-4")
+  assert.equal(machineNamed(known, "P-04 AX-400"), "P-04 AX-400")
+  assert.equal(machineNamed(known, " "), " ")
+})
+
+test("a name that fits several machines is refused with their ids", () => {
+  assert.throws(
+    () => machineNamed([...known, "alcyone-machines_AX-400_P-09"], "AX-400"),
+    /^Error: "AX-400" fits more than one machine: alcyone-machines_AX-400_P-04, alcyone-machines_AX-400_P-09\. Name one of them by its id\.$/,
+  )
+})
+
+test("an id is its own machine, also where it is a word of the id of another", () => {
+  assert.equal(machineNamed([...known, "P-04"], "P-04"), "P-04")
 })
 
 test("a run starts where the value last changed", () => {
@@ -224,6 +253,16 @@ test("a machine id is what the MQTT binding allows, so a machine that is listed 
     ["Line 2"],
   )
   const shown = await showMachine(apis, "Line 2", 1, now)
+  assert.equal(shown.machine.connection.value, "Running")
+})
+
+test("one machine is shown by its serial number, without a list of the machines before", async () => {
+  publishing({
+    "machines/alcyone-machines_AX-400_P-04/umati/Connection/State": [{ at: hoursAgo(1), value: "Running" }],
+    "machines/alcyone-machines_AX-400_P-04/umati/Connection/Heartbeat": heartbeats(1),
+  })
+  const shown = await showMachine(apis, "P-04", 1, now)
+  assert.equal(shown.machine.machine, "alcyone-machines_AX-400_P-04")
   assert.equal(shown.machine.connection.value, "Running")
 })
 
