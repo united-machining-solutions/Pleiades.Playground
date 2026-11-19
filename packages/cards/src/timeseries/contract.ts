@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { SILENT_AFTER_SECONDS, instant, machineId } from "../machine/contract.ts"
+import { MACHINE_NAMING, SILENT_AFTER_SECONDS, instant, machineId } from "../machine/contract.ts"
 
 // The contract of the time series card: signals a person names, of any machine, over the last minutes
 // or hours, a line for each pair of a machine and a signal. Every value keeps the unit it was
@@ -32,7 +32,7 @@ export type SignalKind = z.infer<typeof signalKind>
 
 /** One pair as a caller names it. */
 export const askedLine = z.object({
-  machine: machineId.describe("The machine id, for example alcyone-machines_AX-400_P-04. genui_machine_list names every machine with its id."),
+  machine: machineId.describe(MACHINE_NAMING),
   signal: z
     .string()
     .min(1)

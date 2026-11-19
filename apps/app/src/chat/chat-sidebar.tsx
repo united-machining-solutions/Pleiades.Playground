@@ -86,7 +86,7 @@ import {
   takePress,
   useChatPanel,
 } from "./ask.ts"
-import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
+import { blocksOf, callsAfter, questionOf, thinkingLine } from "./blocks.ts"
 import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { UNNAMED_CHAT, chatName, nameOfQuestion } from "./chat-name.ts"
@@ -447,7 +447,7 @@ function Conversation({ threadId }: { threadId: string }) {
                     )
                   }
                   const live = isLoading && message === messages.at(-1)
-                  const blocks = blocksOf(message.parts, live, chatTools)
+                  const blocks = blocksOf(message.parts, live, chatTools, callsAfter(messages, position, isLoading))
                   // An answer that has nothing to show yet takes no room.
                   if (blocks.length === 0) return null
                   // An answer that has ended, and for which the chat drew a card, can be saved as a
@@ -560,7 +560,8 @@ const callIcon: Record<CallState, typeof CircleCheckIcon> = {
 
 /**
  * One tool call, after the shadcn pattern Tool: a line while it runs, and a line that opens to what
- * the tool gave back, or why it failed, once its result is there.
+ * the tool gave back, or why it failed, once its result is there. A lookup on the way to the answer,
+ * which the chat does not draw on its own, opens to its card (`card`, blocks.ts).
  */
 function CallLine({ call }: { call: Call }) {
   const Icon = callIcon[call.state]
@@ -573,6 +574,14 @@ function CallLine({ call }: { call: Call }) {
     </TraceLine>
   )
   if (call.output === undefined) return line
+  if (call.card !== undefined) {
+    return (
+      <TraceCollapsible>
+        <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>{call.card}</TraceCollapsibleContent>
+      </TraceCollapsible>
+    )
+  }
   // The output is data of the stack, shown whole and unfiltered: the chat has no sign-in, so whoever
   // reaches it may read what the tools read. `wrap` and `max-h-64` bound the box, not the text; a
   // closed step costs nothing, because the panel of Base UI mounts its children only while open

@@ -4,7 +4,7 @@ import type { EnergySeries, EnergyShow, MachineEnergy, MeterReading } from "@ple
 
 import { listTopics, readNewest, readStatistics, readTimelines } from "./apis.ts"
 import type { Apis, Newest, Statistics } from "./apis.ts"
-import { machineOf } from "./machines.ts"
+import { machineNamed, machineOf } from "./machines.ts"
 import { silences, silentBetween } from "./liveness.ts"
 import { slotEnds, slotted, sources, topicOf } from "./measurements.ts"
 import { secondsBefore } from "./time.ts"
@@ -130,13 +130,15 @@ export async function showEnergy(
   // A machine that stands still may send only its heartbeat, with a meter that does not change.
   const alive = machinesOf((machine, topic) => topic === heartbeatOf(machine)).filter((machine) => !measured.includes(machine))
   const known = [...measured, ...alive].sort()
-  const missing = (machines ?? []).filter((machine) => !known.includes(machine))
+  // A machine is named by its id or as people call it.
+  const named = machines?.map((name) => machineNamed(known, name))
+  const missing = (named ?? []).filter((machine) => !known.includes(machine))
   if (missing.length > 0) {
     throw new Error(
       `No machine ${missing.map((one) => `"${one}"`).join(", ")} published active power, its energy meter or a heartbeat in the last ${hours === 1 ? "hour" : `${hours} hours`}. Machines that did: ${known.join(", ") || "none"}.`,
     )
   }
-  const asked = machines === undefined ? known : [...new Set(machines)]
+  const asked = named === undefined ? known : [...new Set(named)]
 
   const shown = await Promise.all(
     asked.map(async (machine): Promise<MachineEnergy> => {
