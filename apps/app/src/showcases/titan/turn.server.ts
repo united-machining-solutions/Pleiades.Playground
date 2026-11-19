@@ -149,6 +149,8 @@ export async function answer(
       for (const call of calls) emit({ type: "call", id: call.id, name: call.name })
       // Calls of one round do not depend on each other: they run together.
       const results = await Promise.all(calls.map((call) => callTool(call, timeZone)))
+      // What a tool gave is drawn as a card: that is an answer too, also when the model adds no word.
+      if (results.some((result) => !result.failed)) said = true
       for (const [index, result] of results.entries()) {
         const call = calls[index] as Call
         emit({ type: "result", id: call.id, name: call.name, content: result.content, failed: result.failed })
