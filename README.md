@@ -111,6 +111,7 @@ docs/         Architecture, decisions (ADR) and guides
 .github/      CI workflows and templates
 compose.yaml  The demo stack
 margo/        The demo stack as a Margo app, packaged and published with bart
+sfh/          The demo stack as an app of the Smart Factory Host, one AppDefinition
 ```
 
 Project and image names follow one pattern: `Pleiades.Playground.<Area>.<Part>` in .NET and

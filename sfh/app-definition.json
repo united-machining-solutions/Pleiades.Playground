@@ -1,0 +1,225 @@
+{
+  "definitionVersion": "1.2.1",
+  "values": [
+    { "name": "dataRetention", "value": "30.00:00:00" },
+    { "name": "llmBaseUrl", "value": "" },
+    { "name": "llmApiKey", "value": "" },
+    { "name": "appMcpServers", "value": "" },
+    { "name": "cardResourceDomains", "value": "" }
+  ],
+  "volumes": [
+    { "name": "mongodb-data", "type": "persistent", "capacity": "10Gi" },
+    {
+      "name": "mosquitto-config",
+      "type": "configMap",
+      "configMapData": {
+        "mosquitto.conf": "# Demo broker: anonymous access inside the app and on its services.\n# Do not expose this configuration to a network you do not control.\npersistence false\nlog_dest stdout\n\nlistener 1883\nprotocol mqtt\n\nlistener 9001\nprotocol websockets\n\nallow_anonymous true\n",
+        "ready.sh": "#!/bin/sh\n# Readiness of the broker: it answers a subscription to its version. A script and not an exec probe with\n# arguments, which the SFH app-generator breaks (adapters#776).\nexec mosquitto_sub -t '$SYS/broker/version' -C 1 -W 3\n"
+      }
+    },
+    {
+      "name": "mongodb-probe",
+      "type": "configMap",
+      "configMapData": {
+        "startup.sh": "#!/bin/sh\n# Passes once MongoDB is the writable primary of its single-node replica set; initiates the set on the\n# first pass. A script and not an exec probe with arguments, which the SFH app-generator breaks (adapters#776).\nHOME=/tmp exec mongosh --quiet --eval \"try { if (!db.hello().isWritablePrimary) throw new Error('not primary') } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'127.0.0.1:27017'}]}); throw e }\"\n",
+        "alive.sh": "#!/bin/bash\n# Readiness and liveness of MongoDB: its port answers. MongoDB listens on 127.0.0.1 only, and a tcpSocket probe\n# of the kubelet goes to the pod IP, so the check runs inside the container.\nexec 3<>/dev/tcp/127.0.0.1/27017\n"
+      }
+    }
+  ],
+  "containers": [
+    {
+      "name": "broker",
+      "image": "eclipse-mosquitto",
+      "tag": "2.1.2-alpine",
+      "resources": { "requests": { "memory": "64Mi", "cpu": "10m" }, "limits": { "memory": "64Mi" } },
+      "ports": [
+        { "name": "mqtt", "containerPort": 1883, "hostPort": 1883, "service": { "app2appPort": 1883 } },
+        {
+          "name": "mqtt-ws",
+          "containerPort": 9001,
+          "hostPort": 9001,
+          "service": {
+            "app2appPort": 9001,
+            "reverseProxy": { "httpProxy": false, "httpsProxy": true, "subDomain": "pleiades-mqtt" }
+          }
+        }
+      ],
+      "volumeMounts": [
+        { "name": "mosquitto-config", "mountPath": "/mosquitto/config", "readOnly": true }
+      ],
+      "readinessProbe": {
+        "exec": { "command": ["sh", "/mosquitto/config/ready.sh"] },
+        "initialDelaySeconds": 2, "periodSeconds": 10, "timeoutSeconds": 5, "failureThreshold": 3
+      },
+      "livenessProbe": { "tcpSocket": { "port": 1883 }, "periodSeconds": 20, "failureThreshold": 3 }
+    },
+    {
+      "name": "mongodb",
+      "image": "mongo",
+      "tag": "8.0.38",
+      "resources": { "requests": { "memory": "1Gi", "cpu": "10m" }, "limits": { "memory": "1Gi" } },
+      "args": ["--replSet", "rs0", "--bind_ip", "127.0.0.1", "--wiredTigerCacheSizeGB", "0.25"],
+      "volumeMounts": [
+        { "name": "mongodb-data", "mountPath": "/data/db" },
+        { "name": "mongodb-probe", "mountPath": "/etc/pleiades-mongodb", "readOnly": true }
+      ],
+      "startupProbe": {
+        "exec": { "command": ["sh", "/etc/pleiades-mongodb/startup.sh"] },
+        "initialDelaySeconds": 5, "periodSeconds": 5, "timeoutSeconds": 10, "failureThreshold": 60
+      },
+      "readinessProbe": { "exec": { "command": ["bash", "/etc/pleiades-mongodb/alive.sh"] }, "periodSeconds": 10, "timeoutSeconds": 5, "failureThreshold": 3 },
+      "livenessProbe": { "exec": { "command": ["bash", "/etc/pleiades-mongodb/alive.sh"] }, "periodSeconds": 20, "timeoutSeconds": 5, "failureThreshold": 3 }
+    },
+    {
+      "name": "timeseries-api",
+      "image": "pleiades.playground.timeseries.api",
+      "tag": "0.2.1-rc3",
+      "resources": { "requests": { "memory": "256Mi", "cpu": "10m" }, "limits": { "memory": "256Mi" } },
+      "ports": [{ "name": "timeseries-api", "containerPort": 5500, "service": { "app2appPort": 5500 } }],
+      "environment": [
+        { "name": "ASPNETCORE_HTTP_PORTS", "value": "5500" },
+        { "name": "DOTNET_gcServer", "value": "0" },
+        { "name": "Config__Loki__Sinks__0__Name", "value": "demo" },
+        { "name": "Config__Loki__Sinks__0__Enabled", "value": "false" },
+        { "name": "Config__Loki__Sinks__0__Uri", "value": "http://localhost:3100" },
+        { "name": "Config__MongoTimeseries__ConnectionString", "value": "mongodb://127.0.0.1:27017/?replicaSet=rs0" },
+        { "name": "Config__MongoTimeseries__DatabaseName", "value": "Timeseries" },
+        { "name": "Config__MongoTimeseries__DataRetentionPeriod", "value": "{{ .Values.app.dataRetention }}" },
+        { "name": "Config__Auth__Enabled", "value": "false" }
+      ],
+      "readinessProbe": { "httpGet": { "path": "/health", "port": 5500 }, "initialDelaySeconds": 5, "periodSeconds": 10 },
+      "livenessProbe": { "httpGet": { "path": "/health", "port": 5500 }, "initialDelaySeconds": 15, "periodSeconds": 20, "failureThreshold": 3 }
+    },
+    {
+      "name": "timeseries-persistence",
+      "image": "pleiades.playground.timeseries.persistence",
+      "tag": "0.2.1-rc3",
+      "resources": { "requests": { "memory": "192Mi", "cpu": "10m" }, "limits": { "memory": "192Mi" } },
+      "environment": [
+        { "name": "ASPNETCORE_HTTP_PORTS", "value": "5501" },
+        { "name": "DOTNET_gcServer", "value": "0" },
+        { "name": "Config__Loki__Sinks__0__Name", "value": "demo" },
+        { "name": "Config__Loki__Sinks__0__Enabled", "value": "false" },
+        { "name": "Config__Loki__Sinks__0__Uri", "value": "http://localhost:3100" },
+        { "name": "Config__MqttSource__ConnectionString", "value": "mqtt://127.0.0.1:1883" },
+        { "name": "Config__MqttSource__User", "value": "" },
+        { "name": "Config__MqttSource__Password", "value": "" },
+        { "name": "Config__MqttSource__ClientId", "value": "timeseries-persistence" },
+        { "name": "Config__Topics__0", "value": "machines/+/umati/#" },
+        { "name": "Config__Topics__1", "value": "machines/+/oem/#" },
+        { "name": "Config__Topics__2", "value": "sites/+/#" },
+        { "name": "Config__CachingTime", "value": "00:00:05" },
+        { "name": "Config__TimeseriesApi__Uri", "value": "http://127.0.0.1:5500" }
+      ],
+      "startupProbe": { "httpGet": { "path": "/healthcheck", "port": 5501 }, "initialDelaySeconds": 5, "periodSeconds": 5, "timeoutSeconds": 5, "failureThreshold": 60 },
+      "readinessProbe": { "tcpSocket": { "port": 5501 }, "periodSeconds": 10 },
+      "livenessProbe": { "tcpSocket": { "port": 5501 }, "periodSeconds": 20, "failureThreshold": 3 }
+    },
+    {
+      "name": "events-api",
+      "image": "pleiades.playground.events.api",
+      "tag": "0.2.1-rc3",
+      "resources": { "requests": { "memory": "256Mi", "cpu": "10m" }, "limits": { "memory": "256Mi" } },
+      "ports": [{ "name": "events-api", "containerPort": 5510, "service": { "app2appPort": 5510 } }],
+      "environment": [
+        { "name": "ASPNETCORE_HTTP_PORTS", "value": "5510" },
+        { "name": "DOTNET_gcServer", "value": "0" },
+        { "name": "Config__Loki__Sinks__0__Name", "value": "demo" },
+        { "name": "Config__Loki__Sinks__0__Enabled", "value": "false" },
+        { "name": "Config__Loki__Sinks__0__Uri", "value": "http://localhost:3100" },
+        { "name": "Config__MongoDb__ConnectionString", "value": "mongodb://127.0.0.1:27017/?replicaSet=rs0" },
+        { "name": "Config__MongoDb__DatabaseName", "value": "Events" },
+        { "name": "Config__MongoDb__DataRetentionPeriod", "value": "{{ .Values.app.dataRetention }}" },
+        { "name": "Config__Auth__Enabled", "value": "false" }
+      ],
+      "readinessProbe": { "httpGet": { "path": "/health", "port": 5510 }, "initialDelaySeconds": 5, "periodSeconds": 10 },
+      "livenessProbe": { "httpGet": { "path": "/health", "port": 5510 }, "initialDelaySeconds": 15, "periodSeconds": 20, "failureThreshold": 3 }
+    },
+    {
+      "name": "events-persistence",
+      "image": "pleiades.playground.events.persistence",
+      "tag": "0.2.1-rc3",
+      "resources": { "requests": { "memory": "192Mi", "cpu": "10m" }, "limits": { "memory": "192Mi" } },
+      "environment": [
+        { "name": "ASPNETCORE_HTTP_PORTS", "value": "5511" },
+        { "name": "DOTNET_gcServer", "value": "0" },
+        { "name": "Config__Loki__Sinks__0__Name", "value": "demo" },
+        { "name": "Config__Loki__Sinks__0__Enabled", "value": "false" },
+        { "name": "Config__Loki__Sinks__0__Uri", "value": "http://localhost:3100" },
+        { "name": "Config__MqttSource__ConnectionString", "value": "mqtt://127.0.0.1:1883" },
+        { "name": "Config__MqttSource__User", "value": "" },
+        { "name": "Config__MqttSource__Password", "value": "" },
+        { "name": "Config__MqttSource__ClientId", "value": "events-persistence" },
+        { "name": "Config__MqttSource__CleanSession", "value": "false" },
+        { "name": "Config__MqttSource__SessionExpiry", "value": "1.00:00:00" },
+        { "name": "Config__Topics__0", "value": "machines/+/events/jobs" },
+        { "name": "Config__Topics__1", "value": "machines/+/events/workmasters" },
+        { "name": "Config__Topics__2", "value": "machines/+/events/notifications" },
+        { "name": "Config__EventsApi__Uri", "value": "http://127.0.0.1:5510" }
+      ],
+      "startupProbe": { "httpGet": { "path": "/healthcheck", "port": 5511 }, "initialDelaySeconds": 5, "periodSeconds": 5, "timeoutSeconds": 5, "failureThreshold": 60 },
+      "readinessProbe": { "tcpSocket": { "port": 5511 }, "periodSeconds": 10 },
+      "livenessProbe": { "tcpSocket": { "port": 5511 }, "periodSeconds": 20, "failureThreshold": 3 }
+    },
+    {
+      "name": "sites-api",
+      "image": "pleiades.playground.sites.api",
+      "tag": "0.2.1-rc3",
+      "resources": { "requests": { "memory": "256Mi", "cpu": "10m" }, "limits": { "memory": "256Mi" } },
+      "ports": [{ "name": "sites-api", "containerPort": 5540, "service": { "app2appPort": 5540 } }],
+      "environment": [
+        { "name": "ASPNETCORE_HTTP_PORTS", "value": "5540" },
+        { "name": "DOTNET_gcServer", "value": "0" },
+        { "name": "Config__Loki__Sinks__0__Name", "value": "demo" },
+        { "name": "Config__Loki__Sinks__0__Enabled", "value": "false" },
+        { "name": "Config__Loki__Sinks__0__Uri", "value": "http://localhost:3100" },
+        { "name": "Config__MongoDb__ConnectionString", "value": "mongodb://127.0.0.1:27017/?replicaSet=rs0" },
+        { "name": "Config__MongoDb__DatabaseName", "value": "Sites" },
+        { "name": "Config__Auth__Enabled", "value": "false" }
+      ],
+      "readinessProbe": { "httpGet": { "path": "/health", "port": 5540 }, "initialDelaySeconds": 5, "periodSeconds": 10 },
+      "livenessProbe": { "httpGet": { "path": "/health", "port": 5540 }, "initialDelaySeconds": 15, "periodSeconds": 20, "failureThreshold": 3 }
+    },
+    {
+      "name": "genui-mcp",
+      "image": "pleiades.playground.genui.mcp",
+      "tag": "0.2.1-rc3",
+      "resources": { "requests": { "memory": "256Mi", "cpu": "10m" }, "limits": { "memory": "256Mi" } },
+      "ports": [{ "name": "genui-mcp", "containerPort": 5520, "service": { "app2appPort": 5520 } }],
+      "environment": [
+        { "name": "PORT", "value": "5520" },
+        { "name": "TIMESERIES_API_URL", "value": "http://127.0.0.1:5500" },
+        { "name": "EVENTS_API_URL", "value": "http://127.0.0.1:5510" },
+        { "name": "CARD_RESOURCE_DOMAINS", "value": "{{ .Values.app.cardResourceDomains }}" }
+      ],
+      "readinessProbe": { "httpGet": { "path": "/health", "port": 5520 }, "initialDelaySeconds": 5, "periodSeconds": 10 },
+      "livenessProbe": { "httpGet": { "path": "/health", "port": 5520 }, "initialDelaySeconds": 15, "periodSeconds": 20, "failureThreshold": 3 }
+    },
+    {
+      "name": "app",
+      "image": "pleiades.playground.app",
+      "tag": "0.2.1-rc3",
+      "resources": { "requests": { "memory": "384Mi", "cpu": "10m" }, "limits": { "memory": "384Mi" } },
+      "ports": [
+        {
+          "name": "app",
+          "containerPort": 5600,
+          "service": {
+            "app2appPort": 5600,
+            "reverseProxy": { "httpProxy": false, "httpsProxy": true, "subDomain": "pleiades" }
+          }
+        }
+      ],
+      "environment": [
+        { "name": "PORT", "value": "5600" },
+        { "name": "GENUI_MCP_URL", "value": "http://127.0.0.1:5520/mcp" },
+        { "name": "APP_MCP_SERVERS", "value": "{{ .Values.app.appMcpServers }}" },
+        { "name": "MQTT_WS_URL", "value": "wss://pleiades-mqtt.{{ .Values.sponsorRef | lower }}.{{ .Values.basedomain }}" },
+        { "name": "LLM_BASE_URL", "value": "{{ .Values.app.llmBaseUrl }}" },
+        { "name": "LLM_API_KEY", "value": "{{ .Values.app.llmApiKey }}" }
+      ],
+      "readinessProbe": { "httpGet": { "path": "/health", "port": 5600 }, "initialDelaySeconds": 5, "periodSeconds": 10 },
+      "livenessProbe": { "httpGet": { "path": "/health", "port": 5600 }, "initialDelaySeconds": 15, "periodSeconds": 20, "failureThreshold": 3 }
+    }
+  ]
+}

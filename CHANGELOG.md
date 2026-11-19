@@ -7,6 +7,10 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- SFH app: the core stack without simulators (broker, MongoDB, APIs, persistence, generative UI backend and
+  example app) as an app of the Smart Factory Host, one AppDefinition 1.2.1 in [`sfh/`](sfh/README.md), with
+  scripts that build and push its images and run it on this computer as one pod. The app is served by the
+  reverse proxy of the SFH, the broker's WebSocket included; it shows the machines that publish to its broker.
 - Juice bar API and example app: the use of the ingredients. `juicebar_consumption_get` and `GET /consumption`
   say in how many sold drinks each ingredient on a pump was, in the last hours (8 if not asked) and since the
   start, the most used first, and name the least used one, the one to take off a pump first. The counts come
