@@ -4,6 +4,7 @@ import type { Listener, Message } from "../conversation.ts"
 
 import { withoutList, withoutSaidAdvice } from "./facts.ts"
 import { transcribe } from "./transcribe.ts"
+import { RECORDING_RATE, wavOf } from "./wav.ts"
 
 // Speech for the assistant page: the browser listens to a question and reads an answer aloud.
 //
@@ -11,8 +12,8 @@ import { transcribe } from "./transcribe.ts"
 //   arrives. A sentence sounds with the voice the page set (setSentenceVoice: the speech model of the
 //   gateway, speech.ts), else with a voice of the system that speaks on this computer (speechSynthesis).
 //   The next sentence is made while one sounds; a sentence the voice cannot make, the system says.
-// - Listening records the microphone while the key is held and recognises the speech with the
-//   transcription model of the gateway (transcribe.ts).
+// - Listening records the microphone while the key is held, as a WAV file written in the page, and
+//   recognises the speech with the transcription model of the gateway (transcribe.ts).
 //
 // Answers are read aloud only while voice is on: the assistant page turns it on while it is open.
 
@@ -221,13 +222,94 @@ function speakWithSystem(sentence: string): Promise<void> {
   })
 }
 
-/** Plays a sound, and resolves when it has ended or was stopped. */
-function play(sound: Blob): Promise<void> {
+// A sentence sounds through one sound context of the page, opened when Titan is started. A browser lets
+// a page make a sound only after a click or a key. An audio element asks for that leave anew every time
+// it plays, seconds after the key, and Firefox then refuses it without a word: Titan answered on the
+// screen and stayed silent. A sound context that was started from the click or the key stays open, in
+// every browser.
+
+let output: AudioContext | undefined
+let soundProblem: ((problem: string | undefined) => void) | undefined
+
+/**
+ * Opens the sound of the page. Call it from the handler of a click or a key, every time: a browser
+ * starts the sound only from there, and starting it again costs nothing.
+ */
+export function openSound() {
+  if (typeof AudioContext === "undefined") return
+  output ??= new AudioContext()
+  if (output.state === "suspended") void output.resume().catch(() => undefined)
+}
+
+/** Where to say that the browser plays no sound, in words for the person, and that it does again. */
+export function onSoundProblem(listener: ((problem: string | undefined) => void) | undefined) {
+  soundProblem = listener
+}
+
+const SOUND_REFUSED = "Der Browser spielt keinen Ton ab. Klicke einmal auf Titan, oder erlaube der Seite die automatische Wiedergabe."
+
+/** A sound context that may not start leaves its start pending, for good: it is waited for this long. */
+const SOUND_STARTS_WITHIN_MS = 300
+
+/** Lets go of the sound of the page: the page is left. The next start opens it again. */
+export function closeSound() {
+  void output?.close().catch(() => undefined)
+  output = undefined
+}
+
+/**
+ * Plays a sound, and resolves when it has ended or was stopped. What was stopped while the sound was
+ * still being got ready, by a new question or the space bar, does not sound afterwards.
+ */
+async function play(sound: Blob): Promise<void> {
+  if (!output) return playWithElement(sound)
+  const context = output
+  const mine = turn
+  if (context.state === "suspended") {
+    const late = new Promise<void>((resolve) => setTimeout(resolve, SOUND_STARTS_WITHIN_MS))
+    await Promise.race([context.resume().catch(() => undefined), late])
+    if (mine !== turn) return
+  }
+  if (context.state !== "running") {
+    soundProblem?.(SOUND_REFUSED)
+    return
+  }
+  let samples: AudioBuffer
+  try {
+    samples = await context.decodeAudioData(await sound.arrayBuffer())
+  } catch {
+    // What the sound context cannot read, an audio element may.
+    return mine === turn ? playWithElement(sound) : undefined
+  }
+  if (mine !== turn) return
+  soundProblem?.(undefined)
+  return new Promise((resolve) => {
+    const source = context.createBufferSource()
+    source.buffer = samples
+    source.connect(context.destination)
+    const done = () => {
+      if (hush === done) hush = undefined
+      source.onended = null
+      try {
+        source.stop()
+      } catch {
+        // It had not started, or had ended.
+      }
+      resolve()
+    }
+    hush = done
+    source.onended = done
+    source.start()
+  })
+}
+
+/** Plays a sound with an audio element: where the page has no sound context. */
+function playWithElement(sound: Blob): Promise<void> {
   const address = URL.createObjectURL(sound)
   const audio = new Audio(address)
   return new Promise((resolve) => {
     const done = () => {
-      hush = undefined
+      if (hush === done) hush = undefined
       audio.pause()
       URL.revokeObjectURL(address)
       resolve()
@@ -235,7 +317,10 @@ function play(sound: Blob): Promise<void> {
     hush = done
     audio.onended = done
     audio.onerror = done
-    audio.play().catch(done)
+    audio.play().catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "NotAllowedError") soundProblem?.(SOUND_REFUSED)
+      done()
+    })
   })
 }
 
@@ -267,22 +352,119 @@ export function forSpeech(markdown: string): string {
     .trim()
 }
 
+/** A unit as it is written, and as it is said in German: one of it, and more. */
+const SPOKEN_UNITS: ReadonlyArray<[unit: string, one: string, more: string]> = [
+  ["kWh", "Kilowattstunde", "Kilowattstunden"],
+  ["Wh", "Wattstunde", "Wattstunden"],
+  ["kW", "Kilowatt", "Kilowatt"],
+  ["min", "Minute", "Minuten"],
+  ["h", "Stunde", "Stunden"],
+  ["s", "Sekunde", "Sekunden"],
+  ["°C", "Grad Celsius", "Grad Celsius"],
+  ["%", "Prozent", "Prozent"],
+]
+
+/**
+ * A text with its units as words, for a voice: "3 h 5 min" is "3 Stunden 5 Minuten". A voice reads "h"
+ * as a letter. Only a unit that stands after a figure is one; Titan speaks German, so the words are.
+ */
+export function unitsInWords(text: string): string {
+  let spoken = text
+  for (const [unit, one, more] of SPOKEN_UNITS) {
+    const end = /\w$/.test(unit) ? "(?![\\p{L}\\d])" : ""
+    spoken = spoken.replace(new RegExp(`(\\d+(?:[.,]\\d+)?)[\\s\\u00a0]?${unit}${end}`, "gu"), (_, figure: string) => `${figure} ${figure === "1" ? one : more}`)
+  }
+  return spoken
+}
+
 // ---- Listening ----
 
 export function canListen(): boolean {
-  return typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined"
+  return typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== "undefined"
+}
+
+// What the space bar records is written as a WAV file in the page, the way "Hey Titan" writes its pieces
+// (wake.ts): the samples of the microphone at 16 kHz, 16 bits. The recorder of the browser (MediaRecorder)
+// would be less code, but each browser writes a format of its own, WebM, Ogg or MP4, and the
+// transcription model refused the recordings of one of them as "corrupted or unsupported" while it took
+// the WAV pieces of the same computer.
+
+/**
+ * How Titan asks for the microphone: the sound as it is, without the browser's echo cancellation, noise
+ * suppression and gain. Titan never listens while it speaks, so it has no echo to cancel. And with any of
+ * the three, Firefox opens the microphone as a call: on Linux the sound server then silences every other
+ * sound of the browser while the call lasts, Titan's own answers among them.
+ */
+export const MICROPHONE: MediaStreamConstraints = {
+  audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
 }
 
 /** The microphone stays open once it was allowed, so a question starts without a delay. */
 let microphone: MediaStream | undefined
-let recorder: MediaRecorder | undefined
+/** Ends the recording that runs, if one does. */
+let stopRecording: (() => void) | undefined
 /** The key was let go: also before the microphone was ready, for example while the browser asked for it. */
 let stopWanted = false
 
+/** After the key is let go the recording goes on this long: people let go as they finish the last word. */
+const TAIL_MS = 250
+/** A recording shorter than this is a tap of the key, not a question: it is not sent. */
+const SHORTEST_RECORDING_MS = 400
+/** The longest recording: a question, not a speech. It ends by itself then. */
+const LONGEST_RECORDING_MS = 60_000
+
 async function openMicrophone(): Promise<MediaStream> {
   if (microphone?.active) return microphone
-  microphone = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+  microphone = await navigator.mediaDevices.getUserMedia(MICROPHONE)
   return microphone
+}
+
+/**
+ * Records the microphone until `stopRecording` is called, and resolves with the samples and how many of
+ * them make a second. That is `RECORDING_RATE` where the browser gives what was asked for, and what it
+ * really recorded at where it does not: the file then says the truth.
+ */
+async function record(stream: MediaStream): Promise<{ samples: Float32Array; rate: number }> {
+  // A recording that still runs, from a key pressed again before its microphone was ready, ends here.
+  stopRecording?.()
+  const context = new AudioContext({ sampleRate: RECORDING_RATE })
+  const rate = context.sampleRate
+  const blocks: Array<Float32Array> = []
+  let length = 0
+  try {
+    const source = context.createMediaStreamSource(stream)
+    // A ScriptProcessor is old but needs no module file, as in wake.ts.
+    const processor = context.createScriptProcessor(2_048, 1, 1)
+    const stopped = new Promise<void>((resolve) => {
+      stopRecording = resolve
+      processor.onaudioprocess = (event) => {
+        const block = new Float32Array(event.inputBuffer.getChannelData(0))
+        blocks.push(block)
+        length += block.length
+        if ((length / rate) * 1000 >= LONGEST_RECORDING_MS) resolve()
+      }
+    })
+    source.connect(processor)
+    // It runs only when it is connected to an output; it writes silence there.
+    processor.connect(context.destination)
+    const mine = stopRecording
+    // A context that does not start, behind another tab for example, is not waited for once the key is up.
+    if (context.state === "suspended") await Promise.race([context.resume(), stopped])
+    if (stopWanted) mine?.()
+    await stopped
+    if (length > 0) await new Promise((resolve) => setTimeout(resolve, TAIL_MS))
+    processor.onaudioprocess = null
+    if (stopRecording === mine) stopRecording = undefined
+  } finally {
+    void context.close()
+  }
+  const samples = new Float32Array(length)
+  let at = 0
+  for (const block of blocks) {
+    samples.set(block, at)
+    at += block.length
+  }
+  return { samples, rate }
 }
 
 /**
@@ -299,24 +481,23 @@ export async function listen(): Promise<string> {
   } catch (error) {
     throw new Error(microphoneError(error))
   }
-  const chunks: Array<Blob> = []
-  const recording = new MediaRecorder(stream)
-  recorder = recording
-  recording.ondataavailable = (event) => {
-    if (event.data.size > 0) chunks.push(event.data)
-  }
-  const stopped = new Promise<void>((resolve) => {
-    recording.onstop = () => resolve()
-  })
   setState("listening")
-  recording.start()
-  if (stopWanted) recording.stop()
-  await stopped
-  if (recorder === recording) recorder = undefined
+  let samples: Float32Array
+  let rate: number
+  try {
+    ;({ samples, rate } = await record(stream))
+  } catch (error) {
+    setState(thinking ? "thinking" : "idle")
+    throw new Error(microphoneError(error))
+  }
+  if ((samples.length / rate) * 1000 < SHORTEST_RECORDING_MS + TAIL_MS) {
+    setState(thinking ? "thinking" : "idle")
+    return ""
+  }
   // Recognising takes a second or two: the orb thinks meanwhile.
   setState("thinking")
   try {
-    return await transcribe(new Blob(chunks, { type: recording.mimeType }))
+    return await transcribe(wavOf(samples, rate))
   } catch (error) {
     throw new Error(`Die Spracherkennung ist ausgefallen: ${error instanceof Error ? error.message : String(error)}`)
   } finally {
@@ -330,8 +511,7 @@ export async function listen(): Promise<string> {
  */
 export function closeMicrophone() {
   stopWanted = true
-  if (recorder?.state === "recording") recorder.stop()
-  recorder = undefined
+  stopRecording?.()
   microphone?.getTracks().forEach((track) => track.stop())
   microphone = undefined
 }
@@ -339,7 +519,7 @@ export function closeMicrophone() {
 /** Ends the recording, as when the key is let go: what was said is recognised then. */
 export function stopListening() {
   stopWanted = true
-  if (recorder?.state === "recording") recorder.stop()
+  stopRecording?.()
 }
 
 function microphoneError(error: unknown): string {
@@ -385,7 +565,7 @@ export function speakingAnswers(): Listener {
       const words = wordsOf(last)
       const end = isLoading ? sentencesEnd(words, said.at) : words.length
       if (end <= said.at) return
-      const piece = forSpeech(words.slice(said.at, end))
+      const piece = unitsInWords(forSpeech(words.slice(said.at, end)))
       said.at = end
       if (piece) void sayNext(piece)
     },

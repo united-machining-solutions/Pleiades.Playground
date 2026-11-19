@@ -142,6 +142,12 @@ What the broker sends is laid onto the list in [`apps/app/src/live/`](../apps/ap
 [`apps/app/src/hooks/use-live.ts`](../apps/app/src/hooks/use-live.ts) keeps a page live. The address `/sites`,
 where the list of the sites stood before, leads here.
 
+The sidebar also leads to **Halls** (<http://localhost:5600/halls>): every hall of a site as a plan seen from
+above, with each machine where it stands and what it does now. Where a machine stands in its hall is a position
+people enter in the Sites API, in metre; a machine without one waits in rows on the plan, with a dashed edge. It
+has no picture in this tour. The page is [`apps/app/src/routes/halls.tsx`](../apps/app/src/routes/halls.tsx),
+the plan [`packages/cards/src/site/hall-plan.tsx`](../packages/cards/src/site/hall-plan.tsx).
+
 The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
 physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
 a line for each machine. A choice above the graphs shows one machine or all of them. It has no picture in
@@ -520,11 +526,13 @@ and its route. No tour screenshot shows the page: the stack the screenshots are 
 ## Optional: Titan, an assistant you talk to
 
 Titan is not part of the six stops either. A stack with `APP_SHOWCASES` set has the page
-<http://localhost:5600/titan>: a dark screen with a cloud of points. A click or the space bar starts it. Then
-hold the space bar, ask "Welche Maschine steht?" and let go, or say "Hey Titan" and the question. Titan
-says "Moment." at once and answers aloud, in German, from the values of the stack; the screen shows the answer
-in one sentence, what to do, and the machine it is about. The space bar interrupts it, P pauses it, Escape
-leaves.
+<http://localhost:5600/titan>, in the sidebar like every page: a dark panel with a cloud of points. A tap on
+the cloud or the space bar starts it. Then press and hold the cloud, or the space bar, ask "Welche Maschine
+steht?" and let go, or say "Hey Titan" and the question. Titan says "Moment." at once and answers aloud, in
+German, from the values of the stack; the panel shows the conversation to scroll through, with the cards its
+tools gave. A press interrupts it, the button under the cloud or P pauses it, and the sidebar leads away from
+it. It needs no keyboard. The button "Tools" at its foot switches a further MCP server of the stack on for Titan,
+the juice bar for example: asked what the bar can mix, Titan then shows the drink card.
 
 Titan needs the language model of stop 4, and of the same gateway a transcription model to listen. With a
 speech model at the gateway it speaks with that voice, else with a voice of the browser. Everything it hears

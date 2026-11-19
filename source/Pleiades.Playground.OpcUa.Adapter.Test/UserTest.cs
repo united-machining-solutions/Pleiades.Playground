@@ -118,16 +118,23 @@ public class UserSessionTest
     }
 
     [TestMethod]
-    public void A_refused_user_stops_the_retries_and_anything_else_is_tried_again()
+    public void A_refused_user_or_a_rejected_certificate_stops_the_retries_and_anything_else_is_tried_again()
     {
-        var policy = new RefusedUserPolicy();
+        var policy = new RefusalPolicy();
 
         Assert.IsTrue(policy.TryGetNextDelay(0, Opc.Ua.StatusCodes.BadUserAccessDenied, null, out var refused));
         Assert.IsNull(refused, "A wrong password is not tried again.");
         Assert.IsTrue(policy.TryGetNextDelay(0, Opc.Ua.StatusCodes.BadIdentityTokenRejected, null, out var rejected));
         Assert.IsNull(rejected);
-        Assert.IsNotNull(policy.GetNextDelay(0), "A server that does not answer is tried again by the default policy.");
-        Assert.IsFalse(RefusedUserPolicy.IsRefusedUser(Opc.Ua.StatusCodes.BadNotConnected));
+        Assert.IsTrue(policy.TryGetNextDelay(0, Opc.Ua.StatusCodes.BadCertificateUriInvalid, null, out var certificate));
+        Assert.IsNull(certificate, "A certificate without the ApplicationUri of its server is not tried again.");
+        Assert.IsTrue(policy.TryGetNextDelay(0, Opc.Ua.StatusCodes.BadSecurityChecksFailed, null, out var untrusted));
+        Assert.IsNull(untrusted, "A server that does not trust the adapter is not tried again until the timeout.");
+        Assert.IsTrue(policy.TryGetNextDelay(0, Opc.Ua.StatusCodes.BadNotConnected, null, out var notConnected));
+        Assert.IsNotNull(notConnected, "A server that does not answer is tried again by the default policy.");
+        Assert.IsFalse(RefusalPolicy.IsRefusedUser(Opc.Ua.StatusCodes.BadNotConnected));
+        Assert.IsFalse(RefusalPolicy.IsRejectedCertificate(Opc.Ua.StatusCodes.BadNotConnected));
+        Assert.IsFalse(RefusalPolicy.IsUntrustedClient(Opc.Ua.StatusCodes.BadNotConnected));
     }
 
     [TestMethod]

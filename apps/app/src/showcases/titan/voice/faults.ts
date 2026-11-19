@@ -3,6 +3,7 @@ import { openError } from "@pleiades/cards/machine/state.ts"
 import { useEffect, useRef, useState } from "react"
 
 import { getMachines } from "@/machines/get-machines.ts"
+import { FROM_THE_HALL } from "../transcript.ts"
 import { serialOf } from "../words.ts"
 
 // The assistant page keeps an eye on the hall: every few seconds it reads the machines, and an error
@@ -28,7 +29,7 @@ export type Fault = {
 /**
  * Calls `onFault` for each error that is raised while the page is open. The errors that are already
  * open when it opens are known, not new. Returns the machines that have an open error now, by
- * their serial numbers, and the list of machines as it was read last, for the board of Titan.
+ * their serial numbers, and the list of machines as it was read last.
  */
 export function useNewFaults(onFault: (fault: Fault) => void): { alarmed: ReadonlyArray<string>; list: MachineList | undefined } {
   const known = useRef<Set<string> | null>(null)
@@ -77,9 +78,9 @@ export function faultBriefing(fault: Fault, person: string | undefined): string 
   const at = new Date(fault.raisedAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
   const who = person ?? "der Person vor dem Bildschirm"
   return [
-    `[Meldung der Anlage, nicht von ${person ?? "der Person"}] Um ${at} hat die Maschine ${fault.machine} (Maschinen-ID ${fault.id}) einen Fehler gemeldet: „${fault.title}“ (Fehler ${fault.notificationId}).`,
-    `Sprich ${person ?? "die Person"} direkt an${person ? "" : ", ohne Namen,"} und sag ${who} in einem kurzen Satz auf Deutsch, was los ist, und gib eine Empfehlung. Der Bildschirm zeigt den Stand aller Maschinen schon, zeig keine Karte.`,
-    `Schlag einen sinnvollen nächsten Schritt vor und frag am Ende, ob du die Details der Maschine zeigen sollst. Erfinde keine Ursache, die die Daten nicht nennen.`,
+    `${FROM_THE_HALL}, nicht von ${person ?? "der Person"}] Um ${at} hat die Maschine ${fault.machine} (Maschinen-ID ${fault.id}) einen Fehler gemeldet: „${fault.title}“ (Fehler ${fault.notificationId}).`,
+    `Sprich ${person ?? "die Person"} direkt an${person ? "" : ", ohne Namen,"} und sag ${who} in einem kurzen Satz auf Deutsch, was los ist, und gib eine Empfehlung. Ruf dafür kein Tool.`,
+    `Erfinde keine Ursache, die die Daten nicht nennen.`,
   ].join(" ")
 }
 

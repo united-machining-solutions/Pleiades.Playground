@@ -14,12 +14,23 @@ All notable changes are documented here. The format follows
   it shows the model or the extension. Only a build with `APP_SHOWCASES` has it; it reads the Timeseries API
   and the Events API from the server of the app, which gets `TIMESERIES_API_URL` and `EVENTS_API_URL` for
   it, and nothing outside `apps/app/src/showcases/trulaser/` and its route changed.
+- Sites API, generative UI backend and example app: a machine has a position in its hall, and the page
+  `/halls` draws every hall as a plan seen from above. `PUT /placements/{machineId}/position` takes the middle
+  of the machine, `x` and `y` in metre from the upper left corner of the plan, and `DELETE` takes it away; the
+  position stays while the machine stays in its hall. `GET /placements`, `sites_placement_list` and
+  `genui_site_list` return it as `position`, null while nobody said. On the plan a machine stands at its
+  position with its state, live; one without waits in rows, with a dashed edge. A hall has no size of its own:
+  its plan is as large as its machines need.
 - Example app: the showcase page `/titan`, an assistant you talk to, from the umati hackathon. Hold the space
-  bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the one thing
-  the answer is about. It has a conversation of its own, made for speaking: the hall as it is now stands in
+  bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the
+  conversation to scroll through, each answer with the card its tool gave. It has a conversation of its own, made for speaking: the hall as it is now stands in
   its instructions, so most questions need no tool call, and it says at once that it heard and announces a
-  lookup. Listening, the conversation and the voice come from the gateway at `LLM_BASE_URL` alone; a speech
-  model named `titan/...` there gives Titan a voice of its own. Only a build with `APP_SHOWCASES` has it, and
+  lookup. A Haiku model is asked not to think first, and a turn the model ends without a word is shown
+  as a problem. A new fault it says by itself, but never over the person or an answer, and at most one a minute.
+  Listening, the conversation and the voice come from the gateway at `LLM_BASE_URL` alone; a speech
+  model named `titan/...` there gives Titan a voice of its own. Its button "Tools" switches a further MCP
+  server of `APP_MCP_SERVERS` on for it, of which Titan takes the tools that only read: asked what the juice
+  bar can mix, it shows the drink card. Only a build with `APP_SHOWCASES` has it, and
   nothing outside `apps/app/src/showcases/titan/` and its routes changed. Its guide,
   `apps/app/src/showcases/titan/README.md`, says what leaves the room.
 - Example app: the list under the chat field that `/` opens offers the tools of the MCP servers the chat
@@ -570,6 +581,13 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- `opcua-adapter`: a rejected certificate is reported with its reason instead of a timeout. A server whose
+  certificate does not carry the ApplicationUri it announces was told in the chat as "did not open a session
+  within 30 seconds"; the reason was only in the log. A connect now stops on the first certificate error and
+  says the status and why, for example `BadCertificateUriInvalid`, in the chat, the REST API and `lastError`.
+  A server that refuses the adapter with `BadSecurityChecksFailed` is told as a server that most likely does
+  not trust the certificate of the adapter yet, with where to trust it; the scan's `opcua_ua_connect` adds the
+  same hint to its error. (#179, #192)
 - SimpleCAM adapter: an alert goes out with a `Severity` of NAMUR NE 107 and the field names of the data model. The
   backend had said `Warning`, which no consumer knows, and one such entry in the Events API left the machine page of
   the example app without any machine ("No answer from the backend"). `Warning` and every other unknown word now

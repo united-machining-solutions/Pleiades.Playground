@@ -59,7 +59,7 @@ internal static class MachineEndpoints
 
     /// <summary>Whether an exception says that the OPC UA server, not the request, is the problem.</summary>
     public static bool IsServerFault(Exception exception) =>
-        exception is Opc.Ua.ServiceResultException or EndpointNotOfferedException or ServerCertificateChangedException
+        exception is Opc.Ua.ServiceResultException or EndpointNotOfferedException or ServerCertificateChangedException or ServerCertificateRejectedException
             or CredentialMissingException or TimeoutException or System.Net.Sockets.SocketException or InvalidOperationException;
 
     /// <summary>The endpoints a server offers, strongest first. The first one is the one to register.</summary>

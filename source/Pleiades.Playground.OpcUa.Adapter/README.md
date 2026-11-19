@@ -493,6 +493,13 @@ consumer that ends the alarms of an earlier run at the start of the next one doe
   another one later, the adapter does not connect and says so in `lastError`.
 - The adapter is one OPC UA client, with one certificate in `/data/pki`. A server that does not accept unknown
   clients has to trust it once.
+- A certificate error ends a connect at once, with its status and reason, instead of being tried again until
+  the timeout: for example a server certificate without the ApplicationUri the server announces
+  (`BadCertificateUriInvalid`). A server that refuses the adapter without a reason (`BadSecurityChecksFailed`,
+  as OPC UA asks of it, or `BadCertificateUntrusted`) most likely does not trust the certificate of the adapter
+  yet: the chat, the REST API and `lastError` say so, and how to trust it (for the UaGateway see
+  [A gateway on the development computer](#a-gateway-on-the-development-computer)). A running machine still
+  tries again on its own back-off, so a certificate fixed or trusted on the server is picked up.
 - **A server that wants a user.** A session is anonymous, or logs in with a user name and a password that a
   person stored for the server. One user per server; a user certificate is not supported.
   - The person enters user name and password in the card of `opcua_endpoint_rank`, and only there: a turn of

@@ -14,6 +14,10 @@ harness.
   hours. It needs no language model. Home leads to it, and it stands under Home. An address of before, `/machines/<machine id>`, leads to it with
   the hours of its history. For a machine the backend does not know, the page
   says so and does not ask again.
+- **Halls** (`/halls`) draws every hall of every site as a plan seen from above, each machine where it stands
+  with its state, live. The positions are what people entered in the Sites API, in metre; a machine without one
+  waits in rows on the plan, with a dashed edge. It reads the same answer as Home, `genui_site_list`, and needs
+  no language model.
 - **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
   machine, live. A choice above the graphs shows one machine or all of them, and stays in the URL
   (`?machine=`).
@@ -302,7 +306,8 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
   `index.tsx` is Home, `sites.index.tsx` the address the list of the sites had before, which leads there, `sites.$machine.tsx` the page of a machine and `machines.$machine.tsx`
-  the old address of it, which leads there, `charts.tsx` the last hours of every
+  the old address of it, which leads there, `halls.tsx` the plans of the halls (drawn by
+  `packages/cards/src/site/hall-plan.tsx`), `charts.tsx` the last hours of every
   machine as charts (drawn by `src/charts/state-tiles.tsx`), `where-is-my-job.tsx` a page for discussion
   that follows an order across the machines (its map, its panels, the grouping of job orders and `getFloor`,
   which reads its values, in `src/where-is-my-job/`), `pages.index.tsx` the list of the pages kept

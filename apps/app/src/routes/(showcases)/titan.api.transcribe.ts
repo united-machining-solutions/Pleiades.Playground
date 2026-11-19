@@ -19,7 +19,7 @@ async function prompt(): Promise<string> {
 
 /**
  * The largest recording the route takes. A question is a few seconds, and "Hey Titan" cuts a piece after
- * eight: as a wav of 16 kHz that is a quarter of a megabyte. Anything over this did not come from the page.
+ * eight, a quarter of a megabyte as a wav of 16 kHz; the space bar ends a recording after a minute, two megabytes. Anything over this did not come from the page.
  */
 const MOST_BYTES = 4 * 1024 * 1024
 
@@ -71,6 +71,13 @@ async function transcribe({ request }: { request: Request }) {
   if (answer instanceof Error) {
     const cause = (answer as { cause?: { code?: string } }).cause?.code
     return Response.json({ error: `The gateway cannot be reached (${cause ?? answer.name})` }, { status: 502 })
+  }
+  // A recording the model cannot read, too short or of no format it knows, is answered with 400: nothing
+  // was understood, which the page says in its own words. Every other refusal is the gateway's.
+  // The log keeps why: a gateway also answers 400 for a model it does not know, and that must not hide.
+  if (answer.status === 400) {
+    console.warn("Titan: the transcription model refused a recording (400):", (await answer.text().catch(() => "")).slice(0, 500))
+    return Response.json({ text: "" })
   }
   if (!answer.ok) return Response.json({ error: `The gateway answered ${answer.status}` }, { status: 502 })
   const body = (await answer.json().catch(() => undefined)) as { text?: unknown } | undefined

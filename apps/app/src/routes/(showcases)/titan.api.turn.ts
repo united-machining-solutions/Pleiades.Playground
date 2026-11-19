@@ -1,13 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router"
 
 import { readBodyText } from "@/chat/body.ts"
+import { furtherServers } from "@/chat/mcp-servers.ts"
+import { serversOf } from "@/showcases/titan/further-tools.ts"
 import { titanModels } from "@/showcases/titan/gateway.server.ts"
 import { answer } from "@/showcases/titan/turn.server.ts"
 import { MOST_BODY_BYTES, conversationOf } from "@/showcases/titan/turn.ts"
 import type { TurnEvent } from "@/showcases/titan/turn.ts"
 
 // A turn of the conversation with Titan (showcases/titan/turn.server.ts): the browser sends the
-// conversation so far, { messages, timeZone }, the last message being the question, and gets the answer
+// conversation so far, { messages, timeZone, servers }, the last message being the question, and gets the answer
 // as it arrives, a line of JSON for each event. Nothing is kept on the server: the conversation lives
 // in the page, and is gone when the page is left.
 //
@@ -41,7 +43,8 @@ async function turn({ request }: { request: Request }) {
           // The browser is gone.
         }
       }
-      await answer({ ...models, chat }, conversation, timeZone, emit, stop.signal)
+      // Only a server the app has is on: a name the browser made up is left out (further-tools.ts).
+      await answer({ ...models, chat }, conversation, timeZone, emit, stop.signal, serversOf(body, Object.keys(furtherServers())))
       try {
         controller.close()
       } catch {

@@ -31,11 +31,6 @@ export function inGerman(message: string): string {
   return GERMAN[message.trim().toLowerCase()] ?? message
 }
 
-/** Whether a question asks to see something: then its card is the focus, else the key facts. */
-export function asksToSee(question: string | undefined): boolean {
-  return /\b(zeig|anzeig|chart|verlauf|grafik|diagramm|kurve|lageplan|hallenplan|messwert|darstell|visualisier)/i.test(question ?? "")
-}
-
 /**
  * A machine name such as M-02 is not broken at its hyphen, and a figure not from its unit (12 h,
  * 57 %): they take a hyphen and a space that do not break.

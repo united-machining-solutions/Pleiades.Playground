@@ -160,7 +160,7 @@ internal static class ScanConnect
             || url.ValueKind != JsonValueKind.String
             || findCredential?.Invoke(url.GetString() ?? string.Empty) is not { } credential)
         {
-            return await next(call, cancellationToken).ConfigureAwait(false);
+            return WithTrustHint(await next(call, cancellationToken).ConfigureAwait(false), EndpointOf(call.Arguments));
         }
 
         // The password goes only to the certificate the user was stored with: the scan connects to whatever
@@ -175,8 +175,42 @@ internal static class ScanConnect
         }
 
         call.Arguments = WithUser(arguments, credential);
-        return Redacted(await next(call, cancellationToken).ConfigureAwait(false), credential.Password);
+        return WithTrustHint(Redacted(await next(call, cancellationToken).ConfigureAwait(false), credential.Password), url.GetString()!);
     }
+
+    /// <summary>
+    /// The result of a connect that the server refused because it does not trust the adapter, with what a person
+    /// does about it. The library tells only the status (<c>BadSecurityChecksFailed</c>); the model then has the
+    /// reason and the remedy to tell the person. Every other result stays as it is.
+    /// </summary>
+    public static CallToolResult WithTrustHint(CallToolResult result, string url)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        if (result.IsError != true)
+        {
+            return result;
+        }
+
+        var status = result.Content.OfType<TextContentBlock>()
+            .Select(block => UntrustedStatusIn(block.Text))
+            .FirstOrDefault(found => found is not null);
+        if (status is null)
+        {
+            return result;
+        }
+
+        result.Content = [.. result.Content, new TextContentBlock { Text = OpcUaClient.UntrustedClient(url, status) }];
+        return result;
+    }
+
+    private static string? UntrustedStatusIn(string text) =>
+        new[] { nameof(Opc.Ua.StatusCodes.BadSecurityChecksFailed), nameof(Opc.Ua.StatusCodes.BadCertificateUntrusted) }
+            .FirstOrDefault(status => text.Contains(status, StringComparison.Ordinal));
+
+    private static string EndpointOf(IDictionary<string, JsonElement>? arguments) =>
+        arguments is not null && arguments.TryGetValue("endpointUrl", out var url) && url.ValueKind == JsonValueKind.String
+            ? url.GetString() ?? "this address"
+            : "this address";
 
     /// <summary>What the model reads when the server presents another certificate than the stored user's.</summary>
     public const string CertificateRefusal =
