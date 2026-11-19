@@ -9,6 +9,7 @@ import "@/showcases/titan/titan.css"
 import {
   canListen,
   closeMicrophone,
+  closeSound,
   listen,
   onSoundProblem,
   openSound,
@@ -190,6 +191,7 @@ function Assistant() {
       setVoiceEnabled(false)
       stopSpeaking()
       closeMicrophone()
+      closeSound()
     },
     [],
   )

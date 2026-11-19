@@ -248,11 +248,28 @@ export function onSoundProblem(listener: ((problem: string | undefined) => void)
 
 const SOUND_REFUSED = "Der Browser spielt keinen Ton ab. Klicke einmal auf Titan, oder erlaube der Seite die automatische Wiedergabe."
 
-/** Plays a sound, and resolves when it has ended or was stopped. */
+/** A sound context that may not start leaves its start pending, for good: it is waited for this long. */
+const SOUND_STARTS_WITHIN_MS = 300
+
+/** Lets go of the sound of the page: the page is left. The next start opens it again. */
+export function closeSound() {
+  void output?.close().catch(() => undefined)
+  output = undefined
+}
+
+/**
+ * Plays a sound, and resolves when it has ended or was stopped. What was stopped while the sound was
+ * still being got ready, by a new question or the space bar, does not sound afterwards.
+ */
 async function play(sound: Blob): Promise<void> {
   if (!output) return playWithElement(sound)
   const context = output
-  if (context.state === "suspended") await context.resume().catch(() => undefined)
+  const mine = turn
+  if (context.state === "suspended") {
+    const late = new Promise<void>((resolve) => setTimeout(resolve, SOUND_STARTS_WITHIN_MS))
+    await Promise.race([context.resume().catch(() => undefined), late])
+    if (mine !== turn) return
+  }
   if (context.state !== "running") {
     soundProblem?.(SOUND_REFUSED)
     return
@@ -262,8 +279,9 @@ async function play(sound: Blob): Promise<void> {
     samples = await context.decodeAudioData(await sound.arrayBuffer())
   } catch {
     // What the sound context cannot read, an audio element may.
-    return playWithElement(sound)
+    return mine === turn ? playWithElement(sound) : undefined
   }
+  if (mine !== turn) return
   soundProblem?.(undefined)
   return new Promise((resolve) => {
     const source = context.createBufferSource()
@@ -346,6 +364,16 @@ export function canListen(): boolean {
 // transcription model refused the recordings of one of them as "corrupted or unsupported" while it took
 // the WAV pieces of the same computer.
 
+/**
+ * How Titan asks for the microphone: the sound as it is, without the browser's echo cancellation, noise
+ * suppression and gain. Titan never listens while it speaks, so it has no echo to cancel. And with any of
+ * the three, Firefox opens the microphone as a call: on Linux the sound server then silences every other
+ * sound of the browser while the call lasts, Titan's own answers among them.
+ */
+export const MICROPHONE: MediaStreamConstraints = {
+  audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+}
+
 /** The microphone stays open once it was allowed, so a question starts without a delay. */
 let microphone: MediaStream | undefined
 /** Ends the recording that runs, if one does. */
@@ -362,7 +390,7 @@ const LONGEST_RECORDING_MS = 60_000
 
 async function openMicrophone(): Promise<MediaStream> {
   if (microphone?.active) return microphone
-  microphone = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+  microphone = await navigator.mediaDevices.getUserMedia(MICROPHONE)
   return microphone
 }
 

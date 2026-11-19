@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 
 import { transcribe } from "./transcribe.ts"
+import { MICROPHONE } from "./voice.ts"
 import { RECORDING_RATE, wavOf } from "./wav.ts"
 
 // "Hey Titan": the assistant page listens all the time, without a key.
@@ -193,7 +194,7 @@ export function useWakeWord(options: WakeOptions) {
 
     void (async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
+        stream = await navigator.mediaDevices.getUserMedia(MICROPHONE)
         if (closed) return stream.getTracks().forEach((track) => track.stop())
         context = new AudioContext({ sampleRate: RATE })
         // What the browser really records at, where it does not give what was asked for.
