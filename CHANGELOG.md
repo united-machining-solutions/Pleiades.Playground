@@ -655,6 +655,10 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Generative UI backend: a question about the job orders of every machine shows the job order card in the
+  chat. The model answered it with `genui_job_order_list`, which draws no card, and told the person the values
+  were in a card; the result of the list now says so and names the machines whose job order runs, for
+  `genui_job_order_show`. The chat calls the list "Read the job orders", not by its name.
 - PDF viewer now supports continuous scrolling and readable native-text highlights that stay aligned through zoom and resize.
 - Example app, showcase TruLaser: `/trulaser` without a machine shows the TruLaser alive most recently, not the first
   by name. A machine that was renamed or stopped kept the page on its old values for a day.

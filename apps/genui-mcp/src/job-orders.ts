@@ -65,3 +65,14 @@ export function jobOrderListInWords(list: JobOrderList): string {
   })
   return `${list.jobOrders.length} job orders on the lists of the machines (as of ${list.asOf}):\n${lines.join("\n")}`
 }
+
+/**
+ * What a language model is told after the list: the list is no card, and which machines to show the job order
+ * card for. A model that reads only the description of a tool answers from the list and shows no card.
+ */
+export function toTheJobOrderCard(list: JobOrderList): string {
+  const running = [...new Set(list.jobOrders.filter((job) => job.state === "Running" || job.state === "Interrupted").map((job) => job.machine))]
+  if (running.length === 0)
+    return "This list is no card. To show the person the job order of a machine as the job order card, call genui_job_order_show with its `machine`."
+  return `This list is no card. Show the person the job order card: call genui_job_order_show once for each machine whose job order runs or is interrupted, with \`machine\` ${running.map((id) => `"${id}"`).join(", ")}. Then a sentence or two is the whole answer.`
+}

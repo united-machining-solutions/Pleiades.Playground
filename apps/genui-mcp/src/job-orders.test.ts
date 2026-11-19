@@ -1,7 +1,9 @@
 import assert from "node:assert/strict"
 import { afterEach, mock, test } from "node:test"
 
-import { listJobOrders } from "./job-orders.ts"
+import type { JobOrderList } from "@pleiades/cards/machine/contract.ts"
+
+import { listJobOrders, toTheJobOrderCard } from "./job-orders.ts"
 
 const apis = { timeseriesUrl: "http://timeseries:8080", eventsUrl: "http://events:8080" }
 const now = new Date("2026-11-18T10:00:00.000Z")
@@ -75,4 +77,14 @@ test("an empty order number is no order number", async () => {
   answering([stored({ orderNumbers: ["", " ", "SO-1"] })])
   const list = await listJobOrders(apis, undefined, now)
   assert.deepEqual(list.jobOrders[0]?.orderNumbers, ["SO-1"])
+})
+
+test("after the list, a language model is told to show the job order card for each machine whose job order runs", () => {
+  const entry = (machine: string, state: string) => ({ machine, state }) as JobOrderList["jobOrders"][number]
+  const list = { asOf: "2026-11-18T10:00:00.000Z", windowSeconds: 86400, jobOrders: [entry("m-1", "Running"), entry("m-1", "Ended"), entry("m-2", "Interrupted"), entry("m-3", "Ended")] }
+  const words = toTheJobOrderCard(list)
+  assert.match(words, /genui_job_order_show/)
+  assert.match(words, /"m-1", "m-2"\./)
+  assert.doesNotMatch(words, /m-3/)
+  assert.match(toTheJobOrderCard({ ...list, jobOrders: [] }), /no card/)
 })

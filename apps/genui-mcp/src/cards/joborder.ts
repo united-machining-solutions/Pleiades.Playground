@@ -24,7 +24,7 @@ const shownAsCard =
 const jobOrderShowTool = toolDefinition({
   name: "genui_job_order_show",
   description:
-    "Show the job order of one machine (JobMonitoring.JobOrders with its result) and its program execution (WorkMasterMonitoring.ProgramExecution), with how many job orders and program executions there were over the last hours. The result says it in a few lines and carries the values of the job order card, which also draws both over those hours. Name the machine by its id or as people call it. Every job order on the list of every machine is in genui_job_order_list.",
+    "Show the job order of one machine (JobMonitoring.JobOrders with its result) and its program execution (WorkMasterMonitoring.ProgramExecution), with how many job orders and program executions there were over the last hours. The result says it in a few lines and carries the values of the job order card, which also draws both over those hours. Name the machine by its id or as people call it. Call it whenever a person asks about the job order, the order or the program of a machine; after genui_job_order_list, call it for each machine whose job order runs. Every job order on the list of every machine is in genui_job_order_list, which draws no card.",
   inputSchema: z.object({
     machine: machineId.describe(MACHINE_NAMING),
     hours: z

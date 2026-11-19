@@ -21,6 +21,15 @@ export const jobOrderTools: ReadonlyArray<ChatTool> = [
       return values && <ShownJobOrder values={values} />
     },
   },
+  // The list draws no card: a language model reads it on its way to genui_job_order_show.
+  {
+    name: "genui_job_order_list",
+    label: {
+      running: "Reading the job orders",
+      done: "Read the job orders",
+      failed: "Failed to read the job orders",
+    },
+  },
   // The timeline: the card asks for it itself, see machines/get-machines.ts.
   { name: JOB_ORDER_TIMELINE_TOOL, cardOnly: true },
 ]
