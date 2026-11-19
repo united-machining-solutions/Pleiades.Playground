@@ -53,3 +53,24 @@ test("a tool under the name of another server, or of one of Titan's own, is not 
     ["juicebar_status"],
   )
 })
+
+test("a tool whose name says that it does something is not taken, whatever its mark says", () => {
+  const marked = (name: string) => ({ name, metadata: reads })
+  const tools = readingTools("opcua", [
+    marked("opcua_ua_read_value"),
+    marked("opcua_ua_browse"),
+    marked("opcua_ua_connect"),
+    marked("opcua_ua_disconnect"),
+    marked("opcua_registration_propose"),
+    marked("opcua_endpoint_rank"),
+  ])
+  assert.deepEqual(
+    tools.map((tool) => tool.name),
+    ["opcua_ua_read_value", "opcua_ua_browse", "opcua_endpoint_rank"],
+  )
+  // A word that only holds such a word is none: the status of a pairing, the history of prints, an order read.
+  assert.deepEqual(
+    readingTools("x", [marked("x_pairing_status"), marked("x_print_history"), marked("x_order_get"), marked("x_settings_list")]).map((tool) => tool.name),
+    ["x_pairing_status", "x_print_history", "x_order_get", "x_settings_list"],
+  )
+})

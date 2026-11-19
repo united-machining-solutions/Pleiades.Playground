@@ -32,6 +32,15 @@ function parametersOf(schema: unknown): Record<string, unknown> {
   return given !== null && typeof given === "object" && given.type === "object" ? (given as Record<string, unknown>) : { type: "object", properties: {} }
 }
 
+/**
+ * A word in the name of a tool that says the tool does something. That a tool only reads is its server's
+ * word, and a server can be wrong about it: one of the stack marked the tools that connect to a machine and
+ * disconnect from it as reading. So Titan also leaves out a tool whose name has one of these words between
+ * its underscores, whatever its mark says. A tool that is left out for its name alone costs Titan one
+ * answer; one that is taken wrongly touches a machine.
+ */
+const DOES_SOMETHING = /(^|_)(connect|disconnect|create|start|stop|cancel|delete|remove|add|set|write|update|propose|pair|register|reset|send|upload)(_|$)/i
+
 /** A name a model can be given, and no longer than its API takes. */
 const NAME = /^[A-Za-z0-9_-]{1,64}$/
 /** At most this many tools of one server: more would be a prompt of their own. */
@@ -46,6 +55,7 @@ export function readingTools(server: string, listed: ReadonlyArray<ListedTool>):
   return listed
     .filter((tool) => tool.metadata?.mcp?.annotations?.readOnlyHint === true && !FOR_FINDING_THE_WAY.test(tool.name))
     .filter((tool) => tool.name.startsWith(`${server}_`) && NAME.test(tool.name))
+    .filter((tool) => !DOES_SOMETHING.test(tool.name))
     .slice(0, MOST_TOOLS)
     .map((tool) => ({ server, name: tool.name, description: (tool.description ?? "").trim(), parameters: parametersOf(tool.inputSchema) }))
 }
