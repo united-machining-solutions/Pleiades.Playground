@@ -216,6 +216,13 @@ services:
       # The OPC UA adapter. While it does not answer, the chat leaves its tools and commands out.
       OPCUA_MCP_URL: http://opcua-adapter:8080/mcp
       OPCUA_ADAPTER_URL: http://opcua-adapter:8080
+      # The app registers at the Pleiades Hub, at the broker of this stack. HUB_REGISTRATION=false switches that
+      # off: a Margo client may leave an empty setting out, and then an empty broker would turn into the default.
+      HUB_REGISTRATION: ${HUB_REGISTRATION:-true}
+      HUB_MQTT_URL: ${HUB_MQTT_URL:-mqtt://broker:1883}
+      # The address under which a browser reaches the app, where the hub opens it: through Traefik, under the host
+      # name of the app. Over HTTP, because the hub is served over HTTP and loads the app into an iframe.
+      HUB_APP_URL: ${HUB_APP_URL:-http://${APP_HOST:-pleiades.example.internal}:${HTTP_PORT:-80}/}
 
   # The reverse proxy in front of the example app, found by its host name. Not in compose.yaml at the root.
   traefik:
