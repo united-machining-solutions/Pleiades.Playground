@@ -61,9 +61,10 @@ without a sign-in, and a word it mishears must not start a machine. What a perso
 stands on the card of its tool: asked what the juice bar can mix, Titan shows the drink card, and its button
 orders.
 
-That a tool only reads is what its server says of it; the app does not check it. Titan adds one guard of
-its own: it leaves out a tool whose name says that it does something, `..._connect`, `..._create`,
-`..._propose`, whatever its mark says. And what a server writes,
+That a tool only reads is what its server says of it, and the app takes the server's word for it. Titan
+adds one guard of its own: it leaves out a tool whose name says that it does something, `..._connect`,
+`..._create`, `..._propose`, whatever its mark says. That is a second guard and no check: name in
+`APP_MCP_SERVERS` only a server you trust. And what a server writes,
 in the description of a tool or in its result, reaches the language model, which may be led by it to say
 something or to read something else. So for a room without a sign-in, `APP_MCP_SERVERS` names only servers
 whose word is trusted. Titan still starts nothing: that takes a person's press.

@@ -33,13 +33,38 @@ function parametersOf(schema: unknown): Record<string, unknown> {
 }
 
 /**
- * A word in the name of a tool that says the tool does something. That a tool only reads is its server's
+ * The words in the name of a tool that say the tool does something. That a tool only reads is its server's
  * word, and a server can be wrong about it: one of the stack marked the tools that connect to a machine and
- * disconnect from it as reading. So Titan also leaves out a tool whose name has one of these words between
- * its underscores, whatever its mark says. A tool that is left out for its name alone costs Titan one
- * answer; one that is taken wrongly touches a machine.
+ * disconnect from it as reading. So Titan also leaves out a tool whose name has one of these words,
+ * whatever its mark says. A tool that is left out for its name alone costs Titan one answer; one that is
+ * taken wrongly touches a machine. That is why the list is long, and why `x_set_points_list` is left out.
+ *
+ * It is a second guard and no check: a tool can act under a name that says nothing. Words that are a thing
+ * as often as a deed stay out of the list, `print`, `order`, `load`, `home` and `call` among them, or a
+ * print job and an order could not be read.
  */
-const DOES_SOMETHING = /(^|_)(connect|disconnect|create|start|stop|cancel|delete|remove|add|set|write|update|propose|pair|register|reset|send|upload)(_|$)/i
+const DOES_SOMETHING: ReadonlySet<string> = new Set(
+  (
+    "connect disconnect reconnect create start stop cancel delete remove add set write update propose pair unpair " +
+    "register unregister reset send upload submit place run execute exec trigger enable disable activate deactivate " +
+    "toggle open close move jog pause resume abort clear ack acknowledge invoke subscribe unsubscribe apply commit " +
+    "publish put patch insert upsert modify edit rename drop purge flush kill restart reboot unload save import " +
+    "install deploy sync configure assign approve reject confirm lock unlock login logout mix dispense"
+  ).split(" "),
+)
+
+/** The words of a name: what stands between `_` and `-`, and where a small letter is followed by a capital. */
+function wordsOf(name: string): Array<string> {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .toLowerCase()
+    .split(/[_-]+/)
+}
+
+/** Whether the name of a tool, without the name of its server, says that the tool does something. */
+function doesSomething(server: string, name: string): boolean {
+  return wordsOf(name.slice(server.length + 1)).some((word) => DOES_SOMETHING.has(word))
+}
 
 /** A name a model can be given, and no longer than its API takes. */
 const NAME = /^[A-Za-z0-9_-]{1,64}$/
@@ -55,7 +80,7 @@ export function readingTools(server: string, listed: ReadonlyArray<ListedTool>):
   return listed
     .filter((tool) => tool.metadata?.mcp?.annotations?.readOnlyHint === true && !FOR_FINDING_THE_WAY.test(tool.name))
     .filter((tool) => tool.name.startsWith(`${server}_`) && NAME.test(tool.name))
-    .filter((tool) => !DOES_SOMETHING.test(tool.name))
+    .filter((tool) => !doesSomething(server, tool.name))
     .slice(0, MOST_TOOLS)
     .map((tool) => ({ server, name: tool.name, description: (tool.description ?? "").trim(), parameters: parametersOf(tool.inputSchema) }))
 }
