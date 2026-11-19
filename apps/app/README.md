@@ -35,19 +35,28 @@ harness.
   composes a recipe with the tool of the app `app_page_propose`, which the app checks against the tools a
   page can call. The chat shows the proposal with its title and its parts in words, "Save to my pages" and
   "Preview", which opens it as a link opens. Nothing is kept unless a person presses it. Why:
-  [ADR-0020](../../docs/adr/0020-the-language-model-composes-a-page-and-nothing-else.md). A page is a recipe: a title
-  and its parts in their order, each part a tool of `genui-mcp` with its arguments. No value is kept and no
-  sentence of a language model: opening a page calls the tools again and draws each answer with the card
-  the chat draws for that tool, so it shows what holds now and needs no language model. It is read once, and
-  its head says as of when; only while a part waits for the backend is it read again. A part whose tool
-  the app has no card for stays where it is and says so; the rest of the page is whole. A page can be
+  [ADR-0020](../../docs/adr/0020-the-language-model-composes-a-page-and-nothing-else.md). Asked to add a machine,
+  to put machines on a site, or to create a site or a hall, the chat proposes it with the second tool of the app,
+  `app_placement_propose`, and draws a card that asks step by step for what is missing (which machine, where) and
+  writes only when a person presses its button, through the server functions and with the undo of Home. Why:
+  [ADR-0026](../../docs/adr/0026-the-chat-proposes-where-a-machine-stands.md). A page is a recipe: a title
+  and its parts in their order, each part a tool the chat draws a card for, with its arguments. No value is
+  kept and no sentence of a language model: opening a page calls the tools again, each at the server that has
+  it, and draws each answer with the card the chat draws for that tool, so it shows what holds now and needs no
+  language model. The server of a tool is the one whose name stands before its first `_`: `genui-mcp` for
+  `genui_*`, the OPC UA adapter for `opcua_*`, the entry `juicebar` of `APP_MCP_SERVERS` for the drink card
+  `juicebar_drinks_list`. A page calls only a tool its server marks as reading, since it calls it each time it
+  is opened; a scan of an OPC UA server is no part. It is read once, and its head says as of when; only while a
+  part waits for its server is it read again. A part whose tool the app has no card for, or whose server this
+  app does not have, stays where it is and says so; the rest of the page is whole. Why:
+  [ADR-0025](../../docs/adr/0025-a-part-of-a-page-asks-the-server-that-has-its-tool.md). A page can be
   renamed, pinned and deleted from its head. "Edit" there shows above each part "Move up", "Move down" and
   "Remove", by hand and with no language model, and "Done" takes them away again; a change is kept at once,
   and no part is asked again because another one moved or went. A removed part is kept nowhere else, so the
   toast that says so has "Undo". The only part of a page stays: "Delete page" is the way to be rid of it.
   "Add a card" at the end of a page that is edited adds one, also by hand: a dialog offers the cards a page
-  can hold, each by what it shows, and asks what the chosen one takes, as the input schema of its tool in the
-  backend says: a machine, chosen by its name from the machines Home lists, and the hours of a history in
+  can hold, each by what it shows, and asks what the chosen one takes, as the input schema of its tool on its
+  server says: a machine, chosen by its name from the machines Home lists, and the hours of a history in
   their range. An optional argument left empty stays out, so the measurements without a machine are every
   machine; the list of machines the energy card can take has no field, and that card shows every machine.
   The card goes to the end and shows its values at once; the other parts are not asked again. The same card
@@ -341,11 +350,7 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   `index.tsx` is Home, `sites.index.tsx` the address the list of the sites had before, which leads there, `sites.$machine.tsx` the page of a machine and `machines.$machine.tsx`
   the old address of it, which leads there, `halls.tsx` the plans of the halls (drawn by
   `packages/cards/src/site/hall-plan.tsx`), `charts.tsx` the last hours of every
-  machine as charts (drawn by `src/charts/state-tiles.tsx`), `where-is-my-job.tsx` a page for discussion
-  that follows an order across the machines, with the machines of one step of manufacturing side by side (its
-  map, its panels, the grouping of job orders, the steps and `getFloor`, which reads its values, in
-  `src/where-is-my-job/`; the showcase "What if", the same view with made-up orders across machines at `/what-if`, gives them
-  to it through `extras.ts`), `pages.index.tsx` the list of the pages kept
+  machine as charts (drawn by `src/charts/state-tiles.tsx`), `pages.index.tsx` the list of the pages kept
   in this browser, `pages.$page.tsx` one of them and `pages.open.tsx` one opened from a link; `health.ts`,
   `api/harness/$.ts` and
   `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
@@ -365,16 +370,17 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   `putPartBack` (the undo of `removePart`), `addPart`, `deletePage`, and `usePages` for a component that
   follows every change. `part-controls.tsx` is what "Edit" shows above a part, and `shown-parts.ts` gives each
   part of the recipe as it is now the answer the loader already has for it. `add-card.tsx` is "Add a card"
-  and its dialog; `card-choices.ts` the server function behind it, which reads the tools of the backend with
-  their input schemas and the machines; `add-part.ts` what the form asks for a card, read from its schema (a
+  and its dialog; `card-choices.ts` the server function behind it, which reads the tools of the servers a page
+  asks with their input schemas, and the machines; `add-part.ts` what the form asks for a card, read from its schema (a
   machine, a whole number in its range, never the time zone), the part it makes, and why a part is not added
   (`cannotAdd`). A card with a required argument the form does not know is offered as off, with why. `link.ts` writes a recipe into one search
   parameter, `r`, and reads it back (`encodeRecipe`, `decodeRecipe`, `linkOf`): JSON as UTF-8 in base64url,
   at most `MAX_PARAM_LENGTH` (8,000) characters, and what is not exactly a recipe (`recipeOf`) is null.
   `share-page.tsx` is "Share" in the head of a kept page, `column.tsx` the column that a kept page and a page
   opened from a link share. `call-part.ts` is the server function that calls
-  the tool of a part, only a tool the chat draws (`parts.ts`), with the time zone of the browser, and
-  returns what the chat hands to `draw`. `drawn-part.tsx` asks the parts of a recipe for a loader
+  the tool of a part at the server that has it (`serverOfTool` in `src/chat/mcp-servers.ts`), only a tool the
+  chat draws and its server marks as reading (`parts.ts`), with the time zone of the browser, and returns
+  what the chat hands to `draw`. `drawn-part.tsx` asks the parts of a recipe for a loader
   (`answerParts`) and draws one (`DrawnPart`): the card of the chat, or what is missing. `pinned.ts`
   makes the entries of the sidebar for the pinned pages, `listed.ts` the rows of the group for the others
   and the row that is marked: none for a pinned page, the list of the pages or a page opened from a link. A route that opens a link is input from outside at its
@@ -397,11 +403,14 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   commit this file; here everything that needs it writes it first.
 - `src/showcases/`: what is made for one demo or one fair, and is in a build only where `APP_SHOWCASES` is
   set ([ADR-0018](../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
-  it is a showcase: `juice-bar/` is what the page `/juice-bar` reads, the drink card of the chat on a page of
-  its own for a screen next to the machine, without a language model. `titan/` is the assistant you talk
-  to, the page `/titan`, with a [guide](src/showcases/titan/README.md) of its own. The pages of the showcases, and their
+  it is a showcase: `titan/` is the assistant you talk
+  to, the page `/titan`, with a [guide](src/showcases/titan/README.md) of its own. `where-is-my-job/` holds
+  the made-up orders WI-… of the page `/where-is-my-job`, "Where is My Job?", a page for discussion that
+  follows an order across the machines, with the machines of one step of manufacturing side by side. Its view,
+  map and panels, the grouping of job orders, the steps and `getFloor`, which reads its values, are of the app,
+  in `src/where-is-my-job/`, and take the made-up orders through `extras.ts`. The pages of the showcases, and their
   server routes, are the route files under `src/routes/(showcases)/`; the brackets make a folder that adds
-  nothing to an address, so `(showcases)/juice-bar.tsx` answers at `/juice-bar`. A page belongs to the
+  nothing to an address, so `(showcases)/titan.tsx` answers at `/titan`. A page belongs to the
   showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and `titan/faces.tsx` are pages of
   `showcases/titan/`. A build without the setting leaves that folder out
   (`vite.config.ts`): the router does not know the pages, nothing imports the folder of a showcase, and
@@ -437,6 +446,14 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
 - `src/sites/`: what Home chooses to show of the sites. `filter.ts` groups the values of `genui_site_list` by site
   and hall, keeps what "Needs you" and a search ask for, cuts the pages, and adds up nothing; `moved.ts` says where an old address of the page of a
   machine or of the list of the sites leads. `unplaced.ts` names the machines on no site for the bar; `row-actions.tsx` is "Add machine" and the menu of a row, `place-dialog.tsx` the dialog of "Add machine" and "Move…"; `sites-api.ts` holds the server functions that write, `placements.ts` their steps against the Sites API and `placing.ts` their rules.
+- `src/placement/`: where machines go, as the chat proposes it. `proposal.ts` checks a proposal against the list
+  of the sites (`checkPlacement`): each machine by its id, by a short name that fits one machine only, or as a
+  machine that sent no data with what the person said it is; the site and the hall by id, by name or by the closest
+  name, or new; and the words the model passes on. `confirmed.ts` notes what a person confirmed, by the id of the
+  tool call, under the key `pleiades-playground.placements.v1`, so the card says it after a reload;
+  `read-sites.ts` reads the sites for the tool on the server. The card of the chat is built of the fields of Home
+  and of `src/sites/done-step.tsx` (an open step and a done one) and `src/sites/place-value.ts` (whether a place is
+  chosen whole).
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `mcp-servers.ts` reads the servers whose tools the chat has and holds a chat to the ones it left on,
@@ -450,8 +467,10 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   (`?chat=`: `all` is the list, `new` a new chat with no question yet), and where the first question of a new
   chat waits,
   `save-as-page.tsx` the row under an answer with "Save as page" (chrome of the app, never part of a card),
-  `propose-page.ts` the one tool of the app the model gets, `app_page_propose`, and `proposed-page.tsx` the
-  proposal the chat draws for its result,
+  `propose-page.ts` the tool of the app with which the model proposes a page, `app_page_propose`, and
+  `proposed-page.tsx` the proposal the chat draws for its result, `propose-placement.ts` the tool with which it
+  proposes where machines go, `app_placement_propose`, and `proposed-placement.tsx` the card of steps the chat
+  draws for it,
   `dictate.tsx` the microphone in its field and its line, `recorder.ts` the recording and `dictation.server.ts`
   the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for

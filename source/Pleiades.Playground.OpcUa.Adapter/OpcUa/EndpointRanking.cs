@@ -20,13 +20,18 @@ internal sealed record OfferedEndpoint(
 /// <summary>An offered endpoint with its place in the order.</summary>
 /// <param name="Endpoint">The endpoint.</param>
 /// <param name="Score">Higher is stronger. Only the order matters.</param>
-/// <param name="Recommended">True for the one the adapter would take.</param>
+/// <param name="Recommended">True for the one the adapter takes: the strongest, or the one a person chose.</param>
 /// <param name="Weak">True without encryption or with a policy that is no longer considered safe.</param>
-internal sealed record RankedEndpoint(OfferedEndpoint Endpoint, int Score, bool Recommended, bool Weak);
+/// <param name="WithUser">
+/// True if a session on this endpoint logs in with the user a person stored: the endpoint is encrypted and takes a
+/// user name. A user a person stored goes before an anonymous session; without one, the session is anonymous.
+/// </param>
+internal sealed record RankedEndpoint(OfferedEndpoint Endpoint, int Score, bool Recommended, bool Weak, bool WithUser = false);
 
 /// <summary>
-/// Orders the endpoints of a server from strongest to weakest. The adapter decides this, not the
-/// person and not a language model: encryption before signing only, then the strength of the policy.
+/// Orders the endpoints of a server from strongest to weakest: encryption before signing only, then the
+/// strength of the policy. Without a choice of a person the adapter takes the strongest; a language model
+/// never chooses. A person may choose a weaker one, one without security included, on the endpoints card.
 /// </summary>
 internal static class EndpointRanking
 {
@@ -76,6 +81,38 @@ internal static class EndpointRanking
     }
 
     /// <summary>
+    /// The endpoints the adapter can open a session on, strongest first: every endpoint that takes an anonymous
+    /// session, and, if a person stored a user, every encrypted endpoint that takes a user name. Where a person stored
+    /// a user, a session logs in with it on every encrypted endpoint that takes a user name
+    /// (<see cref="RankedEndpoint.WithUser"/>), else it is anonymous. The one a person
+    /// chose is the one taken (<see cref="RankedEndpoint.Recommended"/>), if the server still offers it; else the
+    /// strongest.
+    /// </summary>
+    /// <param name="offered">The endpoints of the server.</param>
+    /// <param name="withStoredUser">Whether a person stored a user for the server.</param>
+    /// <param name="choice">The security a person chose for the server, or null.</param>
+    public static IReadOnlyList<RankedEndpoint> ForSession(IEnumerable<OfferedEndpoint> offered, bool withStoredUser, SecurityChoice? choice = null)
+    {
+        ArgumentNullException.ThrowIfNull(offered);
+        var ordered = offered
+            .Where(endpoint => endpoint.Anonymous || (withStoredUser && endpoint.UserName && endpoint.SecurityMode == SecurityMode.SignAndEncrypt))
+            .Select(endpoint => (endpoint, score: Score(endpoint.SecurityMode, endpoint.SecurityPolicy)))
+            .OrderByDescending(pair => pair.score)
+            .ToList();
+        var chosen = choice is null ? -1 : ordered.FindIndex(pair => choice.Matches(pair.endpoint.SecurityMode, pair.endpoint.SecurityPolicy));
+        var taken = chosen < 0 ? 0 : chosen;
+        return
+        [
+            .. ordered.Select((pair, index) => new RankedEndpoint(
+                pair.endpoint,
+                pair.score,
+                Recommended: index == taken,
+                Weak: IsWeak(pair.endpoint.SecurityMode, pair.endpoint.SecurityPolicy),
+                WithUser: withStoredUser && pair.endpoint.UserName && pair.endpoint.SecurityMode == SecurityMode.SignAndEncrypt)),
+        ];
+    }
+
+    /// <summary>
     /// The endpoints a session can use, strongest first: without a user, or with a user name and a
     /// password. A password goes over an encrypted endpoint only, so an endpoint that only signs, or
     /// does neither, is not offered to a session with a user at all.
@@ -94,7 +131,8 @@ internal static class EndpointRanking
                 pair.endpoint,
                 pair.score,
                 Recommended: index == 0,
-                Weak: IsWeak(pair.endpoint.SecurityMode, pair.endpoint.SecurityPolicy))),
+                Weak: IsWeak(pair.endpoint.SecurityMode, pair.endpoint.SecurityPolicy),
+                WithUser: withUser)),
         ];
     }
 }

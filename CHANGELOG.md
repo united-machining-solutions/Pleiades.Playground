@@ -15,14 +15,27 @@ All notable changes are documented here. The format follows
   part or left the list. The next number of a route and the job orders taken are kept in
   `/data/spec_routes.json`. The demo stack runs the route `ValveBody` M-02 → P-07 → P-04 every 30 minutes, so the
   page "Where is My Job?" shows an order across three machines.
+- Example app: the chat adds machines and makes sites and halls. Asked for it, the language model proposes with
+  `app_placement_propose`, and the chat draws a card that asks step by step for what is missing (which machine,
+  where) and writes only when a person confirms, with the server functions and the undo of Home
+  ([ADR-0026](docs/adr/0026-the-chat-proposes-where-a-machine-stands.md)).
+- Generative UI backend and cards: the job order card. `genui_job_order_show` shows the job order of one
+  machine (`JobMonitoring.JobOrders` with its result) and its program execution
+  (`WorkMasterMonitoring.ProgramExecution`) by the names of the umati data model, from the Events API; the
+  card draws both over the last hours as a timeline, which it asks `genui_job_order_timeline` for. The chat
+  draws it, and other hosts get it as `ui://genui/joborder`.
+- OPC UA adapter: a person chooses the security of the sessions to a server under "Choose the security" on
+  the endpoints card of the chat, a weaker endpoint or `None` included. Before `None` is taken the card shows
+  a destructive warning; the endpoint taken, the proposal and the list of servers warn too. The adapter keeps
+  the choice per server (`PUT`, `GET` and `DELETE /security`) and takes it for the scan and for every
+  registration proposed after; the model never chooses. Every session of the scan is anonymous first: the
+  stored user logs in only where the endpoint takes no anonymous session, or the server refuses it.
 - Example app: "Where is My Job?" stands the machines by their step of manufacturing, in clusters in the order
   of DIN 8580 (printing, cutting, turning, milling, grinding, forming, joining). The step comes from
   `Identification.DeviceClass`, else from words of the model; the panel "Arrange" corrects it, kept in the
   browser. A tile has an icon for its step and the logo or name of its manufacturer. The perspectives stand
   below the map in one column, the list of orders shows those in circulation by default. The machine card of
-  the generative UI backend has `identity.deviceClass` (optional). The showcase "What if" (only with
-  `APP_SHOWCASES`) is the same page at `/what-if`, with made-up orders WI-… across the clusters; "Real orders"
-  turns them off. The page of the app shows the real orders in every build.
+  the generative UI backend has `identity.deviceClass` (optional).
 - Documentation answer and conflict cards with verbatim warnings, independently linked safety pages, package-wide source review and PDF quote highlighting.
 - Example app: a machine added over OPC UA in the chat goes on a site too, so Home shows it: on the only
   site there is, or on the one a person chooses on the proposal where there are several. A toast says it,
@@ -107,9 +120,6 @@ All notable changes are documented here. The format follows
   colour; a person picks one, and its button orders it at once, without a question of the language model.
   The card follows the order and shows the glass waiting for the start button of the machine, filling while
   the pumps run, and full, with an umbrella. Without motion the glass shows the same, still.
-- Example app: the showcase page `/juice-bar`, the same drink card on a page of its own, for a screen next to
-  the machine at a fair: a guest picks and orders without a language model. It reads the card of the machine
-  every half minute. Only a build with `APP_SHOWCASES` has it.
 - Juice bar API: a drink carries its colour and the picture of a glass its author chose (`color`, `picture`),
   an ingredient its colour and whether its bottle runs low (`color`, `runsLow`). Colours that are not `#rrggbb`
   are left out.
@@ -175,7 +185,7 @@ All notable changes are documented here. The format follows
   source yet and stand on the page as such. The page reads the job orders from the new tool
   `genui_job_order_list` of `genui-mcp`, the job orders on the lists of the machines from the Events API, so
   they stand also after a reload or a reconnect; a job order the planner took back before it ran is left out.
-  It is a page of the app with its entry in the sidebar, not a showcase: it shows only values the stack has.
+  It is a showcase, only in a build with `APP_SHOWCASES`, and has its entry in the sidebar there (see Changed).
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
@@ -451,11 +461,32 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Home: "Add new machine" adds a machine that is not there yet, said by its manufacturer, model and serial
+  number, its id formed by ADR-0015; an id that sends already is assigned instead, one on a site moved.
+  "Review and add" assigns the machines that sent data in the last 24 hours from a list, searched by name,
+  manufacturer, state, id and last data, seven a page, several at once to one site and hall. Sites and halls
+  are made while typing, "Add site" and "Add hall" make them alone, and both dialogs start at the place used
+  last.
+- Home and the machine card in the chat: the whole row of a machine leads to its page; its buttons stay clicks
+  of their own, and the keyboard meets one link a row.
+- Example app: "Where is My Job?" is a showcase, only in a build with `APP_SHOWCASES`: at `/where-is-my-job`
+  and in the sidebar, it opens with made-up orders WI-… across the clusters, and "Real orders" turns them off.
+  The page "What if" at `/what-if` is gone, and so is the page of the app without the made-up orders: the
+  application alone has no "Where is My Job?".
 - Documentation answers use cards exclusively; retired the previous prose/source-list presentation.
+- Example app: a part of a page asks the server that has its tool, not only `genui-mcp`: the OPC UA adapter for
+  `opcua_*`, an entry of `APP_MCP_SERVERS` for its tools. The drink card of the juice bar, the added OPC UA
+  servers and the mapping of one can be kept as a page, pinned and shared; opened, they show the values of then.
+  A part whose server the app does not have says which setting lacks it, and the rest of the page is whole. A
+  page calls only a tool its server marks as reading; the cards of an OPC UA scan stay in the chat. The chat
+  proposes only parts whose server the stack has, and "Add a card" offers the cards of every server. ADR-0025
+  amends ADR-0014 and ADR-0020.
 - Machine page: while it opens, every part shows a grey placeholder of its form and size, so nothing moves when
   the values come. The tiles of now stand without a card around them, and the machine card leaves out the line
   that only repeats what the control reports. A machine on a site that sent nothing for 24 hours shows
   "No data in the last 24 hours" instead of an error.
+- Machine page: while it opens, nothing of it is written yet. The titles, the labels of the tiles and the head of
+  the alarm table are grey placeholders too, and a reader of the screen hears "Loading" until the data comes.
 - Notification card: the alerts stand as a table, in the chat too: level, message with its code, raised,
   cleared and duration; where the card is narrow, the last two stand under the message. The sums at the foot
   are left out; the note on alerts not listed stands under the table, and the foot names when the card was
@@ -519,7 +550,10 @@ All notable changes are documented here. The format follows
   program executions and alerts with their NE 107 severity as CloudEvents, not retained, waiting in a bounded
   outbox while the broker is away; a stack light; `Connection/State` `Initializing`, `Running`,
   `CommunicationFault` and `Shutdown`. The events of the step that ends a `CommunicationFault` go out after
-  `Running`; only those of the steps meanwhile are lost. Each simulator of the stack has a scenario of its own
+  `Running`; only those of the steps meanwhile are lost. A restart goes on with the numbers of the job orders
+  (kept with the counters in `/data`) and, with a `Scenario:Seed`, gives other ids of program executions and
+  alerts, so no id of a run before comes again. A counter file of before, without that number, goes on above the
+  highest number its runs can have given: two job orders a step over the power-on time they added. Each simulator of the stack has a scenario of its own
   (`Config:SpecOutput:ScenarioName`: P-04 the default, P-07 `housings`, M-02 `small-parts`) and a made-up
   manufacturer on a domain below `.example`: Alcyone Machine Works (`alcyone-machines_AX-400_P-04`), Taygeta
   Precision (`taygeta-precision_TP-800_P-07`) and Merope Microtec (`merope-microtec_MM-120_M-02`). Its tests
@@ -533,13 +567,28 @@ All notable changes are documented here. The format follows
   such as `State/Status` field by field, and keeps no lists, no `null` and no manifest.
 - Events: the persistence takes `application/cloudevents+json` from `machines/+/events/jobs`, `…/workmasters`
   and `…/notifications` with QoS 1 in a persistent session (`Config:MqttSource:SessionExpiry`); an event stored
-  before (409, delivered again or retried) counts as stored and is logged on Debug. The Events
+  before (409, delivered again or retried) counts as stored and is logged on Debug. It acknowledges a message only
+  once its event is stored, stored before or refused for good (another 4xx); while the Events API is away it
+  waits and tries again every `Config:RetryDelay` (5 s), and a stop meanwhile leaves the message to the broker.
+  The broker of the demo keeps its sessions across a restart (volume `broker_data`) and queues up to 50 000
+  messages for a session. The Events
   API keeps the CloudEvents as they came in one collection `MachineEvent`, unique by `source` and `id`. It serves
   `/machineEvents` (by machine, group, type, correlation id, job order and time) with `/machineEvents/gaps`, `/alerts/active`, `/alerts/pairs` and `/alerts/statistics` (by
   NE 107 severity), `/jobOrders` with `/jobOrders/{mId}/{jobOrderId}`, and `/programExecutions`, and the MCP
   tools `events_machine_events_query`, `events_sequence_gaps_query`, `events_active_alerts_query`,
   `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query` and
   `events_program_executions_query`.
+  The active alerts are found by an aggregation in MongoDB over the alerts not cleared, and the gaps from the runs
+  of the adapter (per machine, group and prefix of `sequence`), so neither is limited. A gap before the first
+  stored event of a run is named only when the run started within the retention and the range. The other views
+  read at most the newest 100 000 events, without the CloudEvent as it came, and answer with the header
+  `Pleiades-Truncated: true` when that left older events out. A new start of the adapter (a new prefix of
+  `sequence`) closes an alert or a program execution of an earlier run that the new run does not name again:
+  `clearedBy` / `endType` `AdapterRestart` at the start of the new run, the duration of the alert at most, the
+  execution without sums. A job order is never closed so, only `stale`; so is an open entry with a gap after its
+  last event. Known limit: an adapter that keeps an alert standing across its restart without naming it again
+  loses it in the views; comparing with the retained `Notification/ActiveAlerts` would settle it and is not done
+  yet.
 - The machine card shows the work master instead of the program, the job order that runs, and alerts with their
   NE 107 severity; a machine whose adapter is not `Running` has no data, since the adapter said so.
 - The measurement card and the Ultimaker telemetry follow this tree: the card takes a machine by its machine id,
@@ -651,6 +700,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Generative UI backend: a question about the job orders of every machine shows the job order card in the
+  chat. The model answered it with `genui_job_order_list`, which draws no card, and told the person the values
+  were in a card; the result of the list now says so and names the machines whose job order runs, for
+  `genui_job_order_show`, at most ten: where more run, the answer is the list in words. The chat calls the list "Read the job orders", not by its name.
+- Home: on a narrow page the head of a site no longer lies over the chat below it.
 - PDF viewer now supports continuous scrolling and readable native-text highlights that stay aligned through zoom and resize.
 - Example app, showcase TruLaser: `/trulaser` without a machine shows the TruLaser alive most recently, not the first
   by name. A machine that was renamed or stopped kept the page on its old values for a day.

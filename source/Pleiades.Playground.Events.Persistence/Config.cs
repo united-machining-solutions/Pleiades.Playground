@@ -24,6 +24,13 @@ public class Config
     public Collection<string> Topics { get; } = [];
 
     /// <summary>
+    /// How long to wait before an event that could not be stored is tried again. The client of the Events API
+    /// retries each attempt itself for up to two minutes first.
+    /// </summary>
+    [Range(typeof(TimeSpan), "00:00:00.001", "01:00:00")]
+    public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
     /// Events API configuration
     /// </summary>
     [Required]

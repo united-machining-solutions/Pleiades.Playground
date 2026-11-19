@@ -5,6 +5,7 @@ import {
   addedInWords,
   chosenRows,
   doneInWords,
+  endpointSummary,
   inDoubt,
   machineListOf,
   mappingOf,
@@ -12,11 +13,13 @@ import {
   proposalOf,
   sameChoice,
   securityOf,
+  securityWarning,
   serverListOf,
   shownProfiles,
   shownValue,
   userStep,
 } from "./results.ts"
+import { securityOfServer } from "../../opcua/adapter.ts"
 import type { MappingRow, ProfileCheck } from "./results.ts"
 
 const server = {
@@ -203,4 +206,55 @@ test("a registration that replaces one is not added again", () => {
   const proposal = { serialNumber: "A1121O0001", replaces: true }
   assert.deepEqual(addedInWords(proposal, undefined, undefined), { title: "Registration of A1121O0001 replaced", description: undefined })
   assert.equal(doneInWords(proposal, undefined, undefined), "The registration of A1121O0001 is replaced.")
+})
+
+const endpoints = [
+  { securityMode: "SignAndEncrypt" as const, securityPolicy: "Aes256_Sha256_RsaPss", recommended: false, weak: false },
+  { securityMode: "Sign" as const, securityPolicy: "Basic256Sha256", recommended: false, weak: true },
+  { securityMode: "None" as const, securityPolicy: "None", recommended: true, weak: true },
+]
+
+test("the endpoints card says which endpoint a person chose, and which is the strongest", () => {
+  const chosen = endpointSummary({ endpoints, chosen: { securityMode: "None", securityPolicy: "None" } })
+  assert.equal(chosen.used?.securityMode, "None")
+  assert.equal(chosen.strongest?.securityPolicy, "Aes256_Sha256_RsaPss")
+  assert.equal(chosen.chosen, true)
+  assert.equal(chosen.unsecured, false, "The endpoint taken is the one without security, so no other one is.")
+
+  const strongest = endpointSummary({ endpoints: endpoints.map((one, position) => ({ ...one, recommended: position === 0 })) })
+  assert.equal(strongest.chosen, false)
+  assert.equal(strongest.unsecured, true)
+})
+
+test("no security is warned of the most, signing only and an old policy less, encryption not at all", () => {
+  assert.equal(securityWarning({ securityMode: "None", securityPolicy: "None" })?.severity, "danger")
+  assert.equal(securityWarning({ securityMode: "Sign", securityPolicy: "Basic256Sha256" })?.severity, "caution")
+  assert.equal(securityWarning({ securityMode: "SignAndEncrypt", securityPolicy: "Basic256", weak: true })?.severity, "caution")
+  assert.equal(securityWarning({ securityMode: "SignAndEncrypt", securityPolicy: "Aes256_Sha256_RsaPss", weak: false }), undefined)
+})
+
+test("the card sends a security choice only with an opc.tcp address, a mode of OPC UA and a short policy name", () => {
+  assert.deepEqual(securityOfServer({ url: " opc.tcp://m:4840 ", securityMode: "None", securityPolicy: "None" }), {
+    url: "opc.tcp://m:4840",
+    securityMode: "None",
+    securityPolicy: "None",
+  })
+  assert.throws(() => securityOfServer({ url: "http://m", securityMode: "None", securityPolicy: "None" }))
+  assert.throws(() => securityOfServer({ url: "opc.tcp://m:4840", securityMode: "Encrypt", securityPolicy: "None" }))
+  assert.throws(() => securityOfServer({ url: "opc.tcp://m:4840", securityMode: "Sign", securityPolicy: "http://x#y" }))
+})
+
+test("a stored choice the server does not offer now is shown as kept but not taken, so a person can forget it", () => {
+  const strongest = endpoints.map((one, position) => ({ ...one, recommended: position === 0 }))
+  const none = { securityMode: "None" as const, securityPolicy: "None" }
+
+  const gone = endpointSummary({ endpoints: strongest.slice(0, 2), chosen: none, chosenInEffect: false })
+  assert.equal(gone.chosen, false)
+  assert.deepEqual(gone.dormant, none)
+
+  const taken = endpointSummary({ endpoints, chosen: none, chosenInEffect: true })
+  assert.equal(taken.chosen, true)
+  assert.equal(taken.dormant, undefined)
+
+  assert.equal(endpointSummary({ endpoints: strongest }).dormant, undefined)
 })

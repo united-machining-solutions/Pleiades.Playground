@@ -4,7 +4,7 @@ import { toolDefinition } from "@tanstack/ai"
 import { z } from "zod"
 
 import { card } from "../card.ts"
-import { jobOrderListInWords, listJobOrders } from "../job-orders.ts"
+import { jobOrderListInWords, listJobOrders, toTheJobOrderCard } from "../job-orders.ts"
 import { HISTORY_HOURS, MOST_HOURS, listMachines, listSpans, showMachine } from "../machines.ts"
 import { inTimeZoneOf, knownTimeZone } from "../time.ts"
 import { inWords, readOnly, timeZone } from "../tool.ts"
@@ -87,7 +87,7 @@ const spanListTool = toolDefinition({
 const jobOrderListTool = toolDefinition({
   name: "genui_job_order_list",
   description:
-    "List the job orders on the lists of the machines whose last event lies in the last 24 hours, of every machine or of one with `machine`: state, job name, work master, the order numbers of the ERP, runs planned, and what came of each from its start (start, end, produced and good quantity, result). Job orders that name the same order number belong to one order, also across machines.",
+    "List the job orders on the lists of the machines whose last event lies in the last 24 hours, of every machine or of one with `machine`: state, job name, work master, the order numbers of the ERP, runs planned, and what came of each from its start (start, end, produced and good quantity, result). Job orders that name the same order number belong to one order, also across machines. Its result is no card: to show the job order of a machine, call genui_job_order_show for it.",
   inputSchema: z.object({
     machine: machineId.optional().describe(`${MACHINE_NAMING} Every machine if omitted.`),
     timeZone,
@@ -97,7 +97,7 @@ const jobOrderListTool = toolDefinition({
 }).server<Context>(async (input, ctx) => {
   const zone = knownTimeZone(input.timeZone)
   const list = inTimeZoneOf(await listJobOrders(ctx.context.apis, input.machine), zone)
-  return inWords(list, jobOrderListInWords(list))
+  return inWords(list, `${jobOrderListInWords(list)}\n\n${toTheJobOrderCard(list)}`)
 })
 
 export const machineCard = card({

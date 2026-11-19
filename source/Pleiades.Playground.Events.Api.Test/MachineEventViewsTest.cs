@@ -178,11 +178,11 @@ public sealed class MachineEventViewsTest
             .Where(e => !(e.Group == "JobMonitoring" && e.SequenceCount == 1))
             .ToList();
 
-        var gaps = MachineEventViews.Gaps(stored, fromStart: true);
+        var gaps = Gaps(stored, Start.AddHours(1), TimeSpan.FromDays(30), from: null);
 
         Assert.HasCount(2, gaps);
         var jobs = gaps.Single(g => g.Group == "JobMonitoring");
-        Assert.AreEqual(1, jobs.FirstMissing, "the run begins with 1");
+        Assert.AreEqual(1, jobs.FirstMissing, "the run began within the retention: a gap before its first event");
         Assert.AreEqual(1, jobs.Missing);
         var notifications = gaps.Single(g => g.Group == "Notification");
         Assert.AreEqual(2, notifications.FirstMissing);
@@ -190,8 +190,64 @@ public sealed class MachineEventViewsTest
         Assert.AreEqual(2, notifications.Missing);
         Assert.AreEqual(MachineEventSamples.Prefix, notifications.Prefix);
 
-        Assert.HasCount(1, MachineEventViews.Gaps(stored, fromStart: false), "without the start of the run, no gap before its first event");
-        Assert.IsEmpty(MachineEventViews.Gaps(MachineEventSamples.StoredShift(), fromStart: true));
+        Assert.IsEmpty(Gaps(MachineEventSamples.StoredShift(), Start.AddHours(1), TimeSpan.FromDays(30), from: null));
+    }
+
+    [TestMethod]
+    [DataRow(29, null, true, DisplayName = "the run began within the retention")]
+    [DataRow(31, null, false, DisplayName = "the retention may have removed its first events")]
+    [DataRow(29, -1, true, DisplayName = "the range begins before the run")]
+    [DataRow(29, 1, false, DisplayName = "the range begins after the start of the run")]
+    public void Gaps_BeforeTheFirstStoredEvent_OnlyWhenTheStartOfTheRunIsKeptAndRead(int daysLater, int? fromMinute, bool named)
+    {
+        var stored = MachineEventSamples.StoredShift().Where(e => !(e.Group == "JobMonitoring" && e.SequenceCount == 1)).ToList();
+        DateTime? from = fromMinute is { } minute ? Start.AddMinutes(minute) : null;
+
+        var gaps = Gaps(stored, Start.AddDays(daysLater), TimeSpan.FromDays(30), from);
+
+        Assert.AreEqual(named, gaps.Any(g => g.Group == "JobMonitoring" && g.FirstMissing == 1));
+    }
+
+    [TestMethod]
+    public void Gaps_BeforeTheFirstStoredEvent_NotForAPrefixOfAnotherFormat_ButAlwaysWithoutRetention()
+    {
+        var stored = MachineEventSamples.StoredShift().Where(e => !(e.Group == "JobMonitoring" && e.SequenceCount == 1)).ToList();
+        var foreign = stored.Select(e => e with { SequencePrefix = "run-7" }).ToList();
+
+        Assert.IsEmpty(Gaps(foreign, Start.AddHours(1), TimeSpan.FromDays(30), from: null), "the start of the run is unknown");
+        Assert.HasCount(1, Gaps(stored, Start.AddYears(1), retention: null, from: null), "nothing is removed without a retention");
+    }
+
+    [TestMethod]
+    public void RunStart_IsReadFromThePrefix()
+    {
+        Assert.AreEqual(Start, MachineEventViews.RunStart(MachineEventSamples.Prefix));
+        Assert.AreEqual(DateTimeKind.Utc, MachineEventViews.RunStart(MachineEventSamples.Prefix)!.Value.Kind);
+        Assert.IsNull(MachineEventViews.RunStart("run-7"));
+    }
+
+    [TestMethod]
+    public void ActiveAlerts_FromTheEventsOfTheAlertsNotCleared_AreThoseOfAllEvents()
+    {
+        var stored = MachineEventSamples.StoredShift();
+
+        var open = StoredEvents.OpenAlertEvents(stored, MachineEventSamples.MachineId);
+
+        Assert.IsTrue(open.All(e => e.Data["Id"].AsString == "a-2"), "only the events of the alert that stands");
+        CollectionAssert.AreEqual(
+            MachineEventViews.ActiveAlerts(MachineEventSamples.Shift()).Select(a => a.AlertId).ToList(),
+            MachineEventViews.ActiveAlerts(MachineEventMapper.ToDtos(open)).Select(a => a.AlertId).ToList());
+    }
+
+    /// <summary>The gaps of stored events, read as the endpoint reads them.</summary>
+    private static List<DataTransferObjects.SequenceGapDtoV1> Gaps(
+        List<DataAccessObjects.MachineEventDao> stored, DateTime now, TimeSpan? retention, DateTime? from)
+    {
+        var inRange = stored.Where(e => from is null || e.Time >= from).ToList();
+        return MachineEventViews.Gaps(
+            MachineEventViews.Runs(inRange),
+            run => [.. inRange.Where(e => e.MId == run.MId && e.Group == run.Group && e.SequencePrefix == run.Prefix).Select(e => e.SequenceCount!.Value)],
+            run => MachineEventViews.StartVisible(run, now, retention, from));
     }
 
     [TestMethod]

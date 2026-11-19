@@ -122,6 +122,31 @@ public sealed class SpecPublisherTest
     }
 
     [TestMethod]
+    public async Task TheEventsOfTheStart_GoOutAfterTheFirstConnect_SoARunBeginsWithCount1()
+    {
+        var identity = new MachineIdentity("Alcyone Machine Works", "P-04", Source);
+        var machine = new VirtualMachine(identity, MachineRun.Config(), new MachineCounters(1000, 5000, 100), MachineRun.Start);
+        var initial = machine.TakeInitialMessages();
+        Assert.IsTrue(initial.OfType<SpecEvent>().Any(), "the machine begins with job orders");
+        using var client = new FakeClient { IsConnected = false };
+        using var publisher = Publisher(client, 10);
+
+        await publisher.PublishAsync([.. initial.OfType<SpecEvent>()]);
+        Assert.IsEmpty(client.Published, "nothing goes out before the connect");
+        client.IsConnected = true;
+        await publisher.PublishStateAsync(machine.Values, MachineRun.Start);
+
+        var topics = client.Published.Select(m => m.Topic).ToList();
+        var running = topics.LastIndexOf($"machines/{SerialNumber}/umati/Connection/State");
+        var events = client.Published.Select((m, i) => (m, i)).Where(p => p.m.Topic.EndsWith("/events/jobs", StringComparison.Ordinal)).ToList();
+        CollectionAssert.AreEqual(
+            Enumerable.Range(1, events.Count).Select(i => (long)i).ToList(),
+            events.Select(p => long.Parse(Payload(p.m)["sequence"]!.GetValue<string>().Split('.')[1], System.Globalization.CultureInfo.InvariantCulture)).ToList(),
+            "the job orders of the start, from 1 and without a gap");
+        Assert.IsTrue(events.All(p => p.i > running), "after Running");
+    }
+
+    [TestMethod]
     public async Task TheStepThatEndsAFault_WithoutBroker_KeepsItsEventsInTheOutbox()
     {
         using var client = new FakeClient { IsConnected = false };

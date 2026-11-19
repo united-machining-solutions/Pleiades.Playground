@@ -107,36 +107,45 @@ once, on the last page. Home is live: it reads the list once, and from then on t
 broker, MQTT over WebSocket on port 9001, the moment a machine publishes it.
 
 A machine does not show up on Home by itself: people put it on a site. A machine that sent data in the last 24
-hours and stands on no site is named in a bar above the list, a few by name and how many more; "Review and add"
-opens "Add machine" with the first of them chosen. "Add machine" at the top of the page opens the same dialog
-empty: the machine, one that sent data or one named by its id, which shows "No data" until it sends, then the site, the hall and the name
-people know it by; a new site or hall is made there too. The menu "⋯" of a row moves the machine ("Move…") or
-takes it off its site ("Remove from site"), and "Undo" in the toast takes back each change, as long as nobody
-changed the machine since, together with a site or hall the change made. Home writes to the
+hours and stands on no site is named in a bar above the list, a few by name and how many more. "Review and add"
+there opens "Assign machines to a site": those machines, seven a page, found by name, manufacturer, state, id or
+when they last sent, and as many as go to one site and hall are chosen at once. "Add new machine" at the top of
+the page is for a machine that is not there yet: its manufacturer, model and serial number, from which the app
+forms its id, shown small below; it shows "No data" until it sends. An id that sends already offers "Assign it
+instead", and one that stands on a site already offers "Move it here". Both start at the site and hall this
+browser used last. A site or hall is made while its name is typed; "Add site" at the end of the sites makes
+one alone, and "Add hall" in the menu "⋯" of the head of a site adds a hall to it. The menu "⋯" of a row moves
+the machine ("Move…") or takes it off its site ("Remove from site"), and "Undo" in the toast takes back each
+change, as long as nobody changed the machine since, together with a site or hall the change made. Home writes to the
 [Sites API](../source/Pleiades.Playground.Sites.Api/README.md), at <http://localhost:5540/>, which takes the same
 over REST. A stack that has just started has no site: every machine that sends is in the bar. While the Sites API
 does not answer, a line says the sites cannot be read now and names a few of the machines that sent data; then
 nothing can be added.
 
-![Home: "3 machines at 2 sites · 2 send data now · 2 need you" and the button Add machine at the right. Below, the
-bar "4 machines sent data in the last 24 hours but are not on a site yet: TP-800 P-07, Laser2D L-01, Punch PU-01 +1"
-with Review and add; the search, All and Needs you, and the counts of all sites. North plant of Demo Manufacturing:
-Lathe 4 stopped in Hall 1 with the warning "Coolant pressure low", MM-120 M-02 running in Hall 2 with the warning
-"Filter of the coolant clogged", and "Hall 3: no machine". South plant with AX-400 M-09 without data in Hall A. Each
-row has the menu "⋯".](images/tour/home.png)
+![Home: "4 machines at 2 sites · 2 send data now · 2 need you" and the button Add new machine at the right. Below, the
+bar "5 machines sent data in the last 24 hours but are not on a site yet: TP-800 P-07, 5085 AE325085TB46, Laser2D L-01
++2" with Review and add; the search, All and Needs you, and the counts of all sites. North plant of Demo
+Manufacturing, with the menu "⋯" of the site: Lathe 4 running in Hall 1 with the warning "Lubrication interval
+reached", Lathe 11 without data and MM-120 M-02 running in Hall 2, and "Hall 3: no machine". Below, the head of the
+South plant. Each row has the menu "⋯".](images/tour/home.png)
 
-In the picture Lathe 4, the name entered for P-04, is stopped with the warning "Coolant pressure low", 20017, and
-says since when; M-09 stands in the South plant but has no simulator, so nothing is known about it and its row
-leads nowhere. P-07 and the three cutting machines sent data and stand on no site: the bar names them, and
-"Review and add" puts one on a site. A row leads to the page of its machine, and
+In the picture Lathe 4, the name entered for P-04, runs with the warning "Lubrication interval reached" and says
+since when; Lathe 11, the name entered for Q-11, has no simulator, so nothing is known about it and its row leads
+nowhere, as M-09 in the South plant below. P-07, the bending machine and the three cutting machines sent data and
+stand on no site: the bar names them, and
+"Review and add" puts them on a site. A click anywhere on a row leads to the page of its machine, and
 "Ask why" starts a chat about it (stop 4). The field "Ask a question" in the header starts a chat too.
 
 **In the code:** [`apps/app/src/routes/index.tsx`](../apps/app/src/routes/index.tsx) is the page,
 [`apps/app/src/sites/filter.ts`](../apps/app/src/sites/filter.ts) chooses what "Needs you" and the search show
 and cuts the pages, and [`apps/app/src/machines/machine-item.tsx`](../apps/app/src/machines/machine-item.tsx)
-draws a row. [`apps/app/src/sites/row-actions.tsx`](../apps/app/src/sites/row-actions.tsx) is "Add machine" and the
-menu of a row, [`apps/app/src/sites/place-dialog.tsx`](../apps/app/src/sites/place-dialog.tsx) their dialog, and [`apps/app/src/sites/sites-api.ts`](../apps/app/src/sites/sites-api.ts) writes to the Sites API from
-the server of the app. The values are the result of the tool `genui_site_list`
+draws a row. [`apps/app/src/sites/row-actions.tsx`](../apps/app/src/sites/row-actions.tsx) is "Add new machine", "Add
+site" and the menus, [`apps/app/src/sites/place-dialog.tsx`](../apps/app/src/sites/place-dialog.tsx) their dialog
+around the form of [`apps/app/src/sites/place-form.tsx`](../apps/app/src/sites/place-form.tsx), which the chat
+uses too; [`apps/app/src/sites/choosing.ts`](../apps/app/src/sites/choosing.ts) finds the machines to assign,
+[`apps/app/src/sites/machine-id.ts`](../apps/app/src/sites/machine-id.ts) forms the id of a new machine, and
+[`apps/app/src/sites/sites-api.ts`](../apps/app/src/sites/sites-api.ts) writes to the Sites API from the server of the
+app. The values are the result of the tool `genui_site_list`
 ([`apps/genui-mcp/src/sites.ts`](../apps/genui-mcp/src/sites.ts)), which groups and counts. Which value is which
 state is decided in one file, [`packages/cards/src/machine/state.ts`](../packages/cards/src/machine/state.ts).
 What the broker sends is laid onto the list in [`apps/app/src/live/`](../apps/app/src/live/), and
@@ -173,28 +182,6 @@ chart of shadcn/ui. The values are those of the machine card, from `genui_machin
 read once by one server function, `getCharts` in
 [`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts); from then on the page is
 live from the broker, as Home is.
-
-The page "Where is My Job?" in the sidebar, <http://localhost:5600/where-is-my-job>, is a basis for
-discussion: how an order could be followed across the shop floor. It shows the machines of the stack from above, with their state, utilisation
-and job orders, the machines of one step of manufacturing side by side: cutting, turning, milling, grinding, in
-the order of DIN 8580. The step comes from what a machine says it is, `Identification.DeviceClass`, else from
-its model; "Arrange" lets a person correct it, and what they set wins. Below the map stand a machine with what
-it did, does and what waits for it, or an order on its way, and the list of orders, by default those in
-circulation. An order is every job order that names the same order number, read from the backend
-(`genui_job_order_list`) and kept live by the retained lists `JobMonitoring/JobOrders` and
-`JobOrderResults`. Programming before the machines, packing after them and the single part on its sheet have
-no source yet: the page draws them dashed, as the gaps to discuss. The simulators send one order across machines every
-half hour: the route `ValveBody`, job order `90001/01` and on, order number `SO-90001`, turned on M-02, milled
-on P-07 and ground on P-04; P-07 releases its step once M-02 has ended it, P-04 once P-07 has. Search for
-"Valve body" or "SO-900" to find one. A stack with `APP_SHOWCASES` set has the page <http://localhost:5600/what-if>, in the sidebar
-as "What if": the same page with made-up orders WI-… across the clusters, and "Real orders" turns them off.
-It has no picture in this tour.
-
-**In the code:** [`apps/app/src/routes/where-is-my-job.tsx`](../apps/app/src/routes/where-is-my-job.tsx)
-is the page; the map, the panels and `getFloor` live in
-[`apps/app/src/where-is-my-job/`](../apps/app/src/where-is-my-job/): `floor.ts` there
-groups the job orders into orders, `steps.ts` gives each machine its step. The made-up orders are the
-showcase [`apps/app/src/showcases/what-if/`](../apps/app/src/showcases/what-if/).
 
 ## 3. The page of one machine
 
@@ -321,7 +308,8 @@ card, such as one in words only, has no button. The group "Pages" in the sidebar
 that are not pinned, the newest first, and a page that is pinned from its head moves to the top of the sidebar,
 beside Home. "Edit" in its head moves a card up or down and removes one, with no language model; "Undo" in
 the toast puts a removed card back. "Add a card" at the end of the page adds one by hand: choose what it shows,
-and for one machine which machine and how many hours.
+and for one machine which machine and how many hours. The card of another server of the chat, such as the drink
+card of the [juice bar](#optional-a-juice-bar), is kept the same way: the page asks that server when it opens.
 
 Ask the chat for a page, for example "Make me a page with all machines and P-04", and it proposes one. The model
 reads with its tools what there is to show and composes the page: a title, and the cards in their order, each
@@ -329,17 +317,23 @@ with the machine and the hours it shows. It writes no value and cannot keep the 
 proposal with its parts in words; "Preview" opens it with the values of now, and "Save to my pages" keeps it in
 this browser. What you asked for that no card shows, the model says in words.
 
-Ask the chat for a page, for example "Make me a page with all machines and P-04", and it proposes one. The model
-reads with its tools what there is to show and composes the page: a title, and the cards in their order, each
-with the machine and the hours it shows. It writes no value and cannot keep the page. The chat shows the
-proposal with its parts in words; "Preview" opens it with the values of now, and "Save to my pages" keeps it in
-this browser. What you asked for that no card shows, the model says in words.
+Ask the chat to add a machine, for example "Add my new MFP 20" or "Put P-07 in North plant, Hall 2", and it
+proposes it in a card. The model cannot place a machine itself. The card asks for what is missing, one step at a
+time: which machine it is, with the machines of a similar name to tap, or its manufacturer, model and serial
+number, of which the app makes its id; and where it goes, with the fields of site and hall that Home has. A step
+that is done is one line, and a click opens it again. Nothing is written until you press the button at the foot
+of the card, and the toast after it has "Undo", as on Home. Ask for a site or a hall alone, for example "Create a
+site East plant with Hall 1", and the card makes only that. The card is
+[`apps/app/src/chat/proposed-placement.tsx`](../apps/app/src/chat/proposed-placement.tsx), the tool
+[`apps/app/src/chat/propose-placement.ts`](../apps/app/src/chat/propose-placement.ts) and its check
+[`apps/app/src/placement/proposal.ts`](../apps/app/src/placement/proposal.ts). No screenshot shows it yet.
 
 A page is private to the browser that keeps it, and the stack has no sign-in, so "Share" in its head gives a
 link that carries the recipe: which answers, for which machines and hours, and no value. Open it in a private
 window to see what a colleague sees: the page with the values of now, no chat and no language model needed,
-and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for says so,
-and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
+and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for, or
+whose server it does not have, such as the juice bar, says so, and the rest of the page is whole. A link that
+was cut off when it was copied says that it holds no page.
 
 Ask about the alarms of a machine, for example "Which warnings and errors did P-04 have today?", and the chat
 draws the notification card of the tool `genui_notification_list`: a table with each warning and error, when it
@@ -409,7 +403,8 @@ stand the tools of the MCP servers the chat has: `/machine` finds `/genui_machin
 `/genui_machine_show M-02` asks the model to answer with that tool. The arrow keys mark an entry, Tab writes
 it into the field, Enter takes it and Escape closes the list. Ask
 `/discover A1121O0001`, and the model scans the OPC UA server of the simulated machine, matches its nodes to
-the data model and shows a proposal: the endpoint with the strongest security, whether the machine fulfils
+the data model and shows a proposal: the endpoint with the strongest security, or the one you chose under
+"Choose the security" on the endpoints card (`None` too, behind a warning), whether the machine fulfils
 the core of the data model and which profiles are complete, and how many elements are ok, derived, unclear
 or missing. What the core lacks is marked as not available. Press one of these chips, "2 missing" say, and
 the proposal lists those elements with their values and why; press it again to close the list. The machine is added when you
@@ -539,10 +534,33 @@ The service publishes the state of the machine to the broker. Its machine id def
 to the simulated machines. With
 `juicebar=http://juicebar-api:8080/mcp` in `APP_MCP_SERVERS`, the chat answers what the bar can mix and
 orders a drink when asked. Asked what the bar has, it draws the drink card: each drink in its glass, one to
-pick, and a button that orders it at once; the glass then fills while the machine mixes. A stack with
-`APP_SHOWCASES` set has the same card as a page of its own, <http://localhost:5600/juice-bar>, for a screen next to
-the machine, without a language model. No tour screenshot was retaken: they show the stack without the profile.
+pick, and a button that orders it at once; the glass then fills while the machine mixes. No tour screenshot
+was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).
+
+## Optional: Where is My Job?
+
+Following an order across the shop floor is not part of the six stops either. A stack with `APP_SHOWCASES` set has the page
+<http://localhost:5600/where-is-my-job>, in the sidebar as "Where is My Job?", a basis for discussion. It shows
+the machines of the stack from above, with their state, utilisation and job orders, the machines of one step of
+manufacturing side by side: cutting, turning, milling, grinding, in the order of DIN 8580. The step comes from
+what a machine says it is, `Identification.DeviceClass`, else from its model; "Arrange" lets a person correct
+it, and what they set wins. Below the map stand a machine with what it did, does and what waits for it, or an
+order on its way, and the list of orders, by default those in circulation.
+
+The page opens with made-up orders WI-… across the clusters; "Real orders" turns them off. A real order is
+every job order that names the same order number, read from the backend (`genui_job_order_list`) and kept live
+by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines, packing
+after them and the single part on its sheet have no source yet: the page draws them dashed, as the gaps to
+discuss. The simulators send one real order across machines every half hour: the route `ValveBody`, job order
+`90001/01` and on, the same `JobOrderID` on every machine, order number `SO-90001`, turned on M-02, milled on
+P-07 and ground on P-04; P-07 releases its step once M-02 has ended it, P-04 once P-07 has. Search for "Valve
+body" or "SO-900" to find one. It has no picture in this tour.
+
+It is a showcase: its route is `routes/(showcases)/where-is-my-job.tsx`, and the made-up orders are in
+[`apps/app/src/showcases/where-is-my-job/`](../apps/app/src/showcases/where-is-my-job/). The map, the panels and
+`getFloor` are of the app, in [`apps/app/src/where-is-my-job/`](../apps/app/src/where-is-my-job/): `floor.ts`
+there groups the job orders into orders, `steps.ts` gives each machine its step.
 
 ## Optional: a TruLaser
 

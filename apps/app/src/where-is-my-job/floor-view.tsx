@@ -43,8 +43,8 @@ const title = "Where is My Job?"
 
 /**
  * The page "Where is My Job?" as a view of what the loader read. Where a page gives more to lay onto
- * the shop floor (`extras`, a showcase on a page of its own), the view opens with the first of it, and
- * a switch above the map turns it off. The page of the app gives none.
+ * the shop floor (`extras`, made-up orders of the showcase), the view opens with the first of it, and
+ * a switch above the map turns it off. Without extras it shows the real orders only.
  */
 export function FloorView({
   answer,

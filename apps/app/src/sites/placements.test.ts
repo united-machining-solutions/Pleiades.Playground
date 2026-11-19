@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { placeAdded, placedInWords, place, remove, sitesOf, undo } from "./placements.ts"
+import { makeHallAlone, makeSiteAlone, placeAdded, placedInWords, place, remove, sitesOf, undo, unmake } from "./placements.ts"
 import type { Send } from "./placements.ts"
 import type { PlaceRequest } from "./placing.ts"
 
@@ -365,4 +365,98 @@ test("an added machine on a site that is gone says so", async () => {
 test("the words of the toast", () => {
   assert.equal(placedInWords("P-07", "North plant", "Hall 2", false), "P-07 added · North plant, Hall 2")
   assert.equal(placedInWords("P-07", "North plant", null, true), "P-07 moved · North plant")
+})
+
+test("a site is made alone, with its first hall, under an id that is not taken, and only where none is there", async () => {
+  const api = sitesApi([north()])
+  const outcome = await makeSiteAlone({ name: "North plant", company: "Demo Manufacturing", hall: "Hall 1" }, api.send)
+  assert.ok(outcome.ok)
+  assert.equal(outcome.siteId, "north-plant-2")
+  assert.deepEqual(outcome.made, { siteId: "north-plant-2", siteEtag: etagOf(api.sites[1]!) })
+  assert.deepEqual(api.sites[1], { siteId: "north-plant-2", company: "Demo Manufacturing", name: "North plant", halls: ["Hall 1"] })
+  assert.deepEqual(api.calls, ["GET /sites", "PUT /sites/north-plant-2 if-none-match"])
+})
+
+test("a site someone made under the same id meanwhile is not written over, with a sentence", async () => {
+  const api = sitesApi()
+  const send: Send = async (path, method, body, conditions) => {
+    // Someone makes the site between the read and the write.
+    if (method === "PUT") api.sites.push({ siteId: "west-plant", company: "Other", name: "West plant", halls: [] })
+    return api.send(path, method, body, conditions)
+  }
+  const outcome = await makeSiteAlone({ name: "West plant", company: "Demo Manufacturing", hall: null }, send)
+  assert.deepEqual(outcome, { ok: false, reason: "Someone made a site under the same name meanwhile: choose it from the list.", stale: true })
+  assert.equal(api.sites[0]!.company, "Other")
+})
+
+test("a hall is added alone onto the site as it was read; one that is there makes nothing; a changed site refuses", async () => {
+  const api = sitesApi([north()])
+  const outcome = await makeHallAlone({ siteId: "north-plant", hall: "Hall 4" }, api.send)
+  assert.deepEqual(outcome, { ok: true, siteId: "north-plant", siteName: "North plant", hall: "Hall 4", made: { hall: { siteId: "north-plant", hall: "Hall 4" } } })
+  assert.deepEqual(api.sites[0]!.halls, ["Hall 1", "Hall 2", "Hall 4"])
+  assert.deepEqual(api.calls, ["GET /sites", "PUT /sites/north-plant if-match"])
+
+  assert.deepEqual(await makeHallAlone({ siteId: "north-plant", hall: "Hall 4" }, api.send), {
+    ok: true,
+    siteId: "north-plant",
+    siteName: "North plant",
+    hall: "Hall 4",
+    made: {},
+  })
+  assert.deepEqual(await makeHallAlone({ siteId: "gone", hall: "Hall 1" }, api.send), {
+    ok: false,
+    reason: "The site 'gone' is no longer there.",
+    stale: true,
+  })
+  const changing = sitesApi([north()])
+  const send: Send = async (path, method, body, conditions) => {
+    if (method === "PUT") changing.sites[0]!.name = "North plant (old)"
+    return changing.send(path, method, body, conditions)
+  }
+  assert.deepEqual(await makeHallAlone({ siteId: "north-plant", hall: "Hall 5" }, send), {
+    ok: false,
+    reason: "Someone changed the site meanwhile.",
+    stale: true,
+  })
+})
+
+test("a site or hall made alone goes again on undo, and stays with a sentence where something stands on it", async () => {
+  const api = sitesApi([north()])
+  const site = await makeSiteAlone({ name: "West plant", company: "Demo Manufacturing", hall: null }, api.send)
+  const hall = await makeHallAlone({ siteId: "north-plant", hall: "Hall 4" }, api.send)
+  assert.ok(site.ok && hall.ok)
+  assert.deepEqual(await unmake(site.made, api.send), { ok: true })
+  assert.deepEqual(await unmake(hall.made, api.send), { ok: true })
+  assert.deepEqual(
+    api.sites.map((one) => [one.siteId, one.halls]),
+    [["north-plant", ["Hall 1", "Hall 2"]]],
+  )
+
+  const busy = sitesApi([north()])
+  const again = await makeSiteAlone({ name: "West plant", company: "Demo Manufacturing", hall: "Hall 1" }, busy.send)
+  const more = await makeHallAlone({ siteId: "north-plant", hall: "Hall 4" }, busy.send)
+  assert.ok(again.ok && more.ok)
+  busy.placements.push({ machineId: P07, siteId: "west-plant", hall: "Hall 1", displayName: null })
+  busy.placements.push({ machineId: M02, siteId: "north-plant", hall: "Hall 4", displayName: null })
+  assert.deepEqual(await unmake(again.made, busy.send), { ok: false, reason: "A machine stands on the site now, so it stays." })
+  assert.deepEqual(await unmake(more.made, busy.send), { ok: false, reason: "A machine stands in Hall 4 now, so it stays." })
+})
+
+test("a site made alone that someone changed since stays on undo", async () => {
+  const api = sitesApi()
+  const site = await makeSiteAlone({ name: "West plant", company: "Demo Manufacturing", hall: null }, api.send)
+  assert.ok(site.ok)
+  api.sites[0]!.halls.push("Hall 9")
+  assert.deepEqual(await unmake(site.made, api.send), { ok: false, reason: "Someone changed the site since it was made, so it stays." })
+})
+
+test("making a site or hall while the Sites API is away says so", async () => {
+  const away: Send = async () => {
+    throw new Error("connect ECONNREFUSED")
+  }
+  const site = await makeSiteAlone({ name: "West plant", company: "Demo Manufacturing", hall: null }, away)
+  assert.equal(site.ok, false)
+  assert.match(site.ok ? "" : site.reason, /^The Sites API did not answer/)
+  const undone = await unmake({ siteId: "west-plant" }, away)
+  assert.match(undone.ok ? "" : undone.reason, /^The Sites API did not answer/)
 })

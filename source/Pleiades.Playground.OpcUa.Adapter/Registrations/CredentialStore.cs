@@ -114,7 +114,7 @@ internal sealed class CredentialStore
 
         try
         {
-            var read = JsonSerializer.Deserialize<Dictionary<string, Credential>>(File.ReadAllText(_file), RegistrationJson.Options);
+            var read = JsonSerializer.Deserialize<Dictionary<string, Credential>>(AtomicFile.ReadAllText(_file), RegistrationJson.Options);
             return new Dictionary<string, Credential>(read ?? [], StringComparer.Ordinal);
         }
         catch (JsonException exception)
@@ -128,16 +128,7 @@ internal sealed class CredentialStore
         }
     }
 
-    private void Write(Dictionary<string, Credential> all)
-    {
-        // Written beside and moved, so a crash leaves the old file or the new one, never half of one.
-        var next = _file + ".new";
-        File.WriteAllText(next, JsonSerializer.Serialize(all, RegistrationJson.Options));
-        if (!OperatingSystem.IsWindows())
-        {
-            File.SetUnixFileMode(next, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-        }
-
-        File.Move(next, _file, overwrite: true);
-    }
+    // Readable by the adapter only.
+    private void Write(Dictionary<string, Credential> all) =>
+        AtomicFile.Write(_file, JsonSerializer.Serialize(all, RegistrationJson.Options), UnixFileMode.UserRead | UnixFileMode.UserWrite);
 }

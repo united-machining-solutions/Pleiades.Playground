@@ -39,10 +39,7 @@ public sealed class ApiMachineEventTest
             Repository.Setup(r => r.CreateAsync(It.Is<MachineEventDao>(e => e.EventId == "stored-before"), It.IsAny<CancellationToken>()))
                 .Throws(new PleiadesDuplicateDataException("The event is already stored."));
             var stored = MachineEventSamples.StoredShift();
-            Repository.Setup(r => r.FindForViewAsync(It.IsAny<MachineEventFilter>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync((MachineEventFilter f, CancellationToken _) => [.. stored.Where(e =>
-                    (f.Group is null || e.Group == f.Group)
-                    && (f.JobOrderId is null || (e.Data.Contains("JobOrderID") && e.Data["JobOrderID"].AsString == f.JobOrderId)))]);
+            Repository.SetupViews(stored);
             Repository.Setup(r => r.QueryAsync(It.IsAny<MachineEventFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((stored, stored.Count));
 
@@ -150,7 +147,11 @@ public sealed class ApiMachineEventTest
         repository.Setup(r => r.QueryAsync(It.IsAny<MachineEventFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(([], 0));
 
-        await new McpTools.MachineEventTools(repository.Object).QueryMachineEvents(jobOrderId: "4711/01", cancellationToken: TestContext.CancellationToken);
+        await new McpTools.MachineEventTools(repository.Object, Microsoft.Extensions.Options.Options.Create(new Services.MongoDbSettings
+        {
+            ConnectionString = "mongodb://localhost:27017",
+            DatabaseName = "Events",
+        }), TimeProvider.System).QueryMachineEvents(jobOrderId: "4711/01", cancellationToken: TestContext.CancellationToken);
 
         repository.Verify(r => r.QueryAsync(
             It.Is<MachineEventFilter>(f => f.JobOrderId == "4711/01"),
@@ -203,5 +204,26 @@ public sealed class ApiMachineEventTest
 
         Assert.AreEqual(240, executions!.Items.Single().Duration);
         Assert.IsEmpty(gaps!, "the shift misses no event");
+    }
+
+    [TestMethod]
+    [DataRow("/alerts/pairs")]
+    [DataRow("/alerts/statistics")]
+    [DataRow("/jobOrders")]
+    [DataRow("/programExecutions")]
+    public async Task AViewThatLeftOlderEventsOut_SaysSo(string path)
+    {
+        using var api = new Api();
+        using (var whole = await api.Client.GetAsync(new Uri(path, UriKind.Relative), TestContext.CancellationToken))
+        {
+            Assert.IsFalse(whole.Headers.Contains("Pleiades-Truncated"), "a view that read every event says nothing");
+        }
+        api.Repository.Setup(r => r.FindForViewAsync(It.IsAny<MachineEventFilter>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ViewEvents([], Truncated: true));
+
+        using var response = await api.Client.GetAsync(new Uri(path, UriKind.Relative), TestContext.CancellationToken);
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        Assert.AreEqual("true", response.Headers.GetValues("Pleiades-Truncated").Single());
     }
 }

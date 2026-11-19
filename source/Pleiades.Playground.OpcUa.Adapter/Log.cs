@@ -76,4 +76,19 @@ internal static partial class Log
 
     [LoggerMessage(27, LogLevel.Warning, "Machine {SerialNumber}: the list of alerts of {Node} is not taken: {Reason}. The alerts that stand are kept.")]
     public static partial void AlertListNotTaken(this ILogger logger, string serialNumber, string node, string reason);
+
+    [LoggerMessage(28, LogLevel.Information, "A person chose {SecurityMode} with {SecurityPolicy} for {Url}.")]
+    public static partial void SecurityChosen(this ILogger logger, string url, string securityMode, string securityPolicy);
+
+    [LoggerMessage(29, LogLevel.Warning, "A person chose no security for {Url}: its sessions are neither signed nor encrypted.")]
+    public static partial void SecurityNoneChosen(this ILogger logger, string url);
+
+    [LoggerMessage(30, LogLevel.Information, "The security chosen for {Url} is removed; the adapter takes the strongest endpoint again.")]
+    public static partial void SecurityChoiceRemoved(this ILogger logger, string url);
+
+    [LoggerMessage(31, LogLevel.Error, "The security chosen for the OPC UA servers cannot be read: {Reason}")]
+    public static partial void SecurityChoicesUnreadable(this ILogger logger, string reason);
+
+    [LoggerMessage(32, LogLevel.Information, "Machine {SerialNumber} starts its session anew with the user {User} a person stored.")]
+    public static partial void MachineReconnectsWithUser(this ILogger logger, string serialNumber, string user);
 }

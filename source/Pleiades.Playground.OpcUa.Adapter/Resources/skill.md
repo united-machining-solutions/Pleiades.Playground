@@ -23,8 +23,15 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
 
 ## Scan a server
 
-1. **Endpoints.** `opcua_endpoint_rank` with the address the person gave. The first endpoint is the one to
-   register: its `securityMode` and `securityPolicy` go into the registration. Never choose a weaker one.
+1. **Endpoints.** `opcua_endpoint_rank` with the address the person gave. The endpoint marked `recommended`
+   is the one to register: its `securityMode` and `securityPolicy` go into the registration. It is the
+   strongest, unless a person chose another one on the card of the result; then `chosen` is set. Never choose
+   an endpoint yourself, and never set `allowWeaker`.
+   - The card lets the person choose the security, a weaker one or `None` included, and warns them. If the
+     person asks for another security in the chat, for example because the server does not trust the adapter
+     yet, point them to "Choose the security" on the card, then call `opcua_endpoint_rank` again when they say
+     it is done. If `chosen` has `securityMode` `None`, say in one sentence that the sessions are neither
+     signed nor encrypted, as the card warns.
    - If the person names only a machine, for example "add the OPC UA server of A1121O0001", assume the
      default endpoint: the machine as host name and the port of OPC UA, `opc.tcp://A1121O0001:4840`.
    - If that address does not answer, stop and ask the person for the endpoint, in one sentence with the form
@@ -36,7 +43,11 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
      says it is done, call `opcua_endpoint_rank` again; with `user` set, go on. Every later connect logs in with
      that user by itself.
    - `needsUser` false and `acceptsUser` true: the server works without a user, and the card offers the person
-     to log in with one. Go on without waiting; do not mention it unless the person asks.
+     to log in with one. Go on without waiting; do not mention it unless the person asks. Without a stored user
+     every connect is anonymous.
+   - When the person says they stored a user, call `opcua_endpoint_rank` again, then `opcua_ua_connect` again
+     with the same `name`: that replaces the session, and the new one logs in with the user. Do not go on with a
+     session opened before.
    - `acceptsUser` false: the server takes no user name on an encrypted endpoint, and the card has no form. If
      the person asks for a login, say so. If `needsUser` is true as well, the adapter cannot connect at all:
      say that the server would have to offer a user on an encrypted endpoint, and stop.
@@ -59,10 +70,10 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
      set to that `node`, `serialNumber` from the list and `elements` empty. See
      [A machine in `urn:umati2:datamodel:opcua`](#what-the-adapter-maps-itself).
 3. **Session.** `opcua_ua_connect` with `endpointUrl`, `autoAcceptCerts: true` and `name: "scan"`. Leave the
-   security arguments out: the tool takes the strongest endpoint by itself. Pass `sessionName: "scan"` to every
-   later `opcua_ua_*` call. The person sees the thumbprint of the certificate on the proposal and confirms it
-   there. Never pass a user name or a password: if a person stored a user for the server, the session logs in
-   with it by itself, else it is anonymous.
+   security arguments out: the adapter sets the recommended endpoint by itself, whatever you pass. Pass
+   `sessionName: "scan"` to every later `opcua_ua_*` call. The person sees the thumbprint of the certificate on
+   the proposal and confirms it there. Never pass a user name or a password: the session logs in with the user a
+   person stored by itself, and is anonymous without one.
 4. **Namespaces.** `opcua_ua_read_value` with `{"nodeId": "i=2255", "sessionName": "scan"}`: the namespace
    array. Position `n` is the URI of `ns=n`. You need it for every node of the registration.
 5. **The machine.** `opcua_ua_browse_all` from the `node` of the machine, as `opcua_machine_list` gave it, with

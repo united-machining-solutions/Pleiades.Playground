@@ -1,4 +1,5 @@
 import type { EnergySeries, EnergyShow } from "@pleiades/cards/energy/contract.ts"
+import type { JobOrderTimeline } from "@pleiades/cards/joborder/contract.ts"
 import type { MachineList, MachineShow, Span } from "@pleiades/cards/machine/contract.ts"
 import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import type { NotificationList } from "@pleiades/cards/notification/contract.ts"
@@ -10,7 +11,7 @@ import { createServerFn } from "@tanstack/react-start"
 
 import { reasonOf } from "@/reason.ts"
 
-import { ENERGY_SERIES_TOOL, MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL, TIMESERIES_SERIES_TOOL, TIMESERIES_SIGNALS_TOOL } from "./card-tools.ts"
+import { ENERGY_SERIES_TOOL, JOB_ORDER_TIMELINE_TOOL, MEASUREMENT_SERIES_TOOL, SPAN_LIST_TOOL, TIMESERIES_SERIES_TOOL, TIMESERIES_SIGNALS_TOOL } from "./card-tools.ts"
 import { Refused, keptClient } from "./kept-client.ts"
 
 // The values come from the generative UI backend. These functions run on the server of the app:
@@ -187,6 +188,24 @@ export const getSpans = createServerFn({ method: "GET" })
         throw new Refused(textOf(result) ?? `${SPAN_LIST_TOOL} returned no values.`)
       }
       return result.structuredContent.spans
+    })
+    return answer.values
+  })
+
+/**
+ * The timeline of a job order card, for the machine and the hours its values are about. It is not among
+ * the values, because a language model reads those. Null if it is not to be had: the card says so.
+ */
+export const getJobOrderTimeline = createServerFn({ method: "GET" })
+  .validator((asked: { machine: string; from: string; to: string }) => asked)
+  .handler(async ({ data }): Promise<JobOrderTimeline | null> => {
+    const answer = await ask(async (backend) => {
+      // The name is checked against the tools of the backend: if it changes there, this fails to compile.
+      const result = await backend.callTool(JOB_ORDER_TIMELINE_TOOL, data)
+      if (result.isError || !result.structuredContent) {
+        throw new Refused(textOf(result) ?? `${JOB_ORDER_TIMELINE_TOOL} returned no values.`)
+      }
+      return result.structuredContent
     })
     return answer.values
   })

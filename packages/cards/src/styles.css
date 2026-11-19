@@ -30,6 +30,7 @@
 @source "../../ui/src/components/textarea.tsx";
 @source "../../ui/src/components/toggle.tsx";
 @source "../../ui/src/components/toggle-group.tsx";
+@source "../../ui/src/components/tooltip.tsx";
 /* The rows of a card that turns its pages fade in; a page with reduced motion skips it. */
 @theme {
   --color-evidence: oklch(0.96 0.08 95);

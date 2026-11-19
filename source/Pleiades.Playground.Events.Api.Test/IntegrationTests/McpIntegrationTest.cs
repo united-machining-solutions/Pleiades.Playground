@@ -340,8 +340,7 @@ public class McpIntegrationTest : IntegrationTestBase
         repository.Setup(r => r.QueryAsync(
                 It.IsAny<MachineEventFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((stored, stored.Count));
-        repository.Setup(r => r.FindForViewAsync(It.IsAny<MachineEventFilter>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((MachineEventFilter f, CancellationToken _) => [.. stored.Where(e => f.Group is null || e.Group == f.Group)]);
+        repository.SetupViews(stored);
         ReplaceService(services, repository.Object);
     }
 

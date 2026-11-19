@@ -19,7 +19,8 @@ internal static class MachineEventSamples
     private static string Iso(DateTime time) => time.ToString("yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture);
 
     /// <summary>A CloudEvent 1.0 in structured mode.</summary>
-    public static JsonElement CloudEvent(string type, int minute, long count, JsonObject data, string? correlationId = null, string? id = null)
+    public static JsonElement CloudEvent(
+        string type, int minute, long count, JsonObject data, string? correlationId = null, string? id = null, string prefix = Prefix)
     {
         var cloudEvent = new JsonObject
         {
@@ -28,7 +29,7 @@ internal static class MachineEventSamples
             ["source"] = Source,
             ["type"] = type,
             ["time"] = Iso(Start.AddMinutes(minute)),
-            ["sequence"] = $"{Prefix}.{count:D12}",
+            ["sequence"] = $"{prefix}.{count:D12}",
             ["dataschema"] = "urn:umati2:datamodel:0.17.1:event.schema.json",
             ["data"] = data,
         };

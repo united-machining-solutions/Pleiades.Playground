@@ -300,6 +300,7 @@ const allJobOrdersAnswer = z.object({
       jobOrderId: z.string(),
       state: z.string(),
       lastChange: z.string(),
+      firstSeen: z.string().nullish(),
       removed: z.boolean().default(false),
       jobName: z.string().nullish(),
       workMasterId: z.string().nullish(),
@@ -499,4 +500,44 @@ export async function readAlertsOf(
     hasMore,
     alerts: pairs.map((pair) => ({ ...alertOf(pair), goneAt: pair.clearedAt === null ? null : new Date(pair.clearedAt).toISOString() })),
   }
+}
+
+const programExecutionsAnswer = z.object({
+  items: z.array(
+    z.object({
+      mId: z.string(),
+      executionId: z.string(),
+      jobOrderId: z.string().nullish(),
+      workMasterId: z.string().nullish(),
+      state: z.string(),
+      startTime: z.string(),
+      endTime: z.string().nullish(),
+      // How it ended, by the type of its last event: Ended or Aborted. Null while it runs.
+      endType: z.string().nullish(),
+      interruptions: z.number().nullish(),
+      duration: z.number().nullish(),
+      partsProduced: z.number().nullish(),
+    }),
+  ),
+  hasMore: z.boolean().default(false),
+})
+
+/** A program execution as the Events API pairs its start with its end: `WorkMasterMonitoring.ProgramExecution…`. */
+export type StoredProgramExecution = z.infer<typeof programExecutionsAnswer>["items"][number]
+
+/**
+ * The program executions of one machine that started between the two instants, 1000 at most, the newest
+ * first. `hasMore` says the API had more than it returned.
+ */
+export async function readProgramExecutions(
+  apis: Apis,
+  machine: string,
+  from: Date,
+  to: Date,
+): Promise<{ executions: Array<StoredProgramExecution>; hasMore: boolean }> {
+  const url = between(new URL("/programExecutions", apis.eventsUrl), ["from", "to"], from, to)
+  url.searchParams.set("mId", machine)
+  url.searchParams.set("Take", "1000")
+  const answer = await getJson("Events API", url, programExecutionsAnswer)
+  return { executions: answer.items, hasMore: answer.hasMore }
 }
