@@ -7,6 +7,13 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: "Where is My Job?" stands the machines by their step of manufacturing, in clusters in the order
+  of DIN 8580 (printing, cutting, turning, milling, grinding, forming, joining). The step comes from
+  `Identification.DeviceClass`, else from words of the model; the panel "Arrange" corrects it, kept in the
+  browser. A tile has an icon for its step and the logo or name of its manufacturer. The perspectives stand
+  below the map in one column, the list of orders shows those in circulation by default. The machine card of
+  the generative UI backend has `identity.deviceClass` (optional). The showcase "What if" (only with
+  `APP_SHOWCASES`) lays made-up orders WI-… across the clusters, on by default, switched on the page.
 - Example app: the showcase page `/trulaser`, a cockpit of a TRUMPF laser cutting machine named as the umati
   data model names it: `State.Status` with `Notification.ActiveAlerts` and its history on one time axis, the
   `JobOrder` with its `ProgramExecution`, and from the TRUMPF extension (`oem/Dalle/`) the requests of the
