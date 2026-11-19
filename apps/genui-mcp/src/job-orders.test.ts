@@ -3,7 +3,8 @@ import { afterEach, mock, test } from "node:test"
 
 import type { JobOrderList } from "@pleiades/cards/machine/contract.ts"
 
-import { listJobOrders, toTheJobOrderCard } from "./job-orders.ts"
+import type { StoredJobOrder } from "./apis.ts"
+import { MOST_JOB_ORDER_CARDS, entryOf, listJobOrders, toTheJobOrderCard } from "./job-orders.ts"
 
 const apis = { timeseriesUrl: "http://timeseries:8080", eventsUrl: "http://events:8080" }
 const now = new Date("2026-11-18T10:00:00.000Z")
@@ -79,12 +80,30 @@ test("an empty order number is no order number", async () => {
   assert.deepEqual(list.jobOrders[0]?.orderNumbers, ["SO-1"])
 })
 
+const listOf = (jobOrders: Array<Record<string, unknown>>): JobOrderList => ({
+  asOf: now.toISOString(),
+  windowSeconds: 86400,
+  jobOrders: jobOrders.map((one) => entryOf(stored(one) as StoredJobOrder)),
+})
+
 test("after the list, a language model is told to show the job order card for each machine whose job order runs", () => {
-  const entry = (machine: string, state: string) => ({ machine, state }) as JobOrderList["jobOrders"][number]
-  const list = { asOf: "2026-11-18T10:00:00.000Z", windowSeconds: 86400, jobOrders: [entry("m-1", "Running"), entry("m-1", "Ended"), entry("m-2", "Interrupted"), entry("m-3", "Ended")] }
+  const list = listOf([
+    { mId: "m-1", state: "Running" },
+    { mId: "m-1", state: "Ended" },
+    { mId: "m-2", state: "Interrupted" },
+    { mId: "m-3", state: "Ended" },
+  ])
   const words = toTheJobOrderCard(list)
   assert.match(words, /genui_job_order_show/)
   assert.match(words, /"m-1", "m-2"\./)
   assert.doesNotMatch(words, /m-3/)
-  assert.match(toTheJobOrderCard({ ...list, jobOrders: [] }), /no card/)
+  assert.match(toTheJobOrderCard(listOf([])), /no card/)
+})
+
+test("with more machines whose job order runs than it shows cards for, a language model answers from the list", () => {
+  const machines = Array.from({ length: MOST_JOB_ORDER_CARDS + 1 }, (_, at) => ({ mId: `m-${at}`, state: "Running" }))
+  const words = toTheJobOrderCard(listOf(machines))
+  assert.match(words, /answer from this list/)
+  assert.doesNotMatch(words, /"m-0"/)
+  assert.match(toTheJobOrderCard(listOf(machines.slice(1))), /"m-1", .*"m-10"\./)
 })

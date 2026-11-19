@@ -1,3 +1,5 @@
+import { MOST_JOB_ORDER_CARDS } from "../job-orders.ts"
+
 // What the skill guide of the server says about the machine card: its sections, as markdown.
 
 export const machineGuide = `## Machines
@@ -67,5 +69,6 @@ A job order \`Aborted\` without a \`start\` never ran: the planner took it back.
 The list is no card. A question about the job order of a machine, or what it runs, is answered by
 \`genui_job_order_show\`, which draws the job order card. A question about the job orders of every
 machine starts with the list; then show the card with \`genui_job_order_show\` for each machine whose
-job order runs or is interrupted, one call for each.
+job order runs or is interrupted, one call for each, as the result of the list names them. Where more
+than ${MOST_JOB_ORDER_CARDS} machines have one, the list names none, and the answer is the list in words.
 `

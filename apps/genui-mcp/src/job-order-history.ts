@@ -4,7 +4,7 @@ import { HORIZON_SECONDS } from "@pleiades/cards/machine/contract.ts"
 
 import { EVER, readJobOrders, readProgramExecutions, readStrings } from "./apis.ts"
 import type { Apis, StoredJobOrder, StoredProgramExecution } from "./apis.ts"
-import { entryOf, utc } from "./job-orders.ts"
+import { entryOf, isOpen, utc } from "./job-orders.ts"
 import { knownMachines, machineNamed } from "./machines.ts"
 import { secondsBefore } from "./time.ts"
 
@@ -18,9 +18,6 @@ const MOST_ITEMS = 1000
 
 /** Where the adapter publishes the state of its connection: a new start of it begins with empty lists. */
 const CONNECTION_STATE = "umati/Connection/State"
-
-/** A job order that has begun and not ended: running or interrupted. One not yet started is not open. */
-const isOpen = (state: string) => state === "Running" || state === "Interrupted"
 
 /**
  * Newest first, by an instant of each. Compared as instants, not as text: the Events API may leave out

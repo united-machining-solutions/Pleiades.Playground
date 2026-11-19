@@ -66,13 +66,26 @@ export function jobOrderListInWords(list: JobOrderList): string {
   return `${list.jobOrders.length} job orders on the lists of the machines (as of ${list.asOf}):\n${lines.join("\n")}`
 }
 
+/** A job order that has begun and not ended: running or interrupted. One not yet started is not open. */
+export const isOpen = (state: string) => state === "Running" || state === "Interrupted"
+
+/**
+ * How many job order cards a language model is told to show after the list. Above it, a card for each
+ * machine would be as many calls and cards as there are machines: the answer is the list, in words.
+ */
+export const MOST_JOB_ORDER_CARDS = 10
+
 /**
  * What a language model is told after the list: the list is no card, and which machines to show the job order
  * card for. A model that reads only the description of a tool answers from the list and shows no card.
  */
 export function toTheJobOrderCard(list: JobOrderList): string {
-  const running = [...new Set(list.jobOrders.filter((job) => job.state === "Running" || job.state === "Interrupted").map((job) => job.machine))]
-  if (running.length === 0)
-    return "This list is no card. To show the person the job order of a machine as the job order card, call genui_job_order_show with its `machine`."
-  return `This list is no card. Show the person the job order card: call genui_job_order_show once for each machine whose job order runs or is interrupted, with \`machine\` ${running.map((id) => `"${id}"`).join(", ")}. Then a sentence or two is the whole answer.`
+  const open = [...new Set(list.jobOrders.filter((one) => isOpen(one.state)).map((one) => one.machine))]
+  const card = "To show the person the job order of a machine as the job order card, call genui_job_order_show with its `machine`."
+  if (open.length === 0) return `This list is no card. ${card}`
+  if (open.length > MOST_JOB_ORDER_CARDS) {
+    return `This list is no card. ${open.length} machines have a job order that runs or is interrupted, too many for a card each: answer from this list. ${card}`
+  }
+  const machines = open.map((id) => `"${id}"`).join(", ")
+  return `This list is no card. Show the person the job order card: call genui_job_order_show once for each machine whose job order runs or is interrupted, with \`machine\` ${machines}. Then a sentence or two is the whole answer.`
 }
