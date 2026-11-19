@@ -1,6 +1,6 @@
 # Titan
 
-Titan is an assistant you talk to: a dark screen with a cloud of points that listens, answers aloud from the
+Titan is an assistant you talk to: a dark panel with a cloud of points that listens, answers aloud from the
 values of the stack, and shows the one thing the answer is about. It is a showcase
 ([ADR-0018](../../../../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)): only a build
 with `APP_SHOWCASES` has the page `/titan`, and nothing outside this folder and its routes knows of it. It
@@ -14,7 +14,7 @@ came out of the umati hackathon in November 2026.
 | Ask | Hold the space bar, speak, let go. Or say "Hey Titan" and the question |
 | Interrupt | The space bar: Titan falls silent and listens |
 | Pause | The key P, or "Hey Titan, Pause". "Hey Titan" or the space bar wakes it |
-| Leave | Escape |
+| Leave | The sidebar, as from every page |
 
 Titan also speaks first: when a machine raises a new error it says so, in its own words. It never talks over
 the person or over an answer, and says at most one fault a minute; every fault stands in the line on top.
