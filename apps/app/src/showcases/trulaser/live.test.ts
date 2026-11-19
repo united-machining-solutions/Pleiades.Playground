@@ -1,11 +1,11 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { CARD_SIGNALS, SIGNAL_PATHS } from "@pleiades/cards/trulaser/contract.ts"
-import type { Cockpit, Signal, SignalName, TrulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
+import { CARD_SIGNALS, SIGNAL_PATHS } from "./contract.ts"
+import type { Cockpit, Signal, SignalName, TrulaserTimeline } from "./contract.ts"
 
-import { cockpitMessage, timelineAt, timelineMessage, trulaserFilters } from "./trulaser.ts"
-import type { TimelineLive } from "./trulaser.ts"
+import { cockpitMessage, timelineAt, timelineMessage, trulaserFilters } from "./live.ts"
+import type { TimelineLive } from "./live.ts"
 
 const M = "trumpf_PLL01_L1649A-STARLINER"
 const topic = (path: string) => `machines/${M}/${path}`

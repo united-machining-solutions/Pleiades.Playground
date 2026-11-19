@@ -7,8 +7,8 @@ import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader,
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@pleiades/ui/components/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@pleiades/ui/components/table"
 import { cn } from "@pleiades/ui/lib/utils"
-import { clock } from "../machine/format.ts"
-import { StateSymbol } from "../machine/state-symbol.tsx"
+import { clock } from "@pleiades/cards/machine/format.ts"
+import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
 import { ConditionGuide } from "./condition-guide.tsx"
 import type { ReadSeries } from "./condition-guide.tsx"
 import { EXTENSION, signalValueFields } from "./contract.ts"
@@ -30,7 +30,7 @@ import { signalText, trulaserTitle } from "./words.ts"
 
 // The TruLaser cards. Each is named after the element of the umati data model it shows, or of the
 // extension of TRUMPF where the model has none, and says which of the two it is. Each draws the result of
-// one tool and computes nothing but the wording.
+// one read and computes nothing but the wording.
 
 /** Where the values of a card come from: the data model, or the extension of TRUMPF. */
 type Origin = "umati" | "extension"
@@ -239,21 +239,6 @@ export function HistoryCard({
         <Timelines timeline={timeline} />
       </CardContent>
     </Card>
-  )
-}
-
-/**
- * State.Status with its history below, for a host that shows the status card alone (the chat, an MCP
- * App): the card reads the history itself, for the hours a person chooses.
- */
-export function StatusWithHistory({ status, readTimeline }: { status: TrulaserStatus; readTimeline: ReadTimeline }) {
-  const [hours, setHours] = useState(1)
-  const timeline: Timeline = useRead(useCallback(() => readTimeline("status", hours), [readTimeline, hours]))
-  return (
-    <div className="flex flex-col gap-3">
-      <StatusCard status={status} />
-      <HistoryCard timeline={timeline} hours={hours} onHours={setHours} />
-    </div>
   )
 }
 

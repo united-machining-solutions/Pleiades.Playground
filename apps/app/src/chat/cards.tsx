@@ -7,7 +7,6 @@ import { notificationTools } from "@/cards/notification/chat.tsx"
 import { opcuaTools } from "@/cards/opcua/chat.tsx"
 import { siteTools } from "@/cards/site/chat.tsx"
 import { timeseriesTools } from "@/cards/timeseries/chat.tsx"
-import { trulaserTools } from "@/cards/trulaser/chat.tsx"
 
 import { proposalTool } from "./proposed-page.tsx"
 import { backendTools } from "./tool-results.ts"
@@ -31,7 +30,6 @@ export const chatTools: ReadonlyArray<ChatTool> = [
   ...opcuaTools,
   ...siteTools,
   ...timeseriesTools,
-  ...trulaserTools,
   // It reads this list when it draws a proposal, to name the parts of the page.
   proposalTool(() => chatTools),
 ]

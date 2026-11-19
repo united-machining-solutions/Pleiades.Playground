@@ -17,7 +17,6 @@
 @source "../../ui/src/components/card.tsx";
 @source "../../ui/src/components/chart.tsx";
 @source "../../ui/src/components/combobox.tsx";
-@source "../../ui/src/components/dialog.tsx";
 @source "../../ui/src/components/input.tsx";
 @source "../../ui/src/components/input-group.tsx";
 @source "../../ui/src/components/item.tsx";
@@ -29,7 +28,6 @@
 @source "../../ui/src/components/textarea.tsx";
 @source "../../ui/src/components/toggle.tsx";
 @source "../../ui/src/components/toggle-group.tsx";
-@source "../../ui/src/components/tooltip.tsx";
 /* The rows of a card that turns its pages fade in; a page with reduced motion skips it. */
 @theme {
   --animate-card-fade-in: card-fade-in 160ms ease-out;

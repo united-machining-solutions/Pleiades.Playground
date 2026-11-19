@@ -1,22 +1,21 @@
-import { TIMELINE_HOURS } from "@pleiades/cards/trulaser/contract.ts"
-import type { Cockpit } from "@pleiades/cards/trulaser/contract.ts"
-import type { Timeline } from "@pleiades/cards/trulaser/timelines.tsx"
-import { TrulaserCockpit } from "@pleiades/cards/trulaser/trulaser-cards.tsx"
-import { useRead } from "@pleiades/cards/trulaser/use-read.ts"
-import { trulaserTitle } from "@pleiades/cards/trulaser/words.ts"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { createFileRoute } from "@tanstack/react-router"
 import { ScanLineIcon } from "lucide-react"
 import { useCallback, useMemo } from "react"
 import type { ReactNode } from "react"
 
-import { useReadSeries, useReadTimeline } from "@/cards/trulaser/shown-trulaser.tsx"
 import { NoAnswer } from "@/components/no-answer.tsx"
 import { liveness, useLive, useRetry } from "@/hooks/use-live.ts"
 import type { Live } from "@/hooks/use-live.ts"
-import { cockpitAt, cockpitMessage, timelineAt, timelineMessage, trulaserFilters } from "@/live/trulaser.ts"
-import type { TimelineLive } from "@/live/trulaser.ts"
-import { getTrulaserCockpit, getTrulaserTimeline } from "@/machines/get-machines.ts"
+import { TIMELINE_HOURS } from "@/showcases/trulaser/contract.ts"
+import type { Cockpit, ConditionKey, TimelineView } from "@/showcases/trulaser/contract.ts"
+import { getTrulaserCockpit, getTrulaserSeries, getTrulaserTimeline } from "@/showcases/trulaser/get-trulaser.ts"
+import { cockpitAt, cockpitMessage, timelineAt, timelineMessage, trulaserFilters } from "@/showcases/trulaser/live.ts"
+import type { TimelineLive } from "@/showcases/trulaser/live.ts"
+import type { Timeline } from "@/showcases/trulaser/timelines.tsx"
+import { TrulaserCockpit } from "@/showcases/trulaser/trulaser-cards.tsx"
+import { useRead } from "@/showcases/trulaser/use-read.ts"
+import { trulaserTitle } from "@/showcases/trulaser/words.ts"
 
 type Hours = (typeof TIMELINE_HOURS)[number]
 
@@ -25,7 +24,7 @@ function hoursOf(asked: unknown): Hours | undefined {
   return TIMELINE_HOURS.find((one) => one === Number(asked))
 }
 
-export const Route = createFileRoute("/trulaser")({
+export const Route = createFileRoute("/(showcases)/trulaser")({
   staticData: { nav: { title: "TruLaser", icon: ScanLineIcon } },
   validateSearch: (search): { machine?: string; last?: Hours | undefined } => ({
     ...(typeof search.machine === "string" && search.machine !== "" && { machine: search.machine }),
@@ -47,6 +46,22 @@ export const Route = createFileRoute("/trulaser")({
  * The history of the status for the hours chosen, read on its own: undefined while on its way, null if it
  * is not to be had. From then on the broker keeps it up to date, as it does the cards.
  */
+/** How a card reads the timelines of a view when it opens them. */
+function useReadTimeline(machine: string) {
+  return useCallback(
+    (view: TimelineView, hours: number) => getTrulaserTimeline({ data: { machine, view, hours } }).catch(() => null),
+    [machine],
+  )
+}
+
+/** How the ConditionGuide card reads the values of one tile, for its chart: over the hours of the page. */
+function useReadSeries(machine: string, hours: number) {
+  return useCallback(
+    (key: ConditionKey) => getTrulaserSeries({ data: { machine, key, hours } }).catch(() => null),
+    [machine, hours],
+  )
+}
+
 function useStatusTimeline(machine: string, hours: number): TimelineLive | null | undefined {
   const read = useCallback(
     () => getTrulaserTimeline({ data: { machine, view: "status", hours } }).then((timeline) => timeline && { timeline, recent: {} }),

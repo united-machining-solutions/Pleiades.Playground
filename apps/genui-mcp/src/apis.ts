@@ -68,8 +68,6 @@ const alertPairsAnswer = z.object({
       errorCode: z.string().nullish(),
       message: z.string().nullish(),
       severity: severityAnswer.nullish(),
-      severityValue: z.number().nullish(),
-      sourceName: z.string().nullish(),
       raisedAt: z.string(),
       clearedAt: z.string().nullable(),
     }),
@@ -313,7 +311,6 @@ const allJobOrdersAnswer = z.object({
       endTime: z.string().nullish(),
       producedQuantity: z.number().nullish(),
       goodQuantity: z.number().nullish(),
-      runsCompleted: z.number().nullish(),
       jobResult: z.string().nullish(),
     }),
   ),
@@ -415,77 +412,6 @@ export async function readTimelines(
   }))
 }
 
-/** An alert of one machine as the Events API pairs its raise and its clear, with its source. */
-export type AlertSpan = {
-  alertId: string
-  errorCode: string
-  message: string
-  severity: Severity | null
-  severityValue: number | null
-  sourceName: string
-  raisedAt: string
-  /** Null as long as it stands. */
-  clearedAt: string | null
-}
-
-/**
- * The alerts of one machine that stood at some time between the two instants, with their source, from
- * `readAlertPairs`. `hasMore` says the API had more than it returned.
- */
-export async function readAlertSpans(
-  apis: Apis,
-  machine: string,
-  from: Date,
-  to: Date,
-): Promise<{ spans: Array<AlertSpan>; hasMore: boolean }> {
-  const { pairs, hasMore } = await readAlertPairs(apis, from, to, machine)
-  const spans = pairs.map((one) => ({
-    alertId: one.alertId,
-    errorCode: one.errorCode ?? "",
-    message: one.message ?? "",
-    severity: one.severity ?? null,
-    severityValue: one.severityValue ?? null,
-    sourceName: one.sourceName ?? "",
-    raisedAt: new Date(one.raisedAt).toISOString(),
-    clearedAt: one.clearedAt === null ? null : new Date(one.clearedAt).toISOString(),
-  }))
-  return { spans, hasMore }
-}
-
-/** A job order of one machine as the Events API keeps it from its events: the entry and its result. */
-export type JobOrderEntry = {
-  jobOrderId: string
-  state: string
-  lastChange: string
-  /** True once the machine took it out of its list: it ran, but is no longer the job order of the machine. */
-  removed: boolean
-  jobName: string | null
-  workMasterId: string | null
-  startTime: string | null
-  endTime: string | null
-  runsCompleted: number | null
-  jobResult: string | null
-}
-
-/** The job orders of one machine the Events API knows, removed ones included, the newest change first; from `readJobOrders`. */
-export async function readJobOrderEntries(apis: Apis, machine: string, now: Date): Promise<Array<JobOrderEntry>> {
-  const at = (text: string | null | undefined) => (text ? new Date(text).toISOString() : null)
-  return (await readJobOrders(apis, EVER, now, machine))
-    .map((one) => ({
-      jobOrderId: one.jobOrderId,
-      state: one.state,
-      lastChange: new Date(one.lastChange).toISOString(),
-      removed: one.removed,
-      jobName: one.jobName ?? null,
-      workMasterId: one.workMasterId ?? null,
-      startTime: at(one.startTime),
-      endTime: at(one.endTime),
-      runsCompleted: one.runsCompleted ?? null,
-      jobResult: one.jobResult ?? null,
-    }))
-    .sort((a, b) => b.lastChange.localeCompare(a.lastChange))
-}
-
 /** A site as the Sites API keeps it: a place with a company, a plant and its halls. */
 export type StoredSite = { siteId: string; company: string; name: string; halls: Array<string> }
 /** A machine on a site, as the Sites API keeps it. */
@@ -569,28 +495,4 @@ export async function readAlertsOf(
     hasMore,
     alerts: pairs.map((pair) => ({ ...alertOf(pair), goneAt: pair.clearedAt === null ? null : new Date(pair.clearedAt).toISOString() })),
   }
-}
-
-const jobOrderEventsAnswer = z.object({
-  items: z.array(z.object({ type: z.string(), time: z.string(), data: z.record(z.string(), z.unknown()).nullish() })),
-})
-
-/**
- * Since when a job order is in its state, as its newest event that carries its entry says (`StateSince`).
- * The Events API keeps only the time of the last event of any kind with a job order, a change of its result
- * among them; the entry of the job order says when its state changed. Null if no event says it.
- */
-export async function readJobOrderStateSince(apis: Apis, machine: string, jobOrderId: string): Promise<string | null> {
-  const url = new URL("/machineEvents", apis.eventsUrl)
-  url.searchParams.set("mId", machine)
-  url.searchParams.set("jobOrderId", jobOrderId)
-  url.searchParams.set("group", "JobMonitoring")
-  url.searchParams.set("Take", "20")
-  url.searchParams.set("Sorting", "Descending")
-  const { items } = await getJson("Events API", url, jobOrderEventsAnswer)
-  for (const one of items) {
-    const since = one.data?.StateSince
-    if (typeof since === "string" && !Number.isNaN(Date.parse(since))) return new Date(since).toISOString()
-  }
-  return null
 }

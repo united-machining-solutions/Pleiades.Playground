@@ -16,7 +16,7 @@ import {
   alertLaneKey,
   deviceLane,
   statusOf,
-} from "@pleiades/cards/trulaser/contract.ts"
+} from "./contract.ts"
 import type {
   Alert,
   ConditionKey,
@@ -38,21 +38,22 @@ import type {
   TrulaserStatus,
   TrulaserTechnology,
   TrulaserTimeline,
-} from "@pleiades/cards/trulaser/contract.ts"
+} from "./contract.ts"
 
 import {
   EVER,
+  HORIZON_SECONDS,
   listTopics,
+  machineOf,
   readAlertSpans,
   readJobOrderEntries,
   readJobOrderStateSince,
   readNewest,
   readStrings,
   readTimelines,
-} from "./apis.ts"
-import type { AlertSpan, Apis, JobOrderEntry, Sample } from "./apis.ts"
-import { HORIZON_SECONDS, machineOf } from "./machines.ts"
-import { secondsBefore } from "./time.ts"
+  secondsBefore,
+} from "./apis.server.ts"
+import type { AlertSpan, Apis, JobOrderEntry, Sample } from "./apis.server.ts"
 
 // What a TRUMPF laser cutting machine reports, one answer for each card, by the names of the umati data
 // model: State.Status, Notification.ActiveAlerts, JobMonitoring.JobOrders and

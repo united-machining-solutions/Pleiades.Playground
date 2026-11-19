@@ -4,7 +4,6 @@ import { measurementCard } from "./measurement.ts"
 import { notificationCard } from "./notification.ts"
 import { siteCard } from "./site.ts"
 import { timeseriesCard } from "./timeseries.ts"
-import { trulaserCard } from "./trulaser.ts"
 
 /**
  * The cards of this server: one module each, and one line each here, in the order of the alphabet.
@@ -18,5 +17,4 @@ export const cards = [
   notificationCard,
   siteCard,
   timeseriesCard,
-  trulaserCard,
 ] as const

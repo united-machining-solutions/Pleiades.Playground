@@ -7,11 +7,11 @@ import {
   alertSpanOf,
   byUrgency,
   statusOf,
-} from "@pleiades/cards/trulaser/contract.ts"
-import type { Alert, Cockpit, JobOrder, Lane, LaneSpan, Signal, TrulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
+} from "./contract.ts"
+import type { Alert, Cockpit, JobOrder, Lane, LaneSpan, Signal, TrulaserTimeline } from "./contract.ts"
 
-import { AHEAD_MS, valuesOf } from "./messages.ts"
-import type { Value } from "./messages.ts"
+import { AHEAD_MS, valuesOf } from "../../live/messages.ts"
+import type { Value } from "../../live/messages.ts"
 
 // The TruLaser cockpit, live: its cards and the history of the status as they were read, and from then
 // on every value and event the machine publishes, the moment the broker carries it: State.Status and the

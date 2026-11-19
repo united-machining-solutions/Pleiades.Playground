@@ -28,11 +28,3 @@ export const ENERGY_SERIES_TOOL = "genui_energy_series"
  */
 export const TIMESERIES_SERIES_TOOL = "genui_timeseries_series"
 export const TIMESERIES_SIGNALS_TOOL = "genui_timeseries_signals"
-
-/**
- * The tools for the timelines of the TruLaser card and for the values of a tile of its condition
- * guide. Only a card calls them: the app asks for them itself, see get-machines.ts, and the chat
- * keeps them from its language model, see cards/trulaser/chat.tsx.
- */
-export const TRULASER_TIMELINE_TOOL = "genui_trulaser_timeline"
-export const TRULASER_SERIES_TOOL = "genui_trulaser_series"

@@ -4,8 +4,8 @@ import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@pleiades/ui/components/tooltip"
 import { cn } from "@pleiades/ui/lib/utils"
-import { clock, duration } from "../machine/format.ts"
-import { categoryColour } from "../shared/colour.ts"
+import { clock, duration } from "@pleiades/cards/machine/format.ts"
+import { categoryColour } from "@pleiades/cards/shared/colour.ts"
 import { TIMELINE_HOURS, detailText, signalValueFields } from "./contract.ts"
 import type { Lane, LaneSpan, TimelineView, TrulaserTimeline } from "./contract.ts"
 
@@ -75,7 +75,7 @@ export function HoursChoice({ hours, onHours }: { hours: number; onHours: (hours
 /**
  * Timelines on one time axis: a lane for each value, grouped by the element of the data model or of the
  * extension they belong to. Where an alert of the category Failure stood, a red stripe crosses every lane. On hover a span says its
- * value, from when to when, and its details. It draws a result of `genui_trulaser_timeline` and
+ * value, from when to when, and its details. It draws what `listTimeline` of read.server.ts read and
  * computes nothing but the wording and where a span lies.
  */
 export function Timelines({ timeline }: { timeline: Timeline }) {

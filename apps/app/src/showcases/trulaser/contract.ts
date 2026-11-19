@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { instant, machineId, severity } from "../machine/contract.ts"
+import { instant, machineId, severity } from "@pleiades/cards/machine/contract.ts"
 
 // The contracts of the TruLaser cards. They name what they show as the umati data model 0.17.1 does, and
 // read it from its elements below `machines/{machineId}/umati/` and from the events of the model: the
@@ -8,7 +8,7 @@ import { instant, machineId, severity } from "../machine/contract.ts"
 // and its program execution (WorkMasterMonitoring.ProgramExecution). What the model does not know comes
 // from the extension of TRUMPF, `x-trumpf-com.Dalle.*` below `oem/Dalle/`: the change cause, the requests
 // of the automation devices, the laser technology, the collision data and the condition guide. Each card
-// answers one question and is its own tool. Every value names the topic it comes from.
+// answers one question. Every value names the topic it comes from.
 
 /** Where the extension of TRUMPF publishes the signals of the edge component, below `machines/{machineId}/`. */
 export const TRULASER_PREFIX = "oem/Dalle"
@@ -395,7 +395,7 @@ export const LANE_SLOTS = 900
 
 /**
  * The timelines of a view: one lane for each value on the same time axis, and when an alert of the category
- * Failure stood. They grow with time, so a language model does not read them: the card asks for them.
+ * Failure stood. They grow with time: the card asks for them apart from its values.
  */
 export const trulaserTimeline = z.object({
   machine: machineId,
