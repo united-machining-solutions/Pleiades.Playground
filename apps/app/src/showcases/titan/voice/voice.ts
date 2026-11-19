@@ -4,6 +4,7 @@ import type { Listener, Message } from "../conversation.ts"
 
 import { withoutList, withoutSaidAdvice } from "./facts.ts"
 import { transcribe } from "./transcribe.ts"
+import { RECORDING_RATE, wavOf } from "./wav.ts"
 
 // Speech for the assistant page: the browser listens to a question and reads an answer aloud.
 //
@@ -11,8 +12,8 @@ import { transcribe } from "./transcribe.ts"
 //   arrives. A sentence sounds with the voice the page set (setSentenceVoice: the speech model of the
 //   gateway, speech.ts), else with a voice of the system that speaks on this computer (speechSynthesis).
 //   The next sentence is made while one sounds; a sentence the voice cannot make, the system says.
-// - Listening records the microphone while the key is held and recognises the speech with the
-//   transcription model of the gateway (transcribe.ts).
+// - Listening records the microphone while the key is held, as a WAV file written in the page, and
+//   recognises the speech with the transcription model of the gateway (transcribe.ts).
 //
 // Answers are read aloud only while voice is on: the assistant page turns it on while it is open.
 
@@ -270,19 +271,81 @@ export function forSpeech(markdown: string): string {
 // ---- Listening ----
 
 export function canListen(): boolean {
-  return typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined"
+  return typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== "undefined"
 }
+
+// What the space bar records is written as a WAV file in the page, the way "Hey Titan" writes its pieces
+// (wake.ts): the samples of the microphone at 16 kHz, 16 bits. The recorder of the browser (MediaRecorder)
+// would be less code, but each browser writes a format of its own, WebM, Ogg or MP4, and the
+// transcription model refused the recordings of one of them as "corrupted or unsupported" while it took
+// the WAV pieces of the same computer.
 
 /** The microphone stays open once it was allowed, so a question starts without a delay. */
 let microphone: MediaStream | undefined
-let recorder: MediaRecorder | undefined
+/** Ends the recording that runs, if one does. */
+let stopRecording: (() => void) | undefined
 /** The key was let go: also before the microphone was ready, for example while the browser asked for it. */
 let stopWanted = false
+
+/** After the key is let go the recording goes on this long: people let go as they finish the last word. */
+const TAIL_MS = 250
+/** A recording shorter than this is a tap of the key, not a question: it is not sent. */
+const SHORTEST_RECORDING_MS = 400
+/** The longest recording: a question, not a speech. It ends by itself then. */
+const LONGEST_RECORDING_MS = 60_000
 
 async function openMicrophone(): Promise<MediaStream> {
   if (microphone?.active) return microphone
   microphone = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
   return microphone
+}
+
+/**
+ * Records the microphone until `stopRecording` is called, and resolves with the samples and how many of
+ * them make a second. That is `RECORDING_RATE` where the browser gives what was asked for, and what it
+ * really recorded at where it does not: the file then says the truth.
+ */
+async function record(stream: MediaStream): Promise<{ samples: Float32Array; rate: number }> {
+  // A recording that still runs, from a key pressed again before its microphone was ready, ends here.
+  stopRecording?.()
+  const context = new AudioContext({ sampleRate: RECORDING_RATE })
+  const rate = context.sampleRate
+  const blocks: Array<Float32Array> = []
+  let length = 0
+  try {
+    const source = context.createMediaStreamSource(stream)
+    // A ScriptProcessor is old but needs no module file, as in wake.ts.
+    const processor = context.createScriptProcessor(2_048, 1, 1)
+    const stopped = new Promise<void>((resolve) => {
+      stopRecording = resolve
+      processor.onaudioprocess = (event) => {
+        const block = new Float32Array(event.inputBuffer.getChannelData(0))
+        blocks.push(block)
+        length += block.length
+        if ((length / rate) * 1000 >= LONGEST_RECORDING_MS) resolve()
+      }
+    })
+    source.connect(processor)
+    // It runs only when it is connected to an output; it writes silence there.
+    processor.connect(context.destination)
+    const mine = stopRecording
+    // A context that does not start, behind another tab for example, is not waited for once the key is up.
+    if (context.state === "suspended") await Promise.race([context.resume(), stopped])
+    if (stopWanted) mine?.()
+    await stopped
+    if (length > 0) await new Promise((resolve) => setTimeout(resolve, TAIL_MS))
+    processor.onaudioprocess = null
+    if (stopRecording === mine) stopRecording = undefined
+  } finally {
+    void context.close()
+  }
+  const samples = new Float32Array(length)
+  let at = 0
+  for (const block of blocks) {
+    samples.set(block, at)
+    at += block.length
+  }
+  return { samples, rate }
 }
 
 /**
@@ -299,24 +362,23 @@ export async function listen(): Promise<string> {
   } catch (error) {
     throw new Error(microphoneError(error))
   }
-  const chunks: Array<Blob> = []
-  const recording = new MediaRecorder(stream)
-  recorder = recording
-  recording.ondataavailable = (event) => {
-    if (event.data.size > 0) chunks.push(event.data)
-  }
-  const stopped = new Promise<void>((resolve) => {
-    recording.onstop = () => resolve()
-  })
   setState("listening")
-  recording.start()
-  if (stopWanted) recording.stop()
-  await stopped
-  if (recorder === recording) recorder = undefined
+  let samples: Float32Array
+  let rate: number
+  try {
+    ;({ samples, rate } = await record(stream))
+  } catch (error) {
+    setState(thinking ? "thinking" : "idle")
+    throw new Error(microphoneError(error))
+  }
+  if ((samples.length / rate) * 1000 < SHORTEST_RECORDING_MS + TAIL_MS) {
+    setState(thinking ? "thinking" : "idle")
+    return ""
+  }
   // Recognising takes a second or two: the orb thinks meanwhile.
   setState("thinking")
   try {
-    return await transcribe(new Blob(chunks, { type: recording.mimeType }))
+    return await transcribe(wavOf(samples, rate))
   } catch (error) {
     throw new Error(`Die Spracherkennung ist ausgefallen: ${error instanceof Error ? error.message : String(error)}`)
   } finally {
@@ -330,8 +392,7 @@ export async function listen(): Promise<string> {
  */
 export function closeMicrophone() {
   stopWanted = true
-  if (recorder?.state === "recording") recorder.stop()
-  recorder = undefined
+  stopRecording?.()
   microphone?.getTracks().forEach((track) => track.stop())
   microphone = undefined
 }
@@ -339,7 +400,7 @@ export function closeMicrophone() {
 /** Ends the recording, as when the key is let go: what was said is recognised then. */
 export function stopListening() {
   stopWanted = true
-  if (recorder?.state === "recording") recorder.stop()
+  stopRecording?.()
 }
 
 function microphoneError(error: unknown): string {

@@ -25,7 +25,9 @@ Titan speaks German, as the demo does.
 
 1. **Listening.** The browser records while the space bar is held (`voice/voice.ts`), or cuts a piece out of
    the microphone when someone speaks (`voice/wake.ts`), and sends it to
-   `routes/(showcases)/titan.api.transcribe.ts`.
+   `routes/(showcases)/titan.api.transcribe.ts`. Both write the recording themselves, as a WAV file of
+   16 kHz (`voice/wav.ts`): the formats the browsers record in differ, and the transcription model did not
+   read all of them.
 2. **"Moment."** Titan says at once that it heard: with the space bar as soon as it is let go, before the
    recording is even recognised, and with "Hey Titan" once the name was recognised.
 3. **The turn.** `conversation.ts` sends the conversation to `titan.api.turn.ts`. The server
