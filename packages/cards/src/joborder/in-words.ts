@@ -6,6 +6,11 @@ import type { JobOrderShow } from "./contract.ts"
 // The job order card in words, for a reader that does not see it: a language model reads these lines as
 // the result of the tool, and a host without cards shows them.
 
+/** "1 job order", "2 job orders": a count with its noun. */
+export function counted(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`
+}
+
 /** The job order in a line, by the names of the data model. */
 function jobOrderInWords(job: NonNullable<JobOrderShow["jobOrder"]>, asOf: string): string {
   const name = job.jobName ? ` (${job.jobName})` : ""
@@ -34,7 +39,7 @@ export function jobOrderShowInWords(shown: JobOrderShow): string {
   const atLeast = hasMore ? "at least " : ""
   const aborted = shown.aborted > 0 ? `, ${shown.aborted} of them aborted` : ""
   const lines = [
-    `${machine}, ${stamped(from, asOf)} to ${written(asOf)}: ${atLeast}${shown.jobOrders} job orders and ${atLeast}${shown.programExecutions} program executions${aborted}.`,
+    `${machine}, ${stamped(from, asOf)} to ${written(asOf)}: ${atLeast}${counted(shown.jobOrders, "job order")} and ${atLeast}${counted(shown.programExecutions, "program execution")}${aborted}.`,
     shown.jobOrder ? jobOrderInWords(shown.jobOrder, asOf) : "The machine has no job order.",
     shown.programExecution ? executionInWords(shown.programExecution, asOf) : "The machine has no program execution.",
   ]

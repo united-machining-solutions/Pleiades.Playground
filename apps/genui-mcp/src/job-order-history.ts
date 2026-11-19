@@ -2,9 +2,9 @@ import { JOB_ORDER_HOURS, MOST_JOB_ORDER_HOURS } from "@pleiades/cards/joborder/
 import type { JobOrderShow, JobOrderSpan, JobOrderTimeline, ProgramExecution } from "@pleiades/cards/joborder/contract.ts"
 import { HORIZON_SECONDS } from "@pleiades/cards/machine/contract.ts"
 
-import { readJobOrders, readProgramExecutions, readStrings } from "./apis.ts"
+import { EVER, readJobOrders, readProgramExecutions, readStrings } from "./apis.ts"
 import type { Apis, StoredJobOrder, StoredProgramExecution } from "./apis.ts"
-import { entryOf } from "./job-orders.ts"
+import { entryOf, utc } from "./job-orders.ts"
 import { knownMachines, machineNamed } from "./machines.ts"
 import { secondsBefore } from "./time.ts"
 
@@ -18,13 +18,6 @@ const MOST_ITEMS = 1000
 
 /** Where the adapter publishes the state of its connection: a new start of it begins with empty lists. */
 const CONNECTION_STATE = "umati/Connection/State"
-
-/** An instant as an ISO 8601 string in UTC, or null: the Events API may leave out zeros or write an offset. */
-function utc(written: string | null | undefined): string | null {
-  if (!written) return null
-  const at = Date.parse(written)
-  return Number.isNaN(at) ? null : new Date(at).toISOString()
-}
 
 /** A job order that has begun and not ended: running or interrupted. One not yet started is not open. */
 const isOpen = (state: string) => state === "Running" || state === "Interrupted"
@@ -79,7 +72,23 @@ export function jobOrderEnd(stored: StoredJobOrder, starts: ReadonlyArray<number
   return stored.removed ? Math.min(end, Date.parse(stored.lastChange)) : end
 }
 
-/** The job order a card shows: one that runs or is interrupted and still stands, else the one that changed last. */
+/** Since when a job order stood on the list: its first event. */
+function listedSince(stored: StoredJobOrder): string | null {
+  return utc(stored.firstSeen) ?? utc(stored.startTime) ?? utc(stored.lastChange)
+}
+
+/**
+ * Until when a job order stood on the list, whether it ran or waited: until it was taken off, else until
+ * the next start of the adapter after its last change, which begins with an empty list, else on.
+ */
+export function listedUntil(stored: StoredJobOrder, starts: ReadonlyArray<number>): number {
+  return stored.removed ? Date.parse(stored.lastChange) : endOf(null, stored.lastChange, starts)
+}
+
+/**
+ * The job order a card shows: one that runs or is interrupted and still stands, else the one that changed
+ * last; one left open by an earlier run of the adapter only where there is no other.
+ */
 export function currentJobOrder(stored: ReadonlyArray<StoredJobOrder>, starts: ReadonlyArray<number>): StoredJobOrder | null {
   const listed = stored.filter((one) => !one.removed).sort(newestBy((one) => one.lastChange))
   const standing = listed.find((one) => isOpen(one.state) && jobOrderEnd(one, starts) === Infinity)
@@ -113,17 +122,23 @@ function hoursOf(hours: number): number {
  * starts of its adapter.
  */
 async function readHistory(apis: Apis, machine: string, from: Date, to: Date, now: Date) {
-  // A job order or program execution that began up to a day before still runs into the hours.
+  // A program execution that began up to a day before still runs into the hours.
   const earlier = secondsBefore(from, HORIZON_SECONDS)
-  // The Events API picks a job order by its last change, and has only its last state. One that ran in the
-  // hours and changed after them, as the one that runs does a moment after a card asked, is read up to now.
+  // The Events API picks a job order by its last change and has only its last state, so every job order is
+  // read up to now: one that changed after the hours, as the one that runs does a moment after a card
+  // asked, and one that stands on the list without an event for longer than a day, interrupted or waiting.
+  // Whether one of those still stands, the starts of the adapter after its last change say.
   const lastChange = new Date(Math.max(to.getTime(), now.getTime()))
-  const [jobOrders, { executions, hasMore }, starts] = await Promise.all([
-    readJobOrders(apis, earlier, lastChange, machine),
+  const [stored, { executions, hasMore }, starts] = await Promise.all([
+    readJobOrders(apis, EVER, lastChange, machine),
     readProgramExecutions(apis, machine, earlier, to),
-    adapterStarts(apis, machine, earlier, to),
+    adapterStarts(apis, machine, EVER, to),
   ])
-  return { jobOrders, executions, starts, hasMore: hasMore || jobOrders.length >= MOST_ITEMS }
+  // One taken off the list before the day before the hours did not stand in them.
+  const jobOrders = stored.filter((one) => !one.removed || Date.parse(one.lastChange) >= earlier.getTime())
+  // The API answers the newest 1000 first: only where the oldest of them is younger than that day may some be missing.
+  const cut = stored.length >= MOST_ITEMS && Date.parse(stored[stored.length - 1]!.lastChange) >= earlier.getTime()
+  return { jobOrders, executions, starts, hasMore: hasMore || cut }
 }
 
 /** Whether a stretch from `start` until `end` overlaps the hours from `from` to `to`. */
@@ -153,12 +168,11 @@ export async function showJobOrder(apis: Apis, name: string, hours = JOB_ORDER_H
     hours: back,
     jobOrder: current && entryOf(current),
     programExecution: execution && executionOf(execution),
-    // On the list in the hours: an event of it lies in them, or it started before and ran into them.
-    jobOrders: jobOrders.filter(
-      (one) => Date.parse(one.lastChange) >= start || overlaps(utc(one.startTime), jobOrderEnd(one, starts), start, end),
-    ).length,
+    // On the list at some time in the hours, whether it ran or waited.
+    jobOrders: jobOrders.filter((one) => overlaps(listedSince(one), listedUntil(one, starts), start, end)).length,
     programExecutions: inHours.length,
-    aborted: inHours.filter((one) => one.state === "Aborted").length,
+    // By how it ended, not by its State: an event of the end need not carry one.
+    aborted: inHours.filter((one) => one.endType === "Aborted").length,
     hasMore,
     topics: topicsOf(machine),
   }

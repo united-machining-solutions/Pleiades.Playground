@@ -5,6 +5,7 @@ import { Badge } from "@pleiades/ui/components/badge"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@pleiades/ui/components/tooltip"
+import { cn } from "@pleiades/ui/lib/utils"
 import { clock, duration } from "../machine/format.ts"
 import { labelOf } from "../machine/in-words.ts"
 import { stateBand } from "../machine/state-band.tsx"
@@ -12,12 +13,10 @@ import { StateSymbol } from "../machine/state-symbol.tsx"
 import { span as lastingText } from "../notification/words.ts"
 import { timeTicks } from "../shared/time-ticks.ts"
 import type { JobOrderShow, JobOrderSpan, JobOrderTimeline } from "./contract.ts"
+import { counted } from "./in-words.ts"
 
 /** The timeline as it reaches the card: undefined while it is asked for, null if it is not to be had. */
 export type Timeline = JobOrderTimeline | null | undefined
-
-/** Class names together, the empty ones left out. */
-const cn = (...names: Array<string | false>) => names.filter(Boolean).join(" ")
 
 /** How a state of a job order or a program execution looks on the timeline: never colour alone, the span carries its word. */
 function lookOf(state: string): string {
@@ -41,22 +40,29 @@ function StateBadge({ state }: { state: string }) {
 /** A time as a clock shows it, a dash for none. */
 const clockOf = (instant: string | null | undefined) => (instant ? clock(instant) : "–")
 
-/** The fields of an element of the data model: its name, then a row for each field. */
-function Element({ name, state, rows }: { name: string; state: string | null; rows: ReadonlyArray<[string, ReactNode]> }) {
+/**
+ * The fields of an element of the data model: its name, then a row for each field. Without one, a
+ * sentence (`note`) says why.
+ */
+function Element({ name, state, rows, note }: { name: string; state: string | null; rows?: ReadonlyArray<[string, ReactNode]>; note?: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-xs font-semibold text-muted-foreground">{name}</span>
         {state !== null && <StateBadge state={state} />}
       </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        {rows.map(([label, value]) => (
-          <div key={label} className="contents">
-            <dt className="font-mono text-xs leading-5 text-muted-foreground">{label}</dt>
-            <dd className="min-w-0 break-words">{value ?? "–"}</dd>
-          </div>
-        ))}
-      </dl>
+      {note !== undefined ? (
+        <p className="text-sm text-muted-foreground">{note}</p>
+      ) : (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+          {rows?.map(([label, value]) => (
+            <div key={label} className="contents">
+              <dt className="font-mono text-xs leading-5 text-muted-foreground">{label}</dt>
+              <dd className="min-w-0 break-words">{value ?? "–"}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
     </div>
   )
 }
@@ -74,6 +80,8 @@ function Lane({ name, spans, from, width }: { name: string; spans: ReadonlyArray
         <TooltipTrigger
           render={<div />}
           className="relative h-6 overflow-hidden rounded-sm bg-muted/50"
+          // Over a gap between two spans the pointer is on the lane itself: then no span is named.
+          onPointerOver={(event) => event.target === event.currentTarget && setHovered(null)}
           onPointerLeave={() => setHovered(null)}
         >
           {spans.map((one) => {
@@ -99,7 +107,9 @@ function Lane({ name, spans, from, width }: { name: string; spans: ReadonlyArray
                 {hovered.label} · {hovered.state}
               </span>
               <span className="tabular-nums opacity-80">
-                {clock(hovered.from)} to {hovered.open ? "now" : clock(hovered.to)}, {duration(hovered.from, hovered.to)}
+                {/* An open span ends where the timeline does, the `asOf` of the card, which need not be now. */}
+                {clock(hovered.from)} to {clock(hovered.to)}, {duration(hovered.from, hovered.to)}
+                {hovered.open && ", not ended by then"}
               </span>
               {hovered.details.map(
                 (detail) =>
@@ -162,8 +172,9 @@ export function JobOrderCard({ timeline, ...shown }: JobOrderShow & { timeline?:
         <CardTitle className="font-semibold group-data-[size=sm]/card:text-base">Job order of {labelOf(shown.machine)}</CardTitle>
         <CardDescription>
           Last {shown.hours} h: {atLeast}
-          {shown.jobOrders} job orders, {atLeast}
-          {shown.programExecutions} program executions{shown.aborted > 0 && `, ${shown.aborted} aborted`}
+          {counted(shown.jobOrders, "job order")}, {atLeast}
+          {counted(shown.programExecutions, "program execution")}
+          {shown.aborted > 0 && `, ${shown.aborted} aborted`}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
@@ -183,7 +194,7 @@ export function JobOrderCard({ timeline, ...shown }: JobOrderShow & { timeline?:
               ]}
             />
           ) : (
-            <Element name="JobMonitoring.JobOrders" state={null} rows={[["", "No job order."]]} />
+            <Element name="JobMonitoring.JobOrders" state={null} note="No job order." />
           )}
           {run ? (
             <Element
@@ -199,7 +210,7 @@ export function JobOrderCard({ timeline, ...shown }: JobOrderShow & { timeline?:
               ]}
             />
           ) : (
-            <Element name="WorkMasterMonitoring.ProgramExecution" state={null} rows={[["", "No program execution."]]} />
+            <Element name="WorkMasterMonitoring.ProgramExecution" state={null} note="No program execution." />
           )}
         </div>
         <JobOrderTimelines timeline={timeline} />

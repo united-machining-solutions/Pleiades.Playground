@@ -300,6 +300,7 @@ const allJobOrdersAnswer = z.object({
       jobOrderId: z.string(),
       state: z.string(),
       lastChange: z.string(),
+      firstSeen: z.string().nullish(),
       removed: z.boolean().default(false),
       jobName: z.string().nullish(),
       workMasterId: z.string().nullish(),
@@ -511,6 +512,8 @@ const programExecutionsAnswer = z.object({
       state: z.string(),
       startTime: z.string(),
       endTime: z.string().nullish(),
+      // How it ended, by the type of its last event: Ended or Aborted. Null while it runs.
+      endType: z.string().nullish(),
       interruptions: z.number().nullish(),
       duration: z.number().nullish(),
       partsProduced: z.number().nullish(),

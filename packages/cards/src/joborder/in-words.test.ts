@@ -59,6 +59,11 @@ test("the words name the job order and the program execution by the names of the
   assert.match(words, /10 min/)
 })
 
+test("one job order and one program execution are counted in the singular", () => {
+  const words = jobOrderShowInWords({ ...shown, jobOrders: 1, programExecutions: 1, aborted: 0 })
+  assert.match(words, /: 1 job order and 1 program execution\./)
+})
+
 test("counts that may miss some say at least, and a machine without job orders says so", () => {
   const words = jobOrderShowInWords({ ...shown, jobOrder: null, programExecution: null, hasMore: true })
   assert.match(words, /at least 2 job orders/)

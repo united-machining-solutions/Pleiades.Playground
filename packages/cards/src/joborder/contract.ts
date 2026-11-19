@@ -29,8 +29,8 @@ export type ProgramExecution = z.infer<typeof programExecution>
 /**
  * The job order card: the job order of one machine that runs or is interrupted, else the one that changed
  * last, and its program execution that runs, else the newest that ended; how many of both there were in the
- * last hours. The spans of both
- * over those hours grow with time: the card asks for them itself (`jobOrderTimeline`).
+ * last hours. The spans of both over those hours grow with time: the card asks for them itself
+ * (`jobOrderTimeline`).
  */
 export const jobOrderShow = z.object({
   asOf: instant,
@@ -39,7 +39,9 @@ export const jobOrderShow = z.object({
   hours: z.number().int().describe("How many hours back `from` lies."),
   jobOrder: jobOrderEntry
     .nullable()
-    .describe("The job order that runs or is interrupted, else the one whose last event is the newest. Null if the machine has none."),
+    .describe(
+      "The job order that runs or is interrupted, else the one whose last event is the newest; one left open by an earlier run of the adapter only where there is no other. Null if the machine has none.",
+    ),
   programExecution: programExecution
     .nullable()
     .describe("The program execution of the machine that runs or is interrupted, else the newest that ended. Null if it has none."),

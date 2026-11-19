@@ -22,10 +22,12 @@ function answering(jobOrders: Array<Record<string, unknown>>, executions: Array<
       return Response.json({ items: jobOrders.filter((one) => Date.parse(String(one.lastChange)) >= from && Date.parse(String(one.lastChange)) <= to) })
     }
     if (url.pathname === "/programExecutions") return Response.json({ items: executions, hasMore: false })
-    // The state of the connection, as the Timeseries API returns text.
+    // The state of the connection between the two instants, as the Timeseries API returns text.
     const topic = `machines/${machine}/umati/Connection/State`
+    const [from, to] = [Date.parse(url.searchParams.get("startTime")!), Date.parse(url.searchParams.get("stopTime")!)]
+    const within = starts.map(Date.parse).filter((at) => at >= from && at <= to)
     return Response.json({
-      series: [{ topic, timestamps: starts.map((at) => Date.parse(at) * 1000), values: starts.map(() => "Initializing") }],
+      series: [{ topic, timestamps: within.map((at) => at * 1000), values: within.map(() => "Initializing") }],
     })
   })
   return requested
@@ -50,6 +52,7 @@ const run = (more: Record<string, unknown>) => ({
   state: "Ended",
   startTime: "2026-11-18T08:00:00Z",
   endTime: "2026-11-18T08:30:00Z",
+  endType: "Ended",
   duration: 1800,
   interruptions: 0,
   ...more,
@@ -132,6 +135,63 @@ test("a job order taken off the list without an end stands until it was taken of
     timeline.jobOrders.map((one) => [one.from, one.to, one.open]),
     [["2026-11-18T08:15:00.000Z", "2026-11-18T09:00:00.000Z", false]],
   )
+})
+
+test("the count takes every job order on the list in the hours, one that waits since before them too", async () => {
+  answering(
+    [
+      job({}),
+      // Waiting since the evening before, no event since.
+      job({ jobOrderId: "4712/01", state: "AllowedToStart", firstSeen: "2026-11-17T20:00:00Z", lastChange: "2026-11-17T20:00:00Z", startTime: null }),
+      // Taken off the list before the hours.
+      job({ jobOrderId: "4710/01", state: "Ended", firstSeen: "2026-11-17T20:30:00Z", startTime: "2026-11-17T21:00:00Z", endTime: "2026-11-17T22:00:00Z", lastChange: "2026-11-18T01:00:00Z", removed: true }),
+    ],
+    [],
+  )
+  const shown = await showJobOrder(apis, machine, 8, now)
+  assert.equal(shown.jobOrders, 2)
+  assert.equal(shown.jobOrder?.jobOrderId, "4711/01")
+})
+
+test("a job order interrupted for longer than a day still stands, unless the adapter started again since", async () => {
+  const interrupted = job({ state: "Interrupted", startTime: "2026-11-16T08:00:00Z", lastChange: "2026-11-16T18:00:00Z" })
+  answering([interrupted], [])
+  const standing = await showJobOrder(apis, machine, 8, now)
+  assert.equal(standing.jobOrder?.state, "Interrupted")
+  assert.equal(standing.jobOrders, 1)
+  const timeline = await listJobOrderTimeline(apis, machine, standing.from, standing.asOf, now)
+  assert.deepEqual(
+    timeline.jobOrders.map((one) => [one.from, one.to, one.open]),
+    [["2026-11-18T02:00:00.000Z", "2026-11-18T10:00:00.000Z", true]],
+  )
+
+  mock.restoreAll()
+  answering([interrupted], [], ["2026-11-16T20:00:00Z"])
+  const gone = await showJobOrder(apis, machine, 8, now)
+  assert.equal(gone.jobOrders, 0)
+  assert.deepEqual((await listJobOrderTimeline(apis, machine, gone.from, gone.asOf, now)).jobOrders, [])
+})
+
+test("a program execution counts as aborted by how it ended, also where its end carries no State", async () => {
+  answering(
+    [],
+    [run({}), run({ executionId: "e2", state: "", endType: "Aborted", startTime: "2026-11-18T09:00:00Z", endTime: "2026-11-18T09:10:00Z" })],
+  )
+  const shown = await showJobOrder(apis, machine, 8, now)
+  assert.equal(shown.programExecutions, 2)
+  assert.equal(shown.aborted, 1)
+})
+
+test("1000 job orders are only a lower bound where the oldest of them changed in the day before the hours", async () => {
+  const newestFirst = (oldest: string) =>
+    Array.from({ length: 1000 }, (_, index) =>
+      job({ jobOrderId: `J-${index}`, state: "Ended", removed: true, lastChange: new Date(Date.parse(oldest) + (999 - index) * 1000).toISOString() }),
+    )
+  answering(newestFirst("2026-11-18T03:00:00Z"), [])
+  assert.equal((await showJobOrder(apis, machine, 8, now)).hasMore, true)
+  mock.restoreAll()
+  answering([...newestFirst("2026-11-18T03:00:00Z").slice(0, 999), job({ jobOrderId: "old", state: "Ended", lastChange: "2026-11-10T00:00:00Z" })], [])
+  assert.equal((await showJobOrder(apis, machine, 8, now)).hasMore, false)
 })
 
 test("a timeline longer than a day is refused", async () => {

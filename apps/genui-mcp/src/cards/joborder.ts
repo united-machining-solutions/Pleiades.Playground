@@ -72,16 +72,16 @@ Name the machine (\`machine\`) by its id or as people call it, and pass the \`ti
 answer, if you know it. Everything comes from the events of the machine, as the Events API puts them together.
 
 - \`jobOrder\` is the entry of \`JobMonitoring.JobOrders\` that runs or is interrupted, else the one whose last
-  event is the newest, with what came of it (\`JobMonitoring.JobOrderResults\`): \`produced\`, \`good\`, \`result\`.
-  Null if the machine has none.
+  event is the newest; one left open by an earlier run of the adapter only where there is no other. With what
+  came of it (\`JobMonitoring.JobOrderResults\`): \`produced\`, \`good\`, \`result\`. Null if the machine has none.
 - \`programExecution\` is the \`WorkMasterMonitoring.ProgramExecution\` that runs or is interrupted, else the
-  newest that ended:
-  its \`ActiveWorkMaster\` (the program), \`State\`, \`StartTime\`, \`EndTime\`, \`Duration\` in seconds and the
-  \`JobOrderID\` it belongs to.
+  newest that ended: its \`ActiveWorkMaster\` (the program), \`State\`, \`StartTime\`, \`EndTime\`, \`Duration\` in
+  seconds and the \`JobOrderID\` it belongs to.
 - A job order or a program execution that never ended counts as running only until the adapter of the
   machine started again (\`umati/Connection/State\` became \`Initializing\`): a new start begins with empty lists.
-- \`jobOrders\` and \`programExecutions\` count those of the hours, \`aborted\` the program executions that were
-  aborted. Where \`hasMore\` is true they are lower bounds: say "at least".
+- \`jobOrders\` counts the job orders on the list at some time in the hours, waiting ones too;
+  \`programExecutions\` the program executions that ran in them, \`aborted\` those of them that were aborted.
+  Where \`hasMore\` is true they are lower bounds: say "at least".
 
 The spans of both over these hours are what the timeline of the card draws. They grow with time, so they are
 not in that result: the card asks \`${JOB_ORDER_TIMELINE_TOOL}\` for them itself. You do not need it.
