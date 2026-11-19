@@ -1,5 +1,8 @@
 import { ask, textOf } from "@/machines/get-machines.ts"
 
+import { callFurtherTool, furtherToolsOf } from "./further-tools.server.ts"
+import { furtherInstructions } from "./further-tools.ts"
+import type { FurtherTool } from "./further-tools.ts"
 import { atOnce } from "./gateway.server.ts"
 import type { TitanModels } from "./gateway.server.ts"
 import { TITAN_TOOLS, instructionsOf, withoutPreamble } from "./turn.ts"
@@ -58,15 +61,20 @@ async function hallNow(timeZone: string | undefined): Promise<string | undefined
 
 type Call = { id: string; name: string; arguments: string }
 
-/** Calls a tool of the backend. The words are for the model, the values for the card. */
-async function callTool(call: Call, timeZone: string | undefined): Promise<{ words: string; content: string; failed: boolean }> {
-  if (!TOOL_NAMES.has(call.name)) return { words: `There is no tool ${call.name}.`, content: "", failed: true }
+/**
+ * Calls a tool: one of Titan's own at the backend, or one of a further server that is on for this turn
+ * (`further`). The words are for the model, the values for the card.
+ */
+async function callTool(call: Call, timeZone: string | undefined, further: ReadonlyArray<FurtherTool>): Promise<{ words: string; content: string; failed: boolean }> {
+  const ofAServer = further.find((tool) => tool.name === call.name)
+  if (!TOOL_NAMES.has(call.name) && !ofAServer) return { words: `There is no tool ${call.name}.`, content: "", failed: true }
   let input: Record<string, unknown>
   try {
     input = call.arguments.trim() === "" ? {} : (JSON.parse(call.arguments) as Record<string, unknown>)
   } catch {
     return { words: "The arguments were not JSON.", content: "", failed: true }
   }
+  if (ofAServer) return callFurtherTool(ofAServer, input)
   const answer = await ask(async (backend) => {
     // The names are checked above; the backend checks the arguments against its own schema.
     const result = await (backend.callTool as (name: string, input: unknown) => Promise<{ isError?: boolean; structuredContent?: unknown }>)(call.name, {
@@ -93,11 +101,13 @@ async function round(
   emit: (event: TurnEvent) => void,
   signal: AbortSignal,
   last: boolean,
+  further: ReadonlyArray<FurtherTool>,
 ): Promise<{ text: string; calls: Array<Call> }> {
+  const tools = [...TITAN_TOOLS, ...further.map((tool) => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } }))]
   const answer = await fetch(`${models.baseURL}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${models.apiKey}` },
-    body: JSON.stringify({ model: models.chat, stream: true, max_tokens: MOST_TOKENS, messages, tools: TITAN_TOOLS, ...(last ? { tool_choice: "none" } : {}), ...atOnce(models.chat) }),
+    body: JSON.stringify({ model: models.chat, stream: true, max_tokens: MOST_TOKENS, messages, tools, ...(last ? { tool_choice: "none" } : {}), ...atOnce(models.chat) }),
     signal,
   })
   if (!answer.ok || !answer.body) throw new Error(`The gateway answered ${answer.status}`)
@@ -148,13 +158,18 @@ export async function answer(
   timeZone: string | undefined,
   emit: (event: TurnEvent) => void,
   signal: AbortSignal,
+  /** The further servers the person has switched on for Titan, by name (further-tools.ts). */
+  servers: ReadonlyArray<string> = [],
 ): Promise<void> {
   try {
-    const messages: Array<unknown> = [{ role: "system", content: instructionsOf(await hallNow(timeZone), timeZone) }, ...conversation]
+    // The hall and what the further servers list are read at the same time.
+    const [hall, further] = await Promise.all([hallNow(timeZone), furtherToolsOf(servers)])
+    const instructions = [instructionsOf(hall, timeZone), furtherInstructions(further)].filter(Boolean).join("\n\n")
+    const messages: Array<unknown> = [{ role: "system", content: instructions }, ...conversation]
     let said = false
     for (let asked = 0; asked < MOST_ROUNDS; asked++) {
       // In the last round the model has no tool left: it answers with what it read.
-      const { text, calls } = await round(models, messages, emit, signal, asked === MOST_ROUNDS - 1)
+      const { text, calls } = await round(models, messages, emit, signal, asked === MOST_ROUNDS - 1, further)
       if (text.trim() !== "") said = true
       if (calls.length === 0) break
       messages.push({
@@ -164,7 +179,7 @@ export async function answer(
       })
       for (const call of calls) emit({ type: "call", id: call.id, name: call.name })
       // Calls of one round do not depend on each other: they run together.
-      const results = await Promise.all(calls.map((call) => callTool(call, timeZone)))
+      const results = await Promise.all(calls.map((call) => callTool(call, timeZone, further)))
       // What a tool gave is drawn as a card: that is an answer too, also when the model adds no word.
       if (results.some((result) => !result.failed)) said = true
       for (const [index, result] of results.entries()) {

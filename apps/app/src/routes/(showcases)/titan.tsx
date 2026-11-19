@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { openConversation } from "@/showcases/titan/conversation.ts"
 import { keepingTranscript, useTranscript } from "@/showcases/titan/transcript.ts"
 import { TranscriptView } from "@/showcases/titan/transcript-view.tsx"
+import { TitanToolsMenu } from "@/showcases/titan/tools-menu.tsx"
 import type { Conversation } from "@/showcases/titan/conversation.ts"
 import "@/showcases/titan/titan.css"
 import {
@@ -73,6 +74,8 @@ const ON_IT = "Moment."
 const LOOKING = "Ich schaue kurz nach."
 /** Titan speaks of a new fault by itself at most this often. */
 const FAULT_SAID_EVERY_MS = 60_000
+/** Where this browser keeps which further servers are on for Titan. */
+const SERVERS_KEPT_AS = "titan.servers"
 /** The space bar held shorter than this was a tap, not a question: Titan does not answer it. */
 const SHORTEST_QUESTION_MS = 600
 /** What Titan says when it pauses, and when it is back. */
@@ -128,12 +131,37 @@ function Assistant() {
   latest.current.state = state
   latest.current.paused = paused
 
+  // The further servers switched on for Titan (showcases/titan/further-tools.ts), kept in this browser so
+  // that a screen at a fair still has them after it was loaded again. None is on by itself.
+  const [servers, setServers] = useState<ReadonlyArray<string>>([])
+  const serversOn = useRef(servers)
+  serversOn.current = servers
+  // Read once the page is in the browser: the server that draws the page first knows no browser.
+  useEffect(() => {
+    try {
+      const kept = JSON.parse(window.localStorage.getItem(SERVERS_KEPT_AS) ?? "[]") as unknown
+      if (Array.isArray(kept)) setServers(kept.filter((name): name is string => typeof name === "string"))
+    } catch {
+      // Nothing kept, or nothing to read it from: none is on.
+    }
+  }, [])
+  const switchServer = (name: string, on: boolean) => {
+    const next = on ? [...servers.filter((one) => one !== name), name] : servers.filter((one) => one !== name)
+    setServers(next)
+    try {
+      window.localStorage.setItem(SERVERS_KEPT_AS, JSON.stringify(next))
+    } catch {
+      // A browser that keeps nothing still has the switch until the page is left.
+    }
+  }
+
   // Titan's conversation, for as long as the screen is open: the voice reads its answers aloud, and the
   // screen shows what they say and draw.
   const conversation = useRef<Conversation | undefined>(undefined)
   useEffect(() => {
     const opened = openConversation({
       listeners: [speakingAnswers(), keepingTranscript()],
+      servers: () => serversOn.current,
       onReading: () => void sayNext(LOOKING),
       onProblem: setProblem,
     })
@@ -300,7 +328,11 @@ function Assistant() {
       return true
     }
 
-    const onClick = () => void start()
+    // A click on the panel starts Titan, but not one on its menu of tools: that only opens the menu.
+    const onClick = (event: MouseEvent) => {
+      if (event.target instanceof Element && event.target.closest("[data-not-a-start]")) return
+      start()
+    }
 
     // The app around Titan has fields to type in: there a key is a letter, not Titan's.
     const typing = (event: KeyboardEvent) => {
@@ -461,6 +493,9 @@ function Assistant() {
       {/* At the bottom, quiet: what comes and goes. */}
       <footer className="flex h-12 shrink-0 items-center gap-6 px-8 text-sm text-muted-foreground">
         <p className="min-w-0 flex-1 truncate">{line}</p>
+        <div data-not-a-start>
+          <TitanToolsMenu on={servers} onSwitch={switchServer} />
+        </div>
       </footer>
       <p className="sr-only" aria-live="polite">
         {paused ? "Pause." : said[state]}

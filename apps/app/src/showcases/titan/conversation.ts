@@ -39,6 +39,8 @@ type Options = {
   onReading?: () => void
   /** The answer could not be given, in words for the person. */
   onProblem?: (problem: string) => void
+  /** The further servers that are on now, by name: asked at every question (further-tools.ts). */
+  servers?: () => ReadonlyArray<string>
   /** For tests: how a turn is asked for. */
   fetch?: typeof fetch
 }
@@ -71,7 +73,7 @@ export function withEvent(message: Message, event: TurnEvent): Message {
 let count = 0
 const nextId = () => `titan-${Date.now()}-${count++}`
 
-export function openConversation({ listeners, onReading, onProblem, fetch: ask = fetch }: Options): Conversation {
+export function openConversation({ listeners, onReading, onProblem, servers, fetch: ask = fetch }: Options): Conversation {
   let messages: ReadonlyArray<Message> = []
   let running: AbortController | undefined
 
@@ -86,7 +88,7 @@ export function openConversation({ listeners, onReading, onProblem, fetch: ask =
     const response = await ask("/titan/api/turn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: sent, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }),
+      body: JSON.stringify({ messages: sent, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, servers: servers?.() ?? [] }),
       signal: stop.signal,
     })
     if (!response.ok || !response.body) {
