@@ -18,6 +18,7 @@ import { useLive, useRetry } from "@/hooks/use-live.ts"
 import type { Live } from "@/hooks/use-live.ts"
 import { liveAt, livePageOf, liveWith, measurementFilters } from "@/live/measurements.ts"
 import type { LivePage } from "@/live/measurements.ts"
+import { graphsOf, nowNextToTitle } from "@/live/shown.ts"
 import { signalFilters, signalsAt, signalsPageOf, signalsWith, silentNow } from "@/live/signals.ts"
 import type { SignalsPage } from "@/live/signals.ts"
 import { getMeasurementSeries, getMeasurements, getTimeseriesSeries, getTimeseriesSignals } from "@/machines/get-machines.ts"
@@ -135,12 +136,12 @@ function LiveValues() {
   const { from, to, instants, quantities } = series
   // A machine that is no longer there, from an old link, shows as none: the choice says so.
   const shown = chosen === undefined ? machines : machines.filter((one) => one === chosen)
-  // With all machines, only the graphs that have a line: a value no machine published is left out.
-  const graphs = chosen === undefined ? quantities.filter((one) => one.lines.length > 0) : quantities
-  // With a machine chosen, a graph for each of its signals that has a value; one without any keeps the graphs above.
-  const signalLines = signals?.series.lines.filter((line) => line.values.some((value) => value !== null) || signals.newest[line.topic]) ?? []
   const choose = (machine: string | undefined) =>
     void navigate({ search: (previous) => ({ ...previous, machine }), replace: true })
+  // With all machines, only the graphs that have a line: a value no machine published is left out.
+  const graphs = graphsOf(quantities, chosen)
+  // With a machine chosen, a graph for each of its signals that has a value; one without any keeps the graphs above.
+  const signalLines = signals?.series.lines.filter((line) => line.values.some((value) => value !== null) || signals.newest[line.topic]) ?? []
 
   return (
     <Page
@@ -169,22 +170,40 @@ function LiveValues() {
           </ToggleGroupItem>
         )}
       </ToggleGroup>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,28rem),1fr))] gap-3">
-        {signals !== null && signalLines.length > 0
-          ? signalLines.map((line) => <SignalGraph key={line.topic} line={line} page={signals} machines={machines} />)
-          : graphs.map((one) => (
-              <QuantityGraph
-                key={one.quantity}
-                quantity={one}
-                from={from}
-                to={to}
-                instants={instants}
-                machines={machines}
-                shown={shown}
-                current={now}
-              />
-            ))}
-      </div>
+      {signals !== null && signalLines.length > 0 ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,28rem),1fr))] gap-3">
+          {signalLines.map((line) => (
+            <SignalGraph key={line.topic} line={line} page={signals} machines={machines} />
+          ))}
+        </div>
+      ) : graphs.length === 0 ? (
+        // Machines are there, and none of them published one of the values this page draws.
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <GaugeIcon />
+            </EmptyMedia>
+            <EmptyTitle>No values to draw</EmptyTitle>
+            <EmptyDescription>No machine has published one of the values this page draws, such as its active power.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,28rem),1fr))] gap-3">
+          {graphs.map((one) => (
+            <QuantityGraph
+              key={one.quantity}
+              quantity={one}
+              from={from}
+              to={to}
+              instants={instants}
+              machines={machines}
+              shown={shown}
+              chosen={chosen}
+              current={now}
+            />
+          ))}
+        </div>
+      )}
     </Page>
   )
 }
@@ -218,6 +237,8 @@ type QuantityGraphProps = {
   instants: MeasurementSeries["instants"]
   machines: ReadonlyArray<string>
   shown: ReadonlyArray<string>
+  /** The machine the person chose, or undefined for all of them. */
+  chosen: string | undefined
   current: ReadonlyArray<MachineMeasurements>
 }
 
@@ -238,19 +259,14 @@ function nowOf(current: ReadonlyArray<MachineMeasurements>, quantity: string): s
  * every message kept the browser busy most of the time.
  */
 const QuantityGraph = memo(
-  function QuantityGraph({ quantity, from, to, instants, machines, shown, current }: QuantityGraphProps) {
-    // At most one value of now stands next to the title; where more machines measured it, the lines speak alone.
-    const measuring = current.filter(
-      (measured) =>
-        shown.includes(measured.machine) &&
-        measured.measurements.some((measurement) => measurement.quantity === quantity.quantity),
-    )
+  function QuantityGraph({ quantity, from, to, instants, machines, shown, chosen, current }: QuantityGraphProps) {
     return (
       <MeasurementGraph
         series={{ ...quantity, lines: quantity.lines.filter((line) => shown.includes(line.machine)), from, to, instants }}
         // Every machine, chosen or not, so that each keeps its colour.
         machines={machines}
-        current={measuring.length === 1 ? measuring : []}
+        // With all machines at most one value of now stands next to the title (live/shown.ts).
+        current={nowNextToTitle(current, shown, quantity.quantity, chosen)}
       />
     )
   },
@@ -261,6 +277,7 @@ const QuantityGraph = memo(
     before.instants === after.instants &&
     before.machines.join() === after.machines.join() &&
     before.shown.join() === after.shown.join() &&
+    before.chosen === after.chosen &&
     nowOf(before.current, before.quantity.quantity) === nowOf(after.current, after.quantity.quantity),
 )
 
