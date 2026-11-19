@@ -2,11 +2,12 @@ import { TIMELINE_HOURS } from "@pleiades/cards/trulaser/contract.ts"
 import type { Cockpit } from "@pleiades/cards/trulaser/contract.ts"
 import type { Timeline } from "@pleiades/cards/trulaser/timelines.tsx"
 import { TrulaserCockpit } from "@pleiades/cards/trulaser/trulaser-cards.tsx"
+import { useRead } from "@pleiades/cards/trulaser/use-read.ts"
 import { trulaserTitle } from "@pleiades/cards/trulaser/words.ts"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { createFileRoute } from "@tanstack/react-router"
 import { ScanLineIcon } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo } from "react"
 import type { ReactNode } from "react"
 
 import { useReadSeries, useReadTimeline } from "@/cards/trulaser/shown-trulaser.tsx"
@@ -47,20 +48,11 @@ export const Route = createFileRoute("/trulaser")({
  * is not to be had. From then on the broker keeps it up to date, as it does the cards.
  */
 function useStatusTimeline(machine: string, hours: number): TimelineLive | null | undefined {
-  const [state, setState] = useState<TimelineLive | null | undefined>()
-  useEffect(() => {
-    if (!machine) return
-    let wanted = true
-    setState(undefined)
-    getTrulaserTimeline({ data: { machine, view: "status", hours } }).then(
-      (timeline) => wanted && setState(timeline && { timeline, recent: {} }),
-      () => wanted && setState(null),
-    )
-    return () => {
-      wanted = false
-    }
-  }, [machine, hours])
-  return state
+  const read = useCallback(
+    () => getTrulaserTimeline({ data: { machine, view: "status", hours } }).then((timeline) => timeline && { timeline, recent: {} }),
+    [machine, hours],
+  )
+  return useRead(machine ? read : null)
 }
 
 function Trulaser() {

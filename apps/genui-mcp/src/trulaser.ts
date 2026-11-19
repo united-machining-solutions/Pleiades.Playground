@@ -1,5 +1,5 @@
+import { severity } from "@pleiades/cards/machine/contract.ts"
 import {
-  ALERT_SEVERITIES,
   CARD_SIGNALS,
   DETAIL_SLACK_MS,
   alertSpanOf,
@@ -15,7 +15,6 @@ import {
   STATUS_LANES,
   alertLaneKey,
   deviceLane,
-  sequenceOf,
   statusOf,
 } from "@pleiades/cards/trulaser/contract.ts"
 import type {
@@ -190,11 +189,9 @@ export async function showStatus(apis: Apis, asked?: string, now = new Date()): 
   ])
   // An alert that still stands may have been raised days ago: the starts after it decide whether it does.
   const starts = await adapterStarts(apis, about.machine, oldestRaise(alerts, dayBefore), now)
-  const cause = signals.changeCauseValue.value
   return {
     ...about,
     signals,
-    sequence: sequenceOf(typeof cause === "string" ? cause : null),
     activeAlerts: activeAlertsOf(alerts, starts, now.getTime()),
     alertsComplete: !hasMore,
   }
@@ -412,9 +409,9 @@ export function alertLanes(
   topic: string,
 ): Array<Lane> {
   const lanes: Array<Lane> = []
-  for (const severity of ALERT_SEVERITIES) {
+  for (const category of severity.options) {
     const spans = alerts
-      .filter((one) => one.severity === severity)
+      .filter((one) => one.severity === category)
       .flatMap((one) => {
         const begin = Math.max(from, Date.parse(one.raisedAt))
         const end = Math.min(to, alertEnd(one, starts, to))
@@ -424,9 +421,9 @@ export function alertLanes(
       .sort((a, b) => a.from.localeCompare(b.from))
     if (spans.length === 0) continue
     lanes.push({
-      key: alertLaneKey(severity),
+      key: alertLaneKey(category),
       group: lanes.length === 0 ? "Notification.ActiveAlerts" : null,
-      label: severity,
+      label: category,
       topic,
       details: [],
       labelFrom: null,

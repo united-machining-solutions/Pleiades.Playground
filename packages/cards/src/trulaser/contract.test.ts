@@ -17,12 +17,11 @@ test("the SignalValue of a change cause is read as its SequenceState and Blockin
   assert.equal(sequenceOf(null), null)
 })
 
-test("on hover a SignalValue says its SequenceState and BlockingCause, any other detail itself", () => {
-  const value = "SequenceStateAndBlockingCause { SequenceState = Active, BlockingCause = InternalMalfunction }"
-  assert.equal(detailText({ name: "ChangeCause.SignalValue", value }), "SequenceState Active · BlockingCause InternalMalfunction")
+test("on hover a detail says itself, and nothing if it is empty", () => {
   assert.equal(detailText({ name: "ChangeCause.SignalValue", value: "1" }), "1")
   assert.equal(detailText({ name: "ActiveWorkMaster", value: "PLL_SHEET_0001" }), "PLL_SHEET_0001")
   assert.equal(detailText({ name: "ErrorCode", value: null }), null)
+  assert.equal(detailText({ name: "Message", value: "" }), null)
 })
 
 test("a request of a device that caused the change reads as its fields, as the edge component writes them", () => {
@@ -34,10 +33,6 @@ test("a request of a device that caused the change reads as its fields, as the e
     { name: "State", value: "Active" },
     { name: "ErrorCode", value: "NoError" },
   ])
-  assert.equal(
-    detailText({ name: "ChangeCause.SignalValue", value: message }),
-    "DeviceType HandlingLoad · DeviceDescription LiftMaster · State Active · ErrorCode NoError",
-  )
 })
 
 test("a SignalValue of another shape stands as it is", () => {

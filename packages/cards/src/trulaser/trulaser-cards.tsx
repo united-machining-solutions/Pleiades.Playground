@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import type { ReactNode } from "react"
 
 import { Badge } from "@pleiades/ui/components/badge"
@@ -6,6 +6,7 @@ import { Button } from "@pleiades/ui/components/button"
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@pleiades/ui/components/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@pleiades/ui/components/table"
+import { cn } from "@pleiades/ui/lib/utils"
 import { clock } from "../machine/format.ts"
 import { StateSymbol } from "../machine/state-symbol.tsx"
 import { ConditionGuide } from "./condition-guide.tsx"
@@ -24,6 +25,7 @@ import type {
 } from "./contract.ts"
 import { HoursChoice, Timelines } from "./timelines.tsx"
 import type { ReadTimeline, Timeline } from "./timelines.tsx"
+import { useRead } from "./use-read.ts"
 import { signalText, trulaserTitle } from "./words.ts"
 
 // The TruLaser cards. Each is named after the element of the umati data model it shows, or of the
@@ -83,7 +85,7 @@ function Source({ asOf, children }: { asOf: string; children: ReactNode }) {
 
 function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <div className={`flex flex-col gap-1 ${className ?? ""}`}>
+    <div className={cn("flex flex-col gap-1", className)}>
       <span className="font-mono text-[0.6875rem] font-semibold text-muted-foreground">{label}</span>
       {children}
     </div>
@@ -104,7 +106,7 @@ function Rows({ rows }: { rows: ReadonlyArray<[string, ReactNode]> }) {
 }
 
 const mono = (text: string, strong = false) => (
-  <code className={`font-mono text-xs break-all ${strong ? "font-semibold" : ""}`}>{text}</code>
+  <code className={cn("font-mono text-xs break-all", strong && "font-semibold")}>{text}</code>
 )
 
 /** A state in a badge: a sign and a word, never colour alone. */
@@ -131,7 +133,7 @@ function AlertRow({ alert }: { alert: Alert }) {
           {alert.Severity ?? "–"}
         </Badge>
       </TableCell>
-      <TableCell className={`font-mono text-xs ${failure ? "font-semibold text-destructive" : ""}`}>{alert.SourceName || "–"}</TableCell>
+      <TableCell className={cn("font-mono text-xs", failure && "font-semibold text-destructive")}>{alert.SourceName || "–"}</TableCell>
       <TableCell className="font-mono text-xs">{alert.ErrorCode}</TableCell>
       <TableCell className="text-xs whitespace-normal">{alert.Message}</TableCell>
       <TableCell className="text-xs tabular-nums">{clockOf(alert.Time)}</TableCell>
@@ -240,23 +242,27 @@ export function HistoryCard({
   )
 }
 
+/**
+ * State.Status with its history below, for a host that shows the status card alone (the chat, an MCP
+ * App): the card reads the history itself, for the hours a person chooses.
+ */
+export function StatusWithHistory({ status, readTimeline }: { status: TrulaserStatus; readTimeline: ReadTimeline }) {
+  const [hours, setHours] = useState(1)
+  const timeline: Timeline = useRead(useCallback(() => readTimeline("status", hours), [readTimeline, hours]))
+  return (
+    <div className="flex flex-col gap-3">
+      <StatusCard status={status} />
+      <HistoryCard timeline={timeline} hours={hours} onHours={setHours} />
+    </div>
+  )
+}
+
 /** A button that opens the timelines of a view in a dialog, read when it opens and again for other hours. */
 function OverTime({ title, view, readTimeline }: { title: string; view: TimelineView; readTimeline: ReadTimeline }) {
   const [open, setOpen] = useState(false)
   const [hours, setHours] = useState(1)
-  const [timeline, setTimeline] = useState<Timeline>()
-  useEffect(() => {
-    if (!open) return
-    let wanted = true
-    setTimeline(undefined)
-    readTimeline(view, hours).then(
-      (read) => wanted && setTimeline(read),
-      () => wanted && setTimeline(null),
-    )
-    return () => {
-      wanted = false
-    }
-  }, [open, view, hours, readTimeline])
+  const read = useCallback(() => readTimeline(view, hours), [readTimeline, view, hours])
+  const timeline: Timeline = useRead(open ? read : null)
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" size="sm" />}>Open over time</DialogTrigger>
@@ -414,22 +420,14 @@ export function CollisionCard({ collision }: { collision: TrulaserCollision }) {
 }
 
 /** ConditionGuide of the extension: the media of the machine; a tile opens its chart. */
-export function ConditionsCard({
-  conditions,
-  hours,
-  readSeries,
-}: {
-  conditions: TrulaserConditions
-  hours: number
-  readSeries?: ReadSeries
-}) {
+export function ConditionsCard({ conditions, readSeries }: { conditions: TrulaserConditions; readSeries?: ReadSeries }) {
   return (
     <Card size="sm">
       <Heading origin="extension" description={readSeries ? "Open a tile for its values over time" : undefined}>
         ConditionGuide
       </Heading>
       <CardContent>
-        <ConditionGuide tiles={conditions.tiles} hours={hours} readSeries={readSeries} />
+        <ConditionGuide tiles={conditions.tiles} readSeries={readSeries} />
       </CardContent>
       <Source asOf={conditions.asOf}>oem/Dalle/ConditionGuide</Source>
     </Card>
@@ -464,7 +462,7 @@ export function TrulaserCockpit({
         <TechnologyCard technology={cockpit.technology} />
         <CollisionCard collision={cockpit.collision} />
       </div>
-      <ConditionsCard conditions={cockpit.conditions} hours={hours} readSeries={readSeries} />
+      <ConditionsCard conditions={cockpit.conditions} readSeries={readSeries} />
     </div>
   )
 }

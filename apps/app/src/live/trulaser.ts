@@ -1,12 +1,11 @@
+import { severity } from "@pleiades/cards/machine/contract.ts"
 import {
   CONNECTION_PATH,
   DETAIL_SLACK_MS,
   TRULASER_PREFIX,
   alertLaneKey,
-  alertSeverity,
   alertSpanOf,
   byUrgency,
-  sequenceOf,
   statusOf,
 } from "@pleiades/cards/trulaser/contract.ts"
 import type { Alert, Cockpit, JobOrder, Lane, LaneSpan, Signal, TrulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
@@ -49,10 +48,8 @@ function signalsWith<TSignals extends Record<string, Signal>>(signals: TSignals,
 
 /** The cards with one value of the broker in its place. */
 export function cockpitWith(cockpit: Cockpit, topic: string, value: Value): Cockpit {
-  const statusSignals = signalsWith(cockpit.status.signals, topic, value)
-  const cause = statusSignals.changeCauseValue.value
   return {
-    status: { ...cockpit.status, signals: statusSignals, sequence: sequenceOf(typeof cause === "string" ? cause : null) },
+    status: { ...cockpit.status, signals: signalsWith(cockpit.status.signals, topic, value) },
     jobOrder: { ...cockpit.jobOrder, signals: signalsWith(cockpit.jobOrder.signals, topic, value) },
     devices: {
       ...cockpit.devices,
@@ -109,13 +106,13 @@ export function alertOfEvent(type: string, data: Record<string, unknown>, at: st
   if (!ALERT_EVENTS.has(type)) return null
   const id = text(data.Id)
   if (id === null || id === "") return null
-  const severity = alertSeverity.safeParse(data.Severity)
+  const category = severity.safeParse(data.Severity)
   const time = text(data.Time)
   return {
     Id: id,
     ErrorCode: text(data.ErrorCode) ?? "",
     Message: text(data.Message) ?? "",
-    Severity: severity.success ? severity.data : null,
+    Severity: category.success ? category.data : null,
     SeverityValue: typeof data.SeverityValue === "number" ? data.SeverityValue : null,
     SourceName: text(data.SourceName) ?? "",
     Time: time && !Number.isNaN(Date.parse(time)) ? new Date(time).toISOString() : at,

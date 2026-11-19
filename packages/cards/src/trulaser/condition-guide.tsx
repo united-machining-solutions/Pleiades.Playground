@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@pleiades/ui/components/chart"
@@ -7,8 +7,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@pleiades/ui/components/item"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { clock } from "../machine/format.ts"
+import { clockWithSeconds } from "../measurement/words.ts"
 import { StateSymbol } from "../machine/state-symbol.tsx"
 import type { ConditionKey, ConditionTile, TileStatus, TrulaserSeries } from "./contract.ts"
+import { useRead } from "./use-read.ts"
 import { shownNumber, signalText, tileValue } from "./words.ts"
 
 /** Reads the values of one tile over time, for its chart. Null if they are not to be had. */
@@ -24,17 +26,9 @@ function StatusSign({ status }: { status: TileStatus }) {
 
 /**
  * The tiles of the condition guide: each value with its unit and what its thresholds say. A tile
- * opens a chart of its value over the hours of the timelines, if the card can read one.
+ * opens a chart of its value over the hours its host reads, if the card can read one.
  */
-export function ConditionGuide({
-  tiles,
-  hours,
-  readSeries,
-}: {
-  tiles: ReadonlyArray<ConditionTile>
-  hours: number
-  readSeries?: ReadSeries
-}) {
+export function ConditionGuide({ tiles, readSeries }: { tiles: ReadonlyArray<ConditionTile>; readSeries?: ReadSeries }) {
   const [open, setOpen] = useState<ConditionTile | null>(null)
   return (
     <>
@@ -66,7 +60,7 @@ export function ConditionGuide({
       {readSeries && (
         <Dialog open={open !== null} onOpenChange={(opened) => !opened && setOpen(null)}>
           <DialogContent className="sm:max-w-3xl">
-            {open && <TileChart tile={open} hours={hours} readSeries={readSeries} />}
+            {open && <TileChart tile={open} readSeries={readSeries} />}
           </DialogContent>
         </Dialog>
       )}
@@ -76,20 +70,9 @@ export function ConditionGuide({
 
 const config = { value: { label: "Value", color: "var(--chart-single)" } } satisfies ChartConfig
 
-/** The chart of one tile: its value over the hours of the timelines, read when the tile is opened. */
-function TileChart({ tile, hours, readSeries }: { tile: ConditionTile; hours: number; readSeries: ReadSeries }) {
-  const [series, setSeries] = useState<TrulaserSeries | null>()
-  useEffect(() => {
-    let wanted = true
-    setSeries(undefined)
-    readSeries(tile.key).then(
-      (read) => wanted && setSeries(read),
-      () => wanted && setSeries(null),
-    )
-    return () => {
-      wanted = false
-    }
-  }, [tile.key, readSeries, hours])
+/** The chart of one tile: its value over the hours its host reads, read when the tile is opened. */
+function TileChart({ tile, readSeries }: { tile: ConditionTile; readSeries: ReadSeries }) {
+  const series: TrulaserSeries | null | undefined = useRead(useCallback(() => readSeries(tile.key), [readSeries, tile.key]))
 
   const unit = series ? shownNumber(0, series.unit, series.shown).unit : ""
   const rows = (series?.points ?? []).map((point) => ({
@@ -149,7 +132,7 @@ function TileChart({ tile, hours, readSeries }: { tile: ConditionTile; hours: nu
                   indicator="line"
                   labelFormatter={(_, payload) => {
                     const at = payload?.[0]?.payload?.at
-                    return typeof at === "number" ? new Date(at).toLocaleTimeString("en-GB") : ""
+                    return typeof at === "number" ? clockWithSeconds(at) : ""
                   }}
                   formatter={(value) => (
                     <span className="font-mono font-medium text-foreground tabular-nums">

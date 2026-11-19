@@ -11,14 +11,12 @@ import {
   trulaserTimeline,
 } from "@pleiades/cards/trulaser/contract.ts"
 import type { ConditionKey, TimelineView, TrulaserSeries, TrulaserTimeline } from "@pleiades/cards/trulaser/contract.ts"
-import type { Timeline } from "@pleiades/cards/trulaser/timelines.tsx"
 import {
   CollisionCard,
   ConditionsCard,
   DevicesCard,
-  HistoryCard,
   JobOrderCard,
-  StatusCard,
+  StatusWithHistory,
   TechnologyCard,
 } from "@pleiades/cards/trulaser/trulaser-cards.tsx"
 import { useCallback, useEffect, useState } from "react"
@@ -80,8 +78,6 @@ async function seriesOf(app: App, machine: string, key: ConditionKey): Promise<T
 
 function Trulaser() {
   const [shown, setShown] = useState<Shown>()
-  const [hours, setHours] = useState(1)
-  const [timeline, setTimeline] = useState<Timeline>()
   const { app, isConnected, error } = useApp({
     appInfo: { name: "pleiades-trulaser-card", version: "0.2.0" },
     capabilities: {},
@@ -96,16 +92,6 @@ function Trulaser() {
   }, [app, isConnected])
 
   const machine = shown && shown.card !== "note" ? shown.values.machine : null
-  // State.Status shows its history below it, which the card asks for itself.
-  useEffect(() => {
-    if (!app || machine === null || shown?.card !== "status") return
-    let wanted = true
-    setTimeline(undefined)
-    void timelineOf(app, machine, "status", hours).then((read) => wanted && setTimeline(read))
-    return () => {
-      wanted = false
-    }
-  }, [app, machine, hours, shown?.card])
   const readTimeline = useCallback(
     (view: TimelineView, asked: number) => (app && machine !== null ? timelineOf(app, machine, view, asked) : Promise.resolve(null)),
     [app, machine],
@@ -120,12 +106,8 @@ function Trulaser() {
   if (!shown) return null
   switch (shown.card) {
     case "status":
-      return (
-        <div className="flex flex-col gap-3">
-          <StatusCard status={shown.values} />
-          <HistoryCard timeline={timeline} hours={hours} onHours={setHours} />
-        </div>
-      )
+      // State.Status shows its history below it, which the card asks for itself.
+      return <StatusWithHistory status={shown.values} readTimeline={readTimeline} />
     case "jobOrder":
       return <JobOrderCard jobOrder={shown.values} readTimeline={readTimeline} />
     case "devices":
@@ -135,7 +117,7 @@ function Trulaser() {
     case "collision":
       return <CollisionCard collision={shown.values} />
     case "conditions":
-      return <ConditionsCard conditions={shown.values} hours={1} readSeries={readSeries} />
+      return <ConditionsCard conditions={shown.values} readSeries={readSeries} />
     case "note":
       return <Note>{shown.note}</Note>
   }

@@ -3,7 +3,9 @@ import { useState } from "react"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@pleiades/ui/components/tooltip"
-import { clock, lasting } from "../machine/format.ts"
+import { cn } from "@pleiades/ui/lib/utils"
+import { clock, duration } from "../machine/format.ts"
+import { categoryColour } from "../shared/colour.ts"
 import { TIMELINE_HOURS, detailText, signalValueFields } from "./contract.ts"
 import type { Lane, LaneSpan, TimelineView, TrulaserTimeline } from "./contract.ts"
 
@@ -18,9 +20,6 @@ const STOPPED = new Set(["NotExecuting", "Idle", "Interrupted", "Scheduled", "Of
 const ALARM = new Set(["OutOfService", "Aborted", "Error", "Failure"])
 const NEUTRAL = new Set(["Setup", "None", "Invalid", "NotAvailable", "Ended", "false"])
 
-/** How many categorical colours the theme names, `--chart-1` and on. */
-const COLOURS = 14
-
 /**
  * The look of a value in a lane. A state takes the colours of the states; a value that is not one, a
  * Maintenance for example, a categorical colour in the order it first appears in its lane. Never colour
@@ -33,7 +32,7 @@ function lookOf(value: string | null, categories: ReadonlyArray<string>): { clas
   if (STOPPED.has(value)) return { className: "bg-state-stopped text-state-ink shadow-[inset_0_0_0_1px_var(--state-stopped-edge)]" }
   if (NEUTRAL.has(value)) return { className: "bg-state-setup text-state-ink shadow-[inset_0_0_0_1px_var(--state-setup-edge)]" }
   const index = categories.indexOf(value)
-  return { className: "text-white", colour: `var(--chart-${(Math.max(0, index) % COLOURS) + 1})` }
+  return { className: "text-white", colour: categoryColour(Math.max(0, index)) }
 }
 
 /** Where an instant lies on the axis, in percent of its width. */
@@ -104,7 +103,7 @@ export function Timelines({ timeline }: { timeline: Timeline }) {
       </div>
       <p className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground tabular-nums">
         {/* Only the view of the status has lanes of the alerts, and so the stripes. */}
-        <span className={timeline.view === "status" ? "flex items-center gap-1.5" : "hidden"}>
+        <span className={cn("flex items-center gap-1.5", timeline.view !== "status" && "hidden")}>
           <span aria-hidden className="band-alarm inline-block size-3 rounded-xs" />
           Alert of the category Failure, also as a stripe across every lane
           {timeline.failures.length > 0 && ` (${timeline.failures.length}×)`}
@@ -128,7 +127,7 @@ function LaneRow({ lane, from, width, timeline }: { lane: Lane; from: number; wi
     <>
       <div className="flex flex-col items-end justify-center text-right leading-tight" title={lane.topic}>
         {lane.group && (
-          <span className={`text-[0.6875rem] font-semibold tracking-wide ${failures ? "text-destructive" : "text-primary"}`}>
+          <span className={cn("text-[0.6875rem] font-semibold tracking-wide", failures ? "text-destructive" : "text-primary")}>
             {lane.group}
           </span>
         )}
@@ -137,7 +136,7 @@ function LaneRow({ lane, from, width, timeline }: { lane: Lane; from: number; wi
       <Tooltip trackCursorAxis="x" open={hovered !== null} onOpenChange={(open) => !open && setHovered(null)}>
         <TooltipTrigger
           render={<div />}
-          className={`relative h-6 overflow-hidden rounded-sm bg-muted/40 ${lane.group && lane.key !== timeline.lanes[0]?.key ? "mt-2" : ""}`}
+          className={cn("relative h-6 overflow-hidden rounded-sm bg-muted/40", lane.group && lane.key !== timeline.lanes[0]?.key && "mt-2")}
           onPointerLeave={() => setHovered(null)}
         >
           {spans.map((span, index) => {
@@ -148,7 +147,7 @@ function LaneRow({ lane, from, width, timeline }: { lane: Lane; from: number; wi
             return (
               <div
                 key={`${index}-${span.from}`}
-                className={`absolute inset-y-0 min-w-0.5 overflow-hidden px-1 leading-6 whitespace-nowrap ${look.className}`}
+                className={cn("absolute inset-y-0 min-w-0.5 overflow-hidden px-1 leading-6 whitespace-nowrap", look.className)}
                 style={{ left: `${left}%`, width: `${size}%`, background: look.colour }}
                 onPointerEnter={() => setHovered(span)}
               >
@@ -180,7 +179,7 @@ function LaneRow({ lane, from, width, timeline }: { lane: Lane; from: number; wi
 
 /** What a span says on hover: its lane and value, from when to when, and its details. */
 function SpanWords({ lane, span }: { lane: Lane; span: LaneSpan }) {
-  const during = `${clock(span.from)} to ${clock(span.to)}, ${lasting(Date.parse(span.to) - Date.parse(span.from))}`
+  const during = `${clock(span.from)} to ${clock(span.to)}, ${duration(span.from, span.to)}`
   return (
     <>
       <span className="font-semibold">

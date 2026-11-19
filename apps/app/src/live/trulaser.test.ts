@@ -27,7 +27,7 @@ const signals = <TNames extends ReadonlyArray<SignalName>>(names: TNames) =>
 
 const about = { asOf: at("09:00:00"), machine: M, serialNumber: "L1649A-STARLINER" }
 const cockpit: Cockpit = {
-  status: { ...about, signals: signals(CARD_SIGNALS.status), sequence: null, activeAlerts: [], alertsComplete: true },
+  status: { ...about, signals: signals(CARD_SIGNALS.status), activeAlerts: [], alertsComplete: true },
   jobOrder: { ...about, jobOrder: null, signals: signals(CARD_SIGNALS.jobOrder) },
   devices: { ...about, signals: signals(CARD_SIGNALS.devices), devices: [] },
   technology: { ...about, signals: signals(CARD_SIGNALS.technology) },

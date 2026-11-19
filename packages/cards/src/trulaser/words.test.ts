@@ -31,7 +31,6 @@ test("State.Status in words names the state, the ChangeCause and the ActiveAlert
       changeCauseSignal: signal("PalletChange"),
       changeCauseValue: signal("SequenceStateAndBlockingCause { SequenceState = Active, BlockingCause = InternalMalfunction }"),
     },
-    sequence: { sequenceState: "Active", blockingCause: "InternalMalfunction" },
     alertsComplete: true,
     activeAlerts: [
       {

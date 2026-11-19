@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { instant, machineId } from "../machine/contract.ts"
+import { instant, machineId, severity } from "../machine/contract.ts"
 
 // The contracts of the TruLaser cards. They name what they show as the umati data model 0.17.1 does, and
 // read it from its elements below `machines/{machineId}/umati/` and from the events of the model: the
@@ -257,16 +257,12 @@ export const device = z.object({
 })
 export type Device = z.infer<typeof device>
 
-/** The categories of an alert after NAMUR NE 107, from the most urgent. */
-export const ALERT_SEVERITIES = ["Failure", "CheckFunction", "OffSpec", "MaintenanceRequired"] as const
-export const alertSeverity = z.enum(ALERT_SEVERITIES)
-
 /** An entry of Notification.ActiveAlerts: an alert that stands. */
 export const alert = z.object({
   Id: z.string(),
   ErrorCode: z.string(),
   Message: z.string(),
-  Severity: alertSeverity.nullable().describe("The category after NAMUR NE 107."),
+  Severity: severity.nullable().describe("The category after NAMUR NE 107."),
   SeverityValue: z.number().nullable(),
   SourceName: z.string().describe("Where the alert comes from: for a unit in malfunction, the unit."),
   Time: instant.describe("Since when the alert stands."),
@@ -274,9 +270,9 @@ export const alert = z.object({
 export type Alert = z.infer<typeof alert>
 
 /** Where a category stands in the order a display reads them, after NE 107: Failure first, none last. */
-export function severityRank(severity: string | null): number {
-  const rank = ALERT_SEVERITIES.indexOf((severity ?? "") as (typeof ALERT_SEVERITIES)[number])
-  return rank < 0 ? ALERT_SEVERITIES.length : rank
+export function severityRank(category: string | null): number {
+  const rank = severity.options.indexOf((category ?? "") as (typeof severity.options)[number])
+  return rank < 0 ? severity.options.length : rank
 }
 
 /** The alerts in the order a display reads them: the most urgent first, the newest first within a category. */
@@ -312,10 +308,6 @@ const about = {
 export const trulaserStatus = z.object({
   ...about,
   signals: signalsOf(CARD_SIGNALS.status),
-  sequence: z
-    .object({ sequenceState: z.string(), blockingCause: z.string().nullable() })
-    .nullable()
-    .describe("The SignalValue of the change cause read: SequenceState and BlockingCause, or null if it says neither."),
   activeAlerts: z
     .array(alert)
     .describe("Notification.ActiveAlerts since the adapter started, the most urgent first: what the events of the alerts say stands."),
@@ -526,12 +518,9 @@ export function alertSpanOf(alert: Pick<Alert, "Id" | "ErrorCode" | "Message" | 
   }
 }
 
-/** A detail as a person reads it: a SignalValue of a change cause as its SequenceState and BlockingCause. */
+/** A detail as a person reads it, null if it is empty. A SignalValue with fields a display reads by `signalValueFields`. */
 export function detailText(detail: SpanDetail): string | null {
-  if (detail.value === null || detail.value === "") return null
-  if (!detail.name.endsWith("SignalValue")) return detail.value
-  const fields = signalValueFields(detail.value)
-  return fields ? fields.map((one) => `${one.name} ${one.value}`).join(" · ") : detail.value
+  return detail.value || null
 }
 
 /** `HANDLING_LOAD` as `HandlingLoad`, the way the edge component writes the values of its own outputs. */

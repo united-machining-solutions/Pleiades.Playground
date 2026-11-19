@@ -38,7 +38,7 @@ function ShownDevices({ devices }: { devices: TrulaserDevices }) {
 }
 
 function ShownConditions({ conditions }: { conditions: TrulaserConditions }) {
-  return <ConditionsCard conditions={conditions} hours={1} readSeries={useReadSeries(conditions.machine, 1)} />
+  return <ConditionsCard conditions={conditions} readSeries={useReadSeries(conditions.machine, 1)} />
 }
 
 export const trulaserTools: ReadonlyArray<ChatTool> = [
