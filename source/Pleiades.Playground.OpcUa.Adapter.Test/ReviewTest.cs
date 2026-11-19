@@ -376,14 +376,19 @@ public class MachineSupervisorTest
         },
     };
 
-    private static (MachineSupervisor Supervisor, FakeOutputs Outputs) Supervisor(string dataDirectory)
+    private static (MachineSupervisor Supervisor, FakeOutputs Outputs) Supervisor(
+        string dataDirectory, Mock<IOpcUaDiscoveryService>? discovery = null, IRegistrationProbe? probe = null)
     {
         var credentials = new CredentialStore(dataDirectory);
-        // The server answers no discovery: every session fails and tries again, as a machine that is off does.
-        var discovery = new Mock<IOpcUaDiscoveryService>();
-        discovery
-            .Setup(service => service.GetEndpointsAsync(It.IsAny<string>(), It.IsAny<ArrayOf<string>>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new ServiceResultException(StatusCodes.BadNotConnected));
+        if (discovery is null)
+        {
+            // The server answers no discovery: every session fails and tries again, as a machine that is off does.
+            discovery = new Mock<IOpcUaDiscoveryService>();
+            discovery
+                .Setup(service => service.GetEndpointsAsync(It.IsAny<string>(), It.IsAny<ArrayOf<string>>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new ServiceResultException(StatusCodes.BadNotConnected));
+        }
+
         var client = new OpcUaClient(discovery.Object, new Mock<IManagedSessionFactory>(MockBehavior.Strict).Object, credentials);
         var outputs = new FakeOutputs();
         var config = Options.Create(new Config
@@ -393,7 +398,7 @@ public class MachineSupervisorTest
             DataDirectory = dataDirectory,
         });
         var supervisor = new MachineSupervisor(
-            new RegistrationStore(dataDirectory), new AlertStore(dataDirectory), client, new RegistrationProbe(client), outputs,
+            new RegistrationStore(dataDirectory), new AlertStore(dataDirectory), client, probe ?? new RegistrationProbe(client), outputs,
             new DraftStore(), credentials, config, NullLogger<MachineSupervisor>.Instance);
         return (supervisor, outputs);
     }
@@ -477,6 +482,81 @@ public class MachineSupervisorTest
         await supervisor.StopAsync(TestContext.CancellationToken);
         supervisor.Dispose();
     }
+
+    [TestMethod]
+    public async Task A_new_registration_replaces_the_running_machine_which_says_Shutdown_first()
+    {
+        using var directory = new TemporaryDirectory();
+        var url = "opc.tcp://machine:4840";
+        var store = new RegistrationStore(directory.Path);
+        store.Save(Proposed(url, "the old one"));
+        // The server offers its strongest endpoint, and the probe reads the identification on it. The session of
+        // the running machine never opens: the factory of sessions answers nothing.
+        var discovery = new Mock<IOpcUaDiscoveryService>();
+        discovery
+            .Setup(service => service.GetEndpointsAsync(It.IsAny<string>(), It.IsAny<ArrayOf<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new EndpointDescription[]
+            {
+                new()
+                {
+                    EndpointUrl = url,
+                    SecurityMode = MessageSecurityMode.SignAndEncrypt,
+                    SecurityPolicyUri = SecurityPolicies.Aes256_Sha256_RsaPss,
+                    ServerCertificate = ByteString.From([1, 2, 3]),
+                    UserIdentityTokens = new UserTokenPolicy[] { new() { TokenType = UserTokenType.Anonymous } },
+                },
+            });
+        var probe = new Mock<IRegistrationProbe>();
+        probe.Setup(p => p.ProbeAsync(It.IsAny<MachineRegistration>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((MachineRegistration registration, CancellationToken _) => new ProbeResult(
+                "010203",
+                ["http://opcfoundation.org/UA/", "urn:test"],
+                [.. registration.Elements.Select(element => new ProbedElement(
+                    element.Area, element.Path, element.Node, "Good", true, ValueOf(element.Path), ValueOf(element.Path), element.Unit))],
+                []));
+        var (supervisor, outputs) = Supervisor(directory.Path, discovery, probe.Object);
+        await Started(supervisor, 1);
+
+        var outcome = await supervisor.RegisterAsync(Proposed(url, "the new one"), dryRun: false, TestContext.CancellationToken);
+
+        Assert.IsTrue(outcome.Registered, string.Join(" ", outcome.Problems));
+        Assert.HasCount(2, outputs.Created, "The new registration runs with an output of its own.");
+        CollectionAssert.AreEqual(new[] { false }, outputs.Created[0].Stops, "The machine as it ran says Shutdown before it is replaced.");
+        Assert.IsTrue(outputs.Created[0].Disposed);
+        Assert.IsEmpty(outputs.Created[1].Stops);
+        Assert.HasCount(1, supervisor.Machines, "Replaced, not added a second time.");
+        Assert.AreEqual("the new one", supervisor.Find("A1121O0001")!.Registration.DisplayName);
+        var stored = store.LoadAll().Single();
+        Assert.AreEqual("the new one", stored.DisplayName);
+        Assert.AreEqual("trumpf_TruMatic_A1121O0001", stored.Identity?.MachineId, "The identity is formed from what the server gave.");
+        Assert.AreEqual("010203", stored.Endpoint.ServerCertificateThumbprint, "The certificate the server presented is the one it is known by.");
+
+        await supervisor.StopAsync(TestContext.CancellationToken);
+        supervisor.Dispose();
+    }
+
+    private static MachineRegistration Proposed(string url, string displayName) => new()
+    {
+        SerialNumber = "A1121O0001",
+        DisplayName = displayName,
+        Endpoint = new EndpointRegistration { Url = url, SecurityMode = SecurityMode.SignAndEncrypt, SecurityPolicy = "Aes256_Sha256_RsaPss" },
+        Elements =
+        [
+            new ElementRegistration { Path = "Identification.Manufacturer", Kind = ValueKind.Text, Node = "nsu=urn:test;s=Manufacturer" },
+            new ElementRegistration { Path = "Identification.ManufacturerUri", Kind = ValueKind.Text, Node = "nsu=urn:test;s=ManufacturerUri" },
+            new ElementRegistration { Path = "Identification.Model", Kind = ValueKind.Text, Node = "nsu=urn:test;s=Model" },
+            new ElementRegistration { Path = "Identification.SerialNumber", Kind = ValueKind.Text, Node = "nsu=urn:test;s=SerialNumber" },
+        ],
+    };
+
+    private static string ValueOf(string path) => path switch
+    {
+        "Identification.Manufacturer" => "TRUMPF",
+        "Identification.ManufacturerUri" => "https://www.trumpf.com",
+        "Identification.Model" => "TruMatic",
+        "Identification.SerialNumber" => "A1121O0001",
+        _ => "x",
+    };
 
     private sealed class FakeOutputs : IMachineOutputFactory
     {
