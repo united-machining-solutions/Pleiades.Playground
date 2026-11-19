@@ -38,6 +38,12 @@ history pages (count 1..100, default 20). `ultimaker_print_get` reads one histor
 current jobs are null; missing historical jobs are errors. Empty timestamps/numbers remain null.
 All progress is a fraction, durations are seconds and timestamps UTC.
 
+Use `ultimaker_printer_faults` when a print failed or the printer does not go on. It returns the faults
+of the printer log (UTC time, manufacturer code, level, English text) and the failed or aborted jobs.
+The printer status stays idle while a message stands on its display, so do not take idle as healthy.
+An empty fault list proves nothing; say how far back the log was read (logSince). Clearing a message
+is done by a person at the printer.
+
 Use `ultimaker_slice_prints` for the persistent submission journal. Associations are exact joins
 by printer UUID and printer job UUID. External jobs are not guessed into a slice. Unknown/uploading
 attempts may already have started printing even without a recorded UUID; never retry automatically.

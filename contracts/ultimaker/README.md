@@ -11,6 +11,7 @@ converts units. The initial profile supports PLA, left AA 0.4, single extrusion 
 | MCP tool | REST | Effect |
 |---|---|---|
 | `ultimaker_printer_status` | `GET /printer` | Model, firmware, status, cores, materials |
+| `ultimaker_printer_faults` | `GET /printer/faults` | Faults of the printer log and failed or aborted jobs; read only, no pairing |
 | `ultimaker_profiles_list` | `GET /profiles` | Supported profile |
 | `ultimaker_model_store` | `POST /models` (raw STL body) | Store STL; MCP accepts base64 |
 | `ultimaker_model_slice` | `POST /slices` | Slice a model without contacting the printer |
@@ -69,6 +70,22 @@ Interrupted/failed uploads remain state=uploading or unknown with a potentially 
 These are visible through the slice's submissions. Do not retry automatically or invent a match.
 Inspect printer state and reconcile manually. A persistence failure after API acceptance is also
 ambiguous. Submission records contain no pairing secrets. One replica owns the printer/data volume.
+
+## Faults
+
+The printer has no route for faults. With a message on its display it still reports the status `idle`,
+empty diagnostics and no event for the failure; the reason stands in its system log only. The fault
+query reads the newest lines of `GET /api/v1/system/log` (5000 by default, `Ultimaker:FaultLogLines`)
+and returns, newest first, each fault with its UTC time, the manufacturer's code and level and the
+English text of the firmware, at most 300 characters. `logSince` says how far back the lines reach,
+`logLines` how many were read. `failedJobs` are the jobs with the result `Failed` or `Aborted` among the
+20 newest of the job history. Nothing else of a log line is returned: the log names hosts and users.
+
+The manufacturer documents the log route, not the format of a line. The format read is the one of
+firmware 5.3.0; a line of another format is skipped, so an empty list is no proof of a healthy printer.
+The localized text of the display is in no answer of the printer. The discussion is [issue #134](https://github.com/united-machining-solutions/Pleiades.Playground/issues/134).
+
+## Pairing again and malformed answers
 
 Pairing can be explicitly repeated after the printer reports unauthorized, or HTTP 404 for a forgotten
 request (exposed as expired). Authorized credentials and requests still awaiting display approval
