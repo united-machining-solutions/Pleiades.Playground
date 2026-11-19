@@ -8,11 +8,36 @@ import { Item, ItemContent, ItemFooter, ItemHeader, ItemMedia, ItemTitle } from 
 import { Meter } from "@pleiades/ui/components/meter"
 import { ScrollArea, ScrollBar } from "@pleiades/ui/components/scroll-area"
 import { cn } from "cn"
-import { CodeXmlIcon, FactoryIcon, PackageIcon } from "lucide-react"
+import {
+  CircleDotIcon,
+  CodeXmlIcon,
+  DrillIcon,
+  FactoryIcon,
+  FoldHorizontalIcon,
+  LinkIcon,
+  PackageIcon,
+  PrinterIcon,
+  RotateCwIcon,
+  ScissorsIcon,
+} from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 import { TILE_HEIGHT, TILE_WIDTH, conceptStations, connector, layout, pathOf, utilisation, waiting } from "./floor.ts"
-import type { FloorPage, Order, OrderState, Place } from "./floor.ts"
+import type { Cluster, FloorPage, Order, OrderState, Place } from "./floor.ts"
+import type { StepId } from "./steps.ts"
+import { makerOf } from "./makers.ts"
+
+/** The icon of a step of manufacturing; a machine with no step keeps the factory. */
+const stepIcon: Record<StepId | "none", LucideIcon> = {
+  printing: PrinterIcon,
+  cutting: ScissorsIcon,
+  turning: RotateCwIcon,
+  milling: DrillIcon,
+  grinding: CircleDotIcon,
+  forming: FoldHorizontalIcon,
+  joining: LinkIcon,
+  none: FactoryIcon,
+}
 
 /** The edge of a tile in the colour of its state, so the floor reads from afar. */
 const stripe: Record<State, string> = {
@@ -48,6 +73,7 @@ export function percent(share: number | null): string {
 export function FloorMap({
   page,
   orders,
+  clusters,
   lens,
   machine,
   order,
@@ -55,6 +81,7 @@ export function FloorMap({
   onOrder,
 }: {
   page: FloorPage
+  clusters?: ReadonlyArray<Cluster>
   orders: ReadonlyArray<Order>
   lens: Lens
   machine: string | null
@@ -62,7 +89,12 @@ export function FloorMap({
   onMachine: (id: string) => void
   onOrder: (key: string) => void
 }) {
-  const { places, width, height } = layout(page.machines.map((one) => one.show.machine.machine))
+  const { places, clusters: named, width, height } = layout(
+    page.machines.map((one) => one.show.machine.machine),
+    clusters,
+  )
+  const iconOf = (id: string) =>
+    stepIcon[(clusters?.find((one) => one.machines.includes(id))?.id ?? "none") as StepId | "none"] ?? FactoryIcon
   const placeOf = Object.fromEntries(places.map((one) => [one.id, one])) as Record<string, Place>
   const path = order ? pathOf(order) : []
   const reached = order ? order.steps.filter((step) => step.result !== null).length : 0
@@ -96,6 +128,16 @@ export function FloorMap({
             />
           ))
         })}
+        {/* The name of each cluster above its columns. */}
+        {named.map((one) => (
+          <span
+            key={one.id}
+            className="absolute truncate border-b pb-1 text-xs font-medium text-muted-foreground"
+            style={{ left: one.x, top: 0, width: one.width }}
+          >
+            {one.name} · {clusters?.find((cluster) => cluster.id === one.id)?.machines.length ?? 0}
+          </span>
+        ))}
         {places.map((place) => {
           if (place.id === conceptStations.program.id || place.id === conceptStations.pack.id) {
             const concept = place.id === conceptStations.program.id ? conceptStations.program : conceptStations.pack
@@ -114,6 +156,7 @@ export function FloorMap({
             <MachineTile
               key={place.id}
               place={place}
+              icon={iconOf(place.id)}
               show={entry.show}
               asOf={page.asOf}
               lens={lens}
@@ -164,6 +207,7 @@ function ConceptTile({ place, name, icon: Icon }: { place: Place; name: string; 
 
 function MachineTile({
   place,
+  icon: Icon,
   show,
   asOf,
   lens,
@@ -177,6 +221,7 @@ function MachineTile({
   onOrder,
 }: {
   place: Place
+  icon: LucideIcon
   show: MachineShow
   asOf: string
   lens: Lens
@@ -197,6 +242,7 @@ function MachineTile({
   const job = machine.jobOrder
   const small = job ? `${job.jobOrderId} · ${job.producedQuantity ?? "?"} of ${job.runsPlanned ?? "?"}` : "No job order"
   const badge = orderHere ? orderBadge[orderHere.state] : null
+  const maker = makerOf(machine.identity.manufacturer)
   // The ring stands where the order is or waits; one that is through or held up keeps its badge only.
   const ring = selected || orderHere?.state === "running" || orderHere?.state === "waiting"
   // One order as a marker, the chosen one if it is here; the rest as "+N".
@@ -225,14 +271,24 @@ function MachineTile({
       >
         <ItemHeader>
           <ItemMedia variant="icon">
-            <FactoryIcon />
+            <Icon />
           </ItemMedia>
           <ItemTitle className="mr-auto block min-w-0 truncate">{titleOf(machine)}</ItemTitle>
         </ItemHeader>
         <ItemContent className="gap-0.5">
           <span className="flex items-center gap-1.5 text-xs">
             <StateSymbol state={state} />
-            {stateLabel[state]}
+            <span className="mr-auto truncate">{stateLabel[state]}</span>
+            {maker?.logo ? (
+              <img src={maker.logo} alt={maker.name} title={maker.name} className="w-auto shrink-0" style={{ height: maker.height }} />
+            ) : maker ? (
+              <span
+                className="max-w-16 shrink-0 truncate text-[10px] font-semibold tracking-wide text-muted-foreground uppercase"
+                title={maker.name}
+              >
+                {maker.name}
+              </span>
+            ) : null}
           </span>
           <span className="flex items-baseline gap-1">
             <span className="text-xl font-semibold tabular-nums">{big}</span>

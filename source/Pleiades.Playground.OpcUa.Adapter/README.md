@@ -178,8 +178,8 @@ An aggregation server, a gateway, serves the address spaces of several machines 
 machine below `Machines` (OPC 40001-1) or a folder of the gateway. The adapter treats every machine as a
 machine of its own, with a registration of its own, and every machine on one endpoint shares one session.
 
-- **Which machines.** `opcua_machine_list`, or `GET /endpoints/machines?url=`, connects with the strongest
-  endpoint and lists every object below Objects that has an `Identification` with a `SerialNumber`, with its
+- **Which machines.** `opcua_machine_list`, or `GET /endpoints/machines?url=`, connects with the endpoint
+  the adapter takes, the strongest or the one a person chose, anonymously first, and lists every object below Objects that has an `Identification` with a `SerialNumber`, with its
   node, its path and the serial number read below it. That is code, not the judgement of the model. A server of
   one machine lists one.
 - **TRUMPF machines behind a gateway.** A gateway may leave the `Machines` folder of OPC 40001-1 out, as the
@@ -331,11 +331,14 @@ prefix of a gateway; both are open.
 
 | Request | What it does |
 |---|---|
-| `GET /endpoints?url=opc.tcp://host:4840` | The endpoints the server offers, strongest first. The first one is the one to register. |
+| `GET /endpoints?url=opc.tcp://host:4840` | The endpoints the server offers, strongest first. The one marked `recommended` is the one to register: the strongest, or the one a person chose (`chosen`). |
 | `GET /endpoints/machines?url=opc.tcp://host:4840` | The machines the server serves, with node, path and serial number: one, or several behind a gateway. |
 | `PUT /users` | Stores the user of a server, `{ "url", "user", "password" }`, after the server accepted it. The card in the chat sends it; `409` if the server refuses the user. |
 | `GET /users` | The servers with a stored user, without the passwords. |
 | `DELETE /users?url=opc.tcp://host:4840` | Forgets the user of a server. |
+| `PUT /security` | Keeps the security a person chose for a server, `{ "url", "securityMode", "securityPolicy" }`, `None` included. The card in the chat sends it; `409` if the server offers no such endpoint for a session the adapter can open. |
+| `GET /security` | The servers with a chosen security. |
+| `DELETE /security?url=opc.tcp://host:4840` | Forgets the security chosen for a server: the adapter takes the strongest endpoint again. |
 | `PUT /machines/{SerialNumber}?dryRun=true` | Tries a registration: connects, reads every node once, and answers with each raw and converted value. Nothing is stored or published. |
 | `PUT /machines/{SerialNumber}` | Registers the machine, or replaces its registration, and starts it. `409` with `identity: …` if the server gives no value for `Identification.ManufacturerUri` (or, if the registration has it in `missing`, `.Manufacturer`), `.Model` or `.SerialNumber`, the parts of the machine id. |
 | `POST /drafts/{draftId}/commit` | Registers what a proposal of the chat holds. The button on the proposal sends it; a draft works once and is kept for 30 minutes. Refused as `PUT /machines/{SerialNumber}` is. |
@@ -481,16 +484,43 @@ consumer that ends the alarms of an earlier run at the start of the next one doe
 ## Security
 
 - The adapter orders the endpoints of a server itself: encryption before signing only, then the strength of
-  the policy. A registration that names a weaker endpoint than the strongest one is refused, unless
-  `endpoint.allowWeaker` is true. That is the decision of a person, never a default.
-- The card of `opcua_endpoint_rank` shows the endpoint the adapter takes in one line, and folds the others
-  away behind "n more endpoints", since a person cannot choose one there. Without unfolding, the card says
-  one thing more: that the server also accepts sessions without security, if one of the others has none.
-  Choosing a weaker endpoint in the card, for example after the strongest one failed, is not built yet;
-  until then nothing in the app sets `endpoint.allowWeaker`. The rule is `endpointSummary` in
-  `apps/app/src/cards/opcua/results.ts`.
+  the policy. Without a choice of a person it takes the strongest. A registration that names a weaker endpoint
+  than the strongest one, or a weak one, is refused, unless a person chose that endpoint for the server (below)
+  or `endpoint.allowWeaker` is true. That is the decision of a person, never a default and never the model's.
+- **A person chooses the security.** The card of `opcua_endpoint_rank` shows the endpoint the adapter takes in
+  one line, and "Choose the security" folded below it: every endpoint the adapter can use, strongest first,
+  `None` included. Before the person confirms a weaker one, the card shows what it means: for `None` a
+  destructive warning (nothing is signed or encrypted; anyone on the network can read and change the values or
+  pretend to be the machine) and a button "Connect without security"; for an endpoint that only signs, or a
+  policy no longer considered safe, a plain one. The app sends the choice from its server to `PUT /security`;
+  the adapter keeps it per server in `security.json` in the data directory. From then on `opcua_endpoint_rank`
+  marks that endpoint `recommended` and names it in `chosen`, the scan connects with it, and a registration that
+  names it is accepted and stored with `allowWeaker`. While a choice stands, the card says so, names the
+  strongest, shows the warning of the endpoint taken, and offers "Back to the strongest" (`DELETE /security`).
+  A choice the server does not offer now stays stored and is shown on the card, which says that the adapter
+  takes the strongest until the server offers it again, and offers "Back to the strongest" to forget it:
+  otherwise a weaker choice, `None` after a reset of the server say, would come back unseen. A machine that is
+  added keeps the security of its registration until it is registered again. The list of servers marks a
+  machine without security, and the proposal shows the warning too. The rules are `endpointSummary` and
+  `securityWarning` in `apps/app/src/cards/opcua/results.ts`. Without unfolding, the card still says that the
+  server also accepts sessions without security, if one of the others has none.
+- **Anonymous first, a stored user before it.** Without a stored user every session of the scan is anonymous:
+  `opcua_ua_connect`, `opcua_machine_list` and the probe of `opcua_registration_propose`. Once a person
+  stores a user, it is the user of every session on an encrypted endpoint that takes a user name, also where
+  the server takes anonymous sessions as well, since an anonymous session may see fewer nodes; the registration
+  names it in `endpoint.user`. Storing the user starts the sessions anew: the machines that run on an encrypted
+  endpoint of that server are registered again with the user and connect again, and the chat connects its scan
+  again, which replaces the session of the same name. On an endpoint the user cannot take, one without
+  encryption a person chose, the session stays anonymous; if the server refuses it
+  (`BadIdentityTokenRejected`, `BadUserAccessDenied` and the like), the user logs in on the strongest
+  encrypted endpoint that takes it, never over an endpoint without encryption. For `opcua_ua_connect` the
+  adapter tries that anonymous session with its own client first, which stops at once on a refused identity,
+  since the session of the OPC UA MCP library would try again until its timeout.
 - The certificate a server presents at the registration is the one the machine is known by. If it presents
-  another one later, the adapter does not connect and says so in `lastError`.
+  another one later, the adapter does not connect and says so in `lastError`. That holds on a signed or
+  encrypted endpoint only: on `None` there is no secure channel, the certificate is not checked
+  cryptographically, and its thumbprint from `GetEndpoints` can be forged. A machine without security is not
+  protected against another box at its address.
 - The adapter is one OPC UA client, with one certificate in `/data/pki`. A server that does not accept unknown
   clients has to trust it once.
 - A certificate error ends a connect at once, with its status and reason, instead of being tried again until
@@ -500,6 +530,13 @@ consumer that ends the alarms of an earlier run at the start of the next one doe
   yet: the chat, the REST API and `lastError` say so, and how to trust it (for the UaGateway see
   [A gateway on the development computer](#a-gateway-on-the-development-computer)). A running machine still
   tries again on its own back-off, so a certificate fixed or trusted on the server is picked up.
+- Some servers give a reason with `BadSecurityChecksFailed` all the same. The adapter passes the server's words
+  on in every case. If they say the server cannot handle the security of the endpoint, a signature algorithm or
+  a policy it does not expect, the message names the endpoint and tells the person to choose another security
+  on the endpoints card instead of trusting a certificate. A server that offers `Aes256_Sha256_RsaPss` but cannot
+  verify an RSA-PSS signature answers "Unexpected SignatureData algorithm …rsa-pss-sha256", for example; another
+  policy, `Basic256Sha256` say, works there. The rules are `ReasonIn` and `IsUnsupportedSecurity` in
+  [`OpcUa/RefusalPolicy.cs`](OpcUa/RefusalPolicy.cs).
 - **A server that wants a user.** A session is anonymous, or logs in with a user name and a password that a
   person stored for the server. One user per server; a user certificate is not supported.
   - The person enters user name and password in the card of `opcua_endpoint_rank`, and only there: a turn of
@@ -512,7 +549,7 @@ consumer that ends the alarms of an earlier run at the start of the next one doe
     | The server offers | `needsUser` | `acceptsUser` | The card |
     | --- | --- | --- | --- |
     | A user name on an encrypted endpoint, no anonymous session | true | true | Asks for user name and password before the scan can go on; once stored, "change the user" |
-    | A user name on an encrypted endpoint, and an anonymous session | false | true | The endpoint the adapter takes, with "Log in with a user instead" (folded) |
+    | A user name on an encrypted endpoint, and an anonymous session | false | true | The endpoint the adapter takes, with "Log in with a user instead of anonymously" (folded) |
     | Anonymous sessions only, or a user name only on endpoints that sign or have no security | – | false | The endpoint the adapter takes, no form |
 
     A server with anonymous sessions only, the opc-simulator among them, has no form, by design. To see it,
@@ -523,11 +560,14 @@ consumer that ends the alarms of an earlier run at the start of the next one doe
   - A password goes over an encrypted endpoint only (`SignAndEncrypt`). The ranking offers a session with a
     user no endpoint that only signs or has no security, and a registration with a user and another mode is
     refused.
-  - A registration names the user in `endpoint.user`, filled in by the adapter from the stored user; the
-    password stays in the store. Machines share a session only with the same user.
-  - The scan logs in with the stored user too: the connect tool of the chat, `opcua_ua_connect`, takes no user
-    name and no password, although the library behind it would. A filter of the MCP server puts the stored
-    user into the call on the side of the adapter, and refuses a call that brings a user of its own.
+  - A registration names the user in `endpoint.user`, filled in by the adapter from the stored user on every
+    encrypted endpoint that takes it (above); the password stays in the store. Machines share a session only
+    with the same user.
+  - The scan logs in with the stored user too: the connect tool of the chat,
+    `opcua_ua_connect`, takes no user name and no password, although the library behind it would. A filter of
+    the MCP server sets the security of the endpoint the adapter takes, whatever the model named, puts the
+    stored user into the call on the side of the adapter, and refuses a call that
+    brings a user of its own.
   - Removing the user of a server, `DELETE /users?url=`, stops the machines registered with it from
     connecting; removing a machine keeps the user.
 

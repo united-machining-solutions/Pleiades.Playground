@@ -104,24 +104,18 @@ public class MachineIdentityRefusalTest
         supervisor.Dispose();
     }
 
-    /// <summary>A supervisor whose server offers one endpoint, SignAndEncrypt with Aes256_Sha256_RsaPss, at <see cref="Url"/>.</summary>
-    internal static MachineSupervisor Supervisor(string dataDirectory, IMachineOutputFactory outputs, IRegistrationProbe probe)
+    /// <summary>
+    /// A supervisor whose server offers the endpoints named, at <see cref="Url"/>; without any, one endpoint,
+    /// SignAndEncrypt with Aes256_Sha256_RsaPss, for an anonymous session.
+    /// </summary>
+    internal static MachineSupervisor Supervisor(
+        string dataDirectory, IMachineOutputFactory outputs, IRegistrationProbe probe, params EndpointDescription[] offered)
     {
         var credentials = new CredentialStore(dataDirectory);
         var discovery = new Mock<IOpcUaDiscoveryService>();
         discovery
             .Setup(service => service.GetEndpointsAsync(It.IsAny<string>(), It.IsAny<ArrayOf<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new EndpointDescription[]
-            {
-                new()
-                {
-                    EndpointUrl = Url,
-                    SecurityMode = MessageSecurityMode.SignAndEncrypt,
-                    SecurityPolicyUri = SecurityPolicies.Aes256_Sha256_RsaPss,
-                    ServerCertificate = ByteString.From([1, 2, 3, 4]),
-                    UserIdentityTokens = new UserTokenPolicy[] { new() { TokenType = UserTokenType.Anonymous } },
-                },
-            });
+            .ReturnsAsync(offered.Length > 0 ? offered : new[] { Offered(MessageSecurityMode.SignAndEncrypt, SecurityPolicies.Aes256_Sha256_RsaPss, UserTokenType.Anonymous) });
         var client = new OpcUaClient(discovery.Object, new Mock<IManagedSessionFactory>(MockBehavior.Strict).Object, credentials);
         var config = Options.Create(new Config
         {
@@ -131,11 +125,21 @@ public class MachineIdentityRefusalTest
         });
         return new MachineSupervisor(
             new RegistrationStore(dataDirectory), new AlertStore(dataDirectory), client, probe, outputs,
-            new DraftStore(), credentials, config, NullLogger<MachineSupervisor>.Instance);
+            new DraftStore(), credentials, new SecurityChoiceStore(dataDirectory), config, NullLogger<MachineSupervisor>.Instance);
     }
 
+    /// <summary>An endpoint of the server at <see cref="Url"/>, with the identities it takes.</summary>
+    internal static EndpointDescription Offered(MessageSecurityMode mode, string policyUri, params UserTokenType[] tokens) => new()
+    {
+        EndpointUrl = Url,
+        SecurityMode = mode,
+        SecurityPolicyUri = policyUri,
+        ServerCertificate = ByteString.From([1, 2, 3, 4]),
+        UserIdentityTokens = tokens.Select(token => new UserTokenPolicy { TokenType = token }).ToArray(),
+    };
+
     /// <summary>A registration that maps every value but the ones named, which are in <c>missing</c>.</summary>
-    private static MachineRegistration Registration(params string[] unmapped) => new()
+    internal static MachineRegistration Registration(params string[] unmapped) => new()
     {
         SerialNumber = SerialNumber,
         Endpoint = new EndpointRegistration { Url = Url, SecurityMode = SecurityMode.SignAndEncrypt, SecurityPolicy = "Aes256_Sha256_RsaPss" },
@@ -156,7 +160,7 @@ public class MachineIdentityRefusalTest
     };
 
     /// <summary>A server that has every node of the registration, and no value yet for the ones named.</summary>
-    private sealed class ServerWithout(params string[] paths) : IRegistrationProbe
+    internal sealed class ServerWithout(params string[] paths) : IRegistrationProbe
     {
         /// <summary>The name of the manufacturer the server gives.</summary>
         public string Manufacturer { get; init; } = Values["Identification.Manufacturer"];

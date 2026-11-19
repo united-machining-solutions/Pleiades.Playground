@@ -63,6 +63,7 @@ test("a page hears the readings where the broker carries them, the alerts, the i
     `${base}/umati/Identification/Manufacturer`,
     `${base}/umati/Identification/Model`,
     `${base}/umati/Identification/SerialNumber`,
+    `${base}/umati/Identification/DeviceClass`,
     `${base}/umati/JobMonitoring/JobOrders`,
     `${base}/umati/JobMonitoring/JobOrderResults`,
   ])

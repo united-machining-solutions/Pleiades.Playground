@@ -68,9 +68,19 @@ const MARK = "oem/Dalle/MachineState/ItemState"
 const HEARTBEAT = "umati/Connection/Heartbeat"
 
 /**
+ * The machines in the order a page takes them: the one with the newest sign of life first, so that a
+ * machine that runs comes before one that stopped or was renamed. Equal ones by their id.
+ */
+export function byNewestLife(machines: ReadonlyArray<{ machine: string; lastLife: string }>): Array<string> {
+  return [...machines]
+    .sort((a, b) => b.lastLife.localeCompare(a.lastLife) || a.machine.localeCompare(b.machine))
+    .map((one) => one.machine)
+}
+
+/**
  * The machines that gave a sign of life in the last 24 hours and ever published the signals of an edge
- * component, sorted. The mark is published only when the state changes: a machine that stood in one state
- * all weekend has no value of it in the last 24 hours, but its heartbeat.
+ * component, the one alive most recently first. The mark is published only when the state changes: a
+ * machine that stood in one state all weekend has no value of it in the last 24 hours, but its heartbeat.
  */
 export async function listTrulasers(apis: Apis, now = new Date()): Promise<Array<string>> {
   const topics = await listTopics(apis, secondsBefore(now, HORIZON_SECONDS), now)
@@ -84,14 +94,20 @@ export async function listTrulasers(apis: Apis, now = new Date()): Promise<Array
   const marked = await Promise.all(
     alive.map(async (machine) => {
       const topic = `machines/${machine}/${MARK}`
-      const [series] = (await readStrings(apis, topic, EVER, now, 1)).filter((one) => one.topic === topic)
-      return (series?.samples.length ?? 0) > 0 ? machine : null
+      const [[series], heartbeat] = await Promise.all([
+        readStrings(apis, topic, EVER, now, 1).then((all) => all.filter((one) => one.topic === topic)),
+        readNewest(apis, "baseUnitValues", `machines/${machine}/${HEARTBEAT}`, now),
+      ])
+      const mark = series?.samples.at(-1)?.at
+      if (mark === undefined) return null
+      // A machine without a heartbeat is alive as of its mark.
+      return { machine, lastLife: heartbeat && heartbeat.at > mark ? heartbeat.at : mark }
     }),
   )
-  return marked.flatMap((one) => one ?? []).sort()
+  return byNewestLife(marked.flatMap((one) => one ?? []))
 }
 
-/** The machine that was asked for, or the first TruLaser if none was. Refused with a sentence if there is none. */
+/** The machine that was asked for, or the TruLaser alive most recently if none was. Refused with a sentence if there is none. */
 export async function trulaserOf(apis: Apis, machine: string | undefined, now: Date): Promise<string> {
   const known = await listTrulasers(apis, now)
   const found = machine ?? known[0]

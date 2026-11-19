@@ -168,6 +168,11 @@ parameters:
     targets:
       - pointer: APP_MCP_SERVERS
         components: ["default"]
+  appDocumentationPackage:
+    value: ""
+    targets:
+      - pointer: APP_DOCUMENTATION_PACKAGE
+        components: ["default"]
   hubRegistration:
     value: true
     targets:
@@ -310,6 +315,13 @@ configuration:
             reaches from its container. For the documentation app on this device:
             docs=http://host.docker.internal:3202/mcp. Its MCP listener and published port must be reachable
             from this container; a port published only on host loopback may not be reachable on Linux.
+          schema: optionalText
+        - parameter: appDocumentationPackage
+          name: Documentation package
+          description: >-
+            Optional documentation package for this machine. When set, documentation searches, source
+            reviews and answer evidence stay within this package. Empty: the chat discovers the package
+            or asks which one to use. Requires the documentation MCP server in Further MCP servers.
           schema: optionalText
     - name: Pleiades Hub
       settings:

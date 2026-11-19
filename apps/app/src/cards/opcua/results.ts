@@ -1,4 +1,6 @@
 import { jsonOf } from "../../chat/tool-results.ts"
+import { placedInWords } from "../../sites/placements.ts"
+import type { AddedOutcome, SitesOutcome } from "../../sites/placing.ts"
 
 // The answers of the OPC UA adapter (source/Pleiades.Playground.OpcUa.Adapter/Api/Views.cs), as a
 // chat has them in the result of a tool call. Each is checked before it is drawn: what does not
@@ -106,16 +108,33 @@ export type Proposal = {
   notices?: Array<string>
 }
 
+/** The security of an endpoint: its mode and the short name of its policy. */
+export type Security = { securityMode: SecurityMode; securityPolicy: string }
+
+export type RankedEndpoint = Security & {
+  /** The one the adapter takes: the strongest, or the one a person chose. */
+  recommended: boolean
+  /** Without encryption, or with a policy that is no longer considered safe. */
+  weak: boolean
+  /** A session here logs in with the stored user: the endpoint takes no anonymous session. Absent from an older adapter. */
+  withUser?: boolean
+}
+
 export type RankedEndpoints = {
   url: string
   certificateThumbprint?: string
-  endpoints: Array<{ securityMode: SecurityMode; securityPolicy: string; recommended: boolean; weak: boolean }>
+  /** Strongest first. */
+  endpoints: Array<RankedEndpoint>
   /** The server accepts no session without a user. */
   needsUser?: boolean
   /** The server accepts a user name and a password on an encrypted endpoint. */
   acceptsUser?: boolean
   /** The user a person stored for this server. */
   user?: string
+  /** The security a person chose and the adapter keeps, also while the server does not offer it; absent without one. */
+  chosen?: Security
+  /** The adapter takes the chosen security now; false while the server does not offer it. */
+  chosenInEffect?: boolean
 }
 
 /** A machine an OPC UA server serves, as `opcua_machine_list` gives it. */
@@ -133,7 +152,7 @@ export type ServedMachine = {
 
 export type MachineList = {
   url: string
-  endpoint?: { securityMode: SecurityMode; securityPolicy: string; recommended: boolean; weak: boolean }
+  endpoint?: RankedEndpoint
   gateway: boolean
   machines: Array<ServedMachine>
 }
@@ -241,6 +260,41 @@ export function shownProfiles(checks: ReadonlyArray<ProfileCheck> | undefined): 
   }
 }
 
+/** What a chip of a card chooses: the rows of one state, or the elements a profile lacks. */
+export type RowChoice = { state: MappingState } | { profile: string }
+
+/** Whether two choices are the same chip. No choice is the same as no choice. */
+export function sameChoice(one: RowChoice | null | undefined, other: RowChoice | null | undefined): boolean {
+  if (!one || !other) return !one && !other
+  if ("state" in one) return "state" in other && one.state === other.state
+  return "profile" in other && one.profile === other.profile
+}
+
+/**
+ * The rows a chosen chip shows. For a profile, the elements it lacks in the order it names them; one that has no
+ * row of its own (the scan did not list it) is shown as missing, without a reason.
+ */
+export function chosenRows(
+  rows: ReadonlyArray<MappingRow>,
+  choice: RowChoice,
+  checks: ReadonlyArray<ProfileCheck> | undefined,
+): Array<MappingRow> {
+  if ("state" in choice) return rows.filter((row) => row.state === choice.state)
+  const check = checks?.find((one) => one.name === choice.profile)
+  if (!check) return []
+  return check.missing.map(
+    (path) => rows.find((row) => row.area === "umati" && row.path === path) ?? { path, area: "umati", state: "Missing" },
+  )
+}
+
+/**
+ * The rows in doubt: a node that does not fit (mismatch) or a match that is a guess (unclear). The proposal shows
+ * them before a chip is pressed, since adding the machine would take them as they are.
+ */
+export function inDoubt(rows: ReadonlyArray<MappingRow>): Array<MappingRow> {
+  return rows.filter((row) => row.state === "Mismatch" || row.state === "Unclear")
+}
+
 /** The rows a person has to look at: everything that is not plainly fine. */
 export function needingALook(rows: ReadonlyArray<MappingRow>): Array<MappingRow> {
   return rows.filter((row) => row.state !== "Ok")
@@ -264,18 +318,69 @@ export function securityOf(endpoint: Pick<Endpoint, "securityMode" | "securityPo
   return endpoint.user ? `${security}, user ${endpoint.user}` : security
 }
 
+/** The key of a security, `SignAndEncrypt/Aes256_Sha256_RsaPss`: what the choice on the endpoints card names. */
+export function securityKey(security: Security): string {
+  return `${security.securityMode}/${security.securityPolicy}`
+}
+
 /**
- * What the endpoints card shows: the endpoint the adapter takes, the others the server offers (folded,
- * since a person cannot choose one there), and whether one of them has no security at all.
+ * What the endpoints card shows: the endpoint the adapter takes, the strongest the server offers, whether a person
+ * chose the one taken, a choice the adapter keeps but does not take now (the server does not offer it), the others
+ * (folded), and whether one of them has no security at all.
  */
-export function endpointSummary(values: Pick<RankedEndpoints, "endpoints">): {
-  used?: RankedEndpoints["endpoints"][number]
-  others: RankedEndpoints["endpoints"]
+export function endpointSummary(values: Pick<RankedEndpoints, "endpoints" | "chosen" | "chosenInEffect">): {
+  used?: RankedEndpoint
+  strongest?: RankedEndpoint
+  chosen: boolean
+  dormant?: Security
+  others: Array<RankedEndpoint>
   unsecured: boolean
 } {
   const used = values.endpoints.find((one) => one.recommended) ?? values.endpoints[0]
   const others = values.endpoints.filter((one) => one !== used)
-  return { used, others, unsecured: others.some((one) => one.securityMode === "None") }
+  const chosen =
+    used !== undefined &&
+    values.chosen !== undefined &&
+    values.chosenInEffect !== false &&
+    securityKey(values.chosen) === securityKey(used)
+  const dormant = values.chosen !== undefined && !chosen ? values.chosen : undefined
+  return { used, strongest: values.endpoints[0], chosen, dormant, others, unsecured: others.some((one) => one.securityMode === "None") }
+}
+
+/** What a person is told before and after choosing a security: how bad it is, and why. */
+export type SecurityWarning = { severity: "danger" | "caution"; title: string; text: string }
+
+/**
+ * The warning a security deserves, or none for an encrypted endpoint with a policy that is still safe. None is
+ * the strongest warning: nothing is signed or encrypted, and the adapter cannot tell its machine from another box
+ * at the same address.
+ */
+export function securityWarning(security: Security & { weak?: boolean }): SecurityWarning | undefined {
+  if (security.securityMode === "None") {
+    return {
+      severity: "danger",
+      title: "No security",
+      text:
+        "Nothing between the adapter and the machine is signed or encrypted: anyone on that network can read the values, " +
+        "change them on the way or pretend to be the machine. Choose it only on a network you trust, for example to try a " +
+        "machine whose server does not trust the adapter yet, and go back to an encrypted endpoint once it does.",
+    }
+  }
+  if (security.securityMode === "Sign") {
+    return {
+      severity: "caution",
+      title: "Signed only",
+      text: "The values cannot be changed on the way, but anyone on that network can read them.",
+    }
+  }
+  if (security.weak) {
+    return {
+      severity: "caution",
+      title: "An old policy",
+      text: `${security.securityPolicy} is no longer considered safe. Choose a stronger endpoint if the server offers one.`,
+    }
+  }
+  return undefined
 }
 
 /** What the endpoints card asks of the person about a user: nothing, to enter one, or that one may be entered. */
@@ -283,4 +388,38 @@ export function userStep(values: Pick<RankedEndpoints, "needsUser" | "acceptsUse
   if (!values.acceptsUser) return "none"
   if (values.needsUser && !values.user) return "required"
   return "optional"
+}
+
+/** Where Home shows an added machine, as a person reads it after the click, and what to do where it shows none. */
+function whereAdded(sites: SitesOutcome | undefined, placed: AddedOutcome | undefined): string {
+  if (placed?.ok) return placed.already ? `It stood on ${placed.siteName} already, and stays there.` : "Its values appear on Home within seconds."
+  if (placed) return `It is on no site: ${placed.reason} Put it on one with Add machine on Home.`
+  if (sites?.ok) return "There is no site yet: put it on one with Add machine on Home."
+  if (sites) return `It is on no site: ${sites.reason}`
+  return "Put it on a site with Add machine on Home."
+}
+
+/**
+ * The toast after a proposal was added: "A1121O0001 added · North plant", as Home says it of a machine it put on
+ * a site, or the machine alone and why it is on no site. A registration that replaces one says so.
+ */
+export function addedInWords(
+  proposal: Pick<Proposal, "serialNumber" | "replaces">,
+  sites: SitesOutcome | undefined,
+  placed: AddedOutcome | undefined,
+): { title: string; description: string | undefined } {
+  if (proposal.replaces) return { title: `Registration of ${proposal.serialNumber} replaced`, description: undefined }
+  const title = placed?.ok ? placedInWords(proposal.serialNumber, placed.siteName, null, false) : `${proposal.serialNumber} added`
+  return { title, description: whereAdded(sites, placed) }
+}
+
+/** What the card says once the proposal was added: where the machine went, or why it is on no site. */
+export function doneInWords(
+  proposal: Pick<Proposal, "serialNumber" | "replaces">,
+  sites: SitesOutcome | undefined,
+  placed: AddedOutcome | undefined,
+): string {
+  if (proposal.replaces) return `The registration of ${proposal.serialNumber} is replaced.`
+  if (placed?.ok && !placed.already) return `${proposal.serialNumber} is added on ${placed.siteName}. Its values appear on Home within seconds.`
+  return `${proposal.serialNumber} is added. ${whereAdded(sites, placed)}`
 }

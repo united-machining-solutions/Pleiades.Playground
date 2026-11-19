@@ -88,13 +88,18 @@ export async function knownMachines(apis: Apis, now = new Date()): Promise<Array
 
 /** The identification of a machine: the newest value of each, however old. */
 async function readIdentity(apis: Apis, machine: string, now: Date): Promise<Identity> {
-  const [manufacturer, model, serialNumber] = await Promise.all(
+  const [manufacturer, model, serialNumber, deviceClass] = await Promise.all(
     Object.values(IDENTITY_PATHS).map(async (path) => {
       const [series] = await readStrings(apis, `machines/${machine}/${path}`, EVER, now, 1)
       return series?.samples.at(-1)?.value ?? null
     }),
   )
-  return { manufacturer: manufacturer ?? null, model: model ?? null, serialNumber: serialNumber ?? null }
+  return {
+    manufacturer: manufacturer ?? null,
+    model: model ?? null,
+    serialNumber: serialNumber ?? null,
+    deviceClass: deviceClass ?? null,
+  }
 }
 
 /**

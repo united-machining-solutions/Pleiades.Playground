@@ -20,6 +20,35 @@ internal sealed record UserRequest(string Url, string User, string Password)
     public override string ToString() => $"UserRequest {{ Url = {Url}, User = {User} }}";
 }
 
+/// <summary>The security a person chose for a server on the endpoints card.</summary>
+/// <param name="Url">The address of the server, <c>opc.tcp://host:port</c>.</param>
+/// <param name="SecurityMode">The message security mode: <c>None</c>, <c>Sign</c> or <c>SignAndEncrypt</c>.</param>
+/// <param name="SecurityPolicy">The short name of the security policy, for example <c>Basic256Sha256</c>, or <c>None</c>.</param>
+internal sealed record SecurityRequest(string Url, SecurityMode? SecurityMode, string? SecurityPolicy)
+{
+    /// <summary>
+    /// The choice the request names, or null with why not. Both fields are required: a mode left out is no choice,
+    /// although <c>None</c> is the default of the enumeration, so that no request chooses no security by omission.
+    /// </summary>
+    public SecurityChoice? Choice(out string? problem)
+    {
+        if (SecurityMode is not { } mode || !Enum.IsDefined(mode) || string.IsNullOrWhiteSpace(SecurityPolicy))
+        {
+            problem = "securityMode and securityPolicy: both are required, securityMode one of None, Sign and SignAndEncrypt.";
+            return null;
+        }
+
+        problem = null;
+        return new SecurityChoice(mode, EndpointRanking.ShortName(SecurityPolicy.Trim()));
+    }
+}
+
+/// <summary>A server with the security a person chose for it.</summary>
+/// <param name="Url">The address of the server.</param>
+/// <param name="SecurityMode">The message security mode.</param>
+/// <param name="SecurityPolicy">The short name of the security policy.</param>
+internal sealed record SecurityChoiceView(string Url, SecurityMode SecurityMode, string SecurityPolicy);
+
 /// <summary>
 /// The management API of the adapter: which machines are added, checking a registration, adding and
 /// removing a machine. Adding and removing are here and not among the MCP tools on purpose: a
@@ -34,6 +63,15 @@ internal static class MachineEndpoints
         app.MapGet("/users", ListUsers);
         app.MapPut("/users", SaveUser);
         app.MapDelete("/users", RemoveUser);
+        app.MapGet("/security", ListSecurity);
+        app.MapPut("/security", SaveSecurity)
+            .WithSummary("Keeps the security a person chose for a server")
+            .WithDescription(
+                "The adapter takes this endpoint from now on, for the scan and for every registration proposed after, also if it is " +
+                "weaker than the strongest one or has no security at all (None). 204 when kept; 409 if the server offers no such " +
+                "endpoint for a session the adapter can open. A machine that is added keeps the security of its registration.");
+        app.MapDelete("/security", RemoveSecurity)
+            .WithSummary("Forgets the security chosen for a server: the adapter takes the strongest endpoint again");
         app.MapGet("/machines", List);
         app.MapGet("/machines/{serialNumber}", Show);
         app.MapGet("/machines/{serialNumber}/mapping", Mapping);
@@ -133,6 +171,42 @@ internal static class MachineEndpoints
     /// <summary>Forgets the user of a server.</summary>
     private static IResult RemoveUser([FromQuery] string url, MachineSupervisor supervisor) =>
         supervisor.RemoveUser(url) ? Results.NoContent() : Problem(StatusCodes.Status404NotFound, [$"No user is stored for {url}."]);
+
+    /// <summary>The servers with a chosen security.</summary>
+    private static IResult ListSecurity(MachineSupervisor supervisor) =>
+        Json(supervisor.SecurityChoices.Select(stored => new SecurityChoiceView(stored.Url, stored.Choice.SecurityMode, stored.Choice.SecurityPolicy)).ToList());
+
+    /// <summary>
+    /// Keeps the security a person chose for a server. The card of the chat sends this from the server of the app,
+    /// never the language model: a weaker endpoint is the decision of a person.
+    /// </summary>
+    private static async Task<IResult> SaveSecurity([FromBody] SecurityRequest request, MachineSupervisor supervisor, CancellationToken cancellationToken)
+    {
+        if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var parsed) || parsed.Scheme != "opc.tcp")
+        {
+            return Problem(StatusCodes.Status400BadRequest, ["url: must be an opc.tcp:// URL."]);
+        }
+
+        if (request.Choice(out var problem) is not { } choice)
+        {
+            return Problem(StatusCodes.Status400BadRequest, [problem!]);
+        }
+
+        try
+        {
+            return await supervisor.SaveSecurityAsync(request.Url, choice, cancellationToken).ConfigureAwait(false) is { } refused
+                ? Problem(StatusCodes.Status409Conflict, [refused])
+                : Results.NoContent();
+        }
+        catch (Exception exception) when (IsServerFault(exception))
+        {
+            return Problem(StatusCodes.Status502BadGateway, [$"The server at {request.Url} did not answer: {exception.Message}"]);
+        }
+    }
+
+    /// <summary>Forgets the security chosen for a server.</summary>
+    private static IResult RemoveSecurity([FromQuery] string url, MachineSupervisor supervisor) =>
+        supervisor.RemoveSecurity(url) ? Results.NoContent() : Problem(StatusCodes.Status404NotFound, [$"No security is chosen for {url}."]);
 
     private static IResult List(MachineSupervisor supervisor) =>
         Json(new ServerListView([.. supervisor.Machines.Select(machine => Views.Server(machine, supervisor.SharingSession(machine)))]));

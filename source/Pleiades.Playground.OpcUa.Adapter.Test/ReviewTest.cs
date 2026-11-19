@@ -16,7 +16,7 @@ using Pleiades.Playground.OpcUa.Adapter.Registrations;
 
 namespace Pleiades.Playground.OpcUa.Adapter.Test;
 
-/// <summary>The filter of the scan's connect tool, as the MCP server runs it, with a stored user.</summary>
+/// <summary>The filter of the scan's connect tool, as the MCP server runs it: the security of the adapter, anonymous first.</summary>
 [TestClass]
 public class ScanConnectFilterTest
 {
@@ -31,11 +31,39 @@ public class ScanConnectFilterTest
         Arguments = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json)!,
     };
 
-    private static Func<string, CancellationToken, Task<IReadOnlyList<OfferedEndpoint>>> Presents(string? thumbprint) =>
-        (_, _) => Task.FromResult<IReadOnlyList<OfferedEndpoint>>(
-            [new OfferedEndpoint(Url, SecurityMode.SignAndEncrypt, "Aes256_Sha256_RsaPss", false, thumbprint, UserName: true)]);
-
     private static readonly Credential Stored = new("operator", "s3cret-pass", Pinned);
+
+    /// <summary>A server of one encrypted endpoint that takes a user name only, presenting <paramref name="thumbprint"/>.</summary>
+    private static Func<string, CancellationToken, Task<EndpointOffer>> UserOnly(string? thumbprint, string? user = "operator") =>
+        (url, _) => Task.FromResult(new EndpointOffer(
+            url,
+            [new OfferedEndpoint(Url, SecurityMode.SignAndEncrypt, "Aes256_Sha256_RsaPss", false, thumbprint, UserName: true)],
+            user));
+
+    /// <summary>A server that takes anonymous sessions and a user name on its encrypted endpoint, and anonymous ones without security.</summary>
+    private static Func<string, CancellationToken, Task<EndpointOffer>> Both(string? user = null, SecurityChoice? choice = null) =>
+        (url, _) => Task.FromResult(new EndpointOffer(
+            url,
+            [
+                new OfferedEndpoint(Url, SecurityMode.SignAndEncrypt, "Aes256_Sha256_RsaPss", true, Pinned, UserName: true),
+                new OfferedEndpoint(Url, SecurityMode.None, "None", true, Pinned),
+            ],
+            user,
+            choice));
+
+    private static Func<string, OfferedEndpoint, CancellationToken, Task<bool>> Refuses(bool refuses, List<string>? tried = null) =>
+        (_, endpoint, _) =>
+        {
+            tried?.Add($"{endpoint.SecurityMode}/{endpoint.SecurityPolicy}");
+            return Task.FromResult(refuses);
+        };
+
+    private static Func<CallToolRequestParams, CancellationToken, ValueTask<CallToolResult>> Passing(Action<CallToolRequestParams> seen) =>
+        (call, _) =>
+        {
+            seen(call);
+            return ValueTask.FromResult(new CallToolResult());
+        };
 
     [TestMethod]
     public async Task A_scan_the_server_refuses_for_an_untrusted_adapter_says_how_to_trust_it()
@@ -43,7 +71,8 @@ public class ScanConnectFilterTest
         var result = await ScanConnect.CallAsync(
             Call($$"""{"endpointUrl":"{{Url}}"}"""),
             _ => null,
-            Presents(Pinned),
+            Both(),
+            Refuses(false),
             (_, _) => ValueTask.FromResult(new CallToolResult
             {
                 IsError = true,
@@ -65,7 +94,8 @@ public class ScanConnectFilterTest
         var result = await ScanConnect.CallAsync(
             Call($$"""{"endpointUrl":"{{Url}}"}"""),
             _ => null,
-            Presents(Pinned),
+            Both(),
+            Refuses(false),
             (_, _) => ValueTask.FromResult(new CallToolResult
             {
                 IsError = true,
@@ -77,14 +107,89 @@ public class ScanConnectFilterTest
     }
 
     [TestMethod]
-    public async Task A_stored_user_goes_into_the_call_and_its_password_out_of_the_result()
+    public async Task A_scan_takes_the_strongest_endpoint_anonymously_whatever_security_the_model_named()
+    {
+        CallToolRequestParams? passed = null;
+
+        await ScanConnect.CallAsync(
+            Call($$"""{"endpointUrl":"{{Url}}","securityMode":"None","name":"scan"}"""),
+            _ => null,
+            Both(),
+            Refuses(false),
+            Passing(call => passed = call),
+            TestContext.CancellationToken);
+
+        Assert.AreEqual("SignAndEncrypt", passed!.Arguments!["securityMode"].GetString());
+        Assert.AreEqual("Aes256_Sha256_RsaPss", passed.Arguments["securityPolicy"].GetString(), "The library matches the short name of a policy, not its URI.");
+        Assert.AreEqual("Anonymous", passed.Arguments["authType"].GetString());
+        Assert.IsFalse(passed.Arguments.ContainsKey("password"));
+        Assert.AreEqual("scan", passed.Arguments["name"].GetString());
+    }
+
+    [TestMethod]
+    public async Task A_scan_takes_the_security_a_person_chose_even_none()
+    {
+        CallToolRequestParams? passed = null;
+
+        await ScanConnect.CallAsync(
+            Call($$"""{"endpointUrl":"{{Url}}"}"""),
+            _ => null,
+            Both(choice: new SecurityChoice(SecurityMode.None, "None")),
+            Refuses(false),
+            Passing(call => passed = call),
+            TestContext.CancellationToken);
+
+        Assert.AreEqual("None", passed!.Arguments!["securityMode"].GetString());
+        Assert.AreEqual("None", passed.Arguments["securityPolicy"].GetString(), "The library matches the short name of a policy, not its URI.");
+    }
+
+    [TestMethod]
+    public async Task A_stored_user_goes_before_an_anonymous_session_also_where_the_server_takes_both()
+    {
+        CallToolRequestParams? passed = null;
+        var tried = new List<string>();
+
+        await ScanConnect.CallAsync(
+            Call($$"""{"endpointUrl":"{{Url}}"}"""),
+            _ => Stored,
+            Both(user: "operator"),
+            Refuses(false, tried),
+            Passing(call => passed = call),
+            TestContext.CancellationToken);
+
+        Assert.IsEmpty(tried, "No anonymous session is tried: an anonymous session may see less than the user a person stored.");
+        Assert.AreEqual("operator", passed!.Arguments!["username"].GetString());
+        Assert.AreEqual("SignAndEncrypt", passed.Arguments["securityMode"].GetString());
+    }
+
+    [TestMethod]
+    public async Task Without_a_stored_user_a_scan_is_anonymous_and_tries_nothing_before()
+    {
+        CallToolRequestParams? passed = null;
+        var tried = new List<string>();
+
+        await ScanConnect.CallAsync(
+            Call($$"""{"endpointUrl":"{{Url}}"}"""),
+            _ => null,
+            Both(),
+            Refuses(false, tried),
+            Passing(call => passed = call),
+            TestContext.CancellationToken);
+
+        Assert.IsEmpty(tried);
+        Assert.AreEqual("Anonymous", passed!.Arguments!["authType"].GetString());
+    }
+
+    [TestMethod]
+    public async Task A_server_that_refuses_the_anonymous_session_gets_the_stored_user_and_the_password_stays_out_of_the_result()
     {
         CallToolRequestParams? passed = null;
 
         var result = await ScanConnect.CallAsync(
             Call($$"""{"endpointUrl":"{{Url}}"}"""),
-            url => url == Url ? Stored : null,
-            Presents(Pinned),
+            _ => Stored,
+            Both(user: "operator"),
+            Refuses(true),
             (call, _) =>
             {
                 passed = call;
@@ -92,12 +197,57 @@ public class ScanConnectFilterTest
             },
             TestContext.CancellationToken);
 
-        Assert.IsNotNull(passed);
-        Assert.AreEqual("s3cret-pass", passed.Arguments!["password"].GetString());
+        Assert.AreEqual("s3cret-pass", passed!.Arguments!["password"].GetString());
         Assert.AreEqual("SignAndEncrypt", passed.Arguments["securityMode"].GetString());
         var text = ((TextContentBlock)result.Content[0]).Text;
         Assert.DoesNotContain("s3cret-pass", text, "The model never reads the password, also not in an error.");
         Assert.Contains("***", text);
+    }
+
+    [TestMethod]
+    public async Task A_refused_anonymous_session_without_security_falls_back_to_the_user_on_an_encrypted_endpoint()
+    {
+        CallToolRequestParams? passed = null;
+
+        await ScanConnect.CallAsync(
+            Call($$"""{"endpointUrl":"{{Url}}"}"""),
+            _ => Stored,
+            Both(user: "operator", choice: new SecurityChoice(SecurityMode.None, "None")),
+            Refuses(true),
+            Passing(call => passed = call),
+            TestContext.CancellationToken);
+
+        Assert.AreEqual("SignAndEncrypt", passed!.Arguments!["securityMode"].GetString(), "A password never goes over an endpoint without encryption.");
+        Assert.AreEqual("Aes256_Sha256_RsaPss", passed.Arguments["securityPolicy"].GetString(), "The library matches the short name of a policy, not its URI.");
+    }
+
+    [TestMethod]
+    public async Task An_endpoint_without_anonymous_sessions_takes_the_user_at_once()
+    {
+        CallToolRequestParams? passed = null;
+        var tried = new List<string>();
+
+        await ScanConnect.CallAsync(
+            Call($$"""{"endpointUrl":"{{Url}}"}"""),
+            url => url == Url ? Stored : null,
+            UserOnly(Pinned),
+            Refuses(false, tried),
+            Passing(call => passed = call),
+            TestContext.CancellationToken);
+
+        Assert.IsEmpty(tried, "No anonymous session is tried where the endpoint takes none.");
+        Assert.AreEqual("operator", passed!.Arguments!["username"].GetString());
+    }
+
+    [TestMethod]
+    public async Task A_server_that_wants_a_user_without_a_stored_one_is_not_called()
+    {
+        var result = await ScanConnect.CallAsync(
+            Call($$"""{"endpointUrl":"{{Url}}"}"""), _ => null, UserOnly(Pinned, user: null), Refuses(false),
+            (_, _) => throw new AssertFailedException("The tool must not be called."), TestContext.CancellationToken);
+
+        Assert.IsTrue(result.IsError);
+        Assert.AreEqual(ScanConnect.NeedsUserText, ((TextContentBlock)result.Content[0]).Text);
     }
 
     [TestMethod]
@@ -108,7 +258,8 @@ public class ScanConnectFilterTest
         var result = await ScanConnect.CallAsync(
             Call($$"""{"endpointUrl":"{{Url}}"}"""),
             _ => Stored,
-            Presents("DDEEFF"),
+            UserOnly("DDEEFF"),
+            Refuses(false),
             (_, _) =>
             {
                 called = true;
@@ -122,23 +273,13 @@ public class ScanConnectFilterTest
     }
 
     [TestMethod]
-    public async Task A_call_that_brings_a_user_is_refused_and_one_without_a_stored_user_goes_on_as_it_is()
+    public async Task A_call_that_brings_a_user_is_refused()
     {
         var refused = await ScanConnect.CallAsync(
-            Call($$"""{"endpointUrl":"{{Url}}","username":"x","password":"y"}"""), _ => Stored, Presents(Pinned),
+            Call($$"""{"endpointUrl":"{{Url}}","username":"x","password":"y"}"""), _ => Stored, Both(), Refuses(false),
             (_, _) => throw new AssertFailedException("The tool must not be called."), TestContext.CancellationToken);
-        Assert.AreEqual(ScanConnect.Refusal, ((TextContentBlock)refused.Content[0]).Text);
 
-        CallToolRequestParams? passed = null;
-        await ScanConnect.CallAsync(
-            Call($$"""{"endpointUrl":"{{Url}}"}"""), _ => null, Presents(Pinned),
-            (call, _) =>
-            {
-                passed = call;
-                return ValueTask.FromResult(new CallToolResult());
-            },
-            TestContext.CancellationToken);
-        Assert.IsFalse(passed!.Arguments!.ContainsKey("password"), "An anonymous scan stays anonymous.");
+        Assert.AreEqual(ScanConnect.Refusal, ((TextContentBlock)refused.Content[0]).Text);
     }
 }
 
@@ -394,7 +535,7 @@ public class MachineSupervisorTest
         });
         var supervisor = new MachineSupervisor(
             new RegistrationStore(dataDirectory), new AlertStore(dataDirectory), client, new RegistrationProbe(client), outputs,
-            new DraftStore(), credentials, config, NullLogger<MachineSupervisor>.Instance);
+            new DraftStore(), credentials, new SecurityChoiceStore(dataDirectory), config, NullLogger<MachineSupervisor>.Instance);
         return (supervisor, outputs);
     }
 

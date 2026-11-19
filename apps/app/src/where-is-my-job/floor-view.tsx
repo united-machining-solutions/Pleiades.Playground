@@ -7,20 +7,23 @@ import { titleOf } from "@pleiades/cards/machine/in-words.ts"
 import { stateLabel } from "@pleiades/cards/machine/state.ts"
 import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
 import type { State } from "@pleiades/cards/machine/contract.ts"
-import { createFileRoute } from "@tanstack/react-router"
-import { FactoryIcon, MessageSquareWarningIcon, PackageSearchIcon } from "lucide-react"
+import { FactoryIcon, MessageSquareWarningIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { useMemo, useState } from "react"
 
 import { NoAnswer } from "@/components/no-answer.tsx"
 import { liveness, useLive, useRetry } from "@/hooks/use-live.ts"
 import type { Live } from "@/hooks/use-live.ts"
-import { getFloor } from "@/where-is-my-job/get-floor.ts"
+import type { Floor } from "@/where-is-my-job/get-floor.ts"
+import type { Answer } from "@/machines/get-machines.ts"
 import { floorAt, floorFilters, floorOf, floorWith, ordersOf } from "@/where-is-my-job/floor.ts"
 import type { FloorPage, Order } from "@/where-is-my-job/floor.ts"
+import type { FloorExtra } from "@/where-is-my-job/extras.ts"
 import { FloorMap } from "@/where-is-my-job/floor-map.tsx"
 import type { Lens } from "@/where-is-my-job/floor-map.tsx"
 import { FloorPanel, MachinePanel, OrderPanel, OrdersTable } from "@/where-is-my-job/panels.tsx"
+import { Arrange } from "@/where-is-my-job/arrange.tsx"
+import { clustersOf, useStepSettings } from "@/where-is-my-job/steps.ts"
 
 /** Read once from the backend, the job orders among them; then every value comes from the broker. */
 const live: Live<FloorPage | null> = {
@@ -29,21 +32,6 @@ const live: Live<FloorPage | null> = {
   at: (page, now) => page && floorAt(page, now),
 }
 
-/**
- * Where is My Job? A basis for discussion: how an order could be followed across the shop floor.
- * It shows the machines of the stack with their real state, job orders and history, and an order as
- * every job order that names the same order number. What the stack has no source for yet, the
- * programming before the machines, the packing after them, and a part by its sheet and position,
- * stands on the page as such. The chat does not know the page.
- *
- * It is a page of the app, with its entry in the sidebar: it reads only values the stack has.
- */
-export const Route = createFileRoute("/where-is-my-job")({
-  staticData: { nav: { title: "Where is My Job?", icon: PackageSearchIcon } },
-  loader: () => getFloor().catch((error: unknown) => ({ values: null, error: String(error) })),
-  component: WhereIsMyJob,
-})
-
 type View = "floor" | "machine" | "order"
 
 const legendStates: ReadonlyArray<State> = ["running", "setup", "stopped", "alarm", "no-data"]
@@ -51,12 +39,33 @@ const legendStates: ReadonlyArray<State> = ["running", "setup", "stopped", "alar
 /** Whether an order passes a machine. */
 const passes = (order: Order | null, machine: string) => order !== null && order.steps.some((step) => step.machine === machine)
 
-function WhereIsMyJob() {
-  const answer = Route.useLoaderData()
+const title = "Where is My Job?"
+
+/**
+ * The page "Where is My Job?" as a view of what the loader read. Where a page gives more to lay onto
+ * the shop floor (`extras`, made-up orders of the showcase), the view opens with the first of it, and
+ * a switch above the map turns it off. Without extras it shows the real orders only.
+ */
+export function FloorView({
+  answer,
+  extras = [],
+}: {
+  answer: Answer<Floor> | { values: null; error: string }
+  extras?: ReadonlyArray<FloorExtra>
+}) {
+  // Where a page gives more, the view opens with it: that is what the demo is about.
+  const [extraId, setExtraId] = useState<string>(extras[0]?.id ?? "real")
+  const extra = extras.find((one) => one.id === extraId) ?? null
+  const decorate = extra?.decorate
   // One object per read, so the page is not reset on every render.
   const loaded = useMemo(() => (answer.values ? floorOf(answer.values, answer.values.jobOrders) : null), [answer.values])
-  const { values: page, connected } = useLive<FloorPage | null>(loaded, live)
+  const { values: heard, connected } = useLive<FloorPage | null>(loaded, live)
   useRetry(answer.values === null)
+  // What a person set in "Arrange" wins over the step that follows from the machine.
+  const [settings, saveSettings] = useStepSettings()
+  // The machines by their step of manufacturing; a showcase lays its own job orders onto the page here.
+  const clusters = useMemo(() => clustersOf(heard?.machines.map((one) => one.show.machine) ?? [], settings), [heard, settings])
+  const page = useMemo(() => (heard && decorate ? decorate(heard, clusters) : heard), [heard, clusters, decorate])
 
   const [lens, setLens] = useState<Lens>("load")
   const [machine, setMachine] = useState<string | null>(null)
@@ -73,14 +82,14 @@ function WhereIsMyJob() {
 
   if (answer.values === null || page === null) {
     return (
-      <Page>
+      <Page title={title}>
         <NoAnswer error={answer.error ?? ""} />
       </Page>
     )
   }
   if (page.machines.length === 0) {
     return (
-      <Page>
+      <Page title={title}>
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -98,6 +107,7 @@ function WhereIsMyJob() {
   const backOrder = orders.find((one) => one.key === backTo) ?? null
   const shown = page.machines.find((one) => one.show.machine.machine === machine) ?? null
   const view: View = order ? "order" : shown ? "machine" : "floor"
+  const machines = page.machines.map((one) => one.show.machine)
 
   // The way back to an order stays only for a machine on its path.
   const openMachine = (id: string, from: Order | null = null) => {
@@ -119,14 +129,18 @@ function WhereIsMyJob() {
   }
 
   return (
-    <Page line={`${page.machines.length} ${page.machines.length === 1 ? "machine" : "machines"} · ${liveness(connected, page.asOf)}`}>
+    <Page title={title} line={`${page.machines.length} ${page.machines.length === 1 ? "machine" : "machines"} · ${liveness(connected, page.asOf)}`}>
       <Alert>
         <MessageSquareWarningIcon />
         <AlertTitle>For discussion</AlertTitle>
         <AlertDescription>
-          How could an order be followed across the shop floor? The machines, their job orders and their hours are
-          the real values of the stack. An order is every job order that names the same order number. Programming,
-          packing and the single part on its sheet have no source yet: they stand here dashed, as the gaps to discuss.
+          {extra?.about ?? (
+            <>
+              How could an order be followed across the shop floor? The machines, their job orders and their hours are
+              the real values of the stack. An order is every job order that names the same order number. Programming,
+              packing and the single part on its sheet have no source yet: they stand here dashed, as the gaps to discuss.
+            </>
+          )}
         </AlertDescription>
       </Alert>
 
@@ -142,24 +156,39 @@ function WhereIsMyJob() {
         }}
         className="gap-6"
       >
-        <TabsList aria-label="Perspective">
-          <TabsTrigger value="floor">1 · Shop floor</TabsTrigger>
-          <TabsTrigger value="machine" disabled={!shown}>
-            2 · {shown ? titleOf(shown.show.machine) : "Machine"}
-          </TabsTrigger>
-          <TabsTrigger value="order" disabled={!order}>
-            3 · {order ? order.label : "Order"}
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Side by side where there is room; the perspective drops below the map where there is not. */}
-        <div className="flex flex-wrap items-start gap-6">
-          <div className="flex min-w-0 flex-[999_1_780px] flex-col gap-6">
+        {/* One column, the perspective right below the map: the right of the window is the chat's. */}
+        <div className="flex flex-col gap-6">
+          <div className="flex min-w-0 flex-col gap-6">
             <Card size="sm" className="min-w-0">
               <CardHeader>
                 <CardTitle>The shop floor from above</CardTitle>
-                <CardDescription>A tile opens its machine, a marker below it opens the order.</CardDescription>
-                <CardAction>
+                <CardDescription>
+                  Machines of one step of manufacturing stand side by side. A tile opens its machine, a marker below it
+                  opens the order.
+                </CardDescription>
+                <CardAction className="flex flex-wrap justify-end gap-2">
+                  {extras.length > 0 && (
+                    <ToggleGroup
+                      variant="outline"
+                      size="sm"
+                      spacing={0}
+                      value={[extraId]}
+                      onValueChange={(value) => {
+                        if (!value[0]) return
+                        setExtraId(value[0])
+                        setOrderKey(null)
+                      }}
+                      aria-label="Orders"
+                    >
+                      <ToggleGroupItem value="real">Real orders</ToggleGroupItem>
+                      {extras.map((one) => (
+                        <ToggleGroupItem key={one.id} value={one.id}>
+                          {one.label}
+                        </ToggleGroupItem>
+                      ))}
+                    </ToggleGroup>
+                  )}
+                  <Arrange machines={machines} settings={settings} onSave={saveSettings} />
                   <ToggleGroup
                     variant="outline"
                     size="sm"
@@ -177,6 +206,7 @@ function WhereIsMyJob() {
                 <FloorMap
                   page={page}
                   orders={orders}
+                  clusters={clusters}
                   lens={lens}
                   machine={machine}
                   order={order}
@@ -207,74 +237,74 @@ function WhereIsMyJob() {
               </CardContent>
             </Card>
 
-            <Card size="sm" className="min-w-0">
-              <CardHeader>
-                <CardTitle>Orders on the shop floor</CardTitle>
-                <CardDescription>{orders.length} orders from the job orders of the machines · held up ones first</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <OrdersTable page={page} orders={orders} chosen={orderKey} onOrder={(key) => openOrder(key)} />
-              </CardContent>
-            </Card>
           </div>
 
           {/* One Card in each tab, so both keep their own composition. */}
-          <TabsContent value="floor" className="min-w-0 flex-[1_1_300px]">
-            <Card size="sm">
-              <CardHeader>
-                <CardTitle>1 · Shop floor</CardTitle>
-                <CardDescription>What needs someone now.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FloorPanel page={page} orders={orders} onMachine={(id) => openMachine(id)} onOrder={(key) => openOrder(key)} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="machine" className="min-w-0 flex-[1_1_300px]">
-            <Card size="sm">
-              <CardHeader>
-                <CardTitle>2 · Machine</CardTitle>
-                <CardDescription>What it did, what it does, what waits for it.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {shown && (
-                  <MachinePanel
-                    // A machine of its own reads its band of its own.
-                    key={shown.show.machine.machine}
-                    page={page}
-                    orders={orders}
-                    machine={shown.show.machine.machine}
-                    backTo={backOrder}
-                    onBack={() => backOrder && openOrder(backOrder.key, true)}
-                    onOrder={(key) => openOrder(key, true)}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="order" className="min-w-0 flex-[1_1_300px]">
-            <Card size="sm">
-              <CardHeader>
-                <CardTitle>3 · Order</CardTitle>
-                <CardDescription>Where it has been, where it is, where it goes.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {order && <OrderPanel page={page} order={order} onMachine={(id) => openMachine(id, order)} />}
-              </CardContent>
-            </Card>
-          </TabsContent>
+          <div className="flex flex-col gap-3">
+            <TabsList aria-label="Perspective">
+              <TabsTrigger value="floor">1 · Shop floor</TabsTrigger>
+              <TabsTrigger value="machine" disabled={!shown}>
+                2 · {shown ? titleOf(shown.show.machine) : "Machine"}
+              </TabsTrigger>
+              <TabsTrigger value="order" disabled={!order}>
+                3 · {order ? order.label : "Order"}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="floor" className="min-w-0">
+              <Card size="sm">
+                <CardContent>
+                  <FloorPanel page={page} orders={orders} onMachine={(id) => openMachine(id)} onOrder={(key) => openOrder(key)} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="machine" className="min-w-0">
+              <Card size="sm">
+                <CardContent>
+                  {shown && (
+                    <MachinePanel
+                      // A machine of its own reads its band of its own.
+                      key={shown.show.machine.machine}
+                      page={page}
+                      orders={orders}
+                      machine={shown.show.machine.machine}
+                      backTo={backOrder}
+                      onBack={() => backOrder && openOrder(backOrder.key, true)}
+                      onOrder={(key) => openOrder(key, true)}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="order" className="min-w-0">
+              <Card size="sm">
+                <CardContent>
+                  {order && <OrderPanel page={page} order={order} onMachine={(id) => openMachine(id, order)} />}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </div>
+
+          <Card size="sm" className="min-w-0">
+            <CardHeader>
+              <CardTitle>Orders on the shop floor</CardTitle>
+              <CardDescription>{orders.length} orders from the job orders of the machines · held up ones first</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <OrdersTable page={page} orders={orders} chosen={orderKey} onOrder={(key) => openOrder(key)} />
+            </CardContent>
+          </Card>
         </div>
       </Tabs>
     </Page>
   )
 }
 
-/** Wider than the other pages: the map and the perspective it opens stand side by side. */
-function Page({ line, children }: { line?: string; children: ReactNode }) {
+/** Wider than the other pages: the map needs the room. */
+function Page({ title, line, children }: { title: string; line?: string; children: ReactNode }) {
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold">Where is My Job?</h1>
+        <h1 className="text-2xl font-semibold">{title}</h1>
         {line && <p className="text-sm text-muted-foreground">{line}</p>}
       </div>
       {children}
