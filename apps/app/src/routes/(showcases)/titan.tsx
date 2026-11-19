@@ -71,6 +71,8 @@ const AWAKE = "Ja?"
 const ON_IT = "Moment."
 /** What Titan says when the answer needs a tool and the model said nothing before it called one. */
 const LOOKING = "Ich schaue kurz nach."
+/** Titan speaks of a new fault by itself at most this often. */
+const FAULT_SAID_EVERY_MS = 60_000
 /** The space bar held shorter than this was a tap, not a question: Titan does not answer it. */
 const SHORTEST_QUESTION_MS = 600
 /** What Titan says when it pauses, and when it is back. */
@@ -219,11 +221,19 @@ function Assistant() {
   // The cloud keeps an eye on the hall. A new fault turns it red at once, and Titan speaks first: it is
   // told what happened and says it in its own words. Without a language model, the page says the fault
   // itself.
+  /** When Titan last spoke of a fault by itself. */
+  const lastFaultSaid = useRef(0)
   const { alarmed, list } = useNewFaults((fault) => {
-    setHeard(undefined)
-    setProblem(undefined)
     // Before the start, in a pause or behind another tab, the fault is shown, not said.
     if (!latest.current.mayTalk) return
+    // A fault never talks over the person or over an answer: while Titan listens, thinks or speaks, and
+    // while the space bar is held, it is shown in the line on top and not said. In a hall where faults
+    // come often Titan also says at most one a minute, or nobody could ask it anything.
+    if (latest.current.state !== "idle" || holding.current) return
+    if (performance.now() - lastFaultSaid.current < FAULT_SAID_EVERY_MS && lastFaultSaid.current > 0) return
+    lastFaultSaid.current = performance.now()
+    setHeard(undefined)
+    setProblem(undefined)
     if (!canAnswer.current || !conversation.current) return void speak(faultInWords(fault, undefined))
     conversation.current.ask(faultBriefing(fault, undefined))
   })

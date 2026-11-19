@@ -11,7 +11,8 @@ All notable changes are documented here. The format follows
   bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the one thing
   the answer is about. It has a conversation of its own, made for speaking: the hall as it is now stands in
   its instructions, so most questions need no tool call, and it says at once that it heard and announces a
-  lookup. Listening, the conversation and the voice come from the gateway at `LLM_BASE_URL` alone; a speech
+  lookup. A new fault it says by itself, but never over the person or an answer, and at most one a minute.
+  Listening, the conversation and the voice come from the gateway at `LLM_BASE_URL` alone; a speech
   model named `titan/...` there gives Titan a voice of its own. Only a build with `APP_SHOWCASES` has it, and
   nothing outside `apps/app/src/showcases/titan/` and its routes changed. Its guide,
   `apps/app/src/showcases/titan/README.md`, says what leaves the room.

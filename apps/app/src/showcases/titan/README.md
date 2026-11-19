@@ -16,6 +16,9 @@ came out of the umati hackathon in November 2026.
 | Pause | The key P, or "Hey Titan, Pause". "Hey Titan" or the space bar wakes it |
 | Leave | Escape |
 
+Titan also speaks first: when a machine raises a new error it says so, in its own words. It never talks over
+the person or over an answer, and says at most one fault a minute; every fault stands in the line on top.
+
 Titan speaks German, as the demo does.
 
 ## How a question becomes an answer
