@@ -19,7 +19,7 @@ docker compose --profile juicebar up -d --build
 
 | | |
 |---|---|
-| Reads | The card, the pumps with their ingredients, the state of the production, the queue, the orders. |
+| Reads | The card, the pumps with their ingredients, the state of the production, the queue, the orders; and, where a marketplace is named, its public report of how often each ingredient was in a sold drink. |
 | Writes | One thing: it places an order (`POST /orders`, `juicebar_order_create`). |
 | Never | Starts the production, changes a pump, switches the service mode, runs a program of its own. |
 
@@ -51,19 +51,21 @@ reaches the service only while sign-in is off.
 | `GET /drinks` | The drinks the machine can mix now, each with its colour, the picture of a glass its author chose, and its ingredients, each with its colour and whether its bottle runs low (see below). |
 | `GET /drinks/{id}` | One drink. |
 | `GET /status` | Connection, production state, progress, queue, pumps and warnings. For a machine that is switched off: not connected, and no pumps. |
+| `GET /consumption?hours=8` | Each ingredient on a pump once, with its pumps, colour and warning, and in how many sold drinks it was in the last `hours` (1 to 24, 8 if omitted) and since the start; the most used since the start first, the least used named, and a summary in words. See [The use of the ingredients](#the-use-of-the-ingredients). |
 | `GET /orders/{orderNumber}` | One order with its state and its place in the queue. |
 | `POST /orders` | Body `{ "drinkId": "..." }`. Answers 201 with the order, 409 with the reason of a refusal. |
 | `GET /health`, `GET /healthcheck` | Liveness, and whether the machine answers (`Degraded` if not). |
 | `GET /openapi/v1.json` | The description of the routes above. |
 
-Errors: 404 for an unknown drink or order, 409 for a refused order, 502 when the machine does not answer a
-request for its card or an order.
+Errors: 404 for an unknown drink or order, 409 for a refused order or a use without a marketplace named, 400 for
+hours out of range, 502 when the machine does not answer a request for its card or an order, or the marketplace
+not for its report.
 
 ## MCP
 
 `http://localhost:5550/mcp`, streamable HTTP. The tools are the routes above:
-`juicebar_drinks_list`, `juicebar_drink_get`, `juicebar_status`, `juicebar_order_get`, `juicebar_order_create`,
-and the two discovery tools `juicebar_describe_server` and `juicebar_get_skill_guide`.
+`juicebar_drinks_list`, `juicebar_drink_get`, `juicebar_status`, `juicebar_consumption_get`, `juicebar_order_get`,
+`juicebar_order_create`, and the two discovery tools `juicebar_describe_server` and `juicebar_get_skill_guide`.
 
 ```json
 { "servers": { "pleiades-juicebar": { "type": "http", "url": "http://localhost:5550/mcp" } } }
@@ -80,6 +82,10 @@ For the result of `juicebar_drinks_list` the chat draws the drink card: the drin
 each in its glass, one to pick, and a button that orders it. The button orders at once, without a question
 of the language model, over the same MCP server; the card then follows the order (`juicebar_order_get`, once a
 second) and shows the glass waiting for the start button, filling while the pumps run, and full.
+
+For the result of `juicebar_consumption_get` it draws the card of the juices used, after the energy card: each
+ingredient on a pump with its colour and pumps, a meter against the one used most, its drinks in the last hours
+and since the start, ordered by either, and the least used one marked. Pages keep it as a part (ADR-0025).
 
 ## Values
 
@@ -141,6 +147,19 @@ The Timeseries store keeps the snapshot field by field, as `umati/State/Status/M
 cards read. `MachineryOperationMode` is `None`, the value of the model for a machine without operation modes:
 the schema of the snapshot asks for the field.
 
+## The use of the ingredients
+
+`GET /consumption` and `juicebar_consumption_get` read the public report of the marketplace the machine takes its
+recipes from (`GET /api/reports/components/top` of its website, no sign-in), twice: since the start and over the
+last hours. The report counts the sold drinks each ingredient was in, over **all machines of the marketplace**, not
+this one alone, and **drinks, not millilitres**: the amounts of a recipe are only to be had with the token of a
+machine. Its names are matched with the names of the ingredients on the pumps, in the language of the service.
+
+- The report names at most ten ingredients. One that is not in it is in no drink, while the report has room left;
+  in a full report its count is not known (null), and then no ingredient is called the least used.
+- The least used is the one in the fewest drinks since the start; fewer in the last hours decide a tie.
+- `source` says where the counts come from, `summary` the answer in a few words.
+
 ## Settings
 
 | Variable in `.env` | Default | |
@@ -155,6 +174,7 @@ the schema of the snapshot asks for the field.
 | `JUICEBAR_MANUFACTURER_NAME` | `TRUMPF` | The name of the manufacturer, `Identification/Manufacturer`; it must not be empty. |
 | `JUICEBAR_MODEL` | `JuiceBar` | The model, the second part of the machine id. |
 | `JUICEBAR_LANGUAGE` | `en` | `en` or `de`, for the names of drinks and ingredients. |
+| `JUICEBAR_MARKETPLACE_URL` | empty | The website of the marketplace the machine takes its recipes from, as the container reaches it. Empty: the use of the ingredients is not read, and `GET /consumption` answers 409. |
 | `JUICEBAR_AUTH_ENABLED` | `false` | `true` switches sign-in on; it needs `JUICEBAR_AUTH_METADATA_ADDRESS`, `JUICEBAR_AUTH_VALID_ISSUER` and `JUICEBAR_AUTH_AUDIENCE`. |
 
 ## How it talks to the machine

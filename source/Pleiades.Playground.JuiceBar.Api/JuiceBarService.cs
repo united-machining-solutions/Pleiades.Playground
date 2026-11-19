@@ -3,7 +3,8 @@ using Microsoft.Extensions.Options;
 namespace Pleiades.Playground.JuiceBar.Api;
 
 /// <summary>What REST and MCP both offer: the card, the status, and an order with its guards.</summary>
-internal sealed class JuiceBarService(MixerClient mixer, LiveState live, IOptions<JuiceBarOptions> options, TimeProvider time)
+internal sealed class JuiceBarService(MixerClient mixer, MarketplaceClient marketplace, LiveState live,
+    IOptions<JuiceBarOptions> options, TimeProvider time)
     : IDisposable
 {
     internal const string StartButtonHint =
@@ -75,6 +76,35 @@ internal sealed class JuiceBarService(MixerClient mixer, LiveState live, IOption
         return new(snapshot.Connected, snapshot.ProductionState, snapshot.PumpControlMode, snapshot.PumpControlServiceState,
             snapshot.ProgressFraction, snapshot.Queue, pumps, options.Value.EnableOrdering, options.Value.MaximumQueueLength,
             time.GetUtcNow());
+    }
+
+    /// <summary>
+    /// How often each ingredient on a pump went into a sold drink, in the last <paramref name="hours"/> and since the
+    /// start, by the report of the marketplace.
+    /// </summary>
+    internal async Task<Consumption> ConsumptionAsync(int hours, CancellationToken cancellationToken)
+    {
+        if (hours is < 1 or > ConsumptionReport.MostHours)
+        {
+            throw new ArgumentOutOfRangeException(nameof(hours), hours,
+                $"The hours to look back must be 1 to {ConsumptionReport.MostHours}.");
+        }
+
+        if (!marketplace.Named)
+        {
+            throw new InvalidOperationException(
+                "No marketplace is named for this juice bar (JUICEBAR_MARKETPLACE_URL), so the use of its ingredients is not known.");
+        }
+
+        var to = time.GetUtcNow();
+        var from = to.AddHours(-hours);
+        var pumps = mixer.PumpsAsync(live.Snapshot().AmountWarnings, cancellationToken);
+        var colors = mixer.ColorsAsync(cancellationToken);
+        var sinceStart = marketplace.TopIngredientsAsync(ConsumptionReport.Start, to, cancellationToken);
+        var inHours = marketplace.TopIngredientsAsync(from, to, cancellationToken);
+        await Task.WhenAll(pumps, colors, sinceStart, inHours).ConfigureAwait(false);
+        return ConsumptionReport.Of(await pumps.ConfigureAwait(false), await colors.ConfigureAwait(false),
+            await sinceStart.ConfigureAwait(false), await inHours.ConfigureAwait(false), hours, from, to);
     }
 
     internal async Task<Order> OrderAsync(int orderNumber, CancellationToken cancellationToken)

@@ -49,6 +49,50 @@ export function drinksOf(content: unknown): Array<Drink> | null {
   return list.success ? list.data : null
 }
 
+const ingredientUse = z.object({
+  componentId: z.string().min(1),
+  name: z.string().nullish(),
+  color: colour,
+  pumps: z.array(z.number().int()),
+  drinksInHours: z.number().int().min(0).nullish(),
+  drinksSinceStart: z.number().int().min(0).nullish(),
+  runsLow: z.boolean().nullish(),
+})
+
+const consumption = z.object({
+  from: z.string(),
+  to: z.string(),
+  hours: z.number().int().min(1),
+  ingredients: z.array(ingredientUse),
+  leastUsedId: z.string().nullish(),
+  summary: z.string(),
+  source: z.string(),
+})
+
+export type IngredientUse = z.infer<typeof ingredientUse>
+export type Consumption = z.infer<typeof consumption>
+
+/**
+ * The use of the ingredients in the result of `juicebar_consumption_get`, or null if it is not one. The tool
+ * counts, orders and names the least used one; the card only words it.
+ */
+export function consumptionOf(content: unknown): Consumption | null {
+  const parsed = consumption.safeParse(jsonOf(content))
+  return parsed.success ? parsed.data : null
+}
+
+/** How the card lists the ingredients: as the tool gave them, the most used since the start first, or by the last hours. */
+export type UseOrder = "start" | "hours"
+
+/**
+ * The ingredients in the order a person chose. The tool's order stands for "start"; for "hours" the most used in
+ * the last hours come first, those whose count is not known last, and a tie keeps the tool's order.
+ */
+export function inUseOrder(ingredients: ReadonlyArray<IngredientUse>, order: UseOrder): Array<IngredientUse> {
+  if (order === "start") return [...ingredients]
+  return [...ingredients].sort((a, b) => (b.drinksInHours ?? -1) - (a.drinksInHours ?? -1))
+}
+
 const order = z.object({
   orderNumber: z.number().int(),
   orderName: z.string().nullish(),

@@ -87,6 +87,11 @@ internal sealed class FakeMixerControl : IAsyncDisposable
             _ = fake.EnqueueLaterAsync(number);
             return Results.Json(new { orderNumber = number, orderName = "Tropical Mix", drinkId }, statusCode: StatusCodes.Status201Created);
         });
+        // The public report of the marketplace stands on the same stand-in: since the start (from 2010), and the last
+        // hours. An ingredient that is in no sold drink is not in it.
+        app.MapGet("/api/reports/components/top", (HttpRequest request) => request.Query["from"].ToString().StartsWith("2010-", StringComparison.Ordinal)
+            ? Results.Json(new object[] { new { componentname = "Orange Juice", amount = 17 }, new { componentname = "Mineral Water", amount = 15 } })
+            : Results.Json(new object[] { new { componentname = "Orange Juice", amount = 2 } }));
         app.Map("/socket.io/", fake.ServeSocketAsync);
         await app.StartAsync(cancellationToken).ConfigureAwait(false);
         fake.BaseUrl = new Uri(app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First());

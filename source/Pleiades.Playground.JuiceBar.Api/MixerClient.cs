@@ -25,16 +25,7 @@ internal sealed partial class MixerClient(IHttpClientFactory clients, IOptions<J
         }
 
         // A drink names its ingredients without their colours; the list of components has them.
-        using var components = await ComponentsAsync(cancellationToken).ConfigureAwait(false);
-        var colors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var component in Available(components))
-        {
-            if (Text(component, "id") is { } id && ColorOf(component, "displayColor", "color") is { } color)
-            {
-                colors[id] = color;
-            }
-        }
-
+        var colors = await ColorsAsync(cancellationToken).ConfigureAwait(false);
         Drink[] drinks = [.. document.RootElement.EnumerateArray().Select(d => ToDrink(d, colors)).OfType<Drink>()];
         var pictures = await Task.WhenAll(drinks.Select(d => PictureAsync(d.Id, cancellationToken))).ConfigureAwait(false);
         return [.. drinks.Select((drink, index) => drink with { Picture = pictures[index] })];
@@ -85,6 +76,25 @@ internal sealed partial class MixerClient(IHttpClientFactory clients, IOptions<J
     /// <summary>The first property that holds a colour as <c>#rrggbb</c>. Anything else the machine says is left out.</summary>
     private static string? ColorOf(JsonElement value, params string[] properties)
         => properties.Select(p => Text(value, p)).FirstOrDefault(c => c is not null && HexColor().IsMatch(c))?.ToLowerInvariant();
+
+    /// <summary>
+    /// The colour the marketplace shows each ingredient in, by its id, as <c>#rrggbb</c>. Empty while the marketplace
+    /// of the machine is away.
+    /// </summary>
+    internal async Task<IReadOnlyDictionary<string, string>> ColorsAsync(CancellationToken cancellationToken)
+    {
+        using var components = await ComponentsAsync(cancellationToken).ConfigureAwait(false);
+        var colors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var component in Available(components))
+        {
+            if (Text(component, "id") is { } id && ColorOf(component, "displayColor", "color") is { } color)
+            {
+                colors[id] = color;
+            }
+        }
+
+        return colors;
+    }
 
     private static IEnumerable<JsonElement> Available(JsonDocument? components)
         => components is { RootElement.ValueKind: JsonValueKind.Object }

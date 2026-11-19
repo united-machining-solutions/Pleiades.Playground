@@ -7,6 +7,12 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Juice bar API and example app: the use of the ingredients. `juicebar_consumption_get` and `GET /consumption`
+  say in how many sold drinks each ingredient on a pump was, in the last hours (8 if not asked) and since the
+  start, the most used first, and name the least used one, the one to take off a pump first. The counts come
+  from the public report of the marketplace the machine takes its recipes from, `JUICEBAR_MARKETPLACE_URL`, over
+  all its machines: drinks, not millilitres. The chat draws them as the card of the juices used, after the
+  energy card, and a page keeps it as a part.
 - Generative UI backend and cards: the job order card. `genui_job_order_show` shows the job order of one
   machine (`JobMonitoring.JobOrders` with its result) and its program execution
   (`WorkMasterMonitoring.ProgramExecution`) by the names of the umati data model, from the Events API; the

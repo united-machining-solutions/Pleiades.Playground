@@ -24,6 +24,13 @@ internal sealed class JuiceBarTools(JuiceBarService juiceBar)
     public Task<JuiceBarStatus> Status(CancellationToken cancellationToken)
         => Guard(() => juiceBar.StatusAsync(cancellationToken));
 
+    [McpServerTool(Name = "juicebar_consumption_get", ReadOnly = true, Idempotent = true, Destructive = false),
+     Description("How often each ingredient on a pump went into a sold drink, in the last hours and since the start, the most used first, and which one is used least; each with its pumps, its colour and whether its bottle runs low. The counts come from the public report of the marketplace over all its machines: drinks, not millilitres. The summary says the answer in words.")]
+    public Task<Consumption> Consumption(
+        [Description("How many hours back the recent count looks, 1 to 24. 8 if omitted.")] int hours = ConsumptionReport.DefaultHours,
+        CancellationToken cancellationToken = default)
+        => Guard(() => juiceBar.ConsumptionAsync(hours, cancellationToken));
+
     [McpServerTool(Name = "juicebar_order_get", ReadOnly = true, Idempotent = true, Destructive = false),
      Description("Get one order by its number: its drink, its state, progress as a fraction 0-1 and its place in the queue.")]
     public Task<Order> Order([Description("Number of the order, from juicebar_order_create.")] int orderNumber,

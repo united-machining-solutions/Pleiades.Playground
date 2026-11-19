@@ -1,8 +1,61 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { drinksOf, glassOf, ingredientsOf, isFizzy, orderOf, orderable, shortName, stageOf, whereLost, whyNoOrder } from "./results.ts"
+import {
+  consumptionOf,
+  drinksOf,
+  glassOf,
+  inUseOrder,
+  ingredientsOf,
+  isFizzy,
+  orderOf,
+  orderable,
+  shortName,
+  stageOf,
+  whereLost,
+  whyNoOrder,
+} from "./results.ts"
 import type { Drink } from "./results.ts"
+
+/** The use of the ingredients as juicebar_consumption_get returns it, from the machine of the demo on 19 Nov 2026. */
+const used = {
+  from: "2026-11-19T10:00:00+00:00",
+  to: "2026-11-19T18:00:00+00:00",
+  hours: 8,
+  ingredients: [
+    { componentId: "f6d3", name: "Orange Juice", color: "#FF9900", pumps: [6], drinksInHours: 2, drinksSinceStart: 19, runsLow: false },
+    { componentId: "0425", name: "Cherry Juice", color: "#cc0000", pumps: [4], drinksInHours: 3, drinksSinceStart: 7, runsLow: null },
+    { componentId: "198f", name: "Apple Juice", color: "white", pumps: [3], drinksInHours: 2, drinksSinceStart: 5, runsLow: true },
+    { componentId: "x", name: null, pumps: [9], drinksInHours: null, drinksSinceStart: null },
+  ],
+  leastUsedId: "198f",
+  summary: "Apple Juice is used least.",
+  source: "The report of the marketplace.",
+}
+
+test("the use of the ingredients is read as the tool gives it, and a colour that is not #rrggbb is dropped", () => {
+  const read = consumptionOf(JSON.stringify(used))
+  assert.ok(read)
+  assert.equal(read.leastUsedId, "198f")
+  assert.equal(read.ingredients[0]?.color, "#ff9900")
+  assert.equal(read.ingredients[2]?.color, undefined)
+  assert.equal(read.ingredients[3]?.drinksSinceStart, null)
+  assert.equal(consumptionOf(JSON.stringify({ ...used, hours: 0 })), null)
+  assert.equal(consumptionOf(JSON.stringify([used])), null)
+})
+
+test("the ingredients stand in the tool's order since the start, or by the last hours with the unknown last", () => {
+  const read = consumptionOf(JSON.stringify(used))
+  assert.ok(read)
+  assert.deepEqual(
+    inUseOrder(read.ingredients, "start").map((one) => one.componentId),
+    ["f6d3", "0425", "198f", "x"],
+  )
+  assert.deepEqual(
+    inUseOrder(read.ingredients, "hours").map((one) => one.componentId),
+    ["0425", "f6d3", "198f", "x"],
+  )
+})
 
 /** Two drinks as juicebar_drinks_list returns them, from the machine of the demo on 18 Nov 2026. */
 const listed = [
