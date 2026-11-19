@@ -3,6 +3,7 @@ import { openError } from "@pleiades/cards/machine/state.ts"
 import { useEffect, useRef, useState } from "react"
 
 import { getMachines } from "@/machines/get-machines.ts"
+import { FROM_THE_HALL } from "../transcript.ts"
 import { serialOf } from "../words.ts"
 
 // The assistant page keeps an eye on the hall: every few seconds it reads the machines, and an error
@@ -77,7 +78,7 @@ export function faultBriefing(fault: Fault, person: string | undefined): string 
   const at = new Date(fault.raisedAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
   const who = person ?? "der Person vor dem Bildschirm"
   return [
-    `[Meldung der Anlage, nicht von ${person ?? "der Person"}] Um ${at} hat die Maschine ${fault.machine} (Maschinen-ID ${fault.id}) einen Fehler gemeldet: „${fault.title}“ (Fehler ${fault.notificationId}).`,
+    `${FROM_THE_HALL}, nicht von ${person ?? "der Person"}] Um ${at} hat die Maschine ${fault.machine} (Maschinen-ID ${fault.id}) einen Fehler gemeldet: „${fault.title}“ (Fehler ${fault.notificationId}).`,
     `Sprich ${person ?? "die Person"} direkt an${person ? "" : ", ohne Namen,"} und sag ${who} in einem kurzen Satz auf Deutsch, was los ist, und gib eine Empfehlung. Ruf dafür kein Tool.`,
     `Erfinde keine Ursache, die die Daten nicht nennen.`,
   ].join(" ")

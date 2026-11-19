@@ -30,7 +30,7 @@ import { gatewayVoice, speechAvailable } from "@/showcases/titan/voice/speech.ts
 import { faultBriefing, faultInWords, useNewFaults } from "@/showcases/titan/voice/faults.ts"
 import { loadRecognition } from "@/showcases/titan/voice/transcribe.ts"
 import { AWAKE_MS, isPause, useWakeWord } from "@/showcases/titan/voice/wake.ts"
-import { greetingFor } from "@/showcases/titan/voice/greeting.ts"
+import { greetingFor, machinesInWords } from "@/showcases/titan/voice/greeting.ts"
 import { unbroken } from "@/showcases/titan/words.ts"
 import { Cloud } from "@/showcases/titan/voice/cloud.tsx"
 
@@ -111,8 +111,6 @@ function Assistant() {
   const transcript = useTranscript()
   const inFront = useTabInFront()
   const [problem, setProblem] = useState<string>()
-  /** What the speech recognition heard last, so the person sees what was asked. */
-  const [heard, setHeard] = useState<string>()
   const greeted = useRef(false)
   /** Titan was started by a key or a click: from then on it may speak, and it listens for its name. */
   const [started, setStarted] = useState(false)
@@ -153,7 +151,7 @@ function Assistant() {
       .then((answer) => (answer.ok ? (answer.json() as Promise<{ available?: boolean }>) : { available: false }))
       .then(({ available }) => {
         canAnswer.current = available === true
-        if (!canAnswer.current) setProblem("Das Gateway hat kein Sprachmodell: Titan zeigt die Halle, antwortet aber nicht.")
+        if (!canAnswer.current) setProblem("Das Gateway hat kein Sprachmodell: Titan hört zu, antwortet aber nicht.")
       })
       .catch(() => undefined)
   }, [])
@@ -194,7 +192,6 @@ function Assistant() {
 
   const pause = () => {
     setPaused(true)
-    setHeard(undefined)
     setProblem(undefined)
     void speak(PAUSING)
   }
@@ -240,7 +237,7 @@ function Assistant() {
   const { alarmed } = useNewFaults((fault) => {
     // Before the start, in a pause or behind another tab, the fault is shown, not said.
     if (!latest.current.mayTalk) return
-    // A fault never talks over the person or over an answer. It is shown in the line on top and not said
+    // A fault never talks over the person or over an answer. It is named in the line at the bottom and not said
     // while Titan listens, thinks or speaks, while the space bar is held or what it recorded is being
     // recognised, while someone speaks near the microphone, and while Titan waits for the question after
     // "Hey Titan". In a hall where faults come often Titan also says at most one a minute, or nobody
@@ -249,7 +246,6 @@ function Assistant() {
     if (performance.now() - wokeAt.current < AWAKE_MS) return
     if (performance.now() - lastFaultSaid.current < FAULT_SAID_EVERY_MS && lastFaultSaid.current > 0) return
     lastFaultSaid.current = performance.now()
-    setHeard(undefined)
     setProblem(undefined)
     if (!canAnswer.current || !conversation.current) return void speak(faultInWords(fault, undefined))
     conversation.current.ask(faultBriefing(fault, undefined))
@@ -281,14 +277,12 @@ function Assistant() {
     onWake: () => {
       wokeAt.current = performance.now()
       setProblem(undefined)
-      setHeard(undefined)
       if (!resume(AWAKE)) void speak(AWAKE)
     },
     onQuestion: (question) => {
       setProblem(undefined)
       if (isPause(question)) return pause()
       setPaused(false)
-      setHeard(question)
       void sayNext(ON_IT)
       conversation.current?.ask(question)
     },
@@ -340,7 +334,6 @@ function Assistant() {
         setProblem("Dieser Browser kann nicht aufnehmen. Nimm Chrome oder Edge.")
         return
       }
-      setHeard(undefined)
       // The space bar interrupts: an answer that is still arriving is given up, and Titan listens.
       conversation.current?.stop()
       heldSince.current = performance.now()
@@ -352,7 +345,6 @@ function Assistant() {
             setProblem("Ich habe nichts verstanden. Halte die Leertaste gedrückt, solange du sprichst.")
             return
           }
-          setHeard(question)
           conversation.current?.ask(question)
         },
         (error: unknown) => {
@@ -405,6 +397,8 @@ function Assistant() {
     recognition ??
     (paused ? "Pause · „Hey Titan“ sagen oder die Leertaste drücken, um weiterzumachen." : undefined) ??
     (overheard && `Gehört: „${overheard}“`) ??
+    // A fault Titan did not say, because it was busy or had just said one, is still named here.
+    (alarmed.length > 0 ? `Offener Fehler an ${machinesInWords(alarmed)} · Leertaste halten und fragen.` : undefined) ??
     (wakeReady ? "„Hey Titan“ sagen, oder die Leertaste halten und sprechen. P pausiert." : undefined)
 
   return (
@@ -435,11 +429,9 @@ function Assistant() {
           </div>
         </main>
       )}
-      {/* At the bottom, quiet: what comes and goes, and what Titan understood until its question stands
-          in the conversation. */}
+      {/* At the bottom, quiet: what comes and goes. */}
       <footer className="flex h-12 shrink-0 items-center gap-6 px-8 text-sm text-muted-foreground">
         <p className="min-w-0 flex-1 truncate">{line}</p>
-        {heard && state === "thinking" && <p className="max-w-[50%] truncate italic">„{heard}“</p>}
       </footer>
       <p className="sr-only" aria-live="polite">
         {paused ? "Pause." : said[state]}

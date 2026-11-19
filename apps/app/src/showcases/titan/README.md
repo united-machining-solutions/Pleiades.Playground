@@ -17,7 +17,7 @@ came out of the umati hackathon in November 2026.
 | Leave | The sidebar, as from every page |
 
 Titan also speaks first: when a machine raises a new error it says so, in its own words. It never talks over
-the person or over an answer, and says at most one fault a minute; every fault stands in the line on top.
+the person or over an answer, and says at most one fault a minute; the line at the bottom names the machines with an open error.
 
 Titan speaks German, as the demo does.
 
@@ -66,7 +66,7 @@ none` did not do it. Without `titan/chat`, Titan asks the first chat model and a
 a Haiku or a Qwen model from thinking first. A model that thinks all the same answers after seconds, and a
 turn that ends without a word is shown as a problem in the line at the bottom.
 
-Without a transcription model Titan cannot listen, without a chat model it only shows the hall, and without
+Without a transcription model Titan cannot listen, without a chat model it does not answer, and without
 a speech model it speaks with a voice of the browser that runs on this computer, or stays silent.
 
 This is the one place where the app speaks a third endpoint of the gateway, audio speech; ADR-0010 names

@@ -13,9 +13,11 @@ import { Skeleton } from "@pleiades/ui/components/skeleton"
 
 import { Answer } from "@/chat/answer.tsx"
 import { blocksOf } from "@/chat/blocks.ts"
+import type { Block } from "@/chat/blocks.ts"
 import { chatTools } from "@/chat/cards.tsx"
 
 import { textOf } from "./conversation.ts"
+import type { Message as Said } from "./conversation.ts"
 import type { Transcript } from "./transcript.ts"
 import { isFromTheHall } from "./transcript.ts"
 
@@ -24,11 +26,21 @@ import { isFromTheHall } from "./transcript.ts"
 // (chat/cards.tsx) and in the same components. A new question settles near the top and its answer grows
 // under it; everything before it stays above, a scroll away.
 
+/**
+ * What an answer shows: its words and its cards. The parts have the shape the chat draws
+ * (conversation.ts). The steps of the tools are not listed: Titan says that it looks something up, and
+ * the card shows what it found.
+ */
+function shownOf(message: Said, live: boolean): Array<Block> {
+  return blocksOf(message.parts as unknown as UIMessage["parts"], live, chatTools).filter((block) => block.kind !== "steps")
+}
+
 export function TranscriptView({ transcript }: { transcript: Transcript }) {
   const { messages, isLoading } = transcript
   const last = messages.at(-1)
-  // Until the answer shows anything, two lines stand where it will be.
-  const waiting = isLoading && (last?.role === "user" || (last !== undefined && last.parts.length === 0))
+  // Until the answer shows anything, two lines stand where it will be: also while a tool runs before
+  // the first word, since the steps of the tools are not listed.
+  const waiting = isLoading && (last?.role === "user" || (last !== undefined && shownOf(last, true).length === 0))
   return (
     <MessageScrollerProvider defaultScrollPosition="last-anchor">
       <MessageScroller>
@@ -56,10 +68,7 @@ export function TranscriptView({ transcript }: { transcript: Transcript }) {
                   </MessageScrollerItem>
                 )
               }
-              const live = isLoading && message === last
-              // The parts have the shape the chat draws (conversation.ts). The steps of the tools are
-              // not listed: Titan says that it looks something up, and the card shows what it found.
-              const blocks = blocksOf(message.parts as unknown as UIMessage["parts"], live, chatTools).filter((block) => block.kind !== "steps")
+              const blocks = shownOf(message, isLoading && message === last)
               if (blocks.length === 0) return null
               return (
                 // A card draws its edge as a ring around itself: one pixel of room keeps that edge.
