@@ -34,7 +34,14 @@ export function TitanToolsMenu({ on, onSwitch }: { on: ReadonlyArray<string>; on
     setListed(undefined)
     fetch("/titan/api/tools")
       .then((answer) => (answer.ok ? (answer.json() as Promise<Listed>) : Promise.reject(new Error(String(answer.status)))))
-      .then(setListed, () => setListed("failed"))
+      .then(
+        (list) => {
+          setListed(list)
+          // A server that was switched on in this browser and that the app no longer has is switched off.
+          for (const name of on) if (!list.servers.some((server) => server.name === name)) onSwitch(name, false)
+        },
+        () => setListed("failed"),
+      )
   }
   return (
     <Popover onOpenChange={read}>

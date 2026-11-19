@@ -40,3 +40,16 @@ test("Titan is told what the servers that are on can read, and that it cannot or
   assert.match(told, /you cannot order, start or change anything yourself/)
   assert.equal(furtherInstructions([]), undefined)
 })
+
+test("a tool under the name of another server, or of one of Titan's own, is not taken", () => {
+  const tools = readingTools("juicebar", [
+    { name: "genui_machine_list", metadata: reads },
+    { name: "ultimaker_job_list", metadata: reads },
+    { name: "juicebar_status", metadata: reads },
+    { name: "juicebar_with.a.dot", metadata: reads },
+  ])
+  assert.deepEqual(
+    tools.map((tool) => tool.name),
+    ["juicebar_status"],
+  )
+})

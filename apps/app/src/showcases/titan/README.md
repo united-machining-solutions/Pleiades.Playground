@@ -61,6 +61,11 @@ without a sign-in, and a word it mishears must not start a machine. What a perso
 stands on the card of its tool: asked what the juice bar can mix, Titan shows the drink card, and its button
 orders.
 
+That a tool only reads is what its server says of it; the app does not check it. And what a server writes,
+in the description of a tool or in its result, reaches the language model, which may be led by it to say
+something or to read something else. So for a room without a sign-in, `APP_MCP_SERVERS` names only servers
+whose word is trusted. Titan still starts nothing: that takes a person's press.
+
 ## Models: the gateway, and nothing else
 
 Titan takes its three models from the gateway of the chat, `LLM_BASE_URL` with `LLM_API_KEY`
