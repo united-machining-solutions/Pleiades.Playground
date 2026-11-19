@@ -10,7 +10,7 @@ import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { toast } from "@pleiades/ui/components/toast"
 import { createFileRoute, useRouter } from "@tanstack/react-router"
 import { LayoutGridIcon, MapPinOffIcon } from "lucide-react"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import type { ReactNode } from "react"
 
 import { NoAnswer } from "@/components/no-answer.tsx"
@@ -54,7 +54,12 @@ function Halls() {
   // asked and the list is read again. A position the API refused is taken back.
   const [moved, setMoved] = useState<ReadonlyMap<string, Position>>(new Map())
   const list = read && withPositions(read, moved)
+  // The moves of one machine go to the Sites API one after the other, and only the newest of those that
+  // wait is sent: two requests at once could arrive in either order, and a held arrow key makes many.
+  const sending = useRef(new Map<string, Promise<void>>())
+  const newest = useRef(new Map<string, Position>())
   const onMove = (machine: string, position: Position) => {
+    newest.current.set(machine, position)
     setMoved((before) => new Map(before).set(machine, position))
     const back = () =>
       setMoved((before) => {
@@ -64,18 +69,30 @@ function Halls() {
         without.delete(machine)
         return without
       })
-    positionMachine({ data: { machine, position } }).then(
-      async (outcome) => {
-        if (!outcome.ok) toast.add({ type: "error", title: "The position was not kept", description: outcome.reason, priority: "high" })
-        // The list is read again either way: it says where the machine stands for the Sites API.
+    const refused = (reason: string) => toast.add({ type: "error", title: "The position was not kept", description: reason, priority: "high" })
+    const send = async () => {
+      // A newer move of the machine waits behind this one: that one is sent, this one is not.
+      if (newest.current.get(machine) !== position) return
+      try {
+        const outcome = await positionMachine({ data: { machine, position } })
+        if (!outcome.ok) refused(outcome.reason)
+      } catch (error) {
+        refused(error instanceof Error ? error.message : String(error))
+      }
+      if (newest.current.get(machine) !== position) return
+      newest.current.delete(machine)
+      // The list is read again either way: it says where the machine stands for the Sites API.
+      try {
         await router.invalidate()
+      } finally {
         back()
-      },
-      (error: unknown) => {
-        toast.add({ type: "error", title: "The position was not kept", description: String(error), priority: "high" })
-        back()
-      },
-    )
+      }
+    }
+    const turn = (sending.current.get(machine) ?? Promise.resolve()).then(send, send)
+    sending.current.set(machine, turn)
+    void turn.finally(() => {
+      if (sending.current.get(machine) === turn) sending.current.delete(machine)
+    })
   }
 
   if (answer.values === null || list === null) {

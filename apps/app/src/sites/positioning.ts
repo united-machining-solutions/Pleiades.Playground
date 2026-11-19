@@ -1,4 +1,5 @@
 import type { Position, SiteList } from "@pleiades/cards/site/contract.ts"
+import { FARTHEST } from "@pleiades/cards/site/plan.ts"
 
 import { reasonOf } from "../reason.ts"
 import type { Send } from "./placements.ts"
@@ -8,9 +9,6 @@ import { problemOfId, refusalOf } from "./placing.ts"
 // the plan of its hall. It goes to the REST endpoint of the Sites API from the server of the app
 // (sites-api.ts), never from the browser and never from the language model. The API checks everything
 // again.
-
-/** The largest distance of a position from the corner of its plan, in metre, as the Sites API keeps it. */
-export const FARTHEST = 1000
 
 /** A machine moved on the plan of its hall: where it stands now, x and y in metre. */
 export type PositionRequest = { machine: string; position: Position }

@@ -3,8 +3,10 @@ import { test } from "node:test"
 
 import type { SiteList } from "@pleiades/cards/site/contract.ts"
 
+import { FARTHEST } from "@pleiades/cards/site/plan.ts"
+
 import type { Send } from "./placements.ts"
-import { FARTHEST, position, positionRequestOf, withPositions } from "./positioning.ts"
+import { position, positionRequestOf, withPositions } from "./positioning.ts"
 
 const M02 = "merope-microtec_MM-120_M-02"
 

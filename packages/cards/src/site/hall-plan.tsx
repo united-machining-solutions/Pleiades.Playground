@@ -20,11 +20,17 @@ const floor: CSSProperties = {
 /** A metre of the plan is never drawn smaller than this, in rem: then the signs of two neighbours do not meet. */
 const SMALLEST_METRE = 1.75
 
-/** How far a pointer goes, in pixels, before a sign follows it: less is a tap. */
-const TAP = 4
+/** How far a pointer goes, in pixels, before a sign follows it: less is a tap. A finger is less steady than a mouse. */
+const tapOf = (pointerType: string) => (pointerType === "touch" ? 10 : 4)
 
 /** A machine while it is dragged: where its sign is now, in metre of the drawing. */
 type Dragged = { machine: string; x: number; y: number }
+
+/**
+ * The one pointer that holds a sign: where it went down, how far the middle of the sign is from it, in
+ * metre, and whether it has gone far enough to be a drag.
+ */
+type Held = Dragged & { pointer: number; fromX: number; fromY: number; offsetX: number; offsetY: number; went: boolean }
 
 /**
  * The plan of a hall, seen from above: its floor with lines, and each machine of the hall as a sign with
@@ -33,8 +39,8 @@ type Dragged = { machine: string; x: number; y: number }
  * returned and computes nothing but where the waiting machines go (plan.ts).
  *
  * With `onMove` a person says where a machine stands: a sign is dragged, with a finger or the mouse, and
- * dropped; or moved half a metre with an arrow key while it has the focus. `onMove` gets the position, in
- * metre, and keeps it. Without `onMove` the plan only shows.
+ * dropped; or moved half a metre with an arrow key while it has the focus. One sign is dragged at a time.
+ * `onMove` gets the position, in metre, and keeps it. Without `onMove` the plan only shows.
  */
 export function HallPlan({ hall, onMove }: { hall: Hall; onMove?: (machine: string, position: Position) => void }) {
   const plan = planOf(hall.machines)
@@ -42,20 +48,69 @@ export function HallPlan({ hall, onMove }: { hall: Hall; onMove?: (machine: stri
   const name = hall.name ?? "No hall"
   const every = lineEvery(plan.width)
   const drawing = useRef<HTMLUListElement>(null)
-  // What is drawn while a sign is dragged, and next to it what the handlers read: where the pointer went
-  // down and whether it has gone far enough to be a drag.
+  // What is drawn while a sign is dragged, and next to it what the handlers read.
   const [dragged, setDragged] = useState<Dragged>()
-  const held = useRef<Dragged & { fromX: number; fromY: number; went: boolean }>(undefined)
+  const held = useRef<Held>(undefined)
 
-  /** A point of the screen as a point of the drawing, in metre. */
+  /** A point of the screen as a point of the drawing, in metre; it may lie outside the drawing. */
   const pointOf = (event: PointerEvent): { x: number; y: number } | undefined => {
     const box = drawing.current?.getBoundingClientRect()
     if (!box || box.width === 0 || box.height === 0) return undefined
-    return {
-      x: Math.min(Math.max(((event.clientX - box.left) / box.width) * plan.width, 0), plan.width),
-      y: Math.min(Math.max(((event.clientY - box.top) / box.height) * plan.depth, 0), plan.depth),
-    }
+    return { x: ((event.clientX - box.left) / box.width) * plan.width, y: ((event.clientY - box.top) / box.height) * plan.depth }
   }
+  const onThePlan = (x: number, y: number) => ({ x: Math.min(Math.max(x, 0), plan.width), y: Math.min(Math.max(y, 0), plan.depth) })
+  const letGo = () => {
+    held.current = undefined
+    setDragged(undefined)
+  }
+
+  const movingOf = (spot: Spot<PlacedMachine>): Moving | undefined =>
+    onMove && {
+      begin: (event) => {
+        // One sign at a time: a second finger takes nothing while the first holds a sign.
+        const point = pointOf(event)
+        if (held.current || !point) return false
+        held.current = {
+          machine: spot.machine.machine,
+          pointer: event.pointerId,
+          fromX: event.clientX,
+          fromY: event.clientY,
+          // The sign keeps its place under the pointer: it does not jump to it.
+          offsetX: spot.x - point.x,
+          offsetY: spot.y - point.y,
+          x: spot.x,
+          y: spot.y,
+          went: false,
+        }
+        return true
+      },
+      drag: (event) => {
+        const now = held.current
+        const point = pointOf(event)
+        if (!now || now.pointer !== event.pointerId || !point) return
+        // The sign follows only once the pointer has gone a few pixels: a tap moves nothing.
+        if (!now.went && Math.hypot(event.clientX - now.fromX, event.clientY - now.fromY) < tapOf(event.pointerType)) return
+        const at = onThePlan(point.x + now.offsetX, point.y + now.offsetY)
+        held.current = { ...now, ...at, went: true }
+        setDragged({ machine: now.machine, ...at })
+      },
+      drop: (event) => {
+        const now = held.current
+        if (!now || now.pointer !== event.pointerId) return
+        letGo()
+        if (now.went) onMove(now.machine, positionAt(now.x, now.y))
+      },
+      cancel: (event) => {
+        if (held.current?.pointer === event.pointerId) letGo()
+      },
+      step: (right, down) => {
+        const from = positionAt(spot.x, spot.y)
+        // A machine that waits gets the position of its place in the row with the first key, and moves from there.
+        if (spot.waiting) return onMove(spot.machine.machine, from)
+        const to = positionAt(spot.x + right * STEP, spot.y + down * STEP)
+        if (to.x !== from.x || to.y !== from.y) onMove(spot.machine.machine, to)
+      },
+    }
 
   return (
     <figure className="flex flex-col gap-1.5">
@@ -77,38 +132,7 @@ export function HallPlan({ hall, onMove }: { hall: Hall; onMove?: (machine: stri
               spot={spot}
               plan={plan}
               dragged={dragged?.machine === spot.machine.machine ? dragged : undefined}
-              {...(onMove && {
-                moving: {
-                  begin: (event) => {
-                    // The sign follows only once the pointer has gone a few pixels: a tap moves nothing.
-                    held.current = { machine: spot.machine.machine, fromX: event.clientX, fromY: event.clientY, x: spot.x, y: spot.y, went: false }
-                  },
-                  drag: (event) => {
-                    const now = held.current
-                    const point = pointOf(event)
-                    if (!now || now.machine !== spot.machine.machine || !point) return
-                    if (!now.went && Math.hypot(event.clientX - now.fromX, event.clientY - now.fromY) < TAP) return
-                    held.current = { ...now, ...point, went: true }
-                    setDragged({ machine: now.machine, ...point })
-                  },
-                  drop: () => {
-                    const now = held.current
-                    held.current = undefined
-                    setDragged(undefined)
-                    if (now?.went && now.machine === spot.machine.machine) onMove(now.machine, positionAt(now.x, now.y))
-                  },
-                  cancel: () => {
-                    held.current = undefined
-                    setDragged(undefined)
-                  },
-                  step: (right, down) => {
-                    const from = positionAt(spot.x, spot.y)
-                    const to = positionAt(spot.x + right * STEP, spot.y + down * STEP)
-                    // A machine that waits gets the position of its place in the row with the first key.
-                    if (spot.waiting || to.x !== from.x || to.y !== from.y) onMove(spot.machine.machine, to)
-                  },
-                },
-              })}
+              moving={movingOf(spot)}
             />
           ))}
         </ul>
@@ -124,10 +148,11 @@ export function HallPlan({ hall, onMove }: { hall: Hall; onMove?: (machine: stri
 
 /** What a sign does when a person can move it. */
 type Moving = {
-  begin: (event: PointerEvent) => void
+  /** A pointer went down on the sign: whether it holds the sign now. */
+  begin: (event: PointerEvent) => boolean
   drag: (event: PointerEvent) => void
-  drop: () => void
-  cancel: () => void
+  drop: (event: PointerEvent) => void
+  cancel: (event: PointerEvent) => void
   /** One step with an arrow key: to the right and down, each -1, 0 or 1. */
   step: (right: number, down: number) => void
 }
@@ -135,11 +160,22 @@ type Moving = {
 const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
 
 /** A machine on the plan: the sign of its state, its name, and its state in words below. */
-function MachineSign({ spot, plan, dragged, moving }: { spot: Spot<PlacedMachine>; plan: Plan<PlacedMachine>; dragged?: Dragged | undefined; moving?: Moving }) {
+function MachineSign({
+  spot,
+  plan,
+  dragged,
+  moving,
+}: {
+  spot: Spot<PlacedMachine>
+  plan: Plan<PlacedMachine>
+  dragged?: Dragged | undefined
+  moving?: Moving | undefined
+}) {
   const { machine: placed, waiting: waits } = spot
   const at = dragged ?? spot
   const title = titleOfPlaced(placed)
-  const where = waits ? "without a position" : `at ${positionAt(spot.x, spot.y).x} m, ${positionAt(spot.x, spot.y).y} m`
+  const position = positionAt(spot.x, spot.y)
+  const where = waits ? "without a position" : `at ${position.x} m, ${position.y} m`
   return (
     <li
       className={`absolute -translate-x-1/2 -translate-y-1/2 ${moving ? "cursor-grab touch-none rounded-4xl outline-none select-none focus-visible:ring-[3px] focus-visible:ring-ring/50 active:cursor-grabbing" : ""} ${dragged ? "z-10" : ""}`}
@@ -149,18 +185,19 @@ function MachineSign({ spot, plan, dragged, moving }: { spot: Spot<PlacedMachine
         tabIndex: 0,
         "aria-label": `${title}, ${stateLabel[placed.state]}, ${where}. Move it with the arrow keys.`,
         onPointerDown: (event: PointerEvent<HTMLLIElement>) => {
-          if (event.button !== 0) return
+          if (event.button !== 0 || !moving.begin(event)) return
           // A pointer made by a script cannot be captured; the drag works without it while the pointer stays on the sign.
           try {
             event.currentTarget.setPointerCapture(event.pointerId)
           } catch {
             // Nothing to do.
           }
-          moving.begin(event)
         },
         onPointerMove: moving.drag,
         onPointerUp: moving.drop,
         onPointerCancel: moving.cancel,
+        // After a drop the capture is lost too: then nothing is held any more, and this does nothing.
+        onLostPointerCapture: moving.cancel,
         onKeyDown: (event: KeyboardEvent<HTMLLIElement>) => {
           const step = arrows[event.key]
           if (!step) return
