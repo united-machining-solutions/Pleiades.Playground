@@ -54,7 +54,9 @@ builder.Services.AddHttpClient(MarketplaceClient.HttpClientName, (services, clie
     }
 
     client.Timeout = TimeSpan.FromSeconds(8);
-}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false });
+    // Unlike the machine on the network of the stand, the marketplace may be on the internet: it is reached through
+    // the proxy the container names in HTTPS_PROXY or HTTP_PROXY, where it names one.
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddHostedService<MixerLiveWorker>();
 
 // The state goes to the broker only where one is named; REST and MCP work without it.

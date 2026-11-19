@@ -9,6 +9,13 @@ namespace Pleiades.Playground.JuiceBar.Api;
 internal sealed record IngredientReport(string Name, int Drinks);
 
 /// <summary>
+/// The report of the marketplace over one span of time: the lines it could read, and whether it is complete. Complete
+/// means the report had room left and every line it gave could be read: then an ingredient not in it was in no sold
+/// drink. Otherwise the count of such an ingredient is not known.
+/// </summary>
+internal sealed record MarketplaceReport(IReadOnlyList<IngredientReport> Lines, bool Complete);
+
+/// <summary>
 /// The public report of the marketplace the machine takes its recipes from: how often each ingredient went into a
 /// sold drink, over all machines of the marketplace. It counts drinks, not millilitres, and needs no sign-in. This
 /// service only reads it.
@@ -27,7 +34,7 @@ internal sealed class MarketplaceClient(IHttpClientFactory clients, IOptions<Jui
     /// The ingredients used most between <paramref name="from"/> and <paramref name="to"/>, at most
     /// <see cref="ReportLimit"/>, by the names the marketplace gives them in the language of this service.
     /// </summary>
-    internal async Task<IReadOnlyList<IngredientReport>> TopIngredientsAsync(DateTimeOffset from, DateTimeOffset to,
+    internal async Task<MarketplaceReport> TopIngredientsAsync(DateTimeOffset from, DateTimeOffset to,
         CancellationToken cancellationToken)
     {
         if (!Named)
@@ -50,31 +57,42 @@ internal sealed class MarketplaceClient(IHttpClientFactory clients, IOptions<Jui
             }
 
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
-            if (document.RootElement.ValueKind != JsonValueKind.Array)
-            {
-                throw new JuiceBarUnavailableException("The marketplace returned no list for its report.");
-            }
-
-            var lines = new List<IngredientReport>();
-            foreach (var line in document.RootElement.EnumerateArray())
-            {
-                if (line.ValueKind == JsonValueKind.Object
-                    && line.TryGetProperty("componentname", out var name) && name.ValueKind == JsonValueKind.String
-                    && !string.IsNullOrWhiteSpace(name.GetString())
-                    && line.TryGetProperty("amount", out var amount) && amount.ValueKind == JsonValueKind.Number
-                    && amount.TryGetInt32(out var drinks) && drinks >= 0)
-                {
-                    lines.Add(new(name.GetString()!.Trim(), drinks));
-                }
-            }
-
-            return lines;
+            return ReportOf(document.RootElement);
         }
         catch (Exception error) when (error is HttpRequestException or JsonException
             || (error is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
             throw new JuiceBarUnavailableException("The marketplace is not reachable or gave an unreadable report.", error);
         }
+    }
+
+    /// <summary>
+    /// The lines of a report as the marketplace gives it. A line that cannot be read makes the report incomplete, since
+    /// it may be the line of an ingredient on a pump.
+    /// </summary>
+    internal static MarketplaceReport ReportOf(JsonElement report)
+    {
+        if (report.ValueKind != JsonValueKind.Array)
+        {
+            throw new JuiceBarUnavailableException("The marketplace returned no list for its report.");
+        }
+
+        var lines = new List<IngredientReport>();
+        var given = 0;
+        foreach (var line in report.EnumerateArray())
+        {
+            given++;
+            if (line.ValueKind == JsonValueKind.Object
+                && line.TryGetProperty("componentname", out var name) && name.ValueKind == JsonValueKind.String
+                && !string.IsNullOrWhiteSpace(name.GetString())
+                && line.TryGetProperty("amount", out var amount) && amount.ValueKind == JsonValueKind.Number
+                && amount.TryGetInt32(out var drinks) && drinks >= 0)
+            {
+                lines.Add(new(name.GetString()!.Trim(), drinks));
+            }
+        }
+
+        return new(lines, given < ReportLimit && lines.Count == given);
     }
 
     private static string Instant(DateTimeOffset at) => at.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);

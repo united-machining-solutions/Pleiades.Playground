@@ -84,6 +84,11 @@ internal sealed partial class MixerClient(IHttpClientFactory clients, IOptions<J
     internal async Task<IReadOnlyDictionary<string, string>> ColorsAsync(CancellationToken cancellationToken)
     {
         using var components = await ComponentsAsync(cancellationToken).ConfigureAwait(false);
+        return ColorsOf(components);
+    }
+
+    private static Dictionary<string, string> ColorsOf(JsonDocument? components)
+    {
         var colors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var component in Available(components))
         {
@@ -103,6 +108,14 @@ internal sealed partial class MixerClient(IHttpClientFactory clients, IOptions<J
                 : [];
 
     internal async Task<IReadOnlyList<Pump>> PumpsAsync(IReadOnlyDictionary<int, bool> warnings, CancellationToken cancellationToken)
+        => (await PumpsAndColorsAsync(warnings, cancellationToken).ConfigureAwait(false)).Pumps;
+
+    /// <summary>
+    /// The pumps with their ingredients, and the colour of each ingredient by its id, as <see cref="ColorsAsync"/> has
+    /// it: both from one read of the list of components.
+    /// </summary>
+    internal async Task<(IReadOnlyList<Pump> Pumps, IReadOnlyDictionary<string, string> Colors)> PumpsAndColorsAsync(
+        IReadOnlyDictionary<int, bool> warnings, CancellationToken cancellationToken)
     {
         using var pumps = await GetAsync("api/admin/pumps", cancellationToken).ConfigureAwait(false);
         using var amounts = await GetAsync("api/admin/pumps/standardAmount", cancellationToken).ConfigureAwait(false);
@@ -140,7 +153,7 @@ internal sealed partial class MixerClient(IHttpClientFactory clients, IOptions<J
                 warnings.TryGetValue(number, out var warning) ? warning : null));
         }
 
-        return result;
+        return (result, ColorsOf(components));
     }
 
     // The machine takes the names of the ingredients from its marketplace. While that is away, the pumps are

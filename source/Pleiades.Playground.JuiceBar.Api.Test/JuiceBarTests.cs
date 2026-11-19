@@ -261,7 +261,10 @@ public sealed class JuiceBarTests
         using var client = factory.CreateClient();
         await ConnectedAsync(client);
 
+        var components = machine.Requests.Count(r => r == "GET /api/components");
         var used = await GetAsync<Consumption>(client, "/consumption?hours=3");
+        // The pumps and the colours come from one read of the list of components.
+        Assert.AreEqual(components + 1, machine.Requests.Count(r => r == "GET /api/components"));
         Assert.AreEqual(3, used.Hours);
         Assert.AreEqual(TimeSpan.FromHours(3), used.To - used.From);
         var orange = used.Ingredients[0];

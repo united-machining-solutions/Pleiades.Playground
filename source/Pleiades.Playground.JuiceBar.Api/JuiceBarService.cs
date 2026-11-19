@@ -98,13 +98,13 @@ internal sealed class JuiceBarService(MixerClient mixer, MarketplaceClient marke
 
         var to = time.GetUtcNow();
         var from = to.AddHours(-hours);
-        var pumps = mixer.PumpsAsync(live.Snapshot().AmountWarnings, cancellationToken);
-        var colors = mixer.ColorsAsync(cancellationToken);
+        var machine = mixer.PumpsAndColorsAsync(live.Snapshot().AmountWarnings, cancellationToken);
         var sinceStart = marketplace.TopIngredientsAsync(ConsumptionReport.Start, to, cancellationToken);
         var inHours = marketplace.TopIngredientsAsync(from, to, cancellationToken);
-        await Task.WhenAll(pumps, colors, sinceStart, inHours).ConfigureAwait(false);
-        return ConsumptionReport.Of(await pumps.ConfigureAwait(false), await colors.ConfigureAwait(false),
-            await sinceStart.ConfigureAwait(false), await inHours.ConfigureAwait(false), hours, from, to);
+        await Task.WhenAll(machine, sinceStart, inHours).ConfigureAwait(false);
+        var (pumps, colors) = await machine.ConfigureAwait(false);
+        return ConsumptionReport.Of(pumps, colors, await sinceStart.ConfigureAwait(false), await inHours.ConfigureAwait(false),
+            hours, from, to);
     }
 
     internal async Task<Order> OrderAsync(int orderNumber, CancellationToken cancellationToken)

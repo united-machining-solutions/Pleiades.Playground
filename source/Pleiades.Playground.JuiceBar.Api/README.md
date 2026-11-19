@@ -155,8 +155,9 @@ last hours. The report counts the sold drinks each ingredient was in, over **all
 this one alone, and **drinks, not millilitres**: the amounts of a recipe are only to be had with the token of a
 machine. Its names are matched with the names of the ingredients on the pumps, in the language of the service.
 
-- The report names at most ten ingredients. One that is not in it is in no drink, while the report has room left;
-  in a full report its count is not known (null), and then no ingredient is called the least used.
+- The report names at most ten ingredients. One that is not in it is in no drink, while the report has room left
+  and every line of it could be read; otherwise its count is not known (null), and then no ingredient is called the
+  least used.
 - The least used is the one in the fewest drinks since the start; fewer in the last hours decide a tie.
 - `source` says where the counts come from, `summary` the answer in a few words.
 
@@ -174,7 +175,7 @@ machine. Its names are matched with the names of the ingredients on the pumps, i
 | `JUICEBAR_MANUFACTURER_NAME` | `TRUMPF` | The name of the manufacturer, `Identification/Manufacturer`; it must not be empty. |
 | `JUICEBAR_MODEL` | `JuiceBar` | The model, the second part of the machine id. |
 | `JUICEBAR_LANGUAGE` | `en` | `en` or `de`, for the names of drinks and ingredients. |
-| `JUICEBAR_MARKETPLACE_URL` | empty | The website of the marketplace the machine takes its recipes from, as the container reaches it. Empty: the use of the ingredients is not read, and `GET /consumption` answers 409. |
+| `JUICEBAR_MARKETPLACE_URL` | empty | The website of the marketplace the machine takes its recipes from, as the container reaches it: directly, or through the proxy of `HTTPS_PROXY` or `HTTP_PROXY` where the container has one. Empty: the use of the ingredients is not read, and `GET /consumption` answers 409. |
 | `JUICEBAR_AUTH_ENABLED` | `false` | `true` switches sign-in on; it needs `JUICEBAR_AUTH_METADATA_ADDRESS`, `JUICEBAR_AUTH_VALID_ISSUER` and `JUICEBAR_AUTH_AUDIENCE`. |
 
 ## How it talks to the machine

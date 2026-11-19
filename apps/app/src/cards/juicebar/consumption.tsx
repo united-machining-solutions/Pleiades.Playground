@@ -58,8 +58,9 @@ export function ConsumptionCard({ used }: { used: Consumption }) {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-full">Juice</TableHead>
-                  <TableHead className="text-right">{last}</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  {/* The columns say what the order by them says. */}
+                  <TableHead className="text-right">{label.hours}</TableHead>
+                  <TableHead className="text-right">{label.start}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody key={order} className="motion-safe:animate-card-fade-in">

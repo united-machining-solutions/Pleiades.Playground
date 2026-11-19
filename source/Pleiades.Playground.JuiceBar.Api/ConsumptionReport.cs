@@ -23,10 +23,10 @@ internal static class ConsumptionReport
 
     /// <summary>
     /// Each ingredient on a pump once, with the pumps it is on and its counts: in the report by its name; not in a
-    /// report that has room left, in no drink; not in a full report, not known.
+    /// complete report, in no drink; not in a report that is full or has a line it could not read, not known.
     /// </summary>
     internal static Consumption Of(IReadOnlyList<Pump> pumps, IReadOnlyDictionary<string, string> colors,
-        IReadOnlyList<IngredientReport> sinceStart, IReadOnlyList<IngredientReport> inHours, int hours,
+        MarketplaceReport sinceStart, MarketplaceReport inHours, int hours,
         DateTimeOffset from, DateTimeOffset to)
     {
         IngredientUse[] ingredients = [.. pumps
@@ -55,15 +55,15 @@ internal static class ConsumptionReport
         return new(from, to, hours, ingredients, least?.ComponentId, SummaryOf(ingredients, least, hours), Source);
     }
 
-    private static int? DrinksIn(IReadOnlyList<IngredientReport> report, string? name)
+    private static int? DrinksIn(MarketplaceReport report, string? name)
     {
         if (name is null)
         {
             return null;
         }
 
-        var line = report.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.OrdinalIgnoreCase));
-        return line?.Drinks ?? (report.Count < MarketplaceClient.ReportLimit ? 0 : null);
+        var line = report.Lines.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.OrdinalIgnoreCase));
+        return line?.Drinks ?? (report.Complete ? 0 : null);
     }
 
     private static string NameOf(IngredientUse one) => one.Name ?? one.ComponentId;
@@ -77,7 +77,7 @@ internal static class ConsumptionReport
 
         var last = hours == 1 ? "the last hour" : string.Create(CultureInfo.InvariantCulture, $"the last {hours} h");
         var said = least is null
-            ? "Which ingredient is used least is not known: one has no name, or is not among the ten the report of the marketplace names."
+            ? "Which ingredient is used least is not known: one has no name, or the report of the marketplace does not say its count (it names at most ten)."
             : string.Create(CultureInfo.InvariantCulture,
                 $"{NameOf(least)} is used least: in {least.DrinksSinceStart} sold drinks since the start, {Count(least.DrinksInHours)} in {last} ({PumpsOf(least)}).");
         var most = ingredients[0];

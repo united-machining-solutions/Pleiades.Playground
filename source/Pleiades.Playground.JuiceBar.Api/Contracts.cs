@@ -28,9 +28,9 @@ internal sealed record JuiceBarStatus(bool Connected, string? ProductionState, s
 /// <summary>
 /// One ingredient on the pumps of the machine, and in how many sold drinks it was by the report of the marketplace:
 /// in the last <see cref="Consumption.Hours"/> and since the start. A count is null where the report does not say it:
-/// the ingredient has no name, or the report is full and the ingredient is not among its lines. <paramref name="Pumps"/>
-/// are the numbers of the pumps it is on, <paramref name="RunsLow"/> whether the bottle of one of them warns; null while
-/// the warnings are not known.
+/// the ingredient has no name, or it is not among the lines of a report that is full or has a line that could not be
+/// read. <paramref name="Pumps"/> are the numbers of the pumps it is on, <paramref name="RunsLow"/> whether the bottle of
+/// one of them warns; null while the warnings are not known.
 /// </summary>
 internal sealed record IngredientUse(string ComponentId, string? Name, string? Color, IReadOnlyList<int> Pumps,
     int? DrinksInHours, int? DrinksSinceStart, bool? RunsLow);
