@@ -24,7 +24,7 @@ const machine = machineId.describe(MACHINE_NAMING)
 const machineListTool = toolDefinition({
   name: "genui_machine_list",
   description:
-    "List every machine with what it does now: manufacturer, model and serial number, connection, state and operation mode with the time since when, the active work master and job order, and the alerts of the last 24 hours that have not been cleared. The result says it in a line for each machine and carries the values for a display. Every value names the topic it comes from.",
+    "List every machine with what it does now: manufacturer, model, serial number and device class, connection, state and operation mode with the time since when, the active work master and job order, and the alerts of the last 24 hours that have not been cleared. The result says it in a line for each machine and carries the values for a display. Every value names the topic it comes from.",
   inputSchema: z.object({ timeZone }),
   outputSchema: machineList,
   metadata: { title: "List machines", annotations: readOnly },

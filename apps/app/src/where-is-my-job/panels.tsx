@@ -14,6 +14,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, 
 import { Meter, MeterLabel, MeterValue } from "@pleiades/ui/components/meter"
 import { Progress, ProgressLabel, ProgressValue } from "@pleiades/ui/components/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@pleiades/ui/components/table"
+import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { cn } from "cn"
 import {
   CheckCheckIcon,
@@ -30,8 +31,8 @@ import { Fragment, useEffect, useMemo, useState } from "react"
 
 import { getSpans } from "@/machines/get-machines.ts"
 
-import { conceptStations, finished, utilisation, waiting, workingOn } from "./floor.ts"
-import type { FloorPage, Job, Order, OrderState, Step } from "./floor.ts"
+import { conceptStations, finished, phaseOf, utilisation, waiting, workingOn } from "./floor.ts"
+import type { FloorPage, Job, Order, OrderPhase, OrderState, Step } from "./floor.ts"
 
 const heading = "text-xs font-medium tracking-wide text-muted-foreground uppercase"
 
@@ -125,7 +126,7 @@ export function FloorPanel({
     <section className="flex flex-col gap-2">
       <h3 className={heading}>Needs you · now {clock(page.asOf)}</h3>
       {needs.length === 0 ? (
-        <Empty className="border border-dashed">
+        <Empty className="gap-2 border border-dashed p-4 md:p-4">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <CheckCheckIcon />
@@ -135,7 +136,7 @@ export function FloorPanel({
           </EmptyHeader>
         </Empty>
       ) : (
-        <ItemGroup className="gap-2">
+        <ItemGroup className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {needs.map((one) => (
             <Item
               key={one.key}
@@ -205,6 +206,7 @@ export function MachinePanel({
           Back to order {backTo.label}
         </Button>
       )}
+      <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr]">
       <Item variant="muted" size="sm">
         <ItemMedia variant="icon">
           <FactoryIcon />
@@ -220,6 +222,9 @@ export function MachinePanel({
           <ItemDescription>{machine.identity.manufacturer ?? machine.machine}</ItemDescription>
         </ItemContent>
       </Item>
+      {/* Producing and waiting stand beside who the machine is. */}
+      <MachineStats show={show} waitingCount={jobs?.orders ? queue.length : null} />
+      </div>
       {machine.notifications.map((one) => (
         <Alert key={one.correlationId} variant={one.level === "Error" ? "destructive" : "default"}>
           <CircleAlertIcon />
@@ -229,23 +234,8 @@ export function MachinePanel({
           <AlertDescription>{one.title}</AlertDescription>
         </Alert>
       ))}
-      <ItemGroup className="grid grid-cols-2 gap-3">
-        <Item variant="outline" size="sm">
-          <ItemContent>
-            <Meter value={Math.round((utilisation(show) ?? 0) * 100)} className="gap-1.5">
-              <MeterLabel className="text-xs font-normal text-muted-foreground">Producing</MeterLabel>
-              <MeterValue className="text-xs" />
-            </Meter>
-          </ItemContent>
-        </Item>
-        <Item variant="outline" size="sm">
-          <ItemContent>
-            <ItemTitle className="text-xl tabular-nums">{jobs?.orders ? queue.length : "–"}</ItemTitle>
-            <ItemDescription className="text-xs">job orders waiting</ItemDescription>
-          </ItemContent>
-        </Item>
-      </ItemGroup>
       <MachineBand show={show} />
+      <div className="grid gap-5 md:grid-cols-3">
       <section className="flex flex-col gap-1.5">
         <h3 className={heading}>Now {clock(page.asOf)}</h3>
         {running ? (
@@ -283,7 +273,7 @@ export function MachinePanel({
           <p className="text-sm text-muted-foreground">No job order ended in the shift the machine keeps.</p>
         ) : (
           <ItemGroup className="gap-1.5">
-            {done.map(({ job, result }) => (
+            {done.slice(0, LISTED).map(({ job, result }) => (
               <Item
                 key={job.jobOrderId}
                 variant="outline"
@@ -299,6 +289,7 @@ export function MachinePanel({
             ))}
           </ItemGroup>
         )}
+        <More count={done.length} />
       </section>
       <section className="flex flex-col gap-1.5">
         <h3 className={heading}>Waiting</h3>
@@ -306,7 +297,7 @@ export function MachinePanel({
           <p className="text-sm text-muted-foreground">No job order is released.</p>
         ) : (
           <ItemGroup className="gap-1.5">
-            {queue.map((job) => (
+            {queue.slice(0, LISTED).map((job) => (
               <Item
                 key={job.jobOrderId}
                 variant="outline"
@@ -324,15 +315,22 @@ export function MachinePanel({
             ))}
           </ItemGroup>
         )}
-        <p className="text-xs text-muted-foreground">
-          The machine knows no planned times: the data model has PlannedStartTime, the stack has no plan to fill it.
-        </p>
+        <More count={queue.length} />
       </section>
+      </div>
     </div>
   )
 }
 
-/** What the order is known by, and whether the stack has it. */
+/** How many job orders a list of the machine panel shows; it says how many more there are. */
+const LISTED = 5
+
+/** The line under a list that shows only the first LISTED of `count`. */
+function More({ count }: { count: number }) {
+  return count > LISTED ? <p className="text-xs text-muted-foreground">and {count - LISTED} more</p> : null
+}
+
+/** What the order is known by, and whether the stack has it: the sheet and the box have no source yet. */
 function knownAs(order: Order): Array<{ label: string; value: string | null }> {
   return [
     { label: "Order number", value: order.number },
@@ -343,25 +341,25 @@ function knownAs(order: Order): Array<{ label: string; value: string | null }> {
   ]
 }
 
-/** A step of the path that publishes nothing yet. */
-function ConceptStep({ icon: Icon, name, missing, last }: { icon: LucideIcon; name: string; missing: string; last: boolean }) {
+/** How much of its history the machine was producing, and how many job orders wait for it. */
+function MachineStats({ show, waitingCount }: { show: MachineShow; waitingCount: number | null }) {
   return (
-    <li className="flex gap-3">
-      <div className="flex w-4 shrink-0 flex-col items-center">
-        <span aria-hidden className="mt-1 size-3.5 shrink-0 rounded-full border-2 border-dotted border-muted-foreground bg-background" />
-        {!last && <span aria-hidden className="my-0.5 w-0 flex-1 border-l-2 border-dotted border-border" />}
-      </div>
-      <div className="flex flex-1 flex-col gap-1 pb-4">
-        <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
-          <Icon className="size-4" />
-          {name}
-        </span>
-        <Badge variant="outline" className="border-dashed">
-          No source yet
-        </Badge>
-        <span className="text-xs text-muted-foreground">{missing}</span>
-      </div>
-    </li>
+    <>
+      <Item variant="outline" size="sm">
+        <ItemContent>
+          <Meter value={Math.round((utilisation(show) ?? 0) * 100)} className="gap-1.5">
+            <MeterLabel className="text-xs font-normal text-muted-foreground">Producing</MeterLabel>
+            <MeterValue className="text-xs" />
+          </Meter>
+        </ItemContent>
+      </Item>
+      <Item variant="outline" size="sm">
+        <ItemContent>
+          <ItemTitle className="text-xl tabular-nums">{waitingCount ?? "–"}</ItemTitle>
+          <ItemDescription className="text-xs">job orders waiting</ItemDescription>
+        </ItemContent>
+      </Item>
+    </>
   )
 }
 
@@ -379,7 +377,7 @@ export function OrderPanel({
   const here = machineName(page, order.at.machine)
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="grid items-start gap-4 md:grid-cols-3">
       <div className="flex flex-col gap-0.5">
         <span className="text-lg font-semibold">{order.label}</span>
         <span className="text-sm text-muted-foreground">
@@ -400,93 +398,43 @@ export function OrderPanel({
           {order.at.result?.start ? ` · started ${clock(order.at.result.start)}` : ""}
         </AlertDescription>
       </Alert>
+      <div className="flex flex-col gap-2">
       <Progress value={Math.round((reached / order.steps.length) * 100)}>
         <ProgressLabel className="text-xs font-normal text-muted-foreground">
           {reached} of {order.steps.length} machine steps done
         </ProgressLabel>
         <ProgressValue className="text-xs" />
       </Progress>
-      <section className="flex flex-col gap-1.5">
-        <h3 className={heading}>Known as</h3>
-        <p className="text-xs text-muted-foreground">Solid: the stack has it. Dashed: no source yet.</p>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {knownAs(order).map(({ label, value }, index) => (
-            <Fragment key={label}>
+      {/* The path in one line: the map draws it, this names its machines and opens one. */}
+      {order.steps.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1 text-xs">
+          {order.steps.map((step, index) => (
+            <Fragment key={`${step.machine}:${step.job.jobOrderId}`}>
               {index > 0 && <span aria-hidden className="text-muted-foreground">→</span>}
-              <Badge
-                variant={value ? "secondary" : "outline"}
-                className={cn("h-auto flex-col items-start py-1", !value && "border-dashed")}
-              >
-                <span className="text-[0.625rem] font-normal text-muted-foreground">{label}</span>
-                {value ?? "no source"}
-              </Badge>
+              <Button variant="link" size="xs" className="h-auto px-0" onClick={() => onMachine(step.machine)}>
+                {machineName(page, step.machine)}
+              </Button>
             </Fragment>
           ))}
         </div>
-      </section>
-      {/* The path as a vertical line of steps: no component draws one, so the dots and lines are our own. */}
-      <ol className="flex flex-col">
-        <ConceptStep icon={CodeXmlIcon} name={conceptStations.program.name} missing={conceptStations.program.missing} last={false} />
-        {order.steps.map((step) => {
-          const look = lookOf(step.job)
-          return (
-            <li key={`${step.machine}:${step.job.jobOrderId}`} className="flex gap-3">
-              <div className="flex w-4 shrink-0 flex-col items-center">
-                <span
-                  aria-hidden
-                  className={cn(
-                    "mt-1 size-3.5 shrink-0 rounded-full",
-                    look === "done" && "bg-primary",
-                    look === "current" && "border-4 border-primary bg-background ring-3 ring-primary/20",
-                    look === "blocked" && "border-4 border-destructive bg-background ring-3 ring-destructive/20",
-                    look === "aborted" && "bg-destructive",
-                    look === "planned" && "border-2 border-dashed border-muted-foreground bg-background",
-                  )}
-                />
-                <span aria-hidden className={cn("my-0.5 w-0 flex-1 border-l-2", look === "done" ? "border-primary" : "border-dashed border-border")} />
-              </div>
-              <div className="flex flex-1 flex-col gap-1 pb-4">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5 font-medium">
-                    <FactoryIcon className="size-4" />
-                    {step.job.jobName ?? "Job order"} {step.job.jobOrderId}
-                  </span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {step.result?.end
-                      ? `${clock(step.result.start ?? step.result.end)} to ${clock(step.result.end)}`
-                      : step.result?.start
-                        ? `since ${clock(step.result.start)}`
-                        : step.job.plannedStart
-                          ? `about ${clock(step.job.plannedStart)}`
-                          : "no plan"}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant={stepTag[look].variant} className={cn(look === "planned" && "border-dashed")}>
-                    {stepTag[look].label}
-                  </Badge>
-                  <Button variant="link" size="xs" className="h-auto px-0" onClick={() => onMachine(step.machine)}>
-                    {machineName(page, step.machine)}
-                  </Button>
-                </div>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {quantity(step)} made{step.result?.good != null ? ` · ${step.result.good} good` : ""}
-                </span>
-              </div>
-            </li>
-          )
-        })}
-        <ConceptStep icon={PackageIcon} name={conceptStations.pack.name} missing={conceptStations.pack.missing} last />
-      </ol>
-      {order.steps.length === 1 && (
-        <p className="text-xs text-muted-foreground">
-          {order.number === null
-            ? "The job order names no order number, so it is an order of its own."
-            : `The order passes one machine: no other job order names ${order.number}.`}{" "}
-          Once the ERP gives the job orders of several machines the same order number, its path runs across them by
-          itself.
-        </p>
       )}
+      </div>
+      {/* What the order is known by: the gaps of the page, the sheet and the box, stand dashed. */}
+      <section className="flex flex-col gap-1.5 md:col-span-3">
+        <h3 className={heading}>Known as</h3>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {knownAs(order).map(({ label, value }) => (
+            <Badge
+              key={label}
+              variant={value ? "secondary" : "outline"}
+              className={cn("h-auto flex-col items-start py-1", !value && "border-dashed")}
+            >
+              <span className="text-[0.625rem] font-normal text-muted-foreground">{label}</span>
+              {value ?? "no source yet"}
+            </Badge>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }
@@ -504,12 +452,16 @@ export function OrdersTable({
   onOrder: (key: string) => void
 }) {
   const [query, setQuery] = useState("")
+  // On its way by default: the orders that move across the floor are the ones to follow.
+  const [phase, setPhase] = useState<OrderPhase | "all">("moving")
   const words = query.trim().toLowerCase()
   // The names of the machines, once for all rows. Each tick gives new machines with the same names.
   const named = page.machines.map((one) => `${one.show.machine.machine}\t${titleOf(one.show.machine)}`).join("\n")
   const names = useMemo(() => new Map(named.split("\n").map((line) => line.split("\t") as [string, string])), [named])
   const nameOf = (id: string) => names.get(id) ?? id
+  const count = (wanted: OrderPhase) => orders.filter((one) => phaseOf(one) === wanted).length
   const rows = orders.filter((one) =>
+    (phase === "all" || phaseOf(one) === phase) &&
     `${one.label} ${one.jobName ?? ""} ${one.steps.map((step) => `${step.job.jobOrderId} ${nameOf(step.machine)}`).join(" ")}`
       .toLowerCase()
       .includes(words),
@@ -534,6 +486,20 @@ export function OrdersTable({
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+      <ToggleGroup
+        variant="outline"
+        size="sm"
+        spacing={0}
+        value={[phase]}
+        onValueChange={(value) => value[0] && setPhase(value[0] as OrderPhase | "all")}
+        aria-label="Show orders"
+      >
+        <ToggleGroupItem value="moving">In circulation · {count("moving")}</ToggleGroupItem>
+        <ToggleGroupItem value="waiting">Not started · {count("waiting")}</ToggleGroupItem>
+        <ToggleGroupItem value="through">Through · {count("through")}</ToggleGroupItem>
+        <ToggleGroupItem value="all">All · {orders.length}</ToggleGroupItem>
+      </ToggleGroup>
       <InputGroup className="max-w-sm">
         <InputGroupInput
           type="search"
@@ -546,6 +512,7 @@ export function OrdersTable({
           <SearchIcon />
         </InputGroupAddon>
       </InputGroup>
+      </div>
       {rows.length === 0 ? (
         <Empty className="border border-dashed">
           <EmptyHeader>
@@ -553,7 +520,9 @@ export function OrdersTable({
               <SearchXIcon />
             </EmptyMedia>
             <EmptyTitle>No order found</EmptyTitle>
-            <EmptyDescription>No order, job order or machine matches “{query}”.</EmptyDescription>
+            <EmptyDescription>
+              {words ? `No order, job order or machine matches “${query}”.` : "No order is in this state right now."}
+            </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (

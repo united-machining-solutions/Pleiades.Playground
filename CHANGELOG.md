@@ -13,6 +13,14 @@ All notable changes are documented here. The format follows
   the choice per server (`PUT`, `GET` and `DELETE /security`) and takes it for the scan and for every
   registration proposed after; the model never chooses. Every session of the scan is anonymous first: the
   stored user logs in only where the endpoint takes no anonymous session, or the server refuses it.
+- Example app: "Where is My Job?" stands the machines by their step of manufacturing, in clusters in the order
+  of DIN 8580 (printing, cutting, turning, milling, grinding, forming, joining). The step comes from
+  `Identification.DeviceClass`, else from words of the model; the panel "Arrange" corrects it, kept in the
+  browser. A tile has an icon for its step and the logo or name of its manufacturer. The perspectives stand
+  below the map in one column, the list of orders shows those in circulation by default. The machine card of
+  the generative UI backend has `identity.deviceClass` (optional). The showcase "What if" (only with
+  `APP_SHOWCASES`) is the same page at `/what-if`, with made-up orders WI-… across the clusters; "Real orders"
+  turns them off. The page of the app shows the real orders in every build.
 - Documentation answer and conflict cards with verbatim warnings, independently linked safety pages, package-wide source review and PDF quote highlighting.
 - Example app: a machine added over OPC UA in the chat goes on a site too, so Home shows it: on the only
   site there is, or on the one a person chooses on the proposal where there are several. A toast says it,
