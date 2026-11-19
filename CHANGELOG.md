@@ -454,6 +454,13 @@ All notable changes are documented here. The format follows
   The page "What if" at `/what-if` is gone, and so is the page of the app without the made-up orders: the
   application alone has no "Where is My Job?".
 - Documentation answers use cards exclusively; retired the previous prose/source-list presentation.
+- Example app: a part of a page asks the server that has its tool, not only `genui-mcp`: the OPC UA adapter for
+  `opcua_*`, an entry of `APP_MCP_SERVERS` for its tools. The drink card of the juice bar, the added OPC UA
+  servers and the mapping of one can be kept as a page, pinned and shared; opened, they show the values of then.
+  A part whose server the app does not have says which setting lacks it, and the rest of the page is whole. A
+  page calls only a tool its server marks as reading; the cards of an OPC UA scan stay in the chat. The chat
+  proposes only parts whose server the stack has, and "Add a card" offers the cards of every server. ADR-0025
+  amends ADR-0014 and ADR-0020.
 - Machine page: while it opens, every part shows a grey placeholder of its form and size, so nothing moves when
   the values come. The tiles of now stand without a card around them, and the machine card leaves out the line
   that only repeats what the control reports. A machine on a site that sent nothing for 24 hours shows

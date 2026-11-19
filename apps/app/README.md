@@ -36,18 +36,23 @@ harness.
   page can call. The chat shows the proposal with its title and its parts in words, "Save to my pages" and
   "Preview", which opens it as a link opens. Nothing is kept unless a person presses it. Why:
   [ADR-0020](../../docs/adr/0020-the-language-model-composes-a-page-and-nothing-else.md). A page is a recipe: a title
-  and its parts in their order, each part a tool of `genui-mcp` with its arguments. No value is kept and no
-  sentence of a language model: opening a page calls the tools again and draws each answer with the card
-  the chat draws for that tool, so it shows what holds now and needs no language model. It is read once, and
-  its head says as of when; only while a part waits for the backend is it read again. A part whose tool
-  the app has no card for stays where it is and says so; the rest of the page is whole. A page can be
+  and its parts in their order, each part a tool the chat draws a card for, with its arguments. No value is
+  kept and no sentence of a language model: opening a page calls the tools again, each at the server that has
+  it, and draws each answer with the card the chat draws for that tool, so it shows what holds now and needs no
+  language model. The server of a tool is the one whose name stands before its first `_`: `genui-mcp` for
+  `genui_*`, the OPC UA adapter for `opcua_*`, the entry `juicebar` of `APP_MCP_SERVERS` for the drink card
+  `juicebar_drinks_list`. A page calls only a tool its server marks as reading, since it calls it each time it
+  is opened; a scan of an OPC UA server is no part. It is read once, and its head says as of when; only while a
+  part waits for its server is it read again. A part whose tool the app has no card for, or whose server this
+  app does not have, stays where it is and says so; the rest of the page is whole. Why:
+  [ADR-0025](../../docs/adr/0025-a-part-of-a-page-asks-the-server-that-has-its-tool.md). A page can be
   renamed, pinned and deleted from its head. "Edit" there shows above each part "Move up", "Move down" and
   "Remove", by hand and with no language model, and "Done" takes them away again; a change is kept at once,
   and no part is asked again because another one moved or went. A removed part is kept nowhere else, so the
   toast that says so has "Undo". The only part of a page stays: "Delete page" is the way to be rid of it.
   "Add a card" at the end of a page that is edited adds one, also by hand: a dialog offers the cards a page
-  can hold, each by what it shows, and asks what the chosen one takes, as the input schema of its tool in the
-  backend says: a machine, chosen by its name from the machines Home lists, and the hours of a history in
+  can hold, each by what it shows, and asks what the chosen one takes, as the input schema of its tool on its
+  server says: a machine, chosen by its name from the machines Home lists, and the hours of a history in
   their range. An optional argument left empty stays out, so the measurements without a machine are every
   machine; the list of machines the energy card can take has no field, and that card shows every machine.
   The card goes to the end and shows its values at once; the other parts are not asked again. The same card
@@ -361,16 +366,17 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   `putPartBack` (the undo of `removePart`), `addPart`, `deletePage`, and `usePages` for a component that
   follows every change. `part-controls.tsx` is what "Edit" shows above a part, and `shown-parts.ts` gives each
   part of the recipe as it is now the answer the loader already has for it. `add-card.tsx` is "Add a card"
-  and its dialog; `card-choices.ts` the server function behind it, which reads the tools of the backend with
-  their input schemas and the machines; `add-part.ts` what the form asks for a card, read from its schema (a
+  and its dialog; `card-choices.ts` the server function behind it, which reads the tools of the servers a page
+  asks with their input schemas, and the machines; `add-part.ts` what the form asks for a card, read from its schema (a
   machine, a whole number in its range, never the time zone), the part it makes, and why a part is not added
   (`cannotAdd`). A card with a required argument the form does not know is offered as off, with why. `link.ts` writes a recipe into one search
   parameter, `r`, and reads it back (`encodeRecipe`, `decodeRecipe`, `linkOf`): JSON as UTF-8 in base64url,
   at most `MAX_PARAM_LENGTH` (8,000) characters, and what is not exactly a recipe (`recipeOf`) is null.
   `share-page.tsx` is "Share" in the head of a kept page, `column.tsx` the column that a kept page and a page
   opened from a link share. `call-part.ts` is the server function that calls
-  the tool of a part, only a tool the chat draws (`parts.ts`), with the time zone of the browser, and
-  returns what the chat hands to `draw`. `drawn-part.tsx` asks the parts of a recipe for a loader
+  the tool of a part at the server that has it (`serverOfTool` in `src/chat/mcp-servers.ts`), only a tool the
+  chat draws and its server marks as reading (`parts.ts`), with the time zone of the browser, and returns
+  what the chat hands to `draw`. `drawn-part.tsx` asks the parts of a recipe for a loader
   (`answerParts`) and draws one (`DrawnPart`): the card of the chat, or what is missing. `pinned.ts`
   makes the entries of the sidebar for the pinned pages, `listed.ts` the rows of the group for the others
   and the row that is marked: none for a pinned page, the list of the pages or a page opened from a link. A route that opens a link is input from outside at its

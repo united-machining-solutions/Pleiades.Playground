@@ -15,7 +15,7 @@ import type { ChatSettings } from "./gateway.ts"
 import { withTimeZone } from "./local-times.ts"
 import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
-import { leftOut, mcpServers, serverSwitch } from "./mcp-servers.ts"
+import { leftOut, mcpServers, opcua, opcuaUrl as opcuaUrlOf, serverSwitch } from "./mcp-servers.ts"
 import { proposePageTool } from "./propose-page.ts"
 import { forModel } from "./tool-results.ts"
 
@@ -43,7 +43,7 @@ const proposePage = proposePageTool(chatTools)
 
 // The OPC UA adapter, if the app has one: it scans OPC UA servers and proposes their registration.
 // Adding and removing a machine are buttons of its cards, not tools (src/cards/opcua).
-const opcuaUrl = process.env.OPCUA_MCP_URL?.trim() || undefined
+const opcuaUrl = opcuaUrlOf()
 
 const opcuaInstructions = `OPC UA machines: the tools named opcua_* belong to the OPC UA adapter. Read opcua_get_skill_guide before you scan a server, and follow it.
 You can list the added OPC UA servers, show the mapping of one, and scan a server and propose its registration.
@@ -59,7 +59,7 @@ const tools = mcp({
   servers: {
     ...mcpServers(),
     ...(opcuaUrl && {
-      opcua: {
+      [opcua]: {
         type: "http" as const,
         url: opcuaUrl,
         toolName: (tool: { name: string }) => tool.name,

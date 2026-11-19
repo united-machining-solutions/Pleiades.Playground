@@ -1058,14 +1058,15 @@ function Endpoints({ values }: { values: RankedEndpoints }) {
 
 const label = (running: string, done: string, failed: string): ToolLabel => ({ running, done, failed })
 
-// The cards of the OPC UA adapter are for the chat only (`saveAsPage: false`): a page asks the generative UI
-// backend alone (pages/call-part.ts), which has no opcua_* tool, and a scan is no part to run again
-// each time a page opens.
+// A page holds the added servers and the mapping of one: the adapter reads them from what it keeps
+// (ADR-0025). The cards of a scan are for the chat only (`saveAsPage: false`): their tools reach out to an
+// OPC UA server on every call, and each is one step of adding a machine, whose buttons act on what that
+// step found. A scan is no part to run again each time a page opens.
 export const opcuaTools: ReadonlyArray<ChatTool> = [
   {
     name: "opcua_server_list",
     label: label("Reading the OPC UA servers", "Read the OPC UA servers", "Failed to read the OPC UA servers"),
-    saveAsPage: false,
+    part: "The added OPC UA servers and their state",
     draw(content) {
       const values = serverListOf(content)
       return values && <Servers values={values} />
@@ -1083,7 +1084,7 @@ export const opcuaTools: ReadonlyArray<ChatTool> = [
   {
     name: "opcua_mapping_show",
     label: label("Reading the mapping", "Read the mapping", "Failed to read the mapping"),
-    saveAsPage: false,
+    part: "The mapping of one OPC UA server",
     draw(content) {
       const values = mappingOf(content)
       return values && <ShownMapping values={values} />

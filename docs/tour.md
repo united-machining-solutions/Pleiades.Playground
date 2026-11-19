@@ -299,7 +299,8 @@ card, such as one in words only, has no button. The group "Pages" in the sidebar
 that are not pinned, the newest first, and a page that is pinned from its head moves to the top of the sidebar,
 beside Home. "Edit" in its head moves a card up or down and removes one, with no language model; "Undo" in
 the toast puts a removed card back. "Add a card" at the end of the page adds one by hand: choose what it shows,
-and for one machine which machine and how many hours.
+and for one machine which machine and how many hours. The card of another server of the chat, such as the drink
+card of the [juice bar](#optional-a-juice-bar), is kept the same way: the page asks that server when it opens.
 
 Ask the chat for a page, for example "Make me a page with all machines and P-04", and it proposes one. The model
 reads with its tools what there is to show and composes the page: a title, and the cards in their order, each
@@ -316,8 +317,9 @@ this browser. What you asked for that no card shows, the model says in words.
 A page is private to the browser that keeps it, and the stack has no sign-in, so "Share" in its head gives a
 link that carries the recipe: which answers, for which machines and hours, and no value. Open it in a private
 window to see what a colleague sees: the page with the values of now, no chat and no language model needed,
-and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for says so,
-and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
+and above it "Opened from a link" with "Save to my pages". A part the colleague's app has no card for, or
+whose server it does not have, such as the juice bar, says so, and the rest of the page is whole. A link that
+was cut off when it was copied says that it holds no page.
 
 Ask about the alarms of a machine, for example "Which warnings and errors did P-04 have today?", and the chat
 draws the notification card of the tool `genui_notification_list`: a table with each warning and error, when it

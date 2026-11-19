@@ -17,9 +17,9 @@ import type { Pour } from "./glass.tsx"
 import { drinksOf, glassOf, ingredientsOf, isFizzy, orderOf, orderable, shortName, stageOf, whereLost, whyNoOrder } from "./results.ts"
 import type { Drink, Order, Stage } from "./results.ts"
 
-// The drink card in the chat: what the juice bar can mix now, one drink to pick, and its order. The
-// button orders at once, without a question of the language model; the start button on the machine is
-// the last step, pressed by the person at the glass. chat/cards.tsx lists this module.
+// The drink card, in the chat and on a page: what the juice bar can mix now, one drink to pick, and its
+// order. The button orders at once, without a question of the language model; the start button on the
+// machine is the last step, pressed by the person at the glass. chat/cards.tsx lists this module.
 
 /** The dots and short names of the ingredients, the water last. */
 function Ingredients({ drink }: { drink: Drink }) {
@@ -263,9 +263,9 @@ export const juicebarTools: ReadonlyArray<ChatTool> = [
   {
     name: "juicebar_drinks_list",
     label: { running: "Reading the drinks", done: "Read the drinks", failed: "Failed to read the drinks" },
-    // For the chat only: a page asks the generative UI backend alone (pages/call-part.ts), which has no
-    // juicebar_* tool.
-    saveAsPage: false,
+    // A page asks the juice bar for the drinks each time it is opened (ADR-0025). The tool only reads; the
+    // order is the button of the card, pressed by a person, as in the chat.
+    part: "The drinks the juice bar can mix now",
     draw(content) {
       const drinks = drinksOf(content)
       return drinks && <DrinkPicker drinks={drinks} />

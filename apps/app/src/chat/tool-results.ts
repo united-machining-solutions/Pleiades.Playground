@@ -41,8 +41,9 @@ export type ChatTool = {
   /**
    * Whether a drawn result can be replayed as a saved GenUI page. `false`: the chat draws it, and a
    * page never holds it as a part. Source references are such, the proposal of a page
-   * (pages/proposal.ts), and the cards of a server a page does not ask: a page asks the generative UI
-   * backend alone (pages/call-part.ts).
+   * (pages/proposal.ts), and a card whose tool reaches out or is one step of a flow, such as the scan
+   * of an OPC UA server. A page asks the server that has the tool, each time it is opened, and only a
+   * tool that reads (pages/call-part.ts, ADR-0025).
    */
   saveAsPage?: boolean
   /**

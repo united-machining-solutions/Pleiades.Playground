@@ -3,6 +3,7 @@ import { z } from "zod"
 
 import { PROPOSE_PAGE_TOOL, pageToolNames, proposePage } from "../pages/proposal.ts"
 import { MAX_PARTS, MAX_TITLE_LENGTH } from "../pages/recipe.ts"
+import { serverOfTool } from "./mcp-servers.ts"
 import type { ChatTool } from "./tool-results.ts"
 
 // The one tool of the app itself that the language model gets: it proposes a page. It runs on the
@@ -10,13 +11,19 @@ import type { ChatTool } from "./tool-results.ts"
 // nothing. It checks what the model sent against the chat's list of tools and the schema of a recipe,
 // and gives back what is left; the chat draws that as a proposal, and the person keeps it or not.
 
+/** Whether this app has the server of a tool (chat/mcp-servers.ts). */
+const onThisStack = (tool: string) => serverOfTool(tool).url !== undefined
+
 /**
  * The tool, with the tools a page can call read from `tools`, the chat's list (cards.tsx): a new card
- * is offered without another line here. The schema is loose where the check is strict, so that one
- * wrong part does not refuse the others and every refusal comes back in words the model can act on.
+ * is offered without another line here. A tool whose server this app does not have is not offered
+ * (`served`, ADR-0025): a page would only say that its server is missing. The schema is loose where
+ * the check is strict, so that one wrong part does not refuse the others and every refusal comes back
+ * in words the model can act on.
  */
-export function proposePageTool(tools: ReadonlyArray<ChatTool>) {
-  const names = pageToolNames(tools).join(", ")
+export function proposePageTool(tools: ReadonlyArray<ChatTool>, served: (tool: string) => boolean = onThisStack) {
+  const offered = tools.filter((tool) => served(tool.name))
+  const names = pageToolNames(offered).join(", ")
   return toolDefinition({
     name: PROPOSE_PAGE_TOOL,
     description: `Propose a page that the person can keep: a title, and the parts of the page in their order. A part is a tool whose card the page shows, with its arguments. The page keeps no value: each time it is opened, the app calls the tools again. A page can hold the cards of ${names}. Call those tools first, and take every argument, a machine id above all, from what they returned. The chat shows the person the page you propose, with a way to look at it and to keep it; you cannot keep it yourself. The result is the page as the app checked it, and each part it left out with the reason.`,
@@ -39,5 +46,5 @@ export function proposePageTool(tools: ReadonlyArray<ChatTool>) {
         .min(1)
         .describe(`The parts of the page in the order it shows them, at most ${MAX_PARTS}.`),
     }),
-  }).server((input) => proposePage(input, tools))
+  }).server((input) => proposePage(input, offered))
 }

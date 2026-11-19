@@ -63,8 +63,11 @@ export function listedServer(name: string, listed: Listed | undefined): ListedSe
 const TIMEOUT_MS = 2_000
 const KEEP_MS = 5_000
 
-/** A server that takes longer than this to connect and list does not answer, as far as the panel goes. */
-async function within<TValue>(work: Promise<TValue>, ms: number): Promise<TValue> {
+/**
+ * The work, or a rejection once it takes longer than `ms`: a server that takes longer than that to connect and
+ * list does not answer, as far as the panel goes, or "Add a card" on a page (pages/card-choices.ts).
+ */
+export async function within<TValue>(work: Promise<TValue>, ms: number): Promise<TValue> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([
