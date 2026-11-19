@@ -247,3 +247,39 @@ export function companyOf(list: SiteList): string {
   const companies = new Set(list.sites.map((site) => site.company))
   return companies.size === 1 ? [...companies][0]! : ""
 }
+
+/** A site as a person chooses it: its id and its name. */
+export type SiteOption = { siteId: string; name: string }
+
+/** The sites there are, by name, or why they could not be read. */
+export type SitesOutcome = { ok: true; sites: Array<SiteOption> } | { ok: false; reason: string }
+
+/**
+ * Where a machine that was just added goes: on no site where there is none, on the only one, or on the one a
+ * person chooses among several.
+ */
+export type SiteStep = { kind: "none" } | { kind: "one"; site: SiteOption } | { kind: "choose"; sites: Array<SiteOption> }
+
+/** The step for the sites there are. */
+export function siteStepOf(sites: ReadonlyArray<SiteOption>): SiteStep {
+  if (sites.length === 0) return { kind: "none" }
+  if (sites.length === 1) return { kind: "one", site: sites[0]! }
+  return { kind: "choose", sites: [...sites] }
+}
+
+/** A machine that was just added, put on a site: in no hall, under no display name. */
+export type AddedRequest = { machine: string; siteId: string }
+
+/**
+ * What became of putting an added machine on a site: on the site, or on the one it stood on already; or why
+ * not.
+ */
+export type AddedOutcome = { ok: true; siteId: string; siteName: string; already: boolean } | { ok: false; reason: string }
+
+/** Checks the machine id and the site id of an added machine. Throws the sentence of the problem. */
+export function addedRequestOf(value: unknown): AddedRequest {
+  const given = (value ?? {}) as Record<string, unknown>
+  const problem = problemOfId(given.machine, "machine id") ?? problemOfId(given.siteId, "site id")
+  if (problem) throw new Error(problem)
+  return { machine: given.machine as string, siteId: given.siteId as string }
+}

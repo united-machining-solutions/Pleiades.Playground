@@ -385,8 +385,10 @@ the data model and shows a proposal: the endpoint with the strongest security, w
 the core of the data model and which profiles are complete, and how many elements are ok, derived, unclear
 or missing. What the core lacks is marked as not available. Press one of these chips, "2 missing" say, and
 the proposal lists those elements with their values and why; press it again to close the list. The machine is added when you
-press "Add machine" on the proposal; from then on it sends like the others, also after a restart, and stands in
-the bar of Home until you add it to a site there.
+press "Add the machine" on the proposal; from then on it sends like the others, also after a restart. It goes on
+a site too, so Home shows it: on the only one there is, or on the one you choose on the proposal where there are
+several, and a toast says where. Where there is no site yet, it stands in the bar of Home until you add it to a
+site there.
 `/opcua` lists the added servers with their core and profiles, and a button that removes a machine together
 with its retained messages on the broker; `/mapping A1121O0001` shows what needs a look.
 

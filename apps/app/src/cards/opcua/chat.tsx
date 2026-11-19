@@ -1,5 +1,6 @@
 import { CircleAlertIcon, CircleCheckIcon, InfoIcon, NetworkIcon, ServerIcon, Trash2Icon } from "lucide-react"
-import { Fragment, useId, useState } from "react"
+import { useRouter } from "@tanstack/react-router"
+import { Fragment, useEffect, useId, useState } from "react"
 import type { ComponentProps, ReactNode } from "react"
 
 import type { ChatTool, ToolLabel } from "@/chat/tool-results.ts"
@@ -21,8 +22,10 @@ import { Button } from "@pleiades/ui/components/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@pleiades/ui/components/collapsible"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@pleiades/ui/components/field"
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@pleiades/ui/components/field"
 import { Input } from "@pleiades/ui/components/input"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@pleiades/ui/components/select"
+import { toast } from "@pleiades/ui/components/toast"
 import {
   Item,
   ItemActions,
@@ -37,8 +40,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 import { commitProposal, removeMachine, storeUser } from "@/opcua/adapter.ts"
 import type { Outcome } from "@/opcua/adapter.ts"
+import { siteStepOf } from "@/sites/placing.ts"
+import type { AddedOutcome, SiteStep, SitesOutcome } from "@/sites/placing.ts"
+import { listSites, placeAddedMachine } from "@/sites/sites-api.ts"
 import {
+  addedInWords,
   chosenRows,
+  doneInWords,
   endpointSummary,
   inDoubt,
   machineListOf,
@@ -70,7 +78,8 @@ import type {
 // The OPC UA cards in the chat: the added servers, the machines a server serves, the mapping of one,
 // and a proposal after a scan.
 // chat/cards.tsx lists this module. Adding and removing a machine are buttons here, never tools of
-// the language model.
+// the language model. A machine that is added goes on a site too, so Home shows it: the only one there
+// is, or the one the person chooses.
 
 const stateBadge: Record<MappingState, "default" | "secondary" | "destructive" | "outline"> = {
   Mismatch: "destructive",
@@ -550,9 +559,98 @@ function ChangeList({ proposal }: { proposal: Proposal }) {
   )
 }
 
+/**
+ * The sites there are, read once when the card of a machine to add is drawn, so the machine goes on one of
+ * them: undefined while they are read.
+ */
+function useSites(wanted: boolean): SitesOutcome | undefined {
+  const [sites, setSites] = useState<SitesOutcome>()
+  useEffect(() => {
+    if (!wanted) return
+    let current = true
+    listSites()
+      .catch((error: unknown): SitesOutcome => ({ ok: false, reason: error instanceof Error ? error.message : String(error) }))
+      .then((outcome) => {
+        if (current) setSites(outcome)
+      })
+    return () => {
+      current = false
+    }
+  }, [wanted])
+  return sites
+}
+
+/**
+ * The site a machine to add goes on: the only one there is, said in a line, or the one a person chooses from
+ * the list. Where there is none, or the Sites API does not answer, the line says that it goes on no site.
+ */
+function SitePick({
+  id,
+  sites,
+  step,
+  chosen,
+  onChoose,
+  invalid,
+}: {
+  id: string
+  sites: SitesOutcome | undefined
+  step: SiteStep
+  chosen: string | null
+  onChoose: (siteId: string | null) => void
+  invalid: boolean
+}) {
+  if (sites === undefined) return <p className="text-sm text-muted-foreground">Reading the sites…</p>
+  if (!sites.ok) return <p className="text-sm text-muted-foreground">It goes on no site: {sites.reason}</p>
+  if (step.kind === "none") {
+    return <p className="text-sm text-muted-foreground">There is no site yet: put it on one with Add machine on Home.</p>
+  }
+  if (step.kind === "one") return <p className="text-sm text-muted-foreground">It goes on {step.site.name}.</p>
+  const items = step.sites.map((site) => ({ label: site.name, value: site.siteId }))
+  return (
+    <Field data-invalid={invalid || undefined}>
+      <FieldLabel htmlFor={id}>Site</FieldLabel>
+      <Select items={items} value={chosen} onValueChange={(value) => onChoose(typeof value === "string" ? value : null)}>
+        <SelectTrigger id={id} className="w-full" aria-invalid={invalid || undefined}>
+          <SelectValue placeholder="Choose a site" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {items.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      {invalid ? <FieldError>Choose the site the machine stands on.</FieldError> : <FieldDescription>Home shows the machine on it.</FieldDescription>}
+    </Field>
+  )
+}
+
+/** What became of putting an added machine on a site, also when the server function rejects. */
+async function placedOf(call: () => Promise<AddedOutcome>): Promise<AddedOutcome> {
+  try {
+    return await call()
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) }
+  }
+}
+
 function ShownProposal({ values }: { values: Proposal }) {
   const [outcome, setOutcome] = useState<Outcome>()
   const [busy, setBusy] = useState(false)
+  const router = useRouter()
+  // A new machine goes on a site, else Home does not show it. A registration that replaces one leaves the
+  // machine where it stands, and an older adapter does not say the machine id it publishes under.
+  const machineId = !values.replaces && values.accepted && values.draftId ? values.machineId : undefined
+  const sites = useSites(machineId !== undefined)
+  const step: SiteStep = sites?.ok ? siteStepOf(sites.sites) : { kind: "none" }
+  const [siteId, setSiteId] = useState<string | null>(null)
+  const [tried, setTried] = useState(false)
+  const [placed, setPlaced] = useState<AddedOutcome>()
+  const site = step.kind === "one" ? step.site : step.kind === "choose" ? step.sites.find((one) => one.siteId === siteId) : undefined
+  const pickId = useId()
   // The table is closed until a chip is chosen, but for a mapping in doubt: that stands open, so no one adds a
   // machine with a wrong element without having seen it. The alerts say what the core and the profiles lack.
   const [chosen, setChosen] = useState<RowChoice | null>(null)
@@ -561,9 +659,23 @@ function ShownProposal({ values }: { values: Proposal }) {
   const add = async () => {
     if (!values.draftId) return
     const draftId = values.draftId
+    if (machineId !== undefined && step.kind === "choose" && site === undefined) {
+      setTried(true)
+      return
+    }
     setBusy(true)
     try {
-      setOutcome(await outcomeOf(() => commitProposal({ data: draftId })))
+      const committed = await outcomeOf(() => commitProposal({ data: draftId }))
+      const onSite =
+        committed.ok && machineId !== undefined && site !== undefined
+          ? await placedOf(() => placeAddedMachine({ data: { machine: machineId, siteId: site.siteId } }))
+          : undefined
+      setPlaced(onSite)
+      setOutcome(committed)
+      if (!committed.ok) return
+      if (onSite?.ok) void router.invalidate()
+      const { title, description } = addedInWords(values, sites, onSite)
+      toast.add({ title, description })
     } finally {
       setBusy(false)
     }
@@ -635,13 +747,26 @@ function ShownProposal({ values }: { values: Proposal }) {
       {values.accepted && values.draftId && (
         <CardFooter className="flex flex-col items-stretch gap-2">
           {outcome ? (
-            <Done outcome={outcome} done={`${values.serialNumber} is added. Its values appear on Home within seconds.`} />
+            <Done outcome={outcome} done={doneInWords(values, sites, placed)} />
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
                 Check the certificate and what needs a look. The adapter tries the registration once more when you click.
               </p>
-              <Button disabled={busy} onClick={() => void add()}>
+              {machineId !== undefined && (
+                <SitePick
+                  id={pickId}
+                  sites={sites}
+                  step={step}
+                  chosen={siteId}
+                  onChoose={(chosen) => {
+                    setSiteId(chosen)
+                    setTried(false)
+                  }}
+                  invalid={tried && site === undefined}
+                />
+              )}
+              <Button disabled={busy || (machineId !== undefined && sites === undefined)} onClick={() => void add()}>
                 {busy ? "Adding" : verb}
               </Button>
             </>
