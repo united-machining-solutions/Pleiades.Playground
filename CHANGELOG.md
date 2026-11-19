@@ -632,6 +632,8 @@ All notable changes are documented here. The format follows
 ### Fixed
 
 - PDF viewer now supports continuous scrolling and readable native-text highlights that stay aligned through zoom and resize.
+- Example app, showcase TruLaser: `/trulaser` without a machine shows the TruLaser alive most recently, not the first
+  by name. A machine that was renamed or stopped kept the page on its old values for a day.
 - Example app: `/discover` takes a mistyped or shortened address as the address it is. `opc.tcp//host:port`
   became `opc.tcp://opc.tcp//host:port:4840`, a machine name with the default port; a mistyped `opc.tcp` at
   the start, also `opc.tcp:host:port`, is now written right, and `host:port` or `host:port/path` without a
