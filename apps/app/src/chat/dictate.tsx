@@ -35,6 +35,11 @@ function fail(problem: unknown) {
   })
 }
 
+/** Lets a sound context run where the browser allows it; where not yet, a later call does. */
+function wake(sound: AudioContext) {
+  if (sound.state === "suspended") sound.resume().catch(() => undefined)
+}
+
 function nothingHeard() {
   toast.add({ title: "Nothing was heard", description: "Speak after you press the microphone." })
 }
@@ -85,6 +90,8 @@ export function useDictation(onText: (text: string) => void): Dictation {
   const running = useRef<Running | null>(null)
   /** The microphone is being opened: the browser may still ask the person. */
   const opening = useRef(false)
+  /** The field is gone, with another chat: a microphone that opens now is closed at once. */
+  const gone = useRef(false)
   /** The press that is down on the microphone, if one is. */
   const press = useRef<Press | null>(null)
   const holdTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -92,15 +99,24 @@ export function useDictation(onText: (text: string) => void): Dictation {
   const start = async (): Promise<boolean> => {
     if (running.current || opening.current) return false
     opening.current = true
-    // The sound context is made here, in the press: there every browser lets it run, Safari too.
+    // The sound context is made here, in the press: a mouse button that goes down lets it run.
     const sound = new AudioContext()
-    void sound.resume()
+    wake(sound)
     try {
       if (!canRecord()) {
         // The browser lets a page use the microphone only over https, or on this computer.
         throw new Error("This browser lets the app use the microphone only over https or on localhost.")
       }
       const recorder = await record()
+      if (gone.current) {
+        // The field went while the browser opened the microphone: nothing else would close it.
+        recorder.cancel()
+        void sound.close()
+        return false
+      }
+      // A finger that goes down is no user activation, only one that lets go, so the context may still be
+      // suspended; a page that records may start it. Else the bars stay flat while the recording works.
+      wake(sound)
       const level = sound.createAnalyser()
       level.fftSize = 1024
       sound.createMediaStreamSource(recorder.stream).connect(level)
@@ -152,17 +168,19 @@ export function useDictation(onText: (text: string) => void): Dictation {
     return () => clearTimeout(timer)
   }, [phase])
 
-  // A field that goes, with another chat, lets go of the microphone; nothing it recorded is kept.
-  useEffect(
-    () => () => {
+  // A field that goes, with another chat, lets go of the microphone; nothing it recorded is kept. One that
+  // is being opened is closed when it comes (start). React may mount a field twice: it is there again.
+  useEffect(() => {
+    gone.current = false
+    return () => {
+      gone.current = true
       clearTimeout(holdTimer.current)
       const now = running.current
       running.current = null
       now?.recorder.cancel()
       void now?.sound.close()
-    },
-    [],
-  )
+    }
+  }, [])
 
   // A finger or a mouse button: the recording starts as it goes down, so that the first word is heard,
   // and letting go decides whether it was a tap or a hold.
@@ -192,6 +210,8 @@ export function useDictation(onText: (text: string) => void): Dictation {
   const letGo = () => {
     clearTimeout(holdTimer.current)
     setHolding(false)
+    // A finger that lets go is a user activation: after a tap, the bars move from here on in any case.
+    if (running.current) wake(running.current.sound)
     const now = press.current
     press.current = null
     if (now && onLetGo(now, performance.now()) === "end") void end()
