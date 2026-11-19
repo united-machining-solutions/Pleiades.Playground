@@ -115,6 +115,14 @@ test("the alerts of the one machine are asked for between the start of the range
   assert.equal(list.topic, "machines/alcyone machines_AX-400_P-04/events/notifications")
 })
 
+test("the machine is named as people call it, and its alerts are asked for under its id", async () => {
+  const requested = serve([], { machines: [P04, "taygeta-precision_TP-800_P-07"] })
+  const list = await listNotifications(apis, "P-04", 1, now)
+  assert.equal(requested[0]?.searchParams.get("mId"), P04)
+  assert.equal(list.machine, P04)
+  await assert.rejects(listNotifications(apis, "P-99", 1, now), /No machine "P-99" published a value in the last 24 hours/)
+})
+
 test("one raised before the range that has not been cleared stands in the range, with its real beginning and no duration", async () => {
   serve([alert("a", "Failure", 5 * 60, null)])
   const list = await listNotifications(apis, P04, 1, now)
@@ -184,10 +192,10 @@ test("a machine that published values and has no alerts gets an empty list", asy
 
 test("a machine that published nothing in the last 24 hours is refused, with the machines that did, not answered with an all-clear", async () => {
   serve([], { machines: [P04, "alcyone-machines_AX-400_P-05"] })
-  // The label of a machine, not its id, is what a person or a model may mistype.
+  // A serial number that no machine has, as a person or a model may mistype it.
   await assert.rejects(
-    listNotifications(apis, "P-04", 8, now),
-    /^Error: No machine "P-04" published a value in the last 24 hours. Machines that did: alcyone-machines_AX-400_P-04, alcyone-machines_AX-400_P-05.$/,
+    listNotifications(apis, "P-09", 8, now),
+    /^Error: No machine "P-09" published a value in the last 24 hours. Machines that did: alcyone-machines_AX-400_P-04, alcyone-machines_AX-400_P-05.$/,
   )
 })
 
@@ -225,7 +233,11 @@ test("each level adds up how long its alerts stood, those that have not gone unt
 })
 
 test("an answer without hasMore is refused, because the list could not say whether it is whole", async () => {
-  mock.method(globalThis, "fetch", async () => Response.json({ items: [] }))
+  mock.method(globalThis, "fetch", async (input: Parameters<typeof fetch>[0]) =>
+    new URL(String(input)).pathname === "/topics"
+      ? Response.json({ baseUnitTopics: [`machines/${P04}/activePower`] })
+      : Response.json({ items: [] }),
+  )
   mock.method(console, "error", () => {})
   await assert.rejects(listNotifications(apis, P04, 8, now), /The Events API answered in a shape this server does not know/)
 })

@@ -3,6 +3,7 @@ import type { JobOrderEntry, JobOrderList } from "@pleiades/cards/machine/contra
 
 import { readJobOrders } from "./apis.ts"
 import type { Apis, StoredJobOrder } from "./apis.ts"
+import { knownMachines, machineNamed } from "./machines.ts"
 import { secondsBefore } from "./time.ts"
 
 // The job orders on the lists of the machines, as the Events API puts them together from their
@@ -41,9 +42,11 @@ export function entryOf(stored: StoredJobOrder): JobOrderEntry {
 
 /**
  * Every job order still on the list of its machine whose last event lies in the last 24 hours,
- * of one machine or of all. One that left the list is gone, as it is from the list.
+ * of one machine or of all. One that left the list is gone, as it is from the list. One machine is
+ * named by its id or as people call it (`machineNamed`).
  */
-export async function listJobOrders(apis: Apis, machine?: string, now = new Date()): Promise<JobOrderList> {
+export async function listJobOrders(apis: Apis, name?: string, now = new Date()): Promise<JobOrderList> {
+  const machine = name === undefined ? undefined : machineNamed(await knownMachines(apis, now), name)
   const stored = await readJobOrders(apis, secondsBefore(now, HORIZON_SECONDS), now, machine)
   const jobOrders = stored
     .filter((one) => !one.removed)

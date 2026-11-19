@@ -70,7 +70,9 @@ harness.
   "Chat". The panel opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
-  of a tool call itself: a card of the catalogue, or a list with the same rows as Home. An answer is drawn
+  of a tool call itself: a card of the catalogue, or a list with the same rows as Home. The list of all
+  machines is drawn only where the answer calls no other tool after it: a model that read it to find a
+  machine leaves it a step that opens to the list (`lookup` in `src/chat/tool-results.ts`). An answer is drawn
   from its markdown, and its times are those of your clock: the browser sends its time zone along with a
   question, and the server adds it to the tool calls. Whether the panel is open, and with which chat, is in
   the URL (`?chat=`), and the page stays where it is: you chat about what you see. Everything about the chat

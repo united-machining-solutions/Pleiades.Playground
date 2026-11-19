@@ -142,6 +142,11 @@ test("with a machine the list holds that one only, and an unknown one is refused
   )
   assert.equal(requested.some((url) => url.pathname.includes("/machines/P-04/")), false)
   await assert.rejects(listMeasurements(apis, now, "X-99"), /No machine "X-99" published a value in the last 24 hours. Machines that did: P-04, P-07./)
+  // As people call it, in small letters.
+  assert.deepEqual(
+    (await listMeasurements(apis, now, "p-07")).machines.map((one) => one.machine),
+    ["P-07"],
+  )
 })
 
 test("a line shows at the end of each slot the value that held, as it was measured, and none while the machine is silent", () => {

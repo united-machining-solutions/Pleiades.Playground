@@ -1,4 +1,4 @@
-import { machineId } from "@pleiades/cards/machine/contract.ts"
+import { MACHINE_NAMING, machineId } from "@pleiades/cards/machine/contract.ts"
 import { notificationList } from "@pleiades/cards/notification/contract.ts"
 import { notificationListInWords } from "@pleiades/cards/notification/in-words.ts"
 import { toolDefinition } from "@tanstack/ai"
@@ -22,11 +22,9 @@ const shownAsCard =
 const notificationListTool = toolDefinition({
   name: "genui_notification_list",
   description:
-    "List the warnings and errors of one machine over the last hours: each alert once, with when it was raised, when it was cleared and how long it stood, or that it has not gone. Those that have not gone come first. The result says it in a few lines and carries the values of the notification card. Name the machine by its id, as genui_machine_list gives it: an id that no machine published a value under is refused. Which machines have open alerts now is in genui_machine_list.",
+    "List the warnings and errors of one machine over the last hours: each alert once, with when it was raised, when it was cleared and how long it stood, or that it has not gone. Those that have not gone come first. The result says it in a few lines and carries the values of the notification card. Name the machine by its id or as people call it: a machine that published no value in the last 24 hours is refused. Which machines have open alerts now is in genui_machine_list.",
   inputSchema: z.object({
-    machine: machineId.describe(
-      "The machine id, <manufacturer>_<model>_<serial number>, for example alcyone-machines_AX-400_P-04. genui_machine_list names every machine with its id.",
-    ),
+    machine: machineId.describe(MACHINE_NAMING),
     hours: z
       .number()
       .int()
@@ -48,7 +46,8 @@ const notificationGuide = `## Notifications
 
 \`genui_notification_list\` lists the alerts of one machine that stood at any time in the last \`hours\`:
 each alert once, the ones that have not gone first, then the others with the newest first. Name the
-machine by its id (\`machine\`) and pass the \`timeZone\` of the person you answer, if you know it.
+machine (\`machine\`) by its id or as people call it, and pass the \`timeZone\` of the person you answer,
+if you know it.
 
 - \`raisedAt\` and \`goneAt\` are when the alert came and when it was cleared. \`goneAt\` is null as long
   as it stands: \`open\` is true. An alert that has not gone is, as a rule, also one of \`notifications\`
@@ -65,8 +64,8 @@ machine by its id (\`machine\`) and pass the \`timeZone\` of the person you answ
   its real \`raisedAt\`.
 - An alert that has not gone and was raised more than 24 hours before \`asOf\` is not listed, as the
   list of machines names none that old either: an empty list does not rule it out.
-- A \`machine\` that no machine published a value under in the last 24 hours is refused, with the ids
-  that did. Take the id from \`genui_machine_list\`; the label of a machine, such as \`P-04\`, is not one.
+- A \`machine\` that names no machine that published a value in the last 24 hours is refused, with the
+  ids that did; one that fits several, such as a serial number two makers use, with their ids.
 - \`hasMore\` is true if the Events API had more alerts than it returned, 1000 at most, the oldest
   missing. The counts are then lower bounds: say "at least".
 - \`notifications\` holds at most 50. \`total\`, \`open\`, \`gone\` and \`omitted\` count all that were

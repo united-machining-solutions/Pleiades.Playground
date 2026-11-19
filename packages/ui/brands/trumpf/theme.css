@@ -1,0 +1,35 @@
+@import "@fontsource-variable/open-sans";
+
+/*
+ * The brand "TRUMPF", written from the DESIGN.md next to this file. One rule: it holds while <html>
+ * carries data-brand="trumpf", and sets nothing but tokens of the theme (README.md says which).
+ */
+:root[data-brand="trumpf"] {
+  --background: #fafafa;
+  --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+  --primary: #285172;
+  --primary-foreground: #ffffff;
+  --secondary: #e7ecf0;
+  --secondary-foreground: #285172;
+  --muted: #f3f6f8;
+  --muted-foreground: #5e5e5e;
+  --accent: #e7ecf0;
+  --accent-foreground: #285172;
+  --border: #d5dde3;
+  --input: #a1a1a1;
+  --ring: #51a7eb;
+  --radius: 0rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #000000;
+  --sidebar-primary: #285172;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e7ecf0;
+  --sidebar-accent-foreground: #285172;
+  --sidebar-border: #d5dde3;
+  --sidebar-ring: #51a7eb;
+  --font-sans: "Open Sans Variable", "Open Sans", sans-serif;
+}

@@ -47,6 +47,8 @@ export const machineTools: ReadonlyArray<ChatTool> = [
   {
     name: "genui_machine_list",
     part: "Every machine and what it does now",
+    // A model reads the list to find a machine, too: then the list is a step, not the answer.
+    lookup: true,
     label: {
       running: "Reading the machines",
       done: "Read the machines",

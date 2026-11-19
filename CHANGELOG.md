@@ -413,6 +413,9 @@ All notable changes are documented here. The format follows
   attribute of all candidates in one call and uses it to choose between them, to tell what a node of the maker
   means, and as the unit of a node without `EngineeringUnits`. A description that contradicts the element, or
   disagrees with the `EngineeringUnits`, makes the match `Unclear`.
+- The brand TRUMPF (`packages/ui/brands/trumpf`): the colours, square corners and Open Sans of the TRUMPF
+  UX UI Community design system. Its `DESIGN.md` names what the design system asks for that a brand
+  cannot do.
 
 ### Changed
 
@@ -640,6 +643,14 @@ All notable changes are documented here. The format follows
   and energy or of the measurements of all machines are that tall. A long text no longer pulls the panel along
   either: it grows under its question too, and the button at the foot leads to its end as it stands. An alert
   under an answer, such as "The language model did not answer", comes into view by itself.
+- `genui-mcp`: a tool about one machine takes the machine as people call it, its serial number (`P-04`) or its
+  model and serial number (`AX-400 P-04`), as well as its id. A language model had to call `genui_machine_list`
+  first to learn the id, and the chat drew that list, every machine, above nearly every answer. A name that fits
+  several machines is refused with their ids; an id always means its own machine.
+- `app`: the chat draws the list of all machines only where the answer calls no other tool after it. A model
+  that reads the list to find a machine, and then asks about that machine, leaves it a step, "Read the
+  machines", which opens to the list; "Save as page" does not keep it either. While the answer
+  is coming, the list waits until it is clear which of the two it is.
 - `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page

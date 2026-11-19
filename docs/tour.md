@@ -251,7 +251,9 @@ The picture shows one chat, with a language model configured. The question was "
 last 8 hours?". The chat lists each step of the model, "Read the guide of the backend" and "Read the machine";
 a step opens to what its tool gave back. Whenever the answer is coming and nothing in it moves, before the
 first step and after a step until the next one or the text comes, a running line "Thinking" stands there. The
-chat draws the card from the values of the tool, and the model sums it up in a few sentences. The numbers are
+chat draws the card from the values of the tool, and the model sums it up in a few sentences. Where the model
+reads the list of all machines only to find one and then calls another tool, the list stays a step, "Read the
+machines", which opens to the list. The numbers are
 the tool's and the wording is the model's: the card says 6 minutes of running, the model "just under 7
 minutes". The stack had just started, so most of the 8 hours have no data. The card on the left is one minute
 newer than the one in the chat: the page reads again, an answer shows what was true when it was given.
