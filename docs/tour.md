@@ -174,26 +174,6 @@ read once by one server function, `getCharts` in
 [`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts); from then on the page is
 live from the broker, as Home is.
 
-The page "Where is My Job?" in the sidebar, <http://localhost:5600/where-is-my-job>, is a basis for
-discussion: how an order could be followed across the shop floor. It shows the machines of the stack from above, with their state, utilisation
-and job orders, the machines of one step of manufacturing side by side: cutting, turning, milling, grinding, in
-the order of DIN 8580. The step comes from what a machine says it is, `Identification.DeviceClass`, else from
-its model; "Arrange" lets a person correct it, and what they set wins. Below the map stand a machine with what
-it did, does and what waits for it, or an order on its way, and the list of orders, by default those in
-circulation. An order is every job order that names the same order number, read from the backend
-(`genui_job_order_list`) and kept live by the retained lists `JobMonitoring/JobOrders` and
-`JobOrderResults`. Programming before the machines, packing after them and the single part on its sheet have
-no source yet: the page draws them dashed, as the gaps to discuss. No source of the stack sends an order across
-machines yet; a stack with `APP_SHOWCASES` set has the page <http://localhost:5600/what-if>, in the sidebar
-as "What if": the same page with made-up orders WI-… across the clusters, and "Real orders" turns them off.
-It has no picture in this tour.
-
-**In the code:** [`apps/app/src/routes/where-is-my-job.tsx`](../apps/app/src/routes/where-is-my-job.tsx)
-is the page; the map, the panels and `getFloor` live in
-[`apps/app/src/where-is-my-job/`](../apps/app/src/where-is-my-job/): `floor.ts` there
-groups the job orders into orders, `steps.ts` gives each machine its step. The made-up orders are the
-showcase [`apps/app/src/showcases/what-if/`](../apps/app/src/showcases/what-if/).
-
 ## 3. The page of one machine
 
 A click on a machine on Home opens its page, here
@@ -541,6 +521,28 @@ pick, and a button that orders it at once; the glass then fills while the machin
 `APP_SHOWCASES` set has the same card as a page of its own, <http://localhost:5600/juice-bar>, for a screen next to
 the machine, without a language model. No tour screenshot was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).
+
+## Optional: Where is My Job?
+
+Following an order across the shop floor is not part of the six stops either: no source of the stack sends an
+order across machines yet. A stack with `APP_SHOWCASES` set has the page
+<http://localhost:5600/where-is-my-job>, in the sidebar as "Where is My Job?", a basis for discussion. It shows
+the machines of the stack from above, with their state, utilisation and job orders, the machines of one step of
+manufacturing side by side: cutting, turning, milling, grinding, in the order of DIN 8580. The step comes from
+what a machine says it is, `Identification.DeviceClass`, else from its model; "Arrange" lets a person correct
+it, and what they set wins. Below the map stand a machine with what it did, does and what waits for it, or an
+order on its way, and the list of orders, by default those in circulation.
+
+The page opens with made-up orders WI-… across the clusters; "Real orders" turns them off. A real order is
+every job order that names the same order number, read from the backend (`genui_job_order_list`) and kept live
+by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines, packing
+after them and the single part on its sheet have no source yet: the page draws them dashed, as the gaps to
+discuss. It has no picture in this tour.
+
+It is a showcase: its route is `routes/(showcases)/where-is-my-job.tsx`, and the made-up orders are in
+[`apps/app/src/showcases/where-is-my-job/`](../apps/app/src/showcases/where-is-my-job/). The map, the panels and
+`getFloor` are of the app, in [`apps/app/src/where-is-my-job/`](../apps/app/src/where-is-my-job/): `floor.ts`
+there groups the job orders into orders, `steps.ts` gives each machine its step.
 
 ## Optional: a TruLaser
 

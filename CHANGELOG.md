@@ -12,9 +12,7 @@ All notable changes are documented here. The format follows
   `Identification.DeviceClass`, else from words of the model; the panel "Arrange" corrects it, kept in the
   browser. A tile has an icon for its step and the logo or name of its manufacturer. The perspectives stand
   below the map in one column, the list of orders shows those in circulation by default. The machine card of
-  the generative UI backend has `identity.deviceClass` (optional). The showcase "What if" (only with
-  `APP_SHOWCASES`) is the same page at `/what-if`, with made-up orders WI-… across the clusters; "Real orders"
-  turns them off. The page of the app shows the real orders in every build.
+  the generative UI backend has `identity.deviceClass` (optional).
 - Documentation answer and conflict cards with verbatim warnings, independently linked safety pages, package-wide source review and PDF quote highlighting.
 - Example app: a machine added over OPC UA in the chat goes on a site too, so Home shows it: on the only
   site there is, or on the one a person chooses on the proposal where there are several. A toast says it,
@@ -442,6 +440,11 @@ All notable changes are documented here. The format follows
   cannot do.
 
 ### Changed
+
+- Example app: "Where is My Job?" is a showcase, only in a build with `APP_SHOWCASES`: at `/where-is-my-job`
+  and in the sidebar, it opens with made-up orders WI-… across the clusters, and "Real orders" turns them off.
+  The page "What if" at `/what-if` is gone, and so is the page of the app without the made-up orders: the
+  application alone has no "Where is My Job?".
 
 - Documentation answers use cards exclusively; retired the previous prose/source-list presentation.
 - Machine page: while it opens, every part shows a grey placeholder of its form and size, so nothing moves when
