@@ -76,7 +76,8 @@ internal sealed record RankedEndpointView(SecurityMode SecurityMode, string Secu
 /// <param name="NeedsUser">True if the server accepts no session without a user.</param>
 /// <param name="AcceptsUser">True if the server accepts a user name and a password on an encrypted endpoint.</param>
 /// <param name="User">The user a person stored for this server, or null. Never a password.</param>
-/// <param name="Chosen">The security a person chose for this server, if the recommended endpoint is that one; null for the strongest.</param>
+/// <param name="Chosen">The security a person chose for this server, or null if none is stored. Also while the server does not offer it.</param>
+/// <param name="ChosenInEffect">True if the recommended endpoint is the chosen one; false while the server does not offer it, and the adapter takes the strongest until it does again.</param>
 internal sealed record EndpointRankView(
     string Url,
     string? CertificateThumbprint,
@@ -84,7 +85,8 @@ internal sealed record EndpointRankView(
     bool NeedsUser,
     bool AcceptsUser,
     string? User,
-    SecurityChoice? Chosen = null);
+    SecurityChoice? Chosen = null,
+    bool ChosenInEffect = false);
 
 /// <summary>A user a person stored for a server. The password is never shown.</summary>
 /// <param name="Url">The address of the server.</param>
@@ -219,7 +221,8 @@ internal static class Views
             offer.NeedsUser,
             offer.AcceptsUser,
             offer.User,
-            offer.ChoiceInEffect);
+            offer.Choice,
+            offer.ChoiceInEffect is not null);
     }
 
     public static MachineListView Machines(ServedMachines served, IReadOnlyList<MachineConnection> added)

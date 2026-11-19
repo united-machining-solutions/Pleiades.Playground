@@ -131,8 +131,10 @@ export type RankedEndpoints = {
   acceptsUser?: boolean
   /** The user a person stored for this server. */
   user?: string
-  /** The security a person chose, if the adapter takes it; absent for the strongest, and from an older adapter. */
+  /** The security a person chose and the adapter keeps, also while the server does not offer it; absent without one. */
   chosen?: Security
+  /** The adapter takes the chosen security now; false while the server does not offer it. */
+  chosenInEffect?: boolean
 }
 
 /** A machine an OPC UA server serves, as `opcua_machine_list` gives it. */
@@ -323,19 +325,26 @@ export function securityKey(security: Security): string {
 
 /**
  * What the endpoints card shows: the endpoint the adapter takes, the strongest the server offers, whether a person
- * chose the one taken, the others (folded), and whether one of them has no security at all.
+ * chose the one taken, a choice the adapter keeps but does not take now (the server does not offer it), the others
+ * (folded), and whether one of them has no security at all.
  */
-export function endpointSummary(values: Pick<RankedEndpoints, "endpoints" | "chosen">): {
+export function endpointSummary(values: Pick<RankedEndpoints, "endpoints" | "chosen" | "chosenInEffect">): {
   used?: RankedEndpoint
   strongest?: RankedEndpoint
   chosen: boolean
+  dormant?: Security
   others: Array<RankedEndpoint>
   unsecured: boolean
 } {
   const used = values.endpoints.find((one) => one.recommended) ?? values.endpoints[0]
   const others = values.endpoints.filter((one) => one !== used)
-  const chosen = used !== undefined && values.chosen !== undefined && securityKey(values.chosen) === securityKey(used)
-  return { used, strongest: values.endpoints[0], chosen, others, unsecured: others.some((one) => one.securityMode === "None") }
+  const chosen =
+    used !== undefined &&
+    values.chosen !== undefined &&
+    values.chosenInEffect !== false &&
+    securityKey(values.chosen) === securityKey(used)
+  const dormant = values.chosen !== undefined && !chosen ? values.chosen : undefined
+  return { used, strongest: values.endpoints[0], chosen, dormant, others, unsecured: others.some((one) => one.securityMode === "None") }
 }
 
 /** What a person is told before and after choosing a security: how bad it is, and why. */

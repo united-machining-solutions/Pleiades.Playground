@@ -22,14 +22,11 @@ internal sealed record OfferedEndpoint(
 /// <param name="Score">Higher is stronger. Only the order matters.</param>
 /// <param name="Recommended">True for the one the adapter takes: the strongest, or the one a person chose.</param>
 /// <param name="Weak">True without encryption or with a policy that is no longer considered safe.</param>
-internal sealed record RankedEndpoint(OfferedEndpoint Endpoint, int Score, bool Recommended, bool Weak)
-{
-    /// <summary>
-    /// True if a session on this endpoint logs in with the stored user: the endpoint takes no anonymous session.
-    /// An endpoint that takes both is tried anonymously first.
-    /// </summary>
-    public bool WithUser => !Endpoint.Anonymous;
-}
+/// <param name="WithUser">
+/// True if a session on this endpoint logs in with the user a person stored: the endpoint is encrypted and takes a
+/// user name. A user a person stored goes before an anonymous session; without one, the session is anonymous.
+/// </param>
+internal sealed record RankedEndpoint(OfferedEndpoint Endpoint, int Score, bool Recommended, bool Weak, bool WithUser = false);
 
 /// <summary>
 /// Orders the endpoints of a server from strongest to weakest: encryption before signing only, then the
@@ -85,7 +82,9 @@ internal static class EndpointRanking
 
     /// <summary>
     /// The endpoints the adapter can open a session on, strongest first: every endpoint that takes an anonymous
-    /// session, and, if a person stored a user, every encrypted endpoint that takes a user name. The one a person
+    /// session, and, if a person stored a user, every encrypted endpoint that takes a user name. Where a person stored
+    /// a user, a session logs in with it on every encrypted endpoint that takes a user name
+    /// (<see cref="RankedEndpoint.WithUser"/>), else it is anonymous. The one a person
     /// chose is the one taken (<see cref="RankedEndpoint.Recommended"/>), if the server still offers it; else the
     /// strongest.
     /// </summary>
@@ -108,7 +107,8 @@ internal static class EndpointRanking
                 pair.endpoint,
                 pair.score,
                 Recommended: index == taken,
-                Weak: IsWeak(pair.endpoint.SecurityMode, pair.endpoint.SecurityPolicy))),
+                Weak: IsWeak(pair.endpoint.SecurityMode, pair.endpoint.SecurityPolicy),
+                WithUser: withStoredUser && pair.endpoint.UserName && pair.endpoint.SecurityMode == SecurityMode.SignAndEncrypt)),
         ];
     }
 
@@ -131,7 +131,8 @@ internal static class EndpointRanking
                 pair.endpoint,
                 pair.score,
                 Recommended: index == 0,
-                Weak: IsWeak(pair.endpoint.SecurityMode, pair.endpoint.SecurityPolicy))),
+                Weak: IsWeak(pair.endpoint.SecurityMode, pair.endpoint.SecurityPolicy),
+                WithUser: withUser)),
         ];
     }
 }

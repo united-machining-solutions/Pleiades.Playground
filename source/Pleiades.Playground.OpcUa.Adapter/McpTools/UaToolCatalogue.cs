@@ -80,9 +80,9 @@ internal static class UaToolCatalogue
 /// model. The library accepts a user name and a password, but a password typed into the chat would go through
 /// the model. So the arguments of a user are taken out of the tool (<see cref="Strip"/>), and a call that brings
 /// them all the same is refused by a filter of the MCP server before it reaches the tool (<see cref="Filter"/>).
-/// The filter sets the security of the endpoint the adapter takes, the strongest or the one a person chose, and
-/// connects anonymously first. Only if that endpoint takes no anonymous session, or the server refuses one, does
-/// it put the user a person stored into the call, on the side of the server: the model never sees the password.
+/// The filter sets the security of the endpoint the adapter takes, the strongest or the one a person chose. Where a
+/// person stored a user and that endpoint is encrypted and takes a user name, it puts the user into the call, on the
+/// side of the server: the model never sees the password. Else the session is anonymous.
 /// </summary>
 internal static class ScanConnect
 {
@@ -105,8 +105,8 @@ internal static class ScanConnect
         tool.InputSchema = WithoutUser(tool.InputSchema);
         tool.Description =
             $"{tool.Description} This tool takes no user name and no password, and the adapter sets the security: the " +
-            "endpoint opcua_endpoint_rank recommends, the strongest or the one a person chose. The session is anonymous " +
-            "first; if the server takes no anonymous session there and a person stored a user, it logs in with that user by itself.";
+            "endpoint opcua_endpoint_rank recommends, the strongest or the one a person chose. If a person stored a user, the " +
+            "session logs in with it by itself; else it is anonymous. Connecting again with the same name replaces the session.";
     }
 
     /// <summary>
@@ -135,10 +135,10 @@ internal static class ScanConnect
 
     /// <summary>
     /// What the filter does with a call of the connect tool. A call that brings a user is refused. Every other call
-    /// gets the security of the endpoint the adapter takes. On that endpoint the session is anonymous if the
-    /// endpoint takes anonymous sessions, and the server does not refuse one; else it logs in with the stored user,
-    /// over an encrypted endpoint and only to the certificate the user was stored with, and its result loses the
-    /// password wherever it might be echoed.
+    /// gets the security of the endpoint the adapter takes. On that endpoint the session logs in with the stored user
+    /// if the endpoint is encrypted and takes a user name; else it is anonymous, and if the server refuses that, the
+    /// user logs in on an encrypted endpoint. A user goes only to the certificate it was stored with, and the result
+    /// loses the password wherever it might be echoed.
     /// </summary>
     /// <param name="call">The call of the connect tool.</param>
     /// <param name="findCredential">The stored user of a server address, or null.</param>
@@ -191,7 +191,8 @@ internal static class ScanConnect
         var credential = findCredential?.Invoke(url);
         if (!used.WithUser)
         {
-            // Anonymous first. With no user stored there is nothing to fall back to, so nothing is tried before.
+            // An endpoint the user cannot take, or no user stored: anonymous. With no user stored there is nothing to
+            // fall back to, so nothing is tried before.
             var anonymous = credential is null
                 || refusesAnonymous is null
                 || !await refusesAnonymous(url, used.Endpoint, cancellationToken).ConfigureAwait(false);

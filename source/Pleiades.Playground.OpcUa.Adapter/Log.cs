@@ -88,4 +88,7 @@ internal static partial class Log
 
     [LoggerMessage(31, LogLevel.Error, "The security chosen for the OPC UA servers cannot be read: {Reason}")]
     public static partial void SecurityChoicesUnreadable(this ILogger logger, string reason);
+
+    [LoggerMessage(32, LogLevel.Information, "Machine {SerialNumber} starts its session anew with the user {User} a person stored.")]
+    public static partial void MachineReconnectsWithUser(this ILogger logger, string serialNumber, string user);
 }

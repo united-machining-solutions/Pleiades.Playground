@@ -243,3 +243,18 @@ test("the card sends a security choice only with an opc.tcp address, a mode of O
   assert.throws(() => securityOfServer({ url: "opc.tcp://m:4840", securityMode: "Encrypt", securityPolicy: "None" }))
   assert.throws(() => securityOfServer({ url: "opc.tcp://m:4840", securityMode: "Sign", securityPolicy: "http://x#y" }))
 })
+
+test("a stored choice the server does not offer now is shown as kept but not taken, so a person can forget it", () => {
+  const strongest = endpoints.map((one, position) => ({ ...one, recommended: position === 0 }))
+  const none = { securityMode: "None" as const, securityPolicy: "None" }
+
+  const gone = endpointSummary({ endpoints: strongest.slice(0, 2), chosen: none, chosenInEffect: false })
+  assert.equal(gone.chosen, false)
+  assert.deepEqual(gone.dormant, none)
+
+  const taken = endpointSummary({ endpoints, chosen: none, chosenInEffect: true })
+  assert.equal(taken.chosen, true)
+  assert.equal(taken.dormant, undefined)
+
+  assert.equal(endpointSummary({ endpoints: strongest }).dormant, undefined)
+})

@@ -41,10 +41,13 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
    - `needsUser` true and `user` empty: the server wants a user. The card of the result asks the person for
      user name and password. Say so in one sentence, never ask for them in the chat, and stop. When the person
      says it is done, call `opcua_endpoint_rank` again; with `user` set, go on. Every later connect logs in with
-     that user by itself where the server takes no anonymous session.
+     that user by itself.
    - `needsUser` false and `acceptsUser` true: the server works without a user, and the card offers the person
-     to store one, for when the server refuses an anonymous session. Go on without waiting; do not mention it
-     unless the person asks. Every connect is anonymous first.
+     to log in with one. Go on without waiting; do not mention it unless the person asks. Without a stored user
+     every connect is anonymous.
+   - When the person says they stored a user, call `opcua_endpoint_rank` again, then `opcua_ua_connect` again
+     with the same `name`: that replaces the session, and the new one logs in with the user. Do not go on with a
+     session opened before.
    - `acceptsUser` false: the server takes no user name on an encrypted endpoint, and the card has no form. If
      the person asks for a login, say so. If `needsUser` is true as well, the adapter cannot connect at all:
      say that the server would have to offer a user on an encrypted endpoint, and stop.
@@ -69,8 +72,8 @@ rows as text. Say what needs their attention: unclear, derived and mismatched el
 3. **Session.** `opcua_ua_connect` with `endpointUrl`, `autoAcceptCerts: true` and `name: "scan"`. Leave the
    security arguments out: the adapter sets the recommended endpoint by itself, whatever you pass. Pass
    `sessionName: "scan"` to every later `opcua_ua_*` call. The person sees the thumbprint of the certificate on
-   the proposal and confirms it there. Never pass a user name or a password: the session is anonymous first, and
-   logs in with the user a person stored only where the server takes no anonymous session.
+   the proposal and confirms it there. Never pass a user name or a password: the session logs in with the user a
+   person stored by itself, and is anonymous without one.
 4. **Namespaces.** `opcua_ua_read_value` with `{"nodeId": "i=2255", "sessionName": "scan"}`: the namespace
    array. Position `n` is the URI of `ns=n`. You need it for every node of the registration.
 5. **The machine.** `opcua_ua_browse_all` from the `node` of the machine, as `opcua_machine_list` gave it, with

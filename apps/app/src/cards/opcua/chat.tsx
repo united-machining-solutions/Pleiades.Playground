@@ -819,7 +819,7 @@ function UserForm({ url, user }: { url: string; user?: string }) {
     return (
       <Done
         outcome={outcome}
-        done="The user is stored. Tell the chat to go on: the scan logs in with it where the server takes no anonymous session."
+        done="The user is stored, and the machines added from this server start their sessions anew with it. Tell the chat to go on: it connects again and logs in with the user."
       />
     )
   }
@@ -877,7 +877,7 @@ function securityIn(endpoint: RankedEndpoint, user: string | undefined): string 
  */
 function SecurityChoice({ values }: { values: RankedEndpoints }) {
   const id = useId()
-  const { used, chosen } = endpointSummary(values)
+  const { used, chosen, dormant } = endpointSummary(values)
   const usedKey = used ? securityKey(used) : ""
   const [picked, setPicked] = useState(usedKey)
   const [outcome, setOutcome] = useState<{ outcome: Outcome; done: string }>()
@@ -942,7 +942,7 @@ function SecurityChoice({ values }: { values: RankedEndpoints }) {
       >
         {busy ? "Choosing" : endpoint?.securityMode === "None" ? "Connect without security" : "Connect with this security"}
       </Button>
-      {chosen && (
+      {(chosen || dormant) && (
         <Button variant="outline" disabled={busy} onClick={back}>
           Back to the strongest
         </Button>
@@ -956,7 +956,7 @@ function SecurityChoice({ values }: { values: RankedEndpoints }) {
  * folded. That the server also takes sessions without security is said without unfolding.
  */
 function EndpointSummary({ values }: { values: RankedEndpoints }) {
-  const { used, strongest, chosen, others, unsecured } = endpointSummary(values)
+  const { used, strongest, chosen, dormant, others, unsecured } = endpointSummary(values)
   if (!used) {
     return (
       <Item size="sm">
@@ -984,8 +984,14 @@ function EndpointSummary({ values }: { values: RankedEndpoints }) {
                 : "The strongest the server offers, the one the adapter connects with."}
           </ItemDescription>
           {unsecured && <ItemDescription>The server also accepts sessions without security.</ItemDescription>}
+          {dormant && (
+            <ItemDescription>
+              A person chose {securityOf(dormant)} for this server, which it does not offer now, so the adapter takes the
+              strongest. If the server offers it again, the adapter takes it again; "Back to the strongest" forgets it.
+            </ItemDescription>
+          )}
         </ItemContent>
-        {(others.length > 0 || chosen) && (
+        {(others.length > 0 || chosen || dormant) && (
           <ItemFooter>
             <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>Choose the security</CollapsibleTrigger>
           </ItemFooter>
@@ -999,7 +1005,8 @@ function EndpointSummary({ values }: { values: RankedEndpoints }) {
       <CollapsibleContent>
         <ItemSeparator className="my-0" />
         <div className="p-4">
-          <SecurityChoice values={values} />
+          {/* Keyed by the endpoint taken, so the pick starts there again when the card gets new values. */}
+          <SecurityChoice key={securityKey(used)} values={values} />
         </div>
       </CollapsibleContent>
     </Collapsible>
@@ -1036,8 +1043,8 @@ function Endpoints({ values }: { values: RankedEndpoints }) {
         <Collapsible>
           <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
             {values.user
-              ? `User ${values.user}, for when the server refuses an anonymous session: change it`
-              : "Store a user, for when the server refuses an anonymous session"}
+              ? `Logs in as ${values.user}: change the user`
+              : "Log in with a user instead of anonymously"}
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-3">
             <UserForm url={values.url} user={values.user} />

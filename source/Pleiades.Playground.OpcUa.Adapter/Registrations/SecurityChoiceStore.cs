@@ -99,7 +99,7 @@ internal sealed class SecurityChoiceStore
 
         try
         {
-            var read = JsonSerializer.Deserialize<Dictionary<string, SecurityChoice>>(File.ReadAllText(_file), RegistrationJson.Options);
+            var read = JsonSerializer.Deserialize<Dictionary<string, SecurityChoice>>(AtomicFile.ReadAllText(_file), RegistrationJson.Options);
             return new Dictionary<string, SecurityChoice>(read ?? [], StringComparer.Ordinal);
         }
         catch (JsonException exception)
@@ -113,11 +113,6 @@ internal sealed class SecurityChoiceStore
         }
     }
 
-    private void Write(Dictionary<string, SecurityChoice> all)
-    {
-        // Written beside and moved, so a crash leaves the old file or the new one, never half of one.
-        var next = _file + ".new";
-        File.WriteAllText(next, JsonSerializer.Serialize(all, RegistrationJson.Options));
-        File.Move(next, _file, overwrite: true);
-    }
+    private void Write(Dictionary<string, SecurityChoice> all) =>
+        AtomicFile.Write(_file, JsonSerializer.Serialize(all, RegistrationJson.Options));
 }

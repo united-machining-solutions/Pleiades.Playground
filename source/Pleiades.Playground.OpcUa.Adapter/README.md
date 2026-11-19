@@ -497,22 +497,30 @@ consumer that ends the alarms of an earlier run at the start of the next one doe
   marks that endpoint `recommended` and names it in `chosen`, the scan connects with it, and a registration that
   names it is accepted and stored with `allowWeaker`. While a choice stands, the card says so, names the
   strongest, shows the warning of the endpoint taken, and offers "Back to the strongest" (`DELETE /security`).
-  A choice the server no longer offers is ignored: the adapter takes the strongest again. A machine that is
+  A choice the server does not offer now stays stored and is shown on the card, which says that the adapter
+  takes the strongest until the server offers it again, and offers "Back to the strongest" to forget it:
+  otherwise a weaker choice, `None` after a reset of the server say, would come back unseen. A machine that is
   added keeps the security of its registration until it is registered again. The list of servers marks a
   machine without security, and the proposal shows the warning too. The rules are `endpointSummary` and
   `securityWarning` in `apps/app/src/cards/opcua/results.ts`. Without unfolding, the card still says that the
   server also accepts sessions without security, if one of the others has none.
-- **Anonymous first.** Every session of the scan is anonymous where the endpoint the adapter takes accepts an
-  anonymous session: `opcua_ua_connect`, `opcua_machine_list` and the probe of `opcua_registration_propose`.
-  The stored user logs in only where that endpoint takes no anonymous session, or the server refuses the
-  anonymous one (`BadIdentityTokenRejected`, `BadUserAccessDenied` and the like); then on the same endpoint
-  if it is encrypted and takes a user name, else on the strongest encrypted endpoint that does, never over an
-  endpoint without encryption. For `opcua_ua_connect` the adapter first tries the anonymous session with its
-  own client, which stops at once on a refused identity, since the session of the OPC UA MCP library would try
-  again until its timeout; that try is made only when a user is stored. A registration names `endpoint.user`
-  only if its session needs the user.
+- **Anonymous first, a stored user before it.** Without a stored user every session of the scan is anonymous:
+  `opcua_ua_connect`, `opcua_machine_list` and the probe of `opcua_registration_propose`. Once a person
+  stores a user, it is the user of every session on an encrypted endpoint that takes a user name, also where
+  the server takes anonymous sessions as well, since an anonymous session may see fewer nodes; the registration
+  names it in `endpoint.user`. Storing the user starts the sessions anew: the machines that run on an encrypted
+  endpoint of that server are registered again with the user and connect again, and the chat connects its scan
+  again, which replaces the session of the same name. On an endpoint the user cannot take, one without
+  encryption a person chose, the session stays anonymous; if the server refuses it
+  (`BadIdentityTokenRejected`, `BadUserAccessDenied` and the like), the user logs in on the strongest
+  encrypted endpoint that takes it, never over an endpoint without encryption. For `opcua_ua_connect` the
+  adapter tries that anonymous session with its own client first, which stops at once on a refused identity,
+  since the session of the OPC UA MCP library would try again until its timeout.
 - The certificate a server presents at the registration is the one the machine is known by. If it presents
-  another one later, the adapter does not connect and says so in `lastError`.
+  another one later, the adapter does not connect and says so in `lastError`. That holds on a signed or
+  encrypted endpoint only: on `None` there is no secure channel, the certificate is not checked
+  cryptographically, and its thumbprint from `GetEndpoints` can be forged. A machine without security is not
+  protected against another box at its address.
 - The adapter is one OPC UA client, with one certificate in `/data/pki`. A server that does not accept unknown
   clients has to trust it once.
 - A certificate error ends a connect at once, with its status and reason, instead of being tried again until
@@ -541,7 +549,7 @@ consumer that ends the alarms of an earlier run at the start of the next one doe
     | The server offers | `needsUser` | `acceptsUser` | The card |
     | --- | --- | --- | --- |
     | A user name on an encrypted endpoint, no anonymous session | true | true | Asks for user name and password before the scan can go on; once stored, "change the user" |
-    | A user name on an encrypted endpoint, and an anonymous session | false | true | The endpoint the adapter takes, with "Store a user, for when the server refuses an anonymous session" (folded) |
+    | A user name on an encrypted endpoint, and an anonymous session | false | true | The endpoint the adapter takes, with "Log in with a user instead of anonymously" (folded) |
     | Anonymous sessions only, or a user name only on endpoints that sign or have no security | – | false | The endpoint the adapter takes, no form |
 
     A server with anonymous sessions only, the opc-simulator among them, has no form, by design. To see it,
@@ -552,13 +560,13 @@ consumer that ends the alarms of an earlier run at the start of the next one doe
   - A password goes over an encrypted endpoint only (`SignAndEncrypt`). The ranking offers a session with a
     user no endpoint that only signs or has no security, and a registration with a user and another mode is
     refused.
-  - A registration names the user in `endpoint.user`, filled in by the adapter from the stored user where the
-    session needs it (anonymous first, above); the password stays in the store. Machines share a session only
+  - A registration names the user in `endpoint.user`, filled in by the adapter from the stored user on every
+    encrypted endpoint that takes it (above); the password stays in the store. Machines share a session only
     with the same user.
-  - The scan logs in with the stored user too where it needs one: the connect tool of the chat,
+  - The scan logs in with the stored user too: the connect tool of the chat,
     `opcua_ua_connect`, takes no user name and no password, although the library behind it would. A filter of
     the MCP server sets the security of the endpoint the adapter takes, whatever the model named, puts the
-    stored user into the call on the side of the adapter where the session needs it, and refuses a call that
+    stored user into the call on the side of the adapter, and refuses a call that
     brings a user of its own.
   - Removing the user of a server, `DELETE /users?url=`, stops the machines registered with it from
     connecting; removing a machine keeps the user.

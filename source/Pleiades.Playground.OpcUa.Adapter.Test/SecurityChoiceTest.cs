@@ -155,27 +155,109 @@ public class SecurityChoiceTest
     }
 
     [TestMethod]
-    public async Task A_proposal_is_anonymous_first_and_takes_the_stored_user_when_the_server_refuses_it()
+    public async Task A_proposal_is_anonymous_without_a_stored_user_and_logs_in_with_one_a_person_stored()
     {
         using var directory = new TemporaryDirectory();
-        new CredentialStore(directory.Path).Save(Url, new Credential("operator", "secret-1"));
         var outputs = new Mock<IMachineOutputFactory>(MockBehavior.Strict);
-        var anonymousOk = new SeenUsers(refuseAnonymous: false);
-        var anonymousRefused = new SeenUsers(refuseAnonymous: true);
+        var anonymous = new SeenUsers(refuseAnonymous: false);
+        var withUser = new SeenUsers(refuseAnonymous: false);
 
-        var first = MachineIdentityRefusalTest.Supervisor(directory.Path, outputs.Object, anonymousOk, Server);
-        var accepted = await first.RegisterAsync(MachineIdentityRefusalTest.Registration(), dryRun: true, TestContext.CancellationToken);
-        var second = MachineIdentityRefusalTest.Supervisor(directory.Path, outputs.Object, anonymousRefused, Server);
-        var withUser = await second.RegisterAsync(MachineIdentityRefusalTest.Registration(), dryRun: true, TestContext.CancellationToken);
+        var first = MachineIdentityRefusalTest.Supervisor(directory.Path, outputs.Object, anonymous, Server);
+        var withoutUser = await first.RegisterAsync(MachineIdentityRefusalTest.Registration(), dryRun: true, TestContext.CancellationToken);
+        new CredentialStore(directory.Path).Save(Url, new Credential("operator", "secret-1"));
+        var second = MachineIdentityRefusalTest.Supervisor(directory.Path, outputs.Object, withUser, Server);
+        var stored = await second.RegisterAsync(MachineIdentityRefusalTest.Registration(), dryRun: true, TestContext.CancellationToken);
 
-        Assert.IsTrue(accepted.Registered, string.Join(" ", accepted.Problems));
-        Assert.IsNull(accepted.Registration!.Endpoint.User, "The server takes the anonymous session, so the user is not used.");
-        CollectionAssert.AreEqual(new string?[] { null }, anonymousOk.Users);
-        Assert.IsTrue(withUser.Registered, string.Join(" ", withUser.Problems));
-        Assert.AreEqual("operator", withUser.Registration!.Endpoint.User);
-        CollectionAssert.AreEqual(new string?[] { null, "operator" }, anonymousRefused.Users);
+        Assert.IsTrue(withoutUser.Registered, string.Join(" ", withoutUser.Problems));
+        Assert.IsNull(withoutUser.Registration!.Endpoint.User);
+        CollectionAssert.AreEqual(new string?[] { null }, anonymous.Users);
+        Assert.IsTrue(stored.Registered, string.Join(" ", stored.Problems));
+        Assert.AreEqual("operator", stored.Registration!.Endpoint.User, "The user a person stored goes before an anonymous session, which may see less.");
+        CollectionAssert.AreEqual(new string?[] { "operator" }, withUser.Users);
         first.Dispose();
         second.Dispose();
+    }
+
+    [TestMethod]
+    public void A_stored_user_starts_the_sessions_of_the_machines_on_an_encrypted_endpoint_of_its_server_anew()
+    {
+        var offer = new EndpointOffer(
+            Url,
+            [Offer(SecurityMode.SignAndEncrypt, "Aes256_Sha256_RsaPss", userName: true), Offer(SecurityMode.None, "None")],
+            "operator");
+        MachineRegistration On(string serialNumber, string url, SecurityMode mode, string policy, string? user = null) =>
+            MachineIdentityRefusalTest.Registration() with
+            {
+                SerialNumber = serialNumber,
+                Endpoint = new EndpointRegistration { Url = url, SecurityMode = mode, SecurityPolicy = policy, User = user },
+            };
+
+        var reconnecting = MachineSupervisor.ReconnectingWithUser(
+            [
+                On("anonymous", "opc.tcp://MACHINE:4840/", SecurityMode.SignAndEncrypt, "Aes256_Sha256_RsaPss"),
+                On("other-user", Url, SecurityMode.SignAndEncrypt, "Aes256_Sha256_RsaPss", user: "service"),
+                On("no-security", Url, SecurityMode.None, "None"),
+                On("other-server", "opc.tcp://other:4840", SecurityMode.SignAndEncrypt, "Aes256_Sha256_RsaPss"),
+            ],
+            offer,
+            "operator");
+
+        CollectionAssert.AreEqual(new[] { "anonymous", "other-user" }, reconnecting.Select(registration => registration.SerialNumber).ToArray());
+        Assert.IsTrue(reconnecting.All(registration => registration.Endpoint.User == "operator"));
+    }
+
+    [TestMethod]
+    public void A_stored_choice_the_server_does_not_offer_is_still_named_and_not_in_effect_until_it_comes_back()
+    {
+        var choice = new SecurityChoice(SecurityMode.None, "None");
+        var gone = new EndpointOffer(Url, [Offer(SecurityMode.SignAndEncrypt, "Aes256_Sha256_RsaPss")], null, choice);
+        var back = gone with { Offered = [.. gone.Offered, Offer(SecurityMode.None, "None")] };
+
+        var whileGone = Api.Views.Ranking(gone);
+        var whenBack = Api.Views.Ranking(back);
+
+        Assert.AreEqual(choice, whileGone.Chosen, "The card names the stored choice, so a person can forget it.");
+        Assert.IsFalse(whileGone.ChosenInEffect);
+        Assert.AreEqual(SecurityMode.SignAndEncrypt, whileGone.Endpoints.Single(endpoint => endpoint.Recommended).SecurityMode);
+        Assert.IsTrue(whenBack.ChosenInEffect, "Offered again, the choice is taken again.");
+        Assert.AreEqual(SecurityMode.None, whenBack.Endpoints.Single(endpoint => endpoint.Recommended).SecurityMode);
+    }
+
+    [TestMethod]
+    public void A_request_without_a_security_mode_chooses_nothing_not_None()
+    {
+        var withoutMode = System.Text.Json.JsonSerializer.Deserialize<Api.SecurityRequest>(
+            """{"url":"opc.tcp://machine:4840","securityPolicy":"None"}""", RegistrationJson.Options)!;
+        var withMode = System.Text.Json.JsonSerializer.Deserialize<Api.SecurityRequest>(
+            """{"url":"opc.tcp://machine:4840","securityMode":"Sign","securityPolicy":"http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256"}""",
+            RegistrationJson.Options)!;
+
+        Assert.IsNull(withoutMode.Choice(out var problem));
+        Assert.IsNotNull(problem);
+        Assert.AreEqual(new SecurityChoice(SecurityMode.Sign, "Basic256Sha256"), withMode.Choice(out _));
+        Assert.IsNull(new Api.SecurityRequest(Url, SecurityMode.Sign, " ").Choice(out _));
+    }
+
+    [TestMethod]
+    public async Task A_write_waits_for_a_file_another_process_holds_for_a_moment()
+    {
+        using var directory = new TemporaryDirectory();
+        var file = Path.Combine(directory.Path, "security.json");
+        File.WriteAllText(file, "{}");
+
+        // Held as a virus scanner holds a file it just saw: the move over it fails on Windows until it lets go.
+        var held = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None);
+        var release = Task.Run(async () =>
+        {
+            await Task.Delay(AtomicFile.Pause * 2, TestContext.CancellationToken);
+            await held.DisposeAsync();
+        }, TestContext.CancellationToken);
+
+        AtomicFile.Write(file, """{"written":true}""");
+        await release;
+
+        Assert.AreEqual("""{"written":true}""", AtomicFile.ReadAllText(file));
+        Assert.IsFalse(File.Exists(file + ".new"));
     }
 
     /// <summary>A server that has every node, and refuses an anonymous session if told to. Notes the user of every probe.</summary>

@@ -144,7 +144,7 @@ public class ScanConnectFilterTest
     }
 
     [TestMethod]
-    public async Task With_a_stored_user_a_scan_is_anonymous_first_where_the_server_takes_it()
+    public async Task A_stored_user_goes_before_an_anonymous_session_also_where_the_server_takes_both()
     {
         CallToolRequestParams? passed = null;
         var tried = new List<string>();
@@ -157,9 +157,27 @@ public class ScanConnectFilterTest
             Passing(call => passed = call),
             TestContext.CancellationToken);
 
-        CollectionAssert.AreEqual(new[] { "SignAndEncrypt/Aes256_Sha256_RsaPss" }, tried, "The anonymous session is tried on the endpoint the adapter takes.");
+        Assert.IsEmpty(tried, "No anonymous session is tried: an anonymous session may see less than the user a person stored.");
+        Assert.AreEqual("operator", passed!.Arguments!["username"].GetString());
+        Assert.AreEqual("SignAndEncrypt", passed.Arguments["securityMode"].GetString());
+    }
+
+    [TestMethod]
+    public async Task Without_a_stored_user_a_scan_is_anonymous_and_tries_nothing_before()
+    {
+        CallToolRequestParams? passed = null;
+        var tried = new List<string>();
+
+        await ScanConnect.CallAsync(
+            Call($$"""{"endpointUrl":"{{Url}}"}"""),
+            _ => null,
+            Both(),
+            Refuses(false, tried),
+            Passing(call => passed = call),
+            TestContext.CancellationToken);
+
+        Assert.IsEmpty(tried);
         Assert.AreEqual("Anonymous", passed!.Arguments!["authType"].GetString());
-        Assert.IsFalse(passed.Arguments.ContainsKey("password"), "The password is not sent while the server takes an anonymous session.");
     }
 
     [TestMethod]

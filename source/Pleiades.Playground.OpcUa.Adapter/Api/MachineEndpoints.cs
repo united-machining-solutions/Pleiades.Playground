@@ -24,7 +24,24 @@ internal sealed record UserRequest(string Url, string User, string Password)
 /// <param name="Url">The address of the server, <c>opc.tcp://host:port</c>.</param>
 /// <param name="SecurityMode">The message security mode: <c>None</c>, <c>Sign</c> or <c>SignAndEncrypt</c>.</param>
 /// <param name="SecurityPolicy">The short name of the security policy, for example <c>Basic256Sha256</c>, or <c>None</c>.</param>
-internal sealed record SecurityRequest(string Url, SecurityMode SecurityMode, string SecurityPolicy);
+internal sealed record SecurityRequest(string Url, SecurityMode? SecurityMode, string? SecurityPolicy)
+{
+    /// <summary>
+    /// The choice the request names, or null with why not. Both fields are required: a mode left out is no choice,
+    /// although <c>None</c> is the default of the enumeration, so that no request chooses no security by omission.
+    /// </summary>
+    public SecurityChoice? Choice(out string? problem)
+    {
+        if (SecurityMode is not { } mode || !Enum.IsDefined(mode) || string.IsNullOrWhiteSpace(SecurityPolicy))
+        {
+            problem = "securityMode and securityPolicy: both are required, securityMode one of None, Sign and SignAndEncrypt.";
+            return null;
+        }
+
+        problem = null;
+        return new SecurityChoice(mode, EndpointRanking.ShortName(SecurityPolicy.Trim()));
+    }
+}
 
 /// <summary>A server with the security a person chose for it.</summary>
 /// <param name="Url">The address of the server.</param>
@@ -170,14 +187,13 @@ internal static class MachineEndpoints
             return Problem(StatusCodes.Status400BadRequest, ["url: must be an opc.tcp:// URL."]);
         }
 
-        if (string.IsNullOrWhiteSpace(request.SecurityPolicy) || !Enum.IsDefined(request.SecurityMode))
+        if (request.Choice(out var problem) is not { } choice)
         {
-            return Problem(StatusCodes.Status400BadRequest, ["securityMode and securityPolicy: both are required."]);
+            return Problem(StatusCodes.Status400BadRequest, [problem!]);
         }
 
         try
         {
-            var choice = new SecurityChoice(request.SecurityMode, EndpointRanking.ShortName(request.SecurityPolicy.Trim()));
             return await supervisor.SaveSecurityAsync(request.Url, choice, cancellationToken).ConfigureAwait(false) is { } refused
                 ? Problem(StatusCodes.Status409Conflict, [refused])
                 : Results.NoContent();

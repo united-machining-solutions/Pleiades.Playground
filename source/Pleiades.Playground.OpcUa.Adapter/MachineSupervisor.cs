@@ -49,21 +49,20 @@ internal sealed record EndpointOffer(string Url, IReadOnlyList<OfferedEndpoint> 
         Choice is { } choice && Used is { } used && choice.Matches(used.Endpoint.SecurityMode, used.Endpoint.SecurityPolicy) ? choice : null;
 
     /// <summary>
-    /// Where the stored user logs in when the server refused an anonymous session on <paramref name="refused"/>:
-    /// that endpoint if it is encrypted and takes a user name, else the strongest encrypted endpoint that does. A
-    /// password never goes over an endpoint without encryption. Null if there is none.
+    /// Where the stored user logs in when the server refused an anonymous session on <paramref name="refused"/>, an
+    /// endpoint the user cannot take (one without encryption a person chose): that endpoint if it is encrypted and
+    /// takes a user name, else the strongest encrypted endpoint that does. A password never goes over an endpoint
+    /// without encryption. Null if there is none.
     /// </summary>
     public RankedEndpoint? UserEndpointAfter(RankedEndpoint refused)
     {
         ArgumentNullException.ThrowIfNull(refused);
         if (refused.Endpoint.UserName && refused.Endpoint.SecurityMode == SecurityMode.SignAndEncrypt)
         {
-            return refused with { Endpoint = refused.Endpoint with { Anonymous = false } };
+            return refused with { WithUser = true };
         }
 
-        return EndpointRanking.Rank(Offered, withUser: true) is [var best, ..]
-            ? best with { Endpoint = best.Endpoint with { Anonymous = false } }
-            : null;
+        return EndpointRanking.Rank(Offered, withUser: true) is [var best, ..] ? best : null;
     }
 
     /// <summary>True if the server accepts no session without a user.</summary>
@@ -193,8 +192,8 @@ internal sealed class MachineSupervisor : BackgroundService
     }
 
     /// <summary>
-    /// Opens a session on <paramref name="used"/>: anonymous if the endpoint takes an anonymous session, and with
-    /// the stored user only if it takes none or the server refused the anonymous one.
+    /// Opens a session on <paramref name="used"/>: with the stored user where the endpoint takes it, else anonymous.
+    /// If the server refuses the anonymous session and a user is stored, the user logs in on an encrypted endpoint.
     /// </summary>
     private async Task<Opc.Ua.Client.ManagedSession> ConnectAnonymousFirstAsync(EndpointOffer offer, RankedEndpoint used, CancellationToken cancellationToken)
     {
@@ -203,15 +202,13 @@ internal sealed class MachineSupervisor : BackgroundService
             return (await _client.ConnectAsync(Registration(offer.Url, used, offer.User), cancellationToken).ConfigureAwait(false)).Session;
         }
 
+        var withUser = offer.User is null ? null : offer.UserEndpointAfter(used);
         try
         {
             return (await _client.ConnectAsync(Registration(offer.Url, used, user: null), cancellationToken).ConfigureAwait(false)).Session;
         }
-        catch (Exception exception) when (RefusalPolicy.IsRefusedIdentity(exception)
-            && offer.User is not null
-            && offer.UserEndpointAfter(used) is not null)
+        catch (Exception exception) when (RefusalPolicy.IsRefusedIdentity(exception) && withUser is not null)
         {
-            var withUser = offer.UserEndpointAfter(used)!;
             return (await _client.ConnectAsync(Registration(offer.Url, withUser, offer.User), cancellationToken).ConfigureAwait(false)).Session;
         }
     }
@@ -357,7 +354,58 @@ internal sealed class MachineSupervisor : BackgroundService
 
         _credentials.Save(url, credential);
         _logger.UserStored(url, credential.User);
+        await ReconnectWithUserAsync(offer, credential.User, cancellationToken).ConfigureAwait(false);
         return null;
+    }
+
+    /// <summary>
+    /// The registrations of the machines at the server of <paramref name="offer"/> that start their session anew with
+    /// <paramref name="user"/>: those on an encrypted endpoint that takes a user name, whatever user they logged in
+    /// with before, the password may be new. A machine on an endpoint without encryption stays anonymous.
+    /// </summary>
+    internal static IReadOnlyList<MachineRegistration> ReconnectingWithUser(
+        IEnumerable<MachineRegistration> registrations, EndpointOffer offer, string user)
+    {
+        ArgumentNullException.ThrowIfNull(registrations);
+        ArgumentNullException.ThrowIfNull(offer);
+        var url = EndpointKey.Normalize(offer.Url);
+        return
+        [
+            .. registrations
+                .Where(registration => EndpointKey.Normalize(registration.Endpoint.Url) == url
+                    && registration.Endpoint.SecurityMode == SecurityMode.SignAndEncrypt
+                    && offer.Offered.Any(endpoint => Same(endpoint, registration.Endpoint) && endpoint.UserName))
+                .Select(registration => registration with { Endpoint = registration.Endpoint with { User = user } }),
+        ];
+    }
+
+    /// <summary>
+    /// A person stored a user for a server: the machines that run there start their session anew with it, so the
+    /// user the person chose is the one their sessions log in with, not an anonymous session that may see less.
+    /// </summary>
+    private async Task ReconnectWithUserAsync(EndpointOffer offer, string user, CancellationToken cancellationToken)
+    {
+        var reconnecting = ReconnectingWithUser(Machines.Select(machine => machine.Registration), offer, user);
+        if (reconnecting.Count == 0)
+        {
+            return;
+        }
+
+        await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            foreach (var registration in reconnecting)
+            {
+                await StopAsync(registration.SerialNumber, removed: false).ConfigureAwait(false);
+                _store.Save(registration);
+                await StartAsync(registration).ConfigureAwait(false);
+                _logger.MachineReconnectsWithUser(registration.SerialNumber, user);
+            }
+        }
+        finally
+        {
+            _changes.Release();
+        }
     }
 
     private static readonly TimeSpan UserTrialTimeout = TimeSpan.FromSeconds(30);
@@ -410,11 +458,11 @@ internal sealed class MachineSupervisor : BackgroundService
         // The strongest endpoint the server offers is taken, unless a person decided otherwise.
         var offer = await OfferAsync(registration.Endpoint.Url, cancellationToken).ConfigureAwait(false);
 
-        // Anonymous first: the user a person stored for the server is the user of the session only where the
-        // endpoint takes no anonymous session. The password stays in the store.
+        // The user a person stored for the server is the user of the session wherever the endpoint is encrypted and
+        // takes a user name, also where it takes anonymous sessions: an anonymous session may see less. Without a
+        // stored user the session is anonymous. The password stays in the store.
         if (registration.Endpoint.User is null
             && offer.User is { } storedUser
-            && !offer.Offered.Any(endpoint => Same(endpoint, registration.Endpoint) && endpoint.Anonymous)
             && offer.Offered.Any(endpoint => Same(endpoint, registration.Endpoint) && endpoint.UserName && endpoint.SecurityMode == SecurityMode.SignAndEncrypt))
         {
             registration = registration with { Endpoint = registration.Endpoint with { User = storedUser } };
@@ -456,21 +504,7 @@ internal sealed class MachineSupervisor : BackgroundService
             registration = registration with { Endpoint = registration.Endpoint with { AllowWeaker = true } };
         }
 
-        ProbeResult probe;
-        try
-        {
-            probe = await _probe.ProbeAsync(registration, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception exception) when (RefusalPolicy.IsRefusedIdentity(exception)
-            && registration.Endpoint.User is null
-            && offer.User is not null
-            && chosen.Endpoint.UserName
-            && chosen.Endpoint.SecurityMode == SecurityMode.SignAndEncrypt)
-        {
-            // The server refused the anonymous session: the stored user logs in on the same endpoint instead.
-            registration = registration with { Endpoint = registration.Endpoint with { User = offer.User } };
-            probe = await _probe.ProbeAsync(registration, cancellationToken).ConfigureAwait(false);
-        }
+        var probe = await _probe.ProbeAsync(registration, cancellationToken).ConfigureAwait(false);
 
         // An element a known namespace set and the server does not fill is missing, not wrong.
         registration = Umati2DataModel.WithoutAbsent(registration, probe.NotFound.Select(element => (element.Area, element.Path)), out var absent);
