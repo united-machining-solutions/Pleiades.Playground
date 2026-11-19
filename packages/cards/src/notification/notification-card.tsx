@@ -1,4 +1,4 @@
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@pleiades/ui/components/card"
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { Fragment, useState } from "react"
 
@@ -77,19 +77,22 @@ function LevelToggle({
  * The notification card of one machine: the warnings and errors that stood in the range, a row of a
  * table for each, the ones that have not gone first. A row says when the alert was raised, when it was
  * cleared or that it is still open, and how long it stood. It draws the result of
- * `genui_notification_list` and computes nothing but the wording. It has no foot: the sums of the
- * levels stand in the words of the result, for a language model, not on the card.
+ * `genui_notification_list` and computes nothing but the wording. Under the table it says when
+ * the list is shorter than the counts in the head: how many notifications are not listed, and that the
+ * Events API had more than it returned. Its foot names when it was read and from which topic, as the
+ * other cards do, so its rows can be traced to the broker. The sums of the levels stand in the words of
+ * the result, for a language model, not on the card.
  *
  * A person chooses all of them or the errors or the warnings; ten notifications stand on a page, a
  * person turns the pages, and the card eases to the height of the new one. The counts in the head
  * are those of the level chosen. The result stays whole and in its order:
  * level and page are the state of the card, and what they compute is in pages.ts.
  *
- * `bare` draws it without its frame and its head, for a page that puts it into a card of its
- * own and names the machine and the hours there: the counts then stand above the notifications.
+ * `bare` draws it without its frame, its head and its foot, for a page that puts it into a card of
+ * its own and names the machine and the hours there: the counts then stand above the notifications.
  */
 export function NotificationCard({ bare = false, ...list }: NotificationList & { bare?: boolean }) {
-  const { machine, asOf, from, notifications, hasMore, open, total } = list
+  const { machine, asOf, from, topic, notifications, omitted, hasMore, open, total } = list
   const [level, setLevel] = useState<LevelChoice>("all")
   const [page, setPage] = useState(1)
   const listed = ofLevel(notifications, level)
@@ -135,6 +138,15 @@ export function NotificationCard({ bare = false, ...list }: NotificationList & {
   // A row for each notification, with a column each for when it was raised, when it was cleared and how
   // long it stood; where the card is narrow, as in the chat, the last two stand under the message.
   const rows = <NotificationTable notifications={view.notifications} time={(instant) => stamp(instant, asOf)} turn={`${level}:${view.page}`} />
+  // The head counts every notification of the range; the table lists what the tool returned. Where the
+  // two differ, the card says so, or "60 warnings" would stand over "1–10 of 50" with no word on the rest.
+  const notListed = (omitted > 0 || (hasMore && total > 0)) && (
+    <p className="text-xs text-muted-foreground">
+      {omitted > 0 && `${omitted} more ${omitted === 1 ? "notification is" : "notifications are"} not listed.`}
+      {omitted > 0 && hasMore && " "}
+      {hasMore && total > 0 && "The Events API had more than it returned: the oldest are missing, so the counts are lower bounds."}
+    </p>
+  )
   const content =
     listed.length === 0 ? (
       empty
@@ -142,6 +154,7 @@ export function NotificationCard({ bare = false, ...list }: NotificationList & {
       <div className="flex flex-col gap-3">
         <SmoothHeight>{rows}</SmoothHeight>
         {pages}
+        {notListed}
       </div>
     )
   if (bare) {
@@ -170,6 +183,9 @@ export function NotificationCard({ bare = false, ...list }: NotificationList & {
         {choice}
         {content}
       </CardContent>
+      <CardFooter className="block text-xs break-words text-muted-foreground">
+        Read at {clock(asOf)} from <Breakable text={topic} />
+      </CardFooter>
     </Card>
   )
 }

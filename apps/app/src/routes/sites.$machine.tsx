@@ -230,7 +230,7 @@ function Machine() {
   const choices = useMemo(() => (machines ? choicesOf(machines) : null), [machines])
   // A silent machine is asked for again too: when it sends, the page fills.
   useRetry(answer.values === null)
-  if (read.silent && !page) return <Silent machine={machine} choices={choices} sites={sections.sites} />
+  if (read.silent && !page) return <Silent machine={machine} choices={choices} sections={sections} />
   return (
     // The title is the machine by its model and serial number, once the backend named them; the
     // address keeps its id.
@@ -254,14 +254,21 @@ const NO_DATA = "No data in the last 24 hours"
 /**
  * The page of a machine on a site that published no value in the last 24 hours. It is no failure, so
  * it says so quietly: the head with the machine and its place, the card with the state "No data", and
- * the sections of alarms and of power with the same words. The tiles of what it measures now are left
+ * the sections of alarms and of power with the same words. Only where the Events API still has alarms
+ * or warnings of the machine in the hours of the page, one that is still open among them, the section
+ * of alarms lists them. The tiles of what it measures now are left
  * out: there is nothing now. The title is the model and serial number of the machine id, as the
  * backend has no identification to read.
  */
-function Silent({ machine, choices, sites }: { machine: string; choices: Array<Choice> | null; sites: Promise<Answer<SiteList>> }) {
+function Silent({ machine, choices, sections }: { machine: string; choices: Array<Choice> | null; sections: Sections }) {
   const title = labelOf(machine)
+  const quiet = (
+    <Section title="Alarms & warnings">
+      <p className="text-sm text-muted-foreground">{NO_DATA}.</p>
+    </Section>
+  )
   return (
-    <Page machine={machine} title={title} choices={choices} place={<Place machine={machine} sites={sites} />}>
+    <Page machine={machine} title={title} choices={choices} place={<Place machine={machine} sites={sections.sites} />}>
       <Card size="sm">
         <CardHeader>
           <CardTitle className="font-semibold group-data-[size=sm]/card:text-base">{title}</CardTitle>
@@ -274,9 +281,14 @@ function Silent({ machine, choices, sites }: { machine: string; choices: Array<C
           </CardAction>
         </CardHeader>
       </Card>
-      <Section title="Alarms & warnings">
-        <p className="text-sm text-muted-foreground">{NO_DATA}.</p>
-      </Section>
+      {/* A machine can fall silent with an alarm still open: then the alarm is what the page is opened for.
+          The Events API keeps it whatever the machine sends, so the section shows it; with nothing to show,
+          or no answer, it says the quiet words. */}
+      <Await promise={sections.notifications} fallback={<AlarmsSkeleton />}>
+        {(loaded) =>
+          loaded.values && loaded.values.total > 0 ? <Alarms machine={machine} hours={sections.hours} loaded={loaded} reading={false} /> : quiet
+        }
+      </Await>
       <Section title="Power and energy">
         <p className="text-sm text-muted-foreground">{NO_DATA}.</p>
       </Section>
