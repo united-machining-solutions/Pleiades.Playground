@@ -40,6 +40,7 @@ import type { Outcome } from "@/opcua/adapter.ts"
 import {
   chosenRows,
   endpointSummary,
+  inDoubt,
   machineListOf,
   mappingOf,
   needingALook,
@@ -86,23 +87,50 @@ const stateBadge: Record<MappingState, "default" | "secondary" | "destructive" |
 type Choosing = {
   chosen?: RowChoice | null
   onChoose?: (choice: RowChoice | null) => void
+  /** The id of the list the chips fill, for `aria-controls`. */
+  controls?: string
 }
 
-/** A chip that chooses rows. Pressed again, it lets go of them. */
+type BadgeVariant = NonNullable<ComponentProps<typeof Badge>["variant"]>
+
+/**
+ * The hover of a chip that is a button. Badge has one only for a link (`[a]:hover`); this is the same for a
+ * button, with the tokens of the variant.
+ */
+const chipHover: Partial<Record<BadgeVariant, string>> = {
+  default: "hover:bg-primary/80",
+  secondary: "hover:bg-secondary/80",
+  destructive: "hover:bg-destructive/20",
+  outline: "hover:bg-muted hover:text-muted-foreground",
+}
+
+/**
+ * A chip that chooses rows. Pressed again, it lets go of them. It is 24px high, the least target size of
+ * WCAG 2.2 (2.5.8), where a badge is 20px.
+ */
 function ChoiceBadge({
   choice,
   chosen,
   onChoose,
-  variant,
+  controls,
+  variant = "default",
   children,
-}: Choosing & { choice: RowChoice; variant: ComponentProps<typeof Badge>["variant"]; children: ReactNode }) {
+}: Choosing & { choice: RowChoice; variant: BadgeVariant; children: ReactNode }) {
   if (!onChoose) return <Badge variant={variant}>{children}</Badge>
   const pressed = sameChoice(choice, chosen)
+  const shown = pressed ? "default" : variant
   return (
     <Badge
-      variant={pressed ? "default" : variant}
-      className="cursor-pointer"
-      render={<button type="button" aria-pressed={pressed} onClick={() => onChoose(pressed ? null : choice)} />}
+      variant={shown}
+      className={`h-6 cursor-pointer ${chipHover[shown] ?? ""}`}
+      render={
+        <button
+          type="button"
+          aria-pressed={pressed}
+          aria-controls={controls}
+          onClick={() => onChoose(pressed ? null : choice)}
+        />
+      }
     >
       {children}
     </Badge>
@@ -119,7 +147,7 @@ function Counts({ summary, ...choosing }: Choosing & { summary: MappingSummary }
     ["Ok", summary.ok],
   ]
   return (
-    <span className="flex flex-wrap gap-1">
+    <span className={choosing.onChoose ? "flex flex-wrap gap-2" : "flex flex-wrap gap-1"}>
       {parts
         .filter(([, count]) => count > 0)
         .map(([state, count]) => (
@@ -144,7 +172,7 @@ function ProfileBadges({ checks, ...choosing }: Choosing & { checks?: ReadonlyAr
   const { core, fulfilled, incomplete } = shownProfiles(checks)
   if (!core) return null
   return (
-    <span className="flex flex-wrap gap-1">
+    <span className={choosing.onChoose ? "flex flex-wrap gap-2" : "flex flex-wrap gap-1"}>
       {core.fulfilled ? (
         <Badge variant="secondary">
           <CircleCheckIcon data-icon="inline-start" />
@@ -170,23 +198,40 @@ function ProfileBadges({ checks, ...choosing }: Choosing & { checks?: ReadonlyAr
   )
 }
 
-/** The rows of the chosen chip, with what they are. */
-function ChosenRows({
+/**
+ * The list the chips fill: the rows of the chosen chip, or what stands without a choice. The chips point to it
+ * with `aria-controls`, and its first line is always there and polite, so a screen reader says what the chip
+ * opened or closed.
+ */
+function ChosenList({
+  id,
   rows,
   choice,
   checks,
+  hint,
+  idle,
 }: {
+  id: string
   rows: ReadonlyArray<MappingRow>
-  choice: RowChoice
+  choice: RowChoice | null
   checks?: ReadonlyArray<ProfileCheck>
+  /** The line without a choice. */
+  hint: string
+  /** What stands without a choice. */
+  idle?: ReactNode
 }) {
-  const shown = chosenRows(rows, choice, checks)
-  const what = "state" in choice ? `${shown.length} ${choice.state.toLowerCase()}` : `What ${choice.profile} lacks`
+  const shown = choice ? chosenRows(rows, choice, checks) : null
+  const what =
+    choice && shown
+      ? `${"state" in choice ? `${shown.length} ${choice.state.toLowerCase()}` : `What ${choice.profile} lacks`}. Press the chip again to close the list.`
+      : hint
   return (
-    <>
-      <p className="text-sm text-muted-foreground">{what}. Press the chip again to close the list.</p>
-      {shown.length > 0 && <Rows rows={shown} />}
-    </>
+    <div id={id} className="flex flex-col gap-2">
+      <p aria-live="polite" className="text-sm text-muted-foreground">
+        {what}
+      </p>
+      {shown ? shown.length > 0 && <Rows rows={shown} /> : idle}
+    </div>
   )
 }
 
@@ -456,6 +501,7 @@ function ServedMachines({ values }: { values: MachineList }) {
 function ShownMapping({ values }: { values: Mapping }) {
   const { server } = values
   const [chosen, setChosen] = useState<RowChoice | null>(null)
+  const listId = useId()
   return (
     <Card>
       <CardHeader>
@@ -463,10 +509,17 @@ function ShownMapping({ values }: { values: Mapping }) {
         <CardDescription>
           {server.endpoint.url} · {securityOf(server.endpoint)} · {server.state}
         </CardDescription>
-        <Counts summary={server.mapping} chosen={chosen} onChoose={setChosen} />
+        <Counts summary={server.mapping} chosen={chosen} onChoose={setChosen} controls={listId} />
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
-        {chosen ? <ChosenRows rows={values.rows} choice={chosen} checks={server.conformance} /> : <Review rows={values.rows} />}
+        <ChosenList
+          id={listId}
+          rows={values.rows}
+          choice={chosen}
+          checks={server.conformance}
+          hint="Press a chip above to see only its elements."
+          idle={<Review rows={values.rows} />}
+        />
       </CardContent>
     </Card>
   )
@@ -500,8 +553,11 @@ function ChangeList({ proposal }: { proposal: Proposal }) {
 function ShownProposal({ values }: { values: Proposal }) {
   const [outcome, setOutcome] = useState<Outcome>()
   const [busy, setBusy] = useState(false)
-  // The table is closed until a chip is chosen: the chips and the alerts say what needs a look.
+  // The table is closed until a chip is chosen, but for a mapping in doubt: that stands open, so no one adds a
+  // machine with a wrong element without having seen it. The alerts say what the core and the profiles lack.
   const [chosen, setChosen] = useState<RowChoice | null>(null)
+  const listId = useId()
+  const doubts = inDoubt(values.rows)
   const add = async () => {
     if (!values.draftId) return
     const draftId = values.draftId
@@ -525,8 +581,8 @@ function ShownProposal({ values }: { values: Proposal }) {
             <span className="block break-all">Server certificate {values.endpoint.certificateThumbprint}</span>
           )}
         </CardDescription>
-        <ProfileBadges checks={values.conformance} chosen={chosen} onChoose={setChosen} />
-        {values.summary && <Counts summary={values.summary} chosen={chosen} onChoose={setChosen} />}
+        <ProfileBadges checks={values.conformance} chosen={chosen} onChoose={setChosen} controls={listId} />
+        {values.summary && <Counts summary={values.summary} chosen={chosen} onChoose={setChosen} controls={listId} />}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <ProfileGaps checks={values.conformance} />
@@ -558,10 +614,19 @@ function ShownProposal({ values }: { values: Proposal }) {
         )}
         <ChangeList proposal={values} />
         {values.rows.length > 0 &&
-          (chosen ? (
-            <ChosenRows rows={values.rows} choice={chosen} checks={values.conformance} />
-          ) : values.summary ? (
-            <p className="text-sm text-muted-foreground">Press a chip above to see its elements.</p>
+          (values.summary ? (
+            <ChosenList
+              id={listId}
+              rows={values.rows}
+              choice={chosen}
+              checks={values.conformance}
+              hint={
+                doubts.length > 0
+                  ? `${doubts.length === 1 ? "One element is" : `${doubts.length} elements are`} in doubt: look at ${doubts.length === 1 ? "it" : "them"} before you add the machine. Press a chip above to see the others.`
+                  : "Press a chip above to see its elements."
+              }
+              idle={doubts.length > 0 && <Rows rows={doubts} />}
+            />
           ) : (
             // An older adapter gives no numbers, so there is no chip to press.
             <Review rows={values.rows} />

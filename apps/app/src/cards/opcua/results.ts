@@ -268,6 +268,14 @@ export function chosenRows(
   )
 }
 
+/**
+ * The rows in doubt: a node that does not fit (mismatch) or a match that is a guess (unclear). The proposal shows
+ * them before a chip is pressed, since adding the machine would take them as they are.
+ */
+export function inDoubt(rows: ReadonlyArray<MappingRow>): Array<MappingRow> {
+  return rows.filter((row) => row.state === "Mismatch" || row.state === "Unclear")
+}
+
 /** The rows a person has to look at: everything that is not plainly fine. */
 export function needingALook(rows: ReadonlyArray<MappingRow>): Array<MappingRow> {
   return rows.filter((row) => row.state !== "Ok")

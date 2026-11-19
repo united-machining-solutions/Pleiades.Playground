@@ -3,6 +3,7 @@ import { test } from "node:test"
 
 import {
   chosenRows,
+  inDoubt,
   machineListOf,
   mappingOf,
   needingALook,
@@ -152,4 +153,16 @@ test("the same chip is the same choice, and no choice equals only no choice", ()
   assert.equal(sameChoice({ profile: "Core" }, { state: "Ok" }), false)
   assert.equal(sameChoice(null, undefined), true)
   assert.equal(sameChoice({ state: "Ok" }, null), false)
+})
+
+test("a mismatch and an unclear match are in doubt, a missing, derived or ok element is not", () => {
+  const rows: Array<MappingRow> = [
+    { path: "a", area: "umati", state: "Mismatch" },
+    { path: "b", area: "umati", state: "Unclear" },
+    { path: "c", area: "umati", state: "Derived" },
+    { path: "d", area: "umati", state: "Missing" },
+    { path: "e", area: "umati", state: "Ok" },
+  ]
+  assert.deepEqual(inDoubt(rows).map((row) => row.path), ["a", "b"])
+  assert.deepEqual(inDoubt([]), [])
 })
