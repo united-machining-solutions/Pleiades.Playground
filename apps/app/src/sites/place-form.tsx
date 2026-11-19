@@ -15,7 +15,6 @@ import {
   candidatesOf,
   fromOf,
   makeInWords,
-  makersOf,
   meantBy,
   namedMissing,
   namedOf,
@@ -30,6 +29,7 @@ import {
 } from "./choosing.ts"
 import type { Candidate, HallChoice, Named, PlaceStart, SiteChoice } from "./choosing.ts"
 import { keepLastPlace, lastPlaceIn, readLastPlace } from "./last-place.ts"
+import { makersOf } from "./machine-id.ts"
 import { MachinePicker } from "./machine-picker.tsx"
 import { PlaceFields } from "./place-fields.tsx"
 import { MAX_TEXT, companyOf } from "./placing.ts"
@@ -238,7 +238,7 @@ export function PlaceForm({
             onNamed={(index, change) => setNamed((before) => before.map((each, at) => (at === index ? { ...each, ...change } : each)))}
             onAddNamed={(name) => {
               const meant = meantBy(name, candidates).map((each) => each.machine)
-              setNamed((before) => [...before, { name, meant, chosen: true, byId: false, machine: "", manufacturer: "", model: "", serial: "" }])
+              setNamed((before) => [...before, { name, meant, chosen: true, manufacturer: "", model: "", serialNumber: "" }])
               // The only machine of the form is known by the name it was added by.
               if (displayName === "" && count === 0) setDisplayName(name)
               setQuery("")
