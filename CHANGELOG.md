@@ -11,6 +11,28 @@ All notable changes are documented here. The format follows
   `app_placement_propose`, and the chat draws a card that asks step by step for what is missing (which machine,
   where) and writes only when a person confirms, with the server functions and the undo of Home
   ([ADR-0026](docs/adr/0026-the-chat-proposes-where-a-machine-stands.md)).
+- OPC UA adapter: a person chooses the security of the sessions to a server under "Choose the security" on
+  the endpoints card of the chat, a weaker endpoint or `None` included. Before `None` is taken the card shows
+  a destructive warning; the endpoint taken, the proposal and the list of servers warn too. The adapter keeps
+  the choice per server (`PUT`, `GET` and `DELETE /security`) and takes it for the scan and for every
+  registration proposed after; the model never chooses. Every session of the scan is anonymous first: the
+  stored user logs in only where the endpoint takes no anonymous session, or the server refuses it.
+- Example app: "Where is My Job?" stands the machines by their step of manufacturing, in clusters in the order
+  of DIN 8580 (printing, cutting, turning, milling, grinding, forming, joining). The step comes from
+  `Identification.DeviceClass`, else from words of the model; the panel "Arrange" corrects it, kept in the
+  browser. A tile has an icon for its step and the logo or name of its manufacturer. The perspectives stand
+  below the map in one column, the list of orders shows those in circulation by default. The machine card of
+  the generative UI backend has `identity.deviceClass` (optional).
+- Documentation answer and conflict cards with verbatim warnings, independently linked safety pages, package-wide source review and PDF quote highlighting.
+- Example app: a machine added over OPC UA in the chat goes on a site too, so Home shows it: on the only
+  site there is, or on the one a person chooses on the proposal where there are several. A toast says it,
+  "A1121O0001 added · North plant", as Home does for a machine it puts on a site. Where there is no site, or
+  the Sites API does not answer, the machine is added on no site, and the proposal and the toast say why.
+- Example app: the chips of an OPC UA proposal in the chat are pressed to see what they count. "2 missing"
+  lists the two missing elements with their values and why, "Core: 1 not available" what the core lacks,
+  and a profile marked incomplete what it lacks; pressed again, the list closes. The proposal shows no table
+  until a chip is pressed. On the mapping of `/mapping`, the chips of the numbers filter its table the same
+  way. The list of servers of `/opcua` has the numbers but not the elements, so its chips stay as they are.
 - Bending machine, started with the stack: a simulator of a press brake that reports through RCI telegram files, with a
   web page, and one adapter per machine that publishes it after the binding of machines (data model 0.17.1) as
   `trumpf_5085_AE325085TB46`: identification, `State/Status`, `Notification/ActiveAlerts` with `AlertRaised` and
@@ -153,7 +175,7 @@ All notable changes are documented here. The format follows
   source yet and stand on the page as such. The page reads the job orders from the new tool
   `genui_job_order_list` of `genui-mcp`, the job orders on the lists of the machines from the Events API, so
   they stand also after a reload or a reconnect; a job order the planner took back before it ran is left out.
-  It is a page of the app with its entry in the sidebar, not a showcase: it shows only values the stack has.
+  It is a showcase, only in a build with `APP_SHOWCASES`, and has its entry in the sidebar there (see Changed).
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
@@ -431,16 +453,23 @@ All notable changes are documented here. The format follows
 
 - Home: "Add new machine" adds a machine that is not there yet, said by its manufacturer, model and serial
   number, its id formed by ADR-0015; an id that sends already is assigned instead, one on a site moved.
-  "Review and add" assigns the machines that sent data in the last 24
-  hours from a list, searched by name, manufacturer, state, id and last data, seven a page, several at once to
-  one site and hall. Sites and halls are made while typing, "Add site" and "Add hall" make them alone, and both
-  dialogs start at the place used last.
+  "Review and add" assigns the machines that sent data in the last 24 hours from a list, searched by name,
+  manufacturer, state, id and last data, seven a page, several at once to one site and hall. Sites and halls
+  are made while typing, "Add site" and "Add hall" make them alone, and both dialogs start at the place used
+  last.
 - Home and the machine card in the chat: the whole row of a machine leads to its page; its buttons stay clicks
   of their own, and the keyboard meets one link a row.
+- Example app: "Where is My Job?" is a showcase, only in a build with `APP_SHOWCASES`: at `/where-is-my-job`
+  and in the sidebar, it opens with made-up orders WI-… across the clusters, and "Real orders" turns them off.
+  The page "What if" at `/what-if` is gone, and so is the page of the app without the made-up orders: the
+  application alone has no "Where is My Job?".
+- Documentation answers use cards exclusively; retired the previous prose/source-list presentation.
 - Machine page: while it opens, every part shows a grey placeholder of its form and size, so nothing moves when
   the values come. The tiles of now stand without a card around them, and the machine card leaves out the line
   that only repeats what the control reports. A machine on a site that sent nothing for 24 hours shows
   "No data in the last 24 hours" instead of an error.
+- Machine page: while it opens, nothing of it is written yet. The titles, the labels of the tiles and the head of
+  the alarm table are grey placeholders too, and a reader of the screen hears "Loading" until the data comes.
 - Notification card: the alerts stand as a table, in the chat too: level, message with its code, raised,
   cleared and duration; where the card is narrow, the last two stand under the message. The sums at the foot
   are left out; the note on alerts not listed stands under the table, and the foot names when the card was
@@ -459,7 +488,11 @@ All notable changes are documented here. The format follows
 - Example app: Live values with all machines shows only the graphs of a value some machine published, and
   next to the title of a graph at most one value of now, where a single machine measures it; more stand
   only as lines. Where machines are there and none published such a value, the page says so. With one machine
-  chosen, the page is as before.
+  chosen, it shows every signal that machine published in the last 24 hours, a number or a yes or no, found
+  anew each time the machine is chosen (`genui_timeseries_signals`), each in a graph of its own over the last
+  15 minutes with its newest value, live from the broker. A machine without any value keeps the graphs as
+  before. Every graph has a button at its top right that shows it enlarged over the page, still live; the X
+  at the top right of the enlarged graph closes it.
 - Example app: "New chat" is back in the head of the chat panel, as a plus in the list and in every chat. It
   opens a new chat with no question yet and the cursor in its field; the list stays behind "All chats". After
   the first question asked in the panel, the field of the new chat keeps the cursor, so the next question
@@ -633,6 +666,9 @@ All notable changes are documented here. The format follows
 ### Fixed
 
 - Home: on a narrow page the head of a site no longer lies over the chat below it.
+- PDF viewer now supports continuous scrolling and readable native-text highlights that stay aligned through zoom and resize.
+- Example app, showcase TruLaser: `/trulaser` without a machine shows the TruLaser alive most recently, not the first
+  by name. A machine that was renamed or stopped kept the page on its old values for a day.
 - Example app: `/discover` takes a mistyped or shortened address as the address it is. `opc.tcp//host:port`
   became `opc.tcp://opc.tcp//host:port:4840`, a machine name with the default port; a mistyped `opc.tcp` at
   the start, also `opc.tcp:host:port`, is now written right, and `host:port` or `host:port/path` without a

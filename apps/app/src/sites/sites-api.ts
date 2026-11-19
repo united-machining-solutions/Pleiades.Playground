@@ -1,14 +1,16 @@
 import { createServerFn } from "@tanstack/react-start"
 
-import { makeHallAlone, makeSiteAlone, place, remove, undo, unmake } from "./placements.ts"
+import { makeHallAlone, makeSiteAlone, place, placeAdded, remove, sitesOf, undo, unmake } from "./placements.ts"
 import type { Send } from "./placements.ts"
-import { makeHallRequestOf, makeSiteRequestOf, placeRequestOf, removeRequestOf, undoMadeRequestOf, undoRequestOf } from "./placing.ts"
-import type { MakeOutcome, PlaceOutcome, RemoveOutcome, UndoOutcome } from "./placing.ts"
+import { addedRequestOf, makeHallRequestOf, makeSiteRequestOf, placeRequestOf, removeRequestOf, undoMadeRequestOf, undoRequestOf } from "./placing.ts"
+import type { AddedOutcome, MakeOutcome, PlaceOutcome, RemoveOutcome, SitesOutcome, UndoOutcome } from "./placing.ts"
 import { position, positionRequestOf } from "./positioning.ts"
 import type { PositionOutcome } from "./positioning.ts"
 
 // The steps of a person on Home: adding a machine to a site, moving it, taking it off, and undoing
-// either; making a site or a hall alone, and undoing that; and the step of a person on Halls: saying where in its hall a machine stands. They go to the REST endpoints of the Sites API from the server of the app, never from the
+// either; making a site or a hall alone, and undoing that; the step of a person on Halls: saying where in its
+// hall a machine stands; and putting a machine a person added over OPC UA on a site. They go to the REST
+// endpoints of the Sites API from the server of the app, never from the
 // browser and never from the language model: no tool of the chat writes a site or a placement.
 
 /** Where the Sites API answers, or undefined if the app has none. */
@@ -57,6 +59,20 @@ export const positionMachine = createServerFn({ method: "POST" })
   .handler(({ data }): Promise<PositionOutcome> => {
     const base = sitesApiUrl()
     return base ? position(data, sender(base)) : Promise.resolve({ ok: false, reason: NO_API })
+  })
+
+/** The sites there are, for the card of an OPC UA proposal to put the machine it adds on one. */
+export const listSites = createServerFn({ method: "GET" }).handler((): Promise<SitesOutcome> => {
+  const base = sitesApiUrl()
+  return base ? sitesOf(sender(base)) : Promise.resolve({ ok: false, reason: NO_API })
+})
+
+/** Puts a machine that was just added over OPC UA on a site, unless it stands on one already. */
+export const placeAddedMachine = createServerFn({ method: "POST" })
+  .validator(addedRequestOf)
+  .handler(({ data }): Promise<AddedOutcome> => {
+    const base = sitesApiUrl()
+    return base ? placeAdded(data, sender(base)) : Promise.resolve({ ok: false, reason: NO_API })
   })
 
 /** Undoes a change from its toast, while nothing changed the machine since. */

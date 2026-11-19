@@ -5,7 +5,7 @@ export const machineGuide = `## Machines
 \`genui_machine_list\` lists every machine that published a value in the last 24 hours. Pass the
 \`timeZone\` of the person you answer, if you know it. A machine is named by its id (\`machine\`),
 \`<manufacturer>_<model>_<serial number>\`, the level after \`machines/\` in every topic; name it to a
-person by its \`identity\`: manufacturer, model and serial number.
+person by its \`identity\`: manufacturer, model, serial number and, where the machine names it, its device class.
 
 A tool about one machine takes its id or what people call it: words of the id in their order, such
 as the serial number (\`P-04\`) or the model and serial number (\`AX-400 P-04\`). Pass the name the

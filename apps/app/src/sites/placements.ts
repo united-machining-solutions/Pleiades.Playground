@@ -1,6 +1,8 @@
 import { reasonOf } from "../reason.ts"
 import { hallsWith, placeInWords, refusalOf, sameSpot, siteIdOf } from "./placing.ts"
 import type {
+  AddedOutcome,
+  AddedRequest,
   MakeHallRequest,
   MakeOutcome,
   MakeSiteRequest,
@@ -10,6 +12,7 @@ import type {
   Placed,
   RemoveOutcome,
   RemoveRequest,
+  SitesOutcome,
   Spot,
   UndoOutcome,
   UndoRequest,
@@ -205,6 +208,43 @@ async function dropHall({ siteId, hall }: Spot, send: Send): Promise<string | un
   if (status === 409) return `A machine stands in ${hall} now, so it stays.`
   if (status === 412) return "Someone changed the site meanwhile, so the hall stays."
   return status === 200 ? undefined : `The Sites API answered ${status}, so the hall stays.`
+}
+
+/** The sites there are, by name in the order of the alphabet, for a person to choose one. */
+export async function sitesOf(send: Send): Promise<SitesOutcome> {
+  try {
+    const sites = await read<Array<ApiSite>>(send, "/sites")
+    return {
+      ok: true,
+      sites: sites.map(({ siteId, name }) => ({ siteId, name })).sort((a, b) => a.name.localeCompare(b.name) || a.siteId.localeCompare(b.siteId)),
+    }
+  } catch (error) {
+    if (error instanceof Refused) return { ok: false, reason: error.message }
+    return { ok: false, reason: `The Sites API did not answer: ${reasonOf(error)}.` }
+  }
+}
+
+/**
+ * Puts a machine that was just added on a site, in no hall. One that stands on a site already, from before it
+ * was removed and added again, stays where it stands.
+ */
+export async function placeAdded(request: AddedRequest, send: Send): Promise<AddedOutcome> {
+  try {
+    const { sites, placements } = await current(send)
+    const standing = placements.find((one) => one.machineId === request.machine)
+    if (standing !== undefined) {
+      const siteName = sites.find((site) => site.siteId === standing.siteId)?.name ?? standing.siteId
+      return { ok: true, siteId: standing.siteId, siteName, already: true }
+    }
+  } catch (error) {
+    if (error instanceof Refused) return { ok: false, reason: error.message }
+    return { ok: false, reason: `The Sites API did not answer: ${reasonOf(error)}.` }
+  }
+  const outcome = await place(
+    { machine: request.machine, site: { siteId: request.siteId }, hall: null, newHall: false, displayName: null, from: null },
+    send,
+  )
+  return outcome.ok ? { ok: true, siteId: outcome.siteId, siteName: outcome.siteName, already: false } : { ok: false, reason: outcome.reason }
 }
 
 /** The words of a toast after adding or moving: "P-07 added · North plant, Hall 2". */

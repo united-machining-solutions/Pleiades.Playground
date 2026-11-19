@@ -6,6 +6,9 @@ date: 2026-11-18
 
 # ADR-0019: Documentation sources and original PDFs in chat through MCP
 
+Presentation retirement: [ADR-0024](0024-documentation-cards-only.md) supersedes the legacy source-list
+presentation and runtime toggle described below. Source retrieval and PDF access remain supported.
+
 ## Context
 
 An external documentation service indexes machine manuals. Chat answers need revision-specific filename
@@ -24,6 +27,9 @@ independently deployed; the app already supports additional MCP servers. Its con
   upstream URL. Assistant instructions require evidence and page citations.
 - Render original PDFs with PDF.js and its bundled worker, opening at the cited physical page. Paging,
   zoom and native text search run locally; `docs_search_document` adds indexed OCR page matches.
+  Follow the documentation service's continuous scrolling viewer with nearby-page rendering and compact
+  controls. Preserve page position on zoom and resize. Highlight native text using translucent rectangles
+  between the canvas and selectable text layer; changing search terms does not restart canvas rendering.
 - Serve PDF bytes through a fixed backend route that reads MCP metadata and bounded binary resources.
   Validate document identity, revision, resource URI, MIME type, byte intervals and decoded lengths.
   Translate the validated bytes into HTTP PDF responses with single-range support. No PDF bytes enter

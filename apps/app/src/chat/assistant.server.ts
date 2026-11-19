@@ -7,6 +7,7 @@ import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
 
 import { readSites } from "@/placement/read-sites.ts"
+import { withDocumentationScope } from "../documentation/presentation.ts"
 import { PROPOSE_PAGE_TOOL } from "@/pages/proposal.ts"
 import { PROPOSE_PLACEMENT_TOOL } from "@/placement/proposal.ts"
 
@@ -113,8 +114,9 @@ const modelTools = definePlugin({
 const localTimes = defineChatMiddleware({
   name: "local-times",
   onBeforeToolCall(ctx, call) {
-    const args = withTimeZone(call.args, call.tool?.inputSchema, ctx.context)
-    return args && { type: "transformArgs", args }
+    const timed = withTimeZone(call.args, call.tool?.inputSchema, ctx.context)
+    const args = withDocumentationScope(call.toolName, timed ?? call.args)
+    return args !== call.args ? { type: "transformArgs", args } : undefined
   },
 })
 

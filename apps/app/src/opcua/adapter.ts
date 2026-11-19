@@ -70,6 +70,44 @@ export const storeUser = createServerFn({ method: "POST" })
   .validator(userOfServer)
   .handler(({ data }) => send("/users", "PUT", data))
 
+/** The security a person chose for an OPC UA server on the endpoints card. */
+export type SecurityOfServer = { url: string; securityMode: "None" | "Sign" | "SignAndEncrypt"; securityPolicy: string }
+
+const securityModes: ReadonlyArray<SecurityOfServer["securityMode"]> = ["None", "Sign", "SignAndEncrypt"]
+
+/** Checks what the card sends: an opc.tcp address, a mode of OPC UA and the short name of a policy. */
+export function securityOfServer(value: unknown): SecurityOfServer {
+  const given = (value ?? {}) as Partial<Record<keyof SecurityOfServer, unknown>>
+  const url = typeof given.url === "string" ? given.url.trim() : ""
+  const securityPolicy = typeof given.securityPolicy === "string" ? given.securityPolicy.trim() : ""
+  if (!/^opc\.tcp:\/\/[^\s/]+/i.test(url)) throw new Error("The server is named by its opc.tcp:// address.")
+  if (!securityModes.includes(given.securityMode as SecurityOfServer["securityMode"])) {
+    throw new Error("The security mode is None, Sign or SignAndEncrypt.")
+  }
+  if (!/^[A-Za-z0-9_]+$/.test(securityPolicy)) throw new Error("The security policy is named by its short name, for example Basic256Sha256.")
+  return { url, securityMode: given.securityMode as SecurityOfServer["securityMode"], securityPolicy }
+}
+
+/** The address of a server, as the card sends it to forget a choice. */
+export function urlOfServer(value: unknown): string {
+  const url = typeof value === "string" ? value.trim() : ""
+  if (!/^opc\.tcp:\/\/[^\s/]+/i.test(url)) throw new Error("The server is named by its opc.tcp:// address.")
+  return url
+}
+
+/**
+ * Keeps the security a person chose for a server, a weaker one or one without security included: the adapter
+ * takes it for the scan and for every registration proposed after. A person decides this, never the language model.
+ */
+export const chooseSecurity = createServerFn({ method: "POST" })
+  .validator(securityOfServer)
+  .handler(({ data }) => send("/security", "PUT", data))
+
+/** Forgets the security chosen for a server: the adapter takes the strongest endpoint again. */
+export const forgetSecurity = createServerFn({ method: "POST" })
+  .validator(urlOfServer)
+  .handler(({ data: url }) => send(`/security?url=${encodeURIComponent(url)}`, "DELETE"))
+
 /**
  * Whether the adapter answers. The chat offers the OPC UA commands only then. Asked at most every
  * half minute, and never for longer than a second, because the root of the app waits for it.

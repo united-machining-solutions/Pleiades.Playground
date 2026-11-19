@@ -84,6 +84,11 @@ service to accept `host.docker.internal` as a Host header and expose it only on 
 Enable `docs` under *Tools* in the chat. The service's contract and source/PDF requirements are in
 [contracts/docs](../contracts/docs/README.md). A gateway or chat model is still required for chat.
 
+The *Documentation package* setting in *Language model* maps to `APP_DOCUMENTATION_PACKAGE`. Leave it
+empty for package discovery and selection, or set the exact package name to scope documentation search,
+review and answer evidence to one machine package. Configure the documentation MCP server under
+*Further MCP servers* first.
+
 ## Pleiades Hub
 
 The example app registers at the Pleiades Hub as in `compose.yaml`

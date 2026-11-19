@@ -160,13 +160,17 @@ the plan [`packages/cards/src/site/hall-plan.tsx`](../packages/cards/src/site/ha
 
 The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
 physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
-a line for each machine. A choice above the graphs shows one machine or all of them; with all of them, a
-value no machine published has no graph. It has no picture in this tour.
+a line for each machine. A choice above the graphs shows all machines or one. With all of them, a value no
+machine published has no graph; with one, every signal that machine publishes gets a graph of its own,
+whatever it is. The arrows at the top right of a graph show it enlarged, and its X closes it again. It has no
+picture in this tour.
 
 **In the code:** [`apps/app/src/routes/live.tsx`](../apps/app/src/routes/live.tsx) is the page,
 [`packages/cards/src/measurement/measurement-graph.tsx`](../packages/cards/src/measurement/measurement-graph.tsx)
 a graph. The lines are the result of the tool `genui_measurement_series`
-([`apps/genui-mcp/src/measurements.ts`](../apps/genui-mcp/src/measurements.ts)).
+([`apps/genui-mcp/src/measurements.ts`](../apps/genui-mcp/src/measurements.ts)); those of one machine
+come from `genui_timeseries_signals` and `genui_timeseries_series`, kept live in
+[`apps/app/src/live/signals.ts`](../apps/app/src/live/signals.ts).
 
 The page "Charts" in the sidebar, <http://localhost:5600/charts>, shows the last hours of every machine as charts:
 one bar per machine with how long it was in each state, and a tile per machine with its state over the last 30
@@ -178,19 +182,6 @@ chart of shadcn/ui. The values are those of the machine card, from `genui_machin
 read once by one server function, `getCharts` in
 [`apps/app/src/machines/get-machines.ts`](../apps/app/src/machines/get-machines.ts); from then on the page is
 live from the broker, as Home is.
-
-The page "Where is My Job?" in the sidebar, <http://localhost:5600/where-is-my-job>, is a basis for
-discussion: how an order could be followed across the shop floor. It shows the machines of the stack from above, with their state, utilisation
-and job orders; a machine with what it did, does and what waits for it; and an order on its way. An order is
-every job order that names the same order number, read from the backend (`genui_job_order_list`) and kept
-live by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines,
-packing after them and the single part on its sheet have no source yet: the page draws them dashed, as the
-gaps to discuss. It has no picture in this tour.
-
-**In the code:** [`apps/app/src/routes/where-is-my-job.tsx`](../apps/app/src/routes/where-is-my-job.tsx)
-is the page; the map, the panels and `getFloor` live in
-[`apps/app/src/where-is-my-job/`](../apps/app/src/where-is-my-job/), and `floor.ts` there
-groups the job orders into orders.
 
 ## 3. The page of one machine
 
@@ -278,12 +269,27 @@ newer than the one in the chat: the page reads again, an answer shows what was t
 
 With an external documentation service configured as `docs` in `APP_MCP_SERVERS` and enabled under
 "Tools" in the message field, ask how to operate,
-maintain or program a machine. The chat searches its manuals and shows source references by filename and
+maintain or program a machine. The chat searches its manuals and shows answer cards with evidence by filename and
 page label, with the physical PDF page also shown when it differs. Select one to open that physical PDF page. Use the page controls, zoom and **Find**
-to explore it; **Next match** moves between matching pages. The **Extracted text** tab shows the evidence
-used by chat. A replaced or unavailable source asks you to search again. Both views read documentation
+to explore it, or scroll continuously through pages; **Next match** moves between matching pages.
+Zooming and resizing preserve your position. Evidence and search highlights keep the original text readable. Card previews show the literal evidence used by chat; non-PDF sources open extracted text. A replaced or unavailable source asks you to search again. The card and source viewer read documentation
 through MCP; the app has no direct connection to the documentation REST API.
-Documentation source references stay in the chat and are not cards for "Save as page".
+Documentation answers require the service's `docs_answer` tool and always use an evidence card: source warnings first in original wording, direct answer steps without a repeated source
+introduction, one evidence chip, and an inline source preview.
+Ordinary answers have no status badge after a completed review with no contradiction found.
+**Conflicting requirements** and **Review incomplete** remain explicit, with text, symbols and different layouts. Conflict cards show every competing statement, including
+conflicts within one category or document, with an independent evidence chip and PDF link. A completed
+review may show a recommendation with its explanation, without a separate technical rule label;
+unresolved or incomplete conflicts request technical
+clarification without an approval button. No contradiction found refers to retrieved passages only.
+The conflict states were checked with deterministic fixtures; the live `chat-answer` screenshot was
+not retaken because it invokes the configured language model.
+**Open in document** opens the cited physical PDF page and marks matching native text. Documentation answers use cards exclusively; the previous source-list presentation has been removed. Pin
+`APP_DOCUMENTATION_PACKAGE` to restrict the deployment to one machine package. See
+[the answer-card decision](adr/0022-documentation-answer-cards.md). Documentation cards are not available for
+"Save as page". The live `chat-answer` tour screenshot has not been retaken for this change because doing
+so invokes the configured language model; the card and native-text PDF were checked with deterministic
+fixtures instead.
 
 The panel works like a chat app on a phone: a list and a chat, with a way back. The head says what is open. In a
 chat it says the name of the chat, which is its first question, on one line and cut where it is too long; the
@@ -395,11 +401,15 @@ stand the tools of the MCP servers the chat has: `/machine` finds `/genui_machin
 `/genui_machine_show M-02` asks the model to answer with that tool. The arrow keys mark an entry, Tab writes
 it into the field, Enter takes it and Escape closes the list. Ask
 `/discover A1121O0001`, and the model scans the OPC UA server of the simulated machine, matches its nodes to
-the data model and shows a proposal: the endpoint with the strongest security, whether the machine fulfils
-the core of the data model and which profiles are complete, every element with its value, and what is
-derived, unclear or missing. What the core lacks is marked as not available. The machine is added when you
-press "Add machine" on the proposal; from then on it sends like the others, also after a restart, and stands in
-the bar of Home until you add it to a site there.
+the data model and shows a proposal: the endpoint with the strongest security, or the one you chose under
+"Choose the security" on the endpoints card (`None` too, behind a warning), whether the machine fulfils
+the core of the data model and which profiles are complete, and how many elements are ok, derived, unclear
+or missing. What the core lacks is marked as not available. Press one of these chips, "2 missing" say, and
+the proposal lists those elements with their values and why; press it again to close the list. The machine is added when you
+press "Add the machine" on the proposal; from then on it sends like the others, also after a restart. It goes on
+a site too, so Home shows it: on the only one there is, or on the one you choose on the proposal where there are
+several, and a toast says where. Where there is no site yet, it stands in the bar of Home until you add it to a
+site there.
 `/opcua` lists the added servers with their core and profiles, and a button that removes a machine together
 with its retained messages on the broker; `/mapping A1121O0001` shows what needs a look.
 
@@ -527,6 +537,28 @@ pick, and a button that orders it at once; the glass then fills while the machin
 the machine, without a language model. No tour screenshot was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).
 
+## Optional: Where is My Job?
+
+Following an order across the shop floor is not part of the six stops either: no source of the stack sends an
+order across machines yet. A stack with `APP_SHOWCASES` set has the page
+<http://localhost:5600/where-is-my-job>, in the sidebar as "Where is My Job?", a basis for discussion. It shows
+the machines of the stack from above, with their state, utilisation and job orders, the machines of one step of
+manufacturing side by side: cutting, turning, milling, grinding, in the order of DIN 8580. The step comes from
+what a machine says it is, `Identification.DeviceClass`, else from its model; "Arrange" lets a person correct
+it, and what they set wins. Below the map stand a machine with what it did, does and what waits for it, or an
+order on its way, and the list of orders, by default those in circulation.
+
+The page opens with made-up orders WI-… across the clusters; "Real orders" turns them off. A real order is
+every job order that names the same order number, read from the backend (`genui_job_order_list`) and kept live
+by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines, packing
+after them and the single part on its sheet have no source yet: the page draws them dashed, as the gaps to
+discuss. It has no picture in this tour.
+
+It is a showcase: its route is `routes/(showcases)/where-is-my-job.tsx`, and the made-up orders are in
+[`apps/app/src/showcases/where-is-my-job/`](../apps/app/src/showcases/where-is-my-job/). The map, the panels and
+`getFloor` are of the app, in [`apps/app/src/where-is-my-job/`](../apps/app/src/where-is-my-job/): `floor.ts`
+there groups the job orders into orders, `steps.ts` gives each machine its step.
+
 ## Optional: a TruLaser
 
 A TRUMPF laser cutting machine is not part of the six stops either: none of the simulators of the stack is
@@ -601,3 +633,8 @@ The simulator keeps changing the states, so a new picture shows other states tha
 it, and describe in the text of its stop what it shows. Whoever changes what a stop shows keeps the stop
 current, see [CONTRIBUTING.md](../CONTRIBUTING.md#conventions); CI checks that every pointer of this page
 still has its target.
+
+General safety warnings can cite a different page from the procedure. They remain first and verbatim;
+**Warning source** opens their own physical page in the PDF viewer. The procedure evidence remains
+separate. This warning-source flow was checked without invoking the configured language model; the
+live `chat-answer` screenshot has not been retaken.

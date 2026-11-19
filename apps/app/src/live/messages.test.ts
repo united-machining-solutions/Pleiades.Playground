@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { alertOf, brokerPathOf, brokerPathsOf, filterOf, listOf, machineOf, matches, valueOf, valuesOf } from "./messages.ts"
+import { alertOf, askable, brokerPathOf, brokerPathsOf, filterOf, listOf, machineOf, matches, valueOf, valuesOf } from "./messages.ts"
 
 const P04 = "alcyone-machines_AX-400_P-04"
 
@@ -128,4 +128,10 @@ test("a field of a snapshot is heard on the topic of its snapshot, any other pat
   // Both are heard: the snapshot of the data model, and the field of an adapter that sends no snapshot.
   assert.deepEqual(brokerPathsOf("umati/State/Status/MachineryItemState"), ["umati/State/Status", "umati/State/Status/MachineryItemState"])
   assert.deepEqual(brokerPathsOf("umati/Connection/State"), ["umati/Connection/State"])
+})
+
+test("an empty filter is never asked of the broker: a page that hears nothing asks for nothing", () => {
+  // useLive joins the filters of a page and splits them again: no filter gives one empty filter.
+  assert.deepEqual(askable("".split("\n")), [])
+  assert.deepEqual(askable([`machines/${P04}/#`, ""]), [`machines/${P04}/#`])
 })

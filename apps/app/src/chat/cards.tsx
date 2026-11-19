@@ -1,3 +1,4 @@
+import { documentationCardTools } from "@/cards/documentation/chat.tsx"
 import { documentationTools } from "@/documentation/chat.tsx"
 import { energyTools } from "@/cards/energy/chat.tsx"
 import { juicebarTools } from "@/cards/juicebar/chat.tsx"
@@ -23,6 +24,7 @@ import type { ChatTool } from "./tool-results.ts"
  */
 export const chatTools: ReadonlyArray<ChatTool> = [
   ...backendTools,
+  ...documentationCardTools,
   ...documentationTools,
   ...energyTools,
   ...juicebarTools,
