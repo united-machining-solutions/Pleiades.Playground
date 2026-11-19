@@ -46,6 +46,9 @@ export function useLive<TValues>(loaded: TValues, live: Live<TValues>): { values
 
   const filters = live.filters.join("\n")
   useEffect(() => {
+    // A page that hears nothing asks the broker for nothing: no filter joins to "", and "" split is
+    // one empty filter, which no broker takes (broker.ts).
+    if (filters === "") return
     // The messages of a moment are laid on together: a page is drawn again at most every FLUSH_MS,
     // not once for every message. With a dozen machines that is several times a second fewer.
     let waiting: Array<{ topic: string; payload: string; now: number }> = []

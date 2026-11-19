@@ -61,6 +61,7 @@ export const IDENTITY_PATHS = {
   manufacturer: "umati/Identification/Manufacturer",
   model: "umati/Identification/Model",
   serialNumber: "umati/Identification/SerialNumber",
+  deviceClass: "umati/Identification/DeviceClass",
 } as const
 
 /** Where the alerts and notifications of a machine are published, as CloudEvents, below `machines/{machineId}/`. */
@@ -116,6 +117,11 @@ export const identity = z.object({
   manufacturer: z.string().nullable(),
   model: z.string().nullable(),
   serialNumber: z.string().nullable(),
+  deviceClass: z
+    .string()
+    .nullable()
+    .optional()
+    .describe("The kind of machine as the machine names it, for example Machining centre; absent or null where it names none."),
 })
 export type Identity = z.infer<typeof identity>
 
