@@ -102,6 +102,8 @@ All notable changes are documented here. The format follows
 - Example app: the showcase page `/juice-bar`, the same drink card on a page of its own, for a screen next to
   the machine at a fair: a guest picks and orders without a language model. It reads the card of the machine
   every half minute. Only a build with `APP_SHOWCASES` has it, and there it stands in the sidebar as "Juice bar".
+  The page is as wide as a screen, and the drink card sets its drinks in two to four columns wherever it is
+  that wide, so the button to order stays in sight; in the narrow chat they stay a list.
 - Juice bar API: a drink carries its colour and the picture of a glass its author chose (`color`, `picture`),
   an ingredient its colour and whether its bottle runs low (`color`, `runsLow`). Colours that are not `#rrggbb`
   are left out.

@@ -124,7 +124,9 @@ export function DrinkPicker({ drinks: listed }: { drinks: Array<Drink> }) {
         <CardTitle>Pick a drink</CardTitle>
         <CardDescription>What the juice bar can mix now</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      {/* The drinks stand by the width of the card, not of the screen: a list in the narrow chat, columns
+          where the card is wide, as on a page for a screen, so that the button below stays in sight. */}
+      <CardContent className="@container/drinks flex flex-col gap-3">
         {hidden > 0 && (
           <Alert>
             <TriangleAlertIcon />
@@ -138,7 +140,11 @@ export function DrinkPicker({ drinks: listed }: { drinks: Array<Drink> }) {
           <FieldLegend variant="label" className="sr-only">
             Drinks
           </FieldLegend>
-          <RadioGroup value={picked.id} onValueChange={(value) => setPickedId(String(value))}>
+          <RadioGroup
+            value={picked.id}
+            onValueChange={(value) => setPickedId(String(value))}
+            className="@2xl/drinks:grid-cols-2 @4xl/drinks:grid-cols-3 @7xl/drinks:grid-cols-4"
+          >
             {drinks.map((drink) => {
               const selected = drink.id === picked.id
               const id = `${ids}-${drink.id}`
