@@ -11,7 +11,7 @@ import type { ReactNode } from "react"
 import { getSites } from "@/machines/get-machines.ts"
 import { confirmedOf, keepConfirmed } from "@/placement/confirmed.ts"
 import type { Confirmed } from "@/placement/confirmed.ts"
-import { PROPOSE_PLACEMENT_TOOL, changesNothing, checkPlacement, proposedPlacement } from "@/placement/proposal.ts"
+import { PROPOSE_PLACEMENT_TOOL, changesNothing, checkPlacement, nameToWrite, proposedPlacement } from "@/placement/proposal.ts"
 import type { PlacementCheck, PlacementInput } from "@/placement/proposal.ts"
 import {
   NO_HALL,
@@ -340,12 +340,14 @@ function Steps({
       const one = steps.length === 1
       const machines: Array<ToPlace> = steps.map((step) => {
         if (step.kind === "known") {
-          return { request: { machine: step.machine, ...at, displayName: one ? (input.displayName ?? null) : null, from: step.from }, what: step.what }
+          // A machine that is moved keeps its display name, unless the proposal gives one; one added has none but that.
+          const displayName = step.from ? nameToWrite(one ? check.displayName : null, list, step.machine) : one ? check.displayName : null
+          return { request: { machine: step.machine, ...at, displayName, from: step.from }, what: step.what }
         }
         if (step.chosen) {
           const stands = step.chosen.standsOn
           const from = stands ? { siteId: stands.siteId, hall: stands.hall } : null
-          return { request: { machine: step.chosen.machine, ...at, displayName: null, from }, what: step.chosen.what }
+          return { request: { machine: step.chosen.machine, ...at, displayName: stands ? nameToWrite(null, list, step.chosen.machine) : null, from }, what: step.chosen.what }
         }
         // A machine that sent no data: its id is made of what it is, and it is known by the name the person said.
         const machine = machineIdOf(step.identity, makers)!
@@ -386,6 +388,8 @@ function Steps({
             <DoneStep key={step.key} onOpen={() => reopen(step.key)}>
               {lineOf(step)}
               {step.kind === "known" && step.fromWords && <span className="text-muted-foreground"> · from {step.fromWords}</span>}
+              {/* A display name from the proposal is seen before it is written. */}
+              {step.kind === "known" && steps.length === 1 && check.displayName && <span className="text-muted-foreground"> · shown as “{check.displayName}”</span>}
             </DoneStep>
           ) : step.kind === "named" ? (
             <WhichMachine key={step.key} step={step} makers={makers} onChange={(next) => change(step.key, next)} onChosen={() => close(step.key)} />

@@ -168,10 +168,14 @@ function hallOf(said: string | undefined, site: SiteFinding, list: SiteList): Ha
   return closest === undefined ? { kind: "new", name } : { kind: "guess", name: closest, said: name }
 }
 
-/** The machine a short name such as "P-07" or "TP-800 P-07" stands for: those whose id ends in it or whose name it is. */
+/**
+ * The machine a short name such as "P-07", "TP-800 P-07" or a display name such as "Lathe 4" stands for: those
+ * whose id ends in it or whose name it is, each machine once.
+ */
 export function fitsOf(said: string, known: ReadonlyArray<{ machine: string; what: string }>): Array<{ machine: string; what: string }> {
   const text = plain(said)
-  return known.filter((one) => plain(one.machine).endsWith(`_${text}`) || plain(one.what) === text || plain(one.what).endsWith(` ${text}`))
+  const fits = known.filter((one) => plain(one.machine).endsWith(`_${text}`) || plain(one.what) === text || plain(one.what).endsWith(` ${text}`))
+  return fits.filter((one, index) => fits.findIndex((other) => other.machine === one.machine) === index)
 }
 
 /**
@@ -190,6 +194,8 @@ export function checkPlacement(raw: PlacementInput, list: SiteList): PlacementCh
   const known = [
     ...sending.map(({ machine, what }) => ({ machine, what })),
     ...[...standing.values()].map(({ placed }) => ({ machine: placed.machine, what: modelOf(placed) })),
+    // A machine on a site is known by its display name too.
+    ...[...standing.values()].flatMap(({ placed }) => (placed.displayName ? [{ machine: placed.machine, what: placed.displayName }] : [])),
   ]
   const makers = makersOf(list)
   // The machines a name may mean: those that sent data, and those on a site.
@@ -347,4 +353,23 @@ export function proposedPlacement(content: unknown): PlacementInput | null {
   if (typeof value !== "object" || value === null || !("input" in value)) return null
   const input = placementInputSchema.safeParse(value.input)
   return input.success ? input.data : null
+}
+
+/** The display name a machine has on its site now, as the list of the sites has it; null on no site or without one. */
+export function displayNameOf(list: SiteList, machine: string): string | null {
+  for (const site of list.sites) {
+    for (const hall of site.halls) {
+      const placed = hall.machines.find((one) => one.machine === machine)
+      if (placed) return placed.displayName
+    }
+  }
+  return null
+}
+
+/**
+ * The display name a placement writes: the one the proposal gives, else the one the machine has now, so a
+ * machine that is moved keeps the name people know it by, as it does on Home.
+ */
+export function nameToWrite(given: string | null | undefined, list: SiteList, machine: string): string | null {
+  return given?.trim() || displayNameOf(list, machine)
 }

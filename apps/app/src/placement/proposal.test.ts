@@ -9,7 +9,9 @@ import {
   checkPlacement,
   closestName,
   countsOf,
+  displayNameOf,
   mistypedAs,
+  nameToWrite,
   placementInWords,
   proposedPlacement,
 } from "./proposal.ts"
@@ -224,4 +226,19 @@ test("a name the model split into parts is still looked for whole", () => {
   const [one] = checkPlacement({ machines: [{ name: "2D L-01", manufacturer: "Laser" }] }, list).machines
   assert.equal(one?.status, "named")
   assert.deepEqual(one?.status === "named" && one.meant.map((meant) => meant.machine), [L01])
+})
+
+test("a machine that is moved keeps the name people know it by, unless the proposal gives another", () => {
+  assert.equal(displayNameOf(list, P04), "Lathe 4")
+  assert.equal(displayNameOf(list, M02), null)
+  assert.equal(displayNameOf(list, P07), null)
+  assert.equal(nameToWrite(undefined, list, P04), "Lathe 4")
+  assert.equal(nameToWrite(" ", list, P04), "Lathe 4")
+  assert.equal(nameToWrite("Press 4", list, P04), "Press 4")
+  assert.equal(nameToWrite(null, list, P07), null)
+})
+
+test("a machine on a site is found by its display name", () => {
+  const [one] = checkPlacement({ machines: ["Lathe 4"], site: "South plant", hall: "Hall A" }, list).machines
+  assert.equal(one?.status === "move" && one.machine, P04)
 })
