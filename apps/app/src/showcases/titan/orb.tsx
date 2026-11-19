@@ -34,7 +34,8 @@ export function Orb(props: OrbProps) {
       <Button
         type="button"
         variant="ghost"
-        aria-label={hint.now}
+        data-orb
+        aria-label={paused ? (hint.also ?? hint.now) : hint.now}
         className="h-auto touch-none rounded-full p-0 select-none hover:bg-transparent active:bg-transparent dark:hover:bg-transparent"
         onPointerDown={(event) => {
           if (event.button !== 0) return
@@ -43,13 +44,20 @@ export function Orb(props: OrbProps) {
           } catch {
             // A press that is no pointer of the browser, from a test for example, is still a press.
           }
+          // The release is also heard at the window: the cloud moves to the side when the conversation
+          // begins, and a finger that was down on it then lets go of a button that is no longer there.
+          const up = () => {
+            window.removeEventListener("pointerup", up)
+            window.removeEventListener("pointercancel", up)
+            onRelease()
+          }
+          window.addEventListener("pointerup", up)
+          window.addEventListener("pointercancel", up)
           onPress()
         }}
-        onPointerUp={onRelease}
-        onPointerCancel={onRelease}
         onContextMenu={(event) => event.preventDefault()}
       >
-        <Cloud state={state} alarm={alarm} className={`${large ? "size-72" : "size-44"} ${paused ? "opacity-30" : ""}`} />
+        <Cloud state={state} alarm={alarm} className={`${large ? "size-[min(18rem,36svh)]" : "size-44"} ${paused ? "opacity-30" : ""}`} />
       </Button>
       <p className={`flex flex-col gap-1 text-balance ${large ? "text-xl" : "text-base"}`} aria-hidden>
         <span>{hint.now}</span>

@@ -316,7 +316,8 @@ function Assistant() {
       "button,summary,[role=button],[role=menu],[role=menuitem],[role=listbox],[role=option],[role=dialog],[role=tab],[role=checkbox],[role=switch],[role=radio]"
     const elsewhere = (event: KeyboardEvent) =>
       event.defaultPrevented ||
-      (event.target instanceof Element && !panel.current?.contains(event.target) && event.target.closest(CONTROLS) !== null)
+      // Inside the panel the cloud is Titan's; its other controls, the button that pauses, keep their keys.
+      (event.target instanceof Element && event.target.closest(CONTROLS) !== null && (!panel.current?.contains(event.target) || event.target.closest("[data-orb]") === null))
 
     const onDown = (event: KeyboardEvent) => {
       if (typing(event) || elsewhere(event) || event.ctrlKey || event.metaKey || event.altKey) return
@@ -450,9 +451,9 @@ function Assistant() {
           </main>
         </div>
       ) : (
-        <main className="flex min-h-0 flex-1 px-8 py-10">
+        <main className="flex min-h-0 flex-1 px-8 py-6">
           <div className="m-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
-            <h1 className="text-3xl font-light tracking-wide text-balance">{paused ? "Pause" : unbroken(greetingFor(undefined, alarmed))}</h1>
+            <h1 className="text-3xl font-light tracking-wide text-balance">{unbroken(greetingFor(undefined, alarmed))}</h1>
             {orb("large")}
           </div>
         </main>
