@@ -57,7 +57,7 @@ const LONGEST_MS = 8_000
 /** Kept from before the voice began. */
 const BEFORE_MS = 400
 /** After "Hey Titan" alone, the next piece is the question if it comes within this. */
-const AWAKE_MS = 8_000
+export const AWAKE_MS = 8_000
 
 const RATE = 16_000
 const BLOCK = 2_048
@@ -108,6 +108,11 @@ export type WakeOptions = {
   onReady?(ready: boolean): void
   /** What a piece of speech was recognised as, a call or not, so the person sees what Titan heard. */
   onHeard?(text: string): void
+  /**
+   * Someone speaks, or what they said is being recognised: until this is false again, the page says
+   * nothing of its own, so it does not talk over a call or a question.
+   */
+  onBusy?(busy: boolean): void
 }
 
 /** Listens for "Hey Titan" once `armed`, while the page is open and `enabled` is true. */
@@ -130,7 +135,19 @@ export function useWakeWord(options: WakeOptions) {
     let noise = SPEECH_LEVEL / NOISE_FACTOR
     let awakeUntil = 0
 
+    /** The pieces being recognised now, and whether one is being said: together, whether someone is asking. */
+    let recognising = 0
+    let busy = false
+    const tellBusy = () => {
+      const now = piece !== undefined || recognising > 0
+      if (now === busy) return
+      busy = now
+      latest.current.onBusy?.(now)
+    }
+
     const recognise = async (samples: Float32Array) => {
+      recognising++
+      tellBusy()
       try {
         const text = await transcribe(wavOf(samples))
         if (closed || !text) return
@@ -148,6 +165,9 @@ export function useWakeWord(options: WakeOptions) {
         latest.current.onWake()
       } catch {
         // A piece that could not be recognised is let go; the next one is tried again.
+      } finally {
+        recognising--
+        tellBusy()
       }
     }
 
@@ -155,6 +175,7 @@ export function useWakeWord(options: WakeOptions) {
       if (!latest.current.enabled) {
         piece = undefined
         before = []
+        tellBusy()
         return
       }
       const level = levelOf(block)
@@ -169,6 +190,7 @@ export function useWakeWord(options: WakeOptions) {
           piece = [...before]
           before = []
           quietSince = 0
+          tellBusy()
         }
         return
       }
@@ -178,7 +200,7 @@ export function useWakeWord(options: WakeOptions) {
       if (quietSince < QUIET_MS && length < LONGEST_MS) return
       const done = piece
       piece = undefined
-      if (length - quietSince < SHORTEST_MS) return
+      if (length - quietSince < SHORTEST_MS) return tellBusy()
       const samples = new Float32Array(done.reduce((sum, one) => sum + one.length, 0))
       let at = 0
       for (const one of done) {
@@ -212,6 +234,7 @@ export function useWakeWord(options: WakeOptions) {
       void context?.close()
       stream?.getTracks().forEach((track) => track.stop())
       latest.current.onReady?.(false)
+      latest.current.onBusy?.(false)
     }
   }, [armed])
 }
