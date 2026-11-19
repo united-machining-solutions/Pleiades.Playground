@@ -1,4 +1,4 @@
-import { BAND_SLOTS, instant, jobOrderList, machineId, machineList, machineShow, spanList } from "@pleiades/cards/machine/contract.ts"
+import { BAND_SLOTS, MACHINE_NAMING, instant, jobOrderList, machineId, machineList, machineShow, spanList } from "@pleiades/cards/machine/contract.ts"
 import { machineListInWords, machineShowInWords, spanListInWords } from "@pleiades/cards/machine/in-words.ts"
 import { toolDefinition } from "@tanstack/ai"
 import { z } from "zod"
@@ -19,14 +19,12 @@ import { MACHINE_CARD_URI, SPAN_LIST_TOOL } from "./machine.names.ts"
 const shownAsCard =
   "Where the host shows MCP Apps, the person already sees this result as the machine card: these values, and the states of the last hours as a band. Then a sentence or two is the whole answer. Do not list the values again, and do not draw them again."
 
-const machine = machineId.describe(
-  "The machine id, <manufacturer>_<model>_<serial number>, for example alcyone-machines_AX-400_P-04. genui_machine_list names every machine with its id.",
-)
+const machine = machineId.describe(MACHINE_NAMING)
 
 const machineListTool = toolDefinition({
   name: "genui_machine_list",
   description:
-    "List every machine with what it does now: manufacturer, model and serial number, connection, state and operation mode with the time since when, the active work master and job order, and the alerts of the last 24 hours that have not been cleared. The result says it in a line for each machine and carries the values for a display. Every value names the topic it comes from.",
+    "List every machine with what it does now: manufacturer, model, serial number and device class, connection, state and operation mode with the time since when, the active work master and job order, and the alerts of the last 24 hours that have not been cleared. The result says it in a line for each machine and carries the values for a display. Every value names the topic it comes from.",
   inputSchema: z.object({ timeZone }),
   outputSchema: machineList,
   metadata: { title: "List machines", annotations: readOnly },
@@ -65,7 +63,7 @@ const spanListTool = toolDefinition({
   description:
     "List the states of one machine between two instants as spans without a gap: what the band of the machine card draws. A card calls it after genui_machine_show, with `history.from` and `history.to` of that result. A language model does not need it to say how long or how often: the sums are in the result of genui_machine_show.",
   inputSchema: z.object({
-    machine,
+    machine: machineId.describe("The machine id: `machine.machine` of genui_machine_show."),
     from: instant.describe("Where the spans begin: `history.from` of genui_machine_show."),
     to: instant.describe(`Where they end: \`history.to\` of genui_machine_show. At most ${MOST_HOURS} hours after \`from\`.`),
     slots: z
@@ -91,7 +89,7 @@ const jobOrderListTool = toolDefinition({
   description:
     "List the job orders on the lists of the machines whose last event lies in the last 24 hours, of every machine or of one with `machine`: state, job name, work master, the order numbers of the ERP, runs planned, and what came of each from its start (start, end, produced and good quantity, result). Job orders that name the same order number belong to one order, also across machines.",
   inputSchema: z.object({
-    machine: machine.optional().describe("The machine id of one machine. Every machine if omitted."),
+    machine: machineId.optional().describe(`${MACHINE_NAMING} Every machine if omitted.`),
     timeZone,
   }),
   outputSchema: jobOrderList,

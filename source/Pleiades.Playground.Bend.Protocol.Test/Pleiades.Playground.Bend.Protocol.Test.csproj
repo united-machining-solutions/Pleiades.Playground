@@ -1,0 +1,21 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Bend.Protocol.Test</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Bend.Protocol.Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Bend.Protocol\Pleiades.Playground.Bend.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -4,7 +4,7 @@ import type { MqttClient } from "mqtt"
 import { randomId } from "../random-id.ts"
 import { getBrokerAddress } from "./broker-address.ts"
 import { brokerUrl } from "./broker-url.ts"
-import { matches } from "./messages.ts"
+import { askable, matches } from "./messages.ts"
 
 // The one connection of the browser to the broker, MQTT over WebSocket. Every page that is live
 // subscribes through it to the topics it shows, and hears every value the moment it is published.
@@ -82,7 +82,9 @@ async function connect() {
 let connecting: Promise<void> | null = null
 
 /** Hears the values of the topics that match the filters, until the function it returns is called. */
-export function subscribe(filters: ReadonlyArray<string>, listener: Listener): () => void {
+export function subscribe(asked: ReadonlyArray<string>, listener: Listener): () => void {
+  // An empty filter is never asked for (`askable`).
+  const filters = askable(asked)
   listeners.set(listener, filters)
   const added = filters.filter((filter) => {
     const count = wanted.get(filter) ?? 0

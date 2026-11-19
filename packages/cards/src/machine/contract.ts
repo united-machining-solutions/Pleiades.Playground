@@ -27,6 +27,13 @@ export const instant = z.iso.datetime({ offset: true })
 export const machineId = z.string().regex(/^[^/+#]+$/)
 
 /**
+ * How a caller names one machine to a tool that answers a question about it: by its id, or as people
+ * call it. The backend finds the machine; nobody has to list the machines first to learn its id.
+ */
+export const MACHINE_NAMING =
+  "The machine: its id, <manufacturer>_<model>_<serial number>, for example alcyone-machines_AX-400_P-04, or what people call it, such as its serial number (P-04) or its model and serial number (AX-400 P-04). A name that fits several machines is refused, with their ids."
+
+/**
  * Where each reading of a machine is kept, below `machines/{machineId}/`: the topics of the umati data
  * model. The backend reads the stored values of these topics, and a page that is live hears them at
  * the broker. The state and the operation mode are the two fields of the snapshot `State/Status`: see
@@ -54,6 +61,7 @@ export const IDENTITY_PATHS = {
   manufacturer: "umati/Identification/Manufacturer",
   model: "umati/Identification/Model",
   serialNumber: "umati/Identification/SerialNumber",
+  deviceClass: "umati/Identification/DeviceClass",
 } as const
 
 /** Where the alerts and notifications of a machine are published, as CloudEvents, below `machines/{machineId}/`. */
@@ -109,6 +117,11 @@ export const identity = z.object({
   manufacturer: z.string().nullable(),
   model: z.string().nullable(),
   serialNumber: z.string().nullable(),
+  deviceClass: z
+    .string()
+    .nullable()
+    .optional()
+    .describe("The kind of machine as the machine names it, for example Machining centre; absent or null where it names none."),
 })
 export type Identity = z.infer<typeof identity>
 

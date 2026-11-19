@@ -12,10 +12,12 @@
  * carries no styles of a component it does not show. A card that draws another component adds its
  * line here, in the order of the alphabet; styles.test.ts fails if one is missing or left over.
  */
+@source "../../ui/src/components/alert.tsx";
 @source "../../ui/src/components/badge.tsx";
 @source "../../ui/src/components/button.tsx";
 @source "../../ui/src/components/card.tsx";
 @source "../../ui/src/components/chart.tsx";
+@source "../../ui/src/components/collapsible.tsx";
 @source "../../ui/src/components/combobox.tsx";
 @source "../../ui/src/components/input.tsx";
 @source "../../ui/src/components/input-group.tsx";
@@ -30,6 +32,8 @@
 @source "../../ui/src/components/toggle-group.tsx";
 /* The rows of a card that turns its pages fade in; a page with reduced motion skips it. */
 @theme {
+  --color-evidence: oklch(0.96 0.08 95);
+  --color-evidence-foreground: oklch(0.25 0.02 95);
   --animate-card-fade-in: card-fade-in 160ms ease-out;
   @keyframes card-fade-in {
     from {

@@ -46,6 +46,7 @@ In PowerShell, set the variable first: `$env:PLEIADES_VERSION = "main"`. Or writ
 | Generative UI backend | <http://localhost:5520/mcp> | MCP server for displays, see [`apps/genui-mcp`](apps/genui-mcp/README.md) |
 | Example app | <http://localhost:5600/> | What every machine does now, and a chat about it. It answers on this computer only (`APP_BIND`); see [`apps/app`](apps/app/README.md) |
 | Cutting simulators | <http://localhost:5611/>, `:5612`, `:5613` | A 2D laser, a tube laser and a punching machine that take their jobs through telegram files; see [`Cutting.Simulator`](source/Pleiades.Playground.Cutting.Simulator/README.md). One [`Cutting.Adapter`](source/Pleiades.Playground.Cutting.Adapter/README.md) each publishes them to the broker as `trumpf_Laser2D_L-01`, `trumpf_Tube_T-01` and `trumpf_Punch_PU-01` |
+| Bending simulator | <http://localhost:5614/> | A press brake that reports through RCI telegram files; see [`Bend.Simulator`](source/Pleiades.Playground.Bend.Simulator/README.md). One [`Bend.Adapter`](source/Pleiades.Playground.Bend.Adapter/README.md) per machine publishes it to the broker as `trumpf_5085_AE325085TB46` |
 | OPC UA adapter | <http://localhost:5560/machines> | Machines that speak OPC UA, added in the chat; with a simulated one, A1121O0001, web UI at <http://localhost:8090/>. On this computer only (`OPCUA_ADAPTER_BIND`); see [the adapter](source/Pleiades.Playground.OpcUa.Adapter/README.md) |
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.

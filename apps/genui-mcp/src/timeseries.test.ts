@@ -164,6 +164,13 @@ test("an unknown machine, an unknown signal and a text are refused with what the
   assert.throws(() => resolveLines([{ machine: P04, signal: PROGRAM }], published), /is a text, and a time series draws numbers and yes or no/)
 })
 
+test("a machine is named by its id or as people call it", () => {
+  const published = signalsOf({ numbers: [`machines/${P04}/${POWER}`], texts: [], yesNo: [] })
+  const [line] = resolveLines([{ machine: "AX-400 P-04", signal: "activePower" }], published)
+  assert.equal(line?.machine, P04)
+  assert.equal(line?.topic, `machines/${P04}/${POWER}`)
+})
+
 test("a pair asked twice, also in other words, is one line", () => {
   const published = signalsOf({ numbers: [`machines/${P04}/${POWER}`], texts: [], yesNo: [] })
   const lines = resolveLines(
