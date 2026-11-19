@@ -1,0 +1,25 @@
+<Project Sdk="MSTest.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>Pleiades.Playground.Bend.Simulator.Test</AssemblyName>
+    <RootNamespace>Pleiades.Playground.Bend.Simulator.Test</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SonarAnalyzer.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Pleiades.Playground.Bend.Simulator\Pleiades.Playground.Bend.Simulator.csproj" />
+  </ItemGroup>
+
+</Project>

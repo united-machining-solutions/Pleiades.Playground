@@ -7,6 +7,11 @@ export const machineGuide = `## Machines
 \`<manufacturer>_<model>_<serial number>\`, the level after \`machines/\` in every topic; name it to a
 person by its \`identity\`: manufacturer, model and serial number.
 
+A tool about one machine takes its id or what people call it: words of the id in their order, such
+as the serial number (\`P-04\`) or the model and serial number (\`AX-400 P-04\`). Pass the name the
+person used; you need not list the machines first to learn the id. A name that fits several machines
+is refused with their ids, and one that fits none with the ids of every machine.
+
 - \`connection\`: \`umati/Connection/State\`, the state of the adapter. Anything but \`Running\`
   (\`Initializing\`, \`CommunicationFault\`, \`Shutdown\`) means the other readings are the last known
   ones, not the present.
@@ -28,7 +33,7 @@ alert stands for a reason nobody recorded.
 
 ## One machine
 
-\`genui_machine_show\` takes the machine id (\`machine\`) and returns the same readings for that
+\`genui_machine_show\` takes the machine (\`machine\`) and returns the same readings for that
 machine, and its \`history\`: how long each state lasted in total between \`from\` and \`to\`
 (\`totals\`, in seconds). \`hours\` says how far back the history goes, 8 if omitted, 24 at most.
 The sums are added up here. Take them from there, and do not count states yourself.

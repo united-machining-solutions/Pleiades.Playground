@@ -14,9 +14,18 @@ harness.
   hours. It needs no language model. Home leads to it, and it stands under Home. An address of before, `/machines/<machine id>`, leads to it with
   the hours of its history. For a machine the backend does not know, the page
   says so and does not ask again.
+- **Halls** (`/halls`) draws every hall of every site as a plan seen from above, each machine where it stands
+  with its state, live. The positions are what people entered in the Sites API, in metre; a machine without one
+  waits in rows on the plan, with a dashed edge. A person drags a machine to where it stands, with a finger or
+  the mouse, or moves it half a metre with an arrow key; the app keeps the position to half a metre, in the
+  Sites API, from its server and with no sign-in, as Home writes. It reads the same answer as Home,
+  `genui_site_list`, and needs no language model.
 - **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
   machine, live. A choice above the graphs shows one machine or all of them, and stays in the URL
-  (`?machine=`).
+  (`?machine=`). With all of them, a value no machine published has no graph, and the value of now stands
+  next to the title of a graph only where a single machine measures it. With one machine chosen, every signal
+  it published in the last 24 hours has a graph of its own, found anew each time the machine is chosen. A
+  button at the top right of a graph shows it enlarged; its X closes it.
 - **Pages** (`/pages`) are what a person keeps of the chat, in this browser. "Save as page" under an answer
   of the chat makes one: all the cards of that answer, in their order, titled with the question. It stands
   under an answer that has ended and for which the chat drew a card, and needs no language model: the app
@@ -63,7 +72,9 @@ harness.
   "Chat". The panel opens from the button in the
   header, and a question from the field in the header or from "Ask why" on a machine starts a chat in it. A
   language model answers and calls the tools of [`genui-mcp`](../genui-mcp/README.md); the app draws the values
-  of a tool call itself: a card of the catalogue, or a list with the same rows as Home. An answer is drawn
+  of a tool call itself: a card of the catalogue, or a list with the same rows as Home. The list of all
+  machines is drawn only where the answer calls no other tool after it: a model that read it to find a
+  machine leaves it a step that opens to the list (`lookup` in `src/chat/tool-results.ts`). An answer is drawn
   from its markdown, and its times are those of your clock: the browser sends its time zone along with a
   question, and the server adds it to the tool calls. Whether the panel is open, and with which chat, is in
   the URL (`?chat=`), and the page stays where it is: you chat about what you see. Everything about the chat
@@ -145,10 +156,29 @@ device, set `APP_BIND=0.0.0.0`, and only in a network you trust.
 
 ## Dictation
 
-With a speech-to-text model at the gateway, the chat field has a microphone. Press it, speak, press it
-again: a spinner shows while the model writes down what was said, and the text goes into the field, after
-what is already there. It is sent like a typed question, when you send it. After two minutes the recording
-stops by itself and is written down the same way. The model hears the language itself. It also gets the
+With a speech-to-text model at the gateway, the chat field has a microphone. Tap it, speak, tap it again;
+or hold it while you speak and let go, as on a tablet. A press shorter than 0.4 s is a tap
+(`dictation-press.ts`); Enter or the space bar on the microphone is a tap too. While it records, the second
+line of the field says so, on the left, where a finger on the microphone does not cover it: bars that move
+with the loudness of the microphone (`dictation-level.ts`), the time, and what ends the recording, "Let go to
+finish" or "Tap ■ to finish". What was said so far stands in the field meanwhile, dimmed and in italics: as
+its placeholder when the field is empty, under what is written otherwise. Then the line says that the model
+writes down what was said, and the text goes into the field, after what is already there. It is sent like a
+typed question, when you send it. After two minutes the recording stops by itself and is written down the
+same way.
+
+What was said so far is a draft: the recording so far, written down again about every two seconds
+(`dictation-draft.ts`), one request at a time, by the same model. The gateway has no model that writes while
+one speaks, and the stream of the transcription model does not come through it: LiteLLM collects it and
+answers once. A draft may change as the model hears more. A draft still on its way when the recording ends
+is called off, at the gateway too, and all of the recording is written down once more; that text goes into
+the field. So twenty seconds of speech ask the model about ten times, each time a little longer. As the
+audio of the drafts grows with the square of the length, drafts stop after 30 s of recording: the last one
+stays, the line still shows that the microphone listens, and the end writes down all of it as before. Every
+field of the app shares the key of the gateway, which takes two requests at once, so the server writes one
+draft at a time for all fields together (`/api/transcribe?draft`): a draft that finds one on its way is
+answered 429 and comes again two seconds later, and the other request stays for the chat and for whole
+recordings. The names of the machines for the prompt are kept for a minute. The model hears the language itself. It also gets the
 names of the machines from the backend as its prompt, their serial numbers, models and machine ids, so that
 it writes "P-04" as the stack spells it.
 
@@ -157,11 +187,15 @@ of the hackathon `openai/gpt-transcribe`. The gateway passes it on as OpenAI's a
 (`POST /audio/transcriptions`). Where the gateway lists none, the field has no microphone, and the chat works
 as before.
 
-The browser records (`useAudioRecorder` of TanStack AI) and sends the recording to `/api/transcribe`, which
+The browser records (`recorder.ts`) and sends the recording to `/api/transcribe`, which
 calls the model with the key of the gateway (`generateTranscription`). The route reads at most 32 MiB, as the
 agent harness does, and answers a larger request with 413. A browser lets a page use the
 microphone only over https or on `localhost`; elsewhere the microphone says so when pressed. The recording
-is not kept.
+is not kept, and a field that goes with another chat lets go of the microphone, also of one the browser is
+still opening. The recorder is our own and
+not `useAudioRecorder` of TanStack AI: the bars read the level from the stream that records, and that
+recorder keeps its stream to itself. A second request for the microphone would mute the first one in Safari
+on iOS ([WebKit bug 179363](https://bugs.webkit.org/show_bug.cgi?id=179363)), on the tablet dictation is held on.
 
 ## Develop
 
@@ -190,7 +224,9 @@ MQTT, at the broker of this repository, with the SDK `@pleiades/hub-sdk` from th
 
 For the server the registration is opt-in. With `HUB_MQTT_URL` set, the server of the app registers when it
 starts, with one app. Without the variable, or with an empty one, nothing connects, and the app behaves as
-before. The demo stack sets the variable, see [In the demo stack](#in-the-demo-stack).
+before. `HUB_REGISTRATION=false` switches the registration off as well, whatever `HUB_MQTT_URL` says: the
+Margo app needs that switch, because a Margo client may leave an empty setting out of the environment, see
+[margo/README.md](../../margo/README.md#pleiades-hub). The demo stack sets the variable, see [In the demo stack](#in-the-demo-stack).
 
 The start is a plugin of Nitro, the server under TanStack Start: `src/hub/plugin.ts`, which `vite.config.ts`
 names. Nitro runs it once when the server starts, in development and in the built server, so the app is in
@@ -199,6 +235,7 @@ the hub before anyone opens a page.
 | Variable | Default of the server | In the demo stack | Meaning |
 |---|---|---|---|
 | `HUB_MQTT_URL` | empty: no registration | `mqtt://broker:1883`, the broker of the stack | The MQTT broker at which the app registers: an `mqtt`, `mqtts`, `ws` or `wss` URL. In development the broker of this repository's stack, `mqtt://localhost:1883` |
+| `HUB_REGISTRATION` | empty: `HUB_MQTT_URL` decides | not set | `false` switches the registration off; `true` or empty leaves it to `HUB_MQTT_URL`; any other value is an error at the start |
 | `HUB_APP_URL` | `http://localhost:3000/` | `http://localhost:5600/`, with the port of `APP_PORT` | The address under which a user's browser reaches the app: an absolute `http` or `https` URL, or a path that starts with `/`, such as `/playground/`, which the hub resolves against its own address. It should end with `/`, because the icon link is relative to it. Ignored without `HUB_MQTT_URL` |
 
 With `HUB_MQTT_URL` set, an invalid value of either variable is an error at the start. The built server
@@ -302,7 +339,8 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
 - `src/routes/`: one file per route. `__root.tsx` is the document and the layout with sidebar, header and chat,
   and holds what a tooltip and a toast need at the root (`TooltipProvider`, `Toaster`);
   `index.tsx` is Home, `sites.index.tsx` the address the list of the sites had before, which leads there, `sites.$machine.tsx` the page of a machine and `machines.$machine.tsx`
-  the old address of it, which leads there, `charts.tsx` the last hours of every
+  the old address of it, which leads there, `halls.tsx` the plans of the halls (drawn by
+  `packages/cards/src/site/hall-plan.tsx`), `charts.tsx` the last hours of every
   machine as charts (drawn by `src/charts/state-tiles.tsx`), `where-is-my-job.tsx` a page for discussion
   that follows an order across the machines (its map, its panels, the grouping of job orders and `getFloor`,
   which reads its values, in `src/where-is-my-job/`), `pages.index.tsx` the list of the pages kept
@@ -412,7 +450,8 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   `save-as-page.tsx` the row under an answer with "Save as page" (chrome of the app, never part of a card),
   `propose-page.ts` the one tool of the app the model gets, `app_page_propose`, and `proposed-page.tsx` the
   proposal the chat draws for its result,
-  `dictate.tsx` the microphone in its field and `dictation.server.ts` the model behind it,
+  `dictate.tsx` the microphone in its field and its line, `recorder.ts` the recording and `dictation.server.ts`
+  the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for
   which tool, its server which tools a language model does not get, and the proposal of a page which tools a
   page can call. `tool-results.ts` says what a card may say about a tool, `blocks.ts` turns an answer into blocks, and `answer.tsx` draws what the model writes
@@ -458,11 +497,53 @@ listen on an address reachable by that runtime and accept its Host header; loopb
 be assumed reachable from another container. The standard demo has no documentation dependency.
 
 Ask about a manual, for example “Which four technological machining operations does CYCLE832 distinguish?”.
-The chat uses `docs_search` and `docs_read_page`, cites the document and page, and shows clickable sources.
-Selecting a PDF source opens its original physical page in a PDF.js viewer, with paging, zoom, download
-and literal search. Search combines native PDF text and indexed OCR page matches; only native text can
-be highlighted. The **Extracted text** tab retains the plain-text evidence. The backend reads metadata and
+The chat uses `docs_search` and `docs_read_page`, then displays verified `docs_answer` cards with clickable evidence.
+Selecting a card evidence source opens its original physical page in a continuous PDF.js viewer aligned with the
+documentation service: scroll through pages, enter a page number, zoom, download and search literal text.
+Only nearby pages allocate canvases and text layers; resizing and zoom preserve the current page position. Search combines native PDF text and indexed OCR page matches; only native text can
+be highlighted. Non-PDF card sources use the extracted-page viewer. The backend reads metadata and
 bounded binary resources through MCP and serves PDF bytes to the browser, including HTTP ranges.
 Missing, changed or unavailable sources show an error and require a new search.
 See [ADR-0019](../../docs/adr/0019-documentation-sources-in-chat.md) and the [external documentation contract](../../contracts/docs/README.md).
 The Playground never calls the documentation REST API or accesses its database.
+
+
+### Documentation answer cards
+
+The updated documentation MCP service exposes `docs_answer`. Its result uses the Playground card
+catalogue: source warnings appear first in their original wording, then the answer and one evidence chip.
+The chip opens an inline preview with title, known chapter/version, page and manufacturer/customer badge.
+**Open in document** opens the PDF viewer at the quoted passage and highlights matching native text
+across spans. Translucent evidence rectangles sit above the original canvas and below the selectable text
+layer, preserving readable glyphs. Search changes update these rectangles without rerendering the canvas.
+Scanned pages without positional OCR still open at the cited page and explain why no exact mark is shown.
+
+Documentation answers use cards exclusively. The service must provide `docs_answer`; unsupported or
+failed evidence produces a no-evidence card. The old prose/source-list presentation and runtime toggle
+have been removed. Older source-only chat turns show an unavailable card; ask again to obtain a verified
+answer. See [ADR-0024](../../docs/adr/0024-documentation-cards-only.md).
+`APP_DOCUMENTATION_PACKAGE` optionally pins a deployment to a machine's documentation package. Otherwise
+name/select the package in the question; the card path does not search all packages to guess a machine.
+No new key is required. The package scope is a runtime app setting; the browser cannot choose an upstream address.
+
+The earlier [migration criteria](../../docs/adr/0022-documentation-answer-cards.md) are historical;
+[ADR-0024](../../docs/adr/0024-documentation-cards-only.md) retires the old presentation. Existing source tools remain.
+
+When a package is unknown, `docs_list_packages` discovers package and filename metadata without
+content search or embedding requests. A unique document reference or the sole package in a complete
+listing can resolve the selection; ambiguous packages require clarification. The content search remains
+scoped to that package. An unknown package alone does not mean the document is unavailable.
+
+### Conflicting documentation
+
+`docs_review` retrieves candidate pages from every current file in the selected package without a
+category filter, including conflicting manufacturer/customer sources and different passages on the same
+page. The chat model compares their meaning and conditions; MCP verifies literal evidence, receipt
+coverage and source freshness. Lexical terms limit recall; no contradiction found is not a guarantee.
+Cards show explicit no-contradiction, conflict or incomplete-review states. Missing indexing, failed
+reads, caps, stale reviews and old stored answers cannot claim completed review. Each conflicting
+alternative has its own expandable source and PDF navigation. Multiple alternatives remain accessible.
+Warnings stay first and verbatim. Conflict cards suppress the ordinary action list. Recommendations
+require completed review and an explicit supported rule; otherwise technical clarification is required.
+No approval is inferred from classification, timestamps, author counts or a user's choice. See
+[ADR-0023](../../docs/adr/0023-documentation-conflict-review.md).

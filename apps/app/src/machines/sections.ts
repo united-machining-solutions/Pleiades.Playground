@@ -27,6 +27,16 @@ export function placeOf(sites: SiteList | null, machine: string): Place {
   return sites.unplaced.some((one) => one.machine === machine) ? "onNoSite" : null
 }
 
+/**
+ * True where the machine stands on a site and published no value in the last 24 hours, as the list of
+ * the sites says (`now` is null): its page then says that it has no data, not that the machine is
+ * unknown. A machine on no site, or sites that could not be read, are not known to be silent.
+ */
+export function silentOnSite(sites: SiteList | null, machine: string): boolean {
+  if (sites === null || sites.sitesError !== null) return false
+  return sites.sites.some((site) => site.halls.some((hall) => hall.machines.some((one) => one.machine === machine && one.now === null)))
+}
+
 /** The place in words, as the page writes it under its title: "South plant · Hall 2", "On no site". */
 export function placeWords(place: Place): string | null {
   if (place === null) return null

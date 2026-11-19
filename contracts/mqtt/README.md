@@ -138,7 +138,7 @@ lists, events, manifest and connection. It is the binding of `machines/`; why: s
 [ADR-0015](../../docs/adr/0015-the-binding-of-machines-follows-the-data-model.md).
 
 In the demo stack every simulator (P-04, P-07, M-02), the adapters of two real devices, an Ultimaker printer
-and a juice bar, the adapters of the three cutting machines and the OPC UA adapter publish this tree, and the services of the playground read only it (see "How the stack stores
+and a juice bar, the adapters of the three cutting machines, the bending adapter and the OPC UA adapter publish this tree, and the services of the playground read only it (see "How the stack stores
 it").
 
 ### Topics
@@ -566,6 +566,7 @@ machine does.
 | Ultimaker telemetry | `machines/ultimaker_UM3_UM3-01/` | `https://ultimaker.com` | `x-ultimaker-com`, on `oem/Ultimaker/…` | `Core` |
 | Juice bar | `machines/trumpf_JuiceBar_JUICEBAR-01/` | `https://www.trumpf.com` | `x-trumpf-com`, on `oem/JuiceBar/…` | `Core` |
 | Cutting adapter | `machines/trumpf_Laser2D_L-01/`, `trumpf_Tube_T-01/`, `trumpf_Punch_PU-01/` | `https://www.trumpf.com` | `x-trumpf-com`, on `oem/WorkMasterMonitoring/ActiveProgram` | `Core` |
+| Bending adapter | `machines/trumpf_5085_AE325085TB46/` | `https://www.trumpf.com` | `x-trumpf-com`, on `oem/WorkMasterMonitoring/ActiveProgram`, `oem/Rci/…`, `oem/Production/…` | `Core` |
 
 Each delivers of `Core` the identification, the connection and `State/Status`, with `MachineryOperationMode`
 `None`, the value of the model for a machine without operation modes; `ProductCode`, `YearOfConstruction`
@@ -576,6 +577,13 @@ and each alarm of the machine is an entry of `ActiveAlerts` with the events `Not
 `Notification.AlertCleared` on `events/notifications`. The protocol of the cutting machines has no request for
 the current alarms, so after a start of the adapter `ActiveAlerts` is `null` until the machine runs, stands
 without a fault or names an alarm; the list goes out before the events that change it.
+
+The [bending adapter](../../source/Pleiades.Playground.Bend.Adapter/README.md), one per press brake that reports through RCI
+telegram files, delivers `ActiveAlerts` with the same two events for a fault of the machine, and an operator message
+or a finished order as `Notification.NotificationEvent`; its timestamps are those of the machine as well, and the RCI
+operating state offline is `CommunicationFault`. RCI has no handshake and no request for the current state: the
+adapter reports `Running` as soon as it reads the exchange folder, while `State/Status` and `ActiveAlerts` stay
+`null` until the machine reports its first operating state; the list goes out before the events that change it.
 
 The [OPC UA adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md) brings in every machine a person
 adds in the chat, with the same publisher and one MQTT connection per machine, so that each has its own last

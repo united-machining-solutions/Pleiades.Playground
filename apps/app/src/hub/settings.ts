@@ -2,9 +2,9 @@ import { validateApp } from "@pleiades/hub-sdk/contract"
 import type { AppRegistration } from "@pleiades/hub-sdk/contract"
 
 // How the app registers at the Pleiades Hub, the page that lists the apps of a plant. The
-// registration is opt-in: without HUB_MQTT_URL the app registers nowhere. This file reads the
-// settings and holds what the app says about itself. It opens no connection and imports no MQTT
-// client, so a test can check both.
+// registration is opt-in: without HUB_MQTT_URL, or with HUB_REGISTRATION=false, the app registers
+// nowhere. This file reads the settings and holds what the app says about itself. It opens no
+// connection and imports no MQTT client, so a test can check both.
 
 export type HubSettings = {
   /** The MQTT broker of the hub. The URL may carry a password: it belongs in no log and no message. */
@@ -54,11 +54,16 @@ export function hubRegistration(appUrl: string): HubRegistration {
 }
 
 /**
- * The broker of the hub and the address of the app, or undefined where HUB_MQTT_URL is not set or
- * empty: then the app does not register, and HUB_APP_URL is not looked at. An invalid value
- * throws. The message names the setting and never its value.
+ * The broker of the hub and the address of the app, or undefined where HUB_REGISTRATION is false or
+ * HUB_MQTT_URL is not set or empty: then the app does not register, and HUB_APP_URL is not looked
+ * at. An invalid value throws. The message names the setting and never its value.
  */
 export function hubSettings(env: Readonly<Record<string, string | undefined>>): HubSettings | undefined {
+  // A switch next to the broker, for a setup that cannot pass an empty value: the Margo app. Unset
+  // or empty, the broker alone decides.
+  const registration = env.HUB_REGISTRATION
+  if (registration === "false") return undefined
+  if (registration && registration !== "true") throw new Error("HUB_REGISTRATION must be true or false")
   const brokerUrl = env.HUB_MQTT_URL
   if (!brokerUrl) return undefined
   if (!isBrokerUrl(brokerUrl)) {

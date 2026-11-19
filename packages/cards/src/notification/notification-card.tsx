@@ -1,18 +1,17 @@
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
-import { Item, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@pleiades/ui/components/item"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { Fragment, useState } from "react"
 
 import { cardRange } from "../energy/words.ts"
 import { clock } from "../machine/format.ts"
 import { labelOf } from "../machine/in-words.ts"
-import { StateSymbol } from "../machine/state-symbol.tsx"
 import { Pages } from "../shared/pages.tsx"
 import { SmoothHeight } from "../shared/smooth-height.tsx"
-import type { NotificationEntry, NotificationList } from "./contract.ts"
+import type { NotificationList } from "./contract.ts"
+import { NotificationTable } from "./notification-table.tsx"
 import { LEVEL_CHOICES, levelsOf, notificationPageOf, ofLevel } from "./pages.ts"
 import type { LevelChoice } from "./pages.ts"
-import { levelsInWords, outcomeText, totalsInWords } from "./words.ts"
+import { levelsInWords } from "./words.ts"
 
 const dayFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" })
 
@@ -24,9 +23,8 @@ function stamp(instant: string, asOf: string): string {
 
 /**
  * A name that breaks after its `_` and `/` only, so that the parts of a machine id such as
- * `alcyone-machines_AX-400_P-04` and the levels of its topic stay whole where a line is too short.
- * The title is the model and serial number of the id (`labelOf`), as the legends of the measurements
- * write it; the whole id stands in the topic at the foot.
+ * `alcyone-machines_AX-400_P-04` stay whole where a line is too short. The title is the model and
+ * serial number of the id (`labelOf`), as the legends of the measurements write it.
  */
 function Breakable({ text }: { text: string }) {
   return text.split(/(?<=[/_])/).map((part, position) => (
@@ -35,27 +33,6 @@ function Breakable({ text }: { text: string }) {
       <wbr />
     </Fragment>
   ))
-}
-
-function Notification({ entry, asOf }: { entry: NotificationEntry; asOf: string }) {
-  const time = (instant: string) => stamp(instant, asOf)
-  const outcome = outcomeText(entry, time)
-  const label = [entry.level, entry.notificationId].filter(Boolean).join(" ")
-  return (
-    <Item size="sm" role="listitem" className="flex-nowrap items-start">
-      {/* As tall as the first line, so the sign sits on it. The error code is the label of the sign. */}
-      <ItemMedia variant="icon" className="h-5">
-        <StateSymbol state={entry.level === "Error" ? "alarm" : "warning"} label={label} />
-      </ItemMedia>
-      <ItemContent className="min-w-0">
-        <ItemTitle className="line-clamp-none break-words">{entry.title || entry.notificationId}</ItemTitle>
-        <ItemDescription className={outcome.open ? "font-medium text-foreground" : undefined}>{outcome.text}</ItemDescription>
-      </ItemContent>
-      <ItemContent className="text-right">
-        <ItemTitle className="ml-auto tabular-nums">{time(entry.raisedAt)}</ItemTitle>
-      </ItemContent>
-    </Item>
-  )
 }
 
 /** What the card says where the level chosen has none in the range. */
@@ -97,21 +74,25 @@ function LevelToggle({
 }
 
 /**
- * The notification card of one machine: the warnings and errors that stood in the range, a row for
- * each, the ones that have not gone first. A row says when the alert came and either that it is
- * still open or what became of it. It draws the result of `genui_notification_list` and computes
- * nothing but the wording.
+ * The notification card of one machine: the warnings and errors that stood in the range, a row of a
+ * table for each, the ones that have not gone first. A row says when the alert was raised, when it was
+ * cleared or that it is still open, and how long it stood. It draws the result of
+ * `genui_notification_list` and computes nothing but the wording. Under the table it says when
+ * the list is shorter than the counts in the head: how many notifications of the level chosen are not
+ * listed, and that the Events API had more than it returned. Its foot names when it was read and from which topic, as the
+ * other cards do, so its rows can be traced to the broker. The sums of the levels stand in the words of
+ * the result, for a language model, not on the card.
  *
  * A person chooses all of them or the errors or the warnings; ten notifications stand on a page, a
  * person turns the pages, and the card eases to the height of the new one. The counts in the head
- * and the sums at the foot are those of the level chosen. The result stays whole and in its order:
+ * are those of the level chosen. The result stays whole and in its order:
  * level and page are the state of the card, and what they compute is in pages.ts.
  *
- * `bare` draws it without its frame, its head and its foot, for a page that puts it into a card of its
- * own and names the machine and the hours there: the counts then stand above the list.
+ * `bare` draws it without its frame, its head and its foot, for a page that puts it into a card of
+ * its own and names the machine and the hours there: the counts then stand above the notifications.
  */
 export function NotificationCard({ bare = false, ...list }: NotificationList & { bare?: boolean }) {
-  const { machine, asOf, from, topic, notifications, omitted, hasMore, open, total } = list
+  const { machine, asOf, from, topic, notifications, hasMore, open, total } = list
   const [level, setLevel] = useState<LevelChoice>("all")
   const [page, setPage] = useState(1)
   const listed = ofLevel(notifications, level)
@@ -141,46 +122,46 @@ export function NotificationCard({ bare = false, ...list }: NotificationList & {
       }}
     />
   )
-  const content =
-        listed.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {bare ? "Nothing in this range." : `No ${noneOf[level]} stood between ${stamp(from, asOf)} and ${clock(asOf)}.`}
-            {hasMore && " The Events API had more than it returned, so older ones may be missing."}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <SmoothHeight>
-              {/* When the page changes, its rows fade in; a page with reduced motion skips it. */}
-              <ItemGroup key={view.page} className="gap-0 rounded-lg border has-data-[size=sm]:gap-0 motion-safe:animate-card-fade-in">
-                {view.notifications.map((entry, position) => (
-                  <Fragment key={entry.correlationId}>
-                    {position > 0 && <ItemSeparator className="my-0" />}
-                    <Notification entry={entry} asOf={asOf} />
-                  </Fragment>
-                ))}
-              </ItemGroup>
-            </SmoothHeight>
-            {view.pages > 1 && (
-              <Pages page={view.page} pages={view.pages} onPage={setPage}>
-                <p className="text-xs text-muted-foreground tabular-nums">
-                  {view.first}–{view.last} of {view.total}
-                </p>
-              </Pages>
-            )}
-          </div>
-        )
-  const foot = (
-    <>
-        {omitted > 0 && <p>{omitted} more notifications are not listed.</p>}
-        {hasMore && total > 0 && (
-          <p>The Events API had more than it returned: the oldest are missing, so the counts are lower bounds.</p>
-        )}
-        {shownTotal > 0 && <p>{totalsInWords({ levels })}.</p>}
-        <p>
-          Read at {clock(asOf)} from <Breakable text={topic} />
-        </p>
-    </>
+  // The head counts every notification of the level in the range; the table lists what the tool
+  // returned of them. Where the two differ, the card says so: "60 warnings" would stand over "1–10 of
+  // 50" with no word on the rest, and a level whose notifications all lie beyond the list would read as
+  // if it had none.
+  const notShown = shownTotal - listed.length
+  const notListed = (notShown > 0 || hasMore) && (
+    <p className="text-xs text-muted-foreground">
+      {notShown > 0 && `${notShown} ${notShown === 1 ? "notification is" : "notifications are"} not listed here.`}
+      {notShown > 0 && hasMore && " "}
+      {hasMore && "The Events API had more than it returned: the oldest are missing, so the counts are lower bounds."}
+    </p>
   )
+  const none = shownTotal === 0 && (
+    <p className="text-sm text-muted-foreground">
+      {bare ? "Nothing in this range." : `No ${noneOf[level]} stood between ${stamp(from, asOf)} and ${clock(asOf)}.`}
+    </p>
+  )
+  const pages = view.pages > 1 && (
+    <Pages page={view.page} pages={view.pages} onPage={setPage}>
+      <p className="text-xs text-muted-foreground tabular-nums">
+        {view.first}–{view.last} of {view.total}
+      </p>
+    </Pages>
+  )
+  // A row for each notification, with a column each for when it was raised, when it was cleared and how
+  // long it stood; where the card is narrow, as in the chat, the last two stand under the message.
+  const rows = <NotificationTable notifications={view.notifications} time={(instant) => stamp(instant, asOf)} turn={`${level}:${view.page}`} />
+  const content =
+    listed.length === 0 ? (
+      <div className="flex flex-col gap-3">
+        {none}
+        {notListed}
+      </div>
+    ) : (
+      <div className="flex flex-col gap-3">
+        <SmoothHeight>{rows}</SmoothHeight>
+        {pages}
+        {notListed}
+      </div>
+    )
   if (bare) {
     return (
       <div className="flex flex-col gap-3">
@@ -207,7 +188,9 @@ export function NotificationCard({ bare = false, ...list }: NotificationList & {
         {choice}
         {content}
       </CardContent>
-      <CardFooter className="block text-xs text-muted-foreground">{foot}</CardFooter>
+      <CardFooter className="block text-xs break-words text-muted-foreground">
+        Read at {clock(asOf)} from <Breakable text={topic} />
+      </CardFooter>
     </Card>
   )
 }

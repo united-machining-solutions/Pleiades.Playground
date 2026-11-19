@@ -1,7 +1,9 @@
+import { Fragment } from "react"
 import type { ReactNode } from "react"
 
 import { Badge } from "@pleiades/ui/components/badge"
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
+import { Skeleton } from "@pleiades/ui/components/skeleton"
 import type { MachineShow } from "./contract.ts"
 import { clock, duration } from "./format.ts"
 import { jobOrderInWords, titleOf } from "./in-words.ts"
@@ -20,9 +22,11 @@ import { tell } from "./tell.ts"
  * (`genui_span_list`) and hands them in as they arrive. The card stands without them.
  *
  * `topics` false leaves out the line at the foot that names the topics read, for a page that names
- * none; the chat keeps it.
+ * none; the chat keeps it. `reported` false leaves out the line under the state that only says what
+ * the control reports, such as "NotExecuting, as the control reports", for a page that wants the state
+ * alone; the chat keeps it.
  */
-export function MachineCard({ machine, asOf, history, spans, topics: withTopics = true }: MachineShow & { spans?: Spans; topics?: boolean }) {
+export function MachineCard({ machine, asOf, history, spans, topics: withTopics = true, reported = true }: MachineShow & { spans?: Spans; topics?: boolean; reported?: boolean }) {
   const state = stateOf(machine, asOf)
   const told = tell(machine, state)
   const warning = openWarning(machine)
@@ -50,7 +54,7 @@ export function MachineCard({ machine, asOf, history, spans, topics: withTopics 
           {state !== "running" && (
             <Row label={stateLabel[state]}>
               {told.message}
-              {told.detail && <span className="block text-muted-foreground">{told.detail}</span>}
+              {told.detail && (reported || !told.reported) && <span className="block text-muted-foreground">{told.detail}</span>}
             </Row>
           )}
           {state === "running" && warning && <Row label="Warning">{warning.title}</Row>}
@@ -84,5 +88,61 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
       <dt className="text-muted-foreground">{label}</dt>
       <dd>{children}</dd>
     </>
+  )
+}
+
+/**
+ * The machine card while it is read: its frame, its head and its badge, grey lines where a running
+ * machine has its rows, and the band, so the card keeps its place when its values come.
+ */
+export function MachineCardSkeleton() {
+  return (
+    <Card size="sm" aria-hidden>
+      <CardHeader>
+        <CardTitle className="flex h-6 items-center">
+          <Skeleton className="h-4 w-36" />
+        </CardTitle>
+        <CardDescription className="flex h-5 items-center">
+          <Skeleton className="h-3.5 w-28" />
+        </CardDescription>
+        <CardAction>
+          <Skeleton className="h-5 w-20 rounded-full" />
+        </CardAction>
+      </CardHeader>
+      <CardContent className="gap-4">
+        <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5">
+          {["w-48", "w-28", "w-36", "w-32"].map((width, row) => (
+            <Fragment key={row}>
+              <div className="flex h-5 items-center">
+                <Skeleton className="h-3.5 w-20" />
+              </div>
+              <div className="flex h-5 items-center">
+                <Skeleton className={`h-3.5 ${width}`} />
+              </div>
+            </Fragment>
+          ))}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex h-4 items-center justify-between">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+          <Skeleton className="h-3 rounded-sm" />
+          <div className="flex h-4 items-center justify-between">
+            <Skeleton className="h-3 w-10" />
+            <Skeleton className="h-3 w-10" />
+            <Skeleton className="h-3 w-10" />
+          </div>
+          {/* The totals of the states, as many as a band mostly has: they wrap where the card is narrow. */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {["w-24", "w-24", "w-28", "w-24", "w-32"].map((width, position) => (
+              <div key={position} className="flex h-4 items-center">
+                <Skeleton className={`h-3 ${width}`} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

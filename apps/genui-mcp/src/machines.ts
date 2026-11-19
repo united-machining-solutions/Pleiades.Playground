@@ -50,6 +50,42 @@ export function machineOf(topic: string): string | undefined {
   return machineId.safeParse(level).success ? level : undefined
 }
 
+/** The words of a machine id or of a name: `AX-400 P-04` and `alcyone-machines_AX-400_P-04` share `ax-400` and `p-04`. */
+const wordsOf = (name: string) => name.toLowerCase().split(/[\s_]+/).filter((word) => word !== "")
+
+/** Whether `part` stands in `whole` as it is, word after word. */
+function standsIn(whole: ReadonlyArray<string>, part: ReadonlyArray<string>): boolean {
+  return whole.some((_, start) => part.every((word, offset) => whole[start + offset] === word))
+}
+
+/**
+ * The machine that a caller names, among the machines `known`. A machine is named by its id, or by
+ * what people call it: words of its id in their order, such as its serial number (`P-04`), or its
+ * model and serial number (`AX-400 P-04`); case and the gap between the words do not matter. An id
+ * of a known machine is that machine, even where it is also a word of another id. A name that fits
+ * several machines is refused with their ids. A name that fits none is given back as it is, so the
+ * caller refuses it in its own words, with the machines it knows.
+ *
+ * So a question about one machine takes one call: nobody has to list the machines first to find
+ * its id.
+ */
+export function machineNamed(known: ReadonlyArray<string>, name: string): string {
+  if (known.includes(name)) return name
+  const words = wordsOf(name)
+  if (words.length === 0) return name
+  const fitting = known.filter((machine) => standsIn(wordsOf(machine), words))
+  if (fitting.length > 1) {
+    throw new Error(`"${name}" fits more than one machine: ${fitting.join(", ")}. Name one of them by its id.`)
+  }
+  return fitting[0] ?? name
+}
+
+/** The ids of the machines that published a value in the last 24 hours. */
+export async function knownMachines(apis: Apis, now = new Date()): Promise<Array<string>> {
+  const topics = await listTopics(apis, secondsBefore(now, HORIZON_SECONDS), now)
+  return [...new Set(topics.flatMap((topic) => machineOf(topic) ?? []))].sort()
+}
+
 /** The identification of a machine: the newest value of each, however old. */
 async function readIdentity(apis: Apis, machine: string, now: Date): Promise<Identity> {
   const [manufacturer, model, serialNumber] = await Promise.all(
@@ -236,14 +272,16 @@ async function readSpans(apis: Apis, machine: string, from: Date, to: Date): Pro
 
 /**
  * One machine: what it does now, as in the list, and how long each state lasted in the hours
- * before. The states themselves are not in this result: they grow with time (`listSpans`).
+ * before. The states themselves are not in this result: they grow with time (`listSpans`). The
+ * machine is named by its id or as people call it (`machineNamed`).
  */
 export async function showMachine(
   apis: Apis,
-  machine: string,
+  name: string,
   hours = HISTORY_HOURS,
   now = new Date(),
 ): Promise<MachineShow> {
+  const machine = machineNamed(await knownMachines(apis, now), name)
   const from = secondsBefore(now, hours * 60 * 60)
   const [list, spans] = await Promise.all([listMachines(apis, now, machine), readSpans(apis, machine, from, now)])
   const found = list.machines.find((one) => one.machine === machine)

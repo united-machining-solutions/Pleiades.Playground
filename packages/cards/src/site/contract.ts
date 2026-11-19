@@ -20,11 +20,25 @@ const counts = z
   .array(stateCount)
   .describe("How many machines are in each state now, in the order a display reads the states. A state no machine is in is not listed.")
 
+/**
+ * Where in its hall a machine stands, on the plan of the hall seen from above: the middle of the machine,
+ * in metre from the upper left corner of the plan. A hall has no size of its own; a plan is as large as the
+ * positions in it need.
+ */
+export const position = z.object({
+  x: z.number().min(0).describe("How far to the right of the left edge of the plan, in metre."),
+  y: z.number().min(0).describe("How far below the upper edge of the plan, in metre."),
+})
+export type Position = z.infer<typeof position>
+
 /** A machine on a site. */
 export const placedMachine = z.object({
   machine: machineId.describe("The machine id, which identifies the machine in every topic."),
   displayName: z.string().nullable().describe("The name people know the machine by, as entered in the Sites API, or null."),
   placedAt: instant.describe("When the machine was put on this site, as entered in the Sites API."),
+  position: position
+    .nullish()
+    .describe("Where in its hall the machine stands, as entered in the Sites API, x and y in metre; null or left out when nobody said."),
   state: state.describe("What the machine does now, decided by the rules of the machine card."),
   now: machine
     .nullable()
