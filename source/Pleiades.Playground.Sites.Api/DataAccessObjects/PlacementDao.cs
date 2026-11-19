@@ -5,7 +5,10 @@ namespace Pleiades.Playground.Sites.Api.DataAccessObjects;
 
 /// <summary>
 /// A machine on a site as stored: the machine id is the document id, so a machine stands on one site at most.
+/// A field this version does not know is left out when a document is read, so a version before a new field
+/// still reads what a later one wrote.
 /// </summary>
+[BsonIgnoreExtraElements]
 internal sealed class PlacementDao
 {
     /// <summary>The machine id, the <c>{MachineId}</c> of <c>machines/{MachineId}</c> in the MQTT binding: <c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>.</summary>

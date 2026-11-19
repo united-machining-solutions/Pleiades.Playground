@@ -66,7 +66,7 @@ function Halls() {
             <EmptyDescription>
               {list.sitesError !== null
                 ? "The Sites API did not answer."
-                : "Add a machine to a site and a hall on Home: its hall gets a plan here."}
+                : "Give a site a hall on Home, where a machine is added: every hall gets a plan here."}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
