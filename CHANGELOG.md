@@ -7,6 +7,12 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Margo app: the example app registers at the Pleiades Hub, as in `compose.yaml`, with the section
+  *Pleiades Hub* of the settings. *Register at the Pleiades Hub* (`HUB_REGISTRATION`, on by default) switches
+  the registration off, since a Margo client may leave an empty broker out and the default would come back;
+  the server of the app takes `HUB_REGISTRATION=false` everywhere. *Broker of the hub* is the broker of the
+  stack by default, and *Address of the example app for the hub* is Traefik under *Host name of the app*,
+  over HTTP, so the hub links to the address a browser on the network uses once Traefik is opened to it.
 - Sites API, generative UI backend and example app: a machine has a position in its hall, and the page
   `/halls` draws every hall as a plan seen from above. `PUT /placements/{machineId}/position` takes the middle
   of the machine, `x` and `y` in metre from the upper left corner of the plan, and `DELETE` takes it away; the

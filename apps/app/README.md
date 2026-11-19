@@ -194,7 +194,9 @@ MQTT, at the broker of this repository, with the SDK `@pleiades/hub-sdk` from th
 
 For the server the registration is opt-in. With `HUB_MQTT_URL` set, the server of the app registers when it
 starts, with one app. Without the variable, or with an empty one, nothing connects, and the app behaves as
-before. The demo stack sets the variable, see [In the demo stack](#in-the-demo-stack).
+before. `HUB_REGISTRATION=false` switches the registration off as well, whatever `HUB_MQTT_URL` says: the
+Margo app needs that switch, because a Margo client may leave an empty setting out of the environment, see
+[margo/README.md](../../margo/README.md#pleiades-hub). The demo stack sets the variable, see [In the demo stack](#in-the-demo-stack).
 
 The start is a plugin of Nitro, the server under TanStack Start: `src/hub/plugin.ts`, which `vite.config.ts`
 names. Nitro runs it once when the server starts, in development and in the built server, so the app is in
@@ -203,6 +205,7 @@ the hub before anyone opens a page.
 | Variable | Default of the server | In the demo stack | Meaning |
 |---|---|---|---|
 | `HUB_MQTT_URL` | empty: no registration | `mqtt://broker:1883`, the broker of the stack | The MQTT broker at which the app registers: an `mqtt`, `mqtts`, `ws` or `wss` URL. In development the broker of this repository's stack, `mqtt://localhost:1883` |
+| `HUB_REGISTRATION` | empty: `HUB_MQTT_URL` decides | not set | `false` switches the registration off; `true` or empty leaves it to `HUB_MQTT_URL`; any other value is an error at the start |
 | `HUB_APP_URL` | `http://localhost:3000/` | `http://localhost:5600/`, with the port of `APP_PORT` | The address under which a user's browser reaches the app: an absolute `http` or `https` URL, or a path that starts with `/`, such as `/playground/`, which the hub resolves against its own address. It should end with `/`, because the icon link is relative to it. Ignored without `HUB_MQTT_URL` |
 
 With `HUB_MQTT_URL` set, an invalid value of either variable is an error at the start. The built server

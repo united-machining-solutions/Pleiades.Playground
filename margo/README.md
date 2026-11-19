@@ -87,13 +87,19 @@ Enable `docs` under *Tools* in the chat. The service's contract and source/PDF r
 ## Pleiades Hub
 
 The example app registers at the Pleiades Hub as in `compose.yaml`
-([ADR-0021](../docs/adr/0021-hub-registration.md)). The section *Pleiades Hub* has the two settings:
-*Broker of the hub* (`HUB_MQTT_URL`) is the broker of this app by default, `mqtt://broker:1883`, where the hub
-on the same device looks; empty switches the registration off. *Address of the example app for the hub*
-(`HUB_APP_URL`) is where a browser opens the app; empty is `http://localhost:<Port of the example app>/`, right
-only for a browser on the device. For a browser on another computer, set it to the name of the device and the
-port of the app, such as `http://device.example.internal:5600/`, and open *Address of the example app* to the
-network: the hub loads the app from that address, not through itself.
+([ADR-0021](../docs/adr/0021-hub-registration.md)). The section *Pleiades Hub* has three settings:
+
+- *Register at the Pleiades Hub* (`HUB_REGISTRATION`), on by default; off, the app does not register. It is a
+  switch of its own, and not an empty broker as in `.env`, because a Margo client may leave an empty setting out
+  of the environment, and then `${HUB_MQTT_URL:-…}` puts the default back.
+- *Broker of the hub* (`HUB_MQTT_URL`), the broker of this app by default, `mqtt://broker:1883`, where the hub on
+  the same device looks.
+- *Address of the example app for the hub* (`HUB_APP_URL`), where a browser opens the app. Empty, it is the
+  address of Traefik under the host name of the app, `http://<Host name of the app>:<HTTP port of Traefik>/`,
+  so it follows the host name that is set at the install anyway. HTTP and not HTTPS: the hub is served over
+  HTTP, and its iframe would not show a page whose self-signed certificate the browser has not accepted. For a
+  browser on another computer, open *Address of Traefik* to the network: the hub loads the app from that
+  address, not through itself. Set the setting when a browser reaches the app under another address.
 
 ## Check
 
