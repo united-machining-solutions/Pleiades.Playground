@@ -1,12 +1,12 @@
 import { createServerFn } from "@tanstack/react-start"
 
-import { place, remove, undo } from "./placements.ts"
+import { place, placeAdded, remove, sitesOf, undo } from "./placements.ts"
 import type { Send } from "./placements.ts"
-import { placeRequestOf, removeRequestOf, undoRequestOf } from "./placing.ts"
-import type { PlaceOutcome, RemoveOutcome, UndoOutcome } from "./placing.ts"
+import { addedRequestOf, placeRequestOf, removeRequestOf, undoRequestOf } from "./placing.ts"
+import type { AddedOutcome, PlaceOutcome, RemoveOutcome, SitesOutcome, UndoOutcome } from "./placing.ts"
 
 // The steps of a person on Home: adding a machine to a site, moving it, taking it off, and undoing
-// either. They go to the REST endpoints of the Sites API from the server of the app, never from the
+// either; and putting a machine a person added over OPC UA on a site. They go to the REST endpoints of the Sites API from the server of the app, never from the
 // browser and never from the language model: no tool of the chat writes a site or a placement.
 
 /** Where the Sites API answers, or undefined if the app has none. */
@@ -47,6 +47,20 @@ export const removePlacement = createServerFn({ method: "POST" })
   .handler(({ data }): Promise<RemoveOutcome> => {
     const base = sitesApiUrl()
     return base ? remove(data, sender(base)) : Promise.resolve({ ok: false, reason: NO_API, stale: false })
+  })
+
+/** The sites there are, for the card of an OPC UA proposal to put the machine it adds on one. */
+export const listSites = createServerFn({ method: "GET" }).handler((): Promise<SitesOutcome> => {
+  const base = sitesApiUrl()
+  return base ? sitesOf(sender(base)) : Promise.resolve({ ok: false, reason: NO_API })
+})
+
+/** Puts a machine that was just added over OPC UA on a site, unless it stands on one already. */
+export const placeAddedMachine = createServerFn({ method: "POST" })
+  .validator(addedRequestOf)
+  .handler(({ data }): Promise<AddedOutcome> => {
+    const base = sitesApiUrl()
+    return base ? placeAdded(data, sender(base)) : Promise.resolve({ ok: false, reason: NO_API })
   })
 
 /** Undoes a change from its toast, while nothing changed the machine since. */

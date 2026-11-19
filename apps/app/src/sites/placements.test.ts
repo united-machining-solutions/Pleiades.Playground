@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { placedInWords, place, remove, undo } from "./placements.ts"
+import { placeAdded, placedInWords, place, remove, sitesOf, undo } from "./placements.ts"
 import type { Send } from "./placements.ts"
 import type { PlaceRequest } from "./placing.ts"
 
@@ -317,6 +317,49 @@ test("a machine id with characters of a path is sent encoded", async () => {
   const api = sitesApi([north()])
   await place(request({ machine: "a b?c" }), api.send)
   assert.ok(api.calls.includes("PUT /placements/a%20b%3Fc"))
+})
+
+test("the sites to choose from are by name, without what a person does not choose by", async () => {
+  const api = sitesApi([south(), north()])
+  assert.deepEqual(await sitesOf(api.send), {
+    ok: true,
+    sites: [
+      { siteId: "north-plant", name: "North plant" },
+      { siteId: "south-plant", name: "South plant" },
+    ],
+  })
+})
+
+test("sites that cannot be read are a reason, not an error", async () => {
+  const refused = await sitesOf(async () => ({ status: 403, text: "" }))
+  assert.deepEqual(refused, { ok: false, reason: "The Sites API refused the change: writing needs the role sites:write." })
+  const silent = await sitesOf(async () => {
+    throw new Error("connect ECONNREFUSED")
+  })
+  assert.equal(silent.ok, false)
+  assert.match(!silent.ok ? silent.reason : "", /did not answer: connect ECONNREFUSED/)
+})
+
+test("an added machine goes on the site, in no hall and under no name", async () => {
+  const api = sitesApi([north(), south()])
+  const outcome = await placeAdded({ machine: P07, siteId: "south-plant" }, api.send)
+  assert.deepEqual(outcome, { ok: true, siteId: "south-plant", siteName: "South plant", already: false })
+  assert.deepEqual(api.placements, [{ machineId: P07, siteId: "south-plant", hall: null, displayName: null }])
+})
+
+test("an added machine that stands on a site already stays there", async () => {
+  const api = sitesApi([north(), south()], [{ machineId: P07, siteId: "north-plant", hall: "Hall 2", displayName: "Laser 7" }])
+  const outcome = await placeAdded({ machine: P07, siteId: "south-plant" }, api.send)
+  assert.deepEqual(outcome, { ok: true, siteId: "north-plant", siteName: "North plant", already: true })
+  assert.deepEqual(api.placements, [{ machineId: P07, siteId: "north-plant", hall: "Hall 2", displayName: "Laser 7" }])
+  assert.ok(!api.calls.some((call) => call.startsWith("PUT")))
+})
+
+test("an added machine on a site that is gone says so", async () => {
+  const api = sitesApi([north()])
+  const outcome = await placeAdded({ machine: P07, siteId: "south-plant" }, api.send)
+  assert.deepEqual(outcome, { ok: false, reason: "The site 'south-plant' is no longer there." })
+  assert.deepEqual(api.placements, [])
 })
 
 test("the words of the toast", () => {

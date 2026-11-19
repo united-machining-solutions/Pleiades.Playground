@@ -17,10 +17,27 @@ import {
   sameSpot,
   sentenceOf,
   siteIdOf,
+  siteStepOf,
   undoRequestOf,
+  addedRequestOf,
 } from "./placing.ts"
 
 const P07 = "taygeta-precision_TP-800_P-07"
+
+test("an added machine goes on no site, on the only one, or on one a person chooses", () => {
+  const north = { siteId: "north-plant", name: "North plant" }
+  const south = { siteId: "south-plant", name: "South plant" }
+  assert.deepEqual(siteStepOf([]), { kind: "none" })
+  assert.deepEqual(siteStepOf([north]), { kind: "one", site: north })
+  assert.deepEqual(siteStepOf([north, south]), { kind: "choose", sites: [north, south] })
+})
+
+test("an added machine is put on a site by its machine id and the site id", () => {
+  assert.deepEqual(addedRequestOf({ machine: P07, siteId: "north-plant", more: 1 }), { machine: P07, siteId: "north-plant" })
+  assert.throws(() => addedRequestOf({ machine: "a/b", siteId: "north-plant" }), /machine id/)
+  assert.throws(() => addedRequestOf({ machine: P07 }), /site id is required/)
+  assert.throws(() => addedRequestOf(undefined), /machine id is required/)
+})
 
 test("a machine id or site id is one level of a topic, as the Sites API wants it", () => {
   assert.equal(problemOfId(P07, "machine id"), undefined)

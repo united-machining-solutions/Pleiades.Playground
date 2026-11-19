@@ -2,7 +2,9 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import {
+  addedInWords,
   chosenRows,
+  doneInWords,
   inDoubt,
   machineListOf,
   mappingOf,
@@ -165,4 +167,40 @@ test("a mismatch and an unclear match are in doubt, a missing, derived or ok ele
   ]
   assert.deepEqual(inDoubt(rows).map((row) => row.path), ["a", "b"])
   assert.deepEqual(inDoubt([]), [])
+})
+
+test("the toast after adding says the site the machine went on, as Home says it", () => {
+  const proposal = { serialNumber: "A1121O0001", replaces: false }
+  const sites = { ok: true as const, sites: [{ siteId: "north-plant", name: "North plant" }] }
+  const placed = { ok: true as const, siteId: "north-plant", siteName: "North plant", already: false }
+  assert.deepEqual(addedInWords(proposal, sites, placed), {
+    title: "A1121O0001 added · North plant",
+    description: "Its values appear on Home within seconds.",
+  })
+  assert.equal(doneInWords(proposal, sites, placed), "A1121O0001 is added on North plant. Its values appear on Home within seconds.")
+})
+
+test("the toast after adding says why the machine is on no site", () => {
+  const proposal = { serialNumber: "A1121O0001", replaces: false }
+  assert.deepEqual(addedInWords(proposal, { ok: true, sites: [] }, undefined), {
+    title: "A1121O0001 added",
+    description: "There is no site yet: put it on one with Add machine on Home.",
+  })
+  assert.equal(
+    addedInWords(proposal, { ok: false, reason: "The app has no Sites API (SITES_API_URL is empty)." }, undefined).description,
+    "It is on no site: The app has no Sites API (SITES_API_URL is empty).",
+  )
+  const refused = { ok: false as const, reason: "The site 'south-plant' is no longer there." }
+  assert.equal(
+    doneInWords(proposal, { ok: true, sites: [] }, refused),
+    "A1121O0001 is added. It is on no site: The site 'south-plant' is no longer there. Put it on one with Add machine on Home.",
+  )
+  const already = { ok: true as const, siteId: "north-plant", siteName: "North plant", already: true }
+  assert.equal(doneInWords(proposal, undefined, already), "A1121O0001 is added. It stood on North plant already, and stays there.")
+})
+
+test("a registration that replaces one is not added again", () => {
+  const proposal = { serialNumber: "A1121O0001", replaces: true }
+  assert.deepEqual(addedInWords(proposal, undefined, undefined), { title: "Registration of A1121O0001 replaced", description: undefined })
+  assert.equal(doneInWords(proposal, undefined, undefined), "The registration of A1121O0001 is replaced.")
 })

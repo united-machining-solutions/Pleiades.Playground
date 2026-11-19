@@ -1,4 +1,6 @@
 import { jsonOf } from "../../chat/tool-results.ts"
+import { placedInWords } from "../../sites/placements.ts"
+import type { AddedOutcome, SitesOutcome } from "../../sites/placing.ts"
 
 // The answers of the OPC UA adapter (source/Pleiades.Playground.OpcUa.Adapter/Api/Views.cs), as a
 // chat has them in the result of a tool call. Each is checked before it is drawn: what does not
@@ -318,4 +320,38 @@ export function userStep(values: Pick<RankedEndpoints, "needsUser" | "acceptsUse
   if (!values.acceptsUser) return "none"
   if (values.needsUser && !values.user) return "required"
   return "optional"
+}
+
+/** Where Home shows an added machine, as a person reads it after the click, and what to do where it shows none. */
+function whereAdded(sites: SitesOutcome | undefined, placed: AddedOutcome | undefined): string {
+  if (placed?.ok) return placed.already ? `It stood on ${placed.siteName} already, and stays there.` : "Its values appear on Home within seconds."
+  if (placed) return `It is on no site: ${placed.reason} Put it on one with Add machine on Home.`
+  if (sites?.ok) return "There is no site yet: put it on one with Add machine on Home."
+  if (sites) return `It is on no site: ${sites.reason}`
+  return "Put it on a site with Add machine on Home."
+}
+
+/**
+ * The toast after a proposal was added: "A1121O0001 added · North plant", as Home says it of a machine it put on
+ * a site, or the machine alone and why it is on no site. A registration that replaces one says so.
+ */
+export function addedInWords(
+  proposal: Pick<Proposal, "serialNumber" | "replaces">,
+  sites: SitesOutcome | undefined,
+  placed: AddedOutcome | undefined,
+): { title: string; description: string | undefined } {
+  if (proposal.replaces) return { title: `Registration of ${proposal.serialNumber} replaced`, description: undefined }
+  const title = placed?.ok ? placedInWords(proposal.serialNumber, placed.siteName, null, false) : `${proposal.serialNumber} added`
+  return { title, description: whereAdded(sites, placed) }
+}
+
+/** What the card says once the proposal was added: where the machine went, or why it is on no site. */
+export function doneInWords(
+  proposal: Pick<Proposal, "serialNumber" | "replaces">,
+  sites: SitesOutcome | undefined,
+  placed: AddedOutcome | undefined,
+): string {
+  if (proposal.replaces) return `The registration of ${proposal.serialNumber} is replaced.`
+  if (placed?.ok && !placed.already) return `${proposal.serialNumber} is added on ${placed.siteName}. Its values appear on Home within seconds.`
+  return `${proposal.serialNumber} is added. ${whereAdded(sites, placed)}`
 }
