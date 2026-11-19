@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { levelOf, isPause, wakeQuestion } from "./wake.ts"
+import { isPause, wakeQuestion } from "./wake.ts"
 
 test("Hey Titan with a question wakes and keeps the question", () => {
   assert.deepEqual(wakeQuestion("Hey Titan, welche Maschine steht?"), { woke: true, question: "welche Maschine steht?" })
@@ -21,11 +21,6 @@ test("the name as the recognition may write it still wakes", () => {
 test("talking about Titan is no call", () => {
   assert.equal(wakeQuestion("Was kann Titan eigentlich alles?").woke, false)
   assert.equal(wakeQuestion("Welche Maschine steht?").woke, false)
-})
-
-test("silence has no level, a full wave has one", () => {
-  assert.equal(levelOf(new Float32Array(100)), 0)
-  assert.ok(levelOf(Float32Array.from({ length: 100 }, (_, index) => Math.sin(index))) > 0.5)
 })
 
 test("a growing answer is said up to its last complete sentence", async () => {

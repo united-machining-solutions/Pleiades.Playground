@@ -26,7 +26,10 @@ does now. Titan speaks German, as the demo does.
 
 1. **Listening.** The browser records while the space bar is held (`voice/voice.ts`), or cuts a piece out of
    the microphone when someone speaks (`voice/wake.ts`), and sends it to
-   `routes/(showcases)/titan.api.transcribe.ts`. Both write the recording themselves, as a WAV file of
+   `routes/(showcases)/titan.api.transcribe.ts`. Where a piece begins and ends, `voice/pieces.ts` decides:
+   speech is what rises clearly above the room, and the room is also what its quietest moments of the last
+   seconds reach, so that in a room where people talk a question ends when the voice at the microphone
+   does, and not only after the eight seconds a piece may last. Both write the recording themselves, as a WAV file of
    16 kHz (`voice/wav.ts`): the formats the browsers record in differ, and the transcription model did not
    read all of them.
 2. **"Moment."** Titan says at once that it heard: with the space bar as soon as it is let go, before the
