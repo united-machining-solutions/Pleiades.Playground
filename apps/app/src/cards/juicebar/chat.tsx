@@ -55,7 +55,7 @@ const patience = 10
 /** The pause between two reads of an order. The next read starts when the last one has ended. */
 const READ_EVERY_MS = 1000
 
-export function DrinkPicker({ drinks: listed }: { drinks: Array<Drink> }) {
+function DrinkPicker({ drinks: listed }: { drinks: Array<Drink> }) {
   const { drinks, hidden, low } = orderable(listed)
   const [pickedId, setPickedId] = useState(drinks[0]?.id)
   const [step, setStep] = useState<Step>({ at: "pick" })
@@ -124,9 +124,7 @@ export function DrinkPicker({ drinks: listed }: { drinks: Array<Drink> }) {
         <CardTitle>Pick a drink</CardTitle>
         <CardDescription>What the juice bar can mix now</CardDescription>
       </CardHeader>
-      {/* The drinks stand by the width of the card, not of the screen: a list in the narrow chat, columns
-          where the card is wide, as on a page for a screen, so that the button below stays in sight. */}
-      <CardContent className="@container/drinks flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-3">
         {hidden > 0 && (
           <Alert>
             <TriangleAlertIcon />
@@ -140,11 +138,7 @@ export function DrinkPicker({ drinks: listed }: { drinks: Array<Drink> }) {
           <FieldLegend variant="label" className="sr-only">
             Drinks
           </FieldLegend>
-          <RadioGroup
-            value={picked.id}
-            onValueChange={(value) => setPickedId(String(value))}
-            className="@2xl/drinks:grid-cols-2 @4xl/drinks:grid-cols-3 @7xl/drinks:grid-cols-4"
-          >
+          <RadioGroup value={picked.id} onValueChange={(value) => setPickedId(String(value))}>
             {drinks.map((drink) => {
               const selected = drink.id === picked.id
               const id = `${ids}-${drink.id}`
@@ -270,7 +264,7 @@ export const juicebarTools: ReadonlyArray<ChatTool> = [
     name: "juicebar_drinks_list",
     label: { running: "Reading the drinks", done: "Read the drinks", failed: "Failed to read the drinks" },
     // For the chat only: a page asks the generative UI backend alone (pages/call-part.ts), which has no
-    // juicebar_* tool. The showcase page /juice-bar draws the card on a page of its own.
+    // juicebar_* tool.
     saveAsPage: false,
     draw(content) {
       const drinks = drinksOf(content)

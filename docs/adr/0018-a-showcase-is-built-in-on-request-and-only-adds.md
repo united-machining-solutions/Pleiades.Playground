@@ -49,7 +49,9 @@ My Job?" drew it for itself, in a comment: made-up data, so no entry in the side
 
 - An image of the application alone has nothing of a showcase in it, and a stack started without the setting
   runs that image. "Where is My Job?" was the first showcase; once it showed only values of the stack, it
-  became a page of the base. The page of the juice bar for a fair, `/juice-bar`, is a showcase.
+  became a page of the base. Titan, an assistant you talk to, `/titan`, is a showcase. The page of the
+  juice bar for a fair, `/juice-bar`, was one; it was taken out again, since the drink card of the chat is
+  enough there.
 - The Margo app is always the application alone. bart takes an image reference as it stands, so no setting
   can choose the image there, and a release is base. A device that is to show a showcase runs
   `compose.yaml` with the setting, or would need a Margo app of its own, which this record does not ask for.
