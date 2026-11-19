@@ -7,6 +7,10 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: the chat adds machines and makes sites and halls. Asked for it, the language model proposes with
+  `app_placement_propose`, and the chat draws a card that asks step by step for what is missing (which machine,
+  where) and writes only when a person confirms, with the server functions and the undo of Home
+  ([ADR-0026](docs/adr/0026-the-chat-proposes-where-a-machine-stands.md)).
 - Bending machine, started with the stack: a simulator of a press brake that reports through RCI telegram files, with a
   web page, and one adapter per machine that publishes it after the binding of machines (data model 0.17.1) as
   `trumpf_5085_AE325085TB46`: identification, `State/Status`, `Notification/ActiveAlerts` with `AlertRaised` and
