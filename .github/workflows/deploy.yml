@@ -49,6 +49,15 @@ jobs:
           fi
           # The images of exactly this commit, as "Images" tagged them.
           export PLEIADES_VERSION="sha-${COMMIT:0:7}"
+          # For the hackathon the adapter of the SimpleCAM machine runs on every deployment, whatever the `.env`
+          # says: the profiles of the `.env` stay and `simplecam` is added to them. Remove this block after the
+          # hackathon. The adapter is healthy while it is connected to the broker, so a backend that does not
+          # answer does not stop the deployment.
+          profiles="$(sed -n 's/^COMPOSE_PROFILES=//p' "$DEPLOY_DIR/.env" | tail -n 1 | tr -d '\r"'"'"' ')"
+          case ",$profiles," in
+            *,simplecam,*) ;;
+            *) export COMPOSE_PROFILES="${profiles:+$profiles,}simplecam" ;;
+          esac
           compose=(docker compose --env-file "$DEPLOY_DIR/.env" "${files[@]}")
           "${compose[@]}" pull --quiet
           "${compose[@]}" up -d --no-build --wait --wait-timeout 300 --remove-orphans

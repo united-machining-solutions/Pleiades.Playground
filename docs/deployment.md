@@ -79,6 +79,17 @@ PLEIADES_VERSION=main docker compose --env-file /path/to/.env up -d --no-build -
 
 "Deploy" can also be started by hand, under Actions, for the newest commit of `main`.
 
+## The SimpleCAM adapter (hackathon)
+
+For the hackathon "Deploy" starts the adapter `simplecam-adapter-9042` on every deployment, whatever
+`COMPOSE_PROFILES` says in the `.env` of the computer: the profiles named there stay, and `simplecam` is added to
+them. Nothing has to be set for it. The adapter reads the stream of a SimpleCAM backend that runs outside of the
+stack, at `SIMPLECAM_SSE_URL` (see [`simplecam-adapter-9042`](../apps/simplecam-adapter-9042/README.md)). A
+backend that does not answer does not stop the deployment: the adapter is healthy while it is connected to the
+broker, and the machine stays in `CommunicationFault` until the backend is there. The step is in
+[`deploy.yml`](../.github/workflows/deploy.yml) and is removed after the hackathon; by hand, the adapter starts with
+`docker compose --profile simplecam up -d`.
+
 ## Enable the Ultimaker services
 
 Both `ultimaker-api` (CuraEngine, REST and MCP) and `ultimaker-telemetry` (printer to MQTT) are
