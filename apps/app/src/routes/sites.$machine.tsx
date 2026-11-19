@@ -1,19 +1,22 @@
 import { EnergyCard } from "@pleiades/cards/energy/energy-card.tsx"
 import type { EnergyShow } from "@pleiades/cards/energy/contract.ts"
 import type { MachineList } from "@pleiades/cards/machine/contract.ts"
-import { titleOf } from "@pleiades/cards/machine/in-words.ts"
-import { MachineCard } from "@pleiades/cards/machine/machine-card.tsx"
+import { labelOf, titleOf } from "@pleiades/cards/machine/in-words.ts"
+import { MachineCard, MachineCardSkeleton } from "@pleiades/cards/machine/machine-card.tsx"
 import { stateLabel } from "@pleiades/cards/machine/state.ts"
 import { StateSymbol } from "@pleiades/cards/machine/state-symbol.tsx"
 import type { MeasurementList, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
-import { MeasurementTiles } from "@pleiades/cards/measurement/measurement-tiles.tsx"
+import { MeasurementTiles, MeasurementTilesSkeleton } from "@pleiades/cards/measurement/measurement-tiles.tsx"
 import type { TileEnergy } from "@pleiades/cards/measurement/measurement-tiles.tsx"
 import type { NotificationList } from "@pleiades/cards/notification/contract.ts"
 import { NotificationCard } from "@pleiades/cards/notification/notification-card.tsx"
+import { NotificationTableSkeleton } from "@pleiades/cards/notification/notification-table.tsx"
+import { NOTIFICATIONS_PER_PAGE } from "@pleiades/cards/notification/pages.ts"
 import type { SiteList } from "@pleiades/cards/site/contract.ts"
 import type { TimeseriesShow } from "@pleiades/cards/timeseries/contract.ts"
+import { Badge } from "@pleiades/ui/components/badge"
 import { Button, buttonVariants } from "@pleiades/ui/components/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@pleiades/ui/components/card"
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import {
   Combobox,
   ComboboxContent,
@@ -25,6 +28,7 @@ import {
 } from "@pleiades/ui/components/combobox"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@pleiades/ui/components/table"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
 import { Await, Link, createFileRoute, notFound, useNavigate } from "@tanstack/react-router"
 import { SearchXIcon, ZapOffIcon } from "lucide-react"
@@ -65,6 +69,7 @@ import {
   placeWords,
   powerAndEnergyOf,
   powerRequest,
+  silentOnSite,
 } from "@/machines/sections.ts"
 import { HOURS, choicesOf, chosenHours, hoursOf, matches } from "@/machines/switcher.ts"
 import { debounce, oneAtATime } from "@/machines/pacing.ts"
@@ -110,12 +115,20 @@ export const Route = createFileRoute("/sites/$machine")({
     // The list serves the switcher, and tells a machine that is away from one that is unknown.
     const [card, list] = await Promise.all([cardOf(params.machine, hours), getMachines().catch(() => null)])
     const machines = list?.values ?? null
-    // A backend that is away comes back, and the page keeps trying. A machine the backend does not
-    // know does not: the list tells the two apart.
-    if (!card.answer.values && machines && !machines.machines.some((one) => one.machine === params.machine)) throw notFound()
-    return { ...card, list: machines, sections }
+    if (!card.answer.values) {
+      // A machine on a site that has sent nothing for a day, over a weekend say, keeps its page: it
+      // says so quietly. The list of the sites tells, as it names each placed machine without data.
+      const sites = await sections.sites
+      if (silentOnSite(sites.values, params.machine)) return { ...card, list: machines, sections, silent: true }
+      // A backend that is away comes back, and the page keeps trying. A machine the backend does not
+      // know does not: the list tells the two apart.
+      if (machines && !machines.machines.some((one) => one.machine === params.machine)) throw notFound()
+    }
+    return { ...card, list: machines, sections, silent: false }
   },
   component: Machine,
+  // The page shows its placeholders as soon as it is opened, not only after a second (the default of the router).
+  pendingMs: 0,
   pendingComponent: Loading,
   notFoundComponent: NoMachine,
 })
@@ -215,7 +228,9 @@ function Machine() {
   // into alarm shows so in the list. The broker is asked once for a topic, however many pages hear it.
   const { values: machines } = useLive(list, listLive)
   const choices = useMemo(() => (machines ? choicesOf(machines) : null), [machines])
+  // A silent machine is asked for again too: when it sends, the page fills.
   useRetry(answer.values === null)
+  if (read.silent && !page) return <Silent machine={machine} choices={choices} sites={sections.sites} />
   return (
     // The title is the machine by its model and serial number, once the backend named them; the
     // address keeps its id.
@@ -227,8 +242,44 @@ function Machine() {
       line={page ? liveness(connected, page.show.asOf) : undefined}
       actions={page && <HistoryHours hours={chosenHours(hours)} />}
     >
-      {page ? <MachineCard {...page.show} spans={page.spans} topics={false} /> : <NoAnswer error={answer.error ?? ""} />}
+      {page ? <MachineCard {...page.show} spans={page.spans} topics={false} reported={false} /> : <NoAnswer error={answer.error ?? ""} />}
       <MachineSections machine={machine} sections={sections} />
+    </Page>
+  )
+}
+
+/** What the page of a silent machine says in each of its parts. */
+const NO_DATA = "No data in the last 24 hours"
+
+/**
+ * The page of a machine on a site that published no value in the last 24 hours. It is no failure, so
+ * it says so quietly: the head with the machine and its place, the card with the state "No data", and
+ * the sections of alarms and of power with the same words. The tiles of what it measures now are left
+ * out: there is nothing now. The title is the model and serial number of the machine id, as the
+ * backend has no identification to read.
+ */
+function Silent({ machine, choices, sites }: { machine: string; choices: Array<Choice> | null; sites: Promise<Answer<SiteList>> }) {
+  const title = labelOf(machine)
+  return (
+    <Page machine={machine} title={title} choices={choices} place={<Place machine={machine} sites={sites} />}>
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle className="font-semibold group-data-[size=sm]/card:text-base">{title}</CardTitle>
+          <CardDescription>{NO_DATA}</CardDescription>
+          <CardAction>
+            <Badge variant="outline">
+              <StateSymbol state="no-data" />
+              {stateLabel["no-data"]}
+            </Badge>
+          </CardAction>
+        </CardHeader>
+      </Card>
+      <Section title="Alarms & warnings">
+        <p className="text-sm text-muted-foreground">{NO_DATA}.</p>
+      </Section>
+      <Section title="Power and energy">
+        <p className="text-sm text-muted-foreground">{NO_DATA}.</p>
+      </Section>
     </Page>
   )
 }
@@ -245,8 +296,11 @@ function Page({
   place,
   line,
   actions,
+  loading = false,
   children,
 }: {
+  /** True while the page is read: the head is grey where its title, its lines and its actions will stand. */
+  loading?: boolean
   /** The machine id, as the address names the machine. */
   machine?: string
   /** What the machine is called: its model and serial number, or its id until they are known. */
@@ -265,12 +319,22 @@ function Page({
           <div className="min-w-0">
             {/* The button that opens the list gives the heading no name of its content: it is named here. */}
             <h1 className="text-2xl font-semibold" aria-label={title}>
-              {choices && choices.length > 0 ? <MachineSwitcher machine={machine} title={title ?? machine} choices={choices} /> : title}
+              {loading ? (
+                <TitleSkeleton />
+              ) : choices && choices.length > 0 ? (
+                <MachineSwitcher machine={machine} title={title ?? machine} choices={choices} />
+              ) : (
+                title
+              )}
             </h1>
-            {place}
-            {line && <p className="text-sm text-muted-foreground">{line}</p>}
+            {loading ? <LineSkeleton width="w-32" /> : place}
+            {loading ? <LineSkeleton width="w-24" /> : line && <p className="text-sm text-muted-foreground">{line}</p>}
           </div>
-          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+          {loading ? (
+            <Skeleton aria-hidden className="h-8 w-52" />
+          ) : (
+            actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>
+          )}
         </div>
       )}
       {children}
@@ -388,19 +452,45 @@ function NoMachine() {
   )
 }
 
+/**
+ * The page while it is read: every part in its form and its size, grey where its values will stand,
+ * so nothing moves when they come. The sections below the card show the same placeholders until
+ * their answers are there.
+ */
 function Loading() {
   const { machine } = Route.useParams()
   return (
-    <Page machine={machine}>
-      <Skeleton className="h-56 w-full" />
+    <Page machine={machine} loading>
+      <MachineCardSkeleton />
+      <MeasurementTilesSkeleton />
+      <AlarmsSkeleton />
+      <PowerAndEnergySkeleton />
     </Page>
   )
 }
 
-/** Where the machine stands, under its title: nothing while the sites are read, or where they could not be. */
+/** The title while it is read, as tall as the button of the switcher. */
+function TitleSkeleton() {
+  return (
+    <span className="flex h-10.5 items-center">
+      <Skeleton aria-hidden className="h-6 w-56" />
+    </span>
+  )
+}
+
+/** A line of the head while it is read, as tall as its text. */
+function LineSkeleton({ width }: { width: string }) {
+  return (
+    <span className="flex h-5 items-center">
+      <Skeleton aria-hidden className={`h-3.5 ${width}`} />
+    </span>
+  )
+}
+
+/** Where the machine stands, under its title: grey while the sites are read, nothing where they could not be. */
 function Place({ machine, sites }: { machine: string; sites: Promise<Answer<SiteList>> }) {
   return (
-    <Await promise={sites} fallback={null}>
+    <Await promise={sites} fallback={<LineSkeleton width="w-32" />}>
       {(answer) => {
         const words = placeWords(placeOf(answer.values, machine))
         return words && <p className="text-sm text-muted-foreground">{words}</p>
@@ -475,6 +565,84 @@ function Section({ title, reading = false, children }: { title: string; reading?
 }
 
 /**
+ * The alarms while they are read: the section with its title, the choice of the level and the counts
+ * grey, and a page of the table. How many rows the page will have is not known yet: it takes the room
+ * of a full one, which a machine with alarms over the hours mostly has.
+ */
+function AlarmsSkeleton() {
+  return (
+    <Section title="Alarms & warnings">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <Skeleton aria-hidden className="h-8 w-42" />
+          <Skeleton aria-hidden className="h-3 w-40" />
+        </div>
+        <NotificationTableSkeleton rows={NOTIFICATIONS_PER_PAGE} />
+        <Skeleton aria-hidden className="h-9 w-full" />
+      </div>
+    </Section>
+  )
+}
+
+/** Power and energy while they are read: the section with its title, the graph and the table of the energy grey. */
+function PowerAndEnergySkeleton() {
+  return (
+    <Section title="Power and energy">
+      <div className="flex flex-col gap-6" aria-hidden>
+        <div className="flex flex-col gap-1">
+          <span className="flex h-4 items-center">
+            <Skeleton className="h-3 w-5" />
+          </span>
+          <Skeleton className="h-56 w-full" />
+        </div>
+        {/* The table of the energy, as wide or as narrow as it will be: narrow, its figures stand under the machine. */}
+        <div className="@container/energy">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-full">
+                  <Skeleton className="h-3.5 w-16" />
+                </TableHead>
+                {["w-20", "w-12", "w-12"].map((width, column) => (
+                  <TableHead key={column} className="hidden @lg/energy:table-cell">
+                    <Skeleton className={`ml-auto h-3.5 ${width}`} />
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow className="hover:bg-transparent">
+                <TableCell>
+                  <span className="flex h-5 items-center">
+                    <Skeleton className="h-3.5 w-56 max-w-full" />
+                  </span>
+                  <span className="flex h-9 items-start justify-between gap-4 @lg/energy:hidden">
+                    <span className="flex h-5 items-center">
+                      <Skeleton className="h-3.5 w-28" />
+                    </span>
+                    <span className="flex h-full flex-col items-end justify-center gap-1.5">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-3 w-24" />
+                    </span>
+                  </span>
+                </TableCell>
+                {[0, 1, 2].map((column) => (
+                  <TableCell key={column} className="hidden @lg/energy:table-cell">
+                    <span className="flex h-5 items-center justify-end">
+                      <Skeleton className="h-3.5 w-10" />
+                    </span>
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+/**
  * The sections below the card, in the order of the page of a machine: what it measures now, its alarms
  * and warnings, and its power and energy over time. When the hours change, the sections are drawn with
  * the new answers only once they are there (`useDeferredValue`): until then each shows what it had,
@@ -485,13 +653,13 @@ function MachineSections({ machine, sections }: { machine: string; sections: Sec
   const reading = shown !== sections
   return (
     <>
-      <Await promise={shown.measurements} fallback={<Skeleton className="h-64 w-full" />}>
+      <Await promise={shown.measurements} fallback={<MeasurementTilesSkeleton />}>
         {([current, series]) => <LiveValues machine={machine} current={current} series={series} power={shown.power} />}
       </Await>
-      <Await promise={shown.notifications} fallback={<Skeleton className="h-48 w-full" />}>
+      <Await promise={shown.notifications} fallback={<AlarmsSkeleton />}>
         {(loaded) => <Alarms machine={machine} hours={shown.hours} loaded={loaded} reading={reading} />}
       </Await>
-      <Await promise={shown.power} fallback={<Skeleton className="h-96 w-full" />}>
+      <Await promise={shown.power} fallback={<PowerAndEnergySkeleton />}>
         {(power) => <PowerAndEnergy machine={machine} hours={shown.hours} energy={power.energy} timeseries={power.timeseries} reading={reading} />}
       </Await>
     </>
@@ -536,8 +704,12 @@ function LiveValues({
   const { values: page } = useLive(loaded, live)
   const energy = useTileEnergy(power, machine)
   const measured = measurementsOf(page.current, machine)
+  // The tiles stand on the page without a card around them; the name of the section is for a reader of the screen.
   return (
-    <Section title="Now">
+    <section aria-labelledby="machine-now">
+      <h2 id="machine-now" className="sr-only">
+        Now
+      </h2>
       {now.values === null && graphs.values === null ? (
         <NoAnswer error={now.error ?? graphs.error ?? ""} />
       ) : hasValues(measured) ? (
@@ -550,7 +722,7 @@ function LiveValues({
           </EmptyHeader>
         </Empty>
       )}
-    </Section>
+    </section>
   )
 }
 

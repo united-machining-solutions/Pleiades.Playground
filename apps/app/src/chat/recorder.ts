@@ -20,10 +20,18 @@ const STOP_WAIT_MS = 10_000
 /** What was recorded: base64 without the `data:` before it, empty when nothing came, and its format. */
 export type Recording = { base64: string; mimeType: string }
 
+/**
+ * The recorder hands over what it has every quarter of a second, so that what was said so far can be
+ * written down while it records. The pieces from the first one on make one file.
+ */
+const PIECE_MS = 250
+
 /** A recording that runs. */
 export type Recorder = {
   /** The stream of the microphone, to read its level from. */
   stream: MediaStream
+  /** What was recorded so far, as a file of its own, without ending the recording. */
+  sofar: () => Promise<Recording>
   /** Ends the recording, lets go of the microphone and gives what was recorded. */
   stop: () => Promise<Recording>
   /** Ends the recording and lets go of the microphone; nothing is kept. */
@@ -47,7 +55,7 @@ export async function record(): Promise<Recorder> {
   try {
     const asked = MediaRecorder.isTypeSupported(RECORDING_TYPE) ? RECORDING_TYPE : undefined
     recorder = new MediaRecorder(stream, asked ? { mimeType: asked } : undefined)
-    recorder.start()
+    recorder.start(PIECE_MS)
   } catch (problem) {
     release()
     throw problem
@@ -60,6 +68,7 @@ export async function record(): Promise<Recorder> {
   }
   return {
     stream,
+    sofar: async () => ({ base64: await base64Of(new Blob(chunks, { type: mimeType })), mimeType }),
     stop: () =>
       new Promise<Recording>((resolve, reject) => {
         const done = () => {

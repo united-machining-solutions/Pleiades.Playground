@@ -31,11 +31,21 @@ export async function dictationAdapter() {
  * hold up the dictation either.
  */
 export async function dictationPrompt(): Promise<string | undefined> {
+  // While one speaks, what was said so far is written down every two seconds: the names are asked for once
+  // a minute, not each time.
+  if (kept && Date.now() - kept.at < NAMES_KEPT_MS) return kept.prompt
   const late = new Promise<undefined>((resolve) => setTimeout(resolve, 2000))
   const list = await Promise.race([listMachines(), late])
   // What a person says of a machine is its serial number or its model; the machine id carries both, and is
   // what the tools take.
   const names = list?.values?.machines.flatMap((entry) => [entry.identity.serialNumber, entry.identity.model, entry.machine]) ?? []
   const spoken = [...new Set(names.filter((name): name is string => Boolean(name)))]
-  return spoken.length > 0 ? spoken.join(", ") : undefined
+  const prompt = spoken.length > 0 ? spoken.join(", ") : undefined
+  // A backend that did not answer is asked again the next time.
+  if (prompt !== undefined) kept = { at: Date.now(), prompt }
+  return prompt
 }
+
+/** How long the names of the machines are kept for the prompt. */
+const NAMES_KEPT_MS = 60_000
+let kept: { at: number; prompt: string } | undefined

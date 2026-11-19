@@ -14,6 +14,12 @@ All notable changes are documented here. The format follows
   below the map in one column, the list of orders shows those in circulation by default. The machine card of
   the generative UI backend has `identity.deviceClass` (optional). The showcase "What if" (only with
   `APP_SHOWCASES`) lays made-up orders WI-… across the clusters, on by default, switched on the page.
+- Bending machine, started with the stack: a simulator of a press brake that reports through RCI telegram files, with a
+  web page, and one adapter per machine that publishes it after the binding of machines (data model 0.17.1) as
+  `trumpf_5085_AE325085TB46`: identification, `State/Status`, `Notification/ActiveAlerts` with `AlertRaised` and
+  `AlertCleared`, operator messages as `Notification.NotificationEvent`, and program, order and parts as signals of
+  the manufacturer below `oem/`. The automatic processing reports running and idle around each position and ends it
+  with `ProcessingStopped`, after which the adapter shows no program.
 - Margo app: the example app registers at the Pleiades Hub, as in `compose.yaml`, with the section
   *Pleiades Hub* of the settings. *Register at the Pleiades Hub* (`HUB_REGISTRATION`, on by default) switches
   the registration off, since a Margo client may leave an empty broker out and the default would come back;
@@ -426,11 +432,25 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Machine page: while it opens, every part shows a grey placeholder of its form and size, so nothing moves when
+  the values come. The tiles of now stand without a card around them, and the machine card leaves out the line
+  that only repeats what the control reports. A machine on a site that sent nothing for 24 hours shows
+  "No data in the last 24 hours" instead of an error.
+- Notification card: the alerts stand as a table, in the chat too: level, message with its code, raised,
+  cleared and duration; where the card is narrow, the last two stand under the message. The sums at the foot
+  are left out; the note on alerts not listed stands under the table, and the foot names when the card was
+  read and its topic, as the other cards do.
 - Example app: the microphone of the chat field can be held. Hold it while you speak and let go, as on a
   tablet, and what was said goes into the field; a tap starts and ends the recording as before. The recording
   starts as the finger goes down, so the first word is heard. While it records, the second line of the field
   shows bars that move with the voice, the time and what ends it, where the finger does not cover it. The
   recorder is the app's own now, so that the bars read the stream that records.
+- Example app: what dictation heard so far stands in the chat field while one speaks, dimmed, and grows
+  about every two seconds; when the recording ends, all of it is written down once more and goes into the
+  field. The recording so far is written down again and again, one request at a time, as the gateway has no
+  model that writes while one speaks. A draft still on its way at the end is called off at the gateway too.
+  Drafts stop after 30 s of recording, and the app writes one draft at a time for all its fields, so drafts
+  never take more than one of the two requests a key has at the gateway.
 - Example app: Live values with all machines shows only the graphs of a value some machine published, and
   next to the title of a graph at most one value of now, where a single machine measures it; more stand
   only as lines. Where machines are there and none published such a value, the page says so. With one machine
@@ -440,7 +460,7 @@ All notable changes are documented here. The format follows
   the first question asked in the panel, the field of the new chat keeps the cursor, so the next question
   follows without a click. In the URL the list is `?chat=all` now, and `?chat=new` is the new chat.
 - Notification card: all notifications or those of one level, errors or warnings, ten a page, those that stand
-  first, with the pagination of the energy card; the counts at the head and the sums at the foot follow the level.
+  first, with the pagination of the energy card; the counts at the head follow the level.
 - Time series and energy card: power in kilowatts with an area under its line, a taller graph, and times on full
   hours and quarter hours; the energy table has columns for the meter, kWh, Avg kW and Peak kW. The machine card
   writes the times under its band. This holds in the chat as well, which draws the same cards.
