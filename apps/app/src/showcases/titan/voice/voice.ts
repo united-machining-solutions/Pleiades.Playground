@@ -287,6 +287,8 @@ let stopRecording: (() => void) | undefined
 /** The key was let go: also before the microphone was ready, for example while the browser asked for it. */
 let stopWanted = false
 
+/** After the key is let go the recording goes on this long: people let go as they finish the last word. */
+const TAIL_MS = 250
 /** A recording shorter than this is a tap of the key, not a question: it is not sent. */
 const SHORTEST_RECORDING_MS = 400
 /** The longest recording: a question, not a speech. It ends by itself then. */
@@ -298,9 +300,16 @@ async function openMicrophone(): Promise<MediaStream> {
   return microphone
 }
 
-/** Records the microphone until `stopRecording` is called, and resolves with the samples at `RECORDING_RATE`. */
-async function record(stream: MediaStream): Promise<Float32Array> {
+/**
+ * Records the microphone until `stopRecording` is called, and resolves with the samples and how many of
+ * them make a second. That is `RECORDING_RATE` where the browser gives what was asked for, and what it
+ * really recorded at where it does not: the file then says the truth.
+ */
+async function record(stream: MediaStream): Promise<{ samples: Float32Array; rate: number }> {
+  // A recording that still runs, from a key pressed again before its microphone was ready, ends here.
+  stopRecording?.()
   const context = new AudioContext({ sampleRate: RECORDING_RATE })
+  const rate = context.sampleRate
   const blocks: Array<Float32Array> = []
   let length = 0
   try {
@@ -313,18 +322,21 @@ async function record(stream: MediaStream): Promise<Float32Array> {
         const block = new Float32Array(event.inputBuffer.getChannelData(0))
         blocks.push(block)
         length += block.length
-        if ((length / RECORDING_RATE) * 1000 >= LONGEST_RECORDING_MS) resolve()
+        if ((length / rate) * 1000 >= LONGEST_RECORDING_MS) resolve()
       }
     })
     source.connect(processor)
     // It runs only when it is connected to an output; it writes silence there.
     processor.connect(context.destination)
-    if (context.state === "suspended") await context.resume()
-    if (stopWanted) stopRecording?.()
+    const mine = stopRecording
+    // A context that does not start, behind another tab for example, is not waited for once the key is up.
+    if (context.state === "suspended") await Promise.race([context.resume(), stopped])
+    if (stopWanted) mine?.()
     await stopped
+    if (length > 0) await new Promise((resolve) => setTimeout(resolve, TAIL_MS))
     processor.onaudioprocess = null
+    if (stopRecording === mine) stopRecording = undefined
   } finally {
-    stopRecording = undefined
     void context.close()
   }
   const samples = new Float32Array(length)
@@ -333,7 +345,7 @@ async function record(stream: MediaStream): Promise<Float32Array> {
     samples.set(block, at)
     at += block.length
   }
-  return samples
+  return { samples, rate }
 }
 
 /**
@@ -341,7 +353,7 @@ async function record(stream: MediaStream): Promise<Float32Array> {
  * nothing was. Rejects with a sentence to show, for example without a microphone.
  */
 export async function listen(): Promise<string> {
-  if (!canListen()) throw new Error("Dieser Browser kann nicht aufnehmen. Nimm Chrome, Edge oder Firefox.")
+  if (!canListen()) throw new Error("Dieser Browser kann nicht aufnehmen. Nimm Chrome oder Edge.")
   stopWanted = false
   stopSpeaking()
   let stream: MediaStream
@@ -352,20 +364,21 @@ export async function listen(): Promise<string> {
   }
   setState("listening")
   let samples: Float32Array
+  let rate: number
   try {
-    samples = await record(stream)
+    ;({ samples, rate } = await record(stream))
   } catch (error) {
     setState(thinking ? "thinking" : "idle")
     throw new Error(microphoneError(error))
   }
-  if ((samples.length / RECORDING_RATE) * 1000 < SHORTEST_RECORDING_MS) {
+  if ((samples.length / rate) * 1000 < SHORTEST_RECORDING_MS + TAIL_MS) {
     setState(thinking ? "thinking" : "idle")
     return ""
   }
   // Recognising takes a second or two: the orb thinks meanwhile.
   setState("thinking")
   try {
-    return await transcribe(wavOf(samples, RECORDING_RATE))
+    return await transcribe(wavOf(samples, rate))
   } catch (error) {
     throw new Error(`Die Spracherkennung ist ausgefallen: ${error instanceof Error ? error.message : String(error)}`)
   } finally {

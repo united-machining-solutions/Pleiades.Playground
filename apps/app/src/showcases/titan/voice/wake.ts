@@ -114,6 +114,7 @@ export function useWakeWord(options: WakeOptions) {
     /** The level of the noise of the room. */
     let noise = SPEECH_LEVEL / NOISE_FACTOR
     let awakeUntil = 0
+    let rate = RATE
 
     /** The pieces being recognised now, and whether one is being said: together, whether someone is asking. */
     let recognising = 0
@@ -129,7 +130,7 @@ export function useWakeWord(options: WakeOptions) {
       recognising++
       tellBusy()
       try {
-        const text = await transcribe(wavOf(samples))
+        const text = await transcribe(wavOf(samples, rate))
         if (closed || !text) return
         latest.current.onHeard?.(text)
         if (Date.now() < awakeUntil) {
@@ -162,7 +163,7 @@ export function useWakeWord(options: WakeOptions) {
       // The noise of the room, followed slowly while nobody speaks: speech is clearly louder than it.
       const speech = level > Math.max(SPEECH_LEVEL, noise * NOISE_FACTOR)
       if (!speech && !piece) noise = noise * 0.97 + level * 0.03
-      const blockMs = (block.length / RATE) * 1000
+      const blockMs = (block.length / rate) * 1000
       if (!piece) {
         before.push(block)
         while (before.length * blockMs > BEFORE_MS) before.shift()
@@ -195,6 +196,8 @@ export function useWakeWord(options: WakeOptions) {
         stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } })
         if (closed) return stream.getTracks().forEach((track) => track.stop())
         context = new AudioContext({ sampleRate: RATE })
+        // What the browser really records at, where it does not give what was asked for.
+        rate = context.sampleRate
         const source = context.createMediaStreamSource(stream)
         // A ScriptProcessor is old but needs no module file, and a block of 128 ms is fine here.
         const processor = context.createScriptProcessor(BLOCK, 1, 1)
