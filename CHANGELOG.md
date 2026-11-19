@@ -449,10 +449,10 @@ All notable changes are documented here. The format follows
 
 - Home: "Add new machine" adds a machine that is not there yet, said by its manufacturer, model and serial
   number, its id formed by ADR-0015; an id that sends already is assigned instead, one on a site moved.
-  "Review and add" assigns the machines that sent data in the last 24
-  hours from a list, searched by name, manufacturer, state, id and last data, seven a page, several at once to
-  one site and hall. Sites and halls are made while typing, "Add site" and "Add hall" make them alone, and both
-  dialogs start at the place used last.
+  "Review and add" assigns the machines that sent data in the last 24 hours from a list, searched by name,
+  manufacturer, state, id and last data, seven a page, several at once to one site and hall. Sites and halls
+  are made while typing, "Add site" and "Add hall" make them alone, and both dialogs start at the place used
+  last.
 - Home and the machine card in the chat: the whole row of a machine leads to its page; its buttons stay clicks
   of their own, and the keyboard meets one link a row.
 - Example app: "Where is My Job?" is a showcase, only in a build with `APP_SHOWCASES`: at `/where-is-my-job`
