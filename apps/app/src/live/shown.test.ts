@@ -10,12 +10,12 @@ const P04 = "alcyone-machines_AX-400_P-04"
 const M02 = "merope-microtec_MM-120_M-02"
 
 /** A machine as the backend lists it: every quantity, with null where the machine never published it. */
-function machine(id: string, measured: Partial<Record<Quantity, number | boolean>>): MachineMeasurements {
+function machine(id: string, measured: Partial<Record<Quantity, number | boolean>>, silent = false): MachineMeasurements {
   return {
     machine: id,
     measurements: QUANTITIES.map((quantity) => {
       const value = measured[quantity] ?? null
-      return { quantity, value, unit: null, at: value === null ? null : "2026-11-16T09:29:58.000Z", stale: value === null, topic: `machines/${id}/${quantity}` }
+      return { quantity, value, unit: null, at: value === null ? null : "2026-11-16T09:29:58.000Z", stale: silent || value === null, topic: `machines/${id}/${quantity}` }
     }),
   }
 }
@@ -71,4 +71,29 @@ test("with one machine chosen its values stand next to every title, as before, a
   )
   // A machine of an old link that is no longer there shows none.
   assert.deepEqual(nowNextToTitle(current, [], "activePower", "gone"), [])
+})
+
+test("a machine that went silent does not count next to one that measures now, and stands alone where it is the only one", () => {
+  const silent = machine(P04, { activePower: 3010 }, true)
+  const measuring = machine(M02, { activePower: 1200 })
+  // One measures now, one has an old value: the one of now stands there.
+  assert.deepEqual(
+    nowNextToTitle([silent, measuring], [P04, M02], "activePower", undefined).map((one) => one.machine),
+    [M02],
+  )
+  // None measures now and one has an old value: it stands there, and the graph marks it as not current.
+  assert.deepEqual(
+    nowNextToTitle([silent, machine(M02, {})], [P04, M02], "activePower", undefined).map((one) => one.machine),
+    [P04],
+  )
+  // Two old values and none of now: nothing.
+  assert.deepEqual(nowNextToTitle([silent, machine(M02, { activePower: 1 }, true)], [P04, M02], "activePower", undefined), [])
+})
+
+test("a machine the broker just named, with no measurement yet, counts for nothing", () => {
+  const justNamed: MachineMeasurements = { machine: M02, measurements: [] }
+  assert.deepEqual(
+    nowNextToTitle([machine(P04, { activePower: 3010 }), justNamed], [P04, M02], "activePower", undefined).map((one) => one.machine),
+    [P04],
+  )
 })

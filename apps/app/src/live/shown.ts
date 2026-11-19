@@ -1,4 +1,4 @@
-import type { MachineMeasurements, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
+import type { MachineMeasurements, MeasurementSeries, Quantity } from "@pleiades/cards/measurement/contract.ts"
 
 // What the page Live values shows of what it has: which graphs, and which value of now next to the
 // title of a graph. With all machines the page would otherwise be full of graphs no machine fills and of
@@ -16,22 +16,28 @@ export function graphsOf(quantities: ReadonlyArray<Graph>, chosen: string | unde
 
 /**
  * The values of now that stand next to the title of a graph. With one machine chosen, that machine's, as
- * the page always had it. With all machines, at most one: where a single machine has a value of the
- * quantity it stands there, and where more have one, the lines speak alone.
+ * the page always had it. With all machines, at most one: where a single machine measures the quantity
+ * now, its value stands there, and where more do, the lines speak alone. Where none measures it now and a
+ * single machine has an older value, that one stands there, marked as not current.
  *
  * The backend lists every quantity for every machine, with the value null where the machine never
- * published it: a machine counts only where its value is one.
+ * published it, and keeps the last value of a machine that went silent as `stale`: a machine counts only
+ * where its value is one.
  */
 export function nowNextToTitle(
   current: ReadonlyArray<MachineMeasurements>,
   shown: ReadonlyArray<string>,
-  quantity: string,
+  quantity: Quantity,
   chosen: string | undefined,
 ): Array<MachineMeasurements> {
   const ofShown = current.filter((measured) => shown.includes(measured.machine))
   if (chosen !== undefined) return ofShown
-  const measuring = ofShown.filter((measured) =>
-    measured.measurements.some((measurement) => measurement.quantity === quantity && measurement.value !== null),
-  )
-  return measuring.length === 1 ? measuring : []
+  const having = (live: boolean) =>
+    ofShown.filter((measured) =>
+      measured.measurements.some((one) => one.quantity === quantity && one.value !== null && (!live || !one.stale)),
+    )
+  const now = having(true)
+  if (now.length > 0) return now.length === 1 ? now : []
+  const ever = having(false)
+  return ever.length === 1 ? ever : []
 }
