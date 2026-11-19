@@ -83,12 +83,19 @@ export function instructionsOf(hall: string | undefined, timeZone: string | unde
  * Whether a sentence is about the answering and not the answer: "Die Frage lässt sich ohne Tool
  * beantworten." A model that is asked not to think first sometimes begins with such a sentence, whatever
  * its instructions say, and Titan reads every word aloud.
+ *
+ * Only what speaks of the answering itself counts: that no tool or lookup is needed, that the question is
+ * easy or the list is enough. A sentence that merely holds the word "Tool" or "Frage" is an answer, "P-04
+ * steht wegen Tool-Bruch" and "Diese Frage kann ich aus den Daten nicht beantworten" among them: losing
+ * one of those is worse than reading a sentence too many.
  */
 export function isPreamble(sentence: string): boolean {
   return (
-    /\btools?\b|\babfragen?\b|the hall now|\bschon vor mir\b/i.test(sentence) ||
-    /\bfrage\b.{0,40}\b(beantwort\w*|einfach|betrifft)/i.test(sentence) ||
-    /\b(liste|übersicht|anweisung\w*)\b.{0,30}\b(reicht|zeigt die stände|beantwort\w*|steht)/i.test(sentence)
+    /\b(keine?|ohne)\s+(tool|abfrage)\b/i.test(sentence) ||
+    /the hall now|\bschon vor mir\b/i.test(sentence) ||
+    /^\s*(die|deine|diese)\s+(frage|antwort)\b.{0,60}\b(aus der liste|in der liste|einfach)\b/i.test(sentence) ||
+    /^\s*ich schaue nicht nach\b/i.test(sentence) ||
+    /\bliste\b.{0,20}\b(reicht|zeigt die stände)/i.test(sentence)
   )
 }
 

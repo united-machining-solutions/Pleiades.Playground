@@ -42,7 +42,9 @@ const HALL_WITHIN_MS = 1_500
 async function hallNow(timeZone: string | undefined): Promise<string | undefined> {
   const late = new Promise<undefined>((resolve) => setTimeout(resolve, HALL_WITHIN_MS))
   const read = ask(async (backend) => {
-    const result = await backend.callTool("genui_machine_list", timeZone ? { timeZone } : {})
+    let result = await backend.callTool("genui_machine_list", timeZone ? { timeZone } : {})
+    // A time zone the backend does not know is no reason to do without the hall: then in its own times.
+    if (result.isError && timeZone) result = await backend.callTool("genui_machine_list", {})
     return result.isError ? undefined : textOf(result)
   })
   const words = (await Promise.race([read, late]))?.values

@@ -45,6 +45,8 @@ test("a sentence about the answering is told from the answer", () => {
     "Die Frage ist einfach, und ich habe alle Werte schon vor mir.",
     "Keine Abfrage nötig.",
     'Die Frage ist aus "The hall now" beantwortbar.',
+    "Die Liste zeigt die Stände zum Zeitpunkt 00:48 UTC.",
+    "Ich schaue nicht nach, die Liste von eben reicht.",
   ]) {
     assert.equal(isPreamble(sentence), true, sentence)
   }
@@ -53,6 +55,14 @@ test("a sentence about the answering is told from the answer", () => {
     "Das kann ich aus den Daten nicht beantworten.",
     "Ich schaue mir den Verlauf von P-04 an.",
     "Drei Maschinen stehen ohne hinterlegten Grund.",
+    // Sentences with the words of a sentence about the answering that are answers all the same.
+    "P-04 steht wegen Tool-Bruch.",
+    "P-04 stopped because of a tool breakage.",
+    "Empfehlung: Wechsle das Tool an P-04.",
+    "Die Frage nach den Kosten kann ich aus den Daten nicht beantworten.",
+    "Diese Frage kann ich nicht beantworten.",
+    "Ganz oben auf der Liste steht P-04 mit einem Spindelfehler.",
+    "Laut Liste steht P-04 seit zwei Stunden.",
   ]) {
     assert.equal(isPreamble(sentence), false, sentence)
   }
@@ -74,6 +84,8 @@ test("the sentences about the answering at the beginning of a round are not pass
   assert.equal(passedOn(["P-04 steht, weil ", "der Antrieb ausgefallen ist. Ohne Tool wäre das nicht gegangen."]), "P-04 steht, weil der Antrieb ausgefallen ist. Ohne Tool wäre das nicht gegangen.")
   // A round that is one sentence without a mark, as before a tool call, is passed on when it ends.
   assert.equal(passedOn(["Ich schaue mir den Verlauf an"]), "Ich schaue mir den Verlauf an")
+  // An answer of one sentence that names a tool of the machine is an answer.
+  assert.equal(passedOn(["P-07 wartet auf einen Tool-Wechsel"]), "P-07 wartet auf einen Tool-Wechsel")
   // A round that is nothing but such a sentence says nothing.
   assert.equal(passedOn(["Dafür brauche ich kein Tool"]), "")
 })
