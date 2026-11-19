@@ -53,6 +53,23 @@ x-cutting-adapter: &cutting-adapter
   <<: *service
   image: ghcr.io/united-machining-solutions/pleiades.playground.cutting.adapter:${PLEIADES_VERSION:-dev}
 
+x-bend-simulator: &bend-simulator
+  <<: *service
+  image: ghcr.io/united-machining-solutions/pleiades.playground.bend.simulator:${PLEIADES_VERSION:-dev}
+
+# An adapter waits for the stores, so that its first values are not lost.
+x-bend-adapter-depends: &bend-adapter-depends
+  broker:
+    condition: service_healthy
+  timeseries-persistence:
+    condition: service_healthy
+  events-persistence:
+    condition: service_healthy
+
+x-bend-adapter: &bend-adapter
+  <<: *service
+  image: ghcr.io/united-machining-solutions/pleiades.playground.bend.adapter:${PLEIADES_VERSION:-dev}
+
 services:
   # Read-only printer observations, independent of the slicer and printer pairing.
   ultimaker-telemetry:
@@ -540,6 +557,48 @@ services:
     volumes:
       - cutting-punch-exchange:/exchange
 
+  # Bending simulator: one press brake, reporting through RCI telegram files (RCIMaschToServ<n>.xml) in a volume of
+  # its own. Its adapter (below) mounts the same volume at /exchange and takes serial number, manufacturer and model
+  # from here (YAML anchors): the simulator only shows them, the telegrams do not carry them. Simulator and adapter
+  # start with the stack.
+  bending-press:
+    <<: *bend-simulator
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Bend.Simulator/Dockerfile
+    ports:
+      - "${BENDING_PRESS_PORT:-5614}:8080"
+    environment:
+      Config__SerialNumber: &bending-press-serial AE325085TB46
+      Config__Manufacturer: &bending-press-manufacturer TRUMPF
+      Config__ManufacturerUri: &bending-press-manufacturer-uri https://www.trumpf.com
+      Config__Model: &bending-press-model 5085
+      Config__ExchangeDirectorySource: bending-press-exchange
+    volumes:
+      - bending-press-exchange:/exchange
+      - bending-press-data:/data
+
+  # Bending adapter: one per machine, the host side of the files. It mounts the volume of its machine, read only,
+  # and publishes the binding of machines below machines/trumpf_5085_AE325085TB46/: <manufacturer>_<model>_<serial
+  # number>, the first part the domain of Config__ManufacturerUri.
+  bending-adapter-press:
+    <<: *bend-adapter
+    build:
+      <<: *build
+      dockerfile: Pleiades.Playground.Bend.Adapter/Dockerfile
+    depends_on:
+      <<: *bend-adapter-depends
+      bending-press:
+        condition: service_started
+    environment:
+      Config__SerialNumber: *bending-press-serial
+      Config__Manufacturer: *bending-press-manufacturer
+      Config__ManufacturerUri: *bending-press-manufacturer-uri
+      Config__Model: *bending-press-model
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: bend-adapter-AE325085TB46
+    volumes:
+      - bending-press-exchange:/exchange:ro
   # OPC UA: machines that speak OPC UA, added in the chat.
   #
   #   opc-simulator ──OPC UA──▶ opcua-adapter ──MQTT──▶ broker
@@ -598,5 +657,7 @@ volumes:
   cutting-tube-data:
   cutting-punch-exchange:
   cutting-punch-data:
+  bending-press-exchange:
+  bending-press-data:
   opcua_adapter_data:
   opc_simulator_pki:

@@ -8,6 +8,8 @@ export type Told = {
   /** What is the matter, and the quieter line below it. */
   message: string
   detail: string
+  /** The quieter line only says what the control itself reports, because nothing else explains the state. */
+  reported: boolean
   since: string | null
   /** The state began before the values that were read: "since" is only the earliest time known. */
   atLeast: boolean
@@ -23,6 +25,7 @@ export function tell(machine: Machine, state: State, time: (instant: string) => 
       return {
         message: error?.title ?? "Error",
         detail: `Error ${error?.notificationId ?? ""}`.trim(),
+        reported: false,
         since: error?.raisedAt ?? null,
         atLeast: false,
       }
@@ -31,6 +34,7 @@ export function tell(machine: Machine, state: State, time: (instant: string) => 
       return {
         message: warning?.title ?? "No alarm, no reason recorded",
         detail: warning ? `Warning ${warning.notificationId}` : `${itemState.value ?? "No state"}, as the control reports`,
+        reported: !warning,
         since: itemState.since,
         atLeast: itemState.sinceIsLowerBound,
       }
@@ -44,16 +48,18 @@ export function tell(machine: Machine, state: State, time: (instant: string) => 
         return {
           message: "No data from the adapter",
           detail: `The adapter says ${connection.value}. ${lastKnown}`,
+          reported: false,
           since: connection.since,
           atLeast: connection.sinceIsLowerBound,
         }
       }
-      return { message: "No data from the adapter", detail: lastKnown, since: machine.lastValueAt, atLeast: false }
+      return { message: "No data from the adapter", detail: lastKnown, reported: false, since: machine.lastValueAt, atLeast: false }
     }
     case "setup":
       return {
         message: "Setup mode",
         detail: "Operation mode, as the control reports",
+        reported: true,
         since: operationMode.since,
         atLeast: operationMode.sinceIsLowerBound,
       }
@@ -61,6 +67,7 @@ export function tell(machine: Machine, state: State, time: (instant: string) => 
       return {
         message: program.value ?? "No work master",
         detail: warning ? `Warning: ${warning.title}` : "",
+        reported: false,
         since: itemState.since,
         atLeast: itemState.sinceIsLowerBound,
       }

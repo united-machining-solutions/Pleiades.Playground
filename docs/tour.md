@@ -25,7 +25,7 @@ docker compose up -d --build --wait
 
 The command returns when the stack is ready, that is when every container reports healthy: the broker, the
 database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app, one
-simulator per machine, three cutting machines, each a simulator with its adapter, the OPC UA adapter with a
+simulator per machine, three cutting machines, each a simulator with its adapter, a bending machine with its adapter, the OPC UA adapter with a
 simulated OPC UA machine. To see the demo without building it, start it from the published images, see
 [Start](../README.md#start).
 
@@ -65,6 +65,7 @@ timeseries-persistence   Up 3 minutes (healthy)
 | <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
 | <http://localhost:5611/>, `:5612`, `:5613` | The web pages of the three cutting machines, a 2D laser, a tube laser and a punching machine: their plan, their alarms and every telegram. They answer on the network too, like the web UI of the OPC UA simulator. |
+| <http://localhost:5614/> | The web page of the bending machine, a press brake: its plan, the automatic processing and every RCI telegram. It answers on the network too. |
 | `localhost:1883` | The MQTT broker the simulators and adapters publish to. |
 | <http://localhost:5560/machines> | The OPC UA adapter: the machines added over OPC UA. It answers on this computer only. |
 | <http://localhost:8090/> | The web UI of the simulated OPC UA machine, A1121O0001. |
@@ -196,33 +197,41 @@ the choice is in the address, `?hours=8`, and stays when you switch to another m
 keeps its length and moves on with the clock. Under the title it says where the machine stands, its site and
 hall from the Sites API, or "On no site".
 
-![The page of P-04, with the breadcrumb Home › alcyone-machines_AX-400_P-04 and Home active in the sidebar.
+![The page of P-04, with the breadcrumb Home › alcyone-machines_AX-4… and Home active in the sidebar.
 The title AX-400 P-04 has an arrow for the switcher, and at the right stand the buttons Last 1 h, Last 8 h and
-Last 24 h, with Last 8 h chosen. Under the title it says "South plant · Hall 2" and "live · now 21:55". The
-machine card says Running, since 21:55, work master WM-BUSHING-0815, job order 4749/01, 17 of 20. Below is a band
-of the last 8 hours with the hours 16:00, 18:00 and 20:00 under it, and the total duration of each state. Under
-the card the section Now has four tiles: active power 9.07 kW with a small graph of the last minutes, energy over
-the last 8 hours 60.9 kWh, spindle 1 Rotating, and feed override 80 % with a bar. Below begins the section Alarms
-& warnings.](images/tour/machine-page.png)
+Last 24 h, with Last 8 h chosen. Under the title it says "North plant · Hall 1" and "live · now 10:10". The
+machine card says Running, since 10:10, work master WM-SHAFT-4711, job order 4717/01, 10 of 12. Below is a band
+of the last 8 hours with the hours 04:00, 06:00 and 08:00 under it, and the total duration of each state. Under
+the card stand four tiles on their own: active power 12.06 kW with a small graph of the last minutes, energy over
+the last 8 hours 12.1 kWh, spindle 1 Rotating, and feed override 90 % with a bar. Below begins the section Alarms
+& warnings with the choice All, Errors, Warnings, "4 errors and 16 warnings" and the head of its table: Message,
+Raised, Cleared, Duration.](images/tour/machine-page.png)
 
 The card has two parts. On top is the state with its reason, since when it holds, the work master and the job
 order that runs. Below is the band: one stripe from the chosen number of hours ago until now, coloured by state,
 and below it the full hours and the total of each state. A stack that has just started has a band that is mostly
 hatched, "No data": before it started nobody published. In the chat the same card names at its foot the topics
-it read, so every value can be traced to the broker; the page leaves that line out.
+it read, so every value can be traced to the broker; the page leaves that line out, and the line under the state
+that only repeats what the control reports, such as "NotExecuting, as the control reports".
 
-Below the card come three sections of the machine, each a card with a title, and inside it the card of a tool
-for this machine, the same the chat draws, without its frame. "Now" shows what the machine measures now as
-tiles, live from the broker as on the page Live values: its active power with the last 15 minutes as a small
-graph, the energy it imported over the chosen hours, its spindle and its feed override; a value of a machine
-that has fallen silent is marked "not current". "Alarms & warnings" lists its errors and warnings over the
-chosen hours, all of them or one level, ten on a page, those that stand first; the list is read again the
-moment the machine raises, changes or clears an alert. "Power and energy" draws its power over the chosen hours
-in kilowatts, and below it a table with the energy it imported in those hours, its mean and its peak. In the
-chat the same cards have their frames and feet, and the time series card its lines and the way to add one. The card comes first and
-the sections after it, each with a grey placeholder until it is there; a section whose backend does not answer
-says so and asks again, while the others stand. Choose other hours, and the page stays: the card and the
-sections that depend on the hours are read again and change when their answers are there.
+Below the card stand four tiles of what the machine measures now, live from the broker as on the page Live
+values: its active power with the last 15 minutes as a small graph, the energy it imported over the chosen
+hours, its spindle and its feed override; a value of a machine that has fallen silent is marked "not current".
+Then come two sections of the machine, each a card with a title, and inside it the card of a tool for this
+machine, the same the chat draws, without its frame. "Alarms & warnings" is a table of its errors and warnings
+over the chosen hours, a row for each: its level, the message with its code, when it was raised, when it was
+cleared or that it is still open, and how long it stood. It shows all of them or one level, ten on a page,
+those that stand first, and is read again the moment the machine raises, changes or clears an alert. Where the
+table is narrow, as in the chat, the clearing and the duration stand under the message. "Power and energy"
+draws its power over the chosen hours in kilowatts, and below it a table with the energy it imported in those
+hours, its mean and its peak. In the chat the same cards have their frames, and the time series card its lines
+and the way to add one.
+
+While the page opens, every part of it shows a grey placeholder of its form and size, so nothing moves when the
+values come; a section whose backend does not answer says so and asks again, while the others stand. Choose
+other hours, and the page stays: the card and the sections that depend on the hours are read again and change
+when their answers are there. A machine on a site that has published nothing for 24 hours, over a weekend say,
+keeps its page: its name and place, and "No data in the last 24 hours" in the card and the sections.
 
 **In the code:** [`apps/app/src/routes/sites.$machine.tsx`](../apps/app/src/routes/sites.%24machine.tsx)
 is the page, [`machines.$machine.tsx`](../apps/app/src/routes/machines.%24machine.tsx) leads the old address to it, and the choice of the hours and the list of the switcher are in
@@ -305,8 +314,9 @@ and above it "Opened from a link" with "Save to my pages". A part the colleague'
 and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
 
 Ask about the alarms of a machine, for example "Which warnings and errors did P-04 have today?", and the chat
-draws the notification card of the tool `genui_notification_list`: each warning and error with when it was
-raised, when it went and how long it stood, and the ones that have not gone first. The card is
+draws the notification card of the tool `genui_notification_list`: a table with each warning and error, when it
+was raised, when it went and how long it stood, and the ones that have not gone first. In the narrow panel the
+going and the duration stand under the message. The card is
 [`packages/cards/src/notification/notification-card.tsx`](../packages/cards/src/notification/notification-card.tsx),
 the tool is in [`apps/genui-mcp/src/notifications.ts`](../apps/genui-mcp/src/notifications.ts). No screenshot
 shows it yet.
@@ -351,7 +361,7 @@ question can go.
 With a speech-to-text model at the gateway, the field also has a microphone: tap it, speak, tap it again,
 or hold it while you speak and let go, and what was said stands in the field, to send like a typed question.
 While it records, bars at the left of the field move with your voice, beside the time and what ends the
-recording. The gateway decides which model
+recording, and what you said so far appears in the field, dimmed, every two seconds or so. The gateway decides which model
 writes it down, see [Dictation](../apps/app/README.md#dictation). The picture of the answer shows the microphone
 at the right of the field.
 
@@ -437,6 +447,7 @@ Each part has a section "What is where" that maps its files:
 | A card, its contract, the wording or the colours of a state | [`packages/cards`: What is where](../packages/cards/README.md#what-is-where), and [A new card](../packages/cards/README.md#a-new-card) |
 | What a machine publishes and how it is stored | [`contracts/`](../contracts/README.md) first, then the .NET services under [`source/`](../source) |
 | Cutting machines that take their jobs through telegram files, and the adapter that brings them onto the broker (they start with the stack; the tour does not visit them) | [`Cutting.Simulator`](../source/Pleiades.Playground.Cutting.Simulator/README.md), [`Cutting.Adapter`](../source/Pleiades.Playground.Cutting.Adapter/README.md) |
+| A bending machine that reports through RCI telegram files, and the adapter that brings it onto the broker; both start with the stack, the tour does not stop there | [`Bend.Simulator`](../source/Pleiades.Playground.Bend.Simulator/README.md), [`Bend.Adapter`](../source/Pleiades.Playground.Bend.Adapter/README.md), [`Bend.Protocol`](../source/Pleiades.Playground.Bend.Protocol/README.md) |
 | How a machine that speaks OPC UA is scanned, mapped and run | [OPC UA adapter](../source/Pleiades.Playground.OpcUa.Adapter/README.md) |
 
 Below the app are the two APIs, and next to them the Sites API, which keeps where the machines stand. Each one

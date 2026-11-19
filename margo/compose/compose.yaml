@@ -463,6 +463,53 @@ services:
     volumes:
       - cutting-punch-exchange:/exchange
 
+  # Bending simulator: one press brake, reporting through RCI telegram files in a volume of its own. Its adapter
+  # (below) mounts the same volume and has the same serial number, manufacturer, its web address and model: the
+  # simulator only shows them, the telegrams do not carry them. Its page answers on the network; it has no sign-in.
+  bending-press:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.bend.simulator:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports:
+      - "${BENDING_PRESS_PORT:-5614}:8080"
+    environment:
+      Config__SerialNumber: AE325085TB46
+      Config__Manufacturer: TRUMPF
+      Config__ManufacturerUri: https://www.trumpf.com
+      Config__Model: "5085"
+      Config__ExchangeDirectorySource: bending-press-exchange
+    volumes:
+      - bending-press-exchange:/exchange
+      - bending-press-data:/data
+
+  # Bending adapter: the host side of the files. It mounts the volume of its machine, read only, and publishes the
+  # binding of machines below machines/trumpf_5085_AE325085TB46/.
+  bending-adapter-press:
+    image: ghcr.io/united-machining-solutions/pleiades.playground.bend.adapter:main
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      broker:
+        condition: service_healthy
+      # Healthy means the broker has acknowledged the subscriptions: an event sent before is lost for good.
+      timeseries-persistence:
+        condition: service_healthy
+      events-persistence:
+        condition: service_healthy
+      bending-press:
+        condition: service_started
+    environment:
+      Config__SerialNumber: AE325085TB46
+      Config__Manufacturer: TRUMPF
+      Config__ManufacturerUri: https://www.trumpf.com
+      Config__Model: "5085"
+      Config__MqttDestination__ConnectionString: mqtt://broker:1883
+      Config__MqttDestination__ClientId: bend-adapter-AE325085TB46
+    volumes:
+      - bending-press-exchange:/exchange:ro
+
   # The OPC UA adapter: brings in the machines a person adds in the chat, by the binding of machines.
   #   opc-simulator ──OPC UA──▶ opcua-adapter ──MQTT──▶ broker
   opcua-adapter:
@@ -566,5 +613,7 @@ volumes:
   cutting-tube-data:
   cutting-punch-exchange:
   cutting-punch-data:
+  bending-press-exchange:
+  bending-press-data:
   opcua_adapter_data:
   opc_simulator_pki:
