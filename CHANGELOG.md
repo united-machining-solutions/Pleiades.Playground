@@ -429,6 +429,8 @@ All notable changes are documented here. The format follows
   the values come. The tiles of now stand without a card around them, and the machine card leaves out the line
   that only repeats what the control reports. A machine on a site that sent nothing for 24 hours shows
   "No data in the last 24 hours" instead of an error.
+- Machine page: while it opens, nothing of it is written yet. The titles, the labels of the tiles and the head of
+  the alarm table are grey placeholders too, and a reader of the screen hears "Loading" until the data comes.
 - Notification card: the alerts stand as a table, in the chat too: level, message with its code, raised,
   cleared and duration; where the card is narrow, the last two stand under the message. The sums at the foot
   are left out; the note on alerts not listed stands under the table, and the foot names when the card was

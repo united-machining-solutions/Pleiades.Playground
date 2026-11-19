@@ -59,12 +59,18 @@ export function MeasurementTiles({ machine, series, energy: counted }: { machine
   )
 }
 
-/** A tile: what it shows, its value large, and the values that belong to it. */
-function Tile({ label, stale, value, children }: { label: string; stale: boolean; value: ReactNode; children?: ReactNode }) {
+/** A tile: what it shows, its value large, and the values that belong to it. A label that is not known yet is grey. */
+function Tile({ label, stale, value, children }: { label: string | null; stale: boolean; value: ReactNode; children?: ReactNode }) {
   return (
     <Card size="sm" className="gap-3">
       <CardHeader>
-        <CardTitle className="text-sm font-normal text-muted-foreground">{label}</CardTitle>
+        {label === null ? (
+          <CardTitle className="flex h-5 items-center">
+            <Skeleton className="h-3.5 w-24" />
+          </CardTitle>
+        ) : (
+          <CardTitle className="text-sm font-normal text-muted-foreground">{label}</CardTitle>
+        )}
         {stale && (
           <CardAction>
             <Badge variant="outline">not current</Badge>
@@ -151,7 +157,8 @@ function EnergyTile({ counted, imported }: { counted: TileEnergy; imported: Meas
   const value = counted?.machine.energy
   return (
     <Tile
-      label={counted ? `Energy, last ${counted.hours} h` : "Energy"}
+      // Until the energy is read, the tile does not know whether it counts the hours or the total: its label is grey.
+      label={counted ? `Energy, last ${counted.hours} h` : null}
       stale={false}
       value={
         counted === undefined ? (
