@@ -10,6 +10,7 @@ generative UI backend. Its contract and its component lie next to each other, so
 
 | Card | Tool | Contract | Component |
 |---|---|---|---|
+| Documentation: one answer with exact source warnings, one evidence chip, inline preview and host PDF navigation | External `docs_answer` | `documentationAnswer` in `src/documentation/contract.ts` | `DocumentationAnswerCard` in `src/documentation/documentation-answer-card.tsx` |
 | Energy: how much energy machines imported over the last hours, from their meters, with mean and peak power, and the power of each as a graph | `genui_energy_show`, and `genui_energy_series` for the lines of the graph, which only a card calls | `energyShow` and `energySeries` in `src/energy/contract.ts` | `EnergyCard` in `src/energy/energy-card.tsx` |
 | Machine: what one machine does now, since when, with which work master and job order, and the states of the last hours | `genui_machine_show` | `machineShow` in `src/machine/contract.ts` | `MachineCard` in `src/machine/machine-card.tsx` |
 | Measurement: the newest physical values of every machine, each in the unit it was published in | `genui_measurement_list` | `measurementList` in `src/measurement/contract.ts` | `MeasurementCards` in `src/measurement/measurement-card.tsx`; for one machine as tiles, with its power over the last minutes and its energy, `MeasurementTiles` in `src/measurement/measurement-tiles.tsx` |

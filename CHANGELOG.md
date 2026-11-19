@@ -7,6 +7,7 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Documentation answer and conflict cards with verbatim warnings, independently linked safety pages, package-wide source review and PDF quote highlighting.
 - Margo app: the example app registers at the Pleiades Hub, as in `compose.yaml`, with the section
   *Pleiades Hub* of the settings. *Register at the Pleiades Hub* (`HUB_REGISTRATION`, on by default) switches
   the registration off, since a Margo client may leave an empty broker out and the default would come back;
@@ -419,6 +420,7 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Documentation answers use cards exclusively; retired the previous prose/source-list presentation.
 - Example app: the microphone of the chat field can be held. Hold it while you speak and let go, as on a
   tablet, and what was said goes into the field; a tap starts and ends the recording as before. The recording
   starts as the finger goes down, so the first word is heard. While it records, the second line of the field
@@ -600,6 +602,7 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- PDF viewer now supports continuous scrolling and readable native-text highlights that stay aligned through zoom and resize.
 - Example app: `/discover` takes a mistyped or shortened address as the address it is. `opc.tcp//host:port`
   became `opc.tcp://opc.tcp//host:port:4840`, a machine name with the default port; a mistyped `opc.tcp` at
   the start, also `opc.tcp:host:port`, is now written right, and `host:port` or `host:port/path` without a

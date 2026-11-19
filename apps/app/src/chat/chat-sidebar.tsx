@@ -1,3 +1,5 @@
+import { MissingDocumentationAnswer } from "../cards/documentation/chat.tsx"
+import { documentationTurn } from "../documentation/turn.ts"
 import { createHarnessClient } from "@tanstack/ai-harness/client"
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react"
 import { Link, getRouteApi, useRouter } from "@tanstack/react-router"
@@ -86,7 +88,7 @@ import {
   takePress,
   useChatPanel,
 } from "./ask.ts"
-import { blocksOf, callsAfter, questionOf, thinkingLine } from "./blocks.ts"
+import { blocksOf, callsAfter, exclusiveAnswerId, questionOf, thinkingLine } from "./blocks.ts"
 import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { UNNAMED_CHAT, chatName, nameOfQuestion } from "./chat-name.ts"
@@ -447,7 +449,15 @@ function Conversation({ threadId }: { threadId: string }) {
                     )
                   }
                   const live = isLoading && message === messages.at(-1)
-                  const blocks = blocksOf(message.parts, live, chatTools, callsAfter(messages, position, isLoading))
+                  const exclusive = exclusiveAnswerId(messages, position, chatTools)
+                  const turn = documentationTurn(messages, position)
+                  const useCards = turn.usesDocumentation
+                  let blocks = blocksOf(message.parts, live, chatTools, callsAfter(messages, position, isLoading), exclusive, messages.flatMap(entry => entry.parts))
+                  // Never display unverified procedure prose as a replacement for a failed evidence card.
+                  if (useCards && !exclusive) {
+                    blocks = blocks.filter(block => block.kind === "steps")
+                    if (!(isLoading && turn.last === messages.length - 1) && position === turn.last) blocks.push({ kind: "drawn", node: <MissingDocumentationAnswer /> })
+                  }
                   // An answer that has nothing to show yet takes no room.
                   if (blocks.length === 0) return null
                   // An answer that has ended, and for which the chat drew a card, can be saved as a

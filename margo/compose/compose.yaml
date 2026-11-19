@@ -204,6 +204,7 @@ services:
       SITES_API_URL: http://sites-api:8080
       # Further MCP servers for the chat, as name=address, separated by commas.
       APP_MCP_SERVERS: ${APP_MCP_SERVERS:-}
+      APP_DOCUMENTATION_PACKAGE: ${APP_DOCUMENTATION_PACKAGE:-}
       # The browser hears live values at the broker's WebSocket: at the host of the page and this port, and on a
       # page over HTTPS at this path of Traefik, which forwards it to the broker (the broker speaks no TLS).
       MQTT_WS_PORT: ${MQTT_WS_PORT:-9001}

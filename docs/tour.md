@@ -260,12 +260,27 @@ newer than the one in the chat: the page reads again, an answer shows what was t
 
 With an external documentation service configured as `docs` in `APP_MCP_SERVERS` and enabled under
 "Tools" in the message field, ask how to operate,
-maintain or program a machine. The chat searches its manuals and shows source references by filename and
+maintain or program a machine. The chat searches its manuals and shows answer cards with evidence by filename and
 page label, with the physical PDF page also shown when it differs. Select one to open that physical PDF page. Use the page controls, zoom and **Find**
-to explore it; **Next match** moves between matching pages. The **Extracted text** tab shows the evidence
-used by chat. A replaced or unavailable source asks you to search again. Both views read documentation
+to explore it, or scroll continuously through pages; **Next match** moves between matching pages.
+Zooming and resizing preserve your position. Evidence and search highlights keep the original text readable. Card previews show the literal evidence used by chat; non-PDF sources open extracted text. A replaced or unavailable source asks you to search again. The card and source viewer read documentation
 through MCP; the app has no direct connection to the documentation REST API.
-Documentation source references stay in the chat and are not cards for "Save as page".
+Documentation answers require the service's `docs_answer` tool and always use an evidence card: source warnings first in original wording, direct answer steps without a repeated source
+introduction, one evidence chip, and an inline source preview.
+Ordinary answers have no status badge after a completed review with no contradiction found.
+**Conflicting requirements** and **Review incomplete** remain explicit, with text, symbols and different layouts. Conflict cards show every competing statement, including
+conflicts within one category or document, with an independent evidence chip and PDF link. A completed
+review may show a recommendation with its explanation, without a separate technical rule label;
+unresolved or incomplete conflicts request technical
+clarification without an approval button. No contradiction found refers to retrieved passages only.
+The conflict states were checked with deterministic fixtures; the live `chat-answer` screenshot was
+not retaken because it invokes the configured language model.
+**Open in document** opens the cited physical PDF page and marks matching native text. Documentation answers use cards exclusively; the previous source-list presentation has been removed. Pin
+`APP_DOCUMENTATION_PACKAGE` to restrict the deployment to one machine package. See
+[the answer-card decision](adr/0022-documentation-answer-cards.md). Documentation cards are not available for
+"Save as page". The live `chat-answer` tour screenshot has not been retaken for this change because doing
+so invokes the configured language model; the card and native-text PDF were checked with deterministic
+fixtures instead.
 
 The panel works like a chat app on a phone: a list and a chat, with a way back. The head says what is open. In a
 chat it says the name of the chat, which is its first question, on one line and cut where it is too long; the
@@ -576,3 +591,8 @@ The simulator keeps changing the states, so a new picture shows other states tha
 it, and describe in the text of its stop what it shows. Whoever changes what a stop shows keeps the stop
 current, see [CONTRIBUTING.md](../CONTRIBUTING.md#conventions); CI checks that every pointer of this page
 still has its target.
+
+General safety warnings can cite a different page from the procedure. They remain first and verbatim;
+**Warning source** opens their own physical page in the PDF viewer. The procedure evidence remains
+separate. This warning-source flow was checked without invoking the configured language model; the
+live `chat-answer` screenshot has not been retaken.
