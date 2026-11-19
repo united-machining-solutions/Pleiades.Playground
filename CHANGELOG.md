@@ -582,6 +582,8 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Example app, showcase TruLaser: `/trulaser` without a machine shows the TruLaser alive most recently, not the first
+  by name. A machine that was renamed or stopped kept the page on its old values for a day.
 - `opcua-adapter`: a rejected certificate is reported with its reason instead of a timeout. A server whose
   certificate does not carry the ApplicationUri it announces was told in the chat as "did not open a session
   within 30 seconds"; the reason was only in the log. A connect now stops on the first certificate error and
