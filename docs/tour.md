@@ -387,7 +387,8 @@ stand the tools of the MCP servers the chat has: `/machine` finds `/genui_machin
 `/genui_machine_show M-02` asks the model to answer with that tool. The arrow keys mark an entry, Tab writes
 it into the field, Enter takes it and Escape closes the list. Ask
 `/discover A1121O0001`, and the model scans the OPC UA server of the simulated machine, matches its nodes to
-the data model and shows a proposal: the endpoint with the strongest security, whether the machine fulfils
+the data model and shows a proposal: the endpoint with the strongest security, or the one you chose under
+"Choose the security" on the endpoints card (`None` too, behind a warning), whether the machine fulfils
 the core of the data model and which profiles are complete, and how many elements are ok, derived, unclear
 or missing. What the core lacks is marked as not available. Press one of these chips, "2 missing" say, and
 the proposal lists those elements with their values and why; press it again to close the list. The machine is added when you

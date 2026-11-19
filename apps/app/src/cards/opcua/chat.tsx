@@ -1,4 +1,4 @@
-import { CircleAlertIcon, CircleCheckIcon, InfoIcon, NetworkIcon, ServerIcon, Trash2Icon } from "lucide-react"
+import { CircleAlertIcon, CircleCheckIcon, InfoIcon, NetworkIcon, ServerIcon, ShieldAlertIcon, Trash2Icon } from "lucide-react"
 import { useRouter } from "@tanstack/react-router"
 import { Fragment, useEffect, useId, useState } from "react"
 import type { ComponentProps, ReactNode } from "react"
@@ -22,7 +22,16 @@ import { Button } from "@pleiades/ui/components/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@pleiades/ui/components/collapsible"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@pleiades/ui/components/field"
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@pleiades/ui/components/field"
 import { Input } from "@pleiades/ui/components/input"
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@pleiades/ui/components/select"
 import { toast } from "@pleiades/ui/components/toast"
@@ -36,9 +45,10 @@ import {
   ItemSeparator,
   ItemTitle,
 } from "@pleiades/ui/components/item"
+import { RadioGroup, RadioGroupItem } from "@pleiades/ui/components/radio-group"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@pleiades/ui/components/table"
 
-import { commitProposal, removeMachine, storeUser } from "@/opcua/adapter.ts"
+import { chooseSecurity, commitProposal, forgetSecurity, removeMachine, storeUser } from "@/opcua/adapter.ts"
 import type { Outcome } from "@/opcua/adapter.ts"
 import { siteStepOf } from "@/sites/placing.ts"
 import type { AddedOutcome, SiteStep, SitesOutcome } from "@/sites/placing.ts"
@@ -49,6 +59,8 @@ import {
   doneInWords,
   endpointSummary,
   inDoubt,
+  securityKey,
+  securityWarning,
   machineListOf,
   mappingOf,
   needingALook,
@@ -69,8 +81,10 @@ import type {
   Mapping,
   ProfileCheck,
   Proposal,
+  RankedEndpoint,
   RankedEndpoints,
   RowChoice,
+  SecurityWarning,
   Server,
   ServerList,
 } from "./results.ts"
@@ -408,6 +422,7 @@ function ServerRow({ server }: { server: Server }) {
             {server.state}
           </Badge>
           {server.needsRescan && <Badge variant="destructive">Scan again</Badge>}
+          {server.endpoint.securityMode === "None" && <Badge variant="destructive">No security</Badge>}
         </ItemTitle>
         <ItemDescription>
           <span className="text-foreground">{server.endpoint.url}</span> · {securityOf(server.endpoint)}
@@ -697,6 +712,7 @@ function ShownProposal({ values }: { values: Proposal }) {
         {values.summary && <Counts summary={values.summary} chosen={chosen} onChoose={setChosen} controls={listId} />}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        <SecurityAlert warning={securityWarning(values.endpoint)} />
         <ProfileGaps checks={values.conformance} />
         {values.notices && values.notices.length > 0 && (
           <Alert>
@@ -800,7 +816,12 @@ function UserForm({ url, user }: { url: string; user?: string }) {
     }
   }
   if (outcome?.ok) {
-    return <Done outcome={outcome} done="The user is stored. Tell the chat to go on: the scan logs in with it." />
+    return (
+      <Done
+        outcome={outcome}
+        done="The user is stored, and the machines added from this server start their sessions anew with it. Tell the chat to go on: it connects again and logs in with the user."
+      />
+    )
   }
   return (
     <form
@@ -831,12 +852,111 @@ function UserForm({ url, user }: { url: string; user?: string }) {
   )
 }
 
+/** The warning a security deserves: destructive for no security at all, plain for one that is weak. */
+function SecurityAlert({ warning }: { warning: SecurityWarning | undefined }) {
+  if (!warning) return null
+  return (
+    <Alert variant={warning.severity === "danger" ? "destructive" : "default"}>
+      <ShieldAlertIcon />
+      <AlertTitle>{warning.title}</AlertTitle>
+      <AlertDescription>{warning.text}</AlertDescription>
+    </Alert>
+  )
+}
+
+/** An endpoint in words, with the user only where a session there logs in with it. */
+function securityIn(endpoint: RankedEndpoint, user: string | undefined): string {
+  return securityOf({ ...endpoint, user: endpoint.withUser === false ? undefined : user })
+}
+
 /**
- * The endpoint the adapter takes, in one line, and the rest folded: the person cannot choose another one
- * here. That the server also takes sessions without security is said without unfolding.
+ * The security of the sessions to a server, chosen by the person: every endpoint the adapter can use, the strongest
+ * first, None included. The warning of the endpoint picked stands before the button, so no one chooses no security
+ * without having read what it means. The choice goes from here to the server of the app and on to the adapter,
+ * never through the language model.
+ */
+function SecurityChoice({ values }: { values: RankedEndpoints }) {
+  const id = useId()
+  const { used, chosen, dormant } = endpointSummary(values)
+  const usedKey = used ? securityKey(used) : ""
+  const [picked, setPicked] = useState(usedKey)
+  const [outcome, setOutcome] = useState<{ outcome: Outcome; done: string }>()
+  const [busy, setBusy] = useState(false)
+  const endpoint = values.endpoints.find((one) => securityKey(one) === picked)
+  const run = async (call: () => Promise<Outcome>, done: string) => {
+    setBusy(true)
+    try {
+      setOutcome({ outcome: await outcomeOf(call), done })
+    } finally {
+      setBusy(false)
+    }
+  }
+  const choose = () => {
+    if (!endpoint) return
+    const { securityMode, securityPolicy } = endpoint
+    void run(
+      () => chooseSecurity({ data: { url: values.url, securityMode, securityPolicy } }),
+      `The adapter connects with ${securityIn(endpoint, values.user)} from now on. Tell the chat to go on.`,
+    )
+  }
+  const back = () =>
+    void run(() => forgetSecurity({ data: values.url }), "The adapter takes the strongest endpoint again. Tell the chat to go on.")
+  if (outcome?.outcome.ok) return <Done outcome={outcome.outcome} done={outcome.done} />
+  return (
+    <div className="flex flex-col gap-3">
+      <FieldSet>
+        <FieldLegend variant="label">Security of the session</FieldLegend>
+        <FieldDescription>
+          The adapter connects with the endpoint you choose, for the scan and for every machine you add from it.
+        </FieldDescription>
+        <RadioGroup
+          value={picked}
+          onValueChange={(value) => {
+            setPicked(String(value))
+            setOutcome(undefined)
+          }}
+        >
+          {values.endpoints.map((one, position) => {
+            const key = securityKey(one)
+            return (
+              <Field key={key} orientation="horizontal">
+                <RadioGroupItem value={key} id={`${id}-${position}`} />
+                <FieldContent>
+                  <FieldLabel htmlFor={`${id}-${position}`} className="font-normal">
+                    {securityIn(one, values.user)}
+                    {one.weak && <Badge variant={one.securityMode === "None" ? "destructive" : "outline"}>Weak</Badge>}
+                  </FieldLabel>
+                  {position === 0 && <FieldDescription>The strongest the server offers.</FieldDescription>}
+                </FieldContent>
+              </Field>
+            )
+          })}
+        </RadioGroup>
+      </FieldSet>
+      {endpoint && picked !== usedKey && <SecurityAlert warning={securityWarning(endpoint)} />}
+      {outcome && <Done outcome={outcome.outcome} done="" />}
+      <Button
+        variant={endpoint?.securityMode === "None" ? "destructive" : "default"}
+        disabled={busy || !endpoint || picked === usedKey}
+        onClick={choose}
+      >
+        {busy ? "Choosing" : endpoint?.securityMode === "None" ? "Connect without security" : "Connect with this security"}
+      </Button>
+      {(chosen || dormant) && (
+        <Button variant="outline" disabled={busy} onClick={back}>
+          Back to the strongest
+        </Button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The endpoint the adapter takes, in one line, with its warning if it is weak, and the choice of another one
+ * folded. That the server also takes sessions without security is said without unfolding.
  */
 function EndpointSummary({ values }: { values: RankedEndpoints }) {
-  const { used, others, unsecured } = endpointSummary(values)
+  const { used, strongest, chosen, dormant, others, unsecured } = endpointSummary(values)
   if (!used) {
     return (
       <Item size="sm">
@@ -847,51 +967,49 @@ function EndpointSummary({ values }: { values: RankedEndpoints }) {
       </Item>
     )
   }
+  const warning = securityWarning(used)
   return (
     <Collapsible>
       <Item size="sm">
         <ItemContent>
           <ItemTitle>
-            {securityOf({ ...used, user: values.user })}
-            {used.weak && <Badge variant="outline">Weak</Badge>}
+            {securityIn(used, values.user)}
+            {used.weak && <Badge variant={used.securityMode === "None" ? "destructive" : "outline"}>Weak</Badge>}
           </ItemTitle>
-          <ItemDescription>The strongest the server offers, the one the adapter connects with.</ItemDescription>
+          <ItemDescription>
+            {chosen && strongest && strongest !== used
+              ? `Chosen by a person; the adapter connects with it. The strongest the server offers is ${securityIn(strongest, values.user)}.`
+              : chosen
+                ? "Chosen by a person; the adapter connects with it."
+                : "The strongest the server offers, the one the adapter connects with."}
+          </ItemDescription>
           {unsecured && <ItemDescription>The server also accepts sessions without security.</ItemDescription>}
+          {dormant && (
+            <ItemDescription>
+              A person chose {securityOf(dormant)} for this server, which it does not offer now, so the adapter takes the
+              strongest. If the server offers it again, the adapter takes it again; "Back to the strongest" forgets it.
+            </ItemDescription>
+          )}
         </ItemContent>
-        {others.length > 0 && (
+        {(others.length > 0 || chosen || dormant) && (
           <ItemFooter>
-            <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
-              {others.length === 1 ? "1 more endpoint" : `${others.length} more endpoints`}
-            </CollapsibleTrigger>
+            <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>Choose the security</CollapsibleTrigger>
           </ItemFooter>
         )}
       </Item>
+      {warning && (
+        <div className="px-4 pb-3">
+          <SecurityAlert warning={warning} />
+        </div>
+      )}
       <CollapsibleContent>
         <ItemSeparator className="my-0" />
-        <EndpointList endpoints={others} user={values.user} />
+        <div className="p-4">
+          {/* Keyed by the endpoint taken, so the pick starts there again when the card gets new values. */}
+          <SecurityChoice key={securityKey(used)} values={values} />
+        </div>
       </CollapsibleContent>
     </Collapsible>
-  )
-}
-
-/** The endpoints the adapter does not take, strongest first. */
-function EndpointList({ endpoints, user }: { endpoints: RankedEndpoints["endpoints"]; user?: string }) {
-  return (
-    <ItemGroup className="gap-0">
-      {endpoints.map((endpoint, position) => (
-        <Fragment key={`${endpoint.securityMode}/${endpoint.securityPolicy}`}>
-          {position > 0 && <ItemSeparator className="my-0" />}
-          <Item size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {securityOf({ ...endpoint, user })}
-                {endpoint.weak && <Badge variant="outline">Weak</Badge>}
-              </ItemTitle>
-            </ItemContent>
-          </Item>
-        </Fragment>
-      ))}
-    </ItemGroup>
   )
 }
 
@@ -924,7 +1042,9 @@ function Endpoints({ values }: { values: RankedEndpoints }) {
       <CardFooter className="flex-col items-stretch pb-3">
         <Collapsible>
           <CollapsibleTrigger render={<Button variant="ghost" size="sm" />}>
-            {values.user ? `Logs in as ${values.user}: change the user` : "Log in with a user instead"}
+            {values.user
+              ? `Logs in as ${values.user}: change the user`
+              : "Log in with a user instead of anonymously"}
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-3">
             <UserForm url={values.url} user={values.user} />

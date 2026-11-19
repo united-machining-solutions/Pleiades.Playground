@@ -39,8 +39,9 @@ internal sealed class DiscoveryTools(MachineSupervisor supervisor)
 
     [McpServerTool(Name = "opcua_endpoint_rank", ReadOnly = true, OpenWorld = true),
      Description(
-         "Ask an OPC UA server for its endpoints and order them from strongest to weakest security. The first one, " +
-         "marked recommended, is the one a registration must name. Also returns the thumbprint of the certificate " +
+         "Ask an OPC UA server for its endpoints and order them from strongest to weakest security. The one marked " +
+         "recommended is the one a registration must name: the strongest, or the one a person chose on the card of this result " +
+         "(chosen is then set; it may be weaker, even None, and the card warns the person). Never choose one yourself. Also returns the thumbprint of the certificate " +
          "the server presents. Call it first when a person names a server address. A machine named without an " +
          "address has the default endpoint opc.tcp://<machine>:4840; if that does not answer, ask the person for the endpoint. " +
          "needsUser true and user null: the server wants a user. The card of this result asks the person for user name and " +
@@ -70,7 +71,7 @@ internal sealed class DiscoveryTools(MachineSupervisor supervisor)
 
     [McpServerTool(Name = "opcua_machine_list", ReadOnly = true, OpenWorld = true),
      Description(
-         "List the machines an OPC UA server serves, read on its strongest endpoint: each with its node (machineNode), " +
+         "List the machines an OPC UA server serves, read on the recommended endpoint, anonymously first: each with its node (machineNode), " +
          "where it is below Objects, and the serial number, manufacturer and model read below it. A server of one " +
          "machine lists one; an aggregation server (a gateway) lists several, and gateway is true. Call it after " +
          "opcua_endpoint_rank for every address. For a gateway, scan each machine from its node and propose one " +

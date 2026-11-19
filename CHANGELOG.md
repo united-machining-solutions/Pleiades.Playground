@@ -12,6 +12,12 @@ All notable changes are documented here. The format follows
   (`WorkMasterMonitoring.ProgramExecution`) by the names of the umati data model, from the Events API; the
   card draws both over the last hours as a timeline, which it asks `genui_job_order_timeline` for. The chat
   draws it, and other hosts get it as `ui://genui/joborder`.
+- OPC UA adapter: a person chooses the security of the sessions to a server under "Choose the security" on
+  the endpoints card of the chat, a weaker endpoint or `None` included. Before `None` is taken the card shows
+  a destructive warning; the endpoint taken, the proposal and the list of servers warn too. The adapter keeps
+  the choice per server (`PUT`, `GET` and `DELETE /security`) and takes it for the scan and for every
+  registration proposed after; the model never chooses. Every session of the scan is anonymous first: the
+  stored user logs in only where the endpoint takes no anonymous session, or the server refuses it.
 - Example app: "Where is My Job?" stands the machines by their step of manufacturing, in clusters in the order
   of DIN 8580 (printing, cutting, turning, milling, grinding, forming, joining). The step comes from
   `Identification.DeviceClass`, else from words of the model; the panel "Arrange" corrects it, kept in the
@@ -170,7 +176,7 @@ All notable changes are documented here. The format follows
   source yet and stand on the page as such. The page reads the job orders from the new tool
   `genui_job_order_list` of `genui-mcp`, the job orders on the lists of the machines from the Events API, so
   they stand also after a reload or a reconnect; a job order the planner took back before it ran is left out.
-  It is a page of the app with its entry in the sidebar, not a showcase: it shows only values the stack has.
+  It is a showcase, only in a build with `APP_SHOWCASES`, and has its entry in the sidebar there (see Changed).
 - Sites API (`sites-api`, port 5540): sites with their halls and the machines placed on them, kept in MongoDB.
   REST reads and writes (writing needs `sites:write`), MCP only reads (`sites_site_list`, `sites_placement_list`).
   A placement names its machine by the machine id of the MQTT binding (`machineId`, `/placements/{machineId}`),
@@ -450,12 +456,13 @@ All notable changes are documented here. The format follows
   and in the sidebar, it opens with made-up orders WI-… across the clusters, and "Real orders" turns them off.
   The page "What if" at `/what-if` is gone, and so is the page of the app without the made-up orders: the
   application alone has no "Where is My Job?".
-
 - Documentation answers use cards exclusively; retired the previous prose/source-list presentation.
 - Machine page: while it opens, every part shows a grey placeholder of its form and size, so nothing moves when
   the values come. The tiles of now stand without a card around them, and the machine card leaves out the line
   that only repeats what the control reports. A machine on a site that sent nothing for 24 hours shows
   "No data in the last 24 hours" instead of an error.
+- Machine page: while it opens, nothing of it is written yet. The titles, the labels of the tiles and the head of
+  the alarm table are grey placeholders too, and a reader of the screen hears "Loading" until the data comes.
 - Notification card: the alerts stand as a table, in the chat too: level, message with its code, raised,
   cleared and duration; where the card is narrow, the last two stand under the message. The sums at the foot
   are left out; the note on alerts not listed stands under the table, and the foot names when the card was

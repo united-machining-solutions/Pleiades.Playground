@@ -56,24 +56,37 @@ internal sealed record MappingView(ServerView Server, IReadOnlyList<MappingRow> 
 /// <summary>One endpoint a server offers.</summary>
 /// <param name="SecurityMode">The message security mode.</param>
 /// <param name="SecurityPolicy">The short name of the security policy.</param>
-/// <param name="Recommended">True for the one to register.</param>
+/// <param name="Recommended">True for the one to register: the strongest, or the one a person chose.</param>
 /// <param name="Weak">True without encryption or with a policy that is no longer considered safe.</param>
-internal sealed record RankedEndpointView(SecurityMode SecurityMode, string SecurityPolicy, bool Recommended, bool Weak);
+/// <param name="WithUser">True if a session here logs in with the stored user: the endpoint takes no anonymous session.</param>
+internal sealed record RankedEndpointView(SecurityMode SecurityMode, string SecurityPolicy, bool Recommended, bool Weak, bool WithUser = false)
+{
+    /// <summary>The view of a ranked endpoint.</summary>
+    public static RankedEndpointView Of(RankedEndpoint ranked)
+    {
+        ArgumentNullException.ThrowIfNull(ranked);
+        return new(ranked.Endpoint.SecurityMode, ranked.Endpoint.SecurityPolicy, ranked.Recommended, ranked.Weak, ranked.WithUser);
+    }
+}
 
 /// <summary>The endpoints of a server, strongest first.</summary>
 /// <param name="Url">The address that was asked.</param>
 /// <param name="CertificateThumbprint">SHA-1 thumbprint of the certificate the server presents.</param>
-/// <param name="Endpoints">The endpoints a session can use: with the stored user if there is one, else without a user.</param>
+/// <param name="Endpoints">The endpoints a session can use, strongest first: without a user, and with the stored user the encrypted ones that take it.</param>
 /// <param name="NeedsUser">True if the server accepts no session without a user.</param>
 /// <param name="AcceptsUser">True if the server accepts a user name and a password on an encrypted endpoint.</param>
 /// <param name="User">The user a person stored for this server, or null. Never a password.</param>
+/// <param name="Chosen">The security a person chose for this server, or null if none is stored. Also while the server does not offer it.</param>
+/// <param name="ChosenInEffect">True if the recommended endpoint is the chosen one; false while the server does not offer it, and the adapter takes the strongest until it does again.</param>
 internal sealed record EndpointRankView(
     string Url,
     string? CertificateThumbprint,
     IReadOnlyList<RankedEndpointView> Endpoints,
     bool NeedsUser,
     bool AcceptsUser,
-    string? User);
+    string? User,
+    SecurityChoice? Chosen = null,
+    bool ChosenInEffect = false);
 
 /// <summary>A user a person stored for a server. The password is never shown.</summary>
 /// <param name="Url">The address of the server.</param>
@@ -107,7 +120,7 @@ internal sealed record ServedMachineView(
 
 /// <summary>The machines an OPC UA server serves.</summary>
 /// <param name="Url">The address of the server.</param>
-/// <param name="Endpoint">The strongest endpoint: the machines were read on it, and a registration names it.</param>
+/// <param name="Endpoint">The endpoint the adapter takes, the strongest or the one a person chose: the machines were read on it, and a registration names it.</param>
 /// <param name="Gateway">True if the server serves more than one machine: every registration then names its machineNode.</param>
 /// <param name="Machines">The machines, the ones nearest to Objects first.</param>
 internal sealed record MachineListView(string Url, RankedEndpointView? Endpoint, bool Gateway, IReadOnlyList<ServedMachineView> Machines);
@@ -204,20 +217,22 @@ internal static class Views
         return new(
             offer.Url,
             offer.Offered.Select(one => one.ServerCertificateThumbprint).FirstOrDefault(thumbprint => thumbprint is not null),
-            [.. ranked.Select(one => new RankedEndpointView(one.Endpoint.SecurityMode, one.Endpoint.SecurityPolicy, one.Recommended, one.Weak))],
+            [.. ranked.Select(RankedEndpointView.Of)],
             offer.NeedsUser,
             offer.AcceptsUser,
-            offer.User);
+            offer.User,
+            offer.Choice,
+            offer.ChoiceInEffect is not null);
     }
 
     public static MachineListView Machines(ServedMachines served, IReadOnlyList<MachineConnection> added)
     {
         ArgumentNullException.ThrowIfNull(served);
         ArgumentNullException.ThrowIfNull(added);
-        var best = served.Endpoints.Count > 0 ? served.Endpoints[0] : null;
+        var used = served.Endpoints.FirstOrDefault(endpoint => endpoint.Recommended);
         return new MachineListView(
             served.Url,
-            best is null ? null : new RankedEndpointView(best.Endpoint.SecurityMode, best.Endpoint.SecurityPolicy, best.Recommended, best.Weak),
+            used is null ? null : RankedEndpointView.Of(used),
             served.Machines.Count > 1,
             [.. served.Machines.Select(machine =>
             {
