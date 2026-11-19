@@ -150,8 +150,8 @@ the plan [`packages/cards/src/site/hall-plan.tsx`](../packages/cards/src/site/ha
 
 The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
 physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
-a line for each machine. A choice above the graphs shows one machine or all of them. It has no picture in
-this tour.
+a line for each machine. A choice above the graphs shows one machine or all of them; with all of them, a
+value no machine published has no graph. It has no picture in this tour.
 
 **In the code:** [`apps/app/src/routes/live.tsx`](../apps/app/src/routes/live.tsx) is the page,
 [`packages/cards/src/measurement/measurement-graph.tsx`](../packages/cards/src/measurement/measurement-graph.tsx)
