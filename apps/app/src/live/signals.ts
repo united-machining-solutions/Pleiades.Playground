@@ -1,4 +1,5 @@
 import { SILENT_AFTER_SECONDS } from "@pleiades/cards/machine/contract.ts"
+import { SERIES_SLOTS } from "@pleiades/cards/measurement/contract.ts"
 import type { SeriesLine, TimeseriesSeries } from "@pleiades/cards/timeseries/contract.ts"
 
 import { filterOf, machineOf, valuesOf } from "./messages.ts"
@@ -36,24 +37,63 @@ function drawable(line: SeriesLine): boolean {
   return line.note !== "text"
 }
 
-/** The page as the backend gave it: the lines of the machine, each with its newest value. */
-export function signalsPageOf(machine: string, series: TimeseriesSeries): SignalsPage {
-  const lines = series.lines.filter((line) => line.machine === machine && drawable(line))
+/** The end of each of `slots` even slots between two instants, in milliseconds: as the backend slots the graphs of all machines. */
+function slotEnds(from: number, to: number, slots: number): Array<string> {
+  const width = (to - from) / slots
+  return Array.from({ length: slots }, (_, slot) => new Date(from + (slot + 1) * width).toISOString())
+}
+
+/**
+ * A line of an answer on other instants: at each, the value it had at its own newest instant up to
+ * there. That is the value that held, or none where its machine was silent, as the backend has it.
+ */
+function heldAt(values: SeriesLine["values"], own: ReadonlyArray<string>, instants: ReadonlyArray<string>): SeriesLine["values"] {
+  let next = 0
+  let held: SeriesLine["values"][number] = null
+  return instants.map((end) => {
+    while (next < own.length && own[next]! <= end) held = values[next++] ?? null
+    return held
+  })
+}
+
+/**
+ * The page as the backend gave it: the lines of the machine, each with its newest value. The backend
+ * draws so many lines at most at once, so they come in several answers, and an answer puts its lines
+ * on instants of its own: those of their values. Here every line is put on the same even slots
+ * instead, `slots` of them, as the graphs of all machines have them, so the lines of all answers meet
+ * and the page moves on by whole slots. The slots end where the earliest answer ends. Null without an
+ * answer.
+ */
+export function signalsPageOf(machine: string, answers: ReadonlyArray<TimeseriesSeries>, slots = SERIES_SLOTS): SignalsPage | null {
+  const [first] = answers
+  if (first === undefined) return null
+  const to = Math.min(...answers.map((answer) => Date.parse(answer.to)))
+  const from = to - (Date.parse(first.to) - Date.parse(first.from))
+  const instants = slotEnds(from, to, slots)
   const newest: Record<string, Point> = {}
+  const lines = answers.flatMap((answer) =>
+    answer.lines
+      .filter((line) => line.machine === machine && drawable(line))
+      .map((line): SeriesLine => {
+        // The newest value at the instant the backend gave it, not at the end of its slot.
+        for (let index = line.values.length - 1; index >= 0; index--) {
+          const value = line.values[index]
+          if (value === null || value === undefined) continue
+          newest[line.topic] = { at: answer.instants[index] ?? answer.to, value }
+          break
+        }
+        return { ...line, values: heldAt(line.values, answer.instants, instants) }
+      }),
+  )
   const held: Record<string, number | boolean | null> = {}
   let lastSign: string | undefined
   for (const line of lines) {
     const last = line.values.at(-1) ?? null
     held[line.topic] = last
-    if (last !== null) lastSign = series.to
-    for (let index = line.values.length - 1; index >= 0; index--) {
-      const value = line.values[index]
-      if (value === null || value === undefined) continue
-      newest[line.topic] = { at: series.instants[index] ?? series.to, value }
-      break
-    }
+    if (last !== null) lastSign = new Date(to).toISOString()
   }
-  return { machine, series: { ...series, lines }, asOf: series.to, lastSign, newest, pending: {}, held }
+  const series = { from: new Date(from).toISOString(), to: new Date(to).toISOString(), range: first.range, instants, lines }
+  return { machine, series, asOf: series.to, lastSign, newest, pending: {}, held }
 }
 
 function later(a: string | undefined, b: string): string {

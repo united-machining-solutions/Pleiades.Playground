@@ -54,23 +54,21 @@ export const Route = createFileRoute("/live")({
 /**
  * The lines of every signal a machine published in the last 24 hours, over the last 15 minutes, as
  * the backend lists them: the tool draws so many lines at most at once, so they are asked for in
- * parts that end at the same instant. Null if the machine has none, or they are not to be had.
+ * parts, each up to now by the clock of the server. Each answer has instants of its own; the page
+ * puts them on the same slots (`signalsPageOf`). Null if the machine has none, or they are not to be had.
  */
-async function signalsOf(machine: string): Promise<TimeseriesSeries | null> {
+async function signalsOf(machine: string): Promise<Array<TimeseriesSeries> | null> {
   try {
     const listed = await getTimeseriesSignals()
     const paths = listed?.machines.find((one) => one.machine === machine)?.signals.map((signal) => signal.path) ?? []
     if (paths.length === 0) return null
-    const to = new Date().toISOString()
     const parts = Array.from({ length: Math.ceil(paths.length / MOST_LINES) }, (_, index) =>
       paths.slice(index * MOST_LINES, (index + 1) * MOST_LINES),
     )
     const answers = await Promise.all(
-      parts.map((part) => getTimeseriesSeries({ data: { lines: part.map((signal) => ({ machine, signal })), range: "15m", to } })),
+      parts.map((part) => getTimeseriesSeries({ data: { lines: part.map((signal) => ({ machine, signal })), range: "15m" } })),
     )
-    const [first] = answers
-    if (first === undefined || first === null || answers.some((answer) => answer === null)) return null
-    return { ...first, lines: answers.flatMap((answer) => answer?.lines ?? []) }
+    return answers.every((answer): answer is TimeseriesSeries => answer !== null) ? answers : null
   } catch {
     return null
   }
