@@ -55,6 +55,8 @@ public sealed class WritePermissionTests : IDisposable
     [DataRow("DELETE", "/sites/north-plant")]
     [DataRow("PUT", "/placements/M-05")]
     [DataRow("DELETE", "/placements/M-05")]
+    [DataRow("PUT", "/placements/M-05/position")]
+    [DataRow("DELETE", "/placements/M-05/position")]
     public async Task Write_WithReadPermissionOnly_ReturnsForbidden(string method, string path)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);

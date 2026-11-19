@@ -62,6 +62,23 @@ const placement = (machineId: string, siteId: string, hall: string | null, displ
   hall,
   displayName,
   placedAt: "2026-11-16T08:00:00.000Z",
+  position: null,
+})
+
+test("a machine keeps the position it has in its hall, and one without has none", () => {
+  const result = sitesOf(
+    [north],
+    [{ ...placement("M-01", "north-plant", "Hall 1"), position: { x: 12.5, y: 4 } }, placement("M-02", "north-plant", "Hall 1")],
+    list([machine("M-01", {})]),
+  )
+  assert.deepEqual(
+    result.sites[0]?.halls[0]?.machines.map((one) => [one.machine, one.position]),
+    [
+      ["M-01", { x: 12.5, y: 4 }],
+      ["M-02", null],
+    ],
+  )
+  assert.equal(siteList.safeParse(result).success, true)
 })
 
 test("the machines of a site are grouped by hall, in the order of the site, and counted by state", () => {

@@ -11,7 +11,13 @@ internal static class SitesMapper
     internal static SiteDtoV1 ToDto(SiteDao site) => new(site.SiteId, site.Company, site.Name, site.Halls, SiteTags.Of(site));
 
     internal static PlacementDtoV1 ToDto(PlacementDao placement) =>
-        new(placement.MachineId, placement.SiteId, placement.Hall, placement.DisplayName, placement.PlacedAt);
+        new(
+            placement.MachineId,
+            placement.SiteId,
+            placement.Hall,
+            placement.DisplayName,
+            placement.PlacedAt,
+            placement.Position is { } position ? new PositionDtoV1(position.X, position.Y) : null);
 
     internal static IReadOnlyList<SiteDtoV1> ToDtos(IEnumerable<SiteDao> sites) => [.. sites.Select(ToDto)];
 

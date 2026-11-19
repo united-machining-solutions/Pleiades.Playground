@@ -24,6 +24,23 @@ public sealed class SiteRulesTests
         Assert.IsNotNull(SiteRules.CheckTopicLevel(value, "site id"));
 
     [TestMethod]
+    [DataRow(double.NaN, 1d)]
+    [DataRow(1d, double.NaN)]
+    [DataRow(double.PositiveInfinity, 1d)]
+    [DataRow(1d, double.NegativeInfinity)]
+    [DataRow(-0.001, 1d)]
+    [DataRow(1d, 1000.001)]
+    public void CheckPosition_RefusesWhatIsNoPlaceOnThePlan(double x, double y) =>
+        Assert.IsNotNull(SiteRules.CheckPosition(new PositionRequestV1(x, y)));
+
+    [TestMethod]
+    [DataRow(0d, 0d)]
+    [DataRow(12.5, 4d)]
+    [DataRow(1000d, 1000d)]
+    public void CheckPosition_AcceptsEveryPlaceOnThePlan(double x, double y) =>
+        Assert.IsNull(SiteRules.CheckPosition(new PositionRequestV1(x, y)));
+
+    [TestMethod]
     [DataRow("north-plant")]
     [DataRow("M-05")]
     [DataRow("Plant 3 (Süd)")]
