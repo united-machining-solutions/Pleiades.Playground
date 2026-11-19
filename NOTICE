@@ -16,11 +16,14 @@ The umati sign and wordmark under apps/app/public/ (favicon.svg, favicon.ico, ap
 umati-wordmark.svg) are trademarks of VDW e.V. and are not covered by the licences of this repository.
 They are used in the example application with the agreement of United Machining Solutions (Christoph Plüss).
 
+TRUMPF is a trademark of the TRUMPF group and is not covered by the licences of this repository. The brand
+under packages/ui/brands/trumpf/ is used in the example application with the agreement of TRUMPF.
+
 Third-party container images referenced by compose.yaml (MQTT broker, database) are distributed under
 their own licences and are not part of this repository.
 
-The image of the example application (apps/app) contains the Roboto typeface, licensed under
-the SIL Open Font License 1.1. The chart and state colours of the cards (packages/cards), which that image
+The image of the example application (apps/app) contains the Roboto and Open Sans typefaces, licensed
+under the SIL Open Font License 1.1. The chart and state colours of the cards (packages/cards), which that image
 and the image of the generative UI backend (apps/genui-mcp) contain, are taken from the IBM Carbon Design
 System, licensed under the Apache License, Version 2.0.
 

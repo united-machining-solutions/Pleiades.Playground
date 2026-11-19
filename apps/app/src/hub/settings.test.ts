@@ -16,6 +16,25 @@ test("without HUB_MQTT_URL the app does not register, whatever HUB_APP_URL says"
   assert.equal(hubSettings({ HUB_MQTT_URL: "", HUB_APP_URL: "//evil.example/" }), undefined)
 })
 
+test("HUB_REGISTRATION=false switches the registration off, whatever the other settings say", () => {
+  assert.equal(hubSettings({ HUB_REGISTRATION: "false", HUB_MQTT_URL: broker }), undefined)
+  assert.equal(hubSettings({ HUB_REGISTRATION: "false", HUB_MQTT_URL: "not a url" }), undefined)
+  assert.equal(hubSettings({ HUB_REGISTRATION: "false", HUB_MQTT_URL: broker, HUB_APP_URL: "javascript:alert(1)" }), undefined)
+})
+
+test("HUB_REGISTRATION=true, empty or unset leaves the decision to HUB_MQTT_URL", () => {
+  for (const HUB_REGISTRATION of ["true", "", undefined]) {
+    assert.equal(hubSettings({ HUB_REGISTRATION, HUB_MQTT_URL: broker })?.brokerUrl, broker)
+    assert.equal(hubSettings({ HUB_REGISTRATION }), undefined)
+  }
+})
+
+test("any other HUB_REGISTRATION is an error that names the setting", () => {
+  for (const HUB_REGISTRATION of ["no", "False", "0", "off"]) {
+    assert.throws(() => hubSettings({ HUB_REGISTRATION, HUB_MQTT_URL: broker }), /HUB_REGISTRATION must be true or false/)
+  }
+})
+
 test("with HUB_MQTT_URL alone the address is the one of the development server", () => {
   assert.deepEqual(hubSettings({ HUB_MQTT_URL: broker }), { brokerUrl: broker, appUrl: "http://localhost:3000/" })
   assert.deepEqual(hubSettings({ HUB_MQTT_URL: broker, HUB_APP_URL: "" }), {

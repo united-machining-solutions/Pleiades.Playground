@@ -323,3 +323,19 @@ test("documentation references stay visible in chat but are not replayed as GenU
   assert.equal(recipeOfAnswer("What does the manual say?", docs, allTools), null)
   assert.deepEqual(callsOfAnswer([...docs, ...oneCard()], allTools), [{ tool: "genui_machine_show", args: { machine: "P-04" } }])
 })
+
+test("a list the model looked a machine up in is no part of the page, as the chat does not draw it", () => {
+  const looking = tools.map((tool) => (tool.name === "genui_machine_list" ? { ...tool, lookup: true } : tool))
+  const messages = [
+    asked("What does P-04 do?"),
+    said("list", [call("a", "genui_machine_list"), result("a", list)]),
+    said("show", calls("b", "P-04")),
+    said("words", [text("It runs.")]),
+  ]
+  assert.deepEqual(keepOfAnswer(messages, 3, looking, false)?.recipe.parts, [
+    { tool: "genui_machine_show", args: { machine: "P-04" } },
+  ])
+  // Where the list is the answer, the page keeps it.
+  const overview = [call("a", "genui_machine_list"), result("a", list), text("All run.")]
+  assert.deepEqual(callsOfAnswer(overview, looking), [{ tool: "genui_machine_list", args: {} }])
+})
