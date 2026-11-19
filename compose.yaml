@@ -369,6 +369,7 @@ services:
       EVENTS_API_URL: http://events-api:8080
       # The MCP servers of optional services whose tools the chat has too, see .env.example.
       APP_MCP_SERVERS: ${APP_MCP_SERVERS:-}
+      APP_DOCUMENTATION_PACKAGE: ${APP_DOCUMENTATION_PACKAGE:-}
       # Where the browser hears live values at the broker: the host of the page and this port, or the whole
       # address of MQTT_WS_URL for a broker behind a proxy.
       MQTT_WS_PORT: ${MQTT_WS_PORT:-9001}

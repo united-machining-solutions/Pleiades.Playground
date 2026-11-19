@@ -6,6 +6,7 @@ import { mcp } from "@tanstack/ai-mcp/harness"
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
 
+import { withDocumentationScope } from "../documentation/presentation.ts"
 import { PROPOSE_PAGE_TOOL } from "@/pages/proposal.ts"
 
 import { chatTools } from "./cards.tsx"
@@ -97,8 +98,9 @@ const modelTools = definePlugin({
 const localTimes = defineChatMiddleware({
   name: "local-times",
   onBeforeToolCall(ctx, call) {
-    const args = withTimeZone(call.args, call.tool?.inputSchema, ctx.context)
-    return args && { type: "transformArgs", args }
+    const timed = withTimeZone(call.args, call.tool?.inputSchema, ctx.context)
+    const args = withDocumentationScope(call.toolName, timed ?? call.args)
+    return args !== call.args ? { type: "transformArgs", args } : undefined
   },
 })
 
