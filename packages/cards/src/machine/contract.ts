@@ -27,6 +27,13 @@ export const instant = z.iso.datetime({ offset: true })
 export const machineId = z.string().regex(/^[^/+#]+$/)
 
 /**
+ * How a caller names one machine to a tool that answers a question about it: by its id, or as people
+ * call it. The backend finds the machine; nobody has to list the machines first to learn its id.
+ */
+export const MACHINE_NAMING =
+  "The machine: its id, <manufacturer>_<model>_<serial number>, for example alcyone-machines_AX-400_P-04, or what people call it, such as its serial number (P-04) or its model and serial number (AX-400 P-04). A name that fits several machines is refused, with their ids."
+
+/**
  * Where each reading of a machine is kept, below `machines/{machineId}/`: the topics of the umati data
  * model. The backend reads the stored values of these topics, and a page that is live hears them at
  * the broker. The state and the operation mode are the two fields of the snapshot `State/Status`: see

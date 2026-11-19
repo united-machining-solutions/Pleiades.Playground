@@ -86,11 +86,11 @@ import {
   takePress,
   useChatPanel,
 } from "./ask.ts"
-import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
+import { blocksOf, callsAfter, questionOf, thinkingLine } from "./blocks.ts"
 import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { UNNAMED_CHAT, chatName, nameOfQuestion } from "./chat-name.ts"
-import { DictateButton } from "./dictate.tsx"
+import { DictateButton, DictationLine, useDictation } from "./dictate.tsx"
 import { SaveAsPage } from "./save-as-page.tsx"
 import type { ListedServer } from "./server-list.ts"
 import { chooseChatModel, fetchChatSettings, getChatServers, switchChatServer } from "./status.ts"
@@ -447,7 +447,7 @@ function Conversation({ threadId }: { threadId: string }) {
                     )
                   }
                   const live = isLoading && message === messages.at(-1)
-                  const blocks = blocksOf(message.parts, live, chatTools)
+                  const blocks = blocksOf(message.parts, live, chatTools, callsAfter(messages, position, isLoading))
                   // An answer that has nothing to show yet takes no room.
                   if (blocks.length === 0) return null
                   // An answer that has ended, and for which the chat drew a card, can be saved as a
@@ -560,7 +560,8 @@ const callIcon: Record<CallState, typeof CircleCheckIcon> = {
 
 /**
  * One tool call, after the shadcn pattern Tool: a line while it runs, and a line that opens to what
- * the tool gave back, or why it failed, once its result is there.
+ * the tool gave back, or why it failed, once its result is there. A lookup on the way to the answer,
+ * which the chat does not draw on its own, opens to its card (`card`, blocks.ts).
  */
 function CallLine({ call }: { call: Call }) {
   const Icon = callIcon[call.state]
@@ -573,6 +574,14 @@ function CallLine({ call }: { call: Call }) {
     </TraceLine>
   )
   if (call.output === undefined) return line
+  if (call.card !== undefined) {
+    return (
+      <TraceCollapsible>
+        <TraceCollapsibleTrigger>{line}</TraceCollapsibleTrigger>
+        <TraceCollapsibleContent>{call.card}</TraceCollapsibleContent>
+      </TraceCollapsible>
+    )
+  }
   // The output is data of the stack, shown whole and unfiltered: the chat has no sign-in, so whoever
   // reaches it may read what the tools read. `wrap` and `max-h-64` bound the box, not the text; a
   // closed step costs nothing, because the panel of Base UI mounts its children only while open
@@ -758,7 +767,7 @@ function Composer({
   off,
   settled = true,
   onSwitch,
-  dictation,
+  dictation: canDictate,
 }: {
   placeholder: string
   suggestions?: ReadonlyArray<string>
@@ -818,6 +827,7 @@ function Composer({
     setNotice(undefined)
     field.current?.focus()
   }
+  const dictation = useDictation(dictated)
   // What was typed: a question goes out, a command becomes its question, /help shows the commands.
   const submit = (value: string) => {
     if (value.trim() === "" || busy) return
@@ -941,23 +951,27 @@ function Composer({
             onKeyDown={onKeyDown}
           />
           {/* The second line of the field: the tools, the commands and, with a choice of models, the
-              model on the left, dictation and send on the right. */}
+              model on the left, dictation and send on the right. While dictation records or writes, its
+              line stands on the left instead, where a finger on the microphone does not cover it. */}
           <InputGroupAddon align="block-end">
-            <ToolsMenu off={off} settled={settled} onSwitch={onSwitch} />
-            <InputGroupButton
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Commands"
-              aria-pressed={help}
-              onClick={() => {
-                setHelp((open) => !open)
-                setClosed(false)
-                setMarked(0)
-              }}
-            >
-              <SlashIcon />
-            </InputGroupButton>
-            {choice && (
+            {dictation.phase !== "idle" && <DictationLine dictation={dictation} />}
+            {dictation.phase === "idle" && <ToolsMenu off={off} settled={settled} onSwitch={onSwitch} />}
+            {dictation.phase === "idle" && (
+              <InputGroupButton
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Commands"
+                aria-pressed={help}
+                onClick={() => {
+                  setHelp((open) => !open)
+                  setClosed(false)
+                  setMarked(0)
+                }}
+              >
+                <SlashIcon />
+              </InputGroupButton>
+            )}
+            {choice && dictation.phase === "idle" && (
               <DropdownMenu>
                 <DropdownMenuTrigger render={<InputGroupButton variant="ghost" aria-label={`Model: ${model}`} />}>
                   {model}
@@ -977,12 +991,12 @@ function Composer({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            {dictation && <DictateButton className="ml-auto" onText={dictated} />}
+            {canDictate && <DictateButton dictation={dictation} className="ml-auto" />}
             <InputGroupButton
               type={stoppable ? "button" : "submit"}
               variant="default"
               size="icon-sm"
-              className={dictation ? undefined : "ml-auto"}
+              className={canDictate ? undefined : "ml-auto"}
               aria-label={stoppable ? "Stop" : "Send"}
               disabled={busy && !stoppable}
               onClick={stoppable ? onStop : undefined}

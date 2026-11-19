@@ -8,14 +8,20 @@ export const DEFAULT_PORT = 4840
 
 /**
  * The endpoint of what the person named. An address is taken as it is, without a slash at its end;
- * it may be a gateway that serves several machines. A machine alone, for example `A1121O0001`, is
- * its host name with the port of OPC UA. `assumed` says the latter: if it does not answer, the
- * person is asked for the endpoint instead of guessing another one.
+ * it may be a gateway that serves several machines. A mistyped `opc.tcp` before it, as in
+ * `opc.tcp//host:port`, `opc.tcp:/host:port` or `opc.tcp:host:port`, is written right, and a host
+ * with a port but no scheme, `host:port` or `host:port/path`, gets `opc.tcp://`: both are
+ * addresses, and neither gets a second port.
+ * A machine alone, for example `A1121O0001`, is its host name with the port of OPC UA. `assumed`
+ * says the latter: if it does not answer, the person is asked for the endpoint instead of guessing
+ * another one.
  */
 export function endpointOf(target: string): { url: string; assumed: boolean } {
-  const trimmed = target.trim()
+  const trimmed = target.trim().replace(/^opc\.tcp(:\/*|\/+)/i, "opc.tcp://")
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return { url: trimmed.replace(/\/+$/, ""), assumed: false }
-  return { url: `opc.tcp://${trimmed}:${DEFAULT_PORT}`, assumed: true }
+  const bare = trimmed.replace(/\/+$/, "")
+  if (/^(\[[^\]\s]+\]|[^\s/:[\]]+):\d+(\/\S*)?$/.test(bare)) return { url: `opc.tcp://${bare}`, assumed: false }
+  return { url: `opc.tcp://${bare}:${DEFAULT_PORT}`, assumed: true }
 }
 
 export type ChatCommand = {

@@ -4,7 +4,7 @@ import type { LevelTotal, NotificationEntry, NotificationList } from "@pleiades/
 
 import { listTopics, readAlertsOf } from "./apis.ts"
 import type { AlertStanding, Apis } from "./apis.ts"
-import { machineOf } from "./machines.ts"
+import { machineNamed, machineOf } from "./machines.ts"
 import { secondsBefore } from "./time.ts"
 
 // The warnings and errors of one machine, each with when it came, when it went and how long it
@@ -59,7 +59,7 @@ function totalOf(entries: ReadonlyArray<NotificationEntry>, from: string, asOf: 
 
 export async function listNotifications(
   apis: Apis,
-  machine: string,
+  name: string,
   hours = NOTIFICATION_HOURS,
   now = new Date(),
 ): Promise<NotificationList> {
@@ -69,16 +69,16 @@ export async function listNotifications(
   const asOf = now.toISOString()
   const from = secondsBefore(now, hours * 3600).toISOString()
   const horizon = secondsBefore(now, HORIZON_SECONDS).toISOString()
-  const topic = `machines/${machine}/${NOTIFICATIONS_PATH}`
-  const [topics, { alerts, hasMore }] = await Promise.all([
-    listTopics(apis, new Date(horizon), now),
-    readAlertsOf(apis, machine, new Date(from), now),
-  ])
-  // An id that no machine published a value under is no machine: an empty list would read as an all-clear.
+  // The machine is named by its id or as people call it, so the alerts are read once it is known.
+  const topics = await listTopics(apis, new Date(horizon), now)
   const known = [...new Set(topics.flatMap((one) => machineOf(one) ?? []))].sort()
+  const machine = machineNamed(known, name)
+  // An id that no machine published a value under is no machine: an empty list would read as an all-clear.
   if (!known.includes(machine)) {
     throw new Error(`No machine "${machine}" published a value in the last 24 hours. Machines that did: ${known.join(", ") || "none"}.`)
   }
+  const topic = `machines/${machine}/${NOTIFICATIONS_PATH}`
+  const { alerts, hasMore } = await readAlertsOf(apis, machine, new Date(from), now)
 
   const found = alerts
     // An alert that stands and came up before the horizon is none the list of machines names.
