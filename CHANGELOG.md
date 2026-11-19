@@ -569,7 +569,8 @@ All notable changes are documented here. The format follows
 
 - Example app: `/discover` takes a mistyped or shortened address as the address it is. `opc.tcp//host:port`
   became `opc.tcp://opc.tcp//host:port:4840`, a machine name with the default port; a mistyped `opc.tcp` at
-  the start is now written right, and `host:port` without a scheme gets `opc.tcp://` and no second port. Only
+  the start, also `opc.tcp:host:port`, is now written right, and `host:port` or `host:port/path` without a
+  scheme gets `opc.tcp://` and no second port. Only
   a name alone, for example `A1121O0001`, still means `opc.tcp://<name>:4840`.
 - `opcua-adapter`: a rejected certificate is reported with its reason instead of a timeout. A server whose
   certificate does not carry the ApplicationUri it announces was told in the chat as "did not open a session
