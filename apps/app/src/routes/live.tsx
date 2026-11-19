@@ -117,18 +117,21 @@ function LiveValues() {
         )}
       </ToggleGroup>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,28rem),1fr))] gap-3">
-        {quantities.map((one) => (
-          <QuantityGraph
-            key={one.quantity}
-            quantity={one}
-            from={from}
-            to={to}
-            instants={instants}
-            machines={machines}
-            shown={shown}
-            current={now}
-          />
-        ))}
+        {/* With all machines, only the graphs that have a line: a value no machine published is left out. */}
+        {quantities
+          .filter((one) => chosen !== undefined || one.lines.length > 0)
+          .map((one) => (
+            <QuantityGraph
+              key={one.quantity}
+              quantity={one}
+              from={from}
+              to={to}
+              instants={instants}
+              machines={machines}
+              shown={shown}
+              current={now}
+            />
+          ))}
       </div>
     </Page>
   )
@@ -162,12 +165,18 @@ function nowOf(current: ReadonlyArray<MachineMeasurements>, quantity: string): s
  */
 const QuantityGraph = memo(
   function QuantityGraph({ quantity, from, to, instants, machines, shown, current }: QuantityGraphProps) {
+    // At most one value of now stands next to the title; where more machines measured it, the lines speak alone.
+    const measuring = current.filter(
+      (measured) =>
+        shown.includes(measured.machine) &&
+        measured.measurements.some((measurement) => measurement.quantity === quantity.quantity),
+    )
     return (
       <MeasurementGraph
         series={{ ...quantity, lines: quantity.lines.filter((line) => shown.includes(line.machine)), from, to, instants }}
         // Every machine, chosen or not, so that each keeps its colour.
         machines={machines}
-        current={current.filter((measured) => shown.includes(measured.machine))}
+        current={measuring.length === 1 ? measuring : []}
       />
     )
   },
