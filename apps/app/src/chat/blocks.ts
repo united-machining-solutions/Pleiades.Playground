@@ -82,11 +82,21 @@ export function blocksOf(
   live: boolean,
   tools: ReadonlyArray<ChatTool>,
   after: After = "no call",
+  exclusiveId?: string,
+  relatedParts: UIMessage["parts"] = parts,
 ): Array<Block> {
   const blocks: Array<Block> = []
+  const answerResults = parts.flatMap(part => {
+    if (part.type !== "tool-result" || part.state === "error" || (exclusiveId && part.toolCallId !== exclusiveId)) return []
+    const call = relatedParts.find(other => other.type === "tool-call" && other.id === part.toolCallId)
+    const tool = call?.type === "tool-call" ? tools.find(one => one.name === call.name && one.replacesAnswer) : undefined
+    const node = tool?.draw?.(part.content, { id: part.toolCallId })
+    return node === null || node === undefined ? [] : [{ part, node }]
+  })
+  const answer = answerResults.at(-1)
   for (const [index, part] of parts.entries()) {
     if (part.type === "tool-call") {
-      const result = parts.find((other) => other.type === "tool-result" && other.toolCallId === part.id)
+      const result = relatedParts.find((other) => other.type === "tool-result" && other.toolCallId === part.id)
       const state: CallState =
         result?.type === "tool-result"
           ? result.state === "error"
@@ -101,23 +111,25 @@ export function blocksOf(
       if (last?.kind === "steps") last.calls.push(call)
       else blocks.push({ kind: "steps", calls: [call] })
     } else if (part.type === "tool-result") {
+      if (answer || exclusiveId) {
+        if (part === answer?.part) blocks.push({ kind: "drawn", node: answer.node })
+        continue
+      }
       // The app draws the values of a tool itself, the way the card of that tool says: a card from
       // the catalogue, or a list. The tool is the one that was called, found by the call of this
       // result. The content does not choose the card: two contracts can be alike, one can extend
       // the other, and a result is still the answer of the tool that gave it.
-      const call = parts.find((other) => other.type === "tool-call" && other.id === part.toolCallId)
+      const call = relatedParts.find((other) => other.type === "tool-call" && other.id === part.toolCallId)
       const tool = call?.type === "tool-call" ? tools.find((one) => one.name === call.name) : undefined
-      const node = tool?.draw?.(part.content, { id: part.toolCallId })
+      const node = part.state === "error" ? null : tool?.draw?.(part.content, { id: part.toolCallId })
       if (node === null || node === undefined) continue
-      // A result a model may have looked something up with is drawn only once it is known that the
-      // answer calls no other tool after it. Until then, or as a step, the line of its call opens to it.
       if (tool?.lookup && (after !== "no call" || calledAfter(parts, index))) {
-        const step = blocks.flatMap((block) => (block.kind === "steps" ? block.calls : [])).find((one) => one.id === part.toolCallId)
+        const step = blocks.flatMap(block => block.kind === "steps" ? block.calls : []).find(one => one.id === part.toolCallId)
         if (step) step.card = node
         continue
       }
       blocks.push({ kind: "drawn", node })
-    } else if (part.type === "text" && part.content.trim() !== "") {
+    } else if (part.type === "text" && !answer && !exclusiveId && part.content.trim() !== "") {
       blocks.push({ kind: "text", text: part.content })
     }
   }
@@ -157,4 +169,21 @@ export function questionOf(parts: UIMessage["parts"]): string {
   return parts
     .flatMap((part) => (part.type === "text" ? [part.content] : []))
     .join("\n")
+}
+
+
+/** The final verified card of this user turn, including separate assistant tool messages. */
+export function exclusiveAnswerId(messages: ReadonlyArray<UIMessage>, position: number, tools: ReadonlyArray<ChatTool>): string | undefined {
+  let start = position, end = position + 1
+  while (start > 0 && messages[start - 1].role !== "user") start--
+  while (end < messages.length && messages[end].role !== "user") end++
+  const parts = messages.slice(start, end).flatMap(message => message.parts)
+  let id: string | undefined
+  for (const part of parts) {
+    if (part.type !== "tool-result" || part.state === "error") continue
+    const call = parts.find(other => other.type === "tool-call" && other.id === part.toolCallId)
+    const tool = call?.type === "tool-call" ? tools.find(one => one.name === call.name && one.replacesAnswer) : undefined
+    if (tool?.draw?.(part.content, { id: part.toolCallId }) != null) id = part.toolCallId
+  }
+  return id
 }

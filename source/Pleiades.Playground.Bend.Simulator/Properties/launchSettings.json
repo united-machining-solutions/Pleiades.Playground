@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "BendingPress": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5614",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Config__SerialNumber": "B-01",
+        "Config__Manufacturer": "Manufacturer_A",
+        "Config__Model": "Bend5130"
+      }
+    }
+  }
+}

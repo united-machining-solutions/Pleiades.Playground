@@ -3,7 +3,7 @@ import { test } from "node:test"
 
 import type { UIMessage } from "@tanstack/ai-react"
 
-import { blocksOf, callsAfter, questionOf, thinkingLine } from "./blocks.ts"
+import { blocksOf, callsAfter, exclusiveAnswerId, questionOf, thinkingLine } from "./blocks.ts"
 import type { After } from "./blocks.ts"
 import { jsonOf } from "./tool-results.ts"
 import type { ChatTool } from "./tool-results.ts"
@@ -258,4 +258,43 @@ test("a card is handed the call its result answers, so that it can tell two call
   ]
   blocksOf([call("a", "app_page_propose"), result("a", "{}"), call("b", "app_page_propose"), result("b", "{}")], false, noting)
   assert.deepEqual(handed, ["a", "b"])
+})
+
+test("a verified answer replaces duplicate prose and intermediate citations with one card", () => {
+  const cardTools: ChatTool[] = [
+    { name: "docs_search", draw: () => "old sources" },
+    { name: "docs_answer", replacesAnswer: true, draw: content => content === "verified" ? "answer card" : null },
+  ]
+  const parts: Parts = [call("s", "docs_search"), result("s", "hits"), text("Duplicate prose"), call("a", "docs_answer"), result("a", "verified"), text("Repeated answer")]
+  const blocks = blocksOf(parts, false, cardTools)
+  assert.deepEqual(blocks.filter(block => block.kind === "drawn"), [{ kind: "drawn", node: "answer card" }])
+  assert.equal(blocks.some(block => block.kind === "text"), false)
+  const invalid = blocksOf([call("a", "docs_answer"), result("a", "invalid"), text("Try again")], false, cardTools)
+  assert.equal(invalid.some(block => block.kind === "text"), true)
+  const failed = blocksOf([call("a", "docs_answer"), result("a", "verified", "error"), text("Try again")], false, cardTools)
+  assert.equal(failed.some(block => block.kind === "text"), true)
+})
+
+
+test("one answer card replaces intermediate sources across an entire turn, keeping earlier turns", () => {
+  const cards: ChatTool[] = [{ name: "docs_answer", replacesAnswer: true, draw: content => content === "verified" ? "card" : null }]
+  const messages = [
+    { id: "q1", role: "user", parts: [text("First question")] },
+    { id: "old", role: "assistant", parts: [text("Previous answer")] },
+    { id: "q2", role: "user", parts: [text("New question")] },
+    { id: "search", role: "assistant", parts: [call("s", "docs_search"), result("s", "hits"), text("Intermediate prose")] },
+    { id: "final", role: "assistant", parts: [call("a", "docs_answer"), result("a", "verified")] },
+  ] as UIMessage[]
+  assert.equal(exclusiveAnswerId(messages, 1, cards), undefined)
+  assert.equal(exclusiveAnswerId(messages, 3, cards), "a")
+  assert.equal(blocksOf(messages[3].parts, false, cards, "no call", "a").some(block => block.kind === "text"), false)
+  assert.equal(blocksOf(messages[4].parts, false, cards, "no call", "a").filter(block => block.kind === "drawn").length, 1)
+})
+
+
+test("a result arriving in another assistant message still draws its verified answer card", () => {
+  const cards: ChatTool[] = [{ name: "docs_answer", replacesAnswer: true, draw: content => content === "verified" ? "card" : null }]
+  const calls: Parts = [call("a", "docs_answer")]
+  const results: Parts = [result("a", "verified")]
+  assert.deepEqual(blocksOf(results, false, cards, "no call", "a", [...calls, ...results]), [{ kind: "drawn", node: "card" }])
 })

@@ -123,6 +123,11 @@ parameters:
     targets:
       - pointer: CUTTING_PUNCH_PORT
         components: ["default"]
+  bendingPressPort:
+    value: 5614
+    targets:
+      - pointer: BENDING_PRESS_PORT
+        components: ["default"]
   opcuaAdapterBind:
     value: "127.0.0.1"
     targets:
@@ -162,6 +167,11 @@ parameters:
     value: ""
     targets:
       - pointer: APP_MCP_SERVERS
+        components: ["default"]
+  appDocumentationPackage:
+    value: ""
+    targets:
+      - pointer: APP_DOCUMENTATION_PACKAGE
         components: ["default"]
   hubRegistration:
     value: true
@@ -258,6 +268,10 @@ configuration:
           name: Port of the page of the punching machine
           description: The page answers on the device only (127.0.0.1).
           schema: port
+        - parameter: bendingPressPort
+          name: Port of the page of the press brake
+          description: The page answers on the network; it has no sign-in.
+          schema: port
         - parameter: opcuaAdapterBind
           name: Address of the OPC UA adapter
           description: >-
@@ -301,6 +315,13 @@ configuration:
             reaches from its container. For the documentation app on this device:
             docs=http://host.docker.internal:3202/mcp. Its MCP listener and published port must be reachable
             from this container; a port published only on host loopback may not be reachable on Linux.
+          schema: optionalText
+        - parameter: appDocumentationPackage
+          name: Documentation package
+          description: >-
+            Optional documentation package for this machine. When set, documentation searches, source
+            reviews and answer evidence stay within this package. Empty: the chat discovers the package
+            or asks which one to use. Requires the documentation MCP server in Further MCP servers.
           schema: optionalText
     - name: Pleiades Hub
       settings:

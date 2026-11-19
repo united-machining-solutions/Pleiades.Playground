@@ -29,6 +29,8 @@ export type ChatTool = {
    * says it here.
    */
   cardOnly?: boolean
+  /** A verified documentation card replaces prose and intermediate source renderings. */
+  replacesAnswer?: boolean
   /**
    * A language model also calls this tool on its way to an answer, to look up what there is, such as
    * the machines and their ids. Its result is drawn only where the answer calls no other tool after

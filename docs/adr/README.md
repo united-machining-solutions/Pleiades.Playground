@@ -30,3 +30,6 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0019](0019-documentation-sources-in-chat.md) | Documentation sources and original PDFs in chat through MCP | proposed |
 | [0020](0020-the-language-model-composes-a-page-and-nothing-else.md) | The language model composes a page, and nothing else | proposed |
 | [0021](0021-hub-registration.md) | The example app registers at the Pleiades Hub, with the SDK as a vendored tarball | proposed |
+| [0022](0022-documentation-answer-cards.md) | Verified documentation answer cards alongside legacy sources | proposed |
+| [0023](0023-documentation-conflict-review.md) | Distinct documentation conflict and review states | proposed |
+| [0024](0024-documentation-cards-only.md) | Documentation answers use cards exclusively | proposed |

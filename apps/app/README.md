@@ -23,7 +23,9 @@ harness.
 - **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
   machine, live. A choice above the graphs shows one machine or all of them, and stays in the URL
   (`?machine=`). With all of them, a value no machine published has no graph, and the value of now stands
-  next to the title of a graph only where a single machine measures it.
+  next to the title of a graph only where a single machine measures it. With one machine chosen, every signal
+  it published in the last 24 hours has a graph of its own, found anew each time the machine is chosen. A
+  button at the top right of a graph shows it enlarged; its X closes it.
 - **Pages** (`/pages`) are what a person keeps of the chat, in this browser. "Save as page" under an answer
   of the chat makes one: all the cards of that answer, in their order, titled with the question. It stands
   under an answer that has ended and for which the chat drew a card, and needs no language model: the app
@@ -159,9 +161,24 @@ or hold it while you speak and let go, as on a tablet. A press shorter than 0.4 
 (`dictation-press.ts`); Enter or the space bar on the microphone is a tap too. While it records, the second
 line of the field says so, on the left, where a finger on the microphone does not cover it: bars that move
 with the loudness of the microphone (`dictation-level.ts`), the time, and what ends the recording, "Let go to
-finish" or "Tap ■ to finish". Then it says that the model writes down what was said, and the text goes into
-the field, after what is already there. It is sent like a typed question, when you send it. After two minutes
-the recording stops by itself and is written down the same way. The model hears the language itself. It also gets the
+finish" or "Tap ■ to finish". What was said so far stands in the field meanwhile, dimmed and in italics: as
+its placeholder when the field is empty, under what is written otherwise. Then the line says that the model
+writes down what was said, and the text goes into the field, after what is already there. It is sent like a
+typed question, when you send it. After two minutes the recording stops by itself and is written down the
+same way.
+
+What was said so far is a draft: the recording so far, written down again about every two seconds
+(`dictation-draft.ts`), one request at a time, by the same model. The gateway has no model that writes while
+one speaks, and the stream of the transcription model does not come through it: LiteLLM collects it and
+answers once. A draft may change as the model hears more. A draft still on its way when the recording ends
+is called off, at the gateway too, and all of the recording is written down once more; that text goes into
+the field. So twenty seconds of speech ask the model about ten times, each time a little longer. As the
+audio of the drafts grows with the square of the length, drafts stop after 30 s of recording: the last one
+stays, the line still shows that the microphone listens, and the end writes down all of it as before. Every
+field of the app shares the key of the gateway, which takes two requests at once, so the server writes one
+draft at a time for all fields together (`/api/transcribe?draft`): a draft that finds one on its way is
+answered 429 and comes again two seconds later, and the other request stays for the chat and for whole
+recordings. The names of the machines for the prompt are kept for a minute. The model hears the language itself. It also gets the
 names of the machines from the backend as its prompt, their serial numbers, models and machine ids, so that
 it writes "P-04" as the stack spells it.
 
@@ -325,8 +342,10 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   the old address of it, which leads there, `halls.tsx` the plans of the halls (drawn by
   `packages/cards/src/site/hall-plan.tsx`), `charts.tsx` the last hours of every
   machine as charts (drawn by `src/charts/state-tiles.tsx`), `where-is-my-job.tsx` a page for discussion
-  that follows an order across the machines (its map, its panels, the grouping of job orders and `getFloor`,
-  which reads its values, in `src/where-is-my-job/`), `pages.index.tsx` the list of the pages kept
+  that follows an order across the machines, with the machines of one step of manufacturing side by side (its
+  map, its panels, the grouping of job orders, the steps and `getFloor`, which reads its values, in
+  `src/where-is-my-job/`; the showcase "What if", the same view with made-up orders across machines at `/what-if`, gives them
+  to it through `extras.ts`), `pages.index.tsx` the list of the pages kept
   in this browser, `pages.$page.tsx` one of them and `pages.open.tsx` one opened from a link; `health.ts`,
   `api/harness/$.ts` and
   `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
@@ -480,11 +499,53 @@ listen on an address reachable by that runtime and accept its Host header; loopb
 be assumed reachable from another container. The standard demo has no documentation dependency.
 
 Ask about a manual, for example “Which four technological machining operations does CYCLE832 distinguish?”.
-The chat uses `docs_search` and `docs_read_page`, cites the document and page, and shows clickable sources.
-Selecting a PDF source opens its original physical page in a PDF.js viewer, with paging, zoom, download
-and literal search. Search combines native PDF text and indexed OCR page matches; only native text can
-be highlighted. The **Extracted text** tab retains the plain-text evidence. The backend reads metadata and
+The chat uses `docs_search` and `docs_read_page`, then displays verified `docs_answer` cards with clickable evidence.
+Selecting a card evidence source opens its original physical page in a continuous PDF.js viewer aligned with the
+documentation service: scroll through pages, enter a page number, zoom, download and search literal text.
+Only nearby pages allocate canvases and text layers; resizing and zoom preserve the current page position. Search combines native PDF text and indexed OCR page matches; only native text can
+be highlighted. Non-PDF card sources use the extracted-page viewer. The backend reads metadata and
 bounded binary resources through MCP and serves PDF bytes to the browser, including HTTP ranges.
 Missing, changed or unavailable sources show an error and require a new search.
 See [ADR-0019](../../docs/adr/0019-documentation-sources-in-chat.md) and the [external documentation contract](../../contracts/docs/README.md).
 The Playground never calls the documentation REST API or accesses its database.
+
+
+### Documentation answer cards
+
+The updated documentation MCP service exposes `docs_answer`. Its result uses the Playground card
+catalogue: source warnings appear first in their original wording, then the answer and one evidence chip.
+The chip opens an inline preview with title, known chapter/version, page and manufacturer/customer badge.
+**Open in document** opens the PDF viewer at the quoted passage and highlights matching native text
+across spans. Translucent evidence rectangles sit above the original canvas and below the selectable text
+layer, preserving readable glyphs. Search changes update these rectangles without rerendering the canvas.
+Scanned pages without positional OCR still open at the cited page and explain why no exact mark is shown.
+
+Documentation answers use cards exclusively. The service must provide `docs_answer`; unsupported or
+failed evidence produces a no-evidence card. The old prose/source-list presentation and runtime toggle
+have been removed. Older source-only chat turns show an unavailable card; ask again to obtain a verified
+answer. See [ADR-0024](../../docs/adr/0024-documentation-cards-only.md).
+`APP_DOCUMENTATION_PACKAGE` optionally pins a deployment to a machine's documentation package. Otherwise
+name/select the package in the question; the card path does not search all packages to guess a machine.
+No new key is required. The package scope is a runtime app setting; the browser cannot choose an upstream address.
+
+The earlier [migration criteria](../../docs/adr/0022-documentation-answer-cards.md) are historical;
+[ADR-0024](../../docs/adr/0024-documentation-cards-only.md) retires the old presentation. Existing source tools remain.
+
+When a package is unknown, `docs_list_packages` discovers package and filename metadata without
+content search or embedding requests. A unique document reference or the sole package in a complete
+listing can resolve the selection; ambiguous packages require clarification. The content search remains
+scoped to that package. An unknown package alone does not mean the document is unavailable.
+
+### Conflicting documentation
+
+`docs_review` retrieves candidate pages from every current file in the selected package without a
+category filter, including conflicting manufacturer/customer sources and different passages on the same
+page. The chat model compares their meaning and conditions; MCP verifies literal evidence, receipt
+coverage and source freshness. Lexical terms limit recall; no contradiction found is not a guarantee.
+Cards show explicit no-contradiction, conflict or incomplete-review states. Missing indexing, failed
+reads, caps, stale reviews and old stored answers cannot claim completed review. Each conflicting
+alternative has its own expandable source and PDF navigation. Multiple alternatives remain accessible.
+Warnings stay first and verbatim. Conflict cards suppress the ordinary action list. Recommendations
+require completed review and an explicit supported rule; otherwise technical clarification is required.
+No approval is inferred from classification, timestamps, author counts or a user's choice. See
+[ADR-0023](../../docs/adr/0023-documentation-conflict-review.md).

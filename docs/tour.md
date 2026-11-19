@@ -25,7 +25,7 @@ docker compose up -d --build --wait
 
 The command returns when the stack is ready, that is when every container reports healthy: the broker, the
 database, the two APIs with their persistence workers, the Sites API, the generative UI backend, the app, one
-simulator per machine, three cutting machines, each a simulator with its adapter, the OPC UA adapter with a
+simulator per machine, three cutting machines, each a simulator with its adapter, a bending machine with its adapter, the OPC UA adapter with a
 simulated OPC UA machine. To see the demo without building it, start it from the published images, see
 [Start](../README.md#start).
 
@@ -65,6 +65,7 @@ timeseries-persistence   Up 3 minutes (healthy)
 | <http://localhost:5510/> | The Events API: Swagger UI, and MCP at `/mcp`. |
 | <http://localhost:5540/> | The Sites API, where the machines stand: Swagger UI, and MCP at `/mcp`. It answers on this computer only. |
 | <http://localhost:5611/>, `:5612`, `:5613` | The web pages of the three cutting machines, a 2D laser, a tube laser and a punching machine: their plan, their alarms and every telegram. They answer on the network too, like the web UI of the OPC UA simulator. |
+| <http://localhost:5614/> | The web page of the bending machine, a press brake: its plan, the automatic processing and every RCI telegram. It answers on the network too. |
 | `localhost:1883` | The MQTT broker the simulators and adapters publish to. |
 | <http://localhost:5560/machines> | The OPC UA adapter: the machines added over OPC UA. It answers on this computer only. |
 | <http://localhost:8090/> | The web UI of the simulated OPC UA machine, A1121O0001. |
@@ -150,13 +151,17 @@ the plan [`packages/cards/src/site/hall-plan.tsx`](../packages/cards/src/site/ha
 
 The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
 physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
-a line for each machine. A choice above the graphs shows one machine or all of them; with all of them, a
-value no machine published has no graph. It has no picture in this tour.
+a line for each machine. A choice above the graphs shows all machines or one. With all of them, a value no
+machine published has no graph; with one, every signal that machine publishes gets a graph of its own,
+whatever it is. The arrows at the top right of a graph show it enlarged, and its X closes it again. It has no
+picture in this tour.
 
 **In the code:** [`apps/app/src/routes/live.tsx`](../apps/app/src/routes/live.tsx) is the page,
 [`packages/cards/src/measurement/measurement-graph.tsx`](../packages/cards/src/measurement/measurement-graph.tsx)
 a graph. The lines are the result of the tool `genui_measurement_series`
-([`apps/genui-mcp/src/measurements.ts`](../apps/genui-mcp/src/measurements.ts)).
+([`apps/genui-mcp/src/measurements.ts`](../apps/genui-mcp/src/measurements.ts)); those of one machine
+come from `genui_timeseries_signals` and `genui_timeseries_series`, kept live in
+[`apps/app/src/live/signals.ts`](../apps/app/src/live/signals.ts).
 
 The page "Charts" in the sidebar, <http://localhost:5600/charts>, shows the last hours of every machine as charts:
 one bar per machine with how long it was in each state, and a tile per machine with its state over the last 30
@@ -171,19 +176,25 @@ live from the broker, as Home is.
 
 The page "Where is My Job?" in the sidebar, <http://localhost:5600/where-is-my-job>, is a basis for
 discussion: how an order could be followed across the shop floor. It shows the machines of the stack from above, with their state, utilisation
-and job orders; a machine with what it did, does and what waits for it; and an order on its way. An order is
-every job order that names the same order number, read from the backend (`genui_job_order_list`) and kept
-live by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. The simulators give it one such
-order every half hour: the route `ValveBody`, job order `90001/01` and on, order number `SO-90001`, turned on
-M-02, milled on P-07 and ground on P-04; P-07 releases its step once M-02 has ended it, P-04 once P-07 has.
-Search for "Valve body" or "SO-900" to find one. Programming before the machines,
-packing after them and the single part on its sheet have no source yet: the page draws them dashed, as the
-gaps to discuss. It has no picture in this tour.
+and job orders, the machines of one step of manufacturing side by side: cutting, turning, milling, grinding, in
+the order of DIN 8580. The step comes from what a machine says it is, `Identification.DeviceClass`, else from
+its model; "Arrange" lets a person correct it, and what they set wins. Below the map stand a machine with what
+it did, does and what waits for it, or an order on its way, and the list of orders, by default those in
+circulation. An order is every job order that names the same order number, read from the backend
+(`genui_job_order_list`) and kept live by the retained lists `JobMonitoring/JobOrders` and
+`JobOrderResults`. Programming before the machines, packing after them and the single part on its sheet have
+no source yet: the page draws them dashed, as the gaps to discuss. The simulators send one order across machines every
+half hour: the route `ValveBody`, job order `90001/01` and on, order number `SO-90001`, turned on M-02, milled
+on P-07 and ground on P-04; P-07 releases its step once M-02 has ended it, P-04 once P-07 has. Search for
+"Valve body" or "SO-900" to find one. A stack with `APP_SHOWCASES` set has the page <http://localhost:5600/what-if>, in the sidebar
+as "What if": the same page with made-up orders WI-… across the clusters, and "Real orders" turns them off.
+It has no picture in this tour.
 
 **In the code:** [`apps/app/src/routes/where-is-my-job.tsx`](../apps/app/src/routes/where-is-my-job.tsx)
 is the page; the map, the panels and `getFloor` live in
-[`apps/app/src/where-is-my-job/`](../apps/app/src/where-is-my-job/), and `floor.ts` there
-groups the job orders into orders.
+[`apps/app/src/where-is-my-job/`](../apps/app/src/where-is-my-job/): `floor.ts` there
+groups the job orders into orders, `steps.ts` gives each machine its step. The made-up orders are the
+showcase [`apps/app/src/showcases/what-if/`](../apps/app/src/showcases/what-if/).
 
 ## 3. The page of one machine
 
@@ -199,33 +210,41 @@ the choice is in the address, `?hours=8`, and stays when you switch to another m
 keeps its length and moves on with the clock. Under the title it says where the machine stands, its site and
 hall from the Sites API, or "On no site".
 
-![The page of P-04, with the breadcrumb Home › alcyone-machines_AX-400_P-04 and Home active in the sidebar.
+![The page of P-04, with the breadcrumb Home › alcyone-machines_AX-4… and Home active in the sidebar.
 The title AX-400 P-04 has an arrow for the switcher, and at the right stand the buttons Last 1 h, Last 8 h and
-Last 24 h, with Last 8 h chosen. Under the title it says "South plant · Hall 2" and "live · now 21:55". The
-machine card says Running, since 21:55, work master WM-BUSHING-0815, job order 4749/01, 17 of 20. Below is a band
-of the last 8 hours with the hours 16:00, 18:00 and 20:00 under it, and the total duration of each state. Under
-the card the section Now has four tiles: active power 9.07 kW with a small graph of the last minutes, energy over
-the last 8 hours 60.9 kWh, spindle 1 Rotating, and feed override 80 % with a bar. Below begins the section Alarms
-& warnings.](images/tour/machine-page.png)
+Last 24 h, with Last 8 h chosen. Under the title it says "North plant · Hall 1" and "live · now 10:10". The
+machine card says Running, since 10:10, work master WM-SHAFT-4711, job order 4717/01, 10 of 12. Below is a band
+of the last 8 hours with the hours 04:00, 06:00 and 08:00 under it, and the total duration of each state. Under
+the card stand four tiles on their own: active power 12.06 kW with a small graph of the last minutes, energy over
+the last 8 hours 12.1 kWh, spindle 1 Rotating, and feed override 90 % with a bar. Below begins the section Alarms
+& warnings with the choice All, Errors, Warnings, "4 errors and 16 warnings" and the head of its table: Message,
+Raised, Cleared, Duration.](images/tour/machine-page.png)
 
 The card has two parts. On top is the state with its reason, since when it holds, the work master and the job
 order that runs. Below is the band: one stripe from the chosen number of hours ago until now, coloured by state,
 and below it the full hours and the total of each state. A stack that has just started has a band that is mostly
 hatched, "No data": before it started nobody published. In the chat the same card names at its foot the topics
-it read, so every value can be traced to the broker; the page leaves that line out.
+it read, so every value can be traced to the broker; the page leaves that line out, and the line under the state
+that only repeats what the control reports, such as "NotExecuting, as the control reports".
 
-Below the card come three sections of the machine, each a card with a title, and inside it the card of a tool
-for this machine, the same the chat draws, without its frame. "Now" shows what the machine measures now as
-tiles, live from the broker as on the page Live values: its active power with the last 15 minutes as a small
-graph, the energy it imported over the chosen hours, its spindle and its feed override; a value of a machine
-that has fallen silent is marked "not current". "Alarms & warnings" lists its errors and warnings over the
-chosen hours, all of them or one level, ten on a page, those that stand first; the list is read again the
-moment the machine raises, changes or clears an alert. "Power and energy" draws its power over the chosen hours
-in kilowatts, and below it a table with the energy it imported in those hours, its mean and its peak. In the
-chat the same cards have their frames and feet, and the time series card its lines and the way to add one. The card comes first and
-the sections after it, each with a grey placeholder until it is there; a section whose backend does not answer
-says so and asks again, while the others stand. Choose other hours, and the page stays: the card and the
-sections that depend on the hours are read again and change when their answers are there.
+Below the card stand four tiles of what the machine measures now, live from the broker as on the page Live
+values: its active power with the last 15 minutes as a small graph, the energy it imported over the chosen
+hours, its spindle and its feed override; a value of a machine that has fallen silent is marked "not current".
+Then come two sections of the machine, each a card with a title, and inside it the card of a tool for this
+machine, the same the chat draws, without its frame. "Alarms & warnings" is a table of its errors and warnings
+over the chosen hours, a row for each: its level, the message with its code, when it was raised, when it was
+cleared or that it is still open, and how long it stood. It shows all of them or one level, ten on a page,
+those that stand first, and is read again the moment the machine raises, changes or clears an alert. Where the
+table is narrow, as in the chat, the clearing and the duration stand under the message. "Power and energy"
+draws its power over the chosen hours in kilowatts, and below it a table with the energy it imported in those
+hours, its mean and its peak. In the chat the same cards have their frames, and the time series card its lines
+and the way to add one.
+
+While the page opens, every part of it shows a grey placeholder of its form and size, so nothing moves when the
+values come; a section whose backend does not answer says so and asks again, while the others stand. Choose
+other hours, and the page stays: the card and the sections that depend on the hours are read again and change
+when their answers are there. A machine on a site that has published nothing for 24 hours, over a weekend say,
+keeps its page: its name and place, and "No data in the last 24 hours" in the card and the sections.
 
 **In the code:** [`apps/app/src/routes/sites.$machine.tsx`](../apps/app/src/routes/sites.%24machine.tsx)
 is the page, [`machines.$machine.tsx`](../apps/app/src/routes/machines.%24machine.tsx) leads the old address to it, and the choice of the hours and the list of the switcher are in
@@ -263,12 +282,27 @@ newer than the one in the chat: the page reads again, an answer shows what was t
 
 With an external documentation service configured as `docs` in `APP_MCP_SERVERS` and enabled under
 "Tools" in the message field, ask how to operate,
-maintain or program a machine. The chat searches its manuals and shows source references by filename and
+maintain or program a machine. The chat searches its manuals and shows answer cards with evidence by filename and
 page label, with the physical PDF page also shown when it differs. Select one to open that physical PDF page. Use the page controls, zoom and **Find**
-to explore it; **Next match** moves between matching pages. The **Extracted text** tab shows the evidence
-used by chat. A replaced or unavailable source asks you to search again. Both views read documentation
+to explore it, or scroll continuously through pages; **Next match** moves between matching pages.
+Zooming and resizing preserve your position. Evidence and search highlights keep the original text readable. Card previews show the literal evidence used by chat; non-PDF sources open extracted text. A replaced or unavailable source asks you to search again. The card and source viewer read documentation
 through MCP; the app has no direct connection to the documentation REST API.
-Documentation source references stay in the chat and are not cards for "Save as page".
+Documentation answers require the service's `docs_answer` tool and always use an evidence card: source warnings first in original wording, direct answer steps without a repeated source
+introduction, one evidence chip, and an inline source preview.
+Ordinary answers have no status badge after a completed review with no contradiction found.
+**Conflicting requirements** and **Review incomplete** remain explicit, with text, symbols and different layouts. Conflict cards show every competing statement, including
+conflicts within one category or document, with an independent evidence chip and PDF link. A completed
+review may show a recommendation with its explanation, without a separate technical rule label;
+unresolved or incomplete conflicts request technical
+clarification without an approval button. No contradiction found refers to retrieved passages only.
+The conflict states were checked with deterministic fixtures; the live `chat-answer` screenshot was
+not retaken because it invokes the configured language model.
+**Open in document** opens the cited physical PDF page and marks matching native text. Documentation answers use cards exclusively; the previous source-list presentation has been removed. Pin
+`APP_DOCUMENTATION_PACKAGE` to restrict the deployment to one machine package. See
+[the answer-card decision](adr/0022-documentation-answer-cards.md). Documentation cards are not available for
+"Save as page". The live `chat-answer` tour screenshot has not been retaken for this change because doing
+so invokes the configured language model; the card and native-text PDF were checked with deterministic
+fixtures instead.
 
 The panel works like a chat app on a phone: a list and a chat, with a way back. The head says what is open. In a
 chat it says the name of the chat, which is its first question, on one line and cut where it is too long; the
@@ -308,8 +342,9 @@ and above it "Opened from a link" with "Save to my pages". A part the colleague'
 and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
 
 Ask about the alarms of a machine, for example "Which warnings and errors did P-04 have today?", and the chat
-draws the notification card of the tool `genui_notification_list`: each warning and error with when it was
-raised, when it went and how long it stood, and the ones that have not gone first. The card is
+draws the notification card of the tool `genui_notification_list`: a table with each warning and error, when it
+was raised, when it went and how long it stood, and the ones that have not gone first. In the narrow panel the
+going and the duration stand under the message. The card is
 [`packages/cards/src/notification/notification-card.tsx`](../packages/cards/src/notification/notification-card.tsx),
 the tool is in [`apps/genui-mcp/src/notifications.ts`](../apps/genui-mcp/src/notifications.ts). No screenshot
 shows it yet.
@@ -354,7 +389,7 @@ question can go.
 With a speech-to-text model at the gateway, the field also has a microphone: tap it, speak, tap it again,
 or hold it while you speak and let go, and what was said stands in the field, to send like a typed question.
 While it records, bars at the left of the field move with your voice, beside the time and what ends the
-recording. The gateway decides which model
+recording, and what you said so far appears in the field, dimmed, every two seconds or so. The gateway decides which model
 writes it down, see [Dictation](../apps/app/README.md#dictation). The picture of the answer shows the microphone
 at the right of the field.
 
@@ -375,10 +410,13 @@ stand the tools of the MCP servers the chat has: `/machine` finds `/genui_machin
 it into the field, Enter takes it and Escape closes the list. Ask
 `/discover A1121O0001`, and the model scans the OPC UA server of the simulated machine, matches its nodes to
 the data model and shows a proposal: the endpoint with the strongest security, whether the machine fulfils
-the core of the data model and which profiles are complete, every element with its value, and what is
-derived, unclear or missing. What the core lacks is marked as not available. The machine is added when you
-press "Add machine" on the proposal; from then on it sends like the others, also after a restart, and stands in
-the bar of Home until you add it to a site there.
+the core of the data model and which profiles are complete, and how many elements are ok, derived, unclear
+or missing. What the core lacks is marked as not available. Press one of these chips, "2 missing" say, and
+the proposal lists those elements with their values and why; press it again to close the list. The machine is added when you
+press "Add the machine" on the proposal; from then on it sends like the others, also after a restart. It goes on
+a site too, so Home shows it: on the only one there is, or on the one you choose on the proposal where there are
+several, and a toast says where. Where there is no site yet, it stands in the bar of Home until you add it to a
+site there.
 `/opcua` lists the added servers with their core and profiles, and a button that removes a machine together
 with its retained messages on the broker; `/mapping A1121O0001` shows what needs a look.
 
@@ -439,6 +477,7 @@ Each part has a section "What is where" that maps its files:
 | A card, its contract, the wording or the colours of a state | [`packages/cards`: What is where](../packages/cards/README.md#what-is-where), and [A new card](../packages/cards/README.md#a-new-card) |
 | What a machine publishes and how it is stored | [`contracts/`](../contracts/README.md) first, then the .NET services under [`source/`](../source) |
 | Cutting machines that take their jobs through telegram files, and the adapter that brings them onto the broker (they start with the stack; the tour does not visit them) | [`Cutting.Simulator`](../source/Pleiades.Playground.Cutting.Simulator/README.md), [`Cutting.Adapter`](../source/Pleiades.Playground.Cutting.Adapter/README.md) |
+| A bending machine that reports through RCI telegram files, and the adapter that brings it onto the broker; both start with the stack, the tour does not stop there | [`Bend.Simulator`](../source/Pleiades.Playground.Bend.Simulator/README.md), [`Bend.Adapter`](../source/Pleiades.Playground.Bend.Adapter/README.md), [`Bend.Protocol`](../source/Pleiades.Playground.Bend.Protocol/README.md) |
 | How a machine that speaks OPC UA is scanned, mapped and run | [OPC UA adapter](../source/Pleiades.Playground.OpcUa.Adapter/README.md) |
 
 Below the app are the two APIs, and next to them the Sites API, which keeps where the machines stand. Each one
@@ -579,3 +618,8 @@ The simulator keeps changing the states, so a new picture shows other states tha
 it, and describe in the text of its stop what it shows. Whoever changes what a stop shows keeps the stop
 current, see [CONTRIBUTING.md](../CONTRIBUTING.md#conventions); CI checks that every pointer of this page
 still has its target.
+
+General safety warnings can cite a different page from the procedure. They remain first and verbatim;
+**Warning source** opens their own physical page in the PDF viewer. The procedure evidence remains
+separate. This warning-source flow was checked without invoking the configured language model; the
+live `chat-answer` screenshot has not been retaken.
