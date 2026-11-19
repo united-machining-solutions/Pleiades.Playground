@@ -32,7 +32,6 @@ deploymentProfiles:
         cores: 2
         architectures:
           - amd64
-          - arm64
       # Estimates for thirteen containers and 30 days of retained data, not measured.
       memory: 4Gi
       storage: 20Gi

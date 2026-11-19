@@ -10,12 +10,13 @@ import {
   CircleCheckIcon,
   LoaderCircleIcon,
   MessageCircleDashedIcon,
+  PlusIcon,
   SlashIcon,
   SquareIcon,
   XIcon,
 } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
-import type { FormEvent, KeyboardEvent } from "react"
+import { useEffect, useId, useRef, useState } from "react"
+import type { FormEvent, KeyboardEvent, ReactNode } from "react"
 
 import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
 import { Bubble, BubbleContent } from "@pleiades/ui/components/bubble"
@@ -41,6 +42,7 @@ import {
   MessageScrollerItem,
   MessageScrollerProvider,
   MessageScrollerViewport,
+  useMessageScroller,
 } from "@pleiades/ui/components/message-scroller"
 import {
   Sidebar,
@@ -64,12 +66,13 @@ import {
   TraceTitle,
 } from "@pleiades/ui/components/trace"
 
-import { commandsFor, matching, readTyped, usage } from "@/opcua/commands.ts"
+import { commandsFor, completion, matching, readTyped, stepped, toolCommand, usage } from "@/opcua/commands.ts"
 import type { ChatCommand } from "@/opcua/commands.ts"
 import { keepOfAnswer } from "@/pages/from-answer.ts"
 
 import { Answer } from "./answer.tsx"
 import {
+  CHAT_LIST,
   NEW_CHAT,
   afterSwitch,
   markPress,
@@ -86,12 +89,13 @@ import {
 import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
 import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
-import { chatName, nameOfQuestion } from "./chat-name.ts"
+import { UNNAMED_CHAT, chatName, nameOfQuestion } from "./chat-name.ts"
 import { DictateButton } from "./dictate.tsx"
 import { SaveAsPage } from "./save-as-page.tsx"
-import { chooseChatModel, fetchChatSettings, switchChatServer } from "./status.ts"
+import type { ListedServer } from "./server-list.ts"
+import { chooseChatModel, fetchChatSettings, getChatServers, switchChatServer } from "./status.ts"
 import { suggestions } from "./suggestions.ts"
-import { toolLabel } from "./tool-results.ts"
+import { forModel, toolLabel } from "./tool-results.ts"
 import { ToolsMenu } from "./tools-menu.tsx"
 
 const root = getRouteApi("__root__")
@@ -100,9 +104,9 @@ const { timeZone } = Intl.DateTimeFormat().resolvedOptions()
 /**
  * Everything about the chat lives in this panel on the right, after the shadcn block sidebar-15:
  * the list of the chats and the chat itself. It works like a chat app on a phone, a list and a
- * chat with a way back: in a chat the head says what the chat is called and leads back to the list,
- * and the list is where a new chat begins. Without the panel the app is complete; it only loses the
- * chat.
+ * chat with a way back: in a chat the head says what the chat is called and leads back to the list.
+ * "New chat" in the head begins a new one, and so does the field at the foot of the list. Without the
+ * panel the app is complete; it only loses the chat.
  *
  * It never covers the page. It stands next to it, and where the two do not fit side by side it
  * takes the lower half of the screen.
@@ -118,8 +122,12 @@ export function ChatSidebar({ chat }: { chat: string }) {
     >
       {!chatStatus.configured ? (
         <NoLanguageModel />
+      ) : chat === CHAT_LIST ? (
+        // The keys keep the two views apart: going from one to the other mounts the new one, so its
+        // head and its field take the focus a press asked for.
+        <Start key={CHAT_LIST} />
       ) : chat === NEW_CHAT ? (
-        <Start />
+        <Start key={NEW_CHAT} fresh />
       ) : (
         // The key gives every chat its own state.
         <Conversation key={chat} threadId={chat} />
@@ -131,17 +139,19 @@ export function ChatSidebar({ chat }: { chat: string }) {
 /**
  * The head of the panel. In a chat (`back`) a button leads back to the list, then comes the name of
  * the chat; elsewhere there is only the title of the view. The name takes the room that is left and
- * is cut where it is too long: the buttons never give way.
+ * is cut where it is too long: the buttons never give way. Where a new chat can begin (`add`), "New
+ * chat" stands before the button that closes the panel, in the list and in every chat.
  *
  * "All chats" and the link of a chat go away with the view they stand in. After such a press the
  * heading of the new view takes the focus, so it does not fall to the page and a screen reader says
- * where it is. On a page load the focus stays where it was.
+ * where it is; after "New chat" the field takes it (`Composer`). On a page load the focus stays where
+ * it was.
  */
-function PanelHead({ title, back = false }: { title: string; back?: boolean }) {
+function PanelHead({ title, back = false, add = false }: { title: string; back?: boolean; add?: boolean }) {
   const panel = useChatPanel()
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
-    if (takePress()) heading.current?.focus()
+    if (takePress("heading")) heading.current?.focus()
   }, [])
   return (
     <SidebarHeader className="h-14 flex-row items-center gap-1 border-b">
@@ -153,6 +163,11 @@ function PanelHead({ title, back = false }: { title: string; back?: boolean }) {
       <h2 ref={heading} tabIndex={-1} className="min-w-0 flex-1 truncate px-2 font-medium outline-none">
         {title}
       </h2>
+      {add && (
+        <Button variant="ghost" size="icon-sm" aria-label="New chat" onClick={panel.newChat}>
+          <PlusIcon />
+        </Button>
+      )}
       <Button variant="ghost" size="icon-sm" aria-label="Close the chat" onClick={panel.close}>
         <XIcon />
       </Button>
@@ -187,8 +202,15 @@ function NoLanguageModel() {
  * The list of the chats, where a chat leads back to: the chats so far, and below them the field that
  * begins a new chat, with questions to begin with above it. The head says "Chats", so the group has no
  * label of its own.
+ *
+ * `fresh` is a new chat that has no question yet, where "New chat" leads: the head says so and leads
+ * back to the list, and there is only the field with its questions to begin with. A chat exists from
+ * its first question on; until then it is in no list.
+ *
+ * A question asked here opens its chat, and the field of that chat takes the focus, so the next
+ * question can follow without a click.
  */
-function Start() {
+function Start({ fresh = false }: { fresh?: boolean }) {
   const { chats, chatStatus } = root.useLoaderData()
   const panel = useChatPanel()
   // The next chat begins with the model picked here.
@@ -204,17 +226,21 @@ function Start() {
     pickSwitchedOff(next)
     setOff(next)
   }
+  const ask = (question: string) => {
+    markPress("field")
+    panel.ask(question)
+  }
   return (
     <>
-      <PanelHead title="Chats" />
+      {fresh ? <PanelHead title={UNNAMED_CHAT} back /> : <PanelHead title="Chats" add />}
       <SidebarContent>
-        {chats.length > 0 ? (
+        {!fresh && chats.length > 0 ? (
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
                 {chats.map((entry) => (
                   <SidebarMenuItem key={entry.threadId}>
-                    <SidebarMenuButton render={<Link to="." search={{ chat: entry.threadId }} onClick={markPress} />}>
+                    <SidebarMenuButton render={<Link to="." search={{ chat: entry.threadId }} onClick={() => markPress()} />}>
                       <span>{entry.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -228,7 +254,7 @@ function Start() {
               <EmptyMedia variant="icon">
                 <MessageCircleDashedIcon />
               </EmptyMedia>
-              <EmptyTitle>No chats yet</EmptyTitle>
+              <EmptyTitle>{fresh ? "No question yet" : "No chats yet"}</EmptyTitle>
               <EmptyDescription>
                 Ask what the machines do, begin with one of the questions below, or type <code>/help</code> for the
                 commands.
@@ -241,7 +267,7 @@ function Start() {
         placeholder="Ask about the machines, or type / for commands"
         suggestions={suggestions}
         commands={commandsFor(chatStatus.opcua)}
-        onSend={panel.ask}
+        onSend={ask}
         models={chatStatus.models}
         model={model}
         onModel={choose}
@@ -394,11 +420,15 @@ function Conversation({ threadId }: { threadId: string }) {
 
   return (
     <>
-      <PanelHead title={chatName(entry, firstQuestion ?? asked)} back />
+      <PanelHead title={chatName(entry, firstQuestion ?? asked)} back add />
       <div className="min-h-0 flex-1">
-        {/* A new question settles near the top and the answer grows under it; a chat from before
-            opens at its last question. */}
-        <MessageScrollerProvider autoScroll defaultScrollPosition="last-anchor">
+        {/* A new question settles near the top and the answer grows under it, a long text as a tall
+            card; a chat from before opens at its last question. Without `autoScroll`: with it, the
+            scroller keeps the question at the top only while the answer fits, and then follows its
+            end, so a card taller than the panel, which comes in one piece, took the question out of
+            sight at once. The button at the foot leads to the end as it stands; an alert comes into
+            view by itself (`AlertItem`). */}
+        <MessageScrollerProvider defaultScrollPosition="last-anchor">
           <MessageScroller>
             <MessageScrollerViewport>
               <MessageScrollerContent aria-busy={isLoading} className="gap-6 p-4">
@@ -460,40 +490,40 @@ function Conversation({ threadId }: { threadId: string }) {
                   </MessageScrollerItem>
                 )}
                 {error && (
-                  <MessageScrollerItem messageId="error">
+                  <AlertItem messageId="error">
                     <Alert>
                       <CircleAlertIcon />
                       <AlertTitle>The language model did not answer</AlertTitle>
                       <AlertDescription>{error.message}</AlertDescription>
                     </Alert>
-                  </MessageScrollerItem>
+                  </AlertItem>
                 )}
                 {switchError && (
-                  <MessageScrollerItem messageId="switch-error">
+                  <AlertItem messageId="switch-error">
                     <Alert>
                       <CircleAlertIcon />
                       <AlertTitle>The model was not changed</AlertTitle>
                       <AlertDescription>{switchError}</AlertDescription>
                     </Alert>
-                  </MessageScrollerItem>
+                  </AlertItem>
                 )}
                 {serverError && (
-                  <MessageScrollerItem messageId="server-error">
+                  <AlertItem messageId="server-error">
                     <Alert>
                       <CircleAlertIcon />
                       <AlertTitle>The tools of this chat</AlertTitle>
                       <AlertDescription>{serverError}</AlertDescription>
                     </Alert>
-                  </MessageScrollerItem>
+                  </AlertItem>
                 )}
                 {stopError && (
-                  <MessageScrollerItem messageId="stop-error">
+                  <AlertItem messageId="stop-error">
                     <Alert>
                       <CircleAlertIcon />
                       <AlertTitle>Stopping did not reach the server</AlertTitle>
                       <AlertDescription>{stopError}</AlertDescription>
                     </Alert>
-                  </MessageScrollerItem>
+                  </AlertItem>
                 )}
               </MessageScrollerContent>
             </MessageScrollerViewport>
@@ -562,6 +592,23 @@ function CallLine({ call }: { call: Call }) {
 }
 
 /**
+ * An item of the chat that holds an alert. It comes into view when it appears: a new question stays at
+ * the top of the panel while its answer grows under it, so an alert under a tall answer would stand
+ * below the fold, and the answer would look as if all went well. "nearest" moves the panel only as far
+ * as the alert needs, and not at all when it is in sight; the question no longer holds the top after
+ * that. `useMessageScroller` is the escape hatch the rules of the chat name for what the parts do not
+ * express (`.claude/skills/shadcn/rules/chat.md`).
+ */
+function AlertItem({ messageId, children }: { messageId: string; children: ReactNode }) {
+  const { scrollToMessage } = useMessageScroller()
+  // Once, when the alert appears; `scrollToMessage` stays the same while the chat is open.
+  useEffect(() => {
+    scrollToMessage(messageId, { align: "nearest" })
+  }, [messageId, scrollToMessage])
+  return <MessageScrollerItem messageId={messageId}>{children}</MessageScrollerItem>
+}
+
+/**
  * The running line "Thinking": an answer is coming and nothing in it moves (`thinkingLine` in
  * blocks.ts). Its title shimmers, as every running line of a Trace does.
  */
@@ -610,40 +657,82 @@ function AnswerBlock({ block, thinking = false }: { block: Block; thinking?: boo
 }
 
 /**
- * The commands, under the field: all of them after /help, while a name is typed the ones that begin
- * with it. A command with an argument is put into the field to be completed; one without is sent.
+ * The commands, under the field, and after them the tools of the MCP servers the chat has: all of them
+ * after /help, while a name is typed the ones it fits. A command with an argument is put into the field
+ * to be completed; one without is sent. One entry is marked: the field keeps the focus and moves the
+ * mark with the arrow keys, and Tab or Enter take the marked one (Composer). The field points to it with
+ * aria-activedescendant.
  */
 function CommandList({
+  id,
   commands,
-  title,
+  marked,
+  titled,
+  onMark,
   onPick,
 }: {
+  id: string
+  /** The commands of the chat first, then the tools: the order the arrow keys go. */
   commands: ReadonlyArray<ChatCommand>
-  title?: string
+  marked: number
+  /** Whether each group says what it is: after /help, and wherever tools are in the list. */
+  titled: boolean
+  onMark: (index: number) => void
   onPick: (command: ChatCommand) => void
 }) {
+  // The marked command stays in sight when the arrow keys move past the edge of the scrolling part.
+  useEffect(() => {
+    document.getElementById(`${id}-${marked}`)?.scrollIntoView({ block: "nearest" })
+  }, [id, marked])
+  const split = commands.findIndex((command) => command.server !== undefined)
+  const groups = [
+    { title: "Commands", start: 0, entries: split < 0 ? commands : commands.slice(0, split) },
+    { title: "Tools", start: split, entries: split < 0 ? [] : commands.slice(split) },
+  ].filter((group) => group.entries.length > 0)
   // A ScrollArea of the design system for the scrolling part; its viewport is bounded, so it scrolls. Not a
   // Combobox: the list is filtered by what is typed into the message field itself, which a Combobox would
   // double with an input of its own.
   return (
     <ScrollArea className="[&>[data-slot=scroll-area-viewport]]:max-h-64">
-      {title && <span className="block px-2 pb-1 text-xs font-medium text-muted-foreground">{title}</span>}
-      <ItemGroup className="gap-0" role="list" aria-label="Commands">
-        {commands.map((command) => (
-          <Item
-            key={command.name}
-            size="sm"
-            role="listitem"
-            render={<button type="button" onClick={() => onPick(command)} />}
-            className="cursor-pointer text-left hover:bg-muted"
-          >
-            <ItemContent>
-              <ItemTitle className="font-mono">{usage(command)}</ItemTitle>
-              <ItemDescription>{command.summary}</ItemDescription>
-            </ItemContent>
-          </Item>
+      <div id={id} role="listbox" aria-label="Commands and tools" className="flex flex-col gap-2">
+        {groups.map((group) => (
+          <ItemGroup key={group.title} className="gap-0" role="group" aria-label={group.title}>
+            {titled && (
+              <span aria-hidden className="block px-2 pb-1 text-xs font-medium text-muted-foreground">
+                {group.title}
+              </span>
+            )}
+            {group.entries.map((command, offset) => {
+              const index = group.start + offset
+              return (
+                <Item
+                  key={command.name}
+                  id={`${id}-${index}`}
+                  size="sm"
+                  role="option"
+                  aria-selected={index === marked}
+                  // The field keeps the focus: a click must not take it, and Tab must not stop on an option.
+                  render={
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onMouseMove={() => onMark(index)}
+                      onClick={() => onPick(command)}
+                    />
+                  }
+                  className="cursor-pointer text-left aria-selected:bg-muted"
+                >
+                  <ItemContent>
+                    <ItemTitle className="font-mono break-all">{usage(command)}</ItemTitle>
+                    <ItemDescription>{command.summary}</ItemDescription>
+                  </ItemContent>
+                </Item>
+              )
+            })}
+          </ItemGroup>
         ))}
-      </ItemGroup>
+      </div>
     </ScrollArea>
   )
 }
@@ -688,7 +777,36 @@ function Composer({
   const [text, setText] = useState("")
   const [help, setHelp] = useState(false)
   const [notice, setNotice] = useState<string>()
+  // The command marked in the list, and whether Escape closed the list until the next keystroke.
+  const [marked, setMarked] = useState(0)
+  const [closed, setClosed] = useState(false)
+  const listId = useId()
+  // The tools of the MCP servers come into the list after the commands, so a person can name the tool
+  // the model should take. They are asked for when the list opens, as the panel "Tools" asks when it
+  // opens, so the list says what answers now. A server this chat switched off gives none, and neither
+  // does a tool only a card calls.
+  const [servers, setServers] = useState<ReadonlyArray<ListedServer>>([])
+  const listing = help || text.startsWith("/")
+  useEffect(() => {
+    if (!listing) return
+    let wanted = true
+    getChatServers().then(
+      (listed) => wanted && setServers(listed),
+      () => undefined,
+    )
+    return () => {
+      wanted = false
+    }
+  }, [listing])
+  const tools = servers
+    .filter((server) => server.reachable && !off.includes(server.name))
+    .flatMap((server) => forModel(server.tools, chatTools).map((tool) => toolCommand(server.name, tool)))
+  const all = [...commands, ...tools]
   const field = useRef<HTMLTextAreaElement>(null)
+  // After "New chat", and in a chat its first question opened from the panel, the field takes the focus.
+  useEffect(() => {
+    if (takePress("field")) field.current?.focus()
+  }, [])
   const prepare = (value: string) => {
     setText(value)
     setNotice(undefined)
@@ -703,7 +821,7 @@ function Composer({
   // What was typed: a question goes out, a command becomes its question, /help shows the commands.
   const submit = (value: string) => {
     if (value.trim() === "" || busy) return
-    const typed = readTyped(value, commands)
+    const typed = readTyped(value, all)
     switch (typed.kind) {
       case "question":
         setText("")
@@ -736,12 +854,42 @@ function Composer({
       submit(`/${command.name}`)
     }
   }
-  const offered = help ? commands : matching(text, commands)
+  const offered = closed ? [] : help ? all : [...matching(text, commands), ...matching(text, tools)]
+  const current = Math.min(marked, Math.max(offered.length - 1, 0))
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
     send()
   }
+  // While the list of commands is open, the keys of the field work it, as the slash commands of other
+  // chats do: the arrows move the mark, Tab writes the marked command into the field, Enter takes it,
+  // Escape closes the list. Otherwise Enter sends and Tab leaves the field.
   const onKeyDown = (event: KeyboardEvent) => {
+    if (event.nativeEvent.isComposing) return
+    const command = offered[current]
+    if (command) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault()
+        setMarked(stepped(current, event.key === "ArrowDown" ? 1 : -1, offered.length))
+        return
+      }
+      if (event.key === "Tab" && !event.shiftKey) {
+        event.preventDefault()
+        prepare(completion(command))
+        setHelp(false)
+        return
+      }
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault()
+        pick(command)
+        return
+      }
+      if (event.key === "Escape") {
+        event.preventDefault()
+        setHelp(false)
+        setClosed(true)
+        return
+      }
+    }
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       send()
@@ -754,7 +902,14 @@ function Composer({
   return (
     <SidebarFooter className="border-t">
       {offered.length > 0 && (
-        <CommandList commands={offered} title={help ? "Commands" : undefined} onPick={pick} />
+        <CommandList
+          id={listId}
+          commands={offered}
+          marked={current}
+          titled={help || offered.some((command) => command.server !== undefined)}
+          onMark={setMarked}
+          onPick={pick}
+        />
       )}
       {notice && <p className="px-2 text-sm text-muted-foreground">{notice}</p>}
       {questions.length > 0 && offered.length === 0 && (
@@ -774,9 +929,13 @@ function Composer({
             aria-label="Message"
             placeholder={placeholder}
             value={text}
+            aria-controls={offered.length > 0 ? listId : undefined}
+            aria-activedescendant={offered.length > 0 ? `${listId}-${current}` : undefined}
             onChange={(event) => {
               setText(event.target.value)
               setNotice(undefined)
+              setMarked(0)
+              setClosed(false)
               if (event.target.value !== "") setHelp(false)
             }}
             onKeyDown={onKeyDown}
@@ -790,7 +949,11 @@ function Composer({
               size="icon-sm"
               aria-label="Commands"
               aria-pressed={help}
-              onClick={() => setHelp((open) => !open)}
+              onClick={() => {
+                setHelp((open) => !open)
+                setClosed(false)
+                setMarked(0)
+              }}
             >
               <SlashIcon />
             </InputGroupButton>

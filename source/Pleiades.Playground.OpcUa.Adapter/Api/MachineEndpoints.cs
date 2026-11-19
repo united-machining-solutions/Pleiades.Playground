@@ -53,13 +53,13 @@ internal static class MachineEndpoints
     private const string RefusalDescription =
         "A refused registration answers with its reasons in problems: 400 if it is malformed; 409 once the server " +
         "has answered, if the registration does not fit it, is not the machine it says it is, or if the server gives " +
-        "no value for Identification.ManufacturerUri, Model or SerialNumber, the parts of the machine id " +
-        "(identity: ...); 502 if the server does not answer. A core the machine does not deliver whole is no reason: " +
+        "no value for Identification.ManufacturerUri (or, if it has no node for it, Identification.Manufacturer), Model or SerialNumber, " +
+        "the parts of the machine id (identity: ...); 502 if the server does not answer. A core the machine does not deliver whole is no reason: " +
         "what it lacks is declared not available.";
 
     /// <summary>Whether an exception says that the OPC UA server, not the request, is the problem.</summary>
     public static bool IsServerFault(Exception exception) =>
-        exception is Opc.Ua.ServiceResultException or EndpointNotOfferedException or ServerCertificateChangedException
+        exception is Opc.Ua.ServiceResultException or EndpointNotOfferedException or ServerCertificateChangedException or ServerCertificateRejectedException
             or CredentialMissingException or TimeoutException or System.Net.Sockets.SocketException or InvalidOperationException;
 
     /// <summary>The endpoints a server offers, strongest first. The first one is the one to register.</summary>

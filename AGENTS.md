@@ -76,6 +76,10 @@ Read [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md) and the decision
   [`packages/ui/brands`](packages/ui/brands/README.md), a `DESIGN.md` and a block of theme tokens written
   from it. Follow the skill `add-brand` (`.claude/skills/add-brand/SKILL.md`). A brand never edits a
   component and never sets a colour that carries a meaning; a test fails if it does.
+- A change to how the example app registers at the Pleiades Hub, one more app there, or a new tarball of the
+  SDK under `vendor/` ([ADR-0021](docs/adr/0021-hub-registration.md)): follow the skill `register-hub-app`
+  (`.claude/skills/register-hub-app/SKILL.md`). It is a copy from the hub's repository and leads to the guide
+  that comes with the SDK, `apps/app/node_modules/@pleiades/hub-sdk/register-an-app.md`.
 - A person who wants to add a page, a card or a source of data of their own: follow the skill
   `build-your-own` (`.claude/skills/build-your-own/SKILL.md`). Ask what they want to see, look yourself what
   the stack already has, propose the smallest thing that shows it, and on a yes take the recipe of the step

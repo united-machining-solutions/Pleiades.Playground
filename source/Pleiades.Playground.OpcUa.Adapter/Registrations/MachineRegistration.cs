@@ -84,6 +84,13 @@ internal sealed record IdentityRegistration
     /// <summary><c>Identification.ManufacturerUri</c>, the web address of the manufacturer.</summary>
     public string ManufacturerUri { get; init; } = string.Empty;
 
+    /// <summary>
+    /// True if the server has no node for <c>Identification.ManufacturerUri</c>: <see cref="ManufacturerUri"/> is then the
+    /// <see cref="Manufacturer"/> without its special characters, so that the machine id has a manufacturer.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool ManufacturerUriFromManufacturer { get; init; }
+
     /// <summary><c>Identification.Model</c>.</summary>
     public string Model { get; init; } = string.Empty;
 
@@ -234,15 +241,26 @@ internal sealed record ElementRegistration
     public string? Evidence { get; init; }
 }
 
-/// <summary>Where the alarms of the machine come from.</summary>
+/// <summary>
+/// Where the alarms of the machine come from: the events of an alarm type (<see cref="EventType"/>), or a
+/// variable that lists the alerts that stand (<see cref="List"/>). One of the two.
+/// </summary>
 internal sealed record AlertRegistration
 {
     /// <summary>The object whose events are subscribed. The Server object if empty.</summary>
     public string? Notifier { get; init; }
 
-    /// <summary>The event type of an alarm, with the namespace as a URI. Other events are ignored.</summary>
+    /// <summary>The event type of an alarm, with the namespace as a URI. Other events are ignored. Empty with <see cref="List"/>.</summary>
     [Description("The event type of an alarm of the server, with its namespace as a URI.")]
     public string EventType { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The variable that lists the alerts that stand, <c>Notification.ActiveAlerts</c> of
+    /// <c>urn:umati2:datamodel:opcua</c>, an array of <c>DataType.Alert</c>, with the namespace as a URI. The
+    /// adapter sets it for a machine in that namespace; a list it cannot decode gives no alerts.
+    /// </summary>
+    [Description("Leave out. The adapter sets it for a machine in urn:umati2:datamodel:opcua.")]
+    public string? List { get; init; }
 
     /// <summary>
     /// The field of the event type that holds the code of the maker, as

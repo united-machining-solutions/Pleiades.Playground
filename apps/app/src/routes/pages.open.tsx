@@ -1,6 +1,7 @@
 import { clock } from "@pleiades/cards/machine/format.ts"
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
 import { Button, buttonVariants } from "@pleiades/ui/components/button"
+import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { Link, createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router"
 import { LinkIcon, SearchXIcon } from "lucide-react"
@@ -8,9 +9,10 @@ import { useState } from "react"
 
 import { useRetry } from "@/hooks/use-live.ts"
 import { Column, PartsLoading } from "@/pages/column.tsx"
-import { DrawnPart, answerParts, waitsForBackend } from "@/pages/drawn-part.tsx"
+import { DrawnPart, askParts, useAnswers, waitsForBackend } from "@/pages/drawn-part.tsx"
 import { RECIPE_PARAM, decodeRecipe } from "@/pages/link.ts"
 import type { Recipe } from "@/pages/recipe.ts"
+import { shownParts } from "@/pages/shown-parts.ts"
 import { savePage } from "@/pages/store.ts"
 
 /**
@@ -43,24 +45,29 @@ export const Route = createFileRoute("/pages/open")({
   loader: async ({ deps }) => {
     const recipe = decodeRecipe(deps.recipe)
     if (recipe === null) return { opened: null }
-    return { opened: { recipe, parts: await answerParts(recipe.parts), readAt: new Date().toISOString() } }
+    return { opened: { recipe, parts: askParts(recipe.parts), readAt: new Date().toISOString() } }
   },
   component: OpenedPage,
   pendingComponent: Loading,
 })
 
+/** No parts: one array, so that the answers are not asked for again on every draw. */
+const NO_PARTS: ReadonlyArray<never> = []
+
 function OpenedPage() {
   const { opened } = Route.useLoaderData()
-  useRetry(opened?.parts.some(waitsForBackend) ?? false)
+  // An answer stands until the newer one of its part comes, also while the page is read again.
+  const { answers } = useAnswers(opened?.parts ?? NO_PARTS)
+  const shown = shownParts(opened?.recipe.parts ?? NO_PARTS, answers)
+  useRetry(shown.some(({ answered }) => answered !== undefined && waitsForBackend(answered)))
   if (!opened) return <NoRecipe />
   return (
     <Column>
       <Notice recipe={opened.recipe} />
       <Head title={opened.recipe.title} line={`as of ${clock(opened.readAt)} · from a link`} />
-      {opened.parts.map((part, index) => (
-        // The parts of a page keep their order, so the place is the key.
-        <DrawnPart key={index} part={part} />
-      ))}
+      {shown.map(({ key, answered }) =>
+        answered ? <DrawnPart key={key} part={answered} /> : <Skeleton key={key} className="h-40 w-full" />,
+      )}
     </Column>
   )
 }

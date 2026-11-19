@@ -1,7 +1,7 @@
 import type { Machine, MachineList } from "@pleiades/cards/machine/contract.ts"
 import { stateOf } from "@pleiades/cards/machine/state.ts"
 import { SITES_SOURCE } from "@pleiades/cards/site/contract.ts"
-import { countsOf } from "@pleiades/cards/site/counts.ts"
+import { countsOf, needsYouOf, sendingOf } from "@pleiades/cards/site/counts.ts"
 import type { Hall, PlacedMachine, SiteList } from "@pleiades/cards/site/contract.ts"
 
 import { readPlacements, readSites } from "./apis.ts"
@@ -23,6 +23,7 @@ export function sitesOf(
   sites: ReadonlyArray<StoredSite>,
   placements: ReadonlyArray<Placement>,
   list: MachineList,
+  sitesError: string | null = null,
 ): SiteList {
   const sending = new Map<string, Machine>(list.machines.map((one) => [one.machine, one]))
   const placedOn = (siteId: string) => placements.filter((one) => one.siteId === siteId)
@@ -32,6 +33,7 @@ export function sitesOf(
       machine: placement.machineId,
       displayName: placement.displayName,
       placedAt: placement.placedAt,
+      position: placement.position ?? null,
       state: now === null ? "no-data" : stateOf(now, list.asOf),
       now,
     }
@@ -66,23 +68,37 @@ export function sitesOf(
   const placed = new Set(
     placements.filter((one) => sites.some((site) => site.siteId === one.siteId)).map((one) => one.machineId),
   )
-  const all = grouped.flatMap((site) => site.halls.flatMap((one) => one.machines))
+  const all = grouped.flatMap((site) => site.halls.flatMap((one) => one.machines)).map((one) => one.state)
   return {
     asOf: list.asOf,
     windowSeconds: list.windowSeconds,
     source: SITES_SOURCE,
     machineCount: all.length,
-    counts: countsOf(all.map((one) => one.state)),
+    counts: countsOf(all),
+    sending: sendingOf(all),
+    needsYou: needsYouOf(all),
     sites: grouped,
     unplaced: list.machines
       .filter((one) => !placed.has(one.machine))
       .map((one) => ({ machine: one.machine, state: stateOf(one, list.asOf), now: one }))
       .sort(byMachineId),
+    sitesError,
   }
 }
 
-/** Every site with its machines, and the machines that send values and stand on no site. */
+/**
+ * Every site with its machines, and the machines that send values and stand on no site. If the
+ * Sites API does not answer, or this server was not told where it is, the machines are there all
+ * the same: every one that sends stands on no site, and `sitesError` says why. Without the values
+ * of the machines there is nothing to show, and that fails.
+ */
 export async function listSites(apis: Apis, now = new Date()): Promise<SiteList> {
-  const [sites, placements, list] = await Promise.all([readSites(apis), readPlacements(apis), listMachines(apis, now)])
-  return sitesOf(sites, placements, list)
+  const [read, list] = await Promise.all([
+    Promise.all([readSites(apis), readPlacements(apis)]).then(
+      ([sites, placements]) => ({ sites, placements, error: null }),
+      (error: unknown) => ({ sites: [], placements: [], error: error instanceof Error ? error.message : String(error) }),
+    ),
+    listMachines(apis, now),
+  ])
+  return sitesOf(read.sites, read.placements, list, read.error)
 }

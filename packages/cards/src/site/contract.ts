@@ -20,11 +20,25 @@ const counts = z
   .array(stateCount)
   .describe("How many machines are in each state now, in the order a display reads the states. A state no machine is in is not listed.")
 
+/**
+ * Where in its hall a machine stands, on the plan of the hall seen from above: the middle of the machine,
+ * in metre from the upper left corner of the plan. A hall has no size of its own; a plan is as large as the
+ * positions in it need.
+ */
+export const position = z.object({
+  x: z.number().min(0).describe("How far to the right of the left edge of the plan, in metre."),
+  y: z.number().min(0).describe("How far below the upper edge of the plan, in metre."),
+})
+export type Position = z.infer<typeof position>
+
 /** A machine on a site. */
 export const placedMachine = z.object({
   machine: machineId.describe("The machine id, which identifies the machine in every topic."),
   displayName: z.string().nullable().describe("The name people know the machine by, as entered in the Sites API, or null."),
   placedAt: instant.describe("When the machine was put on this site, as entered in the Sites API."),
+  position: position
+    .nullish()
+    .describe("Where in its hall the machine stands, as entered in the Sites API, x and y in metre; null or left out when nobody said."),
   state: state.describe("What the machine does now, decided by the rules of the machine card."),
   now: machine
     .nullable()
@@ -72,9 +86,21 @@ export const siteList = z.object({
   source: z.literal(SITES_SOURCE),
   machineCount: z.number().int().min(0).describe("How many machines stand on a site, on all sites together."),
   counts,
+  sending: z.number().int().min(0).describe("How many machines on a site send values now: every one that is not without data."),
+  needsYou: z
+    .number()
+    .int()
+    .min(0)
+    .describe("How many machines on a site need someone now: in alarm, stopped or without data."),
   sites: z.array(site).describe("Every site, by site id."),
   unplaced: z
     .array(unplacedMachine)
     .describe("The machines that published a value in the last 24 hours and stand on no site, by machine id."),
+  sitesError: z
+    .string()
+    .nullable()
+    .describe(
+      "Why no site is listed although sites may be entered: the Sites API did not answer, or this server was not told where it is. Then `sites` is empty and every machine that published a value in the last 24 hours stands in `unplaced`. Null when the Sites API answered. Required: the example app and genui-mcp are built from the same commit.",
+    ),
 })
 export type SiteList = z.infer<typeof siteList>

@@ -53,7 +53,7 @@ var applicationUri = builder.Configuration["Config:ApplicationUri"] ?? "urn:plei
 builder.Services.AddOpcUa()
     .AddClient(options =>
     {
-        options.ApplicationName = "Pleiades Playground OPC UA Adapter";
+        options.ApplicationName = OpcUaClient.ApplicationName;
         options.ApplicationUri = applicationUri;
         options.ProductUri = "urn:pleiades:playground:opcua:adapter";
         options.PkiRoot = Path.Combine(dataDirectory, "pki");

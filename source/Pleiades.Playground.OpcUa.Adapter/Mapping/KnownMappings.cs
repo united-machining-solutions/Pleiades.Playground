@@ -40,10 +40,11 @@ internal static class KnownMappings
 
     /// <summary>
     /// The registration with every rule applied whose namespace it names: first the mapping of a
-    /// machine in <see cref="Umati2DataModel.Namespace"/>, then <see cref="All"/>. Applying it twice
-    /// changes nothing more.
+    /// machine in <see cref="Umati2DataModel.Namespace"/>, then <see cref="All"/>, then the alarms of a
+    /// TRUMPF machine outside that namespace (<see cref="TrumpfAlarms"/>). Applying it twice changes nothing more.
     /// </summary>
-    public static MachineRegistration Apply(MachineRegistration registration) => Apply(Umati2DataModel.Apply(registration), All);
+    public static MachineRegistration Apply(MachineRegistration registration) =>
+        TrumpfAlarms.Apply(Apply(Umati2DataModel.Apply(registration), All));
 
     /// <summary>The registration with those of <paramref name="rules"/> applied whose namespace it names.</summary>
     public static MachineRegistration Apply(MachineRegistration registration, IReadOnlyList<KnownMapping> rules)

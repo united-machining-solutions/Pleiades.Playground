@@ -44,6 +44,8 @@ const list: SiteList = {
     { state: "setup", machines: 1 },
     { state: "no-data", machines: 1 },
   ],
+  sending: 2,
+  needsYou: 1,
   sites: [
     {
       siteId: "north-plant",
@@ -71,13 +73,14 @@ const list: SiteList = {
     { siteId: "west-plant", company: "Demo Manufacturing", name: "West plant", machineCount: 0, counts: [], halls: [{ name: "Hall W", machines: [] }] },
   ],
   unplaced: [{ machine: P07, state: "alarm", now: sending(P07, "TP-800", "P-07", "HOUSING-0815") }],
+  sitesError: null,
 }
 
 /** Each group as its site, and hall by hall the ids of the machines shown. */
 const names = (groups: ReadonlyArray<Group>) =>
-  groups.map((group) => [group.site?.name ?? null, group.halls.map((hall) => [hall.name, hall.rows.map((row) => row.machine.machine)])])
+  groups.map((group) => [group.site.name, group.halls.map((hall) => [hall.name, hall.rows.map((row) => row.machine.machine)])])
 
-test("without a filter every site with a machine is a group, with the halls that hold one, and the machines on no site come last", () => {
+test("without a filter every site with a machine is a group, with the halls that hold one; a machine on no site is no row", () => {
   const { groups, emptySites } = groupsOf(list, { needs: false, query: "" })
   assert.deepEqual(names(groups), [
     [
@@ -88,7 +91,6 @@ test("without a filter every site with a machine is a group, with the halls that
       ],
     ],
     ["South plant", [["No hall", [M09]]]],
-    [null, [["", [P07]]]],
   ])
   assert.deepEqual(groups[0]!.emptyHalls, ["Hall 3"])
   assert.deepEqual(
@@ -101,7 +103,6 @@ test("needs you keeps the machines in alarm, stopped or without data, each in it
   const { groups, emptySites } = groupsOf(list, { needs: true, query: "" })
   assert.deepEqual(names(groups), [
     ["South plant", [["No hall", [M09]]]],
-    [null, [["", [P07]]]],
   ])
   assert.deepEqual(groups[0]!.emptyHalls, [])
   assert.deepEqual(emptySites, [])
@@ -114,7 +115,8 @@ test("a search finds a machine by its name, what it is, its id, its work master,
   assert.deepEqual(found("AX-400_M-09"), [["South plant", [["No hall", [M09]]]]])
   assert.deepEqual(found("gear"), [["North plant", [["Hall 2", [M02]]]]])
   assert.deepEqual(found("south"), [["South plant", [["No hall", [M09]]]]])
-  assert.deepEqual(found("housing"), [[null, [["", [P07]]]]])
+  // P-07 works on a housing, but stands on no site: the search does not find it.
+  assert.deepEqual(found("housing"), [])
   assert.deepEqual(found("west"), [])
   assert.deepEqual(groupsOf(list, { needs: false, query: "lathe" }).emptySites, [])
 })
@@ -134,7 +136,7 @@ test("a group keeps the counts the backend gave for its whole site, also where a
   assert.deepEqual(north!.counts, list.sites[0]!.counts)
 })
 
-/** Twenty-three sites with one machine each, and a machine on no site: twenty-four groups. */
+/** Twenty-three sites with one machine each, and a machine on no site: twenty-three groups. */
 function many(): SiteList {
   const sites: Array<Site> = Array.from({ length: 23 }, (_, index) => {
     const id = `acme_X-${index + 1}_S-1`
@@ -153,16 +155,16 @@ function many(): SiteList {
   return { ...list, sites, machineCount: 23, counts: [{ state: "running", machines: 23 }] }
 }
 
-test("ten sites to a page, each whole, the machines on no site last; the count names all sites", () => {
+test("ten sites to a page, each whole; the count names all sites", () => {
   const { groups } = groupsOf(many(), { needs: false, query: "" })
-  assert.equal(groups.length, 24)
+  assert.equal(groups.length, 23)
   const first = pageOf(groups, undefined)
   assert.deepEqual([first.page, first.pages, first.sites, first.groups.length], [1, 3, 23, SITES_PER_PAGE])
   assert.deepEqual(first.groups[0]!.emptyHalls, ["Hall 2"])
   const last = pageOf(groups, 3)
   assert.deepEqual(
-    last.groups.map((group) => group.site?.name ?? null),
-    ["Plant 21", "Plant 22", "Plant 23", null],
+    last.groups.map((group) => group.site.name),
+    ["Plant 21", "Plant 22", "Plant 23"],
   )
   assert.equal(last.sites, 23)
 })
@@ -205,8 +207,8 @@ test("pressing the chosen item of All or Needs you again keeps what is shown", (
 
 test("an empty list says why: nothing there, nobody needed, or nothing found; only a filter can be cleared", () => {
   assert.deepEqual(emptyOf({ needs: false, query: "" }), {
-    title: "No machine yet",
-    description: "No machine stands on a site, and none sent a value in the last 24 hours.",
+    title: "No machine on a site yet",
+    description: "Add a machine to a site, one that sends data or one by its id.",
     clearable: false,
   })
   assert.equal(emptyOf({ needs: true, query: "" }).title, "Nobody is needed")
@@ -224,7 +226,6 @@ test("a machine without a value in the last 24 hours does not lead to its page, 
       [P04, true],
       [M02, true],
       [M09, false],
-      [P07, true],
     ],
   )
 })
@@ -244,4 +245,11 @@ test("a machine is called what it is by its id where its values do not say it, a
   // The name people entered stays the title, and what it is stands below it.
   const lathe = groups[0]!.halls[0]!.rows[0]!
   assert.deepEqual([lathe.name, lathe.what], ["Lathe 4", "AX-400 P-04"])
+})
+
+test("without sites there is no group, also while machines send, and no site is empty", () => {
+  const { groups, emptySites } = groupsOf({ ...list, sites: [], machineCount: 0, counts: [] }, { needs: false, query: "" })
+  assert.deepEqual(names(groups), [])
+  assert.deepEqual(emptySites, [])
+  assert.equal(pageOf(groups, undefined).sites, 0)
 })

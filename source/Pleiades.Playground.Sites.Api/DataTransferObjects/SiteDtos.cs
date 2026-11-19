@@ -7,7 +7,8 @@ namespace Pleiades.Playground.Sites.Api.DataTransferObjects;
 /// <param name="Company">The company the site belongs to. Example: Demo Manufacturing</param>
 /// <param name="Name">The name of the plant. Example: North plant</param>
 /// <param name="Halls">The halls of the site. Example: ["Hall 1", "Hall 2"]</param>
-internal sealed record SiteDtoV1(string SiteId, string Company, string Name, IReadOnlyList<string> Halls);
+/// <param name="Etag">The entity tag of the site, which changes with its company, name or halls: send it as If-Match to change or remove only this site. Example: "3f1c0a9d2b7e4c51"</param>
+internal sealed record SiteDtoV1(string SiteId, string Company, string Name, IReadOnlyList<string> Halls, string Etag);
 
 /// <summary>
 /// The body of <c>PUT /sites/{siteId}</c>: what a site is, without its id, which the path carries.
@@ -25,7 +26,24 @@ internal sealed record SiteRequestV1(string? Company, string? Name, IReadOnlyLis
 /// <param name="Hall">The hall of the site, or null when not given. Example: Hall 2</param>
 /// <param name="DisplayName">The name people know the machine by, or null when not given. Example: M-02</param>
 /// <param name="PlacedAt">When the machine was put on this site (UTC). Example: 2026-11-18T08:12:00Z</param>
-internal sealed record PlacementDtoV1(string MachineId, string SiteId, string? Hall, string? DisplayName, DateTime PlacedAt);
+/// <param name="Position">Where in its hall the machine stands, or null when nobody said. Example: {"x": 12.5, "y": 4}</param>
+internal sealed record PlacementDtoV1(string MachineId, string SiteId, string? Hall, string? DisplayName, DateTime PlacedAt, PositionDtoV1? Position = null);
+
+/// <summary>
+/// Where in its hall a machine stands, on the plan of the hall seen from above: the middle of the machine, in
+/// metre from the upper left corner of the plan. A hall has no size of its own; its plan is as large as the
+/// positions in it need.
+/// </summary>
+/// <param name="X">How far to the right of the left edge of the plan, in metre. Example: 12.5</param>
+/// <param name="Y">How far below the upper edge of the plan, in metre. Example: 4</param>
+internal sealed record PositionDtoV1(double X, double Y);
+
+/// <summary>
+/// The body of <c>PUT /placements/{machineId}/position</c>: where in its hall the machine stands.
+/// </summary>
+/// <param name="X">How far to the right of the left edge of the plan, in metre, from 0 to 1000; required. Example: 12.5</param>
+/// <param name="Y">How far below the upper edge of the plan, in metre, from 0 to 1000; required. Example: 4</param>
+internal sealed record PositionRequestV1(double? X, double? Y);
 
 /// <summary>
 /// The body of <c>PUT /placements/{machineId}</c>: where a machine stands, without its machine id, which

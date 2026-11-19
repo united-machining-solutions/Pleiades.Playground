@@ -23,16 +23,20 @@ export type ChatCommand = {
   name: string
   /** What follows the name, as the help shows it. Absent for a command without an argument. */
   argument?: string
+  /** The argument may be left out: the command is sent without it too. */
+  optional?: boolean
   /** One sentence for the help. */
   summary: string
   /** Only when the OPC UA adapter is there. */
   opcua?: boolean
+  /** The MCP server whose tool the command stands for (toolCommand). Absent for a command of the chat. */
+  server?: string
   /** The question the command stands for. */
   question?: (argument: string) => string
 }
 
 export const commands: ReadonlyArray<ChatCommand> = [
-  { name: "help", summary: "Show these commands." },
+  { name: "help", summary: "Show the commands and the tools." },
   {
     name: "machines",
     summary: "What every machine does now.",
@@ -91,6 +95,22 @@ export function commandsFor(opcua: boolean): ReadonlyArray<ChatCommand> {
   return commands.filter((command) => opcua || !command.opcua)
 }
 
+/**
+ * A tool of an MCP server the chat has, as a command: `/genui_machine_show A1121O0001` asks the model to
+ * answer with that tool, and what follows the name says what for. It is a request, not a call: the model
+ * still fills in the arguments of the tool, so the command needs nothing after its name.
+ */
+export function toolCommand(server: string, tool: { name: string; summary: string }): ChatCommand {
+  return {
+    name: tool.name,
+    argument: "what for",
+    optional: true,
+    server,
+    summary: tool.summary === "" ? `A tool of ${server}.` : tool.summary,
+    question: (argument) => (argument === "" ? `Use the tool ${tool.name}.` : `Use the tool ${tool.name}: ${argument}`),
+  }
+}
+
 /** What the field does with what was typed. */
 export type Typed =
   | { kind: "question"; text: string }
@@ -107,21 +127,48 @@ export function readTyped(text: string, offered: ReadonlyArray<ChatCommand>): Ty
   if (!trimmed.startsWith("/")) return { kind: "question", text: trimmed }
   const [head = "", ...rest] = trimmed.slice(1).split(/\s+/)
   const argument = rest.join(" ")
-  const command = offered.find((one) => one.name === head.toLowerCase())
+  const command = offered.find((one) => one.name.toLowerCase() === head.toLowerCase())
   if (!command) return { kind: "unknown", name: head }
   if (!command.question) return { kind: "help" }
-  if (command.argument && argument === "") return { kind: "incomplete", command }
+  if (command.argument && !command.optional && argument === "") return { kind: "incomplete", command }
   return { kind: "question", text: command.question(argument) }
 }
 
-/** The commands whose name begins with what follows the slash, while the person is still typing it. */
+/**
+ * The commands for what follows the slash, while the person is still typing it: first those whose name
+ * begins with it, then those with a part of the name that does, so `/machine` finds `genui_machine_show`.
+ */
 export function matching(text: string, offered: ReadonlyArray<ChatCommand>): ReadonlyArray<ChatCommand> {
   if (!text.startsWith("/") || /\s/.test(text)) return []
   const begun = text.slice(1).toLowerCase()
-  return offered.filter((command) => command.name.startsWith(begun))
+  const name = (command: ChatCommand) => command.name.toLowerCase()
+  const part = (command: ChatCommand) =>
+    [...name(command).matchAll(/[_\-.:]/g)].some((separator) => name(command).startsWith(begun, separator.index + 1))
+  return [
+    ...offered.filter((command) => name(command).startsWith(begun)),
+    ...offered.filter((command) => !name(command).startsWith(begun) && part(command)),
+  ]
 }
 
-/** How a command is written, for the help: `/mapping <serial number>`. */
+/**
+ * What Tab writes into the field for the command that is marked in the list: its name and a space.
+ * The space closes the list, and the cursor stands where an argument goes; Enter sends the command.
+ */
+export function completion(command: ChatCommand): string {
+  return `/${command.name} `
+}
+
+/**
+ * The command marked after an arrow key: `by` is +1 down and -1 up, and past the end of the list it
+ * goes round to its other end, as in the lists of commands of other chats.
+ */
+export function stepped(marked: number, by: number, count: number): number {
+  if (count === 0) return 0
+  return (((marked + by) % count) + count) % count
+}
+
+/** How a command is written, for the help: `/mapping <serial number>`, and one that may go without it `[what for]`. */
 export function usage(command: ChatCommand): string {
-  return command.argument ? `/${command.name} <${command.argument}>` : `/${command.name}`
+  if (!command.argument) return `/${command.name}`
+  return command.optional ? `/${command.name} [${command.argument}]` : `/${command.name} <${command.argument}>`
 }

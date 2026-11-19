@@ -11,12 +11,7 @@
   },
   "machineNode": "nsu=urn:Z0009A0033:TRUMPF:UAInterfaces/urn:umati2:datamodel:opcua;s=Machine",
   "elements": [],
-  "missing": [
-    {
-      "path": "Notification.ActiveAlerts",
-      "reason": "A list of the structure DataType.Alert; the MQTT binding publishes no lists."
-    }
-  ],
+  "missing": [],
   "discovery": {
     "by": "Known mapping of the adapter for urn:umati2:datamodel:opcua",
     "at": "2026-11-17T21:00:00Z"

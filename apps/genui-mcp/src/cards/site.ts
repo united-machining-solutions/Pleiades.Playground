@@ -41,10 +41,16 @@ halls; people enter the sites, and which machine stands where, in the Sites API.
   machines in no hall follow under a hall whose \`name\` is null.
 - Each machine has its \`state\` and, in \`now\`, what it does as \`genui_machine_list\` says it. \`now\`
   is null if it published no value in the last 24 hours: then it has no data.
+- \`position\`: where in its hall the machine stands, the middle of it, \`x\` to the right and \`y\` down in
+  metre from the upper left corner of the plan of the hall. Null while nobody said. The page "Halls" of
+  the example app draws the plan.
 - \`machineCount\` and \`counts\` at the top are all sites together.
 - \`unplaced\`: the machines that published a value in the last 24 hours and stand on no site, each
   with its \`state\` and, in \`now\`, what it does as \`genui_machine_list\` says it: the values a page
   starts from. They can be put on one; only a person can, in the Sites API, not a tool of this server.
+- \`sitesError\`: null when the Sites API answered. Otherwise it says why the sites cannot be read
+  now; then \`sites\` is empty and every machine that sends stands in \`unplaced\`. Say that the sites
+  cannot be read, not that none is entered.
 
 The counts come from this server. Do not count again, and do not add states up.
 `

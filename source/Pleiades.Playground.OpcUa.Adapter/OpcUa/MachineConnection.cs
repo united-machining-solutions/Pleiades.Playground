@@ -318,11 +318,13 @@ internal sealed class MachineConnection : ISessionTenant
     /// Subscribes to the alarms of the registration, in a subscription of their own: ConditionRefresh
     /// works on a whole subscription, and a server may refuse it for one that also holds data items
     /// (open62541 answers BadFilterNotAllowed). Alarms are an addition to the values: if they cannot
-    /// be monitored, the machine runs without them, and the reason is logged.
+    /// be monitored, the machine runs without them, and the reason is logged. A registration with a
+    /// list of alerts (<see cref="AlertRegistration.List"/>) monitors the value of that variable instead:
+    /// a new subscription reports it once, so what stands is caught up without ConditionRefresh.
     /// </summary>
     private async Task SubscribeAlertsAsync(ISession session, CancellationToken cancellationToken)
     {
-        if (Registration.Alerts is null)
+        if (Registration.Alerts is not { } alerts)
         {
             return;
         }
@@ -334,7 +336,8 @@ internal sealed class MachineConnection : ISessionTenant
             PublishingEnabled = true,
         };
 #pragma warning restore CA2000, CS0618
-        if (AlertItem(session, subscription) is not { } item)
+        var fromList = alerts.List is not null;
+        if ((fromList ? AlertListItem(session, subscription) : AlertItem(session, subscription)) is not { } item)
         {
             subscription.Dispose();
             return;
@@ -360,6 +363,11 @@ internal sealed class MachineConnection : ISessionTenant
         {
             _logger.AlertsNotMonitored(Registration.SerialNumber, item.Status.Error?.ToString() ?? "Bad");
             await RemoveAsync(session, Interlocked.Exchange(ref _alertSubscription, null)).ConfigureAwait(false);
+            return;
+        }
+
+        if (fromList)
+        {
             return;
         }
 
@@ -442,6 +450,60 @@ internal sealed class MachineConnection : ISessionTenant
             }
         };
         return item;
+    }
+
+    /// <summary>The monitored item of the variable that lists the alerts, or null if its namespace is not on the server.</summary>
+    private MonitoredItem? AlertListItem(ISession session, Subscription subscription)
+    {
+        var list = Registration.Alerts!.List!;
+        if (!TryResolve(session, list, out var node))
+        {
+            _logger.AlertsNotMonitored(Registration.SerialNumber, "The server has no namespace of the list of alerts any more.");
+            return null;
+        }
+
+        var item = new MonitoredItem(subscription.DefaultItem)
+        {
+            StartNodeId = node,
+            AttributeId = Attributes.Value,
+            SamplingInterval = (int)_samplingInterval.TotalMilliseconds,
+            QueueSize = 10,
+            DisplayName = "alerts",
+        };
+        item.Notification += (_, e) =>
+        {
+            if (e.NotificationValue is MonitoredItemNotification notification)
+            {
+                OnAlertList(notification.Value, session.NamespaceUris);
+            }
+        };
+        return item;
+    }
+
+    /// <summary>
+    /// Takes a new value of the list of alerts: what is new in it is raised, what left it is cleared. A bad
+    /// value, or one the adapter cannot decode, changes nothing; the alerts that stand are kept.
+    /// </summary>
+    private void OnAlertList(DataValue value, NamespaceTable namespaces)
+    {
+        IReadOnlyList<AlertChange>? changes;
+        string? notTaken;
+        lock (_gate)
+        {
+            changes = AlertListValue.Take(_alerts, value, namespaces, DateTime.UtcNow, out notTaken);
+            if (changes is { Count: > 0 })
+            {
+                _alertStore.Save(Registration.SerialNumber, _alerts.Open);
+            }
+        }
+
+        if (changes is null)
+        {
+            _logger.AlertListNotTaken(Registration.SerialNumber, Registration.Alerts?.List ?? string.Empty, notTaken ?? string.Empty);
+            return;
+        }
+
+        Forget(AlertsAsync(changes));
     }
 
     private void OnValue(ElementRuntime runtime, DataValue value, NamespaceTable namespaces)
@@ -571,7 +633,7 @@ internal sealed class MachineConnection : ISessionTenant
     private async Task IdentifyAsync()
     {
         if (Output.MachineId is null
-            && MachineOutput.IdentityOf(ValueOf, Registration.SerialNumber) is { } identity)
+            && MachineOutput.IdentityOf(ValueOf, Registration) is { } identity)
         {
             await Output.IdentifyAsync(identity).ConfigureAwait(false);
             if (Output.MachineId is not null && Interlocked.Exchange(ref _identifiedOnce, 1) == 0)

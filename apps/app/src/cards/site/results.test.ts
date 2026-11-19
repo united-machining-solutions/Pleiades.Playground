@@ -31,6 +31,8 @@ const result = {
   source: "Sites API /sites and /placements",
   machineCount: 1,
   counts: [{ state: "no-data", machines: 1 }],
+  sending: 0,
+  needsYou: 1,
   sites: [
     {
       siteId: "north-plant",
@@ -47,6 +49,7 @@ const result = {
     },
   ],
   unplaced: [{ machine: "taygeta-tools_TX-9_M-07", state: "running", now }],
+  sitesError: null,
 }
 
 test("the JSON of genui_site_list becomes the sites with their machines", () => {

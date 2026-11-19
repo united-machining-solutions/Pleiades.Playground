@@ -240,36 +240,42 @@ test("a page opened from a link stands behind Pages, called by what the link say
   )
 })
 
-// Sites and the page of a machine under it, as the example app has them: the list of Sites is the
-// index route "/sites/", the page of a machine "/sites/$machine" names no entry of its own.
-const withSites = [
-  ...withCrumbs,
-  route("/sites/", { title: "Sites" }),
+// Home and the page of a machine under it, as the example app has them: Home, "/", lists the machines
+// by site and hall, and the page of a machine "/sites/$machine" names no entry of its own. The old
+// address of the list, "/sites/", only leads to "/" and has no entry either.
+const homeOfSites = [
+  { fullPath: "/", options: { staticData: { nav: { title: "Home", icon, order: 0 } } } },
+  { fullPath: "/sites/", options: {} },
   { fullPath: "/sites/$machine", options: { staticData: { crumb: (params: Record<string, string>) => params.machine ?? "" } } },
+  route("/charts", { title: "Charts" }),
 ]
 
-test("the page of a machine is under Sites: Sites is the marked row", () => {
-  const entries = navPages(withSites)
-  assert.equal(activePage(entries, "/sites/alcyone-machines_AX-400_P-04")?.title, "Sites")
-  assert.equal(activePage(entries, "/sites")?.title, "Sites")
+test("Home is the first entry, and the only one for the sites: marked on its page and on the page of a machine", () => {
+  const entries = navPages(homeOfSites)
+  assert.deepEqual(
+    sidebarPages(entries).map((one) => one.title),
+    ["Home", "Charts"],
+  )
   assert.equal(activePage(entries, "/")?.title, "Home")
+  assert.equal(activePage(entries, "/sites/alcyone-machines_AX-400_P-04")?.title, "Home")
+  assert.equal(activePage(entries, "/charts")?.title, "Charts")
 })
 
-test("the page of a machine stands behind Sites in the breadcrumb", () => {
+test("the page of a machine stands behind Home in the breadcrumb, and Home leads to the first page", () => {
   assert.deepEqual(
-    crumbsOf(navPages(withSites), {
+    crumbsOf(navPages(homeOfSites), {
       fullPath: "/sites/$machine",
       pathname: "/sites/alcyone-machines_AX-400_P-04",
       params: { machine: "alcyone-machines_AX-400_P-04" },
       staticData: { crumb: (params) => params.machine ?? "" },
     }),
-    [{ title: "Sites", path: "/sites" }, { title: "alcyone-machines_AX-400_P-04" }],
+    [{ title: "Home", path: "/" }, { title: "alcyone-machines_AX-400_P-04" }],
   )
 })
 
-test("Sites itself is called Sites and does not link to itself", () => {
+test("Home itself is called Home and does not link to itself", () => {
   assert.deepEqual(
-    crumbsOf(navPages(withSites), { fullPath: "/sites/", pathname: "/sites", params: {}, staticData: { nav: { title: "Sites", icon } } }),
-    [{ title: "Sites" }],
+    crumbsOf(navPages(homeOfSites), { fullPath: "/", pathname: "/", params: {}, staticData: { nav: { title: "Home", icon, order: 0 } } }),
+    [{ title: "Home" }],
   )
 })

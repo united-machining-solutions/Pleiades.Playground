@@ -83,9 +83,9 @@ process.on("exit", startAgain)
 process.once("SIGINT", () => process.exit(130))
 process.once("SIGTERM", () => process.exit(143))
 
-/** Opens a page with the chat panel at its start. Answers why the chat cannot be shown, if it cannot. */
+/** Opens a page with the chat panel at its list. Answers why the chat cannot be shown, if it cannot. */
 async function openChat(page, url) {
-  await page.goto(`${url}?chat=new`)
+  await page.goto(`${url}?chat=all`)
   const field = page.getByRole("textbox", { name: "Message" })
   const none = page.getByText("No language model configured")
   await field.or(none).first().waitFor()
@@ -109,21 +109,13 @@ const pictures = [
     },
   },
   {
-    name: "sites",
-    async show(page, at) {
-      await page.goto(`${at.app}/sites`)
-      // The search stands on the page with sites and without: it says the page is drawn.
-      await page.getByRole("searchbox", { name: "Find a machine, hall or site" }).waitFor()
-      if (await page.getByText("No sites", { exact: true }).isVisible()) return "no site is entered in the Sites API"
-      await page.getByText("· live · now").waitFor()
-    },
-  },
-  {
     name: "machine-page",
     async show(page, at) {
       await page.goto(`${at.app}/sites/${SHOWN}`)
       await page.getByRole("heading", { name: SHOWN_TITLE }).waitFor()
       await page.getByText(/^Last (hour|\d+ hours)$/).waitFor()
+      // The sections below the card come after it: the tiles of now are the first of them.
+      await page.getByText("Bearing temperature").first().waitFor()
     },
   },
   {

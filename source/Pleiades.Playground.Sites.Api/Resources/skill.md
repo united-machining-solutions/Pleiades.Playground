@@ -12,6 +12,8 @@ People enter **sites** and **placements** here; no machine sends them.
   and `placedAt`, when it was put on that site (UTC). The `machineId` is the `{MachineId}` of the topics
   `machines/{MachineId}/...`, `<manufacturer>_<model>_<serial number>`, for example
   `merope-microtec_MM-120_M-02`: the `machine` of `genui_machine_list` and the `mId` of the Events API. A machine stands on one site at most.
+- A placement may have a `position` (or null): where in its hall the machine stands, the middle of the
+  machine, `x` and `y` in metre from the upper left corner of the plan of the hall.
 
 ## Tools
 

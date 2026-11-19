@@ -2,7 +2,7 @@ import { HORIZON_SECONDS } from "@pleiades/cards/machine/contract.ts"
 import type { Machine, State } from "@pleiades/cards/machine/contract.ts"
 import { stateOf } from "@pleiades/cards/machine/state.ts"
 import type { PlacedMachine, SiteList, UnplacedMachine } from "@pleiades/cards/site/contract.ts"
-import { countsOf } from "@pleiades/cards/site/counts.ts"
+import { countsOf, needsYouOf, sendingOf } from "@pleiades/cards/site/counts.ts"
 
 import { machineWith, unknownMachine } from "./machines.ts"
 import { machineOf } from "./messages.ts"
@@ -31,7 +31,7 @@ function stateAt(placed: PlacedMachine, asOf: string): State {
 
 /**
  * The state of every machine at the instant of the list, on a site or on none, and the counts of the
- * sites that follow from them. The machines on no site are not counted, as genui_site_list does not.
+ * sites that follow from them, how many send and how many need someone among them. The machines on no site are not counted, as genui_site_list does not.
  */
 function recounted(list: SiteList): SiteList {
   let sitesChanged = false
@@ -67,6 +67,8 @@ function recounted(list: SiteList): SiteList {
     sites: sitesChanged ? sites : list.sites,
     unplaced: unplacedChanged ? unplaced : list.unplaced,
     counts: sitesChanged ? countsOf(all) : list.counts,
+    sending: sitesChanged ? sendingOf(all) : list.sending,
+    needsYou: sitesChanged ? needsYouOf(all) : list.needsYou,
   }
 }
 

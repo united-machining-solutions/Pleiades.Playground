@@ -130,11 +130,12 @@ public class RegistrationValidatorTest
         var applied = KnownMappings.Apply(sample);
         Assert.IsEmpty(RegistrationValidator.Validate(applied));
         Assert.HasCount(Umati2DataModel.Rules.Count, applied.Elements);
-        Assert.AreEqual("Notification.ActiveAlerts", applied.Missing.Single().Path);
-        CollectionAssert.AreEqual(
-            new[] { DataModelProfiles.ActiveAlertsPath },
-            DataModelProfiles.CoreOf(DataModelProfiles.Check(applied)).Missing.ToArray(),
-            "Without an alarm subscription the core lacks its alarms.");
+        Assert.AreEqual(
+            "nsu=urn:Z0009A0033:TRUMPF:UAInterfaces/urn:umati2:datamodel:opcua;s=Notification.ActiveAlerts",
+            applied.Alerts?.List,
+            "The alerts come from the list of the namespace.");
+        Assert.IsEmpty(applied.Missing);
+        Assert.IsTrue(DataModelProfiles.CoreOf(DataModelProfiles.Check(applied)).Fulfilled, "With the list the namespace gives the whole core.");
     }
 
     [TestMethod]

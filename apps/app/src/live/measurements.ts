@@ -26,11 +26,14 @@ export type LivePage = {
 const readingPaths = [...new Set(Object.values(READING_PATHS).flatMap(brokerPathsOf))]
 
 /**
- * The topics the page subscribes to: every quantity, and the readings of what a machine does,
- * which are signs of life too. Of every machine.
+ * The topics a page subscribes to: every quantity, and the readings of what a machine does,
+ * which are signs of life too. Of every machine, or of the one named.
  */
-export function measurementFilters(): Array<string> {
-  return [...QUANTITIES.map((quantity) => filterOf(QUANTITY_PATHS[quantity])), ...readingPaths.map((path) => filterOf(path))]
+export function measurementFilters(machine?: string): Array<string> {
+  return [
+    ...QUANTITIES.map((quantity) => filterOf(QUANTITY_PATHS[quantity], machine)),
+    ...readingPaths.map((path) => filterOf(path, machine)),
+  ]
 }
 
 function later(a: string | undefined, b: string | undefined): string | undefined {
@@ -102,6 +105,8 @@ function seriesWithLine(series: MeasurementSeries, machine: string, quantity: Qu
     quantities: series.quantities.map((one) => {
       if (one.quantity !== quantity) return one
       const hasLine = one.lines.some((line) => line.topic === topic)
+      // Unchanged, the graph keeps the same object and is not drawn again.
+      if (hasLine && (one.unit ?? unit) === one.unit) return one
       return {
         ...one,
         unit: one.unit ?? unit,

@@ -23,7 +23,48 @@ internal static class RawValues
         };
     }
 
-    private static StructureValue? Decode(ExtensionObject extension, NamespaceTable namespaces)
+    /// <summary>
+    /// The alerts of a value of <c>Notification.ActiveAlerts</c> of <c>urn:umati2:datamodel:opcua</c>, an array
+    /// of <c>DataType.Alert</c>. No value, or an empty array, is no alert. Null if the value is not such an
+    /// array, or an alert in it cannot be decoded: a list the adapter cannot read whole tells nothing.
+    /// </summary>
+    public static IReadOnlyList<ListedAlert>? AlertsOf(Variant value, NamespaceTable namespaces)
+    {
+        ArgumentNullException.ThrowIfNull(namespaces);
+        var items = value.AsBoxedObject(Variant.BoxingBehavior.Legacy) switch
+        {
+            null => [],
+            ExtensionObject single => [single],
+            ExtensionObject[] array => array,
+            IEnumerable<ExtensionObject> sequence => [.. sequence],
+            _ => (ExtensionObject[]?)null,
+        };
+        if (items is null)
+        {
+            return null;
+        }
+
+        var alerts = new List<ListedAlert>(items.Length);
+        foreach (var item in items)
+        {
+            if (BodyOf(item, namespaces) is not { } found
+                || !KnownStructures.IsAlert(found.Encoding)
+                || KnownStructures.DecodeAlert(found.Body) is not { } alert)
+            {
+                return null;
+            }
+
+            alerts.Add(alert);
+        }
+
+        return alerts;
+    }
+
+    private static StructureValue? Decode(ExtensionObject extension, NamespaceTable namespaces) =>
+        BodyOf(extension, namespaces) is { } found ? KnownStructures.Decode(found.Encoding, found.Body) : null;
+
+    /// <summary>The encoding of a structure, as a node with its namespace as a URI, and the bytes of its binary body.</summary>
+    private static (string Encoding, byte[] Body)? BodyOf(ExtensionObject extension, NamespaceTable namespaces)
     {
         if (extension.IsNull || extension.Encoding != ExtensionObjectEncoding.Binary)
         {
@@ -47,6 +88,6 @@ internal static class RawValues
         }
 
         var typeId = ExpandedNodeId.ToNodeId(extension.TypeId, namespaces);
-        return typeId.IsNull ? null : KnownStructures.Decode(UaAddressSpace.Portable(typeId, namespaces), body);
+        return typeId.IsNull ? null : (UaAddressSpace.Portable(typeId, namespaces), body);
     }
 }

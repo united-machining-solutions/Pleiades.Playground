@@ -243,8 +243,8 @@ function alertOf(pair: AlertPair) {
 }
 
 /** The alerts of every machine that were raised between the two instants and have not been cleared. */
-export async function readOpenNotifications(apis: Apis, from: Date, to: Date): Promise<Array<OpenNotification>> {
-  const { pairs } = await readAlertPairs(apis, from, to)
+export async function readOpenNotifications(apis: Apis, from: Date, to: Date, machine?: string): Promise<Array<OpenNotification>> {
+  const { pairs } = await readAlertPairs(apis, from, to, machine)
   return pairs
     .filter((pair) => pair.clearedAt === null && Date.parse(pair.raisedAt) >= from.getTime())
     .map((pair) => ({ ...alertOf(pair), machine: pair.mId }))
@@ -270,12 +270,13 @@ export async function readRaised(
   }))
 }
 
-/** The job orders that run or are interrupted now, the newest change of each machine first. */
-export async function readRunningJobOrders(apis: Apis): Promise<Array<RunningJobOrder>> {
+/** The job orders that run or are interrupted now, the newest change of each machine first; of one machine, if named. */
+export async function readRunningJobOrders(apis: Apis, machine?: string): Promise<Array<RunningJobOrder>> {
   const items = await Promise.all(
     ["Running", "Interrupted"].map(async (state) => {
       const url = new URL("/jobOrders", apis.eventsUrl)
       url.searchParams.set("state", state)
+      if (machine !== undefined) url.searchParams.set("mId", machine)
       url.searchParams.set("Take", "1000")
       return (await getJson("Events API", url, jobOrdersAnswer)).items
     }),
@@ -420,6 +421,8 @@ export type Placement = {
   hall: string | null
   displayName: string | null
   placedAt: string
+  /** Where in its hall it stands, x and y in metre from the upper left corner of the plan, or null. */
+  position: { x: number; y: number } | null
 }
 
 const sitesAnswer = z.array(
@@ -432,6 +435,8 @@ const placementsAnswer = z.array(
     hall: z.string().nullable(),
     displayName: z.string().nullable(),
     placedAt: z.string(),
+    // A Sites API from before the positions leaves it out.
+    position: z.object({ x: z.number(), y: z.number() }).nullish(),
   }),
 )
 
@@ -448,7 +453,7 @@ export async function readSites(apis: Apis): Promise<Array<StoredSite>> {
 /** Every machine that stands on a site, by machine id. */
 export async function readPlacements(apis: Apis): Promise<Array<Placement>> {
   const placements = await getJson("Sites API", sitesUrlOf(apis, "/placements"), placementsAnswer)
-  return placements.map((one) => ({ ...one, placedAt: new Date(one.placedAt).toISOString() }))
+  return placements.map((one) => ({ ...one, placedAt: new Date(one.placedAt).toISOString(), position: one.position ?? null }))
 }
 
 /** What the Timeseries API sums up of the numbers of a topic: their unit, mean, largest and how many. */
