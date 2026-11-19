@@ -6,6 +6,7 @@ packages:
 # A package.json refers to an entry with "catalog:".
 catalog:
   "@base-ui/react": 1.9.0
+  "@fontsource-variable/open-sans": 5.3.0
   "@fontsource-variable/roboto": 5.3.0
   "@modelcontextprotocol/ext-apps": 2.0.4
   # Not on npmjs.org: the SDK of the Pleiades Hub, checked in as a tarball. See vendor/README.md.

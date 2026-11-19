@@ -8,9 +8,11 @@ export type CallState = "running" | "done" | "failed"
 
 /**
  * A tool call of an answer. `output` is what the tool gave back, or why it failed, once its result
- * is there: the line of the call opens to show it, after the shadcn pattern Tool.
+ * is there: the line of the call opens to show it, after the shadcn pattern Tool. `card` is what the
+ * card of the tool draws for a result the chat does not draw on its own, a lookup on the way to the
+ * answer: the line opens to the card then, not to the values.
  */
-export type Call = { id: string; name: string; state: CallState; output?: string }
+export type Call = { id: string; name: string; state: CallState; output?: string; card?: ReactNode }
 
 /**
  * An answer as the chat draws it, block by block. The tool calls of one stretch are one `Trace`,
@@ -39,17 +41,50 @@ export function outputOf(result: ResultPart): string {
 }
 
 /**
+ * Whether a tool is called after the part at `index`: then a result there was a step on the way.
+ * Calls made side by side come before their results, so they are not after one another.
+ */
+export function calledAfter(parts: UIMessage["parts"], index: number): boolean {
+  return parts.slice(index + 1).some((part) => part.type === "tool-call")
+}
+
+/**
+ * What the answer does after one of its messages: it calls a tool, it calls none, or that is not
+ * known yet.
+ */
+export type After = "call" | "no call" | "not known"
+
+/**
+ * What the answer to which the message at `at` belongs does after that message. It is not known yet
+ * while the answer is still coming (`answering`) and nothing after the message shows whether it
+ * calls a tool or speaks. An answer is more than one message: each step of the model is one, and the
+ * words come in the last. It ends at the next question.
+ */
+export function callsAfter(messages: ReadonlyArray<UIMessage>, at: number, answering: boolean): After {
+  for (const message of messages.slice(at + 1)) {
+    if (message.role === "user") return "no call"
+    if (message.parts.some((part) => part.type === "tool-call")) return "call"
+    if (message.parts.some((part) => part.type === "text" && part.content.trim() !== "")) return "no call"
+  }
+  return answering ? "not known" : "no call"
+}
+
+/**
  * The blocks of an assistant's message. `live` says whether the message is still being answered:
  * a call without a result is running then, and failed once the answer is over. `tools` is what the
- * chat knows about the tools (cards.tsx): what it draws for which result.
+ * chat knows about the tools (cards.tsx): what it draws for which result. `after` says what the
+ * answer does after this message (`callsAfter`): the result of a tool a model also looks things up
+ * with (`lookup`) is drawn only where the answer calls no tool after it, and not while that is not
+ * known yet.
  */
 export function blocksOf(
   parts: UIMessage["parts"],
   live: boolean,
   tools: ReadonlyArray<ChatTool>,
+  after: After = "no call",
 ): Array<Block> {
   const blocks: Array<Block> = []
-  for (const part of parts) {
+  for (const [index, part] of parts.entries()) {
     if (part.type === "tool-call") {
       const result = parts.find((other) => other.type === "tool-result" && other.toolCallId === part.id)
       const state: CallState =
@@ -73,7 +108,15 @@ export function blocksOf(
       const call = parts.find((other) => other.type === "tool-call" && other.id === part.toolCallId)
       const tool = call?.type === "tool-call" ? tools.find((one) => one.name === call.name) : undefined
       const node = tool?.draw?.(part.content, { id: part.toolCallId })
-      if (node !== null && node !== undefined) blocks.push({ kind: "drawn", node })
+      if (node === null || node === undefined) continue
+      // A result a model may have looked something up with is drawn only once it is known that the
+      // answer calls no other tool after it. Until then, or as a step, the line of its call opens to it.
+      if (tool?.lookup && (after !== "no call" || calledAfter(parts, index))) {
+        const step = blocks.flatMap((block) => (block.kind === "steps" ? block.calls : [])).find((one) => one.id === part.toolCallId)
+        if (step) step.card = node
+        continue
+      }
+      blocks.push({ kind: "drawn", node })
     } else if (part.type === "text" && part.content.trim() !== "") {
       blocks.push({ kind: "text", text: part.content })
     }
@@ -99,7 +142,8 @@ export function thinkingLine(
   const last = messages.at(-1)
   if (!live || last === undefined) return undefined
   if (last.role === "user") return "apart"
-  const blocks = blocksOf(last.parts, true, tools)
+  // Whether the answer calls another tool after the last message is not known yet.
+  const blocks = blocksOf(last.parts, true, tools, "not known")
   const shown = blocks.at(-1)
   if (shown === undefined) return "apart"
   if (shown.kind === "text") return undefined

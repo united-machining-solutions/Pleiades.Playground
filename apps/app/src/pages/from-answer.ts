@@ -1,6 +1,6 @@
 import type { UIMessage } from "@tanstack/ai-react"
 
-import { blocksOf, questionOf } from "../chat/blocks.ts"
+import { blocksOf, calledAfter, questionOf } from "../chat/blocks.ts"
 import type { ChatTool } from "../chat/tool-results.ts"
 import { drawingTool } from "./parts.ts"
 import { MAX_PARTS, recipeOf, recipePartSchema, titleOf } from "./recipe.ts"
@@ -61,6 +61,8 @@ export function callsOfAnswer(parts: Parts, tools: ReadonlyArray<ChatTool>): Arr
     const result = parts.find((other) => other.type === "tool-result" && other.toolCallId === part.id)
     if (result?.type !== "tool-result" || result.state === "error") continue
     const tool = drawingTool(part.name, tools)
+    // A lookup on the way to the answer, which the chat did not draw (chat/blocks.ts).
+    if (tool?.lookup && calledAfter(parts, parts.indexOf(result))) continue
     const drawn = tool?.draw?.(result.content)
     if (drawn === null || drawn === undefined) continue
     const args = argsOf(part)

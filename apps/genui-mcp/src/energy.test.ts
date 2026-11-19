@@ -235,6 +235,13 @@ test("a machine that published nothing is refused in words, with the machines th
   })
 })
 
+test("the machines to compare are named by their ids or as people call them", async () => {
+  const [p04, p07] = ["alcyone-machines_AX-400_P-04", "taygeta-precision_TP-800_P-07"]
+  serve({ [meterOf(p04)]: meter(0, 1_000, 60), [meterOf(p07)]: meter(0, 2_000, 60) })
+  const shown = await showEnergy(apis, 1, ["P-04", "TP-800 P-07"], now)
+  assert.deepEqual(shown.machines.map((one) => one.machine), [p07, p04])
+})
+
 /** A heartbeat every ten seconds in each stretch, from so many minutes ago to so many. */
 const heartbeat = (machine: string, ...stretches: Array<[from: number, to: number]>) => ({
   [`machines/${machine}/umati/Connection/Heartbeat`]: {

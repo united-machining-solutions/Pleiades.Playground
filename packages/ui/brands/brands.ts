@@ -19,7 +19,10 @@ export type Brand = {
   logo?: string
 }
 
-export const brands: readonly Brand[] = [{ id: "example", name: "Example", logo: exampleLogo }]
+export const brands: readonly Brand[] = [
+  { id: "example", name: "Example", logo: exampleLogo },
+  { id: "trumpf", name: "TRUMPF" },
+]
 
 const storageKey = "pleiades.brand"
 const listeners = new Set<() => void>()
