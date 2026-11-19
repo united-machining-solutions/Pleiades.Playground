@@ -74,9 +74,64 @@ export function instructionsOf(hall: string | undefined, timeZone: string | unde
     titanInstructions,
     `It is ${clock}.`,
     hall
-      ? `The hall as it is now, read with genui_machine_list when the question came:\n${hall}`
-      : "The hall could not be read when the question came: call genui_machine_list before you say anything about a machine.",
+      ? `What every machine does right now:\n${hall}`
+      : "What every machine does right now could not be read: call genui_machine_list before you say anything about a machine.",
   ].join("\n\n")
+}
+
+/**
+ * Whether a sentence is about the answering and not the answer: "Die Frage lässt sich ohne Tool
+ * beantworten." A model that is asked not to think first sometimes begins with such a sentence, whatever
+ * its instructions say, and Titan reads every word aloud.
+ */
+export function isPreamble(sentence: string): boolean {
+  return (
+    /\btools?\b|\babfragen?\b|the hall now|\bschon vor mir\b/i.test(sentence) ||
+    /\bfrage\b.{0,40}\b(beantwort\w*|einfach|betrifft)/i.test(sentence) ||
+    /\b(liste|übersicht|anweisung\w*)\b.{0,30}\b(reicht|zeigt die stände|beantwort\w*|steht)/i.test(sentence)
+  )
+}
+
+/** Where the first sentence of a text ends, or -1 while it is still being written. */
+function firstSentenceEnd(text: string): number {
+  const match = /[.!?…]["“”«»)]*\s+|\n/.exec(text)
+  return match ? match.index + match[0].length : -1
+}
+
+/**
+ * Passes the text of a round on as it arrives, without the sentences at its beginning that are about the
+ * answering (`isPreamble`), two at most. Only the beginning is held back, until its first sentence is
+ * complete; a sentence is spoken as a whole anyway, so the voice loses no time. `end` passes on what is
+ * still held when the round is over.
+ */
+export function withoutPreamble(emit: (delta: string) => void): { push: (delta: string) => void; end: () => void } {
+  let held = ""
+  let passing = false
+  let dropped = 0
+  const pass = () => {
+    passing = true
+    if (held !== "") emit(held)
+    held = ""
+  }
+  return {
+    push(delta) {
+      if (passing) return emit(delta)
+      held += delta
+      for (;;) {
+        const end = firstSentenceEnd(held)
+        // A beginning that goes on and on without a mark is no sentence to wait for.
+        if (end < 0) return held.length > 240 ? pass() : undefined
+        if (dropped >= 2 || !isPreamble(held.slice(0, end))) return pass()
+        held = held.slice(end)
+        dropped++
+      }
+    },
+    end() {
+      if (passing) return
+      if (dropped < 2 && isPreamble(held)) held = ""
+      pass()
+    },
+  }
 }
 
 /** The largest body of a turn the server reads: the conversation below fits many times over. */
