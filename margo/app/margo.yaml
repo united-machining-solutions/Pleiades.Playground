@@ -123,6 +123,11 @@ parameters:
     targets:
       - pointer: CUTTING_PUNCH_PORT
         components: ["default"]
+  bendingPressPort:
+    value: 5614
+    targets:
+      - pointer: BENDING_PRESS_PORT
+        components: ["default"]
   opcuaAdapterBind:
     value: "127.0.0.1"
     targets:
@@ -257,6 +262,10 @@ configuration:
         - parameter: cuttingPunchPort
           name: Port of the page of the punching machine
           description: The page answers on the device only (127.0.0.1).
+          schema: port
+        - parameter: bendingPressPort
+          name: Port of the page of the press brake
+          description: The page answers on the network; it has no sign-in.
           schema: port
         - parameter: opcuaAdapterBind
           name: Address of the OPC UA adapter

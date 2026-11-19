@@ -1,7 +1,23 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { machineListOf, mappingOf, needingALook, proposalOf, securityOf, serverListOf, shownProfiles, shownValue, userStep } from "./results.ts"
+import {
+  addedInWords,
+  chosenRows,
+  doneInWords,
+  inDoubt,
+  machineListOf,
+  mappingOf,
+  needingALook,
+  proposalOf,
+  sameChoice,
+  securityOf,
+  serverListOf,
+  shownProfiles,
+  shownValue,
+  userStep,
+} from "./results.ts"
+import type { MappingRow, ProfileCheck } from "./results.ts"
 
 const server = {
   serialNumber: "A0280O0001",
@@ -103,4 +119,88 @@ test("the core is shown always, and of the other profiles those a server offers"
   assert.deepEqual(shown.fulfilled.map((one) => one.name), ["MonitoringExtended"])
   assert.deepEqual(shown.incomplete.map((one) => one.name), ["ChannelMonitoring"])
   assert.deepEqual(shownProfiles(undefined), { core: undefined, fulfilled: [], incomplete: [] })
+})
+
+test("a chip of a state chooses the rows of that state", () => {
+  const rows: Array<MappingRow> = [
+    { path: "Notification.ActiveAlerts", area: "umati", state: "Missing", detail: "No alarms" },
+    { path: "Identification.SerialNumber", area: "umati", state: "Ok", value: "A1121O0001" },
+    { path: "Production.ActiveProgram", area: "umati", state: "Missing" },
+  ]
+  assert.deepEqual(
+    chosenRows(rows, { state: "Missing" }, undefined).map((row) => row.path),
+    ["Notification.ActiveAlerts", "Production.ActiveProgram"],
+  )
+  assert.deepEqual(chosenRows(rows, { state: "Mismatch" }, undefined), [])
+})
+
+test("a chip of a profile chooses what it lacks, also an element the scan has no row for", () => {
+  const rows: Array<MappingRow> = [
+    { path: "Notification.ActiveAlerts", area: "umati", state: "Missing", detail: "No alarms" },
+    { path: "Notification.ActiveAlerts", area: "oem", state: "Ok" },
+  ]
+  const checks: Array<ProfileCheck> = [
+    { name: "Core", mandatory: true, fulfilled: false, offered: true, missing: ["Notification.ActiveAlerts"], instances: [] },
+    { name: "Energy", mandatory: false, fulfilled: false, offered: true, missing: ["Energy.Total"], instances: [] },
+  ]
+  assert.deepEqual(chosenRows(rows, { profile: "Core" }, checks), [rows[0]])
+  assert.deepEqual(chosenRows(rows, { profile: "Energy" }, checks), [{ path: "Energy.Total", area: "umati", state: "Missing" }])
+  assert.deepEqual(chosenRows(rows, { profile: "Unknown" }, checks), [])
+})
+
+test("the same chip is the same choice, and no choice equals only no choice", () => {
+  assert.equal(sameChoice({ state: "Ok" }, { state: "Ok" }), true)
+  assert.equal(sameChoice({ state: "Ok" }, { state: "Missing" }), false)
+  assert.equal(sameChoice({ profile: "Core" }, { profile: "Core" }), true)
+  assert.equal(sameChoice({ profile: "Core" }, { state: "Ok" }), false)
+  assert.equal(sameChoice(null, undefined), true)
+  assert.equal(sameChoice({ state: "Ok" }, null), false)
+})
+
+test("a mismatch and an unclear match are in doubt, a missing, derived or ok element is not", () => {
+  const rows: Array<MappingRow> = [
+    { path: "a", area: "umati", state: "Mismatch" },
+    { path: "b", area: "umati", state: "Unclear" },
+    { path: "c", area: "umati", state: "Derived" },
+    { path: "d", area: "umati", state: "Missing" },
+    { path: "e", area: "umati", state: "Ok" },
+  ]
+  assert.deepEqual(inDoubt(rows).map((row) => row.path), ["a", "b"])
+  assert.deepEqual(inDoubt([]), [])
+})
+
+test("the toast after adding says the site the machine went on, as Home says it", () => {
+  const proposal = { serialNumber: "A1121O0001", replaces: false }
+  const sites = { ok: true as const, sites: [{ siteId: "north-plant", name: "North plant" }] }
+  const placed = { ok: true as const, siteId: "north-plant", siteName: "North plant", already: false }
+  assert.deepEqual(addedInWords(proposal, sites, placed), {
+    title: "A1121O0001 added · North plant",
+    description: "Its values appear on Home within seconds.",
+  })
+  assert.equal(doneInWords(proposal, sites, placed), "A1121O0001 is added on North plant. Its values appear on Home within seconds.")
+})
+
+test("the toast after adding says why the machine is on no site", () => {
+  const proposal = { serialNumber: "A1121O0001", replaces: false }
+  assert.deepEqual(addedInWords(proposal, { ok: true, sites: [] }, undefined), {
+    title: "A1121O0001 added",
+    description: "There is no site yet: put it on one with Add machine on Home.",
+  })
+  assert.equal(
+    addedInWords(proposal, { ok: false, reason: "The app has no Sites API (SITES_API_URL is empty)." }, undefined).description,
+    "It is on no site: The app has no Sites API (SITES_API_URL is empty).",
+  )
+  const refused = { ok: false as const, reason: "The site 'south-plant' is no longer there." }
+  assert.equal(
+    doneInWords(proposal, { ok: true, sites: [] }, refused),
+    "A1121O0001 is added. It is on no site: The site 'south-plant' is no longer there. Put it on one with Add machine on Home.",
+  )
+  const already = { ok: true as const, siteId: "north-plant", siteName: "North plant", already: true }
+  assert.equal(doneInWords(proposal, undefined, already), "A1121O0001 is added. It stood on North plant already, and stays there.")
+})
+
+test("a registration that replaces one is not added again", () => {
+  const proposal = { serialNumber: "A1121O0001", replaces: true }
+  assert.deepEqual(addedInWords(proposal, undefined, undefined), { title: "Registration of A1121O0001 replaced", description: undefined })
+  assert.equal(doneInWords(proposal, undefined, undefined), "The registration of A1121O0001 is replaced.")
 })

@@ -4,10 +4,11 @@ import { MicIcon, SquareIcon } from "lucide-react"
 import { useEffect, useEffectEvent, useRef, useState } from "react"
 import type { MouseEvent, PointerEvent } from "react"
 
-import { InputGroupButton, InputGroupText } from "@pleiades/ui/components/input-group"
+import { InputGroupAddon, InputGroupButton, InputGroupText } from "@pleiades/ui/components/input-group"
 import { Spinner } from "@pleiades/ui/components/spinner"
 import { toast } from "@pleiades/ui/components/toast"
 
+import { draftIsDue } from "./dictation-draft.ts"
 import { elapsed, loudness } from "./dictation-level.ts"
 import { HOLD_MS, onLetGo } from "./dictation-press.ts"
 import type { Press } from "./dictation-press.ts"
@@ -19,7 +20,10 @@ import type { Recorder } from "./recorder.ts"
 // question. Nothing is sent by itself. After two minutes the recording stops by itself.
 //
 // While it records, the second line of the field says so, where a finger on the microphone does not
-// cover it: bars that move with the voice, the time, and what ends it. The browser records
+// cover it: bars that move with the voice, the time, and what ends it. What was said so far stands in
+// the field, dimmed, and grows every two seconds or so: the recording so far is written down again and
+// again, one request at a time, because the gateway has no model that writes while one speaks. When the
+// recording ends, all of it is written down once more, and that text goes into the field. The browser records
 // (recorder.ts); the model of the settings writes down what was said, on the server
 // (routes/api/transcribe.ts). It hears the language itself.
 //
@@ -46,7 +50,6 @@ function nothingHeard() {
 
 /** Two minutes: enough for a question, and a few megabytes, far below what the route reads. */
 const MAX_SECONDS = 120
-
 /** What dictation does now: nothing, record, or have the model write down what was recorded. */
 export type DictationPhase = "idle" | "listening" | "writing"
 
@@ -59,6 +62,11 @@ export type Dictation = {
   since: number | undefined
   /** Where the level of the microphone is read, while it records. */
   level: AnalyserNode | undefined
+  /**
+   * What was said so far, as the model wrote it down the last time; empty until it first did. It may
+   * change with more context, and goes when the whole recording is written down.
+   */
+  draft: string
   press: {
     onPointerDown: (event: PointerEvent<HTMLButtonElement>) => void
     onPointerUp: () => void
@@ -86,6 +94,24 @@ export function useDictation(onText: (text: string) => void): Dictation {
   const [phase, setPhase] = useState<DictationPhase>("idle")
   const [holding, setHolding] = useState(false)
   const [recording, setRecording] = useState<{ since: number; level: AnalyserNode }>()
+  const [draft, setDraft] = useState("")
+  /** Counts the recordings: a draft that comes back after its recording ended is not shown. */
+  const take = useRef(0)
+  /** The recording the draft on its way belongs to, and whether one is on its way. */
+  const draftOf = useRef(-1)
+  const drafting = useRef(false)
+  const lastDraft = useRef(-Infinity)
+  const drafts = useTranscription({
+    // A draft: the server writes one at a time for all fields of the app, and turns another away.
+    connection: fetchServerSentEvents("/api/transcribe?draft"),
+    threadId: "dictation-draft",
+    onResult: (result) => {
+      if (draftOf.current === take.current && running.current) setDraft(result.text.trim())
+    },
+    // A draft that fails does not matter: the whole recording is written down at the end, and that says
+    // what failed.
+    onError: () => undefined,
+  })
   /** The recording that runs, if one does. */
   const running = useRef<Running | null>(null)
   /** The microphone is being opened: the browser may still ask the person. */
@@ -121,6 +147,8 @@ export function useDictation(onText: (text: string) => void): Dictation {
       level.fftSize = 1024
       sound.createMediaStreamSource(recorder.stream).connect(level)
       running.current = { recorder, sound }
+      lastDraft.current = -Infinity
+      setDraft("")
       setRecording({ since: performance.now(), level })
       setPhase("listening")
       return true
@@ -137,6 +165,10 @@ export function useDictation(onText: (text: string) => void): Dictation {
     const now = running.current
     if (!now) return
     running.current = null
+    // A draft on its way is of no use any more, and leaves the gateway free for the whole recording. The
+    // last draft stays in the field until the whole recording is written down.
+    take.current += 1
+    drafts.stop()
     setRecording(undefined)
     setHolding(false)
     setPhase("writing")
@@ -153,9 +185,38 @@ export function useDictation(onText: (text: string) => void): Dictation {
       fail(problem)
     } finally {
       void now.sound.close()
+      setDraft("")
       setPhase("idle")
     }
   }
+
+  // While it records, what was said so far is written down again, one request at a time.
+  const draftNow = useEffectEvent(() => {
+    const now = running.current
+    const at = performance.now()
+    if (!now || !recording) return
+    if (!draftIsDue({ at, since: recording.since, last: lastDraft.current, busy: drafting.current })) return
+    drafting.current = true
+    lastDraft.current = at
+    const mine = take.current
+    void (async () => {
+      try {
+        const sofar = await now.recorder.sofar()
+        if (sofar.base64 === "" || mine !== take.current) return
+        draftOf.current = mine
+        await drafts.generate({ audio: `data:${sofar.mimeType.split(";")[0]};base64,${sofar.base64}` })
+      } catch {
+        // As onError: the end writes all of it down.
+      } finally {
+        drafting.current = false
+      }
+    })()
+  })
+  useEffect(() => {
+    if (phase !== "listening") return
+    const timer = setInterval(() => draftNow(), 250)
+    return () => clearInterval(timer)
+  }, [phase])
 
   // After two minutes the recording stops by itself and is written down, as if it was let go.
   const stopAtLimit = useEffectEvent(() => {
@@ -175,6 +236,7 @@ export function useDictation(onText: (text: string) => void): Dictation {
     return () => {
       gone.current = true
       clearTimeout(holdTimer.current)
+      take.current += 1
       const now = running.current
       running.current = null
       now?.recorder.cancel()
@@ -222,6 +284,7 @@ export function useDictation(onText: (text: string) => void): Dictation {
     holding,
     since: recording?.since,
     level: recording?.level,
+    draft,
     press: {
       onPointerDown,
       onPointerUp: letGo,
@@ -290,6 +353,18 @@ export function DictationLine({ dictation }: { dictation: Dictation }) {
         </span>
       )}
     </InputGroupText>
+  )
+}
+
+/**
+ * What was said so far, under what was already written in the field: dimmed, until the whole recording is
+ * written down and goes after it. In an empty field it stands in the field itself, as its placeholder.
+ */
+export function DictationDraft({ draft }: { draft: string }) {
+  return (
+    <InputGroupAddon align="block-end">
+      <InputGroupText className="block text-base whitespace-normal italic md:text-sm">{draft}</InputGroupText>
+    </InputGroupAddon>
   )
 }
 

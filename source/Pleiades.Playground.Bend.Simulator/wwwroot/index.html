@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bend RCI Simulator</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b5cad'/%3E%3Cpath d='M7 22h18M9 22l7-12 7 12' stroke='white' stroke-width='3' fill='none' stroke-linejoin='round'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top-bar">
+    <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+            <h1>Bend RCI Simulator</h1>
+        </div>
+    </div>
+    <!-- Read only: the identity comes from the configuration, which the adapter of the machine shares. -->
+    <form class="machine-identity" id="machineIdentityForm" title="From the configuration, read only">
+        <div class="identity-fields">
+            <label class="field">
+                <span>Manufacturer</span>
+                <input id="manufacturerInput" type="text" readonly tabindex="-1">
+            </label>
+            <label class="field">
+                <span>Model</span>
+                <input id="modelInput" type="text" readonly tabindex="-1" placeholder="–">
+            </label>
+            <label class="field">
+                <span>Serial number</span>
+                <input id="serialNumberInput" type="text" readonly tabindex="-1">
+            </label>
+            <div class="field instance-ident">
+                <span>ProductInstanceUri</span>
+                <strong id="productInstanceUri">–</strong>
+            </div>
+        </div>
+    </form>
+    <dl class="machine-meta" id="machineMeta"></dl>
+</header>
+
+<main class="layout">
+    <section class="card plan-card" aria-labelledby="planTitle">
+        <div class="card-header">
+            <h2 id="planTitle">Production plan</h2>
+            <span class="pill" id="planCount">0 packages</span>
+        </div>
+        <p class="hint">Click a package or a position to select it for processing.</p>
+        <div id="planList" class="plan-list" role="tree"></div>
+        <div id="planEmpty" class="empty-state" hidden>
+            No packages yet. Create test data on the right.
+        </div>
+    </section>
+
+    <div class="side-column">
+        <section class="card" aria-labelledby="autoTitle">
+            <div class="card-header">
+                <h2 id="autoTitle">Automatic processing</h2>
+                <span class="status-badge" id="autoState" data-state="Idle">Ready</span>
+            </div>
+            <div class="selection-box">
+                <div><span class="label">Package</span><strong id="selectedPackage">–</strong></div>
+                <div><span class="label">Position</span><strong id="selectedPosition">–</strong></div>
+            </div>
+            <label class="field">
+                <span>Operator (ReportedBy)</span>
+                <input id="reportedByInput" type="text" autocomplete="off" placeholder="optional">
+            </label>
+            <div class="button-row">
+                <button class="primary" id="processPositionButton" type="button">Process position</button>
+                <button id="processPackageButton" type="button">Process whole package</button>
+                <button class="danger-outline" id="cancelProcessingButton" type="button" hidden>Cancel</button>
+            </div>
+            <div class="progress-block" id="progressBlock" hidden>
+                <div class="progress-text">
+                    <span id="progressPosition"></span>
+                    <span id="progressParts"></span>
+                </div>
+                <div class="progress-track"><div class="progress-bar" id="progressBar"></div></div>
+            </div>
+            <p class="status-message" id="autoMessage"></p>
+        </section>
+
+        <section class="card" aria-labelledby="mdeTitle">
+            <div class="card-header">
+                <h2 id="mdeTitle">Machine data – report operating state</h2>
+            </div>
+            <div class="state-grid">
+                <button class="state-button state-running" data-operating-state="Running" type="button">Running</button>
+                <button class="state-button state-idle" data-operating-state="Idle" type="button">Idle</button>
+                <button class="state-button state-maintenance" data-operating-state="Maintenance" type="button">Maintenance</button>
+                <button class="state-button state-error" data-operating-state="Error" type="button">Fault</button>
+            </div>
+            <div class="field-row">
+                <label class="field narrow">
+                    <span>Error no.</span>
+                    <input id="errorNoInput" type="text" autocomplete="off">
+                </label>
+                <label class="field">
+                    <span>Error text</span>
+                    <input id="errorTextInput" type="text" autocomplete="off">
+                </label>
+            </div>
+            <p class="hint">Error no. and error text are sent with “Fault” only.</p>
+        </section>
+
+        <section class="card" aria-labelledby="dataTitle">
+            <div class="card-header">
+                <h2 id="dataTitle">Test data</h2>
+            </div>
+            <div class="tabs" role="tablist">
+                <button role="tab" class="tab" id="manualTab" aria-selected="true" aria-controls="manualPanel" type="button">Create by hand</button>
+                <button role="tab" class="tab" id="datasetTab" aria-selected="false" aria-controls="datasetPanel" type="button">Generate a dataset</button>
+            </div>
+
+            <form id="manualPanel" role="tabpanel" aria-labelledby="manualTab" class="tab-panel">
+                <div class="field-row">
+                    <label class="field">
+                        <span>Package name</span>
+                        <input id="packageNameInput" type="text" required autocomplete="off">
+                    </label>
+                    <label class="field narrow">
+                        <span>Package quantity</span>
+                        <input id="packageQuantityInput" type="number" min="1" value="1" required>
+                    </label>
+                </div>
+                <div class="positions-header">
+                    <span>Order number</span><span>Part number</span><span>Quantity</span><span></span>
+                </div>
+                <div id="positionRows" class="position-rows"></div>
+                <div class="button-row">
+                    <button type="button" id="addPositionRowButton">+ Position</button>
+                    <button type="submit" class="primary">Create package</button>
+                </div>
+            </form>
+
+            <form id="datasetPanel" role="tabpanel" aria-labelledby="datasetTab" class="tab-panel" hidden>
+                <div class="field-grid">
+                    <label class="field"><span>Packages</span><input id="datasetPackageCount" type="number" min="1" max="50" value="5" required></label>
+                    <label class="field"><span>Positions per package</span><input id="datasetPositionCount" type="number" min="1" max="20" value="2" required></label>
+                    <label class="field"><span>Parts min.</span><input id="datasetMinimumParts" type="number" min="1" max="1000" value="3" required></label>
+                    <label class="field"><span>Parts max.</span><input id="datasetMaximumParts" type="number" min="1" max="1000" value="10" required></label>
+                    <label class="field wide"><span>Name prefix</span><input id="datasetPrefix" type="text" value="SIM" autocomplete="off"></label>
+                </div>
+                <div class="button-row">
+                    <button type="submit" class="primary">Generate dataset</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <section class="card log-card" aria-labelledby="logTitle">
+        <div class="card-header">
+            <h2 id="logTitle">Sent messages</h2>
+            <div class="log-tools">
+                <button type="button" id="clearLogButton">Clear</button>
+            </div>
+        </div>
+        <div class="log-list" id="logList" aria-live="polite"></div>
+    </section>
+</main>
+
+<div class="toast-stack" id="toastStack" aria-live="assertive"></div>
+
+<template id="positionRowTemplate">
+    <div class="position-row">
+        <input type="text" name="orderNo" placeholder="e.g. FA-1001" required autocomplete="off">
+        <input type="text" name="partNo" placeholder="e.g. Angle-01" required autocomplete="off">
+        <input type="number" name="desiredParts" min="1" max="1000" value="5" required>
+        <button type="button" class="icon-button" title="Remove position" aria-label="Remove position">×</button>
+    </div>
+</template>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

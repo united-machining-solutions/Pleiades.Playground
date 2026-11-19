@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 
 import type { AlertSpan, JobOrderEntry } from "./apis.server.ts"
-import { activeAlertsOf, alertEnd, alertLanes, currentJobOrder, jobOrderLane, laneSpans, oldestRaise, thinnedLane } from "./read.server.ts"
+import { activeAlertsOf, alertEnd, alertLanes, byNewestLife, currentJobOrder, jobOrderLane, laneSpans, oldestRaise, thinnedLane } from "./read.server.ts"
 
 const at = (clock: string) => `2026-11-18T${clock}.000Z`
 const ms = (clock: string) => Date.parse(at(clock))
@@ -156,4 +156,13 @@ test("a lane with more spans than slots shows in each slot the value that lasted
   ]
   assert.deepEqual(thinnedLane(spans, 2), [span("09:00:00", "09:00:10", "A"), span("09:00:10", "09:00:20", "C")])
   assert.deepEqual(thinnedLane(spans, 4), spans)
+})
+
+test("without a machine asked for, the TruLaser alive most recently comes first, not the first by name", () => {
+  const machines = [
+    { machine: "trumpf_PLL01_L1649A-STARLINER", lastLife: at("08:00:00") },
+    { machine: "trumpf_TruLaser_L1649A-STARLINER", lastLife: at("09:00:00") },
+    { machine: "trumpf_TruLaser_A", lastLife: at("09:00:00") },
+  ]
+  assert.deepEqual(byNewestLife(machines), ["trumpf_TruLaser_A", "trumpf_TruLaser_L1649A-STARLINER", "trumpf_PLL01_L1649A-STARLINER"])
 })

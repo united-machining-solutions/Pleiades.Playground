@@ -216,3 +216,59 @@ function FeedTile({ feed, powerOn }: { feed: Measurement | undefined; powerOn: M
 function apartPercent(text: string): Written | string {
   return text.endsWith(" %") ? { number: text.slice(0, -2), unit: "%" } : text
 }
+
+/** A tile while its values are read: its frame and its label, and grey where its value and what belongs to it stand. */
+function TileSkeleton({ children }: { children: ReactNode }) {
+  return (
+    <Card size="sm" className="gap-3">
+      <CardHeader>
+        <CardTitle className="flex h-5 items-center">
+          <Skeleton className="h-3.5 w-24" />
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col gap-3">
+        <Skeleton className="h-7.5 w-28" />
+        {children}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** A line of the values that belong to a tile, while it is read. */
+function FactSkeleton() {
+  return (
+    <div className="flex h-5 items-center justify-between gap-3">
+      <Skeleton className="h-3.5 w-24" />
+      <Skeleton className="h-3.5 w-12" />
+    </div>
+  )
+}
+
+/**
+ * The tiles while what the machine measures is read: the four of a machine that measures all of them,
+ * each with the room of what it holds, so they keep their place when the values come.
+ */
+export function MeasurementTilesSkeleton() {
+  return (
+    <div className="@container/tiles" aria-hidden>
+      <div className="grid gap-3 @md/tiles:grid-cols-2 @3xl/tiles:grid-cols-4">
+        <TileSkeleton>
+          <Skeleton className="h-14 w-full" />
+        </TileSkeleton>
+        <TileSkeleton>
+          <FactSkeleton />
+        </TileSkeleton>
+        <TileSkeleton>
+          <div className="flex flex-col gap-1">
+            <FactSkeleton />
+            <FactSkeleton />
+          </div>
+        </TileSkeleton>
+        <TileSkeleton>
+          <Skeleton className="h-1.5 w-full rounded-full" />
+          <FactSkeleton />
+        </TileSkeleton>
+      </div>
+    </div>
+  )
+}
