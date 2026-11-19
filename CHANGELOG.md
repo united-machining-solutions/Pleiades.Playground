@@ -8,8 +8,8 @@ All notable changes are documented here. The format follows
 ### Added
 
 - Example app: the showcase page `/titan`, an assistant you talk to, from the umati hackathon. Hold the space
-  bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the one thing
-  the answer is about. It has a conversation of its own, made for speaking: the hall as it is now stands in
+  bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the
+  conversation to scroll through, each answer with the card its tool gave. It has a conversation of its own, made for speaking: the hall as it is now stands in
   its instructions, so most questions need no tool call, and it says at once that it heard and announces a
   lookup. A Haiku model is asked not to think first, and a turn the model ends without a word is shown
   as a problem. A new fault it says by itself, but never over the person or an answer, and at most one a minute.

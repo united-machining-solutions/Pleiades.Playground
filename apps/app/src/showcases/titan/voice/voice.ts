@@ -352,6 +352,31 @@ export function forSpeech(markdown: string): string {
     .trim()
 }
 
+/** A unit as it is written, and as it is said in German: one of it, and more. */
+const SPOKEN_UNITS: ReadonlyArray<[unit: string, one: string, more: string]> = [
+  ["kWh", "Kilowattstunde", "Kilowattstunden"],
+  ["Wh", "Wattstunde", "Wattstunden"],
+  ["kW", "Kilowatt", "Kilowatt"],
+  ["min", "Minute", "Minuten"],
+  ["h", "Stunde", "Stunden"],
+  ["s", "Sekunde", "Sekunden"],
+  ["°C", "Grad Celsius", "Grad Celsius"],
+  ["%", "Prozent", "Prozent"],
+]
+
+/**
+ * A text with its units as words, for a voice: "3 h 5 min" is "3 Stunden 5 Minuten". A voice reads "h"
+ * as a letter. Only a unit that stands after a figure is one; Titan speaks German, so the words are.
+ */
+export function unitsInWords(text: string): string {
+  let spoken = text
+  for (const [unit, one, more] of SPOKEN_UNITS) {
+    const end = /\w$/.test(unit) ? "(?![\\p{L}\\d])" : ""
+    spoken = spoken.replace(new RegExp(`(\\d+(?:[.,]\\d+)?)[\\s\\u00a0]?${unit}${end}`, "gu"), (_, figure: string) => `${figure} ${figure === "1" ? one : more}`)
+  }
+  return spoken
+}
+
 // ---- Listening ----
 
 export function canListen(): boolean {
@@ -540,7 +565,7 @@ export function speakingAnswers(): Listener {
       const words = wordsOf(last)
       const end = isLoading ? sentencesEnd(words, said.at) : words.length
       if (end <= said.at) return
-      const piece = forSpeech(words.slice(said.at, end))
+      const piece = unitsInWords(forSpeech(words.slice(said.at, end)))
       said.at = end
       if (piece) void sayNext(piece)
     },

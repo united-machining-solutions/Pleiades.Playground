@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { Kbd } from "@pleiades/ui/components/kbd"
 import { SparklesIcon } from "lucide-react"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { openConversation } from "@/showcases/titan/conversation.ts"
+import { keepingTranscript, useTranscript } from "@/showcases/titan/transcript.ts"
+import { TranscriptView } from "@/showcases/titan/transcript-view.tsx"
 import type { Conversation } from "@/showcases/titan/conversation.ts"
 import "@/showcases/titan/titan.css"
 import {
@@ -26,16 +28,10 @@ import {
 import type { VoiceState } from "@/showcases/titan/voice/voice.ts"
 import { gatewayVoice, speechAvailable } from "@/showcases/titan/voice/speech.ts"
 import { faultBriefing, faultInWords, useNewFaults } from "@/showcases/titan/voice/faults.ts"
-import { sharingCards, useShown } from "@/showcases/titan/voice/shown.ts"
 import { loadRecognition } from "@/showcases/titan/voice/transcribe.ts"
 import { AWAKE_MS, isPause, useWakeWord } from "@/showcases/titan/voice/wake.ts"
 import { greetingFor } from "@/showcases/titan/voice/greeting.ts"
-import { keyFactsOf, machinesNamed } from "@/showcases/titan/board.ts"
-import type { MachineFacts } from "@/showcases/titan/board.ts"
-import { escalationsOf } from "@/showcases/titan/escalation.ts"
-import { EscalationView } from "@/showcases/titan/escalation-view.tsx"
-import { FocusView } from "@/showcases/titan/focus-view.tsx"
-import { asksToSee, unbroken } from "@/showcases/titan/words.ts"
+import { unbroken } from "@/showcases/titan/words.ts"
 import { Cloud } from "@/showcases/titan/voice/cloud.tsx"
 
 // Titan: a dark panel with a cloud of points that greets, listens and speaks, and nothing else. It stands
@@ -53,11 +49,11 @@ import { Cloud } from "@/showcases/titan/voice/cloud.tsx"
 //   space bar wakes it again. It still shows a new fault.
 // - Titan speaks only once it is started and only while its tab is in front: a tab left open in
 //   the background stays silent.
-// - The screen is dark and has one focus: the question asked last and its answer (titan/focus-view.tsx).
-//   A new question clears what the one before showed. Beside it, once Titan was started, stands the
-//   escalation (titan/escalation-view.tsx): red what stands, amber what to do before a machine fails.
-//   Everything that comes and goes, what Titan heard, a problem, the pause, is one quiet line at the
-//   bottom, so no text appears anywhere else.
+// - The panel is dark. Before the first question it shows the cloud and the greeting. Then the
+//   conversation stands beside a smaller cloud, to read and to scroll through: each question, and under
+//   it the answer with the cards its tools gave (titan/transcript-view.tsx). Nothing that was shown
+//   goes when the next question comes. What comes and goes, a problem, the pause, what Titan overheard,
+//   is one quiet line at the bottom.
 // - The keys are Titan's while nothing is being typed: in the field of the chat or of the search, the
 //   space bar and P are letters.
 //
@@ -112,7 +108,7 @@ function Assistant() {
   /** Titan's panel: a click on it starts Titan, a click elsewhere in the app does not. */
   const panel = useRef<HTMLDivElement>(null)
   const state = useVoiceState()
-  const { cards, briefing, question } = useShown()
+  const transcript = useTranscript()
   const inFront = useTabInFront()
   const [problem, setProblem] = useState<string>()
   /** What the speech recognition heard last, so the person sees what was asked. */
@@ -140,7 +136,7 @@ function Assistant() {
   const conversation = useRef<Conversation | undefined>(undefined)
   useEffect(() => {
     const opened = openConversation({
-      listeners: [speakingAnswers(), sharingCards()],
+      listeners: [speakingAnswers(), keepingTranscript()],
       onReading: () => void sayNext(LOOKING),
       onProblem: setProblem,
     })
@@ -241,7 +237,7 @@ function Assistant() {
   const overhearing = useRef(false)
   /** When "Hey Titan" was said alone: Titan waits for the question that follows. */
   const wokeAt = useRef(-Infinity)
-  const { alarmed, list } = useNewFaults((fault) => {
+  const { alarmed } = useNewFaults((fault) => {
     // Before the start, in a pause or behind another tab, the fault is shown, not said.
     if (!latest.current.mayTalk) return
     // A fault never talks over the person or over an answer. It is shown in the line on top and not said
@@ -400,19 +396,8 @@ function Assistant() {
     }
   }, [])
 
-  const escalations = useMemo(() => list && escalationsOf(list), [list])
-
-  // The key facts of the machines the answer names, two at most, in the order it names them.
-  const named = useMemo(() => {
-    if (!list || !briefing) return []
-    const text = [briefing.summary, briefing.recommendation ?? "", ...briefing.facts.map((fact) => fact.title ?? "")].join(" ")
-    return machinesNamed(text)
-      .flatMap((name) => keyFactsOf(list, name) ?? [])
-      .slice(0, 2) as Array<MachineFacts>
-  }, [list, briefing])
-
-  /** The one thing in focus: the question asked last and what its answer says and shows. */
-  const focused = Boolean(heard) || cards.length > 0 || Boolean(briefing?.summary)
+  /** The conversation has begun: its transcript takes the panel, and the cloud steps to the side. */
+  const talking = started && transcript.messages.length > 0
 
   // Everything that comes and goes stands in one line at the bottom, the most important first.
   const line =
@@ -424,46 +409,37 @@ function Assistant() {
 
   return (
     // A dark panel that fills the page, in the frame of the app: as high as the window below the bar of
-    // the app, so nothing scrolls. Before the start, and between questions, the cloud and the
-    // greeting. Once started, the escalation in one slim line on top. With a question: the focus below
-    // it, the cloud large and faint behind it, and at the bottom one line for what comes and goes.
+    // the app. Before the first question the cloud and the greeting; then the conversation, which scrolls
+    // inside the panel, with the cloud beside it; and at the bottom one line for what comes and goes.
     <div ref={panel} className="titan-night relative flex h-[calc(100svh-6.5rem)] min-h-96 flex-col overflow-hidden rounded-xl bg-black text-foreground">
-      {started && escalations && <EscalationView escalations={escalations} />}
-      <div className="flex min-h-0 flex-1">
-        <div className="relative flex min-w-0 flex-1">
-        {/* With something in focus, the cloud steps back: large, faint and pulsing behind it, so
-            Titan is still there and still shows whether it listens, thinks or speaks. */}
-        {started && focused && (
-          <div className="pointer-events-none absolute inset-0 grid [container-type:size] place-items-center overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-50 motion-safe:duration-700">
-            <Cloud
-              state={state}
-              alarm={alarmed.length > 0}
-              className={`size-[95cqmin] motion-safe:animate-pulse ${paused ? "opacity-10" : "opacity-25"}`}
-            />
-          </div>
-        )}
-        <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden px-8 py-10 md:px-16">
-          {started && focused ? (
-            <FocusView briefing={briefing} cards={cards} machines={named} asked={asksToSee(question ?? heard)} thinking={state === "thinking"} />
-          ) : (
-            <div className="m-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
-              <Cloud state={state} alarm={alarmed.length > 0} className={`size-72 ${paused ? "opacity-30" : ""}`} />
-              <h1 className="text-3xl font-light tracking-wide text-balance">{paused ? "Pause" : unbroken(greetingFor(undefined, alarmed))}</h1>
-              {!started && (
-                <p className="flex items-center gap-2 text-base text-muted-foreground">
-                  <Kbd>Leertaste</Kbd> drücken oder klicken, um Titan zu starten.
-                </p>
-              )}
-            </div>
-          )}
-        </main>
+      {talking ? (
+        <div className="flex min-h-0 flex-1">
+          {/* The cloud stays in sight and still shows whether Titan listens, thinks or speaks. */}
+          <aside className="flex w-56 shrink-0 items-center justify-center max-md:hidden">
+            <Cloud state={state} alarm={alarmed.length > 0} className={`size-48 ${paused ? "opacity-30" : ""}`} />
+          </aside>
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <TranscriptView transcript={transcript} />
+          </main>
         </div>
-      </div>
-      {/* At the bottom, quiet: on the left what comes and goes, on the right what Titan understood,
-          to check, until the answer stands. */}
+      ) : (
+        <main className="flex min-h-0 flex-1 px-8 py-10">
+          <div className="m-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
+            <Cloud state={state} alarm={alarmed.length > 0} className={`size-72 ${paused ? "opacity-30" : ""}`} />
+            <h1 className="text-3xl font-light tracking-wide text-balance">{paused ? "Pause" : unbroken(greetingFor(undefined, alarmed))}</h1>
+            {!started && (
+              <p className="flex items-center gap-2 text-base text-muted-foreground">
+                <Kbd>Leertaste</Kbd> drücken oder klicken, um Titan zu starten.
+              </p>
+            )}
+          </div>
+        </main>
+      )}
+      {/* At the bottom, quiet: what comes and goes, and what Titan understood until its question stands
+          in the conversation. */}
       <footer className="flex h-12 shrink-0 items-center gap-6 px-8 text-sm text-muted-foreground">
         <p className="min-w-0 flex-1 truncate">{line}</p>
-        {heard && !briefing?.summary && cards.length === 0 && <p className="max-w-[50%] truncate italic">„{heard}“</p>}
+        {heard && state === "thinking" && <p className="max-w-[50%] truncate italic">„{heard}“</p>}
       </footer>
       <p className="sr-only" aria-live="polite">
         {paused ? "Pause." : said[state]}

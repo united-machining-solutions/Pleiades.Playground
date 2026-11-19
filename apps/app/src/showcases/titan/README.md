@@ -1,7 +1,7 @@
 # Titan
 
 Titan is an assistant you talk to: a dark panel with a cloud of points that listens, answers aloud from the
-values of the stack, and shows the one thing the answer is about. It is a showcase
+values of the stack, and shows the conversation with the cards of its answers. It is a showcase
 ([ADR-0018](../../../../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)): only a build
 with `APP_SHOWCASES` has the page `/titan`, and nothing outside this folder and its routes knows of it. It
 came out of the umati hackathon in November 2026.
@@ -37,8 +37,9 @@ Titan speaks German, as the demo does.
 4. **Speaking.** The answer arrives sentence by sentence, and each sentence goes to `titan.api.speak.ts` as
    soon as it is complete, the next one while the first sounds. When the model calls a tool before it said
    anything, Titan says "Ich schaue kurz nach.": a spoken conversation bears a wait that is announced.
-5. **The screen.** `voice/shown.ts` takes the answer apart for `focus-view.tsx`, and draws what a tool gave
-   with the card the chat of the app draws for the same tool.
+5. **The screen.** `transcript-view.tsx` shows the conversation to scroll through: each question, and under
+   it the answer with what a tool gave, drawn with the card the chat of the app draws for the same tool. A
+   card stays where it was shown.
 
 The chat of the app is not part of this. Its turn carries every tool and every instruction of the app, about
 17 000 tokens, which is right for a chat and too slow to talk to.
