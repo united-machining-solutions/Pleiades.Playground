@@ -7,6 +7,12 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Margo app: the example app registers at the Pleiades Hub, as in `compose.yaml`, with the section
+  *Pleiades Hub* of the settings. *Register at the Pleiades Hub* (`HUB_REGISTRATION`, on by default) switches
+  the registration off, since a Margo client may leave an empty broker out and the default would come back;
+  the server of the app takes `HUB_REGISTRATION=false` everywhere. *Broker of the hub* is the broker of the
+  stack by default, and *Address of the example app for the hub* is Traefik under *Host name of the app*,
+  over HTTP, so the hub links to the address a browser on the network uses once Traefik is opened to it.
 - Example app: the showcase page `/trulaser`, a cockpit of a TRUMPF laser cutting machine named as the umati
   data model names it: `State.Status` with `Notification.ActiveAlerts` and its history on one time axis, the
   `JobOrder` with its `ProgramExecution`, and from the TRUMPF extension (`oem/Dalle/`) the requests of the
@@ -589,6 +595,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Example app: `/discover` takes a mistyped or shortened address as the address it is. `opc.tcp//host:port`
+  became `opc.tcp://opc.tcp//host:port:4840`, a machine name with the default port; a mistyped `opc.tcp` at
+  the start, also `opc.tcp:host:port`, is now written right, and `host:port` or `host:port/path` without a
+  scheme gets `opc.tcp://` and no second port. Only
+  a name alone, for example `A1121O0001`, still means `opc.tcp://<name>:4840`.
 - `opcua-adapter`: a rejected certificate is reported with its reason instead of a timeout. A server whose
   certificate does not carry the ApplicationUri it announces was told in the chat as "did not open a session
   within 30 seconds"; the reason was only in the log. A connect now stops on the first certificate error and
