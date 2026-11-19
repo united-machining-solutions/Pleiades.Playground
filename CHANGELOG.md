@@ -419,6 +419,8 @@ All notable changes are documented here. The format follows
   about every two seconds; when the recording ends, all of it is written down once more and goes into the
   field. The recording so far is written down again and again, one request at a time, as the gateway has no
   model that writes while one speaks. A draft still on its way at the end is called off at the gateway too.
+  Drafts stop after 30 s of recording, and the app writes one draft at a time for all its fields, so drafts
+  never take more than one of the two requests a key has at the gateway.
 - Example app: Live values with all machines shows only the graphs of a value some machine published, and
   next to the title of a graph at most one value of now, where a single machine measures it; more stand
   only as lines. Where machines are there and none published such a value, the page says so. With one machine

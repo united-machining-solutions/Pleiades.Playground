@@ -102,7 +102,8 @@ export function useDictation(onText: (text: string) => void): Dictation {
   const drafting = useRef(false)
   const lastDraft = useRef(-Infinity)
   const drafts = useTranscription({
-    connection: fetchServerSentEvents("/api/transcribe"),
+    // A draft: the server writes one at a time for all fields of the app, and turns another away.
+    connection: fetchServerSentEvents("/api/transcribe?draft"),
     threadId: "dictation-draft",
     onResult: (result) => {
       if (draftOf.current === take.current && running.current) setDraft(result.text.trim())
