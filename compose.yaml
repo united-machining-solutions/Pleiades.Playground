@@ -36,6 +36,11 @@ x-simulator: &simulator
     events-persistence:
       condition: service_healthy
 
+# The route of the demo (Config:SpecOutput:Routes in the appsettings of the simulator): one job order, one JobOrderID,
+# turned on M-02, milled on P-07, ground on P-04, beside the own job orders of each machine. All three take it.
+x-route-env: &route-env
+  Config__SpecOutput__Routes__ValveBody__Enabled: "true"
+
 x-cutting-simulator: &cutting-simulator
   <<: *service
   image: ghcr.io/united-machining-solutions/pleiades.playground.cutting.simulator:${PLEIADES_VERSION:-dev}
@@ -429,7 +434,7 @@ services:
       <<: *build
       dockerfile: Pleiades.Playground.Simulator/Dockerfile
     environment:
-      <<: *logging-env
+      <<: [*logging-env, *route-env]
       Config__SerialNumber: P-04
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-p-04
@@ -439,7 +444,7 @@ services:
     <<: *simulator
     pull_policy: never
     environment:
-      <<: *logging-env
+      <<: [*logging-env, *route-env]
       Config__SerialNumber: P-07
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-p-07
@@ -450,7 +455,7 @@ services:
     <<: *simulator
     pull_policy: never
     environment:
-      <<: *logging-env
+      <<: [*logging-env, *route-env]
       Config__SerialNumber: M-02
       Config__MqttDestination__ConnectionString: mqtt://broker:1883
       Config__MqttDestination__ClientId: simulator-m-02

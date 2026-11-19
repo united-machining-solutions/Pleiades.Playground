@@ -425,9 +425,36 @@ Each virtual machine works like this:
   cancels it (`JobOrderCancelled`: aborted without having run, so without a result), takes it back
   (`JobOrderRemoved`) or changes the runs it plans (`JobOrderChanged`).
 - A job order names its work master (`WorkMasterID`), the same id as `WorkMasterMonitoring.ActiveWorkMaster`
-  while it runs, an order number of the ERP (`OrderNumbers`, `SO-` and its number), its runs (`RunsPlanned`, the
-  quantity of the job) and `ProductionMode`; the machine knows no planned times. Its result counts one run per
-  part made; `JobResult` is `Successful` at its end, `Unsuccessful` when a failure aborts it.
+  while it runs, an order number of the ERP (`OrderNumbers`, `SO-` and the number of the job order, so the same
+  on every machine of a route, see below), its runs (`RunsPlanned`, the quantity of the job) and `ProductionMode`;
+  the machine knows no planned times. Its result counts one run per part made; `JobResult` is `Successful` at
+  its end, `Unsuccessful` when a failure aborts it.
+- A route (`SpecOutput:Routes:<name>`, off unless `Enabled`) is a job order that passes several machines in turn,
+  each doing one step, under **one `JobOrderID` on every machine**: the id an MES knows the job by and the
+  machine passes on unchanged. In the demo stack the route `ValveBody` turns on M-02, mills on P-07 and grinds
+  on P-04 (`90001/01`, `90002/01`, …, `RouteConfig.FirstJobOrderNumber`), beside the own job orders of each
+  machine. Every simulator reads the same routes and takes the steps of its own machine id.
+  - The machine of the first step adds a job order of the route every `Interval` (30 minutes) and at its start,
+    but none while one of the route still waits there. It releases it at once; a released job order of a route
+    starts before the own queue of the machine.
+  - Every later machine subscribes to the two retained lists of the machine before it,
+    `umati/JobMonitoring/JobOrders` and `JobOrderResults`; the retained values are its catch-up after a start,
+    and every change of them comes after. It knows the job orders of the route by the `WorkMasterID` of the
+    step before. When one shows up there it adds its own step as `NotAllowedToStart` (`JobOrderAdded`). When
+    that step ended there and its result has an `EndTime`, it sets `RunsPlanned` to its `GoodQuantity`
+    (`JobOrderChanged`) and releases its step (`JobOrderReleased`): it starts when the machine is free. When
+    that step was aborted or cancelled, ended without a good part, or left the list before it ended, it cancels
+    its step (`JobOrderCancelled`).
+  - The planner of the machine (`QueueChangesPerHour`) leaves the job orders of a route alone, and their start
+    adds no job order to the own queue.
+  - A machine takes a job order of the machine before only once. The next number of a route and the job orders
+    taken are kept in `/data/spec_routes.json` (`SpecOutput:RouteStateFilePath`), so a restart neither gives a
+    number again nor takes a step twice. A step that was waiting or running here when this machine restarted
+    is lost with its list, as the own job orders are.
+  - So the job orders of one route carry the same `JobOrderID`, `OrderNumbers` and `JobName` stem on several
+    machines; each machine has its own entry, events, result and program executions of it. A consumer that
+    follows a job across machines groups by `JobOrderID` (or the order number); within one machine the
+    `JobOrderID` stays unique.
 - `Executing` in `State/Status`, `Active` in `Channel/1/ChannelState`, a turning spindle and a program execution
   always come together. Channel and active work master carry the `ExecutionId` as `correlationId`; the
   program execution snapshot names it inside, as `ExecutionId`, and carries no `correlationId`.
@@ -644,7 +671,12 @@ will (client id `opcua-adapter-<machineId>`). What it publishes follows from the
   program views of the app like the virtual machine. Open: who builds it.
 - The planned times of a job order. The model asks for `PlannedStartTime` and `PlannedEndTime` and allows `null`;
   the virtual machine knows no plan and sends `null`. `OrderNumbers` is made up (`SO-` and the number of the job
-  order).
+  order, the same on every machine of a route).
+- A job order across machines. The model names a job order by its `JobOrderID`, the number the machine got it
+  with, and says nothing about the same id on several machines. The routes of the virtual machine use one
+  `JobOrderID` for every step of a job, as an MES does that knows the job by it; `OrderNumbers` carries the order
+  of the ERP. Open: whether the model says so, and whether a job order needs a step (an operation of ISA-95) of
+  its own, for a job that passes the same machine twice.
 - The mapping of states to lamps. It is an assumption of the emulator, as in the table above; whether the group
   wants a recommendation, as NE 107 for alerts, is open.
 - The events below `machines/` follow the profiles too: job events (`events/jobs`) carry the job order and its

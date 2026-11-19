@@ -183,8 +183,10 @@ it did, does and what waits for it, or an order on its way, and the list of orde
 circulation. An order is every job order that names the same order number, read from the backend
 (`genui_job_order_list`) and kept live by the retained lists `JobMonitoring/JobOrders` and
 `JobOrderResults`. Programming before the machines, packing after them and the single part on its sheet have
-no source yet: the page draws them dashed, as the gaps to discuss. No source of the stack sends an order across
-machines yet; a stack with `APP_SHOWCASES` set has the page <http://localhost:5600/what-if>, in the sidebar
+no source yet: the page draws them dashed, as the gaps to discuss. The simulators send one order across machines every
+half hour: the route `ValveBody`, job order `90001/01` and on, order number `SO-90001`, turned on M-02, milled
+on P-07 and ground on P-04; P-07 releases its step once M-02 has ended it, P-04 once P-07 has. Search for
+"Valve body" or "SO-900" to find one. A stack with `APP_SHOWCASES` set has the page <http://localhost:5600/what-if>, in the sidebar
 as "What if": the same page with made-up orders WI-… across the clusters, and "Real orders" turns them off.
 It has no picture in this tour.
 

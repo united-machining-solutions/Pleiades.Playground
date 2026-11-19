@@ -85,6 +85,28 @@ internal sealed class SpecOutputConfig
     public Dictionary<string, ScenarioConfig> Scenarios { get; set; } = [];
 
     /// <summary>
+    /// Routes by name: job orders that pass several machines in turn, under one <c>JobOrderID</c>. Every simulator of
+    /// the stack reads the same routes and takes the steps of its own machine. A route does nothing unless it is
+    /// <see cref="RouteConfig.Enabled"/>.
+    /// </summary>
+    [SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "Configuration binding")]
+    public Dictionary<string, RouteConfig> Routes { get; set; } = [];
+
+    /// <summary>
+    /// File that keeps what the routes need across restarts: the next number of each route and the job orders this
+    /// machine has taken from the one before it. Empty: next to <see cref="PersistenceFilePath"/>,
+    /// <c>spec_routes.json</c>; without that file, not kept.
+    /// </summary>
+    public string? RouteStateFilePath { get; init; }
+
+    /// <summary>The file of the route state, <see cref="RouteStateFilePath"/> or the one next to the counters.</summary>
+    public string? EffectiveRouteStateFilePath => !string.IsNullOrWhiteSpace(RouteStateFilePath)
+        ? RouteStateFilePath
+        : string.IsNullOrWhiteSpace(PersistenceFilePath)
+            ? null
+            : Path.Combine(Path.GetDirectoryName(PersistenceFilePath) ?? string.Empty, "spec_routes.json");
+
+    /// <summary>
     /// This configuration with the scenario <see cref="ScenarioName"/> names as <see cref="Scenario"/>, and with the
     /// manufacturer of the scenario, if it names one.
     /// </summary>
@@ -112,6 +134,8 @@ internal sealed class SpecOutputConfig
             Scenario = scenario,
             ScenarioName = ScenarioName,
             Scenarios = Scenarios,
+            Routes = Routes,
+            RouteStateFilePath = RouteStateFilePath,
         };
     }
 
@@ -357,6 +381,81 @@ internal sealed class JobTemplate
 
     /// <summary>Electric power while the program runs, in watt.</summary>
     public double ExecutingPower { get; init; } = 12_000;
+}
+
+/// <summary>
+/// A route: a job order that passes several machines in turn, each doing one step, under one <c>JobOrderID</c>, the id
+/// an MES knows the job by. The machine of the first step adds such a job order now and then; every later machine
+/// follows the retained list of job orders of the machine before it. It adds its step as <c>NotAllowedToStart</c>
+/// once the job order shows up there, releases it once that step ended, with the good parts of it as
+/// <c>RunsPlanned</c>, and cancels it when that step was aborted, cancelled or made no good part.
+/// </summary>
+[SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Bound by the configuration binder")]
+internal sealed class RouteConfig
+{
+    /// <summary>Whether the route runs; off by default.</summary>
+    public bool Enabled { get; init; }
+
+    /// <summary>Number of the first job order of the route; the ids are <c>{number}/01</c>, counting up.</summary>
+    [Range(1, int.MaxValue)]
+    public int FirstJobOrderNumber { get; init; } = 90001;
+
+    /// <summary>Parts the first step makes.</summary>
+    [Range(1, 100_000)]
+    public int Quantity { get; init; } = 6;
+
+    /// <summary>
+    /// How often the machine of the first step adds a job order of the route. It adds none while one of the route
+    /// still waits there for its start.
+    /// </summary>
+    public TimeSpan Interval { get; init; } = TimeSpan.FromMinutes(30);
+
+    /// <summary>The steps, in the order the job order passes them, each on a machine of its own.</summary>
+    [SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "Configuration binding")]
+    public List<RouteStepConfig> Steps { get; set; } = [];
+}
+
+/// <summary>One step of a route: which machine does what.</summary>
+[SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes",
+    Justification = "Bound by the configuration binder")]
+internal sealed class RouteStepConfig
+{
+    /// <summary>The machine id of the machine that does the step, <c>&lt;manufacturer&gt;_&lt;model&gt;_&lt;serial number&gt;</c>.</summary>
+    [Required]
+    public string MachineId { get; init; } = string.Empty;
+
+    /// <summary>Readable name of the job order on this machine.</summary>
+    public string JobName { get; init; } = "Route step";
+
+    /// <summary>
+    /// Id of the work master of the step. It tells the machine of the next step which job orders of the machine
+    /// before it belong to the route. Empty: <c>WM-</c> and the name of <see cref="Program"/> without its extension.
+    /// </summary>
+    public string? WorkMaster { get; init; }
+
+    /// <summary>NC program of the step; one program execution per part.</summary>
+    public string Program { get; init; } = "ROUTE.MPF";
+
+    /// <summary>Time of one program execution at a feed override of 1.0.</summary>
+    public TimeSpan CycleTime { get; init; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>Electric power while the program runs, in watt.</summary>
+    public double ExecutingPower { get; init; } = 10_000;
+
+    /// <summary>The step as the job the virtual machine works through, with <paramref name="quantity"/> parts.</summary>
+    public JobTemplate ToTemplate(int quantity)
+    {
+        return new JobTemplate
+        {
+            JobName = JobName,
+            WorkMaster = WorkMaster,
+            Program = Program,
+            Quantity = Math.Max(1, quantity),
+            CycleTime = CycleTime,
+            ExecutingPower = ExecutingPower,
+        };
+    }
 }
 
 /// <summary>An alert that comes up at random.</summary>

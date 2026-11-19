@@ -7,6 +7,14 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Simulator: routes, job orders that pass several machines in turn under one `JobOrderID`, the id an MES knows
+  a job by (`Config:SpecOutput:Routes`, off unless `Enabled`). The machine of the first step adds one every
+  `Interval`; every later machine follows the retained lists `JobMonitoring/JobOrders` and `JobOrderResults` of
+  the machine before it: it adds its step as `NotAllowedToStart` when the job order shows up there, releases it
+  with the good parts as `RunsPlanned` when it ended there, and cancels it when it was aborted there, made no good
+  part or left the list. The next number of a route and the job orders taken are kept in
+  `/data/spec_routes.json`. The demo stack runs the route `ValveBody` M-02 → P-07 → P-04 every 30 minutes, so the
+  page "Where is My Job?" shows an order across three machines.
 - Example app: "Where is My Job?" stands the machines by their step of manufacturing, in clusters in the order
   of DIN 8580 (printing, cutting, turning, milling, grinding, forming, joining). The step comes from
   `Identification.DeviceClass`, else from words of the model; the panel "Arrange" corrects it, kept in the
