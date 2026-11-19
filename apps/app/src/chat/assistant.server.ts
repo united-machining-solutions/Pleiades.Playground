@@ -6,8 +6,10 @@ import { mcp } from "@tanstack/ai-mcp/harness"
 import { openaiCompatibleText } from "@tanstack/ai-openai/compatible"
 import { memoryPersistence } from "@tanstack/ai-persistence"
 
+import { readSites } from "@/placement/read-sites.ts"
 import { withDocumentationScope } from "../documentation/presentation.ts"
 import { PROPOSE_PAGE_TOOL } from "@/pages/proposal.ts"
+import { PROPOSE_PLACEMENT_TOOL } from "@/placement/proposal.ts"
 
 import { chatTools } from "./cards.tsx"
 import { chatSettings } from "./gateway.ts"
@@ -17,6 +19,7 @@ import { modelNames } from "./models.ts"
 import type { ModelSettings } from "./models.ts"
 import { leftOut, mcpServers, opcua, opcuaUrl as opcuaUrlOf, serverSwitch } from "./mcp-servers.ts"
 import { proposePageTool } from "./propose-page.ts"
+import { proposePlacementTool } from "./propose-placement.ts"
 import { forModel } from "./tool-results.ts"
 
 // The agent harness of the app. It runs on the server only: the keys of the language models stay
@@ -37,9 +40,22 @@ When a person asks for a page, a dashboard or an overview to keep, find out with
 Take a machine id from a tool result and never invent one.
 Then say in one sentence what the page shows. If something that was asked for is on no part of the page, say that your tools do not show it.`
 
+// Where machines stand is the person's to write. The model proposes it with the second tool of the app,
+// and the card of the chat writes it when the person confirms (placement/proposal.ts, ADR-0026).
+const placementInstructions = `You cannot put a machine on a site, and you cannot create a site or a hall. The person does that in a card of the app.
+When a person asks to add machines, to put them on a site or in a hall, or to create a site or a hall, call ${PROPOSE_PLACEMENT_TOOL} at once with what the person said, and no other tool before it.
+Do not ask in words for what is missing, such as which machine, its manufacturer, model or serial number, or where it goes: the card asks the person step by step.
+Pass each machine as the person named it, whole, for example MFP 20, P-07 or Laser 2D L1, as text. Only where the person said its manufacturer, model or serial number as such, pass { name, manufacturer, model, serialNumber } with only what was said; never split a name into them yourself. Pass the site and the hall as the person said them, or leave them out.
+Never put another machine in place of the one the person named.
+Never say that a machine was added or moved, or that a site or a hall was created. After the call, say in one short sentence that the card shows it.
+You cannot take a machine off a site: the person does that on Home.`
+
 // The tool of the app with which the model proposes a page. It reads from the chat's list which
 // tools a page can call.
 const proposePage = proposePageTool(chatTools)
+
+// The tool with which the model proposes where machines go. It reads the sites as Home does.
+const proposePlacement = proposePlacementTool(readSites)
 
 // The OPC UA adapter, if the app has one: it scans OPC UA servers and proposes their registration.
 // Adding and removing a machine are buttons of its cards, not tools (src/cards/opcua).
@@ -146,8 +162,10 @@ function build(settings: ModelSettings | undefined): Handler | null {
       // on, and nothing else.
       expose: { settings: ["model"], config: switches.exposed },
       middleware: [localTimes],
-      systemPrompts: opcuaUrl ? [instructions, pageInstructions, opcuaInstructions] : [instructions, pageInstructions],
-      tools: [proposePage],
+      systemPrompts: opcuaUrl
+        ? [instructions, pageInstructions, placementInstructions, opcuaInstructions]
+        : [instructions, pageInstructions, placementInstructions],
+      tools: [proposePage, proposePlacement],
       plugins: () => [tools, switchPlugin, modelTools],
     }),
     // The demo has no sign-in: every request runs without a user.

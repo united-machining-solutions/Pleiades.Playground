@@ -34,3 +34,4 @@ Short records of decisions that shape the repository, in abbreviated MADR form
 | [0023](0023-documentation-conflict-review.md) | Distinct documentation conflict and review states | proposed |
 | [0024](0024-documentation-cards-only.md) | Documentation answers use cards exclusively | proposed |
 | [0025](0025-a-part-of-a-page-asks-the-server-that-has-its-tool.md) | A part of a page asks the server that has its tool | proposed |
+| [0026](0026-the-chat-proposes-where-a-machine-stands.md) | The chat proposes where a machine stands, and the person writes it | proposed |

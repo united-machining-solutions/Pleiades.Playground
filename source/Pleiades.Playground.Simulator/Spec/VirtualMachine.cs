@@ -13,7 +13,12 @@ internal sealed record MachineIdentity(string Manufacturer, string SerialNumber,
 /// <param name="Energy">Electric energy taken in, in watt hours.</param>
 /// <param name="PartsProduced">Parts produced in the lifetime of the machine.</param>
 /// <param name="OperationDuration">Seconds the machine has been operating: running a program.</param>
-internal sealed record MachineCounters(double PowerOnDuration, double Energy, long PartsProduced, double OperationDuration = 0);
+/// <param name="NextJobOrderNumber">
+/// The number of the next job order; null before the first run. A new run goes on from it, so a job order id is
+/// never given twice: a consumer that pairs the events of a job order by its id over runs would mix them.
+/// </param>
+internal sealed record MachineCounters(
+    double PowerOnDuration, double Energy, long PartsProduced, double OperationDuration = 0, int? NextJobOrderNumber = null);
 
 /// <summary>
 /// A machine tool as a state machine, driven by a scenario. Every value and event follows from one state, so they
@@ -97,7 +102,9 @@ internal sealed class VirtualMachine
         _jobTemplates = _scenario.Jobs.Count > 0 ? _scenario.Jobs : [new JobTemplate()];
         _feedOverrideSteps = _scenario.FeedOverrideSteps.Count > 0 ? _scenario.FeedOverrideSteps : [1.0];
         _spindleOverrideSteps = _scenario.SpindleOverrideSteps.Count > 0 ? _scenario.SpindleOverrideSteps : [1.0];
-        _random = _scenario.Seed is { } seed ? new Random(seed) : new Random();
+        // The ids of executions and alerts come from these numbers: with a seed, the start of the run goes in too,
+        // so that a restart gives no id of the run before it again.
+        _random = _scenario.Seed is { } seed ? new Random(unchecked(seed * 397 ^ (int)start.ToUnixTimeSeconds())) : new Random();
         _now = start;
         SequencePrefix = SpecWire.SequencePrefix(start);
         _warmUpEnd = start + _scenario.WarmUpTime;
@@ -105,7 +112,7 @@ internal sealed class VirtualMachine
         _programPath = SpecElements.ExtensionPath(config.ManufacturerDomain, SpecElements.ActiveProgram);
         _stacklightLamps = _scenario.StacklightLamps.Count > 0 ? _scenario.StacklightLamps : [.. StacklightRules.FourLamps];
         _bearingTemperature = _scenario.BearingTemperatureIdle;
-        _nextJobNumber = _scenario.FirstJobOrderNumber;
+        _nextJobNumber = Math.Max(_scenario.FirstJobOrderNumber, counters.NextJobOrderNumber ?? 0);
         _powerOnDuration = counters.PowerOnDuration;
         _energy = counters.Energy;
         _partsProduced = counters.PartsProduced;
@@ -138,7 +145,7 @@ internal sealed class VirtualMachine
     public IReadOnlyCollection<SpecValue> Values => _values.Values;
 
     /// <summary>The counters to keep across a restart.</summary>
-    public MachineCounters Counters => new(_powerOnDuration, _energy, _partsProduced, _operationDuration);
+    public MachineCounters Counters => new(_powerOnDuration, _energy, _partsProduced, _operationDuration, _nextJobNumber);
 
     /// <summary>
     /// The values set when the machine was created, all of them. Call once, before the first <see cref="Advance"/>.

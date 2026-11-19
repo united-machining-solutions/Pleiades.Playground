@@ -112,7 +112,19 @@ and the stack reads only it; the earlier text of this section is in the history 
   `machines/+/events/notifications` with QoS 1 in a persistent session (Clean Start false, a fixed client id and a
   session expiry of one day), takes what has the content type `application/cloudevents+json`, and stores the
   CloudEvent as it came with the machine id of its topic. `source` and `id` together are unique, so an event the
-  broker delivers twice is stored once.
+  broker delivers twice is stored once. It acknowledges a message only once the Events API stored the event, had
+  stored it before, or refused it for good (no CloudEvent); while the Events API is away it waits and tries again,
+  and the messages behind it wait in the session of the broker, in their order.
+- The broker of the demo keeps its sessions across its own restart (`persistence true`, the volume `broker_data`)
+  and holds up to 50 000 messages for a session (`max_queued_messages`): at the rate of the demo, about 520 events
+  an hour, some four days in which the Events persistence may be away. Beyond that it drops what comes. A broker
+  in production sizes this for its own sources.
+- The Events API does not read the retained lists. For "after a gap or a new prefix it reads the state again" it
+  reads the prefix instead: an alert or a program execution that was open in an earlier run and that no later run
+  names again ends with the start of the next run (`AdapterRestart`); a job order is only marked `stale`, and so
+  is an open entry after a gap. Known limit: an adapter that keeps an alert standing across its restart without
+  naming it again loses it there; comparing with the retained `Notification/ActiveAlerts` would settle it. See
+  [the REST contracts](../openapi/README.md).
 
 ### Example topics of a source
 
@@ -292,10 +304,10 @@ The rules for events, so that a consumer can keep nothing but the events and sti
 | Rule | What | Why |
 |---|---|---|
 | Topic per group | An event is published on `machines/{MachineId}/events/<topic>`, one topic per group of events, the group being the first segment of its path. The binding names the topic of each group, in lower case (table below): every event of a job order and its result on `events/jobs`, every event of a program execution on `events/workmasters`, every alert event on `events/notifications`. A group without a name in the table is not published. The topic names the subject of the events, not the profile: the profiles are called …Monitoring, but the events of a job order may come from a job management (ordering) one day too. The attribute `type`, the full path of the model such as `JobMonitoring.JobOrderStarted`, tells the events of a topic apart. | MQTT keeps the order of messages only within one topic. On one topic `JobOrderStarted` and the `JobOrderResultChanged` that follows arrive in the order they came up; between two groups, such as a job order and its program execution, only `time` orders them. One subscription per group is enough; `machines/+/events/+` gets them all. |
-| CloudEvent | `specversion` `1.0`; `id` a UUID, the same when the event goes out again; `source` the `ProductInstanceUri` of the machine, as a valid URI reference; `type` the path of the event; `time` its source time; `sequence` the start of the adapter (`yyyyMMddTHHmmssZ`), a dot and a count of twelve digits that counts the events of the machine within their group (`JobMonitoring`, `WorkMasterMonitoring`, `Notification`), from 1 and without a gap: one count per topic of events; `correlationid` the `ExecutionId` on the events of a program execution, and on an alert or notification that came up in one; `dataschema` the event schema of the model version; `data` the flat struct of the event. A new start of the adapter begins a new prefix and counts from 1 again. | A consumer finds a duplicate by `source` and `id`, and a gap by the count in `sequence`, in any technology; a comparison of strings orders the events of a group. After a gap or a new prefix it reads the state again: `JobMonitoring.JobOrders` and `JobMonitoring.JobOrderResults` after a gap in `JobMonitoring`, `WorkMasterMonitoring.ProgramExecution` after a gap in `WorkMasterMonitoring`, `Notification.ActiveAlerts` after a gap in `Notification`. |
+| CloudEvent | `specversion` `1.0`; `id` a UUID, the same when the event goes out again; `source` the `ProductInstanceUri` of the machine, as a valid URI reference; `type` the path of the event; `time` its source time; `sequence` the start of the adapter (`yyyyMMddTHHmmssZ`), a dot and a count of twelve digits that counts the events of the machine within their group (`JobMonitoring`, `WorkMasterMonitoring`, `Notification`), from 1 and without a gap: one count per topic of events; `correlationid` the `ExecutionId` on the events of a program execution, and on an alert or notification that came up in one; `dataschema` the event schema of the model version; `data` the flat struct of the event. A new start of the adapter begins a new prefix and counts from 1 again. | A consumer finds a duplicate by `source` and `id`, and a gap by the count in `sequence`, in any technology (events lost at the end of a run show no gap: the next run counts from 1 again); a comparison of strings orders the events of a group. After a gap or a new prefix it reads the state again: `JobMonitoring.JobOrders` and `JobMonitoring.JobOrderResults` after a gap in `JobMonitoring`, `WorkMasterMonitoring.ProgramExecution` after a gap in `WorkMasterMonitoring`, `Notification.ActiveAlerts` after a gap in `Notification`. |
 | Delivery | QoS 1, not retained. | QoS 1 delivers at least once; a duplicate is caught by `id`. A retained event would be a state, and a state is a value. |
 | Outbox | While the broker is away the adapter keeps the events in the order they came up and sends them after the next connect, with their source time and their `id`. The outbox is bounded; when it is full the oldest event is dropped and logged, and its count stays a gap in `sequence`: nothing is numbered again. Values need no outbox, every connect publishes them whole. | Without an outbox the events of a broker outage are lost unnoticed. |
-| Consumer | A consumer that keeps events subscribes with a persistent session: Clean Start false, a session expiry of for example 24 hours, QoS 1. Several instances of one consumer share the events with a shared subscription, `$share/<group>/machines/+/events/+`. | The broker holds the events while the consumer restarts. |
+| Consumer | A consumer that keeps events subscribes with a persistent session: Clean Start false, a session expiry of for example 24 hours, QoS 1, and acknowledges an event only once it is kept. Several instances of one consumer share the events with a shared subscription, `$share/<group>/machines/+/events/+`. | The broker holds the events while the consumer restarts or cannot keep them, as long as its queue for the session lasts. |
 
 | Group of events (first segment of `type`) | Topic below `machines/{MachineId}/events/` |
 |---|---|
@@ -499,7 +511,9 @@ Each virtual machine works like this:
   `"available": false`; without `ActiveAlerts` there are no alert or notification events either. By default
   nothing is unavailable.
 - The counters (power-on duration, operation duration, energy, parts) only grow; they are kept in `/data` across
-  restarts.
+  restarts, and so is the number of the next job order: a new run goes on from it and gives no job order id of a
+  run before it again. With `Scenario:Seed` the start of the run goes into the random numbers too, so a restart
+  gives other ids of program executions and alerts.
 - Its signal of the manufacturer, the temperature of the spindle bearing, warms towards a running temperature
   while the spindle turns (scaled by the spindle override) and cools back while it stands
   (`Scenario:BearingTemperatureIdle`, `BearingTemperatureRunning`, `BearingTimeConstant`).

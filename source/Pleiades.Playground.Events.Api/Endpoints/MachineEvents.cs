@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using Pleiades.Playground.Common.Authorization;
 using Pleiades.Playground.Common.Exceptions;
 using Pleiades.Playground.Common.Pagination;
@@ -8,6 +9,7 @@ using Pleiades.Playground.Events.Api.DataAccessObjects;
 using Pleiades.Playground.Events.Api.Mapping;
 using Pleiades.Playground.Events.Api.Projections;
 using Pleiades.Playground.Events.Api.Repositories.MachineEvent;
+using Pleiades.Playground.Events.Api.Services;
 using Pleiades.Playground.Events.DataTransferObjects;
 
 namespace Pleiades.Playground.Events.Api.Endpoints;
@@ -18,6 +20,12 @@ namespace Pleiades.Playground.Events.Api.Endpoints;
 /// </summary>
 internal static class MachineEvents
 {
+    /// <summary>
+    /// The header a view answers with when it read only the newest <see cref="IMachineEventRepository.MaxEventsForViews"/>
+    /// events and left older ones out; narrow the machine or the time range.
+    /// </summary>
+    public const string TruncatedHeader = "Pleiades-Truncated";
+
     /// <summary>Maps <c>/machineEvents</c>: store, read and find gaps.</summary>
     internal static RouteGroupBuilder MapMachineEvents(this RouteGroupBuilder group)
     {
@@ -126,14 +134,18 @@ internal static class MachineEvents
 
     /// <summary>
     /// Retrieves the gaps in the numbers of the events: per machine, group and run of the adapter, the counts of
-    /// <c>sequence</c> that never arrived. Without <paramref name="from"/>, a run that does not begin with number 1
-    /// has a gap before its first event.
+    /// <c>sequence</c> that never arrived, within the time the events are kept. A run that does not begin with
+    /// number 1 has a gap before its first event only when its start lies within the retention and the range;
+    /// otherwise its first events may have been removed by the retention, and nothing is said about them. Events
+    /// lost at the end of a run cannot be seen.
     /// </summary>
     /// <param name="mId">Optional machine id.</param>
     /// <param name="group">Optional group: JobMonitoring, WorkMasterMonitoring or Notification.</param>
     /// <param name="from">Optional earliest time of the events (inclusive).</param>
     /// <param name="to">Optional latest time of the events (inclusive).</param>
     /// <param name="repository">Repository of the events.</param>
+    /// <param name="settings">The settings of the store, for its retention.</param>
+    /// <param name="timeProvider">The clock.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The gaps.</returns>
     internal static async Task<Ok<List<SequenceGapDtoV1>>> GetSequenceGaps(
@@ -142,10 +154,14 @@ internal static class MachineEvents
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
         IMachineEventRepository repository,
+        IOptions<MongoDbSettings> settings,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var events = await repository.FindForViewAsync(new MachineEventFilter(mId, group, From: from, To: to), cancellationToken).ConfigureAwait(false);
-        return TypedResults.Ok(MachineEventViews.Gaps(events, fromStart: from is null));
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        return TypedResults.Ok(await ReadGapsAsync(
+            repository, mId, group, from, to, timeProvider.GetUtcNow().UtcDateTime, settings.Value.DataRetentionPeriod, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>Stores one CloudEvent of a machine as it came.</summary>
@@ -247,6 +263,7 @@ internal static class MachineEvents
     /// <param name="to">Optional end of the range (inclusive).</param>
     /// <param name="paging">Pagination parameters (skip, take, sorting by the time raised).</param>
     /// <param name="repository">Repository of the events.</param>
+    /// <param name="response">The response; it gets the header Pleiades-Truncated when older events were left out.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A page of alerts with their clear.</returns>
     internal static async Task<Ok<PagedResponse<AlertPairDtoV1>>> GetAlertPairs(
@@ -256,10 +273,12 @@ internal static class MachineEvents
         [FromQuery] DateTime? to,
         [AsParameters] PagedRequest paging,
         IMachineEventRepository repository,
+        HttpResponse response,
         CancellationToken cancellationToken)
     {
         var page = paging.Validated();
-        var pairs = await ReadAlertPairsAsync(repository, mId, severity, from, to, cancellationToken).ConfigureAwait(false);
+        var (pairs, truncated) = await ReadAlertPairsAsync(repository, mId, severity, from, to, cancellationToken).ConfigureAwait(false);
+        MarkTruncated(response, truncated);
         var (items, totalCount) = MachineEventViews.Page(pairs, p => p.RaisedAt, page);
         return TypedResults.Ok(PagedResponse.Create(items, totalCount, page));
     }
@@ -269,6 +288,7 @@ internal static class MachineEvents
     /// <param name="from">Optional start of the range (inclusive).</param>
     /// <param name="to">Optional end of the range (inclusive).</param>
     /// <param name="repository">Repository of the events.</param>
+    /// <param name="response">The response; it gets the header Pleiades-Truncated when older events were left out.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>One entry per severity that occurred.</returns>
     internal static async Task<Ok<List<AlertStatisticDtoV1>>> GetAlertStatistics(
@@ -276,9 +296,11 @@ internal static class MachineEvents
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
         IMachineEventRepository repository,
+        HttpResponse response,
         CancellationToken cancellationToken)
     {
-        var pairs = await ReadAlertPairsAsync(repository, mId, null, from, to, cancellationToken).ConfigureAwait(false);
+        var (pairs, truncated) = await ReadAlertPairsAsync(repository, mId, null, from, to, cancellationToken).ConfigureAwait(false);
+        MarkTruncated(response, truncated);
         return TypedResults.Ok(MachineEventViews.AlertStatistics(pairs));
     }
 
@@ -289,6 +311,7 @@ internal static class MachineEvents
     /// <param name="to">Optional latest time of the last change (inclusive).</param>
     /// <param name="paging">Pagination parameters (skip, take, sorting by the last change).</param>
     /// <param name="repository">Repository of the events.</param>
+    /// <param name="response">The response; it gets the header Pleiades-Truncated when older events were left out.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A page of job orders.</returns>
     internal static async Task<Ok<PagedResponse<JobOrderDtoV1>>> GetJobOrders(
@@ -298,10 +321,12 @@ internal static class MachineEvents
         [FromQuery] DateTime? to,
         [AsParameters] PagedRequest paging,
         IMachineEventRepository repository,
+        HttpResponse response,
         CancellationToken cancellationToken)
     {
         var page = paging.Validated();
-        var jobOrders = await ReadJobOrdersAsync(repository, mId, state, from, to, cancellationToken).ConfigureAwait(false);
+        var (jobOrders, truncated) = await ReadJobOrdersAsync(repository, mId, state, from, to, cancellationToken).ConfigureAwait(false);
+        MarkTruncated(response, truncated);
         var (items, totalCount) = MachineEventViews.Page(jobOrders, j => j.LastChange, page);
         return TypedResults.Ok(PagedResponse.Create(items, totalCount, page));
     }
@@ -310,17 +335,22 @@ internal static class MachineEvents
     /// <param name="mId">Machine id. Example: alcyone-machines_AX-400_P-04</param>
     /// <param name="jobOrderId">Job order, as the machine names it; it may contain '/'. Example: 4711/01</param>
     /// <param name="repository">Repository of the events.</param>
+    /// <param name="response">The response; it gets the header Pleiades-Truncated when older events were left out.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The job order with its history, or 404 if no event names it.</returns>
     internal static async Task<Results<Ok<JobOrderHistoryDtoV1>, NotFound>> GetJobOrder(
         string mId,
         string jobOrderId,
         IMachineEventRepository repository,
+        HttpResponse response,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(repository);
         var jobs = await repository.FindForViewAsync(new MachineEventFilter(mId, "JobMonitoring", JobOrderId: jobOrderId), cancellationToken).ConfigureAwait(false);
         var executions = await repository.FindForViewAsync(new MachineEventFilter(mId, "WorkMasterMonitoring", JobOrderId: jobOrderId), cancellationToken).ConfigureAwait(false);
-        var history = MachineEventViews.History(MachineEventMapper.ToDtos(jobs), MachineEventMapper.ToDtos(executions), mId, jobOrderId);
+        var runs = await ReadRunContextAsync(repository, mId, cancellationToken).ConfigureAwait(false);
+        MarkTruncated(response, jobs.Truncated || executions.Truncated);
+        var history = MachineEventViews.History(MachineEventMapper.ToDtos(jobs.Items), MachineEventMapper.ToDtos(executions.Items), mId, jobOrderId, runs);
         return history is null ? TypedResults.NotFound() : TypedResults.Ok(history);
     }
 
@@ -332,6 +362,7 @@ internal static class MachineEvents
     /// <param name="to">Optional latest time of the events (inclusive).</param>
     /// <param name="paging">Pagination parameters (skip, take, sorting by start time).</param>
     /// <param name="repository">Repository of the events.</param>
+    /// <param name="response">The response; it gets the header Pleiades-Truncated when older events were left out.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A page of program executions.</returns>
     internal static async Task<Ok<PagedResponse<ProgramExecutionDtoV1>>> GetProgramExecutions(
@@ -342,50 +373,114 @@ internal static class MachineEvents
         [FromQuery] DateTime? to,
         [AsParameters] PagedRequest paging,
         IMachineEventRepository repository,
+        HttpResponse response,
         CancellationToken cancellationToken)
     {
         var page = paging.Validated();
-        var executions = await ReadProgramExecutionsAsync(repository, mId, jobOrderId, workMasterId, from, to, cancellationToken).ConfigureAwait(false);
+        var (executions, truncated) = await ReadProgramExecutionsAsync(repository, mId, jobOrderId, workMasterId, from, to, cancellationToken).ConfigureAwait(false);
+        MarkTruncated(response, truncated);
         var (items, totalCount) = MachineEventViews.Page(executions, p => p.StartTime, page);
         return TypedResults.Ok(PagedResponse.Create(items, totalCount, page));
     }
 
     // ─── reads shared with the MCP tools ───────────────────────────────────────
 
+    /// <summary>
+    /// The alerts that stand now; only the events of alerts not cleared are read, so nothing is left out. An alert of
+    /// an earlier run of the adapter than the newest of its machine does not stand any more.
+    /// </summary>
     internal static async Task<List<AlertDtoV1>> ReadActiveAlertsAsync(IMachineEventRepository repository, string? mId, CancellationToken cancellationToken)
     {
-        var events = await repository.FindForViewAsync(new MachineEventFilter(mId, "Notification"), cancellationToken).ConfigureAwait(false);
-        return MachineEventViews.ActiveAlerts(MachineEventMapper.ToDtos(events));
+        ArgumentNullException.ThrowIfNull(repository);
+        var events = await repository.FindOpenAlertEventsAsync(mId, cancellationToken).ConfigureAwait(false);
+        if (events.Count == 0)
+        {
+            return [];
+        }
+        var runs = await ReadRunContextAsync(repository, mId, cancellationToken).ConfigureAwait(false);
+        return MachineEventViews.ActiveAlerts(MachineEventMapper.ToDtos(events), runs);
     }
 
-    internal static async Task<List<AlertPairDtoV1>> ReadAlertPairsAsync(
+    /// <summary>
+    /// The runs of the adapters of a machine, or of all, in every group, and the gaps inside them: what tells the views
+    /// that an entry may have ended unseen.
+    /// </summary>
+    internal static async Task<RunContext> ReadRunContextAsync(IMachineEventRepository repository, string? mId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(repository);
+        var filter = new MachineEventFilter(mId);
+        var runs = await repository.FindRunsAsync(filter, cancellationToken).ConfigureAwait(false);
+        var counts = await ReadCountsOfIncompleteRunsAsync(repository, filter, runs, cancellationToken).ConfigureAwait(false);
+        return RunContext.From(runs, MachineEventViews.Gaps(runs, run => counts[run], _ => false));
+    }
+
+    /// <summary>The counts of the runs with a count missing inside them; most runs are complete and need none.</summary>
+    private static async Task<Dictionary<SequenceRun, IReadOnlyCollection<long>>> ReadCountsOfIncompleteRunsAsync(
+        IMachineEventRepository repository, MachineEventFilter filter, List<SequenceRun> runs, CancellationToken cancellationToken)
+    {
+        var counts = new Dictionary<SequenceRun, IReadOnlyCollection<long>>();
+        foreach (var run in runs.Where(r => !r.IsComplete))
+        {
+            counts[run] = await repository.FindCountsAsync(filter with { MId = run.MId, Group = run.Group }, run.Prefix, cancellationToken).ConfigureAwait(false);
+        }
+        return counts;
+    }
+
+    /// <summary>The gaps in the numbers of the events; see <see cref="GetSequenceGaps"/>.</summary>
+    internal static async Task<List<SequenceGapDtoV1>> ReadGapsAsync(
+        IMachineEventRepository repository, string? mId, string? group, DateTime? from, DateTime? to,
+        DateTime now, TimeSpan? retention, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(repository);
+        var filter = new MachineEventFilter(mId, group, From: from, To: to);
+        var runs = await repository.FindRunsAsync(filter, cancellationToken).ConfigureAwait(false);
+        var counts = await ReadCountsOfIncompleteRunsAsync(repository, filter, runs, cancellationToken).ConfigureAwait(false);
+        return MachineEventViews.Gaps(runs, run => counts[run], run => MachineEventViews.StartVisible(run, now, retention, from));
+    }
+
+    internal static async Task<(List<AlertPairDtoV1> Items, bool Truncated)> ReadAlertPairsAsync(
         IMachineEventRepository repository, string? mId, string? severity, DateTime? from, DateTime? to, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(repository);
         // An alert raised before the range may stand in it: read every alert event up to its end.
         var events = await repository.FindForViewAsync(new MachineEventFilter(mId, "Notification", To: to), cancellationToken).ConfigureAwait(false);
-        return [.. MachineEventViews.AlertPairs(MachineEventMapper.ToDtos(events), from, to)
-            .Where(p => string.IsNullOrEmpty(severity) || string.Equals(p.Severity, severity, StringComparison.OrdinalIgnoreCase))];
+        var runs = await ReadRunContextAsync(repository, mId, cancellationToken).ConfigureAwait(false);
+        return ([.. MachineEventViews.AlertPairs(MachineEventMapper.ToDtos(events.Items), from, to, runs)
+            .Where(p => string.IsNullOrEmpty(severity) || string.Equals(p.Severity, severity, StringComparison.OrdinalIgnoreCase))], events.Truncated);
     }
 
-    internal static async Task<List<JobOrderDtoV1>> ReadJobOrdersAsync(
+    internal static async Task<(List<JobOrderDtoV1> Items, bool Truncated)> ReadJobOrdersAsync(
         IMachineEventRepository repository, string? mId, string? state, DateTime? from, DateTime? to, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(repository);
         // The state of a job order needs all its events, not only those in the range: read them all, then filter.
         var jobs = await repository.FindForViewAsync(new MachineEventFilter(mId, "JobMonitoring"), cancellationToken).ConfigureAwait(false);
         var executions = await repository.FindForViewAsync(new MachineEventFilter(mId, "WorkMasterMonitoring"), cancellationToken).ConfigureAwait(false);
-        return [.. MachineEventViews.JobOrders(MachineEventMapper.ToDtos(jobs), MachineEventMapper.ToDtos(executions))
+        var runs = await ReadRunContextAsync(repository, mId, cancellationToken).ConfigureAwait(false);
+        return ([.. MachineEventViews.JobOrders(MachineEventMapper.ToDtos(jobs.Items), MachineEventMapper.ToDtos(executions.Items), runs)
             .Where(j => string.IsNullOrEmpty(state) || string.Equals(j.State, state, StringComparison.OrdinalIgnoreCase))
             .Where(j => from is null || j.LastChange >= from)
-            .Where(j => to is null || j.LastChange <= to)];
+            .Where(j => to is null || j.LastChange <= to)], jobs.Truncated || executions.Truncated);
     }
 
-    internal static async Task<List<ProgramExecutionDtoV1>> ReadProgramExecutionsAsync(
+    internal static async Task<(List<ProgramExecutionDtoV1> Items, bool Truncated)> ReadProgramExecutionsAsync(
         IMachineEventRepository repository, string? mId, string? jobOrderId, string? workMasterId,
         DateTime? from, DateTime? to, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(repository);
         var events = await repository.FindForViewAsync(
             new MachineEventFilter(mId, "WorkMasterMonitoring", JobOrderId: jobOrderId, From: from, To: to), cancellationToken).ConfigureAwait(false);
-        return [.. MachineEventViews.ProgramExecutions(MachineEventMapper.ToDtos(events))
-            .Where(p => string.IsNullOrEmpty(workMasterId) || p.WorkMasterId == workMasterId)];
+        var runs = await ReadRunContextAsync(repository, mId, cancellationToken).ConfigureAwait(false);
+        return ([.. MachineEventViews.ProgramExecutions(MachineEventMapper.ToDtos(events.Items), runs)
+            .Where(p => string.IsNullOrEmpty(workMasterId) || p.WorkMasterId == workMasterId)], events.Truncated);
+    }
+
+    private static void MarkTruncated(HttpResponse response, bool truncated)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        if (truncated)
+        {
+            response.Headers[TruncatedHeader] = "true";
+        }
     }
 }

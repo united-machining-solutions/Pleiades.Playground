@@ -13,6 +13,10 @@ All notable changes are documented here. The format follows
   from the public report of the marketplace the machine takes its recipes from, `JUICEBAR_MARKETPLACE_URL`, over
   all its machines: drinks, not millilitres. The chat draws them as the card of the juices used, after the
   energy card, and a page keeps it as a part.
+- Example app: the chat adds machines and makes sites and halls. Asked for it, the language model proposes with
+  `app_placement_propose`, and the chat draws a card that asks step by step for what is missing (which machine,
+  where) and writes only when a person confirms, with the server functions and the undo of Home
+  ([ADR-0026](docs/adr/0026-the-chat-proposes-where-a-machine-stands.md)).
 - Generative UI backend and cards: the job order card. `genui_job_order_show` shows the job order of one
   machine (`JobMonitoring.JobOrders` with its result) and its program execution
   (`WorkMasterMonitoring.ProgramExecution`) by the names of the umati data model, from the Events API; the
@@ -544,7 +548,10 @@ All notable changes are documented here. The format follows
   program executions and alerts with their NE 107 severity as CloudEvents, not retained, waiting in a bounded
   outbox while the broker is away; a stack light; `Connection/State` `Initializing`, `Running`,
   `CommunicationFault` and `Shutdown`. The events of the step that ends a `CommunicationFault` go out after
-  `Running`; only those of the steps meanwhile are lost. Each simulator of the stack has a scenario of its own
+  `Running`; only those of the steps meanwhile are lost. A restart goes on with the numbers of the job orders
+  (kept with the counters in `/data`) and, with a `Scenario:Seed`, gives other ids of program executions and
+  alerts, so no id of a run before comes again. A counter file of before, without that number, goes on above the
+  highest number its runs can have given: two job orders a step over the power-on time they added. Each simulator of the stack has a scenario of its own
   (`Config:SpecOutput:ScenarioName`: P-04 the default, P-07 `housings`, M-02 `small-parts`) and a made-up
   manufacturer on a domain below `.example`: Alcyone Machine Works (`alcyone-machines_AX-400_P-04`), Taygeta
   Precision (`taygeta-precision_TP-800_P-07`) and Merope Microtec (`merope-microtec_MM-120_M-02`). Its tests
@@ -558,13 +565,28 @@ All notable changes are documented here. The format follows
   such as `State/Status` field by field, and keeps no lists, no `null` and no manifest.
 - Events: the persistence takes `application/cloudevents+json` from `machines/+/events/jobs`, `…/workmasters`
   and `…/notifications` with QoS 1 in a persistent session (`Config:MqttSource:SessionExpiry`); an event stored
-  before (409, delivered again or retried) counts as stored and is logged on Debug. The Events
+  before (409, delivered again or retried) counts as stored and is logged on Debug. It acknowledges a message only
+  once its event is stored, stored before or refused for good (another 4xx); while the Events API is away it
+  waits and tries again every `Config:RetryDelay` (5 s), and a stop meanwhile leaves the message to the broker.
+  The broker of the demo keeps its sessions across a restart (volume `broker_data`) and queues up to 50 000
+  messages for a session. The Events
   API keeps the CloudEvents as they came in one collection `MachineEvent`, unique by `source` and `id`. It serves
   `/machineEvents` (by machine, group, type, correlation id, job order and time) with `/machineEvents/gaps`, `/alerts/active`, `/alerts/pairs` and `/alerts/statistics` (by
   NE 107 severity), `/jobOrders` with `/jobOrders/{mId}/{jobOrderId}`, and `/programExecutions`, and the MCP
   tools `events_machine_events_query`, `events_sequence_gaps_query`, `events_active_alerts_query`,
   `events_alert_pairs_query`, `events_alert_statistics_query`, `events_job_orders_query` and
   `events_program_executions_query`.
+  The active alerts are found by an aggregation in MongoDB over the alerts not cleared, and the gaps from the runs
+  of the adapter (per machine, group and prefix of `sequence`), so neither is limited. A gap before the first
+  stored event of a run is named only when the run started within the retention and the range. The other views
+  read at most the newest 100 000 events, without the CloudEvent as it came, and answer with the header
+  `Pleiades-Truncated: true` when that left older events out. A new start of the adapter (a new prefix of
+  `sequence`) closes an alert or a program execution of an earlier run that the new run does not name again:
+  `clearedBy` / `endType` `AdapterRestart` at the start of the new run, the duration of the alert at most, the
+  execution without sums. A job order is never closed so, only `stale`; so is an open entry with a gap after its
+  last event. Known limit: an adapter that keeps an alert standing across its restart without naming it again
+  loses it in the views; comparing with the retained `Notification/ActiveAlerts` would settle it and is not done
+  yet.
 - The machine card shows the work master instead of the program, the job order that runs, and alerts with their
   NE 107 severity; a machine whose adapter is not `Running` has no data, since the adapter said so.
 - The measurement card and the Ultimaker telemetry follow this tree: the card takes a machine by its machine id,

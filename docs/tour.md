@@ -317,11 +317,16 @@ with the machine and the hours it shows. It writes no value and cannot keep the 
 proposal with its parts in words; "Preview" opens it with the values of now, and "Save to my pages" keeps it in
 this browser. What you asked for that no card shows, the model says in words.
 
-Ask the chat for a page, for example "Make me a page with all machines and P-04", and it proposes one. The model
-reads with its tools what there is to show and composes the page: a title, and the cards in their order, each
-with the machine and the hours it shows. It writes no value and cannot keep the page. The chat shows the
-proposal with its parts in words; "Preview" opens it with the values of now, and "Save to my pages" keeps it in
-this browser. What you asked for that no card shows, the model says in words.
+Ask the chat to add a machine, for example "Add my new MFP 20" or "Put P-07 in North plant, Hall 2", and it
+proposes it in a card. The model cannot place a machine itself. The card asks for what is missing, one step at a
+time: which machine it is, with the machines of a similar name to tap, or its manufacturer, model and serial
+number, of which the app makes its id; and where it goes, with the fields of site and hall that Home has. A step
+that is done is one line, and a click opens it again. Nothing is written until you press the button at the foot
+of the card, and the toast after it has "Undo", as on Home. Ask for a site or a hall alone, for example "Create a
+site East plant with Hall 1", and the card makes only that. The card is
+[`apps/app/src/chat/proposed-placement.tsx`](../apps/app/src/chat/proposed-placement.tsx), the tool
+[`apps/app/src/chat/propose-placement.ts`](../apps/app/src/chat/propose-placement.ts) and its check
+[`apps/app/src/placement/proposal.ts`](../apps/app/src/placement/proposal.ts). No screenshot shows it yet.
 
 A page is private to the browser that keeps it, and the stack has no sign-in, so "Share" in its head gives a
 link that carries the recipe: which answers, for which machines and hours, and no value. Open it in a private

@@ -35,7 +35,11 @@ harness.
   composes a recipe with the tool of the app `app_page_propose`, which the app checks against the tools a
   page can call. The chat shows the proposal with its title and its parts in words, "Save to my pages" and
   "Preview", which opens it as a link opens. Nothing is kept unless a person presses it. Why:
-  [ADR-0020](../../docs/adr/0020-the-language-model-composes-a-page-and-nothing-else.md). A page is a recipe: a title
+  [ADR-0020](../../docs/adr/0020-the-language-model-composes-a-page-and-nothing-else.md). Asked to add a machine,
+  to put machines on a site, or to create a site or a hall, the chat proposes it with the second tool of the app,
+  `app_placement_propose`, and draws a card that asks step by step for what is missing (which machine, where) and
+  writes only when a person presses its button, through the server functions and with the undo of Home. Why:
+  [ADR-0026](../../docs/adr/0026-the-chat-proposes-where-a-machine-stands.md). A page is a recipe: a title
   and its parts in their order, each part a tool the chat draws a card for, with its arguments. No value is
   kept and no sentence of a language model: opening a page calls the tools again, each at the server that has
   it, and draws each answer with the card the chat draws for that tool, so it shows what holds now and needs no
@@ -442,6 +446,14 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
 - `src/sites/`: what Home chooses to show of the sites. `filter.ts` groups the values of `genui_site_list` by site
   and hall, keeps what "Needs you" and a search ask for, cuts the pages, and adds up nothing; `moved.ts` says where an old address of the page of a
   machine or of the list of the sites leads. `unplaced.ts` names the machines on no site for the bar; `row-actions.tsx` is "Add machine" and the menu of a row, `place-dialog.tsx` the dialog of "Add machine" and "Move…"; `sites-api.ts` holds the server functions that write, `placements.ts` their steps against the Sites API and `placing.ts` their rules.
+- `src/placement/`: where machines go, as the chat proposes it. `proposal.ts` checks a proposal against the list
+  of the sites (`checkPlacement`): each machine by its id, by a short name that fits one machine only, or as a
+  machine that sent no data with what the person said it is; the site and the hall by id, by name or by the closest
+  name, or new; and the words the model passes on. `confirmed.ts` notes what a person confirmed, by the id of the
+  tool call, under the key `pleiades-playground.placements.v1`, so the card says it after a reload;
+  `read-sites.ts` reads the sites for the tool on the server. The card of the chat is built of the fields of Home
+  and of `src/sites/done-step.tsx` (an open step and a done one) and `src/sites/place-value.ts` (whether a place is
+  chosen whole).
 - `src/chat/`: `assistant.server.ts` is the agent harness ([TanStack AI](https://tanstack.com/ai), experimental)
   with the tools of the backend and one adapter per model; chats live in memory and are gone after a restart.
   `mcp-servers.ts` reads the servers whose tools the chat has and holds a chat to the ones it left on,
@@ -455,8 +467,10 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   (`?chat=`: `all` is the list, `new` a new chat with no question yet), and where the first question of a new
   chat waits,
   `save-as-page.tsx` the row under an answer with "Save as page" (chrome of the app, never part of a card),
-  `propose-page.ts` the one tool of the app the model gets, `app_page_propose`, and `proposed-page.tsx` the
-  proposal the chat draws for its result,
+  `propose-page.ts` the tool of the app with which the model proposes a page, `app_page_propose`, and
+  `proposed-page.tsx` the proposal the chat draws for its result, `propose-placement.ts` the tool with which it
+  proposes where machines go, `app_placement_propose`, and `proposed-placement.tsx` the card of steps the chat
+  draws for it,
   `dictate.tsx` the microphone in its field and its line, `recorder.ts` the recording and `dictation.server.ts`
   the model behind it,
   `cards.tsx` lists the cards the chat knows, one line for a card: the chat takes from it what it draws for

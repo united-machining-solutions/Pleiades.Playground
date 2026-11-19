@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Protocol;
+using Polly;
 using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Events.Api.Client.Exceptions;
 using Pleiades.Playground.Events.Api.Client.MachineEvents;
@@ -18,6 +19,12 @@ namespace Pleiades.Playground.Events.Persistence;
 /// QoS 1, and the session of the client is persistent (Clean Start false, a session expiry), so the broker keeps
 /// the events while this service restarts. A message without that content type, or one that is no JSON object, is
 /// logged and dropped; whether it is a valid CloudEvent the Events API decides.
+/// <para>
+/// A message is acknowledged only once its event is stored, was stored before, or is refused for good. While the
+/// Events API is away the handler waits and tries again; the messages behind it wait in the session of the broker,
+/// in their order. When the service stops meanwhile, the message stays unacknowledged, and the broker delivers it
+/// again after the next connect.
+/// </para>
 /// </summary>
 public class Worker : BackgroundService
 {
@@ -29,11 +36,14 @@ public class Worker : BackgroundService
     private readonly Config _config;
     private readonly ILogger<Worker> _logger;
     private readonly MqttSubscriptionReadiness _readiness;
+    private CancellationToken _stopping = CancellationToken.None;
 
     private static readonly Action<ILogger, Exception?> LogStarting = LoggerMessage.Define(LogLevel.Information, 0, "Worker is starting.");
     private static readonly Action<ILogger, Exception?> LogStopping = LoggerMessage.Define(LogLevel.Information, 1, "Worker is stopping.");
     private static readonly Action<ILogger, string, string, Exception?> LogPostSuccessful = LoggerMessage.Define<string, string>(LogLevel.Debug, 3, "Event {Id} of {MachineId} stored");
-    private static readonly Action<ILogger, string, Exception?> LogPostFailed = LoggerMessage.Define<string>(LogLevel.Warning, 4, "Event on {Topic} not stored");
+    private static readonly Action<ILogger, string, TimeSpan, Exception?> LogPostFailed = LoggerMessage.Define<string, TimeSpan>(LogLevel.Warning, 4, "Event on {Topic} not stored yet, trying again every {Delay}; the messages behind it wait");
+    private static readonly Action<ILogger, string, int, Exception?> LogStoredAfterWaiting = LoggerMessage.Define<string, int>(LogLevel.Information, 5, "Event on {Topic} stored after {Attempts} attempts");
+    private static readonly Action<ILogger, string, Exception?> LogLeftUnacknowledged = LoggerMessage.Define<string>(LogLevel.Information, 8, "Event on {Topic} not stored before the stop; the broker delivers it again");
     private static readonly Action<ILogger, string, Exception?> LogAlreadyStored = LoggerMessage.Define<string>(LogLevel.Debug, 7, "Event on {Topic} already stored");
     private static readonly Action<ILogger, string, string, Exception?> LogDropped = LoggerMessage.Define<string, string>(LogLevel.Error, 6, "Message on {Topic} dropped: {Reason}");
 
@@ -58,6 +68,7 @@ public class Worker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         LogStarting(_logger, null);
+        _stopping = stoppingToken;
 
         // Handler FIRST, then subscribe: the other order drops whatever arrives in between.
         _mqttClient.ApplicationMessageReceivedAsync += HandleMqttData;
@@ -109,6 +120,17 @@ public class Worker : BackgroundService
 
     private async Task HandleMqttData(MqttApplicationMessageReceivedEventArgs args)
     {
+        // The handler acknowledges itself: only what is stored, or refused for good, leaves the session.
+        args.AutoAcknowledge = false;
+        if (await StoreAsync(args).ConfigureAwait(false))
+        {
+            await args.AcknowledgeAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Stores the event of a message; true when it may be acknowledged, false when the service stops first.</summary>
+    private async Task<bool> StoreAsync(MqttApplicationMessageReceivedEventArgs args)
+    {
         var message = args.ApplicationMessage.Parse<string>();
         var topic = message.Topic;
         var contentType = message.ContentType;
@@ -118,12 +140,12 @@ public class Worker : BackgroundService
         if (contentType is null || !contentType.Split(';')[0].Trim().Equals(CloudEventContentType, StringComparison.OrdinalIgnoreCase))
         {
             LogDropped(_logger, topic, $"content type {contentType ?? NoContentType}", null);
-            return;
+            return true;
         }
         if (MachineIdOf(topic) is not { } machineId)
         {
             LogDropped(_logger, topic, "no machine id in the topic", null);
-            return;
+            return true;
         }
 
         JsonElement cloudEvent;
@@ -133,33 +155,88 @@ public class Worker : BackgroundService
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
                 LogDropped(_logger, topic, "not a JSON object", null);
-                return;
+                return true;
             }
             cloudEvent = document.RootElement.Clone();
         }
         catch (JsonException)
         {
             LogDropped(_logger, topic, "not JSON", null);
-            return;
+            return true;
         }
 
-        // Durability is provided by the client's standard resilience handler (retry, circuit breaker,
-        // timeouts). On exhaustion the event is logged and not stored. An event stored before, by source and id,
-        // is answered with 409: the broker delivered it again (QoS 1) or a retry followed a write that timed out.
-        // It is stored, so that is a success.
+        var input = new MachineEventInputDtoV1 { MId = machineId, CloudEvent = cloudEvent };
+        var attempt = 0;
+        while (true)
+        {
+            attempt++;
+            var outcome = await PostAsync(input, topic).ConfigureAwait(false);
+            if (outcome != PostOutcome.TryAgain)
+            {
+                if (attempt > 1 && outcome == PostOutcome.Stored)
+                {
+                    LogStoredAfterWaiting(_logger, topic, attempt, null);
+                }
+                return true;
+            }
+            if (attempt == 1)
+            {
+                LogPostFailed(_logger, topic, _config.RetryDelay, null);
+            }
+            try
+            {
+                await Task.Delay(_config.RetryDelay, _stopping).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                LogLeftUnacknowledged(_logger, topic, null);
+                return false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// One attempt to store an event. The client's standard resilience handler retries it for up to two minutes
+    /// first (retry, circuit breaker, timeouts). An event stored before, by source and id, is answered with 409:
+    /// the broker delivered it again (QoS 1) or a retry followed a write that timed out. It is stored, so that is a
+    /// success. Another 4xx refuses the event for good; no answer, a timeout, 408, 429 or 5xx is worth another try.
+    /// </summary>
+    private async Task<PostOutcome> PostAsync(MachineEventInputDtoV1 input, string topic)
+    {
         try
         {
-            var stored = await _machineEventService.PostEvent(new MachineEventInputDtoV1 { MId = machineId, CloudEvent = cloudEvent }).ConfigureAwait(false);
-            LogPostSuccessful(_logger, stored.Id, machineId, null);
+            var stored = await _machineEventService.PostEvent(input).ConfigureAwait(false);
+            LogPostSuccessful(_logger, stored.Id, input.MId, null);
+            return PostOutcome.Stored;
         }
         catch (PleiadesEventPersistenceException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
         {
             LogAlreadyStored(_logger, topic, null);
+            return PostOutcome.Stored;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or PleiadesEventPersistenceException)
+        catch (PleiadesEventPersistenceException ex) when (ex.StatusCode is { } status && IsRefusal(status))
         {
-            LogPostFailed(_logger, topic, ex);
+            LogDropped(_logger, topic, $"refused by the Events API: {ex.Message}", null);
+            return PostOutcome.Refused;
         }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or ExecutionRejectedException or PleiadesEventPersistenceException)
+        {
+            return PostOutcome.TryAgain;
+        }
+    }
+
+    /// <summary>A status that no repetition changes: a 4xx but 408 (timeout), 409 (stored before) and 429 (too many).</summary>
+    public static bool IsRefusal(HttpStatusCode status)
+    {
+        return (int)status is >= 400 and < 500
+            && status is not (HttpStatusCode.RequestTimeout or HttpStatusCode.Conflict or HttpStatusCode.TooManyRequests);
+    }
+
+    private enum PostOutcome
+    {
+        Stored,
+        Refused,
+        TryAgain,
     }
 
     /// <see cref="IDisposable"/>
