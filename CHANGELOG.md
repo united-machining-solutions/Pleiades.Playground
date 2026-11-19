@@ -7,6 +7,13 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Sites API, generative UI backend and example app: a machine has a position in its hall, and the page
+  `/halls` draws every hall as a plan seen from above. `PUT /placements/{machineId}/position` takes the middle
+  of the machine, `x` and `y` in metre from the upper left corner of the plan, and `DELETE` takes it away; the
+  position stays while the machine stays in its hall. `GET /placements`, `sites_placement_list` and
+  `genui_site_list` return it as `position`, null while nobody said. On the plan a machine stands at its
+  position with its state, live; one without waits in rows, with a dashed edge. A hall has no size of its own:
+  its plan is as large as its machines need.
 - Example app: the showcase page `/titan`, an assistant you talk to, from the umati hackathon. Hold the space
   bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the
   conversation to scroll through, each answer with the card its tool gave. It has a conversation of its own, made for speaking: the hall as it is now stands in

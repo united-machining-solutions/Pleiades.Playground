@@ -24,4 +24,20 @@ internal sealed class PlacementDao
     /// <summary>When the machine was put on its current site (UTC).</summary>
     [BsonDateTimeOptions(Kind = DateTimeKind.Utc, Representation = BsonType.DateTime)]
     public required DateTime PlacedAt { get; init; }
+
+    /// <summary>Where in its hall the machine stands, or <see langword="null"/> when nobody said. Only a machine in a hall has one.</summary>
+    [BsonIgnoreIfNull]
+    public PositionDao? Position { get; init; }
+}
+
+/// <summary>
+/// A position on the plan of a hall as stored: the middle of the machine, in metre from the upper left corner.
+/// </summary>
+internal sealed class PositionDao
+{
+    /// <summary>How far to the right of the left edge of the plan, in metre.</summary>
+    public required double X { get; init; }
+
+    /// <summary>How far below the upper edge of the plan, in metre.</summary>
+    public required double Y { get; init; }
 }

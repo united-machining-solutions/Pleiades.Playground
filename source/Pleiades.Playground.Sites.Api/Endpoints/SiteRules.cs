@@ -90,6 +90,27 @@ internal static class SiteRules
             : null;
     }
 
+    /// <summary>The largest distance of a position from the upper left corner of its plan, in metre.</summary>
+    internal const double FarthestPosition = 1000;
+
+    /// <summary>
+    /// A position names both distances, each a number from 0 to <see cref="FarthestPosition"/> metre.
+    /// </summary>
+    internal static string? CheckPosition(PositionRequestV1 position)
+    {
+        if (position.X is not { } x || position.Y is not { } y)
+        {
+            return "The position needs x and y, in metre.";
+        }
+
+        return IsOnThePlan(x) && IsOnThePlan(y)
+            ? null
+            : $"The position lies between 0 and {FarthestPosition:0} metre in x and in y.";
+    }
+
+    // NaN and the infinities compare false with everything, so they are refused here as well.
+    private static bool IsOnThePlan(double metre) => metre is >= 0 and <= FarthestPosition;
+
     /// <summary>The site of a placement exists, and its hall, when given, is one of the halls of that site.</summary>
     internal static string? CheckPlacementOnSite(PlacementRequestV1 placement, SiteDao? site)
     {

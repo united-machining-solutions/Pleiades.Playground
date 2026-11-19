@@ -142,6 +142,12 @@ What the broker sends is laid onto the list in [`apps/app/src/live/`](../apps/ap
 [`apps/app/src/hooks/use-live.ts`](../apps/app/src/hooks/use-live.ts) keeps a page live. The address `/sites`,
 where the list of the sites stood before, leads here.
 
+The sidebar also leads to **Halls** (<http://localhost:5600/halls>): every hall of a site as a plan seen from
+above, with each machine where it stands and what it does now. Where a machine stands in its hall is a position
+people enter in the Sites API, in metre; a machine without one waits in rows on the plan, with a dashed edge. It
+has no picture in this tour. The page is [`apps/app/src/routes/halls.tsx`](../apps/app/src/routes/halls.tsx),
+the plan [`packages/cards/src/site/hall-plan.tsx`](../packages/cards/src/site/hall-plan.tsx).
+
 The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
 physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
 a line for each machine. A choice above the graphs shows one machine or all of them. It has no picture in
