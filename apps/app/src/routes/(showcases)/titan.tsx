@@ -306,8 +306,18 @@ function Assistant() {
       return target !== undefined && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
     }
 
+    // Nor is a key Titan's that the app already took, or that is pressed on one of the app's own
+    // controls outside the panel: the space bar on a button presses that button, in a menu it chooses.
+    // A link is not among them: the focus stays on the link in the sidebar that led here, and from
+    // there the space bar starts Titan.
+    const CONTROLS =
+      "button,summary,[role=button],[role=menu],[role=menuitem],[role=listbox],[role=option],[role=dialog],[role=tab],[role=checkbox],[role=switch],[role=radio]"
+    const elsewhere = (event: KeyboardEvent) =>
+      event.defaultPrevented ||
+      (event.target instanceof Element && !panel.current?.contains(event.target) && event.target.closest(CONTROLS) !== null)
+
     const onDown = (event: KeyboardEvent) => {
-      if (typing(event) || event.ctrlKey || event.metaKey || event.altKey) return
+      if (typing(event) || elsewhere(event) || event.ctrlKey || event.metaKey || event.altKey) return
       if (event.key.toLowerCase() === "p" && greeted.current && !latest.current.paused) {
         actions.current.pause()
         return
@@ -356,7 +366,7 @@ function Assistant() {
     const onUp = (event: KeyboardEvent) => {
       if (event.code !== "Space") return
       // A key that went down for Titan also comes up for it, wherever the focus is by then.
-      if (typing(event) && !holding.current) return
+      if ((typing(event) || elsewhere(event)) && !holding.current) return
       event.preventDefault()
       const wasHolding = holding.current
       holding.current = false
@@ -413,11 +423,11 @@ function Assistant() {
         {/* With something in focus, the cloud steps back: large, faint and pulsing behind it, so
             Titan is still there and still shows whether it listens, thinks or speaks. */}
         {started && focused && (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-50 motion-safe:duration-700">
+          <div className="pointer-events-none absolute inset-0 grid [container-type:size] place-items-center overflow-hidden motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-50 motion-safe:duration-700">
             <Cloud
               state={state}
               alarm={alarmed.length > 0}
-              className={`size-[min(95vh,95%)] motion-safe:animate-pulse ${paused ? "opacity-10" : "opacity-25"}`}
+              className={`size-[95cqmin] motion-safe:animate-pulse ${paused ? "opacity-10" : "opacity-25"}`}
             />
           </div>
         )}
