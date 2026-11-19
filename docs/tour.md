@@ -196,33 +196,41 @@ the choice is in the address, `?hours=8`, and stays when you switch to another m
 keeps its length and moves on with the clock. Under the title it says where the machine stands, its site and
 hall from the Sites API, or "On no site".
 
-![The page of P-04, with the breadcrumb Home › alcyone-machines_AX-400_P-04 and Home active in the sidebar.
+![The page of P-04, with the breadcrumb Home › alcyone-machines_AX-4… and Home active in the sidebar.
 The title AX-400 P-04 has an arrow for the switcher, and at the right stand the buttons Last 1 h, Last 8 h and
-Last 24 h, with Last 8 h chosen. Under the title it says "South plant · Hall 2" and "live · now 21:55". The
-machine card says Running, since 21:55, work master WM-BUSHING-0815, job order 4749/01, 17 of 20. Below is a band
-of the last 8 hours with the hours 16:00, 18:00 and 20:00 under it, and the total duration of each state. Under
-the card the section Now has four tiles: active power 9.07 kW with a small graph of the last minutes, energy over
-the last 8 hours 60.9 kWh, spindle 1 Rotating, and feed override 80 % with a bar. Below begins the section Alarms
-& warnings.](images/tour/machine-page.png)
+Last 24 h, with Last 8 h chosen. Under the title it says "North plant · Hall 1" and "live · now 10:10". The
+machine card says Running, since 10:10, work master WM-SHAFT-4711, job order 4717/01, 10 of 12. Below is a band
+of the last 8 hours with the hours 04:00, 06:00 and 08:00 under it, and the total duration of each state. Under
+the card stand four tiles on their own: active power 12.06 kW with a small graph of the last minutes, energy over
+the last 8 hours 12.1 kWh, spindle 1 Rotating, and feed override 90 % with a bar. Below begins the section Alarms
+& warnings with the choice All, Errors, Warnings, "4 errors and 16 warnings" and the head of its table: Message,
+Raised, Cleared, Duration.](images/tour/machine-page.png)
 
 The card has two parts. On top is the state with its reason, since when it holds, the work master and the job
 order that runs. Below is the band: one stripe from the chosen number of hours ago until now, coloured by state,
 and below it the full hours and the total of each state. A stack that has just started has a band that is mostly
 hatched, "No data": before it started nobody published. In the chat the same card names at its foot the topics
-it read, so every value can be traced to the broker; the page leaves that line out.
+it read, so every value can be traced to the broker; the page leaves that line out, and the line under the state
+that only repeats what the control reports, such as "NotExecuting, as the control reports".
 
-Below the card come three sections of the machine, each a card with a title, and inside it the card of a tool
-for this machine, the same the chat draws, without its frame. "Now" shows what the machine measures now as
-tiles, live from the broker as on the page Live values: its active power with the last 15 minutes as a small
-graph, the energy it imported over the chosen hours, its spindle and its feed override; a value of a machine
-that has fallen silent is marked "not current". "Alarms & warnings" lists its errors and warnings over the
-chosen hours, all of them or one level, ten on a page, those that stand first; the list is read again the
-moment the machine raises, changes or clears an alert. "Power and energy" draws its power over the chosen hours
-in kilowatts, and below it a table with the energy it imported in those hours, its mean and its peak. In the
-chat the same cards have their frames and feet, and the time series card its lines and the way to add one. The card comes first and
-the sections after it, each with a grey placeholder until it is there; a section whose backend does not answer
-says so and asks again, while the others stand. Choose other hours, and the page stays: the card and the
-sections that depend on the hours are read again and change when their answers are there.
+Below the card stand four tiles of what the machine measures now, live from the broker as on the page Live
+values: its active power with the last 15 minutes as a small graph, the energy it imported over the chosen
+hours, its spindle and its feed override; a value of a machine that has fallen silent is marked "not current".
+Then come two sections of the machine, each a card with a title, and inside it the card of a tool for this
+machine, the same the chat draws, without its frame. "Alarms & warnings" is a table of its errors and warnings
+over the chosen hours, a row for each: its level, the message with its code, when it was raised, when it was
+cleared or that it is still open, and how long it stood. It shows all of them or one level, ten on a page,
+those that stand first, and is read again the moment the machine raises, changes or clears an alert. Where the
+table is narrow, as in the chat, the clearing and the duration stand under the message. "Power and energy"
+draws its power over the chosen hours in kilowatts, and below it a table with the energy it imported in those
+hours, its mean and its peak. In the chat the same cards have their frames, and the time series card its lines
+and the way to add one.
+
+While the page opens, every part of it shows a grey placeholder of its form and size, so nothing moves when the
+values come; a section whose backend does not answer says so and asks again, while the others stand. Choose
+other hours, and the page stays: the card and the sections that depend on the hours are read again and change
+when their answers are there. A machine on a site that has published nothing for 24 hours, over a weekend say,
+keeps its page: its name and place, and "No data in the last 24 hours" in the card and the sections.
 
 **In the code:** [`apps/app/src/routes/sites.$machine.tsx`](../apps/app/src/routes/sites.%24machine.tsx)
 is the page, [`machines.$machine.tsx`](../apps/app/src/routes/machines.%24machine.tsx) leads the old address to it, and the choice of the hours and the list of the switcher are in
@@ -305,8 +313,9 @@ and above it "Opened from a link" with "Save to my pages". A part the colleague'
 and the rest of the page is whole. A link that was cut off when it was copied says that it holds no page.
 
 Ask about the alarms of a machine, for example "Which warnings and errors did P-04 have today?", and the chat
-draws the notification card of the tool `genui_notification_list`: each warning and error with when it was
-raised, when it went and how long it stood, and the ones that have not gone first. The card is
+draws the notification card of the tool `genui_notification_list`: a table with each warning and error, when it
+was raised, when it went and how long it stood, and the ones that have not gone first. In the narrow panel the
+going and the duration stand under the message. The card is
 [`packages/cards/src/notification/notification-card.tsx`](../packages/cards/src/notification/notification-card.tsx),
 the tool is in [`apps/genui-mcp/src/notifications.ts`](../apps/genui-mcp/src/notifications.ts). No screenshot
 shows it yet.

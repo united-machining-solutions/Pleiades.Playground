@@ -419,6 +419,13 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Machine page: while it opens, every part shows a grey placeholder of its form and size, so nothing moves when
+  the values come. The tiles of now stand without a card around them, and the machine card leaves out the line
+  that only repeats what the control reports. A machine on a site that sent nothing for 24 hours shows
+  "No data in the last 24 hours" instead of an error.
+- Notification card: the alerts stand as a table, in the chat too: level, message with its code, raised,
+  cleared and duration; where the card is narrow, the last two stand under the message. The card has no foot:
+  the sums, the topic and the note on alerts not listed are left out.
 - Example app: the microphone of the chat field can be held. Hold it while you speak and let go, as on a
   tablet, and what was said goes into the field; a tap starts and ends the recording as before. The recording
   starts as the finger goes down, so the first word is heard. While it records, the second line of the field
@@ -433,7 +440,7 @@ All notable changes are documented here. The format follows
   the first question asked in the panel, the field of the new chat keeps the cursor, so the next question
   follows without a click. In the URL the list is `?chat=all` now, and `?chat=new` is the new chat.
 - Notification card: all notifications or those of one level, errors or warnings, ten a page, those that stand
-  first, with the pagination of the energy card; the counts at the head and the sums at the foot follow the level.
+  first, with the pagination of the energy card; the counts at the head follow the level.
 - Time series and energy card: power in kilowatts with an area under its line, a taller graph, and times on full
   hours and quarter hours; the energy table has columns for the meter, kWh, Avg kW and Peak kW. The machine card
   writes the times under its band. This holds in the chat as well, which draws the same cards.
