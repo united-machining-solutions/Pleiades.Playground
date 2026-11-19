@@ -1,4 +1,4 @@
-import type { Hall, Site, SiteList } from "@pleiades/cards/site/contract.ts"
+import type { Hall, Position, Site, SiteList } from "@pleiades/cards/site/contract.ts"
 import { HallPlan } from "@pleiades/cards/site/hall-plan.tsx"
 import { machinesInWords } from "@pleiades/cards/site/in-words.ts"
 import { StateCounts } from "@pleiades/cards/site/state-counts.tsx"
@@ -7,8 +7,10 @@ import { Badge } from "@pleiades/ui/components/badge"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
-import { createFileRoute } from "@tanstack/react-router"
+import { toast } from "@pleiades/ui/components/toast"
+import { createFileRoute, useRouter } from "@tanstack/react-router"
 import { LayoutGridIcon, MapPinOffIcon } from "lucide-react"
+import { useState } from "react"
 import type { ReactNode } from "react"
 
 import { NoAnswer } from "@/components/no-answer.tsx"
@@ -17,6 +19,8 @@ import type { Live } from "@/hooks/use-live.ts"
 import { machineFilters } from "@/live/machines.ts"
 import { sitesAt, sitesWith } from "@/live/sites.ts"
 import { getSites } from "@/machines/get-machines.ts"
+import { withPositions } from "@/sites/positioning.ts"
+import { positionMachine } from "@/sites/sites-api.ts"
 
 /** The halls are read once, from the backend; then what every machine in them does comes from the broker. */
 const live: Live<SiteList | null> = {
@@ -30,7 +34,8 @@ const live: Live<SiteList | null> = {
  * what each of them does now. The sites, their halls, the machines in them and their positions are
  * what people entered in the Sites API; the backend puts them together with the values of the machines
  * (`genui_site_list`), the same answer Home draws as lists. A machine nobody gave a position waits in
- * rows on the plan. The page asks and draws; it computes nothing.
+ * rows on the plan. A person drags a machine to where it stands, and the app keeps the position in the
+ * Sites API, from its server. The page asks and draws; it computes nothing.
  */
 export const Route = createFileRoute("/halls")({
   staticData: { nav: { title: "Halls", icon: LayoutGridIcon } },
@@ -42,8 +47,36 @@ export const Route = createFileRoute("/halls")({
 
 function Halls() {
   const answer = Route.useLoaderData()
-  const { values: list, connected } = useLive(answer.values, live)
+  const { values: read, connected } = useLive(answer.values, live)
   useRetry(answer.values === null)
+  const router = useRouter()
+  // Where a person just dropped a machine: it stands there at once, and stays there while the Sites API is
+  // asked and the list is read again. A position the API refused is taken back.
+  const [moved, setMoved] = useState<ReadonlyMap<string, Position>>(new Map())
+  const list = read && withPositions(read, moved)
+  const onMove = (machine: string, position: Position) => {
+    setMoved((before) => new Map(before).set(machine, position))
+    const back = () =>
+      setMoved((before) => {
+        // Only what this move put there: a later move of the same machine stays.
+        if (before.get(machine) !== position) return before
+        const without = new Map(before)
+        without.delete(machine)
+        return without
+      })
+    positionMachine({ data: { machine, position } }).then(
+      async (outcome) => {
+        if (!outcome.ok) toast.add({ type: "error", title: "The position was not kept", description: outcome.reason, priority: "high" })
+        // The list is read again either way: it says where the machine stands for the Sites API.
+        await router.invalidate()
+        back()
+      },
+      (error: unknown) => {
+        toast.add({ type: "error", title: "The position was not kept", description: String(error), priority: "high" })
+        back()
+      },
+    )
+  }
 
   if (answer.values === null || list === null) {
     return (
@@ -76,14 +109,14 @@ function Halls() {
   return (
     <Page line={liveness(connected, list.asOf)}>
       {sites.map((site) => (
-        <SiteHalls key={site.siteId} site={site} />
+        <SiteHalls key={site.siteId} site={site} onMove={onMove} />
       ))}
     </Page>
   )
 }
 
 /** The halls of one site, each as a card with its plan. */
-function SiteHalls({ site }: { site: Site }) {
+function SiteHalls({ site, onMove }: { site: Site; onMove: OnMove }) {
   return (
     <section aria-label={site.name} className="flex flex-col gap-3">
       <div>
@@ -93,13 +126,15 @@ function SiteHalls({ site }: { site: Site }) {
       {site.halls
         .filter((hall) => hall.name !== null)
         .map((hall) => (
-          <HallCard key={hall.name} hall={hall} />
+          <HallCard key={hall.name} hall={hall} onMove={onMove} />
         ))}
     </section>
   )
 }
 
-function HallCard({ hall }: { hall: Hall }) {
+type OnMove = (machine: string, position: Position) => void
+
+function HallCard({ hall, onMove }: { hall: Hall; onMove: OnMove }) {
   const counts = countsOf(hall.machines.map((one) => one.state))
   return (
     <Card size="sm">
@@ -115,7 +150,7 @@ function HallCard({ hall }: { hall: Hall }) {
         </CardAction>
       </CardHeader>
       <CardContent>
-        <HallPlan hall={hall} />
+        <HallPlan hall={hall} onMove={onMove} />
       </CardContent>
     </Card>
   )

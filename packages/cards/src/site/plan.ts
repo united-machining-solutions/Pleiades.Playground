@@ -59,6 +59,21 @@ export function drawnAt(position: Position): Position {
   return { x: Math.max(position.x, 0) + EDGE.x, y: Math.max(position.y, 0) + EDGE.y }
 }
 
+/** A position is kept to half a metre: fine enough for a sign, and a number a person can read. */
+export const STEP = 0.5
+/** The largest distance of a position from the corner of its plan, in metre, as the Sites API keeps it. */
+export const FARTHEST = 1000
+
+const stepped = (metre: number) => Math.min(Math.max(Math.round(metre / STEP) * STEP, 0), FARTHEST)
+
+/**
+ * The position of a point of the drawing: the other way round of `drawnAt`, kept to half a metre and
+ * on the plan. `x` and `y` are in metre from the upper left corner of the drawing.
+ */
+export function positionAt(x: number, y: number): Position {
+  return { x: stepped(x - EDGE.x), y: stepped(y - EDGE.y) }
+}
+
 /** How many machines of a hall have no position yet. */
 export function waitingOf(machines: ReadonlyArray<Pick<PlacedMachine, "position">>): number {
   return machines.filter((machine) => !machine.position).length

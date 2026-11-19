@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { EDGE, ROOM, SMALLEST_PLAN, lineEvery, planOf, waitingOf } from "./plan.ts"
+import { EDGE, FARTHEST, ROOM, SMALLEST_PLAN, drawnAt, lineEvery, planOf, positionAt, waitingOf } from "./plan.ts"
 
 const at = (name: string, x: number, y: number) => ({ name, position: { x, y } })
 const nowhere = (name: string) => ({ name, position: null })
@@ -70,4 +70,15 @@ test("a position that is left out counts as none", () => {
 
 test("a small plan has a line every metre, a large one every five or ten", () => {
   assert.deepEqual([16, 60, 61, 300, 301, 1004].map(lineEvery), [1, 1, 5, 5, 10, 10])
+})
+
+test("a point of the drawing is a position, kept to half a metre and on the plan", () => {
+  assert.deepEqual(positionAt(EDGE.x + 12.5, EDGE.y + 4), { x: 12.5, y: 4 })
+  assert.deepEqual(positionAt(EDGE.x + 3.2, EDGE.y + 3.3), { x: 3, y: 3.5 })
+  // Left of the edge and above it there is no position: the corner is the nearest one.
+  assert.deepEqual(positionAt(0.2, 0), { x: 0, y: 0 })
+  assert.deepEqual(positionAt(5000, 1), { x: FARTHEST, y: 0 })
+  // Where a position is drawn is the position again.
+  const drawn = drawnAt({ x: 7.5, y: 2 })
+  assert.deepEqual(positionAt(drawn.x, drawn.y), { x: 7.5, y: 2 })
 })

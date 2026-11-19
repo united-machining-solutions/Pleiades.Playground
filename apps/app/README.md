@@ -16,8 +16,10 @@ harness.
   says so and does not ask again.
 - **Halls** (`/halls`) draws every hall of every site as a plan seen from above, each machine where it stands
   with its state, live. The positions are what people entered in the Sites API, in metre; a machine without one
-  waits in rows on the plan, with a dashed edge. It reads the same answer as Home, `genui_site_list`, and needs
-  no language model.
+  waits in rows on the plan, with a dashed edge. A person drags a machine to where it stands, with a finger or
+  the mouse, or moves it half a metre with an arrow key; the app keeps the position to half a metre, in the
+  Sites API, from its server and with no sign-in, as Home writes. It reads the same answer as Home,
+  `genui_site_list`, and needs no language model.
 - **Live values** (`/live`) draws a graph for each physical value over the last 15 minutes, a line for each
   machine, live. A choice above the graphs shows one machine or all of them, and stays in the URL
   (`?machine=`).

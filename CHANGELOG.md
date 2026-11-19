@@ -13,7 +13,8 @@ All notable changes are documented here. The format follows
   position stays while the machine stays in its hall. `GET /placements`, `sites_placement_list` and
   `genui_site_list` return it as `position`, null while nobody said. On the plan a machine stands at its
   position with its state, live; one without waits in rows, with a dashed edge. A hall has no size of its own:
-  its plan is as large as its machines need.
+  its plan is as large as its machines need. A person drags a machine on the plan to where it stands, or moves
+  it with the arrow keys, and the app keeps the position, to half a metre.
 - Example app: the showcase page `/titan`, an assistant you talk to, from the umati hackathon. Hold the space
   bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the
   conversation to scroll through, each answer with the card its tool gave. It has a conversation of its own, made for speaking: the hall as it is now stands in

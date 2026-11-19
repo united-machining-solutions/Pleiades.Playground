@@ -144,8 +144,8 @@ where the list of the sites stood before, leads here.
 
 The sidebar also leads to **Halls** (<http://localhost:5600/halls>): every hall of a site as a plan seen from
 above, with each machine where it stands and what it does now. Where a machine stands in its hall is a position
-people enter in the Sites API, in metre; a machine without one waits in rows on the plan, with a dashed edge. It
-has no picture in this tour. The page is [`apps/app/src/routes/halls.tsx`](../apps/app/src/routes/halls.tsx),
+people enter in the Sites API, in metre; a machine without one waits in rows on the plan, with a dashed edge.
+Drag a machine to where it stands: the app keeps the position. It has no picture in this tour. The page is [`apps/app/src/routes/halls.tsx`](../apps/app/src/routes/halls.tsx),
 the plan [`packages/cards/src/site/hall-plan.tsx`](../packages/cards/src/site/hall-plan.tsx).
 
 The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
