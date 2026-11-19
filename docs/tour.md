@@ -500,7 +500,8 @@ the cloud or the space bar starts it. Then press and hold the cloud, or the spac
 steht?" and let go, or say "Hey Titan" and the question. Titan says "Moment." at once and answers aloud, in
 German, from the values of the stack; the panel shows the conversation to scroll through, with the cards its
 tools gave. A press interrupts it, the button under the cloud or P pauses it, and the sidebar leads away from
-it. It needs no keyboard.
+it. It needs no keyboard. The button "Tools" at its foot switches a further MCP server of the stack on for Titan,
+the juice bar for example: asked what the bar can mix, Titan then shows the drink card.
 
 Titan needs the language model of stop 4, and of the same gateway a transcription model to listen. With a
 speech model at the gateway it speaks with that voice, else with a voice of the browser. Everything it hears

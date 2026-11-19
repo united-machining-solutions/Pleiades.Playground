@@ -45,6 +45,22 @@ does now. Titan speaks German, as the demo does.
 The chat of the app is not part of this. Its turn carries every tool and every instruction of the app, about
 17 000 tokens, which is right for a chat and too slow to talk to.
 
+## Tools: four of its own, and further servers on request
+
+Titan reads with four tools of the generative UI backend, named in `turn.ts`: the machines, one machine over
+time, its warnings and errors, and energy. They are always there.
+
+The further MCP servers of the app, `APP_MCP_SERVERS`, the optional services of the stack such as the juice
+bar, are Titan's on request: the button "Tools" at the foot of its panel lists them, and a switch turns one
+on, as in the chat. None is on by itself, since every tool more makes the first word later, and the choice
+is kept in the browser. With the four tools of the juice bar on, a question about the machines began as
+soon as without them, after 0.9 to 1.1 s.
+
+Titan takes only the tools a server marks as reading (`further-tools.ts`). It is talked to, in a room,
+without a sign-in, and a word it mishears must not start a machine. What a person can do with such a system
+stands on the card of its tool: asked what the juice bar can mix, Titan shows the drink card, and its button
+orders.
+
 ## Models: the gateway, and nothing else
 
 Titan takes its three models from the gateway of the chat, `LLM_BASE_URL` with `LLM_API_KEY`

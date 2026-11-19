@@ -47,6 +47,7 @@ test("a sentence about the answering is told from the answer", () => {
     'Die Frage ist aus "The hall now" beantwortbar.',
     "Die Liste zeigt die Stände zum Zeitpunkt 00:48 UTC.",
     "Ich schaue nicht nach, die Liste von eben reicht.",
+    "Der Zustand der Halle steht bereits im Kontext, daher brauche ich kein Werkzeug.",
   ]) {
     assert.equal(isPreamble(sentence), true, sentence)
   }
@@ -63,6 +64,7 @@ test("a sentence about the answering is told from the answer", () => {
     "Diese Frage kann ich nicht beantworten.",
     "Ganz oben auf der Liste steht P-04 mit einem Spindelfehler.",
     "Laut Liste steht P-04 seit zwei Stunden.",
+    "P-07 steht, weil ein Werkzeug gebrochen ist.",
   ]) {
     assert.equal(isPreamble(sentence), false, sentence)
   }

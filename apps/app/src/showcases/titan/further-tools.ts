@@ -57,7 +57,7 @@ export function furtherInstructions(tools: ReadonlyArray<FurtherTool>): string |
   return [
     "The person has switched on further systems of the hall for you. Use their tools when the question is about one of them, and only then:",
     ...lines,
-    "With these tools you read; you cannot order, start or change anything yourself. What such a tool lists, the screen draws as a card on which the person can choose and press: say in one sentence what the card shows and that they can pick there.",
+    "With these tools you read; you cannot order, start or change anything yourself. What such a tool lists, the screen draws as a card on which the person can choose and press: say in one sentence what the card shows and that they can pick there. When the person asks you to order or start something, call the tool that lists the choices, so that its card stands on the screen, and say that they press there. As always, answer in the language of the question and begin with the answer.",
   ].join("\n")
 }
 

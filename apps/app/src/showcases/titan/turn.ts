@@ -91,8 +91,8 @@ export function instructionsOf(hall: string | undefined, timeZone: string | unde
  */
 export function isPreamble(sentence: string): boolean {
   return (
-    /\b(keine?|ohne)\s+(tool|abfrage)\b/i.test(sentence) ||
-    /the hall now|\bschon vor mir\b/i.test(sentence) ||
+    /\b(keine?|ohne)\s+(tool|abfrage|werkzeug)\b/i.test(sentence) ||
+    /the hall now|\bschon vor mir\b|\b(bereits|schon) im kontext\b/i.test(sentence) ||
     /^\s*(die|deine|diese)\s+(frage|antwort)\b.{0,60}\b(aus der liste|in der liste|einfach)\b/i.test(sentence) ||
     /^\s*ich schaue nicht nach\b/i.test(sentence) ||
     /\bliste\b.{0,20}\b(reicht|zeigt die stände)/i.test(sentence)

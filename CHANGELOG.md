@@ -14,7 +14,9 @@ All notable changes are documented here. The format follows
   lookup. A Haiku model is asked not to think first, and a turn the model ends without a word is shown
   as a problem. A new fault it says by itself, but never over the person or an answer, and at most one a minute.
   Listening, the conversation and the voice come from the gateway at `LLM_BASE_URL` alone; a speech
-  model named `titan/...` there gives Titan a voice of its own. Only a build with `APP_SHOWCASES` has it, and
+  model named `titan/...` there gives Titan a voice of its own. Its button "Tools" switches a further MCP
+  server of `APP_MCP_SERVERS` on for it, of which Titan takes the tools that only read: asked what the juice
+  bar can mix, it shows the drink card. Only a build with `APP_SHOWCASES` has it, and
   nothing outside `apps/app/src/showcases/titan/` and its routes changed. Its guide,
   `apps/app/src/showcases/titan/README.md`, says what leaves the room.
 - Example app: the list under the chat field that `/` opens offers the tools of the MCP servers the chat
