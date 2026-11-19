@@ -342,7 +342,9 @@ function Assistant() {
         setProblem("Dieser Browser kann nicht aufnehmen. Nimm Chrome oder Edge.")
         return
       }
-      // A press interrupts: an answer that is still arriving is given up, and Titan listens.
+      // A press interrupts: an answer that is still arriving is given up, and Titan listens. A tap that
+      // only interrupted asked nothing: Titan then does not say that it understood nothing.
+      const interrupting = latest.current.state === "speaking" || latest.current.state === "thinking"
       conversation.current?.stop()
       heldSince.current = performance.now()
       recognising.current = true
@@ -350,7 +352,7 @@ function Assistant() {
         (question) => {
           recognising.current = false
           if (!question) {
-            setProblem("Ich habe nichts verstanden. Halte gedrückt, solange du sprichst.")
+            if (!interrupting) setProblem("Ich habe nichts verstanden. Halte gedrückt, solange du sprichst.")
             return
           }
           conversation.current?.ask(question)

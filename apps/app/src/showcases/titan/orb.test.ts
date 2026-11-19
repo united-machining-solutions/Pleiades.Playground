@@ -10,7 +10,7 @@ test("the line under the cloud says what a press does now", () => {
   assert.deepEqual(hintFor(idle), { now: "Gedrückt halten und sprechen", also: "oder „Hey Titan“ sagen" })
   assert.deepEqual(hintFor({ ...idle, hearsItsName: false }), { now: "Gedrückt halten und sprechen", also: undefined })
   assert.equal(hintFor({ ...idle, state: "listening" }).now, "Ich höre zu")
-  assert.equal(hintFor({ ...idle, state: "speaking" }).now, "Gedrückt halten, um zu unterbrechen")
+  assert.deepEqual(hintFor({ ...idle, state: "speaking" }), { now: "Tippen zum Unterbrechen", also: "oder gedrückt halten und weiterfragen" })
 })
 
 test("in a pause the line says how to go on, whatever the voice does", () => {

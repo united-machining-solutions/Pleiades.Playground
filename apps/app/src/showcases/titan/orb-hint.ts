@@ -15,6 +15,7 @@ export function hintFor({ state, started, paused, hearsItsName }: HintFor): { no
   if (paused) return { now: "Pause", also: "Tippen, um weiterzumachen" }
   if (state === "listening") return { now: "Ich höre zu", also: "Loslassen, wenn du fertig bist" }
   if (state === "thinking") return { now: "Moment …" }
-  if (state === "speaking") return { now: "Gedrückt halten, um zu unterbrechen" }
+  // A tap is enough to make Titan fall silent; held, the press goes on into the next question.
+  if (state === "speaking") return { now: "Tippen zum Unterbrechen", also: "oder gedrückt halten und weiterfragen" }
   return { now: "Gedrückt halten und sprechen", also: hearsItsName ? "oder „Hey Titan“ sagen" : undefined }
 }
