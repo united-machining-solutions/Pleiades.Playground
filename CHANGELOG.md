@@ -415,6 +415,10 @@ All notable changes are documented here. The format follows
   starts as the finger goes down, so the first word is heard. While it records, the second line of the field
   shows bars that move with the voice, the time and what ends it, where the finger does not cover it. The
   recorder is the app's own now, so that the bars read the stream that records.
+- Example app: what dictation heard so far stands in the chat field while one speaks, dimmed, and grows
+  about every two seconds; when the recording ends, all of it is written down once more and goes into the
+  field. The recording so far is written down again and again, one request at a time, as the gateway has no
+  model that writes while one speaks. A draft still on its way at the end is called off at the gateway too.
 - Example app: "New chat" is back in the head of the chat panel, as a plus in the list and in every chat. It
   opens a new chat with no question yet and the cursor in its field; the list stays behind "All chats". After
   the first question asked in the panel, the field of the new chat keeps the cursor, so the next question

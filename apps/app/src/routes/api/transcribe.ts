@@ -20,6 +20,9 @@ async function transcribe({ request }: { request: Request }) {
     audio: input.audio,
     language: input.language,
     ...(prompt !== undefined && { prompt }),
+    // A draft that the field no longer needs is called off at the gateway too, which takes two requests
+    // of a key at once: the whole recording then has the gateway to itself.
+    abortSignal: request.signal,
     stream: true,
   })
   return toServerSentEventsResponse(stream)
