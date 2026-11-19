@@ -1,10 +1,8 @@
-import { machineListInWords } from "@pleiades/cards/machine/in-words.ts"
-
-import { ask, listMachines, textOf } from "@/machines/get-machines.ts"
+import { ask, textOf } from "@/machines/get-machines.ts"
 
 import { atOnce } from "./gateway.server.ts"
 import type { TitanModels } from "./gateway.server.ts"
-import { TITAN_TOOLS, instructionsOf } from "./turn.ts"
+import { TITAN_TOOLS, instructionsOf, withoutPreamble } from "./turn.ts"
 import type { TurnEvent, TurnMessage } from "./turn.ts"
 
 // One turn of a conversation with Titan, made for speaking: the first words have to come soon.
@@ -36,11 +34,26 @@ const MOST_TOKENS = 1_500
 /** The hall is read before the model is asked; a backend slower than this does not hold up the answer. */
 const HALL_WITHIN_MS = 1_500
 
-/** What every machine does now, in the words the tool gives a model, or nothing if the backend is slow or away. */
-async function hallNow(): Promise<string | undefined> {
+/**
+ * What every machine does now, in the words the tool gives a model, with the times as the person's clock
+ * shows them, or nothing if the backend is slow or away. The last line of the tool says when it was read,
+ * which is now: it is left out, or the model tells the person the time.
+ */
+async function hallNow(timeZone: string | undefined): Promise<string | undefined> {
   const late = new Promise<undefined>((resolve) => setTimeout(resolve, HALL_WITHIN_MS))
-  const list = await Promise.race([listMachines(), late])
-  return list?.values ? machineListInWords(list.values) : undefined
+  const read = ask(async (backend) => {
+    let result = await backend.callTool("genui_machine_list", timeZone ? { timeZone } : {})
+    // A time zone the backend does not know is no reason to do without the hall: then in its own times.
+    if (result.isError && timeZone) result = await backend.callTool("genui_machine_list", {})
+    return result.isError ? undefined : textOf(result)
+  })
+  const words = (await Promise.race([read, late]))?.values
+  if (!words) return undefined
+  return words
+    .split("\n")
+    .filter((line) => !line.startsWith("Read at"))
+    .join("\n")
+    .trim()
 }
 
 type Call = { id: string; name: string; arguments: string }
@@ -88,7 +101,12 @@ async function round(
     signal,
   })
   if (!answer.ok || !answer.body) throw new Error(`The gateway answered ${answer.status}`)
+  // What is passed on is what Titan says and what the model reads of itself in the next round.
   let text = ""
+  const said = withoutPreamble((delta) => {
+    text += delta
+    emit({ type: "text", delta })
+  })
   const calls: Array<Call> = []
   const decoder = new TextDecoder()
   let buffer = ""
@@ -107,10 +125,7 @@ async function round(
       } catch {
         continue
       }
-      if (typeof delta?.content === "string" && delta.content !== "") {
-        text += delta.content
-        emit({ type: "text", delta: delta.content })
-      }
+      if (typeof delta?.content === "string" && delta.content !== "") said.push(delta.content)
       for (const part of delta?.tool_calls ?? []) {
         const call = (calls[part.index] ??= { id: "", name: "", arguments: "" })
         if (part.id) call.id = part.id
@@ -119,6 +134,7 @@ async function round(
       }
     }
   }
+  said.end()
   return { text, calls: calls.filter(Boolean).map((call, index) => ({ ...call, id: call.id || `call-${index}` })) }
 }
 
@@ -134,7 +150,7 @@ export async function answer(
   signal: AbortSignal,
 ): Promise<void> {
   try {
-    const messages: Array<unknown> = [{ role: "system", content: instructionsOf(await hallNow(), timeZone) }, ...conversation]
+    const messages: Array<unknown> = [{ role: "system", content: instructionsOf(await hallNow(timeZone), timeZone) }, ...conversation]
     let said = false
     for (let asked = 0; asked < MOST_ROUNDS; asked++) {
       // In the last round the model has no tool left: it answers with what it read.
