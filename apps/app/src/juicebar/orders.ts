@@ -17,13 +17,13 @@ import { reasonOf } from "@/reason.ts"
  */
 export type JuiceBarAnswer = { ok: true; json: string } | { ok: false; reason: string; answered: boolean }
 
-/** How long a read may take: the card reads an order every second, and a page waits for the drinks. */
+/** How long a read may take: the card reads its order every second. */
 export const READ_TIMEOUT_MS = 5_000
 /** How long an order may take: the service waits for the machine to answer it once. */
 export const ORDER_TIMEOUT_MS = 20_000
 
 /** Calls a tool of the juice bar on the server of the app: the JSON it wrote, or why there is none. */
-export async function callJuiceBar(
+async function callJuiceBar(
   tool: string,
   args: Record<string, unknown>,
   timeout = READ_TIMEOUT_MS,

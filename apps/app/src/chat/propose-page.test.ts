@@ -73,3 +73,25 @@ test("called with nothing a page can hold, it fails with the reasons", async () 
     /^Error: No part is left, so there is no page to propose\. Part 1: A page cannot call genui_span_list\./,
   )
 })
+
+test("a tool whose server this app does not have is not offered, and a part of it is left out", async () => {
+  const withDrinks: ReadonlyArray<ChatTool> = [...tools, { name: "juicebar_drinks_list", draw: () => "drinks" }]
+  const served = proposePageTool(withDrinks, () => true)
+  assert.ok(served.description.includes("genui_machine_list, genui_machine_show, juicebar_drinks_list"), served.description)
+  const lacking = proposePageTool(withDrinks, (name) => !name.startsWith("juicebar_"))
+  assert.ok(!lacking.description.includes("juicebar_drinks_list"), lacking.description)
+  const result = await lacking.execute?.({
+    title: "Bar",
+    parts: [{ tool: "genui_machine_list" }, { tool: "juicebar_drinks_list" }],
+  })
+  assert.deepEqual(result, {
+    recipe: { title: "Bar", parts: [{ tool: "genui_machine_list", args: {} }] },
+    leftOut: [
+      {
+        part: 2,
+        tool: "juicebar_drinks_list",
+        reason: "A page cannot call juicebar_drinks_list. The tools a page can call are genui_machine_list, genui_machine_show.",
+      },
+    ],
+  })
+})

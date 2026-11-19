@@ -7,7 +7,9 @@ import {
   isOnBy,
   leftOut,
   mcpServers,
+  opcuaUrl,
   serverOfKey,
+  serverOfTool,
   serverSwitch,
   serverSwitches,
   switchKey,
@@ -33,6 +35,56 @@ test("further servers join in their order, and the tools keep their names", () =
   assert.equal(servers.juicebar?.url, "http://juicebar-api:8080/mcp")
   assert.equal(servers.juicebar?.toolName({ name: "juicebar_status" }), "juicebar_status")
   assert.match(furtherInstructions(settings) ?? "", /ultimaker, juicebar/)
+})
+
+test("a tool goes to the server whose name stands before its first _, as the chat has the tools", () => {
+  const settings = {
+    GENUI_MCP_URL: "http://genui-mcp:8080/mcp",
+    OPCUA_MCP_URL: " http://opcua-adapter:8080/mcp ",
+    APP_MCP_SERVERS: "juicebar=http://juicebar-api:8080/mcp,docs=http://docs:3202/mcp",
+  }
+  assert.deepEqual(serverOfTool("genui_machine_show", settings), {
+    name: "genui",
+    url: "http://genui-mcp:8080/mcp",
+    who: "the generative UI backend",
+  })
+  assert.deepEqual(serverOfTool("opcua_server_list", settings), {
+    name: "opcua",
+    url: "http://opcua-adapter:8080/mcp",
+    who: "the OPC UA adapter",
+  })
+  assert.deepEqual(serverOfTool("juicebar_drinks_list", settings), {
+    name: "juicebar",
+    url: "http://juicebar-api:8080/mcp",
+    who: "the server juicebar",
+  })
+  // Without a setting the backend has the address of a stack started on this computer, as in the chat.
+  assert.equal(serverOfTool("genui_machine_list", {}).url, "http://localhost:5520/mcp")
+})
+
+test("a tool whose server this app does not have says which setting lacks it", () => {
+  assert.deepEqual(serverOfTool("juicebar_drinks_list", {}), {
+    name: "juicebar",
+    missing: "It asks the server juicebar for juicebar_drinks_list, and this app has no such server: APP_MCP_SERVERS does not name it.",
+  })
+  assert.deepEqual(serverOfTool("opcua_server_list", { OPCUA_MCP_URL: " " }), {
+    name: "opcua",
+    missing: "It asks the OPC UA adapter for opcua_server_list, and this app has none: OPCUA_MCP_URL is empty.",
+  })
+  assert.equal(opcuaUrl({ OPCUA_MCP_URL: " " }), undefined)
+  // A name without `_` is a server of its own name, which no setting names here.
+  assert.equal(serverOfTool("status", { APP_MCP_SERVERS: "juicebar=http://juicebar-api:8080/mcp" }).url, undefined)
+  assert.equal(serverOfTool("_status", { APP_MCP_SERVERS: "juicebar=http://juicebar-api:8080/mcp" }).url, undefined)
+})
+
+test("the OPC UA adapter of its own setting stands before an entry opcua of APP_MCP_SERVERS, as in the chat", () => {
+  const settings = { OPCUA_MCP_URL: "http://opcua-adapter:8080/mcp", APP_MCP_SERVERS: "opcua=http://other:8080/mcp" }
+  assert.equal(serverOfTool("opcua_server_list", settings).url, "http://opcua-adapter:8080/mcp")
+  assert.deepEqual(serverOfTool("opcua_server_list", { APP_MCP_SERVERS: "opcua=http://other:8080/mcp" }), {
+    name: "opcua",
+    url: "http://other:8080/mcp",
+    who: "the server opcua",
+  })
 })
 
 test("an entry that is no name and address is left out, and the backend cannot be replaced", () => {

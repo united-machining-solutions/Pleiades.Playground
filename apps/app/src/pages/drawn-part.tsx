@@ -91,11 +91,12 @@ export function DrawnPart({ part: { tool, answer } }: { part: AnsweredPart }) {
     return <NoPartAnswer icon={<SearchXIcon />} title="This part has no answer here" reason={answer.error} />
   }
   if (answer.values === null) {
-    // The words of NoAnswer (components/no-answer.tsx), which the other pages show in their place.
+    // The words of NoAnswer (components/no-answer.tsx), which the other pages show in their place, with
+    // the server that did not answer where it is not the backend.
     return (
       <NoPartAnswer
         icon={<ServerOffIcon />}
-        title="No answer from the backend"
+        title={`No answer from ${answer.from ?? "the backend"}`}
         reason={`${answer.error} This page keeps trying.`}
       />
     )

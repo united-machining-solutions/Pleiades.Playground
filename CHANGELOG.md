@@ -11,6 +11,11 @@ All notable changes are documented here. The format follows
   `app_placement_propose`, and the chat draws a card that asks step by step for what is missing (which machine,
   where) and writes only when a person confirms, with the server functions and the undo of Home
   ([ADR-0026](docs/adr/0026-the-chat-proposes-where-a-machine-stands.md)).
+- Generative UI backend and cards: the job order card. `genui_job_order_show` shows the job order of one
+  machine (`JobMonitoring.JobOrders` with its result) and its program execution
+  (`WorkMasterMonitoring.ProgramExecution`) by the names of the umati data model, from the Events API; the
+  card draws both over the last hours as a timeline, which it asks `genui_job_order_timeline` for. The chat
+  draws it, and other hosts get it as `ui://genui/joborder`.
 - OPC UA adapter: a person chooses the security of the sessions to a server under "Choose the security" on
   the endpoints card of the chat, a weaker endpoint or `None` included. Before `None` is taken the card shows
   a destructive warning; the endpoint taken, the proposal and the list of servers warn too. The adapter keeps
@@ -107,9 +112,6 @@ All notable changes are documented here. The format follows
   colour; a person picks one, and its button orders it at once, without a question of the language model.
   The card follows the order and shows the glass waiting for the start button of the machine, filling while
   the pumps run, and full, with an umbrella. Without motion the glass shows the same, still.
-- Example app: the showcase page `/juice-bar`, the same drink card on a page of its own, for a screen next to
-  the machine at a fair: a guest picks and orders without a language model. It reads the card of the machine
-  every half minute. Only a build with `APP_SHOWCASES` has it.
 - Juice bar API: a drink carries its colour and the picture of a glass its author chose (`color`, `picture`),
   an ingredient its colour and whether its bottle runs low (`color`, `runsLow`). Colours that are not `#rrggbb`
   are left out.
@@ -464,6 +466,13 @@ All notable changes are documented here. The format follows
   The page "What if" at `/what-if` is gone, and so is the page of the app without the made-up orders: the
   application alone has no "Where is My Job?".
 - Documentation answers use cards exclusively; retired the previous prose/source-list presentation.
+- Example app: a part of a page asks the server that has its tool, not only `genui-mcp`: the OPC UA adapter for
+  `opcua_*`, an entry of `APP_MCP_SERVERS` for its tools. The drink card of the juice bar, the added OPC UA
+  servers and the mapping of one can be kept as a page, pinned and shared; opened, they show the values of then.
+  A part whose server the app does not have says which setting lacks it, and the rest of the page is whole. A
+  page calls only a tool its server marks as reading; the cards of an OPC UA scan stay in the chat. The chat
+  proposes only parts whose server the stack has, and "Add a card" offers the cards of every server. ADR-0025
+  amends ADR-0014 and ADR-0020.
 - Machine page: while it opens, every part shows a grey placeholder of its form and size, so nothing moves when
   the values come. The tiles of now stand without a card around them, and the machine card leaves out the line
   that only repeats what the control reports. A machine on a site that sent nothing for 24 hours shows
