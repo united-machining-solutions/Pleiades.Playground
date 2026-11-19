@@ -1,5 +1,7 @@
 import { CircleAlertIcon, CircleCheckIcon, InfoIcon, NetworkIcon, ServerIcon, Trash2Icon } from "lucide-react"
-import { Fragment, useId, useState } from "react"
+import { useRouter } from "@tanstack/react-router"
+import { Fragment, useEffect, useId, useState } from "react"
+import type { ComponentProps, ReactNode } from "react"
 
 import type { ChatTool, ToolLabel } from "@/chat/tool-results.ts"
 import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
@@ -20,8 +22,10 @@ import { Button } from "@pleiades/ui/components/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@pleiades/ui/components/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@pleiades/ui/components/collapsible"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@pleiades/ui/components/field"
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@pleiades/ui/components/field"
 import { Input } from "@pleiades/ui/components/input"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@pleiades/ui/components/select"
+import { toast } from "@pleiades/ui/components/toast"
 import {
   Item,
   ItemActions,
@@ -36,13 +40,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 import { commitProposal, removeMachine, storeUser } from "@/opcua/adapter.ts"
 import type { Outcome } from "@/opcua/adapter.ts"
+import { siteStepOf } from "@/sites/placing.ts"
+import type { AddedOutcome, SiteStep, SitesOutcome } from "@/sites/placing.ts"
+import { listSites, placeAddedMachine } from "@/sites/sites-api.ts"
 import {
+  addedInWords,
+  chosenRows,
+  doneInWords,
   endpointSummary,
+  inDoubt,
   machineListOf,
   mappingOf,
   needingALook,
   proposalOf,
   rankedEndpointsOf,
+  sameChoice,
   securityOf,
   serverListOf,
   shownProfiles,
@@ -58,6 +70,7 @@ import type {
   ProfileCheck,
   Proposal,
   RankedEndpoints,
+  RowChoice,
   Server,
   ServerList,
 } from "./results.ts"
@@ -65,7 +78,8 @@ import type {
 // The OPC UA cards in the chat: the added servers, the machines a server serves, the mapping of one,
 // and a proposal after a scan.
 // chat/cards.tsx lists this module. Adding and removing a machine are buttons here, never tools of
-// the language model.
+// the language model. A machine that is added goes on a site too, so Home shows it: the only one there
+// is, or the one the person chooses.
 
 const stateBadge: Record<MappingState, "default" | "secondary" | "destructive" | "outline"> = {
   Mismatch: "destructive",
@@ -75,8 +89,65 @@ const stateBadge: Record<MappingState, "default" | "secondary" | "destructive" |
   Ok: "outline",
 }
 
+/**
+ * The chips of a card that has the rows: one chosen, the table shows its rows. Without `onChoose` the chips are
+ * only badges, as on the list of servers, which has the numbers but not the rows.
+ */
+type Choosing = {
+  chosen?: RowChoice | null
+  onChoose?: (choice: RowChoice | null) => void
+  /** The id of the list the chips fill, for `aria-controls`. */
+  controls?: string
+}
+
+type BadgeVariant = NonNullable<ComponentProps<typeof Badge>["variant"]>
+
+/**
+ * The hover of a chip that is a button. Badge has one only for a link (`[a]:hover`); this is the same for a
+ * button, with the tokens of the variant.
+ */
+const chipHover: Partial<Record<BadgeVariant, string>> = {
+  default: "hover:bg-primary/80",
+  secondary: "hover:bg-secondary/80",
+  destructive: "hover:bg-destructive/20",
+  outline: "hover:bg-muted hover:text-muted-foreground",
+}
+
+/**
+ * A chip that chooses rows. Pressed again, it lets go of them. It is 24px high, the least target size of
+ * WCAG 2.2 (2.5.8), where a badge is 20px.
+ */
+function ChoiceBadge({
+  choice,
+  chosen,
+  onChoose,
+  controls,
+  variant = "default",
+  children,
+}: Choosing & { choice: RowChoice; variant: BadgeVariant; children: ReactNode }) {
+  if (!onChoose) return <Badge variant={variant}>{children}</Badge>
+  const pressed = sameChoice(choice, chosen)
+  const shown = pressed ? "default" : variant
+  return (
+    <Badge
+      variant={shown}
+      className={`h-6 cursor-pointer ${chipHover[shown] ?? ""}`}
+      render={
+        <button
+          type="button"
+          aria-pressed={pressed}
+          aria-controls={controls}
+          onClick={() => onChoose(pressed ? null : choice)}
+        />
+      }
+    >
+      {children}
+    </Badge>
+  )
+}
+
 /** The numbers of a mapping, what needs a look first. A zero is left out. */
-function Counts({ summary }: { summary: MappingSummary }) {
+function Counts({ summary, ...choosing }: Choosing & { summary: MappingSummary }) {
   const parts: Array<[MappingState, number]> = [
     ["Mismatch", summary.mismatch],
     ["Unclear", summary.unclear],
@@ -85,13 +156,13 @@ function Counts({ summary }: { summary: MappingSummary }) {
     ["Ok", summary.ok],
   ]
   return (
-    <span className="flex flex-wrap gap-1">
+    <span className={choosing.onChoose ? "flex flex-wrap gap-2" : "flex flex-wrap gap-1"}>
       {parts
         .filter(([, count]) => count > 0)
         .map(([state, count]) => (
-          <Badge key={state} variant={stateBadge[state]}>
+          <ChoiceBadge key={state} choice={{ state }} variant={stateBadge[state]} {...choosing}>
             {count} {state.toLowerCase()}
-          </Badge>
+          </ChoiceBadge>
         ))}
     </span>
   )
@@ -106,26 +177,70 @@ function profileName(check: ProfileCheck): string {
  * The core and the profiles of the data model at a glance: whether the core is fulfilled, the profiles that
  * are complete, and those the server offers in part, which are not published.
  */
-function ProfileBadges({ checks }: { checks?: ReadonlyArray<ProfileCheck> }) {
+function ProfileBadges({ checks, ...choosing }: Choosing & { checks?: ReadonlyArray<ProfileCheck> }) {
   const { core, fulfilled, incomplete } = shownProfiles(checks)
   if (!core) return null
   return (
-    <span className="flex flex-wrap gap-1">
-      <Badge variant={core.fulfilled ? "secondary" : "outline"}>
-        {core.fulfilled ? <CircleCheckIcon data-icon="inline-start" /> : <CircleAlertIcon data-icon="inline-start" />}
-        {core.fulfilled ? "Core complete" : `Core: ${core.missing.length} not available`}
-      </Badge>
+    <span className={choosing.onChoose ? "flex flex-wrap gap-2" : "flex flex-wrap gap-1"}>
+      {core.fulfilled ? (
+        <Badge variant="secondary">
+          <CircleCheckIcon data-icon="inline-start" />
+          Core complete
+        </Badge>
+      ) : (
+        <ChoiceBadge choice={{ profile: core.name }} variant="outline" {...choosing}>
+          <CircleAlertIcon data-icon="inline-start" />
+          Core: {core.missing.length} not available
+        </ChoiceBadge>
+      )}
       {fulfilled.map((check) => (
         <Badge key={check.name} variant="outline">
           {profileName(check)}
         </Badge>
       ))}
       {incomplete.map((check) => (
-        <Badge key={check.name} variant="ghost">
+        <ChoiceBadge key={check.name} choice={{ profile: check.name }} variant="ghost" {...choosing}>
           {check.name} incomplete
-        </Badge>
+        </ChoiceBadge>
       ))}
     </span>
+  )
+}
+
+/**
+ * The list the chips fill: the rows of the chosen chip, or what stands without a choice. The chips point to it
+ * with `aria-controls`, and its first line is always there and polite, so a screen reader says what the chip
+ * opened or closed.
+ */
+function ChosenList({
+  id,
+  rows,
+  choice,
+  checks,
+  hint,
+  idle,
+}: {
+  id: string
+  rows: ReadonlyArray<MappingRow>
+  choice: RowChoice | null
+  checks?: ReadonlyArray<ProfileCheck>
+  /** The line without a choice. */
+  hint: string
+  /** What stands without a choice. */
+  idle?: ReactNode
+}) {
+  const shown = choice ? chosenRows(rows, choice, checks) : null
+  const what =
+    choice && shown
+      ? `${"state" in choice ? `${shown.length} ${choice.state.toLowerCase()}` : `What ${choice.profile} lacks`}. Press the chip again to close the list.`
+      : hint
+  return (
+    <div id={id} className="flex flex-col gap-2">
+      <p aria-live="polite" className="text-sm text-muted-foreground">
+        {what}
+      </p>
+      {shown ? shown.length > 0 && <Rows rows={shown} /> : idle}
+    </div>
   )
 }
 
@@ -394,6 +509,8 @@ function ServedMachines({ values }: { values: MachineList }) {
 
 function ShownMapping({ values }: { values: Mapping }) {
   const { server } = values
+  const [chosen, setChosen] = useState<RowChoice | null>(null)
+  const listId = useId()
   return (
     <Card>
       <CardHeader>
@@ -401,10 +518,17 @@ function ShownMapping({ values }: { values: Mapping }) {
         <CardDescription>
           {server.endpoint.url} · {securityOf(server.endpoint)} · {server.state}
         </CardDescription>
-        <Counts summary={server.mapping} />
+        <Counts summary={server.mapping} chosen={chosen} onChoose={setChosen} controls={listId} />
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
-        <Review rows={values.rows} />
+        <ChosenList
+          id={listId}
+          rows={values.rows}
+          choice={chosen}
+          checks={server.conformance}
+          hint="Press a chip above to see only its elements."
+          idle={<Review rows={values.rows} />}
+        />
       </CardContent>
     </Card>
   )
@@ -435,15 +559,123 @@ function ChangeList({ proposal }: { proposal: Proposal }) {
   )
 }
 
+/**
+ * The sites there are, read once when the card of a machine to add is drawn, so the machine goes on one of
+ * them: undefined while they are read.
+ */
+function useSites(wanted: boolean): SitesOutcome | undefined {
+  const [sites, setSites] = useState<SitesOutcome>()
+  useEffect(() => {
+    if (!wanted) return
+    let current = true
+    listSites()
+      .catch((error: unknown): SitesOutcome => ({ ok: false, reason: error instanceof Error ? error.message : String(error) }))
+      .then((outcome) => {
+        if (current) setSites(outcome)
+      })
+    return () => {
+      current = false
+    }
+  }, [wanted])
+  return sites
+}
+
+/**
+ * The site a machine to add goes on: the only one there is, said in a line, or the one a person chooses from
+ * the list. Where there is none, or the Sites API does not answer, the line says that it goes on no site.
+ */
+function SitePick({
+  id,
+  sites,
+  step,
+  chosen,
+  onChoose,
+  invalid,
+}: {
+  id: string
+  sites: SitesOutcome | undefined
+  step: SiteStep
+  chosen: string | null
+  onChoose: (siteId: string | null) => void
+  invalid: boolean
+}) {
+  if (sites === undefined) return <p className="text-sm text-muted-foreground">Reading the sites…</p>
+  if (!sites.ok) return <p className="text-sm text-muted-foreground">It goes on no site: {sites.reason}</p>
+  if (step.kind === "none") {
+    return <p className="text-sm text-muted-foreground">There is no site yet: put it on one with Add machine on Home.</p>
+  }
+  if (step.kind === "one") return <p className="text-sm text-muted-foreground">It goes on {step.site.name}.</p>
+  const items = step.sites.map((site) => ({ label: site.name, value: site.siteId }))
+  return (
+    <Field data-invalid={invalid || undefined}>
+      <FieldLabel htmlFor={id}>Site</FieldLabel>
+      <Select items={items} value={chosen} onValueChange={(value) => onChoose(typeof value === "string" ? value : null)}>
+        <SelectTrigger id={id} className="w-full" aria-invalid={invalid || undefined}>
+          <SelectValue placeholder="Choose a site" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {items.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      {invalid ? <FieldError>Choose the site the machine stands on.</FieldError> : <FieldDescription>Home shows the machine on it.</FieldDescription>}
+    </Field>
+  )
+}
+
+/** What became of putting an added machine on a site, also when the server function rejects. */
+async function placedOf(call: () => Promise<AddedOutcome>): Promise<AddedOutcome> {
+  try {
+    return await call()
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) }
+  }
+}
+
 function ShownProposal({ values }: { values: Proposal }) {
   const [outcome, setOutcome] = useState<Outcome>()
   const [busy, setBusy] = useState(false)
+  const router = useRouter()
+  // A new machine goes on a site, else Home does not show it. A registration that replaces one leaves the
+  // machine where it stands, and an older adapter does not say the machine id it publishes under.
+  const machineId = !values.replaces && values.accepted && values.draftId ? values.machineId : undefined
+  const sites = useSites(machineId !== undefined)
+  const step: SiteStep = sites?.ok ? siteStepOf(sites.sites) : { kind: "none" }
+  const [siteId, setSiteId] = useState<string | null>(null)
+  const [tried, setTried] = useState(false)
+  const [placed, setPlaced] = useState<AddedOutcome>()
+  const site = step.kind === "one" ? step.site : step.kind === "choose" ? step.sites.find((one) => one.siteId === siteId) : undefined
+  const pickId = useId()
+  // The table is closed until a chip is chosen, but for a mapping in doubt: that stands open, so no one adds a
+  // machine with a wrong element without having seen it. The alerts say what the core and the profiles lack.
+  const [chosen, setChosen] = useState<RowChoice | null>(null)
+  const listId = useId()
+  const doubts = inDoubt(values.rows)
   const add = async () => {
     if (!values.draftId) return
     const draftId = values.draftId
+    if (machineId !== undefined && step.kind === "choose" && site === undefined) {
+      setTried(true)
+      return
+    }
     setBusy(true)
     try {
-      setOutcome(await outcomeOf(() => commitProposal({ data: draftId })))
+      const committed = await outcomeOf(() => commitProposal({ data: draftId }))
+      const onSite =
+        committed.ok && machineId !== undefined && site !== undefined
+          ? await placedOf(() => placeAddedMachine({ data: { machine: machineId, siteId: site.siteId } }))
+          : undefined
+      setPlaced(onSite)
+      setOutcome(committed)
+      if (!committed.ok) return
+      if (onSite?.ok) void router.invalidate()
+      const { title, description } = addedInWords(values, sites, onSite)
+      toast.add({ title, description })
     } finally {
       setBusy(false)
     }
@@ -461,8 +693,8 @@ function ShownProposal({ values }: { values: Proposal }) {
             <span className="block break-all">Server certificate {values.endpoint.certificateThumbprint}</span>
           )}
         </CardDescription>
-        <ProfileBadges checks={values.conformance} />
-        {values.summary && <Counts summary={values.summary} />}
+        <ProfileBadges checks={values.conformance} chosen={chosen} onChoose={setChosen} controls={listId} />
+        {values.summary && <Counts summary={values.summary} chosen={chosen} onChoose={setChosen} controls={listId} />}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <ProfileGaps checks={values.conformance} />
@@ -493,18 +725,48 @@ function ShownProposal({ values }: { values: Proposal }) {
           </Alert>
         )}
         <ChangeList proposal={values} />
-        {values.rows.length > 0 && <Review rows={values.rows} />}
+        {values.rows.length > 0 &&
+          (values.summary ? (
+            <ChosenList
+              id={listId}
+              rows={values.rows}
+              choice={chosen}
+              checks={values.conformance}
+              hint={
+                doubts.length > 0
+                  ? `${doubts.length === 1 ? "One element is" : `${doubts.length} elements are`} in doubt: look at ${doubts.length === 1 ? "it" : "them"} before you add the machine. Press a chip above to see the others.`
+                  : "Press a chip above to see its elements."
+              }
+              idle={doubts.length > 0 && <Rows rows={doubts} />}
+            />
+          ) : (
+            // An older adapter gives no numbers, so there is no chip to press.
+            <Review rows={values.rows} />
+          ))}
       </CardContent>
       {values.accepted && values.draftId && (
         <CardFooter className="flex flex-col items-stretch gap-2">
           {outcome ? (
-            <Done outcome={outcome} done={`${values.serialNumber} is added. Its values appear on Home within seconds.`} />
+            <Done outcome={outcome} done={doneInWords(values, sites, placed)} />
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
                 Check the certificate and what needs a look. The adapter tries the registration once more when you click.
               </p>
-              <Button disabled={busy} onClick={() => void add()}>
+              {machineId !== undefined && (
+                <SitePick
+                  id={pickId}
+                  sites={sites}
+                  step={step}
+                  chosen={siteId}
+                  onChoose={(chosen) => {
+                    setSiteId(chosen)
+                    setTried(false)
+                  }}
+                  invalid={tried && site === undefined}
+                />
+              )}
+              <Button disabled={busy || (machineId !== undefined && sites === undefined)} onClick={() => void add()}>
                 {busy ? "Adding" : verb}
               </Button>
             </>

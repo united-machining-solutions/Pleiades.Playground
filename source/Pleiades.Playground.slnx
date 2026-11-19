@@ -89,4 +89,12 @@
     <Project Path="Pleiades.Playground.JuiceBar.Api/Pleiades.Playground.JuiceBar.Api.csproj" />
     <Project Path="Pleiades.Playground.JuiceBar.Api.Test/Pleiades.Playground.JuiceBar.Api.Test.csproj" />
   </Folder>
+  <Folder Name="/Bend/">
+    <Project Path="Pleiades.Playground.Bend.Adapter/Pleiades.Playground.Bend.Adapter.csproj" />
+    <Project Path="Pleiades.Playground.Bend.Adapter.Test/Pleiades.Playground.Bend.Adapter.Test.csproj" />
+    <Project Path="Pleiades.Playground.Bend.Protocol/Pleiades.Playground.Bend.Protocol.csproj" />
+    <Project Path="Pleiades.Playground.Bend.Protocol.Test/Pleiades.Playground.Bend.Protocol.Test.csproj" />
+    <Project Path="Pleiades.Playground.Bend.Simulator/Pleiades.Playground.Bend.Simulator.csproj" />
+    <Project Path="Pleiades.Playground.Bend.Simulator.Test/Pleiades.Playground.Bend.Simulator.Test.csproj" />
+  </Folder>
 </Solution>

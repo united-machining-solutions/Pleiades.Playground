@@ -159,9 +159,24 @@ or hold it while you speak and let go, as on a tablet. A press shorter than 0.4 
 (`dictation-press.ts`); Enter or the space bar on the microphone is a tap too. While it records, the second
 line of the field says so, on the left, where a finger on the microphone does not cover it: bars that move
 with the loudness of the microphone (`dictation-level.ts`), the time, and what ends the recording, "Let go to
-finish" or "Tap ■ to finish". Then it says that the model writes down what was said, and the text goes into
-the field, after what is already there. It is sent like a typed question, when you send it. After two minutes
-the recording stops by itself and is written down the same way. The model hears the language itself. It also gets the
+finish" or "Tap ■ to finish". What was said so far stands in the field meanwhile, dimmed and in italics: as
+its placeholder when the field is empty, under what is written otherwise. Then the line says that the model
+writes down what was said, and the text goes into the field, after what is already there. It is sent like a
+typed question, when you send it. After two minutes the recording stops by itself and is written down the
+same way.
+
+What was said so far is a draft: the recording so far, written down again about every two seconds
+(`dictation-draft.ts`), one request at a time, by the same model. The gateway has no model that writes while
+one speaks, and the stream of the transcription model does not come through it: LiteLLM collects it and
+answers once. A draft may change as the model hears more. A draft still on its way when the recording ends
+is called off, at the gateway too, and all of the recording is written down once more; that text goes into
+the field. So twenty seconds of speech ask the model about ten times, each time a little longer. As the
+audio of the drafts grows with the square of the length, drafts stop after 30 s of recording: the last one
+stays, the line still shows that the microphone listens, and the end writes down all of it as before. Every
+field of the app shares the key of the gateway, which takes two requests at once, so the server writes one
+draft at a time for all fields together (`/api/transcribe?draft`): a draft that finds one on its way is
+answered 429 and comes again two seconds later, and the other request stays for the chat and for whole
+recordings. The names of the machines for the prompt are kept for a minute. The model hears the language itself. It also gets the
 names of the machines from the backend as its prompt, their serial numbers, models and machine ids, so that
 it writes "P-04" as the stack spells it.
 

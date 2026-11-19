@@ -18,6 +18,7 @@ import {
   powerAndEnergyOf,
   powerRequest,
   rangeOfHours,
+  silentOnSite,
 } from "./sections.ts"
 
 const P04 = "alcyone-machines_AX-400_P-04"
@@ -49,6 +50,18 @@ const sites = {
   unplaced: [{ machine: M02, state: "running", now: {} }],
   sitesError: null,
 } as unknown as SiteList
+
+test("a machine on a site that published nothing for a day is silent; one that sends, one on no site or an unknown one is not", () => {
+  const sending = { ...sites, sites: [{ ...sites.sites[0], halls: [{ name: "Hall 2", machines: [{ ...placed(P04), now: {} }] }] }] } as unknown as SiteList
+  assert.equal(silentOnSite(sites, P04), true)
+  assert.equal(silentOnSite(sites, P07), true)
+  assert.equal(silentOnSite(sending, P04), false)
+  assert.equal(silentOnSite(sites, M02), false)
+  assert.equal(silentOnSite(sites, "gone_X_1"), false)
+  // Sites that could not be read say nothing about a machine.
+  assert.equal(silentOnSite(null, P04), false)
+  assert.equal(silentOnSite({ ...sites, sitesError: "The Sites API did not answer." }, P04), false)
+})
 
 test("a machine stands on its site and in its hall, or on no site", () => {
   assert.deepEqual(placeOf(sites, P04), { site: "South plant", hall: "Hall 2" })
