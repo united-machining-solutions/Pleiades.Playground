@@ -96,6 +96,10 @@ Not checked: Docker Engine on Linux, the image of `genui-mcp` built with `vendor
   `HUB_MQTT_URL=` in `.env` switches the registration off: `compose.yaml` takes its default only where the
   variable is not set (`${HUB_MQTT_URL-mqtt://broker:1883}`, without a colon), so an empty value reaches
   the container.
+  The Margo app cannot rely on that: a Margo client may leave an empty setting out of the environment, and
+  then the default comes back. There the switch is a boolean setting of its own, `HUB_REGISTRATION=false`,
+  which the server reads before `HUB_MQTT_URL`, and the address defaults to Traefik under the host name of
+  the app ([margo/README.md](../../margo/README.md#pleiades-hub)).
 - A stack without a hub pays one idle MQTT connection. The app sends one message when it connects, and
   nobody asks on `hub/discover`. `app` has no `depends_on` for the broker: the SDK retries until the broker
   answers.

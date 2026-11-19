@@ -46,6 +46,25 @@ test("an address may be a gateway: its machines are listed first, and its slash 
   assert.doesNotMatch(text, /4840/)
 })
 
+test("a mistyped opc.tcp before an address is written right, and the address gets no second port", () => {
+  assert.deepEqual(endpointOf("opc.tcp//opcgateway:11878"), { url: "opc.tcp://opcgateway:11878", assumed: false })
+  assert.deepEqual(endpointOf("opc.tcp:/opcgateway:11878"), { url: "opc.tcp://opcgateway:11878", assumed: false })
+  assert.deepEqual(endpointOf("OPC.TCP:///opcgateway:11878/"), { url: "opc.tcp://opcgateway:11878", assumed: false })
+  assert.deepEqual(endpointOf("opc.tcp:host:4841"), { url: "opc.tcp://host:4841", assumed: false })
+  const typed = readTyped("/discover opc.tcp//opcgateway:11878", all)
+  const text = typed.kind === "question" ? typed.text : ""
+  assert.match(text, /^Discover the OPC UA server at opc\.tcp:\/\/opcgateway:11878\./)
+  assert.doesNotMatch(text, /4840|opc\.tcp:\/\/opc\.tcp/)
+})
+
+test("a host with a port but no scheme is an address, not a machine", () => {
+  assert.deepEqual(endpointOf("opcgateway:11878"), { url: "opc.tcp://opcgateway:11878", assumed: false })
+  assert.deepEqual(endpointOf("10.0.0.7:4841"), { url: "opc.tcp://10.0.0.7:4841", assumed: false })
+  assert.deepEqual(endpointOf("[fd00::7]:4841"), { url: "opc.tcp://[fd00::7]:4841", assumed: false })
+  assert.deepEqual(endpointOf("opcgateway:11878/UA/Server"), { url: "opc.tcp://opcgateway:11878/UA/Server", assumed: false })
+  assert.deepEqual(endpointOf("opcgateway"), { url: "opc.tcp://opcgateway:4840", assumed: true })
+})
+
 test("/help asks the model nothing", () => {
   assert.deepEqual(readTyped("/help", all), { kind: "help" })
 })

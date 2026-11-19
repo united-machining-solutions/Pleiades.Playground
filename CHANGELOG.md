@@ -12,6 +12,27 @@ All notable changes are documented here. The format follows
   and a profile marked incomplete what it lacks; pressed again, the list closes. The proposal shows no table
   until a chip is pressed. On the mapping of `/mapping`, the chips of the numbers filter its table the same
   way. The list of servers of `/opcua` has the numbers but not the elements, so its chips stay as they are.
+- Margo app: the example app registers at the Pleiades Hub, as in `compose.yaml`, with the section
+  *Pleiades Hub* of the settings. *Register at the Pleiades Hub* (`HUB_REGISTRATION`, on by default) switches
+  the registration off, since a Margo client may leave an empty broker out and the default would come back;
+  the server of the app takes `HUB_REGISTRATION=false` everywhere. *Broker of the hub* is the broker of the
+  stack by default, and *Address of the example app for the hub* is Traefik under *Host name of the app*,
+  over HTTP, so the hub links to the address a browser on the network uses once Traefik is opened to it.
+- Example app: the showcase page `/trulaser`, a cockpit of a TRUMPF laser cutting machine named as the umati
+  data model names it: `State.Status` with `Notification.ActiveAlerts` and its history on one time axis, the
+  `JobOrder` with its `ProgramExecution`, and from the TRUMPF extension (`oem/Dalle/`) the requests of the
+  automation devices, the laser technology, the collision data and the condition guide. Each card says whether
+  it shows the model or the extension. Only a build with `APP_SHOWCASES` has it; it reads the Timeseries API
+  and the Events API from the server of the app, which gets `TIMESERIES_API_URL` and `EVENTS_API_URL` for
+  it, and nothing outside `apps/app/src/showcases/trulaser/` and its route changed.
+- Sites API, generative UI backend and example app: a machine has a position in its hall, and the page
+  `/halls` draws every hall as a plan seen from above. `PUT /placements/{machineId}/position` takes the middle
+  of the machine, `x` and `y` in metre from the upper left corner of the plan, and `DELETE` takes it away; the
+  position stays while the machine stays in its hall. `GET /placements`, `sites_placement_list` and
+  `genui_site_list` return it as `position`, null while nobody said. On the plan a machine stands at its
+  position with its state, live; one without waits in rows, with a dashed edge. A hall has no size of its own:
+  its plan is as large as its machines need. A person drags a machine on the plan to where it stands, or moves
+  it with the arrow keys, and the app keeps the position, to half a metre.
 - Example app: the showcase page `/titan`, an assistant you talk to, from the umati hackathon. Hold the space
   bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the
   conversation to scroll through, each answer with the card its tool gave. It has a conversation of its own, made for speaking: the hall as it is now stands in
@@ -397,9 +418,21 @@ All notable changes are documented here. The format follows
   attribute of all candidates in one call and uses it to choose between them, to tell what a node of the maker
   means, and as the unit of a node without `EngineeringUnits`. A description that contradicts the element, or
   disagrees with the `EngineeringUnits`, makes the match `Unclear`.
+- The brand TRUMPF (`packages/ui/brands/trumpf`): the colours, square corners and Open Sans of the TRUMPF
+  UX UI Community design system. Its `DESIGN.md` names what the design system asks for that a brand
+  cannot do.
 
 ### Changed
 
+- Example app: the microphone of the chat field can be held. Hold it while you speak and let go, as on a
+  tablet, and what was said goes into the field; a tap starts and ends the recording as before. The recording
+  starts as the finger goes down, so the first word is heard. While it records, the second line of the field
+  shows bars that move with the voice, the time and what ends it, where the finger does not cover it. The
+  recorder is the app's own now, so that the bars read the stream that records.
+- Example app: Live values with all machines shows only the graphs of a value some machine published, and
+  next to the title of a graph at most one value of now, where a single machine measures it; more stand
+  only as lines. Where machines are there and none published such a value, the page says so. With one machine
+  chosen, the page is as before.
 - Example app: "New chat" is back in the head of the chat panel, as a plus in the list and in every chat. It
   opens a new chat with no question yet and the cursor in its field; the list stays behind "All chats". After
   the first question asked in the panel, the field of the new chat keeps the cursor, so the next question
@@ -572,6 +605,11 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Example app: `/discover` takes a mistyped or shortened address as the address it is. `opc.tcp//host:port`
+  became `opc.tcp://opc.tcp//host:port:4840`, a machine name with the default port; a mistyped `opc.tcp` at
+  the start, also `opc.tcp:host:port`, is now written right, and `host:port` or `host:port/path` without a
+  scheme gets `opc.tcp://` and no second port. Only
+  a name alone, for example `A1121O0001`, still means `opc.tcp://<name>:4840`.
 - `opcua-adapter`: a rejected certificate is reported with its reason instead of a timeout. A server whose
   certificate does not carry the ApplicationUri it announces was told in the chat as "did not open a session
   within 30 seconds"; the reason was only in the log. A connect now stops on the first certificate error and
@@ -604,6 +642,14 @@ All notable changes are documented here. The format follows
   and energy or of the measurements of all machines are that tall. A long text no longer pulls the panel along
   either: it grows under its question too, and the button at the foot leads to its end as it stands. An alert
   under an answer, such as "The language model did not answer", comes into view by itself.
+- `genui-mcp`: a tool about one machine takes the machine as people call it, its serial number (`P-04`) or its
+  model and serial number (`AX-400 P-04`), as well as its id. A language model had to call `genui_machine_list`
+  first to learn the id, and the chat drew that list, every machine, above nearly every answer. A name that fits
+  several machines is refused with their ids; an id always means its own machine.
+- `app`: the chat draws the list of all machines only where the answer calls no other tool after it. A model
+  that reads the list to find a machine, and then asks about that machine, leaves it a step, "Read the
+  machines", which opens to the list; "Save as page" does not keep it either. While the answer
+  is coming, the list waits until it is clear which of the two it is.
 - `genui-mcp`: the card files load the `data-*` variants of shadcn, as the example app does, so a part of `packages/ui` that is styled by one, such as a separator, is drawn in them too.
 - `app`: the live pages and the chat work on a page opened over plain HTTP at the address of another computer,
   as a demo in a local network is. A browser gives `crypto.randomUUID` only to a secure context, so such a page

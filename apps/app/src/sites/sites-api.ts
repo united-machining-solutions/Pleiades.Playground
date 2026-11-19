@@ -4,9 +4,11 @@ import { place, remove, undo } from "./placements.ts"
 import type { Send } from "./placements.ts"
 import { placeRequestOf, removeRequestOf, undoRequestOf } from "./placing.ts"
 import type { PlaceOutcome, RemoveOutcome, UndoOutcome } from "./placing.ts"
+import { position, positionRequestOf } from "./positioning.ts"
+import type { PositionOutcome } from "./positioning.ts"
 
 // The steps of a person on Home: adding a machine to a site, moving it, taking it off, and undoing
-// either. They go to the REST endpoints of the Sites API from the server of the app, never from the
+// either; and the step of a person on Halls: saying where in its hall a machine stands. They go to the REST endpoints of the Sites API from the server of the app, never from the
 // browser and never from the language model: no tool of the chat writes a site or a placement.
 
 /** Where the Sites API answers, or undefined if the app has none. */
@@ -47,6 +49,14 @@ export const removePlacement = createServerFn({ method: "POST" })
   .handler(({ data }): Promise<RemoveOutcome> => {
     const base = sitesApiUrl()
     return base ? remove(data, sender(base)) : Promise.resolve({ ok: false, reason: NO_API, stale: false })
+  })
+
+/** Says where in its hall a machine stands, after a person moved it on the plan of the hall. */
+export const positionMachine = createServerFn({ method: "POST" })
+  .validator(positionRequestOf)
+  .handler(({ data }): Promise<PositionOutcome> => {
+    const base = sitesApiUrl()
+    return base ? position(data, sender(base)) : Promise.resolve({ ok: false, reason: NO_API })
   })
 
 /** Undoes a change from its toast, while nothing changed the machine since. */

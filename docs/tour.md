@@ -142,10 +142,16 @@ What the broker sends is laid onto the list in [`apps/app/src/live/`](../apps/ap
 [`apps/app/src/hooks/use-live.ts`](../apps/app/src/hooks/use-live.ts) keeps a page live. The address `/sites`,
 where the list of the sites stood before, leads here.
 
+The sidebar also leads to **Halls** (<http://localhost:5600/halls>): every hall of a site as a plan seen from
+above, with each machine where it stands and what it does now. Where a machine stands in its hall is a position
+people enter in the Sites API, in metre; a machine without one waits in rows on the plan, with a dashed edge.
+Drag a machine to where it stands: the app keeps the position. It has no picture in this tour. The page is [`apps/app/src/routes/halls.tsx`](../apps/app/src/routes/halls.tsx),
+the plan [`packages/cards/src/site/hall-plan.tsx`](../packages/cards/src/site/hall-plan.tsx).
+
 The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
 physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
-a line for each machine. A choice above the graphs shows one machine or all of them. It has no picture in
-this tour.
+a line for each machine. A choice above the graphs shows one machine or all of them; with all of them, a
+value no machine published has no graph. It has no picture in this tour.
 
 **In the code:** [`apps/app/src/routes/live.tsx`](../apps/app/src/routes/live.tsx) is the page,
 [`packages/cards/src/measurement/measurement-graph.tsx`](../packages/cards/src/measurement/measurement-graph.tsx)
@@ -245,7 +251,9 @@ The picture shows one chat, with a language model configured. The question was "
 last 8 hours?". The chat lists each step of the model, "Read the guide of the backend" and "Read the machine";
 a step opens to what its tool gave back. Whenever the answer is coming and nothing in it moves, before the
 first step and after a step until the next one or the text comes, a running line "Thinking" stands there. The
-chat draws the card from the values of the tool, and the model sums it up in a few sentences. The numbers are
+chat draws the card from the values of the tool, and the model sums it up in a few sentences. Where the model
+reads the list of all machines only to find one and then calls another tool, the list stays a step, "Read the
+machines", which opens to the list. The numbers are
 the tool's and the wording is the model's: the card says 6 minutes of running, the model "just under 7
 minutes". The stack had just started, so most of the 8 hours have no data. The card on the left is one minute
 newer than the one in the chat: the page reads again, an answer shows what was true when it was given.
@@ -340,8 +348,10 @@ The three questions above are suggestions to begin with.
 While an answer comes, send turns into stop: it ends the answer, what came so far stays, and the next
 question can go.
 
-With a speech-to-text model at the gateway, the field also has a microphone: press it, speak, press it
-again, and what was said stands in the field, to send like a typed question. The gateway decides which model
+With a speech-to-text model at the gateway, the field also has a microphone: tap it, speak, tap it again,
+or hold it while you speak and let go, and what was said stands in the field, to send like a typed question.
+While it records, bars at the left of the field move with your voice, beside the time and what ends the
+recording. The gateway decides which model
 writes it down, see [Dictation](../apps/app/README.md#dictation). The picture of the answer shows the microphone
 at the right of the field.
 
@@ -492,6 +502,31 @@ pick, and a button that orders it at once; the glass then fills while the machin
 `APP_SHOWCASES` set has the same card as a page of its own, <http://localhost:5600/juice-bar>, for a screen next to
 the machine, without a language model. No tour screenshot was retaken: they show the stack without the profile.
 For deployment from published images, see [deployment](deployment.md#enable-the-juice-bar-service).
+
+## Optional: a TruLaser
+
+A TRUMPF laser cutting machine is not part of the six stops either: none of the simulators of the stack is
+one. A stack with `APP_SHOWCASES` set has the page <http://localhost:5600/trulaser>, in the sidebar as
+"TruLaser", which shows such a machine once one publishes to the broker: a machine whose edge component
+(DALLE) publishes the signals of its extension below `machines/{MachineId}/oem/Dalle/`. Without one the page
+says that no TruLaser published.
+
+With one, look at how the page names what it shows: each card says whether it reads an element of the data
+model (`umati 0.17.1`) or the extension of TRUMPF.
+
+- **State.Status**: `MachineryItemState` and `MachineryOperationMode`, the `ChangeCause` of the extension
+  that put the machine there, and `Notification.ActiveAlerts`; a unit in malfunction is an alert of the
+  category Failure, with the unit as `SourceName`.
+- **History**: the state, the requests of the automation devices and the alerts on one time axis. Hover a
+  span for its `ChangeCause`, an error code or the source of an alert; a Failure crosses every lane.
+- **JobOrder**: the entry of `JobMonitoring.JobOrders` that runs and the
+  `WorkMasterMonitoring.ProgramExecution` in it. "Open over time" shows the job orders and their program
+  executions, each called by its work master.
+- **AutomationDeviceRequestStates**, **LaserTechnology**, **CollisionData** and **ConditionGuide**: the
+  extension. A tile of the ConditionGuide opens a chart of its value.
+
+It is a showcase: everything of it is in [`apps/app/src/showcases/trulaser`](../apps/app/src/showcases/trulaser/README.md)
+and its route. No tour screenshot shows the page: the stack the screenshots are taken from has no TruLaser.
 
 ## Optional: Titan, an assistant you talk to
 

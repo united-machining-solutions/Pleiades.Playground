@@ -26,8 +26,10 @@ internal sealed class SitesTools(ISitesStore store)
     [McpServerTool(Name = "sites_placement_list", ReadOnly = true),
      Description(
          "List every machine that stands on a site, ordered by machineId: its siteId, hall (or null), " +
-         "displayName (or null) and placedAt, when it was put on that site (UTC). A machine stands on one site at " +
-         "most. A machine that sends values but is not listed here stands on no site.")]
+         "displayName (or null), placedAt, when it was put on that site (UTC), and position (or null), where in " +
+         "its hall it stands: the middle of the machine, x and y in metre from the upper left corner of the plan " +
+         "of the hall. A machine stands on one site at most. A machine that sends values but is not listed here " +
+         "stands on no site.")]
     public async Task<IReadOnlyList<PlacementDtoV1>> ListPlacements(CancellationToken cancellationToken = default)
     {
         var placements = await store.ListPlacementsAsync(cancellationToken).ConfigureAwait(false);

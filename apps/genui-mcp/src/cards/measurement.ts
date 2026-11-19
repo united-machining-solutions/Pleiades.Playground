@@ -1,4 +1,4 @@
-import { machineId } from "@pleiades/cards/machine/contract.ts"
+import { MACHINE_NAMING, machineId } from "@pleiades/cards/machine/contract.ts"
 import { SERIES_SLOTS, measurementList, measurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import { measurementListInWords } from "@pleiades/cards/measurement/in-words.ts"
 import { toolDefinition } from "@tanstack/ai"
@@ -27,7 +27,7 @@ const measurementListTool = toolDefinition({
   inputSchema: z.object({
     machine: machineId
       .optional()
-      .describe("The machine id of one machine, for example alcyone-machines_AX-400_P-04. Every machine if omitted."),
+      .describe(`${MACHINE_NAMING} Every machine if omitted.`),
     timeZone,
   }),
   outputSchema: measurementList,
