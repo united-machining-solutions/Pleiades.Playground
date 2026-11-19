@@ -341,11 +341,7 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   `index.tsx` is Home, `sites.index.tsx` the address the list of the sites had before, which leads there, `sites.$machine.tsx` the page of a machine and `machines.$machine.tsx`
   the old address of it, which leads there, `halls.tsx` the plans of the halls (drawn by
   `packages/cards/src/site/hall-plan.tsx`), `charts.tsx` the last hours of every
-  machine as charts (drawn by `src/charts/state-tiles.tsx`), `where-is-my-job.tsx` a page for discussion
-  that follows an order across the machines, with the machines of one step of manufacturing side by side (its
-  map, its panels, the grouping of job orders, the steps and `getFloor`, which reads its values, in
-  `src/where-is-my-job/`; the showcase "What if", the same view with made-up orders across machines at `/what-if`, gives them
-  to it through `extras.ts`), `pages.index.tsx` the list of the pages kept
+  machine as charts (drawn by `src/charts/state-tiles.tsx`), `pages.index.tsx` the list of the pages kept
   in this browser, `pages.$page.tsx` one of them and `pages.open.tsx` one opened from a link; `health.ts`,
   `api/harness/$.ts` and
   `api/transcribe.ts` are server routes. A page that stands in the sidebar names its entry itself, in the `staticData` of its route
@@ -399,7 +395,11 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   set ([ADR-0018](../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
   it is a showcase: `juice-bar/` is what the page `/juice-bar` reads, the drink card of the chat on a page of
   its own for a screen next to the machine, without a language model. `titan/` is the assistant you talk
-  to, the page `/titan`, with a [guide](src/showcases/titan/README.md) of its own. The pages of the showcases, and their
+  to, the page `/titan`, with a [guide](src/showcases/titan/README.md) of its own. `where-is-my-job/` holds
+  the made-up orders WI-… of the page `/where-is-my-job`, "Where is My Job?", a page for discussion that
+  follows an order across the machines, with the machines of one step of manufacturing side by side. Its view,
+  map and panels, the grouping of job orders, the steps and `getFloor`, which reads its values, are of the app,
+  in `src/where-is-my-job/`, and take the made-up orders through `extras.ts`. The pages of the showcases, and their
   server routes, are the route files under `src/routes/(showcases)/`; the brackets make a folder that adds
   nothing to an address, so `(showcases)/juice-bar.tsx` answers at `/juice-bar`. A page belongs to the
   showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and `titan/faces.tsx` are pages of
