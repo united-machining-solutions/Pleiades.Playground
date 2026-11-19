@@ -41,7 +41,7 @@ export async function transcribe(recording: Blob): Promise<string> {
   if (recording.size < 2_000) return ""
   const answer = await fetch("/titan/api/transcribe", {
     method: "POST",
-    headers: { "content-type": recording.type || "audio/webm" },
+    headers: { "content-type": recording.type || "audio/wav" },
     body: recording,
   })
   const body = (await answer.json().catch(() => ({}))) as { text?: string; error?: string }

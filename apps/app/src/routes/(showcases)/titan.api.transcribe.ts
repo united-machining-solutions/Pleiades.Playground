@@ -72,6 +72,9 @@ async function transcribe({ request }: { request: Request }) {
     const cause = (answer as { cause?: { code?: string } }).cause?.code
     return Response.json({ error: `The gateway cannot be reached (${cause ?? answer.name})` }, { status: 502 })
   }
+  // A recording the model cannot read, too short or of no format it knows, is answered with 400: nothing
+  // was understood, which the page says in its own words. Every other refusal is the gateway's.
+  if (answer.status === 400) return Response.json({ text: "" })
   if (!answer.ok) return Response.json({ error: `The gateway answered ${answer.status}` }, { status: 502 })
   const body = (await answer.json().catch(() => undefined)) as { text?: unknown } | undefined
   if (body === undefined) return Response.json({ error: "The gateway did not answer with JSON" }, { status: 502 })

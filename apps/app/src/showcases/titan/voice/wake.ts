@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 
 import { transcribe } from "./transcribe.ts"
+import { RECORDING_RATE, wavOf } from "./wav.ts"
 
 // "Hey Titan": the assistant page listens all the time, without a key.
 //
@@ -59,7 +60,7 @@ const BEFORE_MS = 400
 /** After "Hey Titan" alone, the next piece is the question if it comes within this. */
 export const AWAKE_MS = 8_000
 
-const RATE = 16_000
+const RATE = RECORDING_RATE
 const BLOCK = 2_048
 
 /** The root mean square of a block of samples. */
@@ -67,27 +68,6 @@ export function levelOf(samples: Float32Array): number {
   let sum = 0
   for (const sample of samples) sum += sample * sample
   return Math.sqrt(sum / Math.max(samples.length, 1))
-}
-
-/** One channel at 16 kHz as a WAV file of 16 bits, which every endpoint of transcription reads. */
-export function wavOf(samples: Float32Array, rate = RATE): Blob {
-  const data = new DataView(new ArrayBuffer(44 + samples.length * 2))
-  const text = (at: number, value: string) => [...value].forEach((sign, index) => data.setUint8(at + index, sign.charCodeAt(0)))
-  text(0, "RIFF")
-  data.setUint32(4, 36 + samples.length * 2, true)
-  text(8, "WAVE")
-  text(12, "fmt ")
-  data.setUint32(16, 16, true)
-  data.setUint16(20, 1, true)
-  data.setUint16(22, 1, true)
-  data.setUint32(24, rate, true)
-  data.setUint32(28, rate * 2, true)
-  data.setUint16(32, 2, true)
-  data.setUint16(34, 16, true)
-  text(36, "data")
-  data.setUint32(40, samples.length * 2, true)
-  samples.forEach((sample, index) => data.setInt16(44 + index * 2, Math.max(-1, Math.min(1, sample)) * 0x7fff, true))
-  return new Blob([data.buffer], { type: "audio/wav" })
 }
 
 export type WakeOptions = {
