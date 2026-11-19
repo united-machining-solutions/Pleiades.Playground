@@ -49,7 +49,7 @@ there (YAML anchors). Only the port of the web page comes from `.env`.
 | Setting | Default | Compose | Meaning |
 |---|---|---|---|
 | `SerialNumber` | empty | `AE325085TB46` | The serial number, as the adapter publishes it |
-| `Manufacturer` | `Manufacturer_A` | `Trumpf` | The manufacturer |
+| `Manufacturer` | `Manufacturer_A` | `TRUMPF` | The manufacturer |
 | `ManufacturerUri` | `https://www.trumpf.com` | `https://www.trumpf.com` | The web address of the manufacturer, as the adapter publishes it |
 | `Model` | empty | `5085` | The model |
 | `ProductInstanceUri` | empty | | The ProductInstanceUri, as the adapter publishes it; empty: `{ManufacturerUri}/{Model}/{SerialNumber}` |

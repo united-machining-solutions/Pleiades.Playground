@@ -87,7 +87,7 @@ public sealed class AdapterWorkerTest
         await worker.StartUpAsync();
 
         CollectionAssert.AreEqual(new[] { "Start", "Heartbeat", "Reached" }, CallNames());
-        Assert.IsEmpty(BendTranslatorTest.ValueAt(_publisher.Published, Paths.ActiveAlerts)!.AsArray());
+        Assert.IsNull(BendTranslatorTest.ValueAt(_publisher.Published, Paths.ActiveAlerts), "Without a file nothing says whether an alert stands.");
     }
 
     [TestMethod]

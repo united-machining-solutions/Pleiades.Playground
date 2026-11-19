@@ -466,7 +466,7 @@ services:
       - "${BENDING_PRESS_PORT:-5614}:8080"
     environment:
       Config__SerialNumber: AE325085TB46
-      Config__Manufacturer: Trumpf
+      Config__Manufacturer: TRUMPF
       Config__ManufacturerUri: https://www.trumpf.com
       Config__Model: "5085"
       Config__ExchangeDirectorySource: bending-press-exchange
@@ -493,7 +493,7 @@ services:
         condition: service_started
     environment:
       Config__SerialNumber: AE325085TB46
-      Config__Manufacturer: Trumpf
+      Config__Manufacturer: TRUMPF
       Config__ManufacturerUri: https://www.trumpf.com
       Config__Model: "5085"
       Config__MqttDestination__ConnectionString: mqtt://broker:1883

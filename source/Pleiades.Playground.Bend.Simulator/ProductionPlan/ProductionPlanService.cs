@@ -43,12 +43,12 @@ internal sealed class ProductionPlanService(
             .FirstOrDefault(candidate => string.Equals(candidate.ProductionPackageName, packageName, StringComparison.Ordinal));
         if (package is null)
         {
-            return CommandResult.Failure(CommandError.NotFound, $"Paket '{packageName}' nicht gefunden.");
+            return CommandResult.Failure(CommandError.NotFound, $"Package '{packageName}' not found.");
         }
 
         runtime.ProductionPackages.Remove(package);
         runtime.NotifyChanged();
-        return CommandResult.Success($"Paket '{packageName}' gelöscht.");
+        return CommandResult.Success($"Package '{packageName}' deleted.");
     }
 
     private CommandResult AddPackages(IReadOnlyList<ProductionPackage> packages)
@@ -66,11 +66,11 @@ internal sealed class ProductionPlanService(
 
         runtime.ProductionPackages.AddRange(packages);
         runtime.NotifyChanged();
-        return CommandResult.Success($"{packages.Count} Paket(e) angelegt.");
+        return CommandResult.Success($"{packages.Count} package(s) created.");
     }
 
     private static CommandResult Busy() =>
-        CommandResult.Failure(CommandError.MachineBusy, "Während der automatischen Abarbeitung nicht möglich.");
+        CommandResult.Failure(CommandError.MachineBusy, "Not possible during automatic processing.");
 
     /// <summary>
     /// Package names and order numbers are unique on the machine: the automatic processing finds a position by its
@@ -82,7 +82,7 @@ internal sealed class ProductionPlanService(
         var duplicateName = added.Select(package => package.ProductionPackageName).FirstOrDefault(name => !names.Add(name));
         if (duplicateName is not null)
         {
-            return CommandResult.Failure(CommandError.InvalidInput, $"Paket '{duplicateName}' existiert bereits.");
+            return CommandResult.Failure(CommandError.InvalidInput, $"Package '{duplicateName}' already exists.");
         }
 
         var orderNumbers = existing.SelectMany(package => package.ManufacturingOrders).Select(order => order.OrderNo)
@@ -91,24 +91,24 @@ internal sealed class ProductionPlanService(
             .FirstOrDefault(orderNo => !orderNumbers.Add(orderNo));
         return duplicateOrderNo is null
             ? CommandResult.Success(string.Empty)
-            : CommandResult.Failure(CommandError.InvalidInput, $"Auftragsnummer '{duplicateOrderNo}' existiert bereits.");
+            : CommandResult.Failure(CommandError.InvalidInput, $"Order number '{duplicateOrderNo}' already exists.");
     }
 
     private static CommandResult Validate(CreateProductionPackageRequest? request)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.PackageName))
         {
-            return CommandResult.Failure(CommandError.InvalidInput, "Paketname ist erforderlich.");
+            return CommandResult.Failure(CommandError.InvalidInput, "A package name is required.");
         }
 
         if (request.DesiredQuantity < 1)
         {
-            return CommandResult.Failure(CommandError.InvalidInput, "Paket-Sollmenge muss mindestens 1 sein.");
+            return CommandResult.Failure(CommandError.InvalidInput, "The desired quantity of a package must be at least 1.");
         }
 
         if (request.Positions is null || request.Positions.Count == 0)
         {
-            return CommandResult.Failure(CommandError.InvalidInput, "Mindestens eine Position ist erforderlich.");
+            return CommandResult.Failure(CommandError.InvalidInput, "At least one position is required.");
         }
 
         var invalid = request.Positions.Any(position =>
@@ -119,7 +119,7 @@ internal sealed class ProductionPlanService(
             || position.DesiredNumberOfParts > MaxPartsPerPosition);
         return invalid
             ? CommandResult.Failure(CommandError.InvalidInput,
-                $"Jede Position braucht Auftragsnummer, Teilenummer und eine Sollmenge von 1 bis {MaxPartsPerPosition}.")
+                $"Each position needs an order number, a part number and a desired quantity from 1 to {MaxPartsPerPosition}.")
             : CommandResult.Success(string.Empty);
     }
 
@@ -130,7 +130,7 @@ internal sealed class ProductionPlanService(
             || request.PositionsPerPackage < 1 || request.PositionsPerPackage > MaxGeneratedPositionsPerPackage)
         {
             return CommandResult.Failure(CommandError.InvalidInput,
-                $"Paketanzahl 1-{MaxGeneratedPackages}, Positionen je Paket 1-{MaxGeneratedPositionsPerPackage}.");
+                $"Packages 1-{MaxGeneratedPackages}, positions per package 1-{MaxGeneratedPositionsPerPackage}.");
         }
 
         if (request.MinimumPartsPerPosition < 1
@@ -138,7 +138,7 @@ internal sealed class ProductionPlanService(
             || request.MinimumPartsPerPosition > request.MaximumPartsPerPosition)
         {
             return CommandResult.Failure(CommandError.InvalidInput,
-                $"Teile je Position: 1 <= Minimum <= Maximum <= {MaxPartsPerPosition}.");
+                $"Parts per position: 1 <= minimum <= maximum <= {MaxPartsPerPosition}.");
         }
 
         return CommandResult.Success(string.Empty);

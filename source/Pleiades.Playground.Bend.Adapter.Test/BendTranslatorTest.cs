@@ -187,13 +187,26 @@ public sealed class BendTranslatorTest
     }
 
     [TestMethod]
-    public void What_the_machine_has_not_said_yet_is_null_and_the_alerts_are_an_empty_list()
+    public void What_the_machine_has_not_said_yet_is_null_the_alerts_included()
     {
         var publications = Translator().Current();
 
         Assert.IsNull(ValueAt(publications, Paths.Status));
         Assert.IsNull(ValueAt(publications, "x-trumpf-com.WorkMasterMonitoring.ActiveProgram"));
-        Assert.IsEmpty(ValueAt(publications, Paths.ActiveAlerts)!.AsArray());
+        Assert.IsNull(ValueAt(publications, Paths.ActiveAlerts));
+    }
+
+    [TestMethod]
+    public void The_first_operating_state_makes_the_alerts_known()
+    {
+        var translator = Translator();
+
+        var first = translator.Translate(new OperatingStateObserved(Fallback, 0, string.Empty, string.Empty));
+        var second = translator.Translate(new OperatingStateObserved(Fallback.AddSeconds(1), 1, string.Empty, string.Empty));
+
+        Assert.IsEmpty(ValueAt(first, Paths.ActiveAlerts)!.AsArray());
+        Assert.IsFalse(second.OfType<ValuePublication>().Any(p => p.Path == Paths.ActiveAlerts), "A list known to be empty is not sent again.");
+        Assert.IsEmpty(ValueAt(translator.Current(), Paths.ActiveAlerts)!.AsArray());
     }
 
     [TestMethod]

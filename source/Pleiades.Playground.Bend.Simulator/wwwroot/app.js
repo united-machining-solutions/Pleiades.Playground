@@ -6,11 +6,11 @@ const MAX_LOG_ENTRIES = 1000;
 const API_BASE_PATH = "/api/simulator";
 
 const processingStateLabels = {
-    Idle: "Bereit",
-    Running: "Läuft",
-    Completed: "Abgeschlossen",
-    Cancelled: "Abgebrochen",
-    Failed: "Fehler"
+    Idle: "Ready",
+    Running: "Running",
+    Completed: "Completed",
+    Cancelled: "Cancelled",
+    Failed: "Failed"
 };
 
 const viewState = {
@@ -140,7 +140,7 @@ async function loadMachine() {
     try {
         viewState.machine = await callApi(apiPath("/machine"));
     } catch (error) {
-        showToast(`Maschine konnte nicht geladen werden: ${error.message}`, true);
+        showToast(`The machine could not be loaded: ${error.message}`, true);
         return;
     }
 
@@ -171,8 +171,8 @@ function renderMachineMeta() {
         ? `${machine.transferDirectorySource} → ${machine.machineDirectory}`
         : machine.machineDirectory;
     const metaItems = [
-        ["Übergabeverzeichnis", transferDirectory],
-        ["Telegramme", `${machine.outputFile}<n>.xml`]
+        ["Exchange folder", transferDirectory],
+        ["Telegrams", `${machine.outputFile}<n>.xml`]
     ];
     for (const [label, value] of metaItems) {
         const item = createElement("div");
@@ -225,12 +225,12 @@ function renderPlan() {
     viewState.lastRenderedPlanJson = planJson;
 
     const packageCount = viewState.productionPackages.length;
-    elements.planCount.textContent = `${packageCount} ${packageCount === 1 ? "Paket" : "Pakete"}`;
+    elements.planCount.textContent = `${packageCount} ${packageCount === 1 ? "package" : "packages"}`;
     elements.planEmpty.hidden = packageCount > 0;
     elements.planList.replaceChildren(...viewState.productionPackages.map(renderPackage));
 
     elements.selectedPackage.textContent = viewState.selectedPackageName ?? "–";
-    elements.selectedPosition.textContent = viewState.selectedOrderNo ?? (viewState.selectedPackageName ? "alle Positionen" : "–");
+    elements.selectedPosition.textContent = viewState.selectedOrderNo ?? (viewState.selectedPackageName ? "all positions" : "–");
 }
 
 function renderPackage(productionPackage) {
@@ -243,15 +243,15 @@ function renderPackage(productionPackage) {
     header.append(createElement("span", "package-name", productionPackage.name));
 
     const info = createElement("div", "package-info");
-    info.append(createElement("span", null, `Paket ${productionPackage.processedQuantity} / ${productionPackage.desiredQuantity}`));
+    info.append(createElement("span", null, `Package ${productionPackage.processedQuantity} / ${productionPackage.desiredQuantity}`));
     if (productionPackage.reportedBy) {
-        info.append(createElement("span", null, `Bediener: ${productionPackage.reportedBy}`));
+        info.append(createElement("span", null, `Operator: ${productionPackage.reportedBy}`));
     }
 
     const deleteButton = createElement("button", "icon-button", "×");
     deleteButton.type = "button";
-    deleteButton.title = "Paket löschen (nur lokal, kein Telegramm)";
-    deleteButton.setAttribute("aria-label", `Paket ${productionPackage.name} löschen`);
+    deleteButton.title = "Delete package (local only, no telegram)";
+    deleteButton.setAttribute("aria-label", `Delete package ${productionPackage.name}`);
     deleteButton.disabled = isProcessingRunning();
     deleteButton.addEventListener("click", event => {
         event.stopPropagation();
@@ -276,7 +276,7 @@ function renderPackage(productionPackage) {
 function renderPositionTable(productionPackage) {
     const table = createElement("table", "position-table");
     const headRow = createElement("tr");
-    for (const columnTitle of ["Auftrag", "Teil", "Status", "Fortschritt", ""]) {
+    for (const columnTitle of ["Order", "Part", "Status", "Progress", ""]) {
         headRow.append(createElement("th", null, columnTitle));
     }
     table.append(createElement("thead"));
@@ -358,7 +358,7 @@ function renderProcessingStatus() {
 
     elements.progressPosition.textContent =
         `${status.productionPackageName} · Position ${status.currentPositionNumber}/${status.positionCount} (${status.currentOrderNo ?? "–"})`;
-    elements.progressParts.textContent = `Teil ${status.processedParts}/${status.desiredParts}`;
+    elements.progressParts.textContent = `Part ${status.processedParts}/${status.desiredParts}`;
     const progressPercent = status.desiredParts > 0 ? (status.processedParts / status.desiredParts) * 100 : 0;
     elements.progressBar.style.width = `${progressPercent}%`;
 }
@@ -472,7 +472,7 @@ async function loadCommunicationLog() {
     try {
         viewState.logEntries = await callApi("/api/simulator/communication-log");
     } catch (error) {
-        showToast(`Log konnte nicht geladen werden: ${error.message}`, true);
+        showToast(`The log could not be loaded: ${error.message}`, true);
     }
     renderLog();
 }
@@ -494,7 +494,7 @@ function connectCommunicationLogStream() {
 
 function renderLogRow(entry) {
     const row = createElement("div", "log-row");
-    const time = new Date(entry.timestamp).toLocaleTimeString("de-DE");
+    const time = new Date(entry.timestamp).toLocaleTimeString();
     row.append(
         createElement("span", "muted", time),
         createElement("span", "muted channel", entry.channel),
@@ -512,7 +512,7 @@ function isLogScrolledToBottom() {
 function renderLog() {
     const visibleEntries = viewState.logEntries;
     if (visibleEntries.length === 0) {
-        elements.logList.replaceChildren(createElement("div", "log-empty", "Noch keine Messages gesendet."));
+        elements.logList.replaceChildren(createElement("div", "log-empty", "No messages sent yet."));
         return;
     }
 

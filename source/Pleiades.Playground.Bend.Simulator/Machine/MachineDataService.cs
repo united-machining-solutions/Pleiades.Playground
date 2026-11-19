@@ -11,12 +11,12 @@ internal sealed class MachineDataService(SimulatorRuntime runtime, MachineBusySt
     {
         if (request is null || !Enum.IsDefined(request.OperatingState))
         {
-            return CommandResult.Failure(CommandError.InvalidInput, "Unbekannter Betriebszustand.");
+            return CommandResult.Failure(CommandError.InvalidInput, "Unknown operating state.");
         }
 
         if (busyState.IsBusy)
         {
-            return CommandResult.Failure(CommandError.MachineBusy, "Während der automatischen Abarbeitung nicht möglich.");
+            return CommandResult.Failure(CommandError.MachineBusy, "Not possible during automatic processing.");
         }
 
         switch (request.OperatingState)
@@ -35,6 +35,6 @@ internal sealed class MachineDataService(SimulatorRuntime runtime, MachineBusySt
                 break;
         }
 
-        return CommandResult.Success($"Betriebszustand '{request.OperatingState}' gesendet.");
+        return CommandResult.Success($"Operating state '{request.OperatingState}' sent.");
     }
 }

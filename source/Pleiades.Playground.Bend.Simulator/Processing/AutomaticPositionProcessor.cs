@@ -62,7 +62,7 @@ internal sealed record AutomaticPositionProcessingContext(
 internal static class AutomaticPositionProcessor
 {
     public const string AlreadyCompletedMessage =
-        "Die benötigte Auftragsmenge (Desired) wurde bereits erreicht. Keine Abarbeitung mehr möglich";
+        "The desired quantity of the order is already reached; nothing is left to process.";
 
     /// <summary>How many parts are still open; 0 means the position is complete.</summary>
     public static int GetRemainingParts(ManufacturingOrder position)

@@ -549,7 +549,9 @@ without a fault or names an alarm; the list goes out before the events that chan
 The [bending adapter](../../source/Pleiades.Playground.Bend.Adapter/README.md), one per press brake that reports through RCI
 telegram files, delivers `ActiveAlerts` with the same two events for a fault of the machine, and an operator message
 or a finished order as `Notification.NotificationEvent`; its timestamps are those of the machine as well, and the RCI
-operating state offline is `CommunicationFault`.
+operating state offline is `CommunicationFault`. RCI has no handshake and no request for the current state: the
+adapter reports `Running` as soon as it reads the exchange folder, while `State/Status` and `ActiveAlerts` stay
+`null` until the machine reports its first operating state; the list goes out before the events that change it.
 
 The [OPC UA adapter](../../source/Pleiades.Playground.OpcUa.Adapter/README.md) brings in every machine a person
 adds in the chat, with the same publisher and one MQTT connection per machine, so that each has its own last

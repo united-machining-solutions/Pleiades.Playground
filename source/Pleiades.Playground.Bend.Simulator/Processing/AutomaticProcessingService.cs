@@ -27,7 +27,7 @@ internal sealed partial class AutomaticProcessingService(
             .FirstOrDefault(order => string.Equals(order.OrderNo, orderNo, StringComparison.Ordinal));
         if (position is null)
         {
-            return CommandResult.Failure(CommandError.NotFound, $"Position '{orderNo}' wurde im Paket '{packageName}' nicht gefunden.");
+            return CommandResult.Failure(CommandError.NotFound, $"Position '{orderNo}' was not found in package '{packageName}'.");
         }
 
         if (AutomaticPositionProcessor.GetRemainingParts(position) == 0)
@@ -60,11 +60,11 @@ internal sealed partial class AutomaticProcessingService(
         var job = Volatile.Read(ref _lastJob);
         if (job is null || !job.IsRunning)
         {
-            return CommandResult.Failure(CommandError.NotFound, "Es läuft keine Abarbeitung.");
+            return CommandResult.Failure(CommandError.NotFound, "No processing is running.");
         }
 
         job.RequestCancellation();
-        return CommandResult.Success("Abbruch angefordert.");
+        return CommandResult.Success("Cancellation requested.");
     }
 
     public AutomaticProcessingStatusDto GetStatus()
@@ -76,7 +76,7 @@ internal sealed partial class AutomaticProcessingService(
     {
         package = runtime.GetProductionPackagesSnapshot()
             .FirstOrDefault(candidate => string.Equals(candidate.ProductionPackageName, packageName, StringComparison.Ordinal))!;
-        failure = CommandResult.Failure(CommandError.NotFound, $"Paket '{packageName}' nicht gefunden.");
+        failure = CommandResult.Failure(CommandError.NotFound, $"Package '{packageName}' not found.");
         return package is not null;
     }
 
@@ -84,13 +84,13 @@ internal sealed partial class AutomaticProcessingService(
     {
         if (!busyState.TryMarkBusy())
         {
-            return CommandResult.Failure(CommandError.MachineBusy, "Es läuft bereits eine Abarbeitung.");
+            return CommandResult.Failure(CommandError.MachineBusy, "A processing is already running.");
         }
 
         var job = new AutomaticProcessingJob(package.ProductionPackageName, positions.Length, time);
         Interlocked.Exchange(ref _lastJob, job)?.Dispose();
         _ = Task.Run(() => RunJobAsync(job, package, positions, reportedBy ?? string.Empty), CancellationToken.None);
-        return CommandResult.Success($"Abarbeitung von '{package.ProductionPackageName}' gestartet.");
+        return CommandResult.Success($"Processing of '{package.ProductionPackageName}' started.");
     }
 
     private async Task RunJobAsync(
@@ -107,7 +107,7 @@ internal sealed partial class AutomaticProcessingService(
                 if (index > 0 && !await AutomaticPositionProcessor.TryWaitAsync(
                         runtime.Config.PositionChangeInterval, job.CancellationToken).ConfigureAwait(false))
                 {
-                    job.ReportFinished(AutomaticProcessingState.Cancelled, "Abarbeitung abgebrochen.");
+                    job.ReportFinished(AutomaticProcessingState.Cancelled, "Processing cancelled.");
                     return;
                 }
 
@@ -125,7 +125,7 @@ internal sealed partial class AutomaticProcessingService(
                 var outcome = await AutomaticPositionProcessor.ProcessPositionAsync(context, job.CancellationToken).ConfigureAwait(false);
                 if (outcome == PositionProcessingOutcome.Cancelled)
                 {
-                    job.ReportFinished(AutomaticProcessingState.Cancelled, "Abarbeitung abgebrochen.");
+                    job.ReportFinished(AutomaticProcessingState.Cancelled, "Processing cancelled.");
                     return;
                 }
 
@@ -133,7 +133,7 @@ internal sealed partial class AutomaticProcessingService(
                 {
                     runtime.ProductionPackages.Remove(package);
                     job.ReportFinished(AutomaticProcessingState.Completed,
-                        $"Paket '{package.ProductionPackageName}' fertig und aus dem Produktionsplan entfernt.");
+                        $"Package '{package.ProductionPackageName}' finished and removed from the production plan.");
                     return;
                 }
 
@@ -141,13 +141,13 @@ internal sealed partial class AutomaticProcessingService(
                 {
                     // The package is to be made again: it stays in the plan with its positions from 0.
                     job.ReportFinished(AutomaticProcessingState.Completed,
-                        $"Paket '{package.ProductionPackageName}' {package.ProcessedQuantity} von {package.DesiredQuantity} gefertigt, " +
-                        "der nächste Durchlauf ist offen.");
+                        $"Package '{package.ProductionPackageName}': {package.ProcessedQuantity} of {package.DesiredQuantity} made, " +
+                        "the next run is open.");
                     return;
                 }
             }
 
-            job.ReportFinished(AutomaticProcessingState.Completed, "Position(en) abgearbeitet, Paket hat noch offene Positionen.");
+            job.ReportFinished(AutomaticProcessingState.Completed, "Position(s) processed; the package has open positions left.");
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException)
         {

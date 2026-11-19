@@ -85,7 +85,10 @@ public sealed class MqttPublisherTest
 
         var lists = messages.Where(m => m.Topic == Root + "umati/Notification/ActiveAlerts")
             .Select(m => RecordingManagedMqttClient.Json(m)["value"]!.AsArray().Count).ToList();
-        CollectionAssert.AreEqual(new[] { 1, 0 }, lists, "The list follows the events.");
+        CollectionAssert.AreEqual(new[] { 1, 0 }, lists);
+        var order = messages.Where(m => m.Topic == Root + "events/notifications" || m.Topic == Root + "umati/Notification/ActiveAlerts")
+            .Select(m => m.Topic.EndsWith("ActiveAlerts", StringComparison.Ordinal) ? "list" : "event").ToList();
+        CollectionAssert.AreEqual(new[] { "list", "event", "list", "event" }, order, "The list goes out before the event that changes it.");
     }
 
     [TestMethod]

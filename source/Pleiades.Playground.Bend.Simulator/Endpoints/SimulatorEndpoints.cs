@@ -63,7 +63,7 @@ internal static class SimulatorEndpoints
     {
         if (request is null || string.IsNullOrWhiteSpace(request.PackageName))
         {
-            return Results.Problem("Paketname ist erforderlich.", statusCode: StatusCodes.Status400BadRequest);
+            return Results.Problem("A package name is required.", statusCode: StatusCodes.Status400BadRequest);
         }
 
         return ToHttpResult(string.IsNullOrWhiteSpace(request.OrderNo)

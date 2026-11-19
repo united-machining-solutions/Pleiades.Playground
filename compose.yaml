@@ -531,7 +531,7 @@ services:
       - "${BENDING_PRESS_PORT:-5614}:8080"
     environment:
       Config__SerialNumber: &bending-press-serial AE325085TB46
-      Config__Manufacturer: &bending-press-manufacturer Trumpf
+      Config__Manufacturer: &bending-press-manufacturer TRUMPF
       Config__ManufacturerUri: &bending-press-manufacturer-uri https://www.trumpf.com
       Config__Model: &bending-press-model 5085
       Config__ExchangeDirectorySource: bending-press-exchange

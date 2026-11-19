@@ -12,8 +12,8 @@ internal sealed class DummyProductionDataFactory(Random random, TimeProvider tim
 {
     private static readonly string[] PartNames =
     [
-        "Winkel", "Haltewinkel", "Abdeckblech", "Gehaeuseunterteil", "Gehaeusedeckel", "Seitenwand",
-        "Konsole", "U-Profil", "Z-Profil", "Laschenblech", "Rueckwand", "Traverse",
+        "Angle", "Bracket", "CoverPlate", "HousingBase", "HousingLid", "SidePanel",
+        "Console", "U-Profile", "Z-Profile", "Tab", "BackPanel", "Crossbar",
     ];
 
     /// <summary>The bending program of a part: its part number with the extension <c>.jupidu</c>.</summary>

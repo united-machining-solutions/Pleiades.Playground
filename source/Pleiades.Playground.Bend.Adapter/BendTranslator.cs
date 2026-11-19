@@ -17,13 +17,18 @@ namespace Pleiades.Playground.Bend.Adapter;
 ///                         2 maintenance   State.Status  OutOfService  Maintenance
 ///                        -1 fault         State.Status  OutOfService  Processing   + Notification.ActiveAlerts, AlertRaised
 ///                         3 offline       State.Status  NotAvailable  None         the machine is not reached
-/// another operating state                 AlertCleared for a fault that stood
+/// another operating state                 Notification.ActiveAlerts, AlertCleared for a fault that stood
 /// ManufacturingOrder…     WorkMasterMonitoring.ActiveWorkMaster and x-&lt;domain&gt;.WorkMasterMonitoring.ActiveProgram
 ///                         the ProgramName; x-&lt;domain&gt;.Production.*
 /// ProcessingStopped       ActiveWorkMaster and ActiveProgram null: the machine runs no program
 /// order done              Notification.NotificationEvent RCI-ORDER-FINISHED
 /// OperatorMessage         Notification.NotificationEvent RCI-MESSAGE-&lt;MessageNo&gt;
 /// </code>
+/// <para>
+/// The list <c>Notification.ActiveAlerts</c> goes out before the events that change it, so that a consumer who reads it
+/// when an event arrives finds the list the event speaks of. It is <c>null</c>, not known, until the machine reports its
+/// first operating state: before that nothing says whether a fault stands.
+/// </para>
 /// </remarks>
 internal sealed class BendTranslator
 {
@@ -37,6 +42,7 @@ internal sealed class BendTranslator
     private readonly Func<string> _newId;
     private readonly Dictionary<string, DateTimeOffset> _lastTimestamp = new(StringComparer.Ordinal);
     private JsonObject? _fault;
+    private bool _alertsKnown;
     private string? _lastFinishedOrder;
 
     /// <param name="identity">Who the machine is; gives the prefix of the signals of the manufacturer.</param>
@@ -98,7 +104,7 @@ internal sealed class BendTranslator
 
     /// <summary>
     /// What stands when the adapter begins publishing: the state and the program as <c>null</c> where the machine has
-    /// said nothing yet, not known right now, and the list of alerts.
+    /// said nothing yet, not known right now, and the list of alerts, <c>null</c> as well until an operating state came.
     /// </summary>
     public IReadOnlyList<Publication> Current()
     {
@@ -109,7 +115,7 @@ internal sealed class BendTranslator
             result.Add(new ValuePublication(path, null, now));
         }
 
-        result.Add(new ValuePublication(Paths.ActiveAlerts, AlertList(), now));
+        result.Add(new ValuePublication(Paths.ActiveAlerts, _alertsKnown ? AlertList() : null, now));
         return Ordered(result);
     }
 
@@ -166,6 +172,8 @@ internal sealed class BendTranslator
             Signal(Paths.RciOperatingState, state.OperatingState, at),
         ];
 
+        var alertsWereKnown = _alertsKnown;
+        _alertsKnown = true;
         if (rci == RciOperatingState.Fault)
         {
             var errorCode = string.IsNullOrEmpty(state.ErrorNo) ? "RCI-FAULT" : $"RCI-{state.ErrorNo}";
@@ -184,13 +192,18 @@ internal sealed class BendTranslator
                     ["Severity"] = FaultSeverity,
                     ["Time"] = MachineBinding.Timestamp(at),
                 };
-                publications.Add(new EventPublication(Paths.AlertRaised, (JsonObject)_fault.DeepClone(), at));
                 publications.Add(new ValuePublication(Paths.ActiveAlerts, AlertList(), at));
+                publications.Add(new EventPublication(Paths.AlertRaised, (JsonObject)_fault.DeepClone(), at));
             }
         }
-        else
+        else if (_fault is not null)
         {
             publications.AddRange(ClearFault(at));
+        }
+        else if (!alertsWereKnown)
+        {
+            // The first operating state without a fault: now it is known that no alert stands.
+            publications.Add(new ValuePublication(Paths.ActiveAlerts, AlertList(), at));
         }
 
         if (Offline)
@@ -270,8 +283,8 @@ internal sealed class BendTranslator
         _fault = null;
         return
         [
-            new EventPublication(Paths.AlertCleared, cleared, at),
             new ValuePublication(Paths.ActiveAlerts, AlertList(), at),
+            new EventPublication(Paths.AlertCleared, cleared, at),
         ];
     }
 

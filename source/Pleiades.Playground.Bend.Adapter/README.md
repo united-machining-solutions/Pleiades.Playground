@@ -50,7 +50,7 @@ and a value goes out when it changes.
 | `umati/Connection/State` | string | – | The state of the adapter: `Initializing`, `Running`, `CommunicationFault` while the operating state is offline (3), `Shutdown`; the last will is `CommunicationFault` |
 | `umati/Connection/Heartbeat` | integer | – | Counts up every 10 s while the adapter runs |
 | `umati/State/Status` | snapshot | – | `MachineryItemState` and `MachineryOperationMode` from `OperatingStateFeedback`, see below |
-| `umati/Notification/ActiveAlerts` | list | – | The fault that stands, see below; `[]` for none |
+| `umati/Notification/ActiveAlerts` | list | – | The fault that stands, see below; `[]` for none; `null` until the first operating state |
 | `umati/WorkMasterMonitoring/ActiveWorkMaster` | string | – | The work master, for RCI the `ProgramName` of the order (the catalogue: for a machine tool mostly the name of the program); `null` after `ProcessingStopped` and while offline. The example app shows it as the program |
 | `oem/WorkMasterMonitoring/ActiveProgram` | string | – | `ProgramName` of the order of `ManufacturingOrderFeedback`, `ProcessingStarted`; `null` after `ProcessingStopped` (finished or paused) and while offline |
 | `oem/Rci/OperatingState` | integer | `one` | The RCI operating state as it is: -1, 0, 1, 2, 3 |
@@ -83,7 +83,7 @@ machine is offline, they wait and go out after the values and `Running`.
 - Fault: operating state -1 makes an alert with `ErrorCode` `RCI-<ErrorNo>`, the `ErrorText` as `Message` and the
   `Severity` `Failure` (NAMUR NE 107; RCI names none). It stands in `ActiveAlerts` and comes with
   `Notification.AlertRaised`; the next other operating state, or a fault with another number, clears it with
-  `Notification.AlertCleared` and the same `Id`.
+  `Notification.AlertCleared` and the same `Id`. The list goes out before the event that changes it.
 - Finished order: a `Notification.NotificationEvent` `RCI-ORDER-FINISHED` once the processed parts of an order reach its
   desired number.
 - `OperatorMessage`: a `Notification.NotificationEvent` `RCI-MESSAGE-<MessageNo>`.
@@ -101,10 +101,23 @@ later one moves a millisecond on.
   that counts from 1 after a restart) is read again.
 - At the start, the files that are there already are read once, and only the newest value of each path is
   published, without events, so a restart does not repeat the history. A fault that stands is in `ActiveAlerts`.
+- RCI has no handshake: the adapter cannot ask the machine whether it is there, and a machine writes a file only when
+  something happens. So the adapter reports `Running` as soon as it reads the folder, even with no file in it, while
+  `State/Status`, `ActiveAlerts` and the program stay `null`, not known, until the machine reports. `Running` says
+  that the adapter reaches the folder, not that the machine runs.
 - The machine counts as reached until it says it is offline (3); then the values stand with `CommunicationFault`.
   The next other operating state publishes what changed meanwhile and `Running` again.
 - The RCI simulator reports the operating state only when it is set in its UI (MDE). Part feedbacks alone do
   not set `MachineryItemState`.
+
+## Next to a real host
+
+At a real press brake the host, for example TruTops or Oseon, reads `RCIMaschToServ<n>.xml` and removes it, often
+within the second. The adapter only reads and looks every second, and waits 300 ms for a file to settle, so a file the
+host takes earlier is never seen. Next to the simulator this does not happen: Oseon and the adapter read the same
+folder, and the simulator keeps its files. Against a real machine the adapter needs a folder of its own that gets
+every file, for example a copy job on the machine or the share that copies each new file into a second folder before
+the host takes it, or a host that is set to keep its files. This was not tried against a real machine.
 
 ## Configuration
 
@@ -114,7 +127,7 @@ number, manufacturer and model come from the simulator `bending-press` (YAML anc
 | Setting | Default | Compose | Meaning |
 |---|---|---|---|
 | `SerialNumber` | (required) | `AE325085TB46` | `Identification.SerialNumber`, the last part of the machine id |
-| `Manufacturer` | `TRUMPF` | `Trumpf` | `Identification.Manufacturer` |
+| `Manufacturer` | `TRUMPF` | `TRUMPF` | `Identification.Manufacturer` |
 | `ManufacturerUri` | `https://www.trumpf.com` | `https://www.trumpf.com` | `Identification.ManufacturerUri`; its domain is the first part of the machine id and, with dashes, the prefix of the signals |
 | `Model` | `Bend5130` | `5085` | `Identification.Model`, the middle part of the machine id |
 | `ProductInstanceUri` | empty: `{ManufacturerUri}/{Model}/{SerialNumber}` | | The globally unique id of the machine, `source` of every event |
