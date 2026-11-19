@@ -26,8 +26,17 @@ function utc(written: string | null | undefined): string | null {
   return Number.isNaN(at) ? null : new Date(at).toISOString()
 }
 
-/** A job order that has not ended: running, interrupted, or not yet started. */
+/** A job order that has begun and not ended: running or interrupted. One not yet started is not open. */
 const isOpen = (state: string) => state === "Running" || state === "Interrupted"
+
+/**
+ * Newest first, by an instant of each. Compared as instants, not as text: the Events API may leave out
+ * zeros of the fraction, and then the text does not order two instants of the same second.
+ */
+const newestBy =
+  <TOne>(instantOf: (one: TOne) => string) =>
+  (a: TOne, b: TOne) =>
+    Date.parse(instantOf(b)) - Date.parse(instantOf(a))
 
 /** A program execution of the Events API by the names of the data model. */
 export function executionOf(stored: StoredProgramExecution): ProgramExecution {
@@ -61,11 +70,34 @@ export function endOf(end: string | null, since: string, starts: ReadonlyArray<n
   return starts.find((start) => start > begun) ?? Infinity
 }
 
+/**
+ * Until when a job order stood: as `endOf`, and one taken off the list (`JobOrderRemoved`) stands no
+ * longer than until then, also where it had no EndTime.
+ */
+export function jobOrderEnd(stored: StoredJobOrder, starts: ReadonlyArray<number>): number {
+  const end = endOf(utc(stored.endTime), stored.lastChange, starts)
+  return stored.removed ? Math.min(end, Date.parse(stored.lastChange)) : end
+}
+
 /** The job order a card shows: one that runs or is interrupted and still stands, else the one that changed last. */
 export function currentJobOrder(stored: ReadonlyArray<StoredJobOrder>, starts: ReadonlyArray<number>): StoredJobOrder | null {
-  const listed = [...stored].filter((one) => !one.removed).sort((a, b) => b.lastChange.localeCompare(a.lastChange))
-  const standing = listed.find((one) => isOpen(one.state) && endOf(utc(one.endTime), one.lastChange, starts) === Infinity)
+  const listed = stored.filter((one) => !one.removed).sort(newestBy((one) => one.lastChange))
+  const standing = listed.find((one) => isOpen(one.state) && jobOrderEnd(one, starts) === Infinity)
   return standing ?? listed.find((one) => !isOpen(one.state)) ?? listed[0] ?? null
+}
+
+/**
+ * The program execution a card shows: the one that runs or is interrupted and still stands, else the
+ * newest that ended. One left open by an earlier run of the adapter does not run on, so it is shown only
+ * where there is no other.
+ */
+export function currentExecution(
+  stored: ReadonlyArray<StoredProgramExecution>,
+  starts: ReadonlyArray<number>,
+): StoredProgramExecution | null {
+  const newest = [...stored].sort(newestBy((one) => one.startTime))
+  const standing = newest.find((one) => endOf(utc(one.endTime), one.startTime, starts) === Infinity)
+  return standing ?? newest.find((one) => utc(one.endTime) !== null) ?? newest[0] ?? null
 }
 
 /** The hours asked for, refused with a sentence if they are not ones the card looks back. */
@@ -76,15 +108,21 @@ function hoursOf(hours: number): number {
   return hours
 }
 
-/** What the card needs of one machine between two instants: its job orders, program executions and the starts of its adapter. */
-async function readHistory(apis: Apis, machine: string, from: Date, to: Date) {
+/**
+ * What the card needs of one machine between two instants: its job orders, program executions and the
+ * starts of its adapter.
+ */
+async function readHistory(apis: Apis, machine: string, from: Date, to: Date, now: Date) {
   // A job order or program execution that began up to a day before still runs into the hours.
   const earlier = secondsBefore(from, HORIZON_SECONDS)
-  const [jobOrders, { executions, hasMore }] = await Promise.all([
-    readJobOrders(apis, earlier, to, machine),
+  // The Events API picks a job order by its last change, and has only its last state. One that ran in the
+  // hours and changed after them, as the one that runs does a moment after a card asked, is read up to now.
+  const lastChange = new Date(Math.max(to.getTime(), now.getTime()))
+  const [jobOrders, { executions, hasMore }, starts] = await Promise.all([
+    readJobOrders(apis, earlier, lastChange, machine),
     readProgramExecutions(apis, machine, earlier, to),
+    adapterStarts(apis, machine, earlier, to),
   ])
-  const starts = await adapterStarts(apis, machine, earlier, to)
   return { jobOrders, executions, starts, hasMore: hasMore || jobOrders.length >= MOST_ITEMS }
 }
 
@@ -95,18 +133,18 @@ const overlaps = (start: string | null, end: number, from: number, to: number) =
 const topicsOf = (machine: string) => ({ jobs: `machines/${machine}/events/jobs`, workmasters: `machines/${machine}/events/workmasters` })
 
 /**
- * The job order card of one machine: its job order now, its newest program execution, and how many of
+ * The job order card of one machine: its job order now, its program execution that runs, else the newest
+ * that ended, and how many of
  * both ran in the last hours. The machine is named by its id or as people call it.
  */
 export async function showJobOrder(apis: Apis, name: string, hours = JOB_ORDER_HOURS, now = new Date()): Promise<JobOrderShow> {
   const back = hoursOf(hours)
   const machine = machineNamed(await knownMachines(apis, now), name)
   const from = secondsBefore(now, back * 3600)
-  const { jobOrders, executions, starts, hasMore } = await readHistory(apis, machine, from, now)
+  const { jobOrders, executions, starts, hasMore } = await readHistory(apis, machine, from, now, now)
   const [start, end] = [from.getTime(), now.getTime()]
   const current = currentJobOrder(jobOrders, starts)
-  const newest = [...executions].sort((a, b) => b.startTime.localeCompare(a.startTime))
-  const running = newest.find((one) => endOf(utc(one.endTime), one.startTime, starts) === Infinity)
+  const execution = currentExecution(executions, starts)
   const inHours = executions.filter((one) => overlaps(one.startTime, endOf(utc(one.endTime), one.startTime, starts), start, end))
   return {
     asOf: now.toISOString(),
@@ -114,11 +152,10 @@ export async function showJobOrder(apis: Apis, name: string, hours = JOB_ORDER_H
     from: from.toISOString(),
     hours: back,
     jobOrder: current && entryOf(current),
-    programExecution: (running ?? newest[0]) ? executionOf((running ?? newest[0])!) : null,
+    programExecution: execution && executionOf(execution),
     // On the list in the hours: an event of it lies in them, or it started before and ran into them.
     jobOrders: jobOrders.filter(
-      (one) =>
-        Date.parse(one.lastChange) >= start || overlaps(utc(one.startTime), endOf(utc(one.endTime), one.lastChange, starts), start, end),
+      (one) => Date.parse(one.lastChange) >= start || overlaps(utc(one.startTime), jobOrderEnd(one, starts), start, end),
     ).length,
     programExecutions: inHours.length,
     aborted: inHours.filter((one) => one.state === "Aborted").length,
@@ -133,25 +170,32 @@ function clipped(begin: string, end: number, from: number, to: number) {
 }
 
 /** The job orders and program executions of one machine between two instants, for the timeline of the card. */
-export async function listJobOrderTimeline(apis: Apis, machine: string, fromText: string, toText: string): Promise<JobOrderTimeline> {
+export async function listJobOrderTimeline(
+  apis: Apis,
+  machine: string,
+  fromText: string,
+  toText: string,
+  now = new Date(),
+): Promise<JobOrderTimeline> {
   const [from, to] = [new Date(fromText), new Date(toText)]
   const [start, end] = [from.getTime(), to.getTime()]
   if (!(end > start) || end - start > MOST_JOB_ORDER_HOURS * 3600_000) {
     throw new Error(`\`to\` lies after \`from\`, at most ${MOST_JOB_ORDER_HOURS} hours.`)
   }
-  const { jobOrders, executions, starts, hasMore } = await readHistory(apis, machine, from, to)
+  const { jobOrders, executions, starts, hasMore } = await readHistory(apis, machine, from, to, now)
   const jobSpans = jobOrders.flatMap((one): Array<JobOrderSpan> => {
     const begun = utc(one.startTime)
     // A job order that never started has no stretch on the timeline.
     if (begun === null) return []
-    const until = endOf(utc(one.endTime), one.lastChange, starts)
+    const until = jobOrderEnd(one, starts)
     if (!overlaps(begun, until, start, end)) return []
     return [
       {
         ...clipped(begun, until, start, end),
         id: one.jobOrderId,
         label: one.jobOrderId,
-        // One left open by an earlier run of the adapter shows the state it had then.
+        // Its last state: one left open by an earlier run of the adapter shows the state it had then, one
+        // that changed after `to` the state it has now.
         state: one.state,
         details: [
           { name: "JobOrderID", value: one.jobOrderId },
@@ -167,9 +211,9 @@ export async function listJobOrderTimeline(apis: Apis, machine: string, fromText
     ]
   })
   const runSpans = executions.flatMap((one): Array<JobOrderSpan> => {
-    const begun = utc(one.startTime)!
+    const begun = utc(one.startTime)
     const until = endOf(utc(one.endTime), one.startTime, starts)
-    if (!overlaps(begun, until, start, end)) return []
+    if (begun === null || !overlaps(begun, until, start, end)) return []
     const run = executionOf(one)
     return [
       {

@@ -28,7 +28,8 @@ export type ProgramExecution = z.infer<typeof programExecution>
 
 /**
  * The job order card: the job order of one machine that runs or is interrupted, else the one that changed
- * last, and its newest program execution; how many of both there were in the last hours. The spans of both
+ * last, and its program execution that runs, else the newest that ended; how many of both there were in the
+ * last hours. The spans of both
  * over those hours grow with time: the card asks for them itself (`jobOrderTimeline`).
  */
 export const jobOrderShow = z.object({
@@ -41,7 +42,7 @@ export const jobOrderShow = z.object({
     .describe("The job order that runs or is interrupted, else the one whose last event is the newest. Null if the machine has none."),
   programExecution: programExecution
     .nullable()
-    .describe("The newest program execution of the machine, the one that runs if one does. Null if it has none."),
+    .describe("The program execution of the machine that runs or is interrupted, else the newest that ended. Null if it has none."),
   jobOrders: z.number().int().describe("How many job orders were on the list of the machine at some time between `from` and `asOf`."),
   programExecutions: z.number().int().describe("How many program executions ran at some time between `from` and `asOf`."),
   aborted: z.number().int().describe("How many of those program executions were aborted."),
@@ -60,7 +61,9 @@ export const jobOrderSpan = z.object({
   to: instant,
   id: z.string().describe("The JobOrderID or the ExecutionId."),
   label: z.string().describe("What the span is called: the JobOrderID, or the ActiveWorkMaster of a program execution."),
-  state: z.string().describe("Its state at the end of the span: Running, Interrupted, Ended or Aborted."),
+  state: z
+    .string()
+    .describe("Its last known state: Running, Interrupted, Ended or Aborted. One that runs on past `to` (`open`) may have ended since."),
   open: z.boolean().describe("True if it had not ended at `to`: it runs on."),
   details: z
     .array(z.object({ name: z.string(), value: z.string().nullable() }))

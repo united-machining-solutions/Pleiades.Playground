@@ -16,7 +16,11 @@ function answering(jobOrders: Array<Record<string, unknown>>, executions: Array<
     const url = new URL(String(input))
     requested.push(url)
     if (url.pathname === "/topics") return Response.json({ baseUnitTopics: [`machines/${machine}/umati/Connection/Heartbeat`] })
-    if (url.pathname === "/jobOrders") return Response.json({ items: jobOrders })
+    // As the Events API does: a job order by its last change between the two instants.
+    if (url.pathname === "/jobOrders") {
+      const [from, to] = [Date.parse(url.searchParams.get("from")!), Date.parse(url.searchParams.get("to")!)]
+      return Response.json({ items: jobOrders.filter((one) => Date.parse(String(one.lastChange)) >= from && Date.parse(String(one.lastChange)) <= to) })
+    }
     if (url.pathname === "/programExecutions") return Response.json({ items: executions, hasMore: false })
     // The state of the connection, as the Timeseries API returns text.
     const topic = `machines/${machine}/umati/Connection/State`
@@ -98,6 +102,35 @@ test("the timeline clips each span to the hours and says which run on", async ()
       ["WM-1", "2026-11-18T08:15:00.000Z", "2026-11-18T08:30:00.000Z", false],
       ["WM-1", "2026-11-18T09:00:00.000Z", "2026-11-18T10:00:00.000Z", true],
     ],
+  )
+})
+
+test("a program execution left open by an earlier run of the adapter is not shown as the one that runs", async () => {
+  answering(
+    [],
+    [run({}), run({ executionId: "e2", state: "Running", startTime: "2026-11-18T09:00:00Z", endTime: null, duration: null })],
+    ["2026-11-18T09:30:00Z"],
+  )
+  const shown = await showJobOrder(apis, machine, 8, now)
+  assert.equal(shown.programExecution?.ExecutionId, "e1")
+  assert.equal(shown.programExecution?.State, "Ended")
+})
+
+test("the timeline keeps a job order that changed after the timeline ends, as the one that runs does a moment after a card asked", async () => {
+  answering([job({ startTime: "2026-11-18T08:00:00Z", lastChange: "2026-11-18T09:45:00Z" })], [])
+  const timeline = await listJobOrderTimeline(apis, machine, "2026-11-18T08:15:00.000Z", "2026-11-18T09:30:00.000Z", now)
+  assert.deepEqual(
+    timeline.jobOrders.map((one) => [one.id, one.from, one.to, one.open]),
+    [["4711/01", "2026-11-18T08:15:00.000Z", "2026-11-18T09:30:00.000Z", true]],
+  )
+})
+
+test("a job order taken off the list without an end stands until it was taken off", async () => {
+  answering([job({ startTime: "2026-11-18T08:00:00Z", lastChange: "2026-11-18T09:00:00Z", removed: true })], [])
+  const timeline = await listJobOrderTimeline(apis, machine, "2026-11-18T08:15:00.000Z", now.toISOString(), now)
+  assert.deepEqual(
+    timeline.jobOrders.map((one) => [one.from, one.to, one.open]),
+    [["2026-11-18T08:15:00.000Z", "2026-11-18T09:00:00.000Z", false]],
   )
 })
 

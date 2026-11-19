@@ -74,7 +74,8 @@ answer, if you know it. Everything comes from the events of the machine, as the 
 - \`jobOrder\` is the entry of \`JobMonitoring.JobOrders\` that runs or is interrupted, else the one whose last
   event is the newest, with what came of it (\`JobMonitoring.JobOrderResults\`): \`produced\`, \`good\`, \`result\`.
   Null if the machine has none.
-- \`programExecution\` is the newest \`WorkMasterMonitoring.ProgramExecution\`, the one that runs if one does:
+- \`programExecution\` is the \`WorkMasterMonitoring.ProgramExecution\` that runs or is interrupted, else the
+  newest that ended:
   its \`ActiveWorkMaster\` (the program), \`State\`, \`StartTime\`, \`EndTime\`, \`Duration\` in seconds and the
   \`JobOrderID\` it belongs to.
 - A job order or a program execution that never ended counts as running only until the adapter of the
