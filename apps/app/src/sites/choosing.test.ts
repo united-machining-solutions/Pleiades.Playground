@@ -10,6 +10,7 @@ import {
   NO_HALL,
   addInWords,
   addOneInWords,
+  addStartOf,
   addedInWords,
   candidateById,
   candidatesOf,
@@ -19,11 +20,11 @@ import {
   fieldsOf,
   fromOf,
   isMachineId,
+  knownMachineOf,
   madeInWords,
   makeInWords,
   matches,
   meantBy,
-  oneStartOf,
   pickerPageOf,
   placedCandidatesOf,
   siteChoicesOf,
@@ -374,32 +375,32 @@ const makers = [
   { name: "Alcyone Machine Works", part: "alcyone-machines" },
 ]
 
-test("\"Add a machine\" starts with the machine handed in, chosen, or with what is known of one named by a name", () => {
-  const findable = [...candidates, ...placedCandidatesOf(placedList).values()]
-  assert.deepEqual(oneStartOf(undefined, findable, makers), { query: "", pick: null, identity: null, meant: [] })
-  const sending = oneStartOf({ machines: [L01] }, findable, makers)
-  assert.deepEqual([sending.query, sending.pick?.machine, sending.identity], ["Laser2D L-01", L01, null])
-  const placed = oneStartOf({ machines: ["alcyone-machines_AX-400_P-04"] }, findable, makers)
-  assert.deepEqual([placed.pick?.standsOn?.siteId, placed.query], ["north-plant", "Lathe 4"])
-  assert.deepEqual(oneStartOf({ machines: ["trumpf_TruPunch-5000_A1234"] }, findable, makers), {
-    query: "trumpf_TruPunch-5000_A1234",
-    pick: null,
-    identity: { manufacturer: "TRUMPF", model: "TruPunch-5000", serialNumber: "A1234" },
-    meant: [],
-  })
-  assert.deepEqual(oneStartOf({ named: [{ name: " MFP 7 ", meant: [L01], manufacturer: "Trumpf", model: "TruPunch 5000", serialNumber: "A1234" }] }, findable, makers), {
-    query: "MFP 7",
-    pick: null,
+test("\"Add a new machine\" starts with what is known of the machine named, or an id handed in, split", () => {
+  const none = { manufacturer: "", model: "", serialNumber: "" }
+  assert.deepEqual(addStartOf(undefined, makers), { identity: none, name: "" })
+  assert.deepEqual(addStartOf({ named: [{ name: " MFP 7 ", meant: [], manufacturer: "Trumpf", model: "TruPunch 5000", serialNumber: "A1234" }] }, makers), {
     identity: { manufacturer: "Trumpf", model: "TruPunch 5000", serialNumber: "A1234" },
-    meant: [L01],
+    name: "MFP 7",
   })
-  assert.deepEqual(oneStartOf({ named: [{ name: "MFP 7", meant: [], machine: "trumpf_TruPunch-5000_A1234" }] }, findable, makers).identity, {
-    manufacturer: "TRUMPF",
-    model: "TruPunch-5000",
-    serialNumber: "A1234",
+  assert.deepEqual(addStartOf({ named: [{ name: "MFP 7", meant: [], machine: "trumpf_TruPunch-5000_A1234" }] }, makers), {
+    identity: { manufacturer: "TRUMPF", model: "TruPunch-5000", serialNumber: "A1234" },
+    name: "MFP 7",
   })
-  // Nothing known of it but its name: the fields follow what is typed.
-  assert.equal(oneStartOf({ named: [{ name: "MFP 7", meant: [] }] }, findable, makers).identity, null)
+  assert.deepEqual(addStartOf({ named: [{ name: "MFP 7", meant: [] }] }, makers), { identity: none, name: "MFP 7" })
+  assert.deepEqual(addStartOf({ machines: ["acme_MFP_7"] }, makers), { identity: { manufacturer: "acme", model: "MFP", serialNumber: "7" }, name: "" })
+  assert.deepEqual(addStartOf({ machines: ["mfp7"] }, makers), { identity: none, name: "" })
+})
+
+test("a new machine is checked by its id alone: one that sends, one on a site, or a new one", () => {
+  const placed = placedCandidatesOf(placedList)
+  assert.deepEqual(knownMachineOf(undefined, candidates, placed), { kind: "new" })
+  assert.deepEqual(knownMachineOf("acme_MFP_7", candidates, placed), { kind: "new" })
+  const sends = knownMachineOf(L01, candidates, placed)
+  assert.deepEqual([sends.kind, sends.kind === "sends" && sends.candidate.machine], ["sends", L01])
+  const onSite = knownMachineOf(P04, candidates, placed)
+  assert.deepEqual([onSite.kind, onSite.kind === "placed" && onSite.candidate.standsOn?.siteName], ["placed", "North plant"])
+  // Only the exact id counts: one letter off is a new machine.
+  assert.deepEqual(knownMachineOf("trumpf_Laser2D_L-1", candidates, placed), { kind: "new" })
 })
 
 test("the buttons say what is done to how many machines, and where", () => {

@@ -12,14 +12,11 @@ import {
   NO_HALL,
   addInWords,
   addOneInWords,
+  addStartOf,
   candidatesOf,
-  fieldsOf,
   fromOf,
-  isMachineId,
+  knownMachineOf,
   makeInWords,
-  matches,
-  meantBy,
-  oneStartOf,
   placedCandidatesOf,
   siteChoicesOf,
   standsAt,
@@ -30,10 +27,10 @@ import {
 } from "./choosing.ts"
 import type { Candidate, HallChoice, PlaceStart, SiteChoice } from "./choosing.ts"
 import { keepLastPlace, lastPlaceIn, readLastPlace } from "./last-place.ts"
-import { identityFromTyped, machineIdOf, makersOf, problemsOfIdentity } from "./machine-id.ts"
+import { IdentityFields } from "./identity-fields.tsx"
+import { machineIdOf, makersOf, problemsOfIdentity } from "./machine-id.ts"
 import type { Identity, IdentityProblems } from "./machine-id.ts"
 import { MachinePicker } from "./machine-picker.tsx"
-import { OneMachine } from "./one-machine.tsx"
 import { PlaceFields } from "./place-fields.tsx"
 import { MAX_TEXT, companyOf } from "./placing.ts"
 import type { Placement } from "./placing.ts"
@@ -41,16 +38,16 @@ import { useMake, usePlace } from "./use-place.ts"
 import type { ToMake, ToPlace } from "./use-place.ts"
 
 // The form of the four things a person does with the sites, wherever it stands: in a dialog of Home, or in a
-// card of the chat that a person confirms. "add": one machine a person means, found among those that send or
-// stand on a site (then moved), or said by its manufacturer, model and serial number, and the site and hall
-// it goes to. "assign": the machines that sent data and stand on no site, chosen from a list, as many as go to
+// card of the chat that a person confirms. "add": a new machine, said by its manufacturer, model and serial
+// number, from which its id is formed, and the site and hall it goes to; an id that sends already, or stands
+// on a site, is said so, and the machine is assigned or moved instead. "assign": the machines that sent data and stand on no site, chosen from a list, as many as go to
 // one place. "move": the site and hall of a machine on a site. "site": a new site with a first hall, or a new
 // hall of a site. A site or hall that is not there yet is made from the name typed. The form sends through
 // the server of the app itself and says when it is done; what stands around it, a title or a dialog, is the
 // business of the one who shows it.
 
 /**
- * What the form is for: adding one machine, assigning the machines that send to a site, moving one that
+ * What the form is for: adding a new machine, assigning the machines that send to a site, moving one that
  * stands on a site (`placed`), or making a site or a hall without a machine.
  */
 export type PlaceMode =
@@ -63,11 +60,12 @@ export type PlaceMode =
 export type Placed = { siteId: string; siteName: string; hall: string | null }
 
 /**
- * The form. `start` chooses machines and a place before a person does: for "add" the first machine or name
- * handed in, for "assign" all machines handed in. Without a site, "add" and "assign" start at the place this
+ * The form. `start` chooses machines and a place before a person does: for "add" what is known of the first
+ * machine named, or the first id handed in, for "assign" all machines handed in. Without a site, "add" and "assign" start at the place this
  * browser added machines to last, with a site of null at none. `listed` "chosen" shows the machines handed in
  * to "assign" alone, until a person opens the whole list. `cancel` stands beside the button that sends, as a
  * dialog has its Cancel. `onPlaced` hears where the machines went, or what was made, once all of it went through.
+ * `onAssignInstead` offers, in "add", to assign a machine whose id sends already; without it, it is added here.
  */
 export function PlaceForm({
   mode,
@@ -76,6 +74,7 @@ export function PlaceForm({
   listed: shows = "all",
   cancel,
   onPlaced,
+  onAssignInstead,
 }: {
   mode: PlaceMode
   list: SiteList
@@ -83,6 +82,7 @@ export function PlaceForm({
   listed?: "chosen" | "all" | undefined
   cancel?: ReactNode
   onPlaced?: ((placed: Placed) => void) | undefined
+  onAssignInstead?: ((machine: string) => void) | undefined
 }) {
   const id = useId()
   const onPlace = usePlace()
@@ -99,24 +99,23 @@ export function PlaceForm({
     return {
       place: startPlaceOf(handed, listed, last),
       machines: startMachinesOf(mode.kind === "assign" ? start : undefined, fromList, placedOnes),
-      one: oneStartOf(mode.kind === "add" ? start : undefined, [...fromList, ...placedOnes.values()], makers),
+      add: addStartOf(mode.kind === "add" ? start : undefined, makers),
     }
   })
   // "assign": the machines chosen from the list, and those handed in that are not in it.
   const [more] = useState<ReadonlyArray<Candidate>>(first.machines.more)
   const [chosen, setChosen] = useState<ReadonlySet<string>>(first.machines.chosen)
   const [query, setQuery] = useState("")
-  // "add": what is typed to find the machine, the machine chosen, and what it is where none was found.
-  const [oneQuery, setOneQuery] = useState(first.one.query)
-  const [pick, setPick] = useState<Candidate | null>(first.one.pick)
-  const [identity, setIdentity] = useState<Identity | null>(first.one.identity)
+  // "add": what the new machine is, and whether one that stands on a site with its id is moved instead.
+  const [identity, setIdentity] = useState<Identity>(first.add.identity)
+  const [moveIt, setMoveIt] = useState(false)
   const [made, setMade] = useState<SiteChoice | null>(first.place.site?.siteId === null ? first.place.site : null)
   const [site, setSite] = useState<SiteChoice | null>(first.place.site)
   const [hall, setHall] = useState<HallChoice>(first.place.hall)
   const known = companyOf(list)
   const [company, setCompany] = useState(start?.company?.trim() || known)
-  const [displayName, setDisplayName] = useState<string | null>(() =>
-    mode.kind === "move" ? (mode.placed.displayName ?? "") : (start?.displayName ?? null),
+  const [displayName, setDisplayName] = useState(() =>
+    mode.kind === "move" ? (mode.placed.displayName ?? "") : (start?.displayName ?? (mode.kind === "add" ? first.add.name : "")),
   )
   const [tried, setTried] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -132,21 +131,14 @@ export function PlaceForm({
   const picked = candidates.filter((one) => chosen.has(one.machine) && !standsAt(one, site, hall))
   const moves = picked.filter((one) => one.standsOn !== null).length
 
-  // "add": the machines to find, those that send and those on a site; what was typed finds some, or none.
-  const findable = [...fromList, ...placedOnes.values()]
-  const typed = oneQuery.trim()
-  const found = pick ? [] : findable.filter((one) => matches(fieldsOf(one), typed))
-  const unknown = mode.kind === "add" && pick === null && typed !== "" && found.length === 0
-  const oneIdentity = identity ?? identityFromTyped(typed, makers)
-  const oneId = unknown ? machineIdOf(oneIdentity, makers) : undefined
-  const identityProblems: IdentityProblems = unknown ? problemsOfIdentity(oneIdentity, makers) : {}
-  const meantIds = first.one.meant
-  const meant = unknown ? (meantIds.length > 0 ? findable.filter((one) => meantIds.includes(one.machine)) : meantBy(typed, findable)) : []
-  const pickThere = pick !== null && standsAt(pick, site, hall)
-  // The name the machine is known by: what a person typed in its field, else the name a machine said by
-  // what it is was found by, as "MFP 7".
-  const display = displayName ?? (unknown && !isMachineId(typed) ? typed : "")
-  const oneName = display.trim() || pick?.what || (unknown ? typed : "")
+  // "add": the id formed from what the new machine is, and whether the list has a machine of that id.
+  const addId = mode.kind === "add" ? machineIdOf(identity, makers) : undefined
+  const existing = knownMachineOf(addId, fromList, placedOnes)
+  const moving = existing.kind === "placed" && moveIt
+  const identityProblems: IdentityProblems = mode.kind === "add" ? problemsOfIdentity(identity, makers) : {}
+  const there = moving && standsAt(existing.candidate, site, hall)
+  // The name the machine is known by: its display name, else its model and serial number.
+  const addName = displayName.trim() || (existing.kind === "new" ? [identity.model, identity.serialNumber].map((one) => one.trim()).filter(Boolean).join(" ") : existing.candidate.what)
 
   // Handed no place, the form asks for one from the start, and sends nothing until it has one.
   const placeAsked = adding && start?.site === null
@@ -154,16 +146,6 @@ export function PlaceForm({
   const where = site ? whereInWords(site.name, hall.name) : null
   const making = mode.kind === "site" ? makeInWords(site, hall) : null
   const one = mode.kind === "move" || mode.kind === "add" || (mode.kind === "assign" && picked.length === 1)
-  const oneMissing =
-    mode.kind !== "add" || !tried
-      ? undefined
-      : pick === null && typed === ""
-        ? "Find a machine, or say what it is."
-        : pick === null && found.length > 0
-          ? "Choose one of the machines found, or say what it is."
-          : pickThere
-            ? "It stands there already."
-            : undefined
   const missing = {
     machines: tried && mode.kind === "assign" && picked.length === 0,
     site: (tried || placeAsked) && site === null,
@@ -173,7 +155,7 @@ export function PlaceForm({
   }
   // A field of what the machine is says what is missing once a person sent the form, or typed in it.
   const shownProblems = Object.fromEntries(
-    (Object.keys(identityProblems) as Array<keyof Identity>).filter((field) => tried || identity?.[field]).map((field) => [field, identityProblems[field]]),
+    (Object.keys(identityProblems) as Array<keyof Identity>).filter((field) => tried || identity[field].trim() !== "").map((field) => [field, identityProblems[field]]),
   ) as IdentityProblems
 
   const send = async (): Promise<Placed | string> => {
@@ -187,16 +169,12 @@ export function PlaceForm({
       return outcome.ok ? outcome : outcome.reason
     }
     const place = whereOf(site, hall, company)
-    const name = one ? display : ""
+    const name = one ? displayName : ""
     const machines: Array<ToPlace> =
       mode.kind === "move"
         ? [{ request: { machine: mode.machine, ...place, displayName: name, from: { siteId: mode.placed.siteId, hall: mode.placed.hall } }, what: mode.what }]
         : mode.kind === "add"
-          ? [
-              pick
-                ? { request: { machine: pick.machine, ...place, displayName: name, from: fromOf(pick) }, what: pick.what }
-                : { request: { machine: oneId ?? "", ...place, displayName: name, from: null }, what: oneName },
-            ]
+          ? [{ request: { machine: addId ?? "", ...place, displayName: name, from: moving ? fromOf(existing.candidate) : null }, what: addName }]
           : picked.map((candidate) => ({ request: { machine: candidate.machine, ...place, displayName: name, from: fromOf(candidate) }, what: candidate.what }))
     const outcome = await onPlace(machines)
     if (!outcome.ok) return outcome.reason
@@ -212,7 +190,7 @@ export function PlaceForm({
       site === null ||
       (site.siteId === null && company.trim() === "") ||
       (mode.kind === "assign" && picked.length === 0) ||
-      (mode.kind === "add" && ((pick === null && oneId === undefined) || pickThere)) ||
+      (mode.kind === "add" && (addId === undefined || (existing.kind === "placed" && !moveIt) || there)) ||
       (mode.kind === "site" && making === null)
     if (incomplete) return
     setBusy(true)
@@ -238,7 +216,7 @@ export function PlaceForm({
       : mode.kind === "site"
         ? (making ?? "Create site")
         : mode.kind === "add"
-          ? addOneInWords(oneName, to, pick?.standsOn != null, newSite)
+          ? addOneInWords(addName, to, moving, newSite)
           : addInWords(picked.length, to, moves, newSite, "Assign")
 
   return (
@@ -256,24 +234,42 @@ export function PlaceForm({
     >
       <FieldGroup>
         {mode.kind === "add" && (
-          <OneMachine
-            id={id}
-            candidates={findable}
-            query={oneQuery}
-            pick={pick}
-            identity={oneIdentity}
-            meant={meant}
-            machineId={oneId}
-            problems={shownProblems}
-            missing={oneMissing}
-            onQuery={(next) => {
-              setOneQuery(next)
-              // What the fields say follows what is typed, until a person writes in them.
-              setIdentity(null)
-            }}
-            onPick={setPick}
-            onIdentity={(change) => setIdentity({ ...oneIdentity, ...change })}
-          />
+          <div className="flex flex-col gap-2">
+            <IdentityFields
+              id={id}
+              value={identity}
+              onChange={(change) => {
+                setIdentity({ ...identity, ...change })
+                setMoveIt(false)
+              }}
+              problems={shownProblems}
+              machineId={addId}
+            />
+            {/* The id of a machine the list has already: it is assigned or moved, not made a second time. */}
+            {existing.kind === "sends" && (
+              <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+                This machine already sends data.
+                {onAssignInstead && (
+                  <Button type="button" variant="ghost" size="xs" onClick={() => onAssignInstead(existing.candidate.machine)}>
+                    Assign it instead
+                  </Button>
+                )}
+              </p>
+            )}
+            {existing.kind === "placed" && existing.candidate.standsOn && (
+              <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+                {moving
+                  ? `Moved from ${whereInWords(existing.candidate.standsOn.siteName, existing.candidate.standsOn.hall)}.`
+                  : `Stands in ${whereInWords(existing.candidate.standsOn.siteName, existing.candidate.standsOn.hall)} already.`}
+                {!moving && (
+                  <Button type="button" variant="ghost" size="xs" onClick={() => setMoveIt(true)}>
+                    Move it here
+                  </Button>
+                )}
+              </p>
+            )}
+            {there && <FieldError>It stands there already.</FieldError>}
+          </div>
         )}
         {mode.kind === "assign" && (
           <MachinePicker
@@ -314,9 +310,9 @@ export function PlaceForm({
             </FieldLabel>
             <Input
               id={`${id}-display`}
-              value={display}
+              value={displayName}
               maxLength={MAX_TEXT}
-              placeholder={mode.kind === "move" ? mode.what : (pick?.what ?? picked[0]?.what)}
+              placeholder={mode.kind === "move" ? mode.what : mode.kind === "add" ? addName : picked[0]?.what}
               onChange={(event) => setDisplayName(event.target.value)}
             />
             <FieldDescription>The name people know the machine by.</FieldDescription>
@@ -333,7 +329,7 @@ export function PlaceForm({
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
         {cancel}
-        <Button type="submit" disabled={busy || (placeAsked && site === null)}>
+        <Button type="submit" disabled={busy || (placeAsked && site === null) || (mode.kind === "add" && existing.kind === "placed" && !moveIt)}>
           {busy && <Spinner data-icon="inline-start" />}
           {label}
         </Button>

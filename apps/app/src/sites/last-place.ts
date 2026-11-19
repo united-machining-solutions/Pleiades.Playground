@@ -3,9 +3,10 @@ import type { SiteList } from "@pleiades/cards/site/contract.ts"
 import type { Backing } from "../pages/store.ts"
 import type { Spot } from "./placing.ts"
 
-// The site and hall a person added machines to last, in the localStorage of this browser: the next
-// "Add machine" starts there, as people add the machines of one hall one after the other. It is a
-// convenience of this browser, nothing a service keeps. A site or hall that is gone since is not offered.
+// The site and hall a person added machines to last, in the localStorage of this browser: the next "Add a
+// new machine" or "Assign machines to a site" starts there, as people add the machines of one hall one after
+// the other. It is a convenience of this browser, nothing a service keeps. A site or hall that is gone since
+// is not offered.
 
 /** The key of the place. A new shape gets a new key. */
 export const LAST_PLACE_KEY = "pleiades-playground.last-place.v1"

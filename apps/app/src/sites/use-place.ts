@@ -10,7 +10,7 @@ import { namesInWords } from "./unplaced.ts"
 
 // Placing machines from the app, and making a site or hall alone: the requests to the server of the app,
 // the list read again afterwards, and the toast that says what happened, with its undo. The form of
-// "Add machine" sends through here, wherever it stands; the menu of a row takes off through the same toast.
+// "Add a new machine" sends through here, wherever it stands; the menu of a row takes off through the same toast.
 
 /** A machine to place, with what it is, for the words of the toast. */
 export type ToPlace = { request: PlaceRequest; what: string }

@@ -118,7 +118,7 @@ function Home() {
     )
   }
   return (
-    <Page line={list.sites.length === 0 ? liveness(connected, list.asOf) : line} action={<AddMachine list={list}>Add machine</AddMachine>}>
+    <Page line={list.sites.length === 0 ? liveness(connected, list.asOf) : line} action={<AddMachine list={list}>Add new machine</AddMachine>}>
       {/* The machines that sent data and stand on no site are no rows: a bar names a few of them, and they
           are added to a site from there. */}
       {list.unplaced.length > 0 && <Unplaced list={list} />}
@@ -137,7 +137,7 @@ function Home() {
           add={
             <>
               <AddMachine list={list} variant="outline">
-                Add machine
+                Add new machine
               </AddMachine>
               {list.sites.length === 0 && (
                 <AddSite list={list} variant="ghost">
@@ -175,7 +175,7 @@ function Home() {
 
 /**
  * The machines that sent data in the last 24 hours and stand on no site: how many, a few of them by what they are, and
- * "Review and add", which opens "Add machine" with the first of them chosen.
+ * "Review and add", which opens "Assign machines to a site".
  */
 function Unplaced({ list }: { list: SiteList }) {
   const { title, names } = unplacedInWords(list.unplaced)

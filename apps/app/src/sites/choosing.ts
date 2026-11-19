@@ -13,7 +13,7 @@ import { placeInWords, problemOfId } from "./placing.ts"
 import type { PlaceRequest } from "./placing.ts"
 import { namesInWords } from "./unplaced.ts"
 
-// What the form of "Add machine" offers, in words over the list Home read; nothing here asks the backend,
+// What the forms of "Add a new machine" and "Assign machines to a site" offer, in words over the list Home read; nothing here asks the backend,
 // and nothing needs React, so a tool on the server can use it too. The machines, by what tells them apart:
 // what it is, its manufacturer, what it does now and when it last sent a value; one that stands on a site
 // is moved from there. A person finds one by any of these; a typed id that matches none gets the machines
@@ -275,7 +275,7 @@ export function whereOf(site: SiteChoice, hall: HallChoice, company: string): Pi
 }
 
 /**
- * What a form of "Add machine" may start with, where a page or the chat hands it one: machines chosen by
+ * What a form of "Add a new machine" or "Assign machines to a site" may start with, where a page or the chat hands it one: machines chosen by
  * id, a site by its id or by a name, a hall by its name, the company of a new site, a display name. A
  * site of a name the list does not have, and a hall the site does not have, are made when the machines are
  * placed.
@@ -389,24 +389,34 @@ export function chosenWithAll(chosen: ReadonlySet<string>, found: ReadonlyArray<
 }
 
 /**
- * Where "Add a machine" starts from what it is handed: the first machine handed in by its id, chosen where it
- * sends or stands on a site, else its id split into the fields of what it is; or the first machine named by a
- * name, the name typed in the field and what is known of it in the fields, with the machines it may mean.
+ * What "Add a new machine" starts with from what it is handed: what is known of the first machine named, its
+ * manufacturer, model and serial number, or its id split into them, and the name it is known by; or the first
+ * machine handed in by its id, split.
  */
-export function oneStartOf(
-  start: PlaceStart | undefined,
-  findable: ReadonlyArray<Candidate>,
-  makers: ReadonlyArray<Maker>,
-): { query: string; pick: Candidate | null; identity: Identity | null; meant: Array<string> } {
-  const machine = start?.machines?.map((one) => one.trim()).find((one) => one !== "")
-  if (machine !== undefined) {
-    const pick = findable.find((one) => one.machine === machine) ?? null
-    if (pick) return { query: pick.what, pick, identity: null, meant: [] }
-    return { query: machine, pick: null, identity: identityOfId(machine, makers) ?? null, meant: [] }
-  }
+export function addStartOf(start: PlaceStart | undefined, makers: ReadonlyArray<Maker>): { identity: Identity; name: string } {
+  const none = { manufacturer: "", model: "", serialNumber: "" }
   const named = start?.named?.find((one) => one.name.trim() !== "")
-  if (named === undefined) return { query: "", pick: null, identity: null, meant: [] }
-  const said = { manufacturer: named.manufacturer ?? "", model: named.model ?? "", serialNumber: named.serialNumber ?? "" }
-  const heard = Object.values(said).some((part) => part.trim() !== "") ? said : (identityOfId(named.machine ?? "", makers) ?? null)
-  return { query: named.name.trim(), pick: null, identity: heard, meant: [...named.meant] }
+  if (named !== undefined) {
+    const said = { manufacturer: named.manufacturer ?? "", model: named.model ?? "", serialNumber: named.serialNumber ?? "" }
+    const heard = Object.values(said).some((part) => part.trim() !== "") ? said : (identityOfId(named.machine ?? "", makers) ?? none)
+    return { identity: heard, name: named.name.trim() }
+  }
+  const machine = start?.machines?.map((one) => one.trim()).find((one) => one !== "")
+  return { identity: (machine && identityOfId(machine, makers)) || none, name: "" }
+}
+
+/**
+ * Whether the id of a new machine is one the list has: a machine that sends and stands on no site, one that
+ * stands on a site, or none, a new machine. Only the id itself counts, written exactly as the binding writes it.
+ */
+export function knownMachineOf(
+  machine: string | undefined,
+  sending: ReadonlyArray<Candidate>,
+  placed: ReadonlyMap<string, Candidate>,
+): { kind: "sends"; candidate: Candidate } | { kind: "placed"; candidate: Candidate } | { kind: "new" } {
+  if (machine === undefined) return { kind: "new" }
+  const onSite = placed.get(machine)
+  if (onSite) return { kind: "placed", candidate: onSite }
+  const sends = sending.find((one) => one.machine === machine)
+  return sends ? { kind: "sends", candidate: sends } : { kind: "new" }
 }

@@ -425,9 +425,9 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
-- Home: "Add machine" adds the one machine a person means: found among those that send, or on a site and
-  moved, else said by its manufacturer, model and serial number, its id formed by ADR-0015, after only near
-  machines were offered ("Did you mean"). "Review and add" assigns the machines that sent data in the last 24
+- Home: "Add new machine" adds a machine that is not there yet, said by its manufacturer, model and serial
+  number, its id formed by ADR-0015; an id that sends already is assigned instead, one on a site moved.
+  "Review and add" assigns the machines that sent data in the last 24
   hours from a list, searched by name, manufacturer, state, id and last data, seven a page, several at once to
   one site and hall. Sites and halls are made while typing, "Add site" and "Add hall" make them alone, and both
   dialogs start at the place used last.

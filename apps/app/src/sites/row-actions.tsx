@@ -12,8 +12,8 @@ import type { Placement } from "./placing.ts"
 import { removePlacement } from "./sites-api.ts"
 import { failed, told, useReread } from "./use-place.ts"
 
-// What a person does on Home: "Add machine", from the head of the page or from the bar of the
-// machines that send and stand on no site; "Move" or "Remove from site" in the menu of a row; "Add site"
+// What a person does on Home: "Add new machine" from the head of the page, "Review and add" from the bar of
+// the machines that send and stand on no site; "Move" or "Remove from site" in the menu of a row; "Add site"
 // at the end of the sites, and "Add hall" in the menu of the head of a site.
 // Each change is undone from its toast. After every change Home reads the list again; it changes
 // nothing in the list itself.
@@ -22,9 +22,9 @@ import { failed, told, useReread } from "./use-place.ts"
 export type RowMachine = { machine: string; title: string; what: string }
 
 /**
- * A button that opens "Add a machine", in the head of the page or under an empty list: one machine a person
- * means. As "Review and add" in the bar it opens "Assign machines to a site": the machines that send and
- * stand on no site, as many as go to one place.
+ * A button that opens "Add a new machine", in the head of the page or under an empty list: a machine that is
+ * not there yet. As "Review and add" in the bar it opens "Assign machines to a site": the machines that send
+ * and stand on no site, as many as go to one place.
  */
 export function AddMachine({
   list,
