@@ -57,8 +57,11 @@ A model whose name begins with `titan/` is meant for Titan. That is how Titan ge
 admin of the gateway adds a speech model, for example `titan/tom`, that points at a service which answers
 the speech endpoint of the OpenAI API (`POST /v1/audio/speech`) with `wav`. The voice, and the recording it
 was trained on, belong to that service and its operator; nothing of them is in this repository. In the same
-way `titan/chat` can name a chat model set up to answer at once. Without it, Titan asks the first chat
-model and adds the parameter that keeps a Haiku or a Qwen model from thinking first.
+way `titan/chat` can name a chat model set up to answer at once: one that does not think first, which for
+a Claude model behind LiteLLM is `thinking: {type: disabled}` in its `litellm_params`; `reasoning_effort:
+none` did not do it. Without `titan/chat`, Titan asks the first chat model and adds the parameter that keeps
+a Haiku or a Qwen model from thinking first. A model that thinks all the same answers after seconds, and a
+turn that ends without a word is shown as a problem in the line at the bottom.
 
 Without a transcription model Titan cannot listen, without a chat model it only shows the hall, and without
 a speech model it speaks with a voice of the browser that runs on this computer, or stays silent.

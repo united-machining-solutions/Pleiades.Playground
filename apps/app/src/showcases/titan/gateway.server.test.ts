@@ -26,7 +26,7 @@ test("a model meant for Titan wins for its mode, else the first one answers", ()
 })
 
 test("a model is asked to answer at once in the way its family takes, and one set up for Titan gets nothing", () => {
-  assert.deepEqual(atOnce("anthropic/claude-haiku-5-5"), { reasoning_effort: "none" })
+  assert.deepEqual(atOnce("anthropic/claude-haiku-5-5"), { thinking: { type: "disabled" } })
   assert.deepEqual(atOnce("spark/qwen3.8-27b"), { chat_template_kwargs: { enable_thinking: false } })
   assert.deepEqual(atOnce("titan/chat"), {})
   assert.deepEqual(atOnce("openai/gpt-6-luna"), {})

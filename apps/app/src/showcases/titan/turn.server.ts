@@ -27,8 +27,12 @@ const TOOL_NAMES = new Set(TITAN_TOOLS.map((tool) => tool.function.name))
 
 /** At most this many times the model is asked in one turn: a question, and what it read, three times over. */
 const MOST_ROUNDS = 4
-/** A spoken answer is short. */
-const MOST_TOKENS = 500
+/**
+ * A spoken answer is short, about 150 tokens with its list. The limit is well above that: a model that
+ * thinks before it answers, against what Titan asks of it, spends its thought from the same budget, and
+ * with too small a one it ends before its first word.
+ */
+const MOST_TOKENS = 1_500
 /** The hall is read before the model is asked; a backend slower than this does not hold up the answer. */
 const HALL_WITHIN_MS = 1_500
 
@@ -131,9 +135,11 @@ export async function answer(
 ): Promise<void> {
   try {
     const messages: Array<unknown> = [{ role: "system", content: instructionsOf(await hallNow(), timeZone) }, ...conversation]
+    let said = false
     for (let asked = 0; asked < MOST_ROUNDS; asked++) {
       // In the last round the model has no tool left: it answers with what it read.
       const { text, calls } = await round(models, messages, emit, signal, asked === MOST_ROUNDS - 1)
+      if (text.trim() !== "") said = true
       if (calls.length === 0) break
       messages.push({
         role: "assistant",
@@ -151,6 +157,8 @@ export async function answer(
       // The text of one round and the next are two paragraphs, for the voice and for the screen.
       if (text) emit({ type: "text", delta: "\n\n" })
     }
+    // A turn without a word is no answer: the page says so, instead of falling silent after "Moment.".
+    if (!said) throw new Error("the model answered without a word")
     emit({ type: "done" })
   } catch (error) {
     if (signal.aborted) return

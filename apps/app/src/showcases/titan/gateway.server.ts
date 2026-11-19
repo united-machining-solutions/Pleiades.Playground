@@ -46,10 +46,15 @@ export function listed(body: unknown): { chat: Array<string>; speech: Array<stri
  * What a model is sent along so that it answers at once instead of thinking first: a spoken answer that
  * begins after ten seconds of thought is no conversation. A model meant for Titan is set up at the
  * gateway and gets nothing; of the others, the two families the hackathon gateway offers are known here.
+ *
+ * For Haiku it is `thinking: disabled`. `reasoning_effort: "none"` does not do it: measured through
+ * LiteLLM with Titan's instructions, Haiku still thought for 600 to 750 tokens, unseen, and its first
+ * word came after 3.2 to 3.9 s instead of 0.5 to 0.6 s. A model set up for Titan at the gateway needs the
+ * same in its `litellm_params`.
  */
 export function atOnce(model: string): Record<string, unknown> {
   if (FOR_TITAN.test(model)) return {}
-  if (/haiku/i.test(model)) return { reasoning_effort: "none" }
+  if (/haiku/i.test(model)) return { thinking: { type: "disabled" } }
   if (/qwen/i.test(model)) return { chat_template_kwargs: { enable_thinking: false } }
   return {}
 }
