@@ -23,7 +23,10 @@ Three groups of events:
 - `events_active_alerts_query` — the alerts that stand now
 - `events_alert_pairs_query` — alerts that stood in a time range, from raise to clear, with their duration
 - `events_alert_statistics_query` — alerts per severity in a range: how many, how many still stand, how long
-- `events_job_orders_query` — the last state of each job order with its result and energy
+- `events_job_orders_query` — the last state of each job order with its result and energy, one per machine;
+  `jobOrderId` or `orderNumber` finds a job on every machine it passes
+- `events_job_query` — one job across machines by its job order id: a step per machine, the waiting between
+  them and where the job stands now
 - `events_program_executions_query` — program executions from start to end: duration, parts, energy
 - `events_machine_events_query` — the stored events themselves, filtered by machine, group, type, time
 - `events_sequence_gaps_query` — events that never arrived (gaps in the numbers per group)
@@ -40,6 +43,12 @@ Three groups of events:
    many parts and how much energy
 2. `events_program_executions_query` with `jobOrderId` — cycle times and aborts of one job order
 3. `events_machine_events_query` with `group=JobMonitoring` — every event of the job orders, in order
+
+### Where Is a Job?
+A job of the MES carries the same job order id on every machine it passes.
+1. `events_job_orders_query` with `orderNumber` (or `jobOrderId`) — its job order on each machine
+2. `events_job_query` with `jobOrderId` — the steps in order, `waitingSecondsBefore` of each, and `position`
+   (Running, Interrupted, Waiting, Between, Ended, Aborted) with the machine it is at
 
 ### Trust the Data
 `events_sequence_gaps_query` — an empty list means no event of the machine is missing.

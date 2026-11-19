@@ -43,7 +43,8 @@ public class McpIntegrationTest : IntegrationTestBase
         "events_alert_pairs_query",
         "events_alert_statistics_query",
         "events_job_orders_query",
-        "events_program_executions_query"
+        "events_program_executions_query",
+        "events_job_query"
     ];
 
     [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "The created disposables are transferred to McpClient and McpClientScope for the test lifetime.")]

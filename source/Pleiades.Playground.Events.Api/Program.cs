@@ -145,6 +145,7 @@ app.UsePleiadesSwaggerUI($"{serviceInfo.Name} - V {serviceInfo.Version}");
 app.MapGroup("machineEvents").WithTags("Machine Events").MapMachineEvents();
 app.MapGroup("alerts").WithTags("Alerts").MapAlerts();
 app.MapGroup("jobOrders").WithTags("Job Orders").MapJobOrders();
+app.MapGroup("jobs").WithTags("Jobs").MapJobs();
 app.MapGroup("programExecutions").WithTags("Program Executions").MapProgramExecutions();
 
 // MCP tool discovery/queries are reads; the internal API key satisfies the read policy.

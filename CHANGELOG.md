@@ -7,6 +7,14 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Events API: one job across machines. A job of a MES carries the same `JobOrderID` on every machine it passes;
+  `GET /jobOrders` takes `jobOrderId` and `orderNumber` (one of `OrderNumbers`) to find its job order on each
+  machine, and `GET /jobs/{jobOrderId}` puts them together as one job: a step per machine, sorted by start, with
+  its state, start, end, duration, quantities and the sums of its program executions, the waiting between two
+  steps, and where the job stands now (`Running`, `Interrupted`, `Waiting`, `Between`, `Ended`, `Aborted`). An id
+  a machine had before, as the simulators count anew after a restart, counts there from its last life on. The
+  MCP tool `events_job_query` gives the same, and `events_job_orders_query` takes the two filters.
+
 - Example app: the showcase page `/trulaser`, a cockpit of a TRUMPF laser cutting machine named as the umati
   data model names it: `State.Status` with `Notification.ActiveAlerts` and its history on one time axis, the
   `JobOrder` with its `ProgramExecution`, and from the TRUMPF extension (`oem/Dalle/`) the requests of the

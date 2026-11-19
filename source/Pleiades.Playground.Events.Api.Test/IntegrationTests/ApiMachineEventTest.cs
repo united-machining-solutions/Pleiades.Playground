@@ -33,15 +33,16 @@ public sealed class ApiMachineEventTest
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "WithWebHostBuilder manages the lifecycle of the parent factory")]
-        public Api()
+        public Api(List<MachineEventDao>? events = null)
         {
             Repository = new Mock<IMachineEventRepository>();
             Repository.Setup(r => r.CreateAsync(It.Is<MachineEventDao>(e => e.EventId == "stored-before"), It.IsAny<CancellationToken>()))
                 .Throws(new PleiadesDuplicateDataException("The event is already stored."));
-            var stored = MachineEventSamples.StoredShift();
+            var stored = events ?? MachineEventSamples.StoredShift();
             Repository.Setup(r => r.FindForViewAsync(It.IsAny<MachineEventFilter>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((MachineEventFilter f, CancellationToken _) => [.. stored.Where(e =>
-                    (f.Group is null || e.Group == f.Group)
+                    (f.MId is null || e.MId == f.MId)
+                    && (f.Group is null || e.Group == f.Group)
                     && (f.JobOrderId is null || (e.Data.Contains("JobOrderID") && e.Data["JobOrderID"].AsString == f.JobOrderId)))]);
             Repository.Setup(r => r.QueryAsync(It.IsAny<MachineEventFilter>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<Sorting>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync((stored, stored.Count));
@@ -189,6 +190,62 @@ public sealed class ApiMachineEventTest
         Assert.HasCount(6, history!.History);
         Assert.HasCount(1, history.ProgramExecutions);
         Assert.AreEqual(HttpStatusCode.NotFound, unknown.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task JobOrders_ByJobOrderIdOrOrderNumber_OnEveryMachine_ThePagePassedOn()
+    {
+        using var api = new Api(JobSamples.Stored());
+
+        var byId = await api.Client.GetFromJsonAsync<PagedResponse<JobOrderDtoV1>>(
+            new Uri($"/jobOrders?jobOrderId={Uri.EscapeDataString(JobSamples.JobOrderId)}&take=2&sorting=Ascending", UriKind.Relative),
+            Json, TestContext.CancellationToken);
+        var byNumber = await api.Client.GetFromJsonAsync<PagedResponse<JobOrderDtoV1>>(
+            new Uri("/jobOrders?orderNumber=SO-100", UriKind.Relative), Json, TestContext.CancellationToken);
+        var noNumber = await api.Client.GetFromJsonAsync<PagedResponse<JobOrderDtoV1>>(
+            new Uri("/jobOrders?orderNumber=SO-1", UriKind.Relative), Json, TestContext.CancellationToken);
+
+        Assert.AreEqual(3, byId!.TotalCount, "one per machine");
+        Assert.HasCount(2, byId.Items);
+        Assert.AreEqual(3, byNumber!.TotalCount);
+        Assert.AreEqual(0, noNumber!.TotalCount, "an order number matches whole, not in part");
+        api.Repository.Verify(r => r.FindForViewAsync(
+            It.Is<MachineEventFilter>(f => f.JobOrderId == JobSamples.JobOrderId && f.MId == null), It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [TestMethod]
+    public async Task Jobs_OneJobAcrossMachines_ByAnIdWithASlash_Or404()
+    {
+        using var api = new Api(JobSamples.Stored());
+
+        var job = await api.Client.GetFromJsonAsync<JobDtoV1>(
+            new Uri($"/jobs/{JobSamples.JobOrderId}", UriKind.Relative), Json, TestContext.CancellationToken);
+        var unknown = await api.Client.GetAsync(new Uri("/jobs/unknown/01", UriKind.Relative), TestContext.CancellationToken);
+
+        Assert.AreEqual(JobSamples.JobOrderId, job!.JobOrderId);
+        Assert.HasCount(3, job.Steps);
+        Assert.AreEqual("Between", job.Position.State);
+        Assert.AreEqual(JobSamples.Measuring, job.Position.MId);
+        Assert.AreEqual(600, job.Steps[1].WaitingSecondsBefore);
+        Assert.AreEqual(HttpStatusCode.NotFound, unknown.StatusCode);
+    }
+
+    [TestMethod]
+    public async Task McpTool_Job_AndJobOrdersByOrderNumber()
+    {
+        var stored = JobSamples.Stored();
+        var repository = new Mock<IMachineEventRepository>();
+        repository.Setup(r => r.FindForViewAsync(It.IsAny<MachineEventFilter>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((MachineEventFilter f, CancellationToken _) => [.. stored.Where(e => f.Group is null || e.Group == f.Group)]);
+        var tools = new McpTools.MachineEventTools(repository.Object);
+
+        var job = await tools.QueryJob(JobSamples.JobOrderId, TestContext.CancellationToken);
+        var jobOrders = await tools.QueryJobOrders(orderNumber: "SO-100", take: 500, cancellationToken: TestContext.CancellationToken);
+
+        Assert.HasCount(3, job!.Steps);
+        Assert.AreEqual(3, jobOrders.TotalCount);
+        Assert.AreEqual(100, jobOrders.Take, "at most 100");
+        await Assert.ThrowsExactlyAsync<ModelContextProtocol.McpException>(() => tools.QueryJob(" ", TestContext.CancellationToken));
     }
 
     [TestMethod]

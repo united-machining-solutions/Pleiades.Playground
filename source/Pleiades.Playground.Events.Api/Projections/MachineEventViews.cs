@@ -233,6 +233,174 @@ internal static class MachineEventViews
             };
     }
 
+    // ─── jobs across machines ──────────────────────────────────────────────────
+
+    /// <summary>The states of a job, as <see cref="JobPositionDtoV1.State"/> names them.</summary>
+    internal static class JobStates
+    {
+        public const string Running = "Running";
+        public const string Interrupted = "Interrupted";
+        public const string Waiting = "Waiting";
+        public const string Between = "Between";
+        public const string Ended = "Ended";
+        public const string Aborted = "Aborted";
+    }
+
+    /// <summary>
+    /// One job across machines: every machine whose job order list had <paramref name="jobOrderId"/> is one step.
+    /// A step is the last life of the job order on its machine (see <see cref="LastLife"/>); its sums are those of the
+    /// program executions of the job order on that machine that started at or after the start of the step, none
+    /// before it started. Null if no event names the job order.
+    /// </summary>
+    /// <param name="jobEvents">Events of the group JobMonitoring in any order, of any machine.</param>
+    /// <param name="workMasterEvents">Events of the group WorkMasterMonitoring, of any machine.</param>
+    /// <param name="jobOrderId">The job order id, the same on every machine.</param>
+    public static JobDtoV1? Job(IEnumerable<MachineEventDtoV1> jobEvents, IEnumerable<MachineEventDtoV1> workMasterEvents, string jobOrderId)
+    {
+        ArgumentNullException.ThrowIfNull(jobEvents);
+        ArgumentNullException.ThrowIfNull(workMasterEvents);
+        var executions = ProgramExecutions(workMasterEvents.Where(e => Text(e.Data, "JobOrderID") == jobOrderId))
+            .Where(p => p.JobOrderId == jobOrderId)
+            .ToLookup(p => p.MId);
+
+        var steps = jobEvents
+            .Where(e => e.Type.StartsWith(JobOrderPrefix, StringComparison.Ordinal) && Text(e.Data, "JobOrderID") == jobOrderId)
+            .GroupBy(e => e.MId)
+            .Select(machine => Step(LastLife(machine), executions[machine.Key]))
+            .OrderBy(s => s.StartTime ?? DateTime.MaxValue)
+            .ThenBy(s => s.PlannedStartTime ?? DateTime.MaxValue)
+            .ThenBy(s => s.FirstSeen)
+            .ThenBy(s => s.MId, StringComparer.Ordinal)
+            .ToList();
+        if (steps.Count == 0)
+        {
+            return null;
+        }
+
+        for (var i = 1; i < steps.Count; i++)
+        {
+            steps[i] = steps[i] with
+            {
+                WaitingSecondsBefore = steps[i].StartTime is { } start && steps[i - 1].EndTime is { } end
+                    ? Math.Round((start - end).TotalSeconds, 3)
+                    : null,
+            };
+        }
+
+        var position = PositionOf(steps);
+        return new JobDtoV1
+        {
+            JobOrderId = jobOrderId,
+            OrderNumbers = [.. steps.SelectMany(s => s.OrderNumbers ?? []).Distinct(StringComparer.Ordinal)],
+            Position = position,
+            Steps = steps,
+            StartTime = steps[0].StartTime,
+            EndTime = position.State is JobStates.Ended or JobStates.Aborted ? steps[position.StepIndex].EndTime : null,
+            EnergyElectricity = Math.Round(steps.Sum(s => s.EnergyElectricity), 3),
+            EnergyCompressedAir = Math.Round(steps.Sum(s => s.EnergyCompressedAir), 3),
+        };
+    }
+
+    /// <summary>
+    /// The events of the last life of one job order on one machine, oldest first. A job order id may stand on a
+    /// machine more than once: the simulators count their ids anew after a restart. A life begins with
+    /// <c>JobOrderAdded</c>, or with the first event after a <c>JobOrderRemoved</c>.
+    /// </summary>
+    public static List<MachineEventDtoV1> LastLife(IEnumerable<MachineEventDtoV1> eventsOfOneMachine)
+    {
+        ArgumentNullException.ThrowIfNull(eventsOfOneMachine);
+        var ordered = eventsOfOneMachine.OrderBy(e => e.Time).ThenBy(e => e.Sequence, StringComparer.Ordinal).ToList();
+        var begin = 0;
+        for (var i = 1; i < ordered.Count; i++)
+        {
+            if (ordered[i].Type == JobOrderPrefix + "Added" || ordered[i - 1].Type == JobOrderRemoved)
+            {
+                begin = i;
+            }
+        }
+        return ordered[begin..];
+    }
+
+    private static JobStepDtoV1 Step(List<MachineEventDtoV1> life, IEnumerable<ProgramExecutionDtoV1> executionsOfMachine)
+    {
+        // A step is one job order: the projection of the list puts it together, without executions, they count here.
+        var order = JobOrders(life, []).Single();
+        var ofStep = order.StartTime is { } start ? executionsOfMachine.Where(p => p.StartTime >= start).ToList() : [];
+        return new JobStepDtoV1
+        {
+            MId = order.MId,
+            State = order.State,
+            FirstSeen = order.FirstSeen,
+            LastChange = order.LastChange,
+            Removed = order.Removed,
+            JobName = order.JobName,
+            WorkMasterId = order.WorkMasterId,
+            OrderNumbers = order.OrderNumbers,
+            RunsPlanned = order.RunsPlanned,
+            PlannedStartTime = order.PlannedStartTime,
+            PlannedEndTime = order.PlannedEndTime,
+            StartTime = order.StartTime,
+            EndTime = order.EndTime,
+            DurationSeconds = order.StartTime is { } s && order.EndTime is { } e ? Math.Round((e - s).TotalSeconds, 3) : null,
+            ProducedQuantity = order.ProducedQuantity,
+            GoodQuantity = order.GoodQuantity,
+            RunsCompleted = order.RunsCompleted,
+            ActualProductionTime = order.ActualProductionTime,
+            JobResult = order.JobResult,
+            ProgramExecutions = ofStep.Count,
+            ProgramExecutionDuration = Math.Round(ofStep.Sum(p => p.Duration ?? 0), 3),
+            PartsProduced = Math.Round(ofStep.Sum(p => p.PartsProduced ?? 0), 3),
+            EnergyElectricity = Math.Round(ofStep.Sum(p => p.EnergyElectricity ?? 0), 3),
+            EnergyCompressedAir = Math.Round(ofStep.Sum(p => p.EnergyCompressedAir ?? 0), 3),
+        };
+    }
+
+    /// <summary>
+    /// Where a job stands: on the step that runs, else on the one that is interrupted; else after its last started
+    /// step: aborted there, between it and the next step that is still on a list, or ended; waiting if none started.
+    /// </summary>
+    private static JobPositionDtoV1 PositionOf(List<JobStepDtoV1> steps)
+    {
+        var running = steps.FindLastIndex(s => s.State == JobStates.Running);
+        if (running >= 0)
+        {
+            return At(JobStates.Running, running, steps[running].StartTime);
+        }
+        var interrupted = steps.FindLastIndex(s => s.State == JobStates.Interrupted);
+        if (interrupted >= 0)
+        {
+            return At(JobStates.Interrupted, interrupted, steps[interrupted].StartTime);
+        }
+
+        var last = steps.FindLastIndex(s => s.StartTime is not null || s.State is JobStates.Ended or JobStates.Aborted);
+        if (last < 0)
+        {
+            return At(JobStates.Waiting, 0, null);
+        }
+        var step = steps[last];
+        if (step.State == JobStates.Aborted)
+        {
+            return At(JobStates.Aborted, last, step.EndTime ?? step.LastChange);
+        }
+        if (step.State != JobStates.Ended && step.EndTime is null)
+        {
+            return At(JobStates.Waiting, last, null);
+        }
+        // A job order taken back before it started is no step the job waits for.
+        var next = steps.FindIndex(last + 1, s => !(s.Removed && s.StartTime is null));
+        return next >= 0
+            ? At(JobStates.Between, next, step.EndTime ?? step.LastChange)
+            : At(JobStates.Ended, last, step.EndTime ?? step.LastChange);
+
+        JobPositionDtoV1 At(string state, int index, DateTime? since) => new()
+        {
+            State = state,
+            StepIndex = index,
+            MId = steps[index].MId,
+            Since = since,
+        };
+    }
+
     // ─── gaps ──────────────────────────────────────────────────────────────────
 
     /// <summary>

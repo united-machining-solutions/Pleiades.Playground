@@ -82,6 +82,21 @@ internal static class MachineEvents
         return group;
     }
 
+    /// <summary>
+    /// Maps <c>/jobs</c>: one job across the machines it passes, by its job order id. A job is what a MES orders under
+    /// one id; on each machine it is a job order, at <c>/jobOrders</c>.
+    /// </summary>
+    internal static RouteGroupBuilder MapJobs(this RouteGroupBuilder group)
+    {
+        // A job order id may contain '/', such as 4711/01: the catch-all takes the rest of the path as it is.
+        group.MapGet("/{**jobOrderId}", GetJob)
+            .WithName("GetJob")
+            .WithSummary("Retrieves one job across machines: its job order on each machine as a step, the waiting between them and where it stands")
+            .RequireFeatureRead(EventsFeature.Name);
+
+        return group;
+    }
+
     /// <summary>Maps <c>/programExecutions</c>.</summary>
     internal static RouteGroupBuilder MapProgramExecutions(this RouteGroupBuilder group)
     {
@@ -282,8 +297,13 @@ internal static class MachineEvents
         return TypedResults.Ok(MachineEventViews.AlertStatistics(pairs));
     }
 
-    /// <summary>Retrieves the last known state of each job order, put together from its events when it is read.</summary>
+    /// <summary>
+    /// Retrieves the last known state of each job order, one per machine and job order id, put together from its
+    /// events when it is read. A job that passes several machines has the same job order id on each of them.
+    /// </summary>
     /// <param name="mId">Optional machine id.</param>
+    /// <param name="jobOrderId">Optional job order id, on every machine that has it. Example: 4711/01</param>
+    /// <param name="orderNumber">Optional order number of the ERP: one of the OrderNumbers of the job order. Example: SO-4711</param>
     /// <param name="state">Optional state after the last event, such as Running or Ended.</param>
     /// <param name="from">Optional earliest time of the last change (inclusive).</param>
     /// <param name="to">Optional latest time of the last change (inclusive).</param>
@@ -293,6 +313,8 @@ internal static class MachineEvents
     /// <returns>A page of job orders.</returns>
     internal static async Task<Ok<PagedResponse<JobOrderDtoV1>>> GetJobOrders(
         [FromQuery] string? mId,
+        [FromQuery] string? jobOrderId,
+        [FromQuery] string? orderNumber,
         [FromQuery] string? state,
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to,
@@ -301,7 +323,8 @@ internal static class MachineEvents
         CancellationToken cancellationToken)
     {
         var page = paging.Validated();
-        var jobOrders = await ReadJobOrdersAsync(repository, mId, state, from, to, cancellationToken).ConfigureAwait(false);
+        var jobOrders = await ReadJobOrdersAsync(
+            repository, new JobOrderQuery(mId, jobOrderId, orderNumber, state, from, to), cancellationToken).ConfigureAwait(false);
         var (items, totalCount) = MachineEventViews.Page(jobOrders, j => j.LastChange, page);
         return TypedResults.Ok(PagedResponse.Create(items, totalCount, page));
     }
@@ -322,6 +345,25 @@ internal static class MachineEvents
         var executions = await repository.FindForViewAsync(new MachineEventFilter(mId, "WorkMasterMonitoring", JobOrderId: jobOrderId), cancellationToken).ConfigureAwait(false);
         var history = MachineEventViews.History(MachineEventMapper.ToDtos(jobs), MachineEventMapper.ToDtos(executions), mId, jobOrderId);
         return history is null ? TypedResults.NotFound() : TypedResults.Ok(history);
+    }
+
+    /// <summary>
+    /// Retrieves one job across machines by its job order id, the id of the MES that stands on every machine the job
+    /// passes. Each machine with a job order of that id is a step: its last life there, with its result and the sums
+    /// of the program executions that started from its start on. The steps are sorted by start, then planned start,
+    /// then first seen; each says how long the job waited for it after the step before.
+    /// </summary>
+    /// <param name="jobOrderId">Job order id; it may contain '/'. Example: 4711/01</param>
+    /// <param name="repository">Repository of the events.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The job with its steps, or 404 if no event names the job order.</returns>
+    internal static async Task<Results<Ok<JobDtoV1>, NotFound>> GetJob(
+        string jobOrderId,
+        IMachineEventRepository repository,
+        CancellationToken cancellationToken)
+    {
+        var job = await ReadJobAsync(repository, jobOrderId, cancellationToken).ConfigureAwait(false);
+        return job is null ? TypedResults.NotFound() : TypedResults.Ok(job);
     }
 
     /// <summary>Retrieves program executions: the events of each paired by its ExecutionId, with duration, parts and energy of its end.</summary>
@@ -368,15 +410,29 @@ internal static class MachineEvents
     }
 
     internal static async Task<List<JobOrderDtoV1>> ReadJobOrdersAsync(
-        IMachineEventRepository repository, string? mId, string? state, DateTime? from, DateTime? to, CancellationToken cancellationToken)
+        IMachineEventRepository repository, JobOrderQuery query, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(query);
         // The state of a job order needs all its events, not only those in the range: read them all, then filter.
-        var jobs = await repository.FindForViewAsync(new MachineEventFilter(mId, "JobMonitoring"), cancellationToken).ConfigureAwait(false);
-        var executions = await repository.FindForViewAsync(new MachineEventFilter(mId, "WorkMasterMonitoring"), cancellationToken).ConfigureAwait(false);
+        // The job order id is a field of the events of a job order and of its program executions: the store filters on it.
+        var jobs = await repository.FindForViewAsync(
+            new MachineEventFilter(query.MId, "JobMonitoring", JobOrderId: query.JobOrderId), cancellationToken).ConfigureAwait(false);
+        var executions = await repository.FindForViewAsync(
+            new MachineEventFilter(query.MId, "WorkMasterMonitoring", JobOrderId: query.JobOrderId), cancellationToken).ConfigureAwait(false);
         return [.. MachineEventViews.JobOrders(MachineEventMapper.ToDtos(jobs), MachineEventMapper.ToDtos(executions))
-            .Where(j => string.IsNullOrEmpty(state) || string.Equals(j.State, state, StringComparison.OrdinalIgnoreCase))
-            .Where(j => from is null || j.LastChange >= from)
-            .Where(j => to is null || j.LastChange <= to)];
+            .Where(j => string.IsNullOrEmpty(query.OrderNumber) || (j.OrderNumbers?.Contains(query.OrderNumber, StringComparer.Ordinal) ?? false))
+            .Where(j => string.IsNullOrEmpty(query.State) || string.Equals(j.State, query.State, StringComparison.OrdinalIgnoreCase))
+            .Where(j => query.From is null || j.LastChange >= query.From)
+            .Where(j => query.To is null || j.LastChange <= query.To)];
+    }
+
+    internal static async Task<JobDtoV1?> ReadJobAsync(IMachineEventRepository repository, string jobOrderId, CancellationToken cancellationToken)
+    {
+        var jobs = await repository.FindForViewAsync(
+            new MachineEventFilter(Group: "JobMonitoring", JobOrderId: jobOrderId), cancellationToken).ConfigureAwait(false);
+        var executions = await repository.FindForViewAsync(
+            new MachineEventFilter(Group: "WorkMasterMonitoring", JobOrderId: jobOrderId), cancellationToken).ConfigureAwait(false);
+        return MachineEventViews.Job(MachineEventMapper.ToDtos(jobs), MachineEventMapper.ToDtos(executions), jobOrderId);
     }
 
     internal static async Task<List<ProgramExecutionDtoV1>> ReadProgramExecutionsAsync(
@@ -389,3 +445,18 @@ internal static class MachineEvents
             .Where(p => string.IsNullOrEmpty(workMasterId) || p.WorkMasterId == workMasterId)];
     }
 }
+
+/// <summary>The filters of the list of job orders; every part that is null filters nothing.</summary>
+/// <param name="MId">Machine id.</param>
+/// <param name="JobOrderId">Job order id, on every machine that has it.</param>
+/// <param name="OrderNumber">Order number of the ERP, one of the OrderNumbers of the job order.</param>
+/// <param name="State">State after the last event.</param>
+/// <param name="From">Earliest last change, inclusive.</param>
+/// <param name="To">Latest last change, inclusive.</param>
+internal sealed record JobOrderQuery(
+    string? MId = null,
+    string? JobOrderId = null,
+    string? OrderNumber = null,
+    string? State = null,
+    DateTime? From = null,
+    DateTime? To = null);
