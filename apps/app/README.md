@@ -182,7 +182,8 @@ The browser records (`recorder.ts`) and sends the recording to `/api/transcribe`
 calls the model with the key of the gateway (`generateTranscription`). The route reads at most 32 MiB, as the
 agent harness does, and answers a larger request with 413. A browser lets a page use the
 microphone only over https or on `localhost`; elsewhere the microphone says so when pressed. The recording
-is not kept, and a field that goes with another chat lets go of the microphone. The recorder is our own and
+is not kept, and a field that goes with another chat lets go of the microphone, also of one the browser is
+still opening. The recorder is our own and
 not `useAudioRecorder` of TanStack AI: the bars read the level from the stream that records, and that
 recorder keeps its stream to itself. A second request for the microphone would mute the first one in Safari
 on iOS ([WebKit bug 179363](https://bugs.webkit.org/show_bug.cgi?id=179363)), on the tablet dictation is held on.
