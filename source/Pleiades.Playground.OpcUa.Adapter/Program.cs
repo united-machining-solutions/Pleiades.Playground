@@ -67,6 +67,8 @@ builder.Services.AddSingleton(new RegistrationStore(dataDirectory));
 builder.Services.AddSingleton(new AlertStore(dataDirectory));
 builder.Services.AddSingleton(services => new CredentialStore(
     dataDirectory, reason => services.GetRequiredService<ILogger<CredentialStore>>().CredentialsUnreadable(reason)));
+builder.Services.AddSingleton(services => new SecurityChoiceStore(
+    dataDirectory, reason => services.GetRequiredService<ILogger<SecurityChoiceStore>>().SecurityChoicesUnreadable(reason)));
 builder.Services.AddSingleton<DraftStore>();
 builder.Services.AddSingleton<OpcUaClient>();
 builder.Services.AddSingleton<IRegistrationProbe, RegistrationProbe>();

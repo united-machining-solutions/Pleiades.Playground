@@ -76,13 +76,13 @@ internal static class UaToolCatalogue
 }
 
 /// <summary>
-/// The connect tool of the library, without a user from the language model. The library accepts a
-/// user name and a password, but a password typed into the chat would go through the model. So the
-/// arguments of a user are taken out of the tool (<see cref="Strip"/>), and a call that brings them
-/// all the same is refused by a filter of the MCP server before it reaches the tool
-/// (<see cref="Filter"/>). If a person stored a user for the server, the filter puts it into the call
-/// on the side of the server: the scan logs in as the running machines will, and the model never
-/// sees the password.
+/// The connect tool of the library, with the security and the identity the adapter decides, not the language
+/// model. The library accepts a user name and a password, but a password typed into the chat would go through
+/// the model. So the arguments of a user are taken out of the tool (<see cref="Strip"/>), and a call that brings
+/// them all the same is refused by a filter of the MCP server before it reaches the tool (<see cref="Filter"/>).
+/// The filter sets the security of the endpoint the adapter takes, the strongest or the one a person chose, and
+/// connects anonymously first. Only if that endpoint takes no anonymous session, or the server refuses one, does
+/// it put the user a person stored into the call, on the side of the server: the model never sees the password.
 /// </summary>
 internal static class ScanConnect
 {
@@ -104,13 +104,14 @@ internal static class ScanConnect
         ArgumentNullException.ThrowIfNull(tool);
         tool.InputSchema = WithoutUser(tool.InputSchema);
         tool.Description =
-            $"{tool.Description} This tool takes no user name and no password: if a person stored a user for the server, " +
-            "the session logs in with it by itself, else it is anonymous.";
+            $"{tool.Description} This tool takes no user name and no password, and the adapter sets the security: the " +
+            "endpoint opcua_endpoint_rank recommends, the strongest or the one a person chose. The session is anonymous " +
+            "first; if the server takes no anonymous session there and a person stored a user, it logs in with that user by itself.";
     }
 
     /// <summary>
-    /// Refuses a call of the connect tool that passes a user, before the tool or a server sees it, and
-    /// puts the stored user of the server into a call that passes none.
+    /// Refuses a call of the connect tool that passes a user, before the tool or a server sees it, and gives a call
+    /// that passes none the security and the identity of the adapter.
     /// </summary>
     public static McpRequestHandler<CallToolRequestParams, CallToolResult> Filter(
         McpRequestHandler<CallToolRequestParams, CallToolResult> next) =>
@@ -122,29 +123,34 @@ internal static class ScanConnect
             }
 
             var credentials = request.Services?.GetService(typeof(CredentialStore)) as CredentialStore;
-            var client = request.Services?.GetService(typeof(OpcUaClient)) as OpcUaClient;
+            var supervisor = request.Services?.GetService(typeof(MachineSupervisor)) as MachineSupervisor;
             return CallAsync(
                 call,
                 credentials is null ? null : credentials.Find,
-                client is null ? null : client.GetEndpointsAsync,
+                supervisor is null ? null : supervisor.OfferAsync,
+                supervisor is null ? null : supervisor.RefusesAnonymousAsync,
                 (_, token) => next(request, token),
                 cancellationToken);
         };
 
     /// <summary>
-    /// What the filter does with a call of the connect tool: a call that brings a user is refused; a call to a
-    /// server with a stored user gets that user, if the server presents the certificate the user was stored with,
-    /// and its result loses the password wherever it might be echoed. Every other call goes on as it is.
+    /// What the filter does with a call of the connect tool. A call that brings a user is refused. Every other call
+    /// gets the security of the endpoint the adapter takes. On that endpoint the session is anonymous if the
+    /// endpoint takes anonymous sessions, and the server does not refuse one; else it logs in with the stored user,
+    /// over an encrypted endpoint and only to the certificate the user was stored with, and its result loses the
+    /// password wherever it might be echoed.
     /// </summary>
     /// <param name="call">The call of the connect tool.</param>
     /// <param name="findCredential">The stored user of a server address, or null.</param>
-    /// <param name="offered">The endpoints a server offers, with their certificates; null to skip the check.</param>
+    /// <param name="offerOf">The endpoints of a server with the user and the security a person stored; null to pass the call on as it is.</param>
+    /// <param name="refusesAnonymous">Whether the server refuses an anonymous session on an endpoint; null to try none.</param>
     /// <param name="next">The tool.</param>
     /// <param name="cancellationToken">Cancels the call.</param>
     public static async ValueTask<CallToolResult> CallAsync(
         CallToolRequestParams call,
         Func<string, Credential?>? findCredential,
-        Func<string, CancellationToken, Task<IReadOnlyList<OfferedEndpoint>>>? offered,
+        Func<string, CancellationToken, Task<EndpointOffer>>? offerOf,
+        Func<string, OfferedEndpoint, CancellationToken, Task<bool>>? refusesAnonymous,
         Func<CallToolRequestParams, CancellationToken, ValueTask<CallToolResult>> next,
         CancellationToken cancellationToken)
     {
@@ -156,26 +162,105 @@ internal static class ScanConnect
         }
 
         if (call.Arguments is not { } arguments
-            || !arguments.TryGetValue("endpointUrl", out var url)
-            || url.ValueKind != JsonValueKind.String
-            || findCredential?.Invoke(url.GetString() ?? string.Empty) is not { } credential)
+            || !arguments.TryGetValue("endpointUrl", out var given)
+            || given.ValueKind != JsonValueKind.String
+            || given.GetString() is not { Length: > 0 } url
+            || offerOf is null)
         {
             return WithTrustHint(await next(call, cancellationToken).ConfigureAwait(false), EndpointOf(call.Arguments));
         }
 
-        // The password goes only to the certificate the user was stored with: the scan connects to whatever
-        // answers at the address the model chose, and the library accepts every certificate there.
-        if (offered is not null)
+        EndpointOffer offer;
+        try
         {
-            var endpoints = await offered(url.GetString()!, cancellationToken).ConfigureAwait(false);
-            if (!endpoints.Any(endpoint => credential.Trusts(endpoint.ServerCertificateThumbprint)))
-            {
-                return CertificateRefused();
-            }
+            offer = await offerOf(url, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (Api.MachineEndpoints.IsServerFault(exception))
+        {
+            // The server does not answer the adapter either: the library says so in its own words.
+            return WithTrustHint(await next(call, cancellationToken).ConfigureAwait(false), url);
         }
 
-        call.Arguments = WithUser(arguments, credential);
-        return WithTrustHint(Redacted(await next(call, cancellationToken).ConfigureAwait(false), credential.Password), url.GetString()!);
+        if (offer.Used is not { } used)
+        {
+            return offer.NeedsUser && offer.User is null
+                ? Failed(NeedsUserText)
+                : WithTrustHint(await next(call, cancellationToken).ConfigureAwait(false), url);
+        }
+
+        var credential = findCredential?.Invoke(url);
+        if (!used.WithUser)
+        {
+            // Anonymous first. With no user stored there is nothing to fall back to, so nothing is tried before.
+            var anonymous = credential is null
+                || refusesAnonymous is null
+                || !await refusesAnonymous(url, used.Endpoint, cancellationToken).ConfigureAwait(false);
+            if (anonymous)
+            {
+                call.Arguments = Anonymous(WithSecurity(arguments, used.Endpoint));
+                return WithTrustHint(await next(call, cancellationToken).ConfigureAwait(false), url);
+            }
+
+            if (offer.UserEndpointAfter(used) is not { } withUser)
+            {
+                return Failed(AnonymousRefusedText);
+            }
+
+            used = withUser;
+        }
+
+        if (credential is null)
+        {
+            return Failed(NeedsUserText);
+        }
+
+        // The password goes only to the certificate the user was stored with: the scan connects to whatever
+        // answers at the address the model chose, and the library accepts every certificate there.
+        if (!credential.Trusts(used.Endpoint.ServerCertificateThumbprint))
+        {
+            return CertificateRefused();
+        }
+
+        call.Arguments = WithUser(WithSecurity(arguments, used.Endpoint), credential);
+        return WithTrustHint(Redacted(await next(call, cancellationToken).ConfigureAwait(false), credential.Password), url);
+    }
+
+    /// <summary>What the model reads when the server takes no session without a user, and no user is stored.</summary>
+    public const string NeedsUserText =
+        "The server takes no session without a user, and no person stored one for it. The card of opcua_endpoint_rank asks the " +
+        "person for user name and password; never ask for them in the chat. Call opcua_endpoint_rank, and wait until the person says it is done.";
+
+    /// <summary>What the model reads when the server refused an anonymous session, and offers the stored user no encrypted endpoint.</summary>
+    public const string AnonymousRefusedText =
+        "The server refused an anonymous session, and offers no encrypted endpoint for the user a person stored. The adapter cannot " +
+        "connect to it: tell the person.";
+
+    private static CallToolResult Failed(string text) => new()
+    {
+        IsError = true,
+        Content = [new TextContentBlock { Text = text }],
+    };
+
+    /// <summary>The arguments of a connect call with the security of <paramref name="endpoint"/>, the policy as its URI.</summary>
+    public static Dictionary<string, JsonElement> WithSecurity(IDictionary<string, JsonElement> arguments, OfferedEndpoint endpoint)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        ArgumentNullException.ThrowIfNull(endpoint);
+        return new Dictionary<string, JsonElement>(arguments, StringComparer.Ordinal)
+        {
+            ["securityMode"] = JsonSerializer.SerializeToElement(endpoint.SecurityMode.ToString()),
+            ["securityPolicy"] = JsonSerializer.SerializeToElement(EndpointRanking.PolicyUri(endpoint.SecurityPolicy)),
+        };
+    }
+
+    /// <summary>The arguments of an anonymous connect call.</summary>
+    public static Dictionary<string, JsonElement> Anonymous(IDictionary<string, JsonElement> arguments)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        return new Dictionary<string, JsonElement>(arguments, StringComparer.Ordinal)
+        {
+            ["authType"] = JsonSerializer.SerializeToElement("Anonymous"),
+        };
     }
 
     /// <summary>

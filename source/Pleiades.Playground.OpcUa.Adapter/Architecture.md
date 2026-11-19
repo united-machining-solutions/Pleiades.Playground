@@ -85,6 +85,7 @@ and the certificate of the adapter.
 │   └── <serial>.json        the alarms of that machine that stand
 ├── secrets/
 │   └── credentials.json     the user and password of each server that wants one
+├── security.json            the security a person chose for a server, in place of the strongest
 └── pki/
     ├── certs/               the certificates of the adapter, public part (.der)
     └── private/             the same with their private keys (.pfx)
@@ -93,6 +94,7 @@ and the certificate of the adapter.
 | What | Where | Written by | Read |
 |---|---|---|---|
 | Endpoint of a machine: `url`, `securityMode`, `securityPolicy`, `allowWeaker`, `user` | `machines/<serial>.json`, `endpoint` | [`RegistrationStore`](Registrations/RegistrationStore.cs), when a registration is added or replaced | At start and when the machine is added |
+| Security a person chose for a server: `securityMode`, `securityPolicy` | `security.json`, one entry per server address | [`SecurityChoiceStore`](Registrations/SecurityChoiceStore.cs), when a person chooses on the card in the chat (`PUT /security`); removed by `DELETE /security` | On every ranking of the endpoints of that server: by the scan and by every registration proposed after |
 | Password of the user of a server | `secrets/credentials.json`, one entry per server address, readable by the adapter only (the folder `0700`, the file `0600`) | [`CredentialStore`](Registrations/CredentialStore.cs), when a person enters a user on the card in the chat (`PUT /users`) and the server accepted it | On every connect with that user, by the running machines and by a scan; never sent back |
 | Certificate of the server, pinned | `machines/<serial>.json`, `endpoint.serverCertificateThumbprint` (SHA-1) | The adapter, from the certificate the server presented at the registration | On every connect: another certificate is refused, the machine says why in `lastError` |
 | Identity of a machine: manufacturer, its web address, model, product instance URI, and the machine id of the topics | `machines/<serial>.json`, `identity` | The adapter, from the values read when the machine is added; for an older registration from its first values | At start: the topics, the last will and the source of the events |

@@ -23,6 +23,23 @@ internal sealed class RefusalPolicy : IReconnectPolicy
         || status == StatusCodes.BadUserSignatureInvalid;
 
     /// <summary>
+    /// Whether a connect failed because the server refused the identity of the session: an anonymous session the
+    /// server does not take after all, or a user. Looks through the causes of the exception.
+    /// </summary>
+    public static bool IsRefusedIdentity(Exception? exception)
+    {
+        for (var cause = exception; cause is not null; cause = cause.InnerException)
+        {
+            if (cause is ServiceResultException refused && IsRefusedUser(refused.StatusCode))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Whether a certificate was rejected, the one of the server by the adapter or the one of the adapter by
     /// the server: trying again does not help until a person fixes or trusts the certificate.
     /// </summary>

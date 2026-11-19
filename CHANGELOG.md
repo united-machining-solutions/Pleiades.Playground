@@ -7,6 +7,12 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- OPC UA adapter: a person chooses the security of the sessions to a server under "Choose the security" on
+  the endpoints card of the chat, a weaker endpoint or `None` included. Before `None` is taken the card shows
+  a destructive warning; the endpoint taken, the proposal and the list of servers warn too. The adapter keeps
+  the choice per server (`PUT`, `GET` and `DELETE /security`) and takes it for the scan and for every
+  registration proposed after; the model never chooses. Every session of the scan is anonymous first: the
+  stored user logs in only where the endpoint takes no anonymous session, or the server refuses it.
 - Example app: the showcase page `/titan`, an assistant you talk to, from the umati hackathon. Hold the space
   bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the
   conversation to scroll through, each answer with the card its tool gave. It has a conversation of its own, made for speaking: the hall as it is now stands in

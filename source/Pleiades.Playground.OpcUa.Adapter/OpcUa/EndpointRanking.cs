@@ -20,13 +20,21 @@ internal sealed record OfferedEndpoint(
 /// <summary>An offered endpoint with its place in the order.</summary>
 /// <param name="Endpoint">The endpoint.</param>
 /// <param name="Score">Higher is stronger. Only the order matters.</param>
-/// <param name="Recommended">True for the one the adapter would take.</param>
+/// <param name="Recommended">True for the one the adapter takes: the strongest, or the one a person chose.</param>
 /// <param name="Weak">True without encryption or with a policy that is no longer considered safe.</param>
-internal sealed record RankedEndpoint(OfferedEndpoint Endpoint, int Score, bool Recommended, bool Weak);
+internal sealed record RankedEndpoint(OfferedEndpoint Endpoint, int Score, bool Recommended, bool Weak)
+{
+    /// <summary>
+    /// True if a session on this endpoint logs in with the stored user: the endpoint takes no anonymous session.
+    /// An endpoint that takes both is tried anonymously first.
+    /// </summary>
+    public bool WithUser => !Endpoint.Anonymous;
+}
 
 /// <summary>
-/// Orders the endpoints of a server from strongest to weakest. The adapter decides this, not the
-/// person and not a language model: encryption before signing only, then the strength of the policy.
+/// Orders the endpoints of a server from strongest to weakest: encryption before signing only, then the
+/// strength of the policy. Without a choice of a person the adapter takes the strongest; a language model
+/// never chooses. A person may choose a weaker one, one without security included, on the endpoints card.
 /// </summary>
 internal static class EndpointRanking
 {
@@ -73,6 +81,35 @@ internal static class EndpointRanking
         var known = Array.IndexOf(PoliciesWeakestFirst, policy);
         var strength = known < 0 ? PoliciesWeakestFirst.Length : known;
         return ((int)mode * 100) + strength;
+    }
+
+    /// <summary>
+    /// The endpoints the adapter can open a session on, strongest first: every endpoint that takes an anonymous
+    /// session, and, if a person stored a user, every encrypted endpoint that takes a user name. The one a person
+    /// chose is the one taken (<see cref="RankedEndpoint.Recommended"/>), if the server still offers it; else the
+    /// strongest.
+    /// </summary>
+    /// <param name="offered">The endpoints of the server.</param>
+    /// <param name="withStoredUser">Whether a person stored a user for the server.</param>
+    /// <param name="choice">The security a person chose for the server, or null.</param>
+    public static IReadOnlyList<RankedEndpoint> ForSession(IEnumerable<OfferedEndpoint> offered, bool withStoredUser, SecurityChoice? choice = null)
+    {
+        ArgumentNullException.ThrowIfNull(offered);
+        var ordered = offered
+            .Where(endpoint => endpoint.Anonymous || (withStoredUser && endpoint.UserName && endpoint.SecurityMode == SecurityMode.SignAndEncrypt))
+            .Select(endpoint => (endpoint, score: Score(endpoint.SecurityMode, endpoint.SecurityPolicy)))
+            .OrderByDescending(pair => pair.score)
+            .ToList();
+        var chosen = choice is null ? -1 : ordered.FindIndex(pair => choice.Matches(pair.endpoint.SecurityMode, pair.endpoint.SecurityPolicy));
+        var taken = chosen < 0 ? 0 : chosen;
+        return
+        [
+            .. ordered.Select((pair, index) => new RankedEndpoint(
+                pair.endpoint,
+                pair.score,
+                Recommended: index == taken,
+                Weak: IsWeak(pair.endpoint.SecurityMode, pair.endpoint.SecurityPolicy))),
+        ];
     }
 
     /// <summary>
