@@ -173,7 +173,10 @@ The page "Where is My Job?" in the sidebar, <http://localhost:5600/where-is-my-j
 discussion: how an order could be followed across the shop floor. It shows the machines of the stack from above, with their state, utilisation
 and job orders; a machine with what it did, does and what waits for it; and an order on its way. An order is
 every job order that names the same order number, read from the backend (`genui_job_order_list`) and kept
-live by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines,
+live by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. The simulators give it one such
+order every half hour: the route `ValveBody`, job order `90001/01` and on, order number `SO-90001`, turned on
+M-02, milled on P-07 and ground on P-04; P-07 releases its step once M-02 has ended it, P-04 once P-07 has.
+Search for "Valve body" or "SO-900" to find one. Programming before the machines,
 packing after them and the single part on its sheet have no source yet: the page draws them dashed, as the
 gaps to discuss. It has no picture in this tour.
 
