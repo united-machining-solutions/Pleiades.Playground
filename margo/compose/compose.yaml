@@ -26,6 +26,8 @@ services:
     configs:
       - source: mosquitto
         target: /mosquitto/config/mosquitto.conf
+    volumes:
+      - broker_data:/mosquitto/data
     healthcheck:
       test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/version", "-C", "1", "-W", "3"]
       start_period: 5s
@@ -562,7 +564,13 @@ configs:
     content: |
       # Demo broker: anonymous access inside the compose network and on the published ports.
       # Do not expose this configuration to a network you do not control.
-      persistence false
+      # Sessions and their queued messages survive a restart of the broker. The Events persistence keeps a persistent
+      # session and acknowledges an event only once it is stored, so while it or the Events API is away the events wait
+      # here: up to 50 000 for a session, some four days at the rate of the demo (about 520 events an hour).
+      persistence true
+      persistence_location /mosquitto/data/
+      autosave_interval 60
+      max_queued_messages 50000
       log_dest stdout
 
       listener 1883
@@ -607,6 +615,7 @@ configs:
                 - url: http://broker:9001
 
 volumes:
+  broker_data:
   mongodb_data:
   cutting-laser-2d-exchange:
   cutting-laser-2d-data:
