@@ -449,6 +449,14 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Home: "Add new machine" adds a machine that is not there yet, said by its manufacturer, model and serial
+  number, its id formed by ADR-0015; an id that sends already is assigned instead, one on a site moved.
+  "Review and add" assigns the machines that sent data in the last 24 hours from a list, searched by name,
+  manufacturer, state, id and last data, seven a page, several at once to one site and hall. Sites and halls
+  are made while typing, "Add site" and "Add hall" make them alone, and both dialogs start at the place used
+  last.
+- Home and the machine card in the chat: the whole row of a machine leads to its page; its buttons stay clicks
+  of their own, and the keyboard meets one link a row.
 - Example app: "Where is My Job?" is a showcase, only in a build with `APP_SHOWCASES`: at `/where-is-my-job`
   and in the sidebar, it opens with made-up orders WI-… across the clusters, and "Real orders" turns them off.
   The page "What if" at `/what-if` is gone, and so is the page of the app without the made-up orders: the
@@ -666,6 +674,7 @@ All notable changes are documented here. The format follows
   chat. The model answered it with `genui_job_order_list`, which draws no card, and told the person the values
   were in a card; the result of the list now says so and names the machines whose job order runs, for
   `genui_job_order_show`. The chat calls the list "Read the job orders", not by its name.
+- Home: on a narrow page the head of a site no longer lies over the chat below it.
 - PDF viewer now supports continuous scrolling and readable native-text highlights that stay aligned through zoom and resize.
 - Example app, showcase TruLaser: `/trulaser` without a machine shows the TruLaser alive most recently, not the first
   by name. A machine that was renamed or stopped kept the page on its old values for a day.

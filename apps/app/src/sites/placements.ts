@@ -3,6 +3,9 @@ import { hallsWith, placeInWords, refusalOf, sameSpot, siteIdOf } from "./placin
 import type {
   AddedOutcome,
   AddedRequest,
+  MakeHallRequest,
+  MakeOutcome,
+  MakeSiteRequest,
   Made,
   PlaceOutcome,
   PlaceRequest,
@@ -189,16 +192,22 @@ export async function undo(request: UndoRequest, send: Send): Promise<UndoOutcom
   }
 }
 
-/** Takes a hall off its site again, read as it is now, while no machine stands in it. */
-async function dropHall({ siteId, hall }: Spot, send: Send): Promise<void> {
+/**
+ * Takes a hall off its site again, read as it is now, while no machine stands in it. Says why it stays, or
+ * nothing where it went or was gone already.
+ */
+async function dropHall({ siteId, hall }: Spot, send: Send): Promise<string | undefined> {
   const { sites, placements } = await current(send)
   const site = sites.find((one) => one.siteId === siteId)
-  if (!site || hall === null || !site.halls.includes(hall)) return
-  if (placements.some((one) => one.siteId === siteId && one.hall === hall)) return
+  if (!site || hall === null || !site.halls.includes(hall)) return undefined
+  if (placements.some((one) => one.siteId === siteId && one.hall === hall)) return `A machine stands in ${hall} now, so it stays.`
   // The Sites API answers 409 if a machine was put in the hall since, 412 if the site was changed since it was
   // read: then the hall stays.
   const halls = site.halls.filter((one) => one !== hall)
-  await send(`/sites/${at(siteId)}`, "PUT", { company: site.company, name: site.name, halls }, { ifMatch: site.etag })
+  const { status } = await send(`/sites/${at(siteId)}`, "PUT", { company: site.company, name: site.name, halls }, { ifMatch: site.etag })
+  if (status === 409) return `A machine stands in ${hall} now, so it stays.`
+  if (status === 412) return "Someone changed the site meanwhile, so the hall stays."
+  return status === 200 ? undefined : `The Sites API answered ${status}, so the hall stays.`
 }
 
 /** The sites there are, by name in the order of the alphabet, for a person to choose one. */
@@ -241,4 +250,70 @@ export async function placeAdded(request: AddedRequest, send: Send): Promise<Add
 /** The words of a toast after adding or moving: "P-07 added · North plant, Hall 2". */
 export function placedInWords(title: string, siteName: string, hall: string | null, move: boolean): string {
   return `${title} ${move ? "moved" : "added"} · ${placeInWords(siteName, hall)}`
+}
+
+/**
+ * Makes a site alone, without a machine, under an id from its name that is not taken: only where there is
+ * no site of that id, so one someone made meanwhile is not written over.
+ */
+export async function makeSiteAlone(request: MakeSiteRequest, send: Send): Promise<MakeOutcome> {
+  try {
+    const sites = await read<Array<ApiSite>>(send, "/sites")
+    const siteId = siteIdOf(request.name, new Set(sites.map((one) => one.siteId)))
+    const created = { company: request.company, name: request.name, halls: request.hall === null ? [] : [request.hall] }
+    const answer = await send(`/sites/${at(siteId)}`, "PUT", created, { ifNoneMatch: "*" })
+    if (answer.status === 412) throw new Refused(SITE_MADE_MEANWHILE, true)
+    if (answer.status !== 201) throw new Refused(refusalOf(answer.status, answer.text), false)
+    const site = JSON.parse(answer.text) as ApiSite
+    return { ok: true, siteId, siteName: request.name, hall: request.hall, made: { siteId, siteEtag: site.etag } }
+  } catch (error) {
+    if (error instanceof Refused) return { ok: false, reason: error.message, stale: error.stale }
+    return { ok: false, reason: `The Sites API did not answer: ${reasonOf(error)}.`, stale: false }
+  }
+}
+
+/**
+ * Adds a hall to a site that is there, to its halls as they are now: only onto the site as it was read, so
+ * a hall or a name someone changed meanwhile is not written over.
+ */
+export async function makeHallAlone(request: MakeHallRequest, send: Send): Promise<MakeOutcome> {
+  try {
+    const sites = await read<Array<ApiSite>>(send, "/sites")
+    const site = sites.find((one) => one.siteId === request.siteId)
+    if (!site) throw new Refused(`The site '${request.siteId}' is no longer there.`, true)
+    // A hall of that name is there already, made by someone meanwhile: nothing to make, and nothing to undo.
+    if (site.halls.includes(request.hall)) return { ok: true, siteId: site.siteId, siteName: site.name, hall: request.hall, made: {} }
+    const changed = { company: site.company, name: site.name, halls: hallsWith(site.halls, request.hall) }
+    const answer = await send(`/sites/${at(site.siteId)}`, "PUT", changed, { ifMatch: site.etag })
+    if (answer.status === 412) throw new Refused(SITE_CHANGED_MEANWHILE, true)
+    if (answer.status !== 200) throw new Refused(refusalOf(answer.status, answer.text), false)
+    return { ok: true, siteId: site.siteId, siteName: site.name, hall: request.hall, made: { hall: { siteId: site.siteId, hall: request.hall } } }
+  } catch (error) {
+    if (error instanceof Refused) return { ok: false, reason: error.message, stale: error.stale }
+    return { ok: false, reason: `The Sites API did not answer: ${reasonOf(error)}.`, stale: false }
+  }
+}
+
+/**
+ * Undoes a site or hall made alone: the site goes while it is the one that was made and nothing stands on
+ * it, the hall while no machine stands in it. Where either stays, the outcome says why.
+ */
+export async function unmake(made: Made, send: Send): Promise<UndoOutcome> {
+  try {
+    if (made.siteId !== undefined) {
+      const conditions = made.siteEtag ? { ifMatch: made.siteEtag } : undefined
+      const { status, text } = await send(`/sites/${at(made.siteId)}`, "DELETE", undefined, conditions)
+      if (status === 409) return { ok: false, reason: "A machine stands on the site now, so it stays." }
+      if (status === 412) return { ok: false, reason: "Someone changed the site since it was made, so it stays." }
+      if (status !== 204 && status !== 404) return { ok: false, reason: refusalOf(status, text) }
+    }
+    if (made.hall !== undefined) {
+      const kept = await dropHall(made.hall, send)
+      if (kept) return { ok: false, reason: kept }
+    }
+    return { ok: true }
+  } catch (error) {
+    if (error instanceof Refused) return { ok: false, reason: error.message }
+    return { ok: false, reason: `The Sites API did not answer: ${reasonOf(error)}.` }
+  }
 }

@@ -6,7 +6,10 @@ import type { SiteList } from "@pleiades/cards/site/contract.ts"
 import {
   MAX_TEXT,
   companyOf,
+  followingRequest,
   hallsWith,
+  makeHallRequestOf,
+  makeSiteRequestOf,
   placeInWords,
   placeRequestOf,
   placementOf,
@@ -18,6 +21,7 @@ import {
   sentenceOf,
   siteIdOf,
   siteStepOf,
+  undoMadeRequestOf,
   undoRequestOf,
   addedRequestOf,
 } from "./placing.ts"
@@ -191,4 +195,41 @@ test("a place in words, and the company a new site starts with", () => {
   assert.equal(companyOf(list), "Demo Manufacturing")
   assert.equal(companyOf({ ...list, sites: [...list.sites, { ...list.sites[1]!, siteId: "x", company: "Other" }] }), "")
   assert.equal(companyOf({ ...list, sites: [] }), "")
+})
+
+test("a further machine of one add goes to the site of the first, which is there by then", () => {
+  const first = {
+    machine: "trumpf_Laser2D_L-01",
+    site: { name: "West plant", company: "Demo Manufacturing" },
+    hall: "Hall 1",
+    newHall: true,
+    displayName: null,
+    from: null,
+  }
+  assert.deepEqual(followingRequest({ ...first, machine: "trumpf_Punch_PU-01" }, "west-plant"), {
+    ...first,
+    machine: "trumpf_Punch_PU-01",
+    site: { siteId: "west-plant" },
+    newHall: false,
+  })
+})
+
+test("a site or hall made alone is checked before it goes to the Sites API", () => {
+  assert.deepEqual(makeSiteRequestOf({ name: " West plant ", company: "Demo Manufacturing", hall: " " }), {
+    name: "West plant",
+    company: "Demo Manufacturing",
+    hall: null,
+  })
+  assert.throws(() => makeSiteRequestOf({ name: "West plant", company: " " }), /The company is required/)
+  assert.throws(() => makeSiteRequestOf({ name: "x".repeat(MAX_TEXT + 1), company: "Demo" }), /longer than/)
+  assert.deepEqual(makeHallRequestOf({ siteId: "north-plant", hall: "Hall 4" }), { siteId: "north-plant", hall: "Hall 4" })
+  assert.throws(() => makeHallRequestOf({ siteId: "north/plant", hall: "Hall 4" }), /contains/)
+  assert.throws(() => makeHallRequestOf({ siteId: "north-plant", hall: "" }), /The hall is required/)
+  assert.deepEqual(undoMadeRequestOf({ siteId: "west-plant", siteEtag: '"1"' }), { siteId: "west-plant", siteEtag: '"1"', hall: undefined })
+  assert.deepEqual(undoMadeRequestOf({ made: { siteId: "west-plant" } }), { siteId: "west-plant", siteEtag: undefined, hall: undefined })
+  assert.deepEqual(undoMadeRequestOf({ hall: { siteId: "north-plant", hall: "Hall 4" } }), {
+    siteId: undefined,
+    siteEtag: undefined,
+    hall: { siteId: "north-plant", hall: "Hall 4" },
+  })
 })

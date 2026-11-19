@@ -248,6 +248,48 @@ export function companyOf(list: SiteList): string {
   return companies.size === 1 ? [...companies][0]! : ""
 }
 
+/**
+ * The request of a further machine of one "Add": to the site the first machine went to, by the id it has
+ * now, as the first request may have made the site; a hall it made is there by then too.
+ */
+export function followingRequest(request: PlaceRequest, siteId: string): PlaceRequest {
+  return { ...request, site: { siteId }, newHall: false }
+}
+
+/** A site made alone, without a machine: its name, its company, and a first hall or none. */
+export type MakeSiteRequest = { name: string; company: string; hall: string | null }
+
+/** A hall added to a site that is there. */
+export type MakeHallRequest = { siteId: string; hall: string }
+
+/**
+ * What became of making a site or a hall: the site and the hall, and what was made, for its undo; or why
+ * not, and whether the list is out of date.
+ */
+export type MakeOutcome =
+  | { ok: true; siteId: string; siteName: string; hall: string | null; made: Made }
+  | { ok: false; reason: string; stale: boolean }
+
+/** Checks a new site, before anything goes to the Sites API. Throws the sentence of the problem. */
+export function makeSiteRequestOf(value: unknown): MakeSiteRequest {
+  const given = (value ?? {}) as Record<string, unknown>
+  return { name: required(given.name, "name of the site"), company: required(given.company, "company"), hall: textOf(given.hall, "hall") }
+}
+
+/** Checks a new hall: the site by its id, and the name of the hall. Throws the sentence of the problem. */
+export function makeHallRequestOf(value: unknown): MakeHallRequest {
+  const given = (value ?? {}) as Record<string, unknown>
+  const problem = problemOfId(given.siteId, "site id")
+  if (problem) throw new Error(problem)
+  return { siteId: given.siteId as string, hall: required(given.hall, "hall") }
+}
+
+/** Checks the undo of a site or hall made alone: what was made, as the outcome said, alone or as `{ made }`. */
+export function undoMadeRequestOf(value: unknown): Made {
+  const given = (value ?? {}) as Record<string, unknown>
+  return undoRequestOf({ machine: "unused", now: null, back: null, made: "made" in given ? given.made : given }).made
+}
+
 /** A site as a person chooses it: its id and its name. */
 export type SiteOption = { siteId: string; name: string }
 

@@ -2,109 +2,29 @@ import type { SiteList } from "@pleiades/cards/site/contract.ts"
 import { Button } from "@pleiades/ui/components/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@pleiades/ui/components/dropdown-menu"
 import { toast } from "@pleiades/ui/components/toast"
-import { useRouter } from "@tanstack/react-router"
-import { EllipsisIcon, MapPinOffIcon, MoveIcon, PlusIcon } from "lucide-react"
-import { useRef, useState } from "react"
+import { EllipsisIcon, MapPinOffIcon, MoveIcon, PlusIcon, WarehouseIcon } from "lucide-react"
+import { useState } from "react"
 import type { ComponentProps, ReactNode } from "react"
 
 import { PlaceDialog } from "./place-dialog.tsx"
-import type { PlaceMode } from "./place-dialog.tsx"
-import { placedInWords } from "./placements.ts"
 import { placeInWords } from "./placing.ts"
-import type { PlaceOutcome, PlaceRequest, Placement, UndoRequest } from "./placing.ts"
-import { placeMachine, removePlacement, undoChange } from "./sites-api.ts"
+import type { Placement } from "./placing.ts"
+import { removePlacement } from "./sites-api.ts"
+import { failed, told, useReread } from "./use-place.ts"
 
-// What a person does on Home: "Add machine", from the head of the page or from the bar of the
-// machines that send and stand on no site, and "Move" or "Remove from site" in the menu of a row.
+// What a person does on Home: "Add new machine" from the head of the page, "Review and add" from the bar of
+// the machines that send and stand on no site; "Move" or "Remove from site" in the menu of a row; "Add site"
+// at the end of the sites, and "Add hall" in the menu of the head of a site.
 // Each change is undone from its toast. After every change Home reads the list again; it changes
 // nothing in the list itself.
-
-/** The time the docs of the Toast of Base UI give a toast with an undo, as the parts of a kept page have it. */
-const UNDO_MS = 10_000
 
 /** A machine of a row: its id, the name it is shown by, and what it is. */
 export type RowMachine = { machine: string; title: string; what: string }
 
-function useReread() {
-  const router = useRouter()
-  return () => router.invalidate()
-}
-
-function failed(title: string, reason: string) {
-  toast.add({ type: "error", title, description: reason, priority: "high" })
-}
-
 /**
- * The toast after a change, with its undo. `name` is what the machine is called in it. The undo puts
- * the machine back where the Sites API had it before the change, and only while nothing changed it
- * since; what the change made goes again while nothing stands on it.
- */
-function told(name: string, title: string, description: string | undefined, undone: UndoRequest, reread: () => Promise<void>) {
-  const shown = toast.add({
-    title,
-    description,
-    timeout: UNDO_MS,
-    actionProps: {
-      children: "Undo",
-      onClick() {
-        toast.close(shown)
-        // A server of the app that does not answer is a reason too, not an error of the page.
-        void undoChange({ data: undone })
-          .then((outcome) => (outcome.ok ? undefined : outcome.reason))
-          .catch((error: unknown) => (error instanceof Error ? error.message : String(error)))
-          .then(async (reason) => {
-            await reread()
-            if (reason) failed(`${name} was not put back`, reason)
-          })
-      },
-    },
-  })
-}
-
-/**
- * Sends a placement, reads the list again, and says where the machine went. A refusal that came from
- * a change meanwhile leaves the list as it is while the dialog says why: read again at once, the row
- * of the machine, and the dialog with it, could go. It is read again when the dialog closes.
- */
-function usePlace() {
-  const reread = useReread()
-  const stale = useRef(false)
-  const onPlace = async (request: PlaceRequest, what: string): Promise<PlaceOutcome> => {
-    const outcome = await placeMachine({ data: request })
-    if (!outcome.ok) {
-      if (!outcome.stale) return outcome
-      stale.current = true
-      return { ...outcome, reason: `${outcome.reason} Cancel shows Home as it is now.` }
-    }
-    await reread()
-    const name = request.displayName?.trim() || what
-    const undone = { machine: request.machine, now: { siteId: outcome.siteId, hall: outcome.hall }, back: outcome.before, made: outcome.made }
-    told(name, placedInWords(name, outcome.siteName, outcome.hall, request.from !== null), undefined, undone, reread)
-    return outcome
-  }
-  const onClosed = () => {
-    if (!stale.current) return
-    stale.current = false
-    void reread()
-  }
-  return { onPlace, onClosed }
-}
-
-/** Opens and closes a dialog, and tells `onClosed` when it closed. */
-function useOpen(onClosed: () => void): [boolean, (open: boolean) => void] {
-  const [open, setOpen] = useState(false)
-  return [
-    open,
-    (next: boolean) => {
-      setOpen(next)
-      if (!next) onClosed()
-    },
-  ]
-}
-
-/**
- * A button that opens "Add machine": in the head of the page, under an empty list, or as "Review and
- * add" in the bar, where the first machine that sends and stands on no site is chosen already.
+ * A button that opens "Add a new machine", in the head of the page or under an empty list: a machine that is
+ * not there yet. As "Review and add" in the bar it opens "Assign machines to a site": the machines that send
+ * and stand on no site, as many as go to one place.
  */
 export function AddMachine({
   list,
@@ -112,16 +32,14 @@ export function AddMachine({
   children,
   ...button
 }: { list: SiteList; review?: boolean; children: ReactNode } & Omit<ComponentProps<typeof Button>, "onClick" | "children">) {
-  const { onPlace, onClosed } = usePlace()
-  const [open, setOpen] = useOpen(onClosed)
-  const mode: PlaceMode = { kind: "add", first: review ? list.unplaced[0]?.machine : undefined }
+  const [open, setOpen] = useState(false)
   return (
     <>
       <Button {...button} onClick={() => setOpen(true)}>
         {!review && <PlusIcon data-icon="inline-start" />}
         {children}
       </Button>
-      <PlaceDialog open={open} onOpenChange={setOpen} mode={mode} list={list} onPlace={onPlace} />
+      <PlaceDialog open={open} onOpenChange={setOpen} mode={{ kind: review ? "assign" : "add" }} list={list} />
     </>
   )
 }
@@ -129,8 +47,7 @@ export function AddMachine({
 /** The menu of a machine on a site: "Move…" opens the dialog, "Remove from site" takes it off at once, with an undo. */
 export function PlacedMenu({ machine, shown, list }: { machine: RowMachine; shown: Placement | undefined; list: SiteList }) {
   // `shown` is where Home shows the machine: a change is refused where it stands elsewhere now.
-  const { onPlace, onClosed } = usePlace()
-  const [moving, setMoving] = useOpen(onClosed)
+  const [moving, setMoving] = useState(false)
   const reread = useReread()
   const takeOff = async () => {
     if (!shown) return
@@ -147,7 +64,7 @@ export function PlacedMenu({ machine, shown, list }: { machine: RowMachine; show
       toast.add({ title: `${machine.title} stood on no site any more`, description: "Someone took it off meanwhile." })
       return
     }
-    const undone = { machine: machine.machine, now: null, back: outcome.before, made: {} }
+    const undone = [{ machine: machine.machine, now: null, back: outcome.before, made: {} }]
     told(
       machine.title,
       `${machine.title} taken off ${placeInWords(outcome.siteName, outcome.before.hall)}`,
@@ -181,9 +98,45 @@ export function PlacedMenu({ machine, shown, list }: { machine: RowMachine; show
           onOpenChange={setMoving}
           mode={{ kind: "move", machine: machine.machine, title: machine.title, what: machine.what, placed: shown }}
           list={list}
-          onPlace={onPlace}
         />
       )}
+    </>
+  )
+}
+
+/** "Add site", at the end of the sites and where there is none: the form makes a site, with a first hall or none. */
+export function AddSite({ list, children, ...button }: { list: SiteList; children: ReactNode } & Omit<ComponentProps<typeof Button>, "onClick" | "children">) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button {...button} onClick={() => setOpen(true)}>
+        <PlusIcon data-icon="inline-start" />
+        {children}
+      </Button>
+      <PlaceDialog open={open} onOpenChange={setOpen} mode={{ kind: "site" }} list={list} />
+    </>
+  )
+}
+
+/** The menu of the head of a site: "Add hall" opens the form with the site chosen. */
+export function SiteMenu({ site, list }: { site: { siteId: string; name: string }; list: SiteList }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`More for ${site.name}`} />}>
+          <EllipsisIcon />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuGroup>
+            <DropdownMenuItem onClick={() => setOpen(true)}>
+              <WarehouseIcon />
+              Add hall
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <PlaceDialog open={open} onOpenChange={setOpen} mode={{ kind: "site" }} list={list} start={{ site: { siteId: site.siteId } }} />
     </>
   )
 }

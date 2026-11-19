@@ -1,15 +1,16 @@
 import { createServerFn } from "@tanstack/react-start"
 
-import { place, placeAdded, remove, sitesOf, undo } from "./placements.ts"
+import { makeHallAlone, makeSiteAlone, place, placeAdded, remove, sitesOf, undo, unmake } from "./placements.ts"
 import type { Send } from "./placements.ts"
-import { addedRequestOf, placeRequestOf, removeRequestOf, undoRequestOf } from "./placing.ts"
-import type { AddedOutcome, PlaceOutcome, RemoveOutcome, SitesOutcome, UndoOutcome } from "./placing.ts"
+import { addedRequestOf, makeHallRequestOf, makeSiteRequestOf, placeRequestOf, removeRequestOf, undoMadeRequestOf, undoRequestOf } from "./placing.ts"
+import type { AddedOutcome, MakeOutcome, PlaceOutcome, RemoveOutcome, SitesOutcome, UndoOutcome } from "./placing.ts"
 import { position, positionRequestOf } from "./positioning.ts"
 import type { PositionOutcome } from "./positioning.ts"
 
 // The steps of a person on Home: adding a machine to a site, moving it, taking it off, and undoing
-// either; the step of a person on Halls: saying where in its hall a machine stands; and putting a machine
-// a person added over OPC UA on a site. They go to the REST endpoints of the Sites API from the server of the app, never from the
+// either; making a site or a hall alone, and undoing that; the step of a person on Halls: saying where in its
+// hall a machine stands; and putting a machine a person added over OPC UA on a site. They go to the REST
+// endpoints of the Sites API from the server of the app, never from the
 // browser and never from the language model: no tool of the chat writes a site or a placement.
 
 /** Where the Sites API answers, or undefined if the app has none. */
@@ -80,4 +81,28 @@ export const undoChange = createServerFn({ method: "POST" })
   .handler(({ data }): Promise<UndoOutcome> => {
     const base = sitesApiUrl()
     return base ? undo(data, sender(base)) : Promise.resolve({ ok: false, reason: NO_API })
+  })
+
+/** Makes a site without a machine, with a first hall or none, only where no site of its id is there. */
+export const makeSite = createServerFn({ method: "POST" })
+  .validator(makeSiteRequestOf)
+  .handler(({ data }): Promise<MakeOutcome> => {
+    const base = sitesApiUrl()
+    return base ? makeSiteAlone(data, sender(base)) : Promise.resolve({ ok: false, reason: NO_API, stale: false })
+  })
+
+/** Adds a hall to a site, only onto the site as it was read. */
+export const makeHall = createServerFn({ method: "POST" })
+  .validator(makeHallRequestOf)
+  .handler(({ data }): Promise<MakeOutcome> => {
+    const base = sitesApiUrl()
+    return base ? makeHallAlone(data, sender(base)) : Promise.resolve({ ok: false, reason: NO_API, stale: false })
+  })
+
+/** Undoes a site or hall made alone, while nothing stands on it and nobody changed it since. */
+export const undoMade = createServerFn({ method: "POST" })
+  .validator(undoMadeRequestOf)
+  .handler(({ data }): Promise<UndoOutcome> => {
+    const base = sitesApiUrl()
+    return base ? unmake(data, sender(base)) : Promise.resolve({ ok: false, reason: NO_API })
   })

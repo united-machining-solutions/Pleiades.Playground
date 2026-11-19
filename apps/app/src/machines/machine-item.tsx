@@ -11,7 +11,7 @@ import { ChevronRightIcon } from "lucide-react"
 import { Fragment } from "react"
 import type { ReactNode } from "react"
 
-import { Button, buttonVariants } from "@pleiades/ui/components/button"
+import { Button } from "@pleiades/ui/components/button"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@pleiades/ui/components/item"
 
 import { chatOf } from "@/chat/ask.ts"
@@ -51,7 +51,10 @@ const why: Partial<Record<State, (machine: string) => string>> = {
 }
 
 /**
- * A machine: one row of a list, with the way to its page.
+ * A machine: one row of a list, with the way to its page. The whole row leads there: its title is the one
+ * link of the row, and the link covers the row, so a click anywhere on it opens the page while a person
+ * reading it with the keyboard or a screen reader meets one link. The buttons of the row lie above it and
+ * stay clicks of their own; the arrow at the end only shows that the row leads somewhere.
  * With `onAsk`, a machine that needs someone offers the question why. The chat stays open while
  * the page changes. With `name`, the name people know the machine by is its title, and what it
  * is comes first in the line below. `what` says what it is where its values do not, as for a
@@ -83,14 +86,35 @@ export function MachineRow({
   const kind = what ?? titleOf(machine)
   const title = name || kind
   return (
-    <Item role="listitem">
+    // A row that leads somewhere shows it as the Item of a link does: the colour under the pointer, and the
+    // ring of the focus around the whole row while its link has the focus.
+    <Item
+      role="listitem"
+      className={
+        linked
+          ? "relative hover:bg-muted has-[[data-slot=row-link]:focus-visible]:border-ring has-[[data-slot=row-link]:focus-visible]:ring-[3px] has-[[data-slot=row-link]:focus-visible]:ring-ring/50"
+          : undefined
+      }
+    >
       {/* As tall as the first line, so the sign sits on it. */}
       <ItemMedia variant="icon" className="h-5">
         <StateSymbol state={state} />
       </ItemMedia>
       <ItemContent>
         <ItemTitle>
-          {title}
+          {linked ? (
+            <Link
+              to="/sites/$machine"
+              params={{ machine: machine.machine }}
+              search={chatOf}
+              data-slot="row-link"
+              className="outline-none after:absolute after:inset-0"
+            >
+              {title}
+            </Link>
+          ) : (
+            title
+          )}
           <Badge variant="outline">{stateLabel[state]}</Badge>
         </ItemTitle>
         <ItemDescription>
@@ -107,24 +131,19 @@ export function MachineRow({
         </ItemDescription>
       </ItemContent>
       <Since told={told} asOf={asOf} />
-      <ItemActions>
+      {/* Its buttons are positioned after the link, so they lie above the area of the link; between them a click
+          still opens the page. */}
+      <ItemActions className="*:relative">
         {onAsk && question && (
           <Button variant="outline" size="sm" onClick={() => onAsk(question)}>
             Ask why
           </Button>
         )}
         {actions}
-        {/* A link that looks like the buttons next to it: it leads somewhere, so it stays a link. */}
         {linked && (
-          <Link
-            to="/sites/$machine"
-            params={{ machine: machine.machine }}
-            search={chatOf}
-            className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
-            aria-label={`Open ${title}`}
-          >
+          <span aria-hidden className="pointer-events-none flex size-8 items-center justify-center text-muted-foreground">
             <ChevronRightIcon />
-          </Link>
+          </span>
         )}
       </ItemActions>
     </Item>

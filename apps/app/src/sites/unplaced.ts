@@ -1,8 +1,6 @@
 import type { SiteList, UnplacedMachine } from "@pleiades/cards/site/contract.ts"
 import { modelOf } from "@pleiades/cards/site/in-words.ts"
 
-import { placementOf, problemOfId } from "./placing.ts"
-
 // The machines that sent values in the last 24 hours and stand on no site, as Home names them: a few
 // by what they are, then how many more. They are no rows of the list; they come to a site from the bar
 // above it. Some of them may have fallen silent since, so the words say "sent", not "send".
@@ -49,23 +47,4 @@ export function headInWords(list: Pick<SiteList, "machineCount" | "sites" | "sen
   const sending = `${list.sending} ${list.sending === 1 ? "sends" : "send"} data now`
   const needs = `${list.needsYou} ${list.needsYou === 1 ? "needs" : "need"} you`
   return `${machines} at ${sites} · ${sending} · ${needs}`
-}
-
-/**
- * A machine id a person typed, against the list Home has: one that stands on a site already, one
- * that sends and stands on none, one the stack has heard nothing from, or one that is no id.
- */
-export type TypedMachine =
-  | { kind: "invalid"; problem: string }
-  | { kind: "placed"; siteName: string }
-  | { kind: "sending"; machine: UnplacedMachine }
-  | { kind: "unknown" }
-
-export function typedMachineOf(list: SiteList, typed: string): TypedMachine {
-  const problem = problemOfId(typed, "machine id")
-  if (problem) return { kind: "invalid", problem }
-  const placed = placementOf(list, typed)
-  if (placed) return { kind: "placed", siteName: placed.siteName }
-  const sending = list.unplaced.find((one) => one.machine === typed)
-  return sending ? { kind: "sending", machine: sending } : { kind: "unknown" }
 }

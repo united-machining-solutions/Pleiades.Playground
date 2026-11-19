@@ -29,7 +29,7 @@ import { changed, emptyOf, groupsOf, pageOf, pageOfSearch, showOf, showOfToggle 
 import type { Group, Row } from "@/sites/filter.ts"
 import { placementsOf } from "@/sites/placing.ts"
 import type { Placement } from "@/sites/placing.ts"
-import { AddMachine, PlacedMenu } from "@/sites/row-actions.tsx"
+import { AddMachine, AddSite, PlacedMenu, SiteMenu } from "@/sites/row-actions.tsx"
 import { headInWords, unplacedInWords, unreadableInWords } from "@/sites/unplaced.ts"
 
 /** The sites are read once, from the backend; then what every machine on them does comes from the broker. */
@@ -118,7 +118,7 @@ function Home() {
     )
   }
   return (
-    <Page line={list.sites.length === 0 ? liveness(connected, list.asOf) : line} action={<AddMachine list={list}>Add machine</AddMachine>}>
+    <Page line={list.sites.length === 0 ? liveness(connected, list.asOf) : line} action={<AddMachine list={list}>Add new machine</AddMachine>}>
       {/* The machines that sent data and stand on no site are no rows: a bar names a few of them, and they
           are added to a site from there. */}
       {list.unplaced.length > 0 && <Unplaced list={list} />}
@@ -135,9 +135,16 @@ function Home() {
             void navigate({ to: ".", search: (previous) => changed(previous, { show: undefined }) })
           }}
           add={
-            <AddMachine list={list} variant="outline">
-              Add machine
-            </AddMachine>
+            <>
+              <AddMachine list={list} variant="outline">
+                Add new machine
+              </AddMachine>
+              {list.sites.length === 0 && (
+                <AddSite list={list} variant="ghost">
+                  Add site
+                </AddSite>
+              )}
+            </>
           }
         />
       ) : (
@@ -148,6 +155,12 @@ function Home() {
         </div>
       )}
       {emptySites.length > 0 && shown.page === shown.pages && <EmptySites names={emptySites.map((site) => site.name)} />}
+      {/* A new site is made at the end of the sites, where a person looks for one. */}
+      {list.sites.length > 0 && shown.page === shown.pages && (
+        <AddSite list={list} variant="ghost" size="sm" className="self-start">
+          Add site
+        </AddSite>
+      )}
       {shown.pages > 1 && (
         <Pages page={shown.page} pages={shown.pages} onPage={onPage} className="border-t pt-3">
           <p className="text-sm text-muted-foreground tabular-nums">
@@ -162,7 +175,7 @@ function Home() {
 
 /**
  * The machines that sent data in the last 24 hours and stand on no site: how many, a few of them by what they are, and
- * "Review and add", which opens "Add machine" with the first of them chosen.
+ * "Review and add", which opens "Assign machines to a site".
  */
 function Unplaced({ list }: { list: SiteList }) {
   const { title, names } = unplacedInWords(list.unplaced)
@@ -205,15 +218,19 @@ function Nothing({
         <EmptyTitle>{title}</EmptyTitle>
         <EmptyDescription>{description}</EmptyDescription>
       </EmptyHeader>
-      <EmptyContent>{clearable ? <Button onClick={onShowAll}>Show every machine</Button> : add}</EmptyContent>
+      <EmptyContent className="flex-row flex-wrap justify-center">{clearable ? <Button onClick={onShowAll}>Show every machine</Button> : add}</EmptyContent>
     </Empty>
   )
 }
 
-/** The title and the line under it, at the top of the page, and beside them what the page offers to do. */
+/**
+ * The title and the line under it, at the top of the page, and beside them what the page offers to do. The
+ * page is a layer of its own: the heads of the sites that stay at the top while it scrolls lie above its
+ * rows, never above the chat beside or below it.
+ */
 function Page({ line, action, children }: { line?: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
+    <div className="isolate mx-auto flex w-full max-w-5xl flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Home</h1>
@@ -284,9 +301,9 @@ function GroupSection({ group, list, placed }: { group: Group; list: SiteList; p
   const title = group.site.name
   return (
     <Collapsible defaultOpen render={<section aria-label={title} />} className="flex flex-col">
-      {/* As an accordion has it: the heading holds the button that folds the site. */}
-      <h2 className="sticky top-14 z-[5] border-b bg-background/95 backdrop-blur">
-        <CollapsibleTrigger className="group/head flex w-full flex-wrap items-center gap-x-3 gap-y-1 py-2 text-left font-normal">
+      {/* As an accordion has it: the heading holds the button that folds the site; beside it the menu of the site. */}
+      <h2 className="sticky top-14 z-[5] flex items-center gap-1 border-b bg-background/95 backdrop-blur">
+        <CollapsibleTrigger className="group/head flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 py-2 text-left font-normal">
           <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[panel-open]/head:rotate-90" />
           <span className="font-medium">{title}</span>
           <span className="text-sm text-muted-foreground">{group.site.company}</span>
@@ -297,6 +314,7 @@ function GroupSection({ group, list, placed }: { group: Group; list: SiteList; p
             </Badge>
           </span>
         </CollapsibleTrigger>
+        <SiteMenu site={group.site} list={list} />
       </h2>
       <CollapsibleContent className="flex flex-col gap-3 pt-3">
         {group.halls.map((hall) => (

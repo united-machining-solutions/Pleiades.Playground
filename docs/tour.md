@@ -107,36 +107,45 @@ once, on the last page. Home is live: it reads the list once, and from then on t
 broker, MQTT over WebSocket on port 9001, the moment a machine publishes it.
 
 A machine does not show up on Home by itself: people put it on a site. A machine that sent data in the last 24
-hours and stands on no site is named in a bar above the list, a few by name and how many more; "Review and add"
-opens "Add machine" with the first of them chosen. "Add machine" at the top of the page opens the same dialog
-empty: the machine, one that sent data or one named by its id, which shows "No data" until it sends, then the site, the hall and the name
-people know it by; a new site or hall is made there too. The menu "⋯" of a row moves the machine ("Move…") or
-takes it off its site ("Remove from site"), and "Undo" in the toast takes back each change, as long as nobody
-changed the machine since, together with a site or hall the change made. Home writes to the
+hours and stands on no site is named in a bar above the list, a few by name and how many more. "Review and add"
+there opens "Assign machines to a site": those machines, seven a page, found by name, manufacturer, state, id or
+when they last sent, and as many as go to one site and hall are chosen at once. "Add new machine" at the top of
+the page is for a machine that is not there yet: its manufacturer, model and serial number, from which the app
+forms its id, shown small below; it shows "No data" until it sends. An id that sends already offers "Assign it
+instead", and one that stands on a site already offers "Move it here". Both start at the site and hall this
+browser used last. A site or hall is made while its name is typed; "Add site" at the end of the sites makes
+one alone, and "Add hall" in the menu "⋯" of the head of a site adds a hall to it. The menu "⋯" of a row moves
+the machine ("Move…") or takes it off its site ("Remove from site"), and "Undo" in the toast takes back each
+change, as long as nobody changed the machine since, together with a site or hall the change made. Home writes to the
 [Sites API](../source/Pleiades.Playground.Sites.Api/README.md), at <http://localhost:5540/>, which takes the same
 over REST. A stack that has just started has no site: every machine that sends is in the bar. While the Sites API
 does not answer, a line says the sites cannot be read now and names a few of the machines that sent data; then
 nothing can be added.
 
-![Home: "3 machines at 2 sites · 2 send data now · 2 need you" and the button Add machine at the right. Below, the
-bar "4 machines sent data in the last 24 hours but are not on a site yet: TP-800 P-07, Laser2D L-01, Punch PU-01 +1"
-with Review and add; the search, All and Needs you, and the counts of all sites. North plant of Demo Manufacturing:
-Lathe 4 stopped in Hall 1 with the warning "Coolant pressure low", MM-120 M-02 running in Hall 2 with the warning
-"Filter of the coolant clogged", and "Hall 3: no machine". South plant with AX-400 M-09 without data in Hall A. Each
-row has the menu "⋯".](images/tour/home.png)
+![Home: "4 machines at 2 sites · 2 send data now · 2 need you" and the button Add new machine at the right. Below, the
+bar "5 machines sent data in the last 24 hours but are not on a site yet: TP-800 P-07, 5085 AE325085TB46, Laser2D L-01
++2" with Review and add; the search, All and Needs you, and the counts of all sites. North plant of Demo
+Manufacturing, with the menu "⋯" of the site: Lathe 4 running in Hall 1 with the warning "Lubrication interval
+reached", Lathe 11 without data and MM-120 M-02 running in Hall 2, and "Hall 3: no machine". Below, the head of the
+South plant. Each row has the menu "⋯".](images/tour/home.png)
 
-In the picture Lathe 4, the name entered for P-04, is stopped with the warning "Coolant pressure low", 20017, and
-says since when; M-09 stands in the South plant but has no simulator, so nothing is known about it and its row
-leads nowhere. P-07 and the three cutting machines sent data and stand on no site: the bar names them, and
-"Review and add" puts one on a site. A row leads to the page of its machine, and
+In the picture Lathe 4, the name entered for P-04, runs with the warning "Lubrication interval reached" and says
+since when; Lathe 11, the name entered for Q-11, has no simulator, so nothing is known about it and its row leads
+nowhere, as M-09 in the South plant below. P-07, the bending machine and the three cutting machines sent data and
+stand on no site: the bar names them, and
+"Review and add" puts them on a site. A click anywhere on a row leads to the page of its machine, and
 "Ask why" starts a chat about it (stop 4). The field "Ask a question" in the header starts a chat too.
 
 **In the code:** [`apps/app/src/routes/index.tsx`](../apps/app/src/routes/index.tsx) is the page,
 [`apps/app/src/sites/filter.ts`](../apps/app/src/sites/filter.ts) chooses what "Needs you" and the search show
 and cuts the pages, and [`apps/app/src/machines/machine-item.tsx`](../apps/app/src/machines/machine-item.tsx)
-draws a row. [`apps/app/src/sites/row-actions.tsx`](../apps/app/src/sites/row-actions.tsx) is "Add machine" and the
-menu of a row, [`apps/app/src/sites/place-dialog.tsx`](../apps/app/src/sites/place-dialog.tsx) their dialog, and [`apps/app/src/sites/sites-api.ts`](../apps/app/src/sites/sites-api.ts) writes to the Sites API from
-the server of the app. The values are the result of the tool `genui_site_list`
+draws a row. [`apps/app/src/sites/row-actions.tsx`](../apps/app/src/sites/row-actions.tsx) is "Add new machine", "Add
+site" and the menus, [`apps/app/src/sites/place-dialog.tsx`](../apps/app/src/sites/place-dialog.tsx) their dialog
+around the form of [`apps/app/src/sites/place-form.tsx`](../apps/app/src/sites/place-form.tsx), which the chat
+uses too; [`apps/app/src/sites/choosing.ts`](../apps/app/src/sites/choosing.ts) finds the machines to assign,
+[`apps/app/src/sites/machine-id.ts`](../apps/app/src/sites/machine-id.ts) forms the id of a new machine, and
+[`apps/app/src/sites/sites-api.ts`](../apps/app/src/sites/sites-api.ts) writes to the Sites API from the server of the
+app. The values are the result of the tool `genui_site_list`
 ([`apps/genui-mcp/src/sites.ts`](../apps/genui-mcp/src/sites.ts)), which groups and counts. Which value is which
 state is decided in one file, [`packages/cards/src/machine/state.ts`](../packages/cards/src/machine/state.ts).
 What the broker sends is laid onto the list in [`apps/app/src/live/`](../apps/app/src/live/), and
