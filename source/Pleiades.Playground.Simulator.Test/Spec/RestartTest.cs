@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+using System.Text.Json;
 using Pleiades.Playground.Simulator.Spec;
 
 namespace Pleiades.Playground.Simulator.Test.Spec;
@@ -25,7 +26,7 @@ public sealed class RestartTest
             SpecCounterStore.Save(path, first.Counters);
 
             var restart = MachineRun.Start.AddHours(2).AddMinutes(1);
-            var second = new VirtualMachine(Identity, MachineRun.Config(), SpecCounterStore.Load(path, MachineRun.Config().Scenario), restart);
+            var second = new VirtualMachine(Identity, MachineRun.Config(), SpecCounterStore.Load(path, MachineRun.Config().Scenario, TimeSpan.FromSeconds(1)), restart);
             var secondIds = JobOrderIds(second, restart, TimeSpan.FromMinutes(10));
 
             Assert.IsNotEmpty(secondIds);
@@ -38,7 +39,48 @@ public sealed class RestartTest
     }
 
     [TestMethod]
-    public void ACounterFileWithoutTheNextNumber_BeginsWithTheFirstNumberOfTheScenario()
+    public void ACounterFileWithoutTheNextNumber_GivesNoJobOrderIdOfTheRunBefore()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"counters-{Guid.NewGuid():N}.json");
+        try
+        {
+            // A run as before the number was kept: it begins at the first number, and its file does not name the next.
+            var config = MachineRun.Config();
+            var before = new VirtualMachine(Identity, config, new MachineCounters(config.Scenario.InitialPowerOnDuration, 1, 1), MachineRun.Start);
+            var beforeIds = JobOrderIds(before, MachineRun.Start, TimeSpan.FromHours(2));
+            Assert.Contains($"{config.Scenario.FirstJobOrderNumber}/01", beforeIds);
+            var counters = before.Counters;
+            File.WriteAllText(path, JsonSerializer.Serialize(new { counters.PowerOnDuration, counters.Energy, counters.PartsProduced, counters.OperationDuration }));
+
+            var restart = MachineRun.Start.AddHours(2).AddMinutes(1);
+            var loaded = SpecCounterStore.Load(path, config.Scenario, TimeSpan.FromSeconds(1));
+            var after = new VirtualMachine(Identity, config, loaded, restart);
+            var afterIds = JobOrderIds(after, restart, TimeSpan.FromMinutes(10));
+
+            Assert.IsNotNull(loaded.NextJobOrderNumber);
+            Assert.IsNotEmpty(afterIds);
+            Assert.IsEmpty(beforeIds.Intersect(afterIds).ToList(), "no job order id of the run before comes again");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
+    public void TheNumberAfterEarlierRuns_LeavesRoomForTwoJobOrdersAStep()
+    {
+        var scenario = MachineRun.Config().Scenario;
+        var counters = new MachineCounters(scenario.InitialPowerOnDuration + 3600, 1, 1);
+
+        var next = SpecCounterStore.NextJobOrderNumberAfterEarlierRuns(counters, scenario, TimeSpan.FromSeconds(1));
+
+        // An hour and the save interval in steps of a second, two job orders a step, and the queue of the start.
+        Assert.AreEqual(scenario.FirstJobOrderNumber + scenario.QueuedJobOrders + (2 * (3600 + 30)), next);
+    }
+
+    [TestMethod]
+    public void AFirstRun_BeginsWithTheFirstNumberOfTheScenario()
     {
         var config = MachineRun.Config();
         var machine = new VirtualMachine(Identity, config, new MachineCounters(1, 1, 1), MachineRun.Start);

@@ -55,7 +55,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
             _spec.EffectiveProductInstanceUri(_config.SerialNumber));
         _manifest = SpecManifest.Build(identity, _spec);
         _machineId = SpecManifest.MachineId(identity, _spec);
-        var counters = SpecCounterStore.Load(_spec.PersistenceFilePath, _spec.Scenario);
+        var counters = SpecCounterStore.Load(_spec.PersistenceFilePath, _spec.Scenario, _spec.TickInterval);
         _machine = new VirtualMachine(identity, _spec, counters, start);
         // The values of the start go out whole with the first connect. Its events, the first entries of the list
         // of job orders, wait in the outbox for it: so the count of a group begins at 1, without a gap.
@@ -91,7 +91,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
 
                 await PublishSpecAsync(publisher, faults.IsFaulted(now), messages, now).ConfigureAwait(false);
 
-                if (now - lastSaved >= TimeSpan.FromSeconds(30))
+                if (now - lastSaved >= SpecCounterStore.SaveInterval)
                 {
                     SaveCounters(current);
                     lastSaved = now;
@@ -276,7 +276,15 @@ internal sealed class CommunicationFaults(TimeSpan? interval, TimeSpan duration,
 /// <summary>Keeps the counters of the virtual machine in a small JSON file.</summary>
 internal static class SpecCounterStore
 {
-    public static MachineCounters Load(string? path, ScenarioConfig scenario)
+    /// <summary>How often a running machine writes its counters; at the stop it writes them once more.</summary>
+    public static readonly TimeSpan SaveInterval = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// The counters of the file at <paramref name="path"/>, or those of the scenario without one. A file written
+    /// before the number of the next job order was kept gets one that no earlier run can have given, see
+    /// <see cref="NextJobOrderNumberAfterEarlierRuns"/>.
+    /// </summary>
+    public static MachineCounters Load(string? path, ScenarioConfig scenario, TimeSpan tickInterval)
     {
         ArgumentNullException.ThrowIfNull(scenario);
         var initial = new MachineCounters(scenario.InitialPowerOnDuration, scenario.InitialEnergy, scenario.InitialPartsProduced, scenario.InitialOperationDuration);
@@ -286,12 +294,37 @@ internal static class SpecCounterStore
         }
         try
         {
-            return JsonSerializer.Deserialize<MachineCounters>(File.ReadAllText(path)) ?? initial;
+            var stored = JsonSerializer.Deserialize<MachineCounters>(File.ReadAllText(path));
+            return stored switch
+            {
+                null => initial,
+                { NextJobOrderNumber: null } => stored with { NextJobOrderNumber = NextJobOrderNumberAfterEarlierRuns(stored, scenario, tickInterval) },
+                _ => stored,
+            };
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
         {
             return initial;
         }
+    }
+
+    /// <summary>
+    /// The number of the next job order after runs that did not keep it. Each of them began at
+    /// <see cref="ScenarioConfig.FirstJobOrderNumber"/> and gave <see cref="ScenarioConfig.QueuedJobOrders"/> job
+    /// orders at its start and at most two in a step after: one for a job order started, one for a job order
+    /// cancelled or taken back. None of them had more steps than fit into the power-on time of all earlier runs
+    /// (what the counters gained over the scenario) and the <see cref="SaveInterval"/> after the last write. So no
+    /// earlier run reached the number returned, as long as its step was not shorter than
+    /// <paramref name="tickInterval"/>.
+    /// </summary>
+    internal static int NextJobOrderNumberAfterEarlierRuns(MachineCounters counters, ScenarioConfig scenario, TimeSpan tickInterval)
+    {
+        ArgumentNullException.ThrowIfNull(counters);
+        ArgumentNullException.ThrowIfNull(scenario);
+        var seconds = Math.Max(0, counters.PowerOnDuration - scenario.InitialPowerOnDuration) + SaveInterval.TotalSeconds;
+        var steps = Math.Ceiling(seconds / Math.Max(tickInterval.TotalSeconds, 0.001));
+        var next = scenario.FirstJobOrderNumber + scenario.QueuedJobOrders + (2 * steps);
+        return next >= int.MaxValue ? int.MaxValue : (int)next;
     }
 
     public static void Save(string? path, MachineCounters counters)
