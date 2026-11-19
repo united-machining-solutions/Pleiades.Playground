@@ -7,6 +7,11 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Example app: the chips of an OPC UA proposal in the chat are pressed to see what they count. "2 missing"
+  lists the two missing elements with their values and why, "Core: 1 not available" what the core lacks,
+  and a profile marked incomplete what it lacks; pressed again, the list closes. The proposal shows no table
+  until a chip is pressed. On the mapping of `/mapping`, the chips of the numbers filter its table the same
+  way. The list of servers of `/opcua` has the numbers but not the elements, so its chips stay as they are.
 - Example app: the showcase page `/titan`, an assistant you talk to, from the umati hackathon. Hold the space
   bar or say "Hey Titan", ask, and Titan answers aloud from the values of the stack and shows the
   conversation to scroll through, each answer with the card its tool gave. It has a conversation of its own, made for speaking: the hall as it is now stands in

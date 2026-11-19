@@ -1,5 +1,6 @@
 import { CircleAlertIcon, CircleCheckIcon, InfoIcon, NetworkIcon, ServerIcon, Trash2Icon } from "lucide-react"
 import { Fragment, useId, useState } from "react"
+import type { ComponentProps, ReactNode } from "react"
 
 import type { ChatTool, ToolLabel } from "@/chat/tool-results.ts"
 import { Alert, AlertDescription, AlertTitle } from "@pleiades/ui/components/alert"
@@ -37,12 +38,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { commitProposal, removeMachine, storeUser } from "@/opcua/adapter.ts"
 import type { Outcome } from "@/opcua/adapter.ts"
 import {
+  chosenRows,
   endpointSummary,
   machineListOf,
   mappingOf,
   needingALook,
   proposalOf,
   rankedEndpointsOf,
+  sameChoice,
   securityOf,
   serverListOf,
   shownProfiles,
@@ -58,6 +61,7 @@ import type {
   ProfileCheck,
   Proposal,
   RankedEndpoints,
+  RowChoice,
   Server,
   ServerList,
 } from "./results.ts"
@@ -75,8 +79,38 @@ const stateBadge: Record<MappingState, "default" | "secondary" | "destructive" |
   Ok: "outline",
 }
 
+/**
+ * The chips of a card that has the rows: one chosen, the table shows its rows. Without `onChoose` the chips are
+ * only badges, as on the list of servers, which has the numbers but not the rows.
+ */
+type Choosing = {
+  chosen?: RowChoice | null
+  onChoose?: (choice: RowChoice | null) => void
+}
+
+/** A chip that chooses rows. Pressed again, it lets go of them. */
+function ChoiceBadge({
+  choice,
+  chosen,
+  onChoose,
+  variant,
+  children,
+}: Choosing & { choice: RowChoice; variant: ComponentProps<typeof Badge>["variant"]; children: ReactNode }) {
+  if (!onChoose) return <Badge variant={variant}>{children}</Badge>
+  const pressed = sameChoice(choice, chosen)
+  return (
+    <Badge
+      variant={pressed ? "default" : variant}
+      className="cursor-pointer"
+      render={<button type="button" aria-pressed={pressed} onClick={() => onChoose(pressed ? null : choice)} />}
+    >
+      {children}
+    </Badge>
+  )
+}
+
 /** The numbers of a mapping, what needs a look first. A zero is left out. */
-function Counts({ summary }: { summary: MappingSummary }) {
+function Counts({ summary, ...choosing }: Choosing & { summary: MappingSummary }) {
   const parts: Array<[MappingState, number]> = [
     ["Mismatch", summary.mismatch],
     ["Unclear", summary.unclear],
@@ -89,9 +123,9 @@ function Counts({ summary }: { summary: MappingSummary }) {
       {parts
         .filter(([, count]) => count > 0)
         .map(([state, count]) => (
-          <Badge key={state} variant={stateBadge[state]}>
+          <ChoiceBadge key={state} choice={{ state }} variant={stateBadge[state]} {...choosing}>
             {count} {state.toLowerCase()}
-          </Badge>
+          </ChoiceBadge>
         ))}
     </span>
   )
@@ -106,26 +140,53 @@ function profileName(check: ProfileCheck): string {
  * The core and the profiles of the data model at a glance: whether the core is fulfilled, the profiles that
  * are complete, and those the server offers in part, which are not published.
  */
-function ProfileBadges({ checks }: { checks?: ReadonlyArray<ProfileCheck> }) {
+function ProfileBadges({ checks, ...choosing }: Choosing & { checks?: ReadonlyArray<ProfileCheck> }) {
   const { core, fulfilled, incomplete } = shownProfiles(checks)
   if (!core) return null
   return (
     <span className="flex flex-wrap gap-1">
-      <Badge variant={core.fulfilled ? "secondary" : "outline"}>
-        {core.fulfilled ? <CircleCheckIcon data-icon="inline-start" /> : <CircleAlertIcon data-icon="inline-start" />}
-        {core.fulfilled ? "Core complete" : `Core: ${core.missing.length} not available`}
-      </Badge>
+      {core.fulfilled ? (
+        <Badge variant="secondary">
+          <CircleCheckIcon data-icon="inline-start" />
+          Core complete
+        </Badge>
+      ) : (
+        <ChoiceBadge choice={{ profile: core.name }} variant="outline" {...choosing}>
+          <CircleAlertIcon data-icon="inline-start" />
+          Core: {core.missing.length} not available
+        </ChoiceBadge>
+      )}
       {fulfilled.map((check) => (
         <Badge key={check.name} variant="outline">
           {profileName(check)}
         </Badge>
       ))}
       {incomplete.map((check) => (
-        <Badge key={check.name} variant="ghost">
+        <ChoiceBadge key={check.name} choice={{ profile: check.name }} variant="ghost" {...choosing}>
           {check.name} incomplete
-        </Badge>
+        </ChoiceBadge>
       ))}
     </span>
+  )
+}
+
+/** The rows of the chosen chip, with what they are. */
+function ChosenRows({
+  rows,
+  choice,
+  checks,
+}: {
+  rows: ReadonlyArray<MappingRow>
+  choice: RowChoice
+  checks?: ReadonlyArray<ProfileCheck>
+}) {
+  const shown = chosenRows(rows, choice, checks)
+  const what = "state" in choice ? `${shown.length} ${choice.state.toLowerCase()}` : `What ${choice.profile} lacks`
+  return (
+    <>
+      <p className="text-sm text-muted-foreground">{what}. Press the chip again to close the list.</p>
+      {shown.length > 0 && <Rows rows={shown} />}
+    </>
   )
 }
 
@@ -394,6 +455,7 @@ function ServedMachines({ values }: { values: MachineList }) {
 
 function ShownMapping({ values }: { values: Mapping }) {
   const { server } = values
+  const [chosen, setChosen] = useState<RowChoice | null>(null)
   return (
     <Card>
       <CardHeader>
@@ -401,10 +463,10 @@ function ShownMapping({ values }: { values: Mapping }) {
         <CardDescription>
           {server.endpoint.url} · {securityOf(server.endpoint)} · {server.state}
         </CardDescription>
-        <Counts summary={server.mapping} />
+        <Counts summary={server.mapping} chosen={chosen} onChoose={setChosen} />
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
-        <Review rows={values.rows} />
+        {chosen ? <ChosenRows rows={values.rows} choice={chosen} checks={server.conformance} /> : <Review rows={values.rows} />}
       </CardContent>
     </Card>
   )
@@ -438,6 +500,8 @@ function ChangeList({ proposal }: { proposal: Proposal }) {
 function ShownProposal({ values }: { values: Proposal }) {
   const [outcome, setOutcome] = useState<Outcome>()
   const [busy, setBusy] = useState(false)
+  // The table is closed until a chip is chosen: the chips and the alerts say what needs a look.
+  const [chosen, setChosen] = useState<RowChoice | null>(null)
   const add = async () => {
     if (!values.draftId) return
     const draftId = values.draftId
@@ -461,8 +525,8 @@ function ShownProposal({ values }: { values: Proposal }) {
             <span className="block break-all">Server certificate {values.endpoint.certificateThumbprint}</span>
           )}
         </CardDescription>
-        <ProfileBadges checks={values.conformance} />
-        {values.summary && <Counts summary={values.summary} />}
+        <ProfileBadges checks={values.conformance} chosen={chosen} onChoose={setChosen} />
+        {values.summary && <Counts summary={values.summary} chosen={chosen} onChoose={setChosen} />}
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <ProfileGaps checks={values.conformance} />
@@ -493,7 +557,15 @@ function ShownProposal({ values }: { values: Proposal }) {
           </Alert>
         )}
         <ChangeList proposal={values} />
-        {values.rows.length > 0 && <Review rows={values.rows} />}
+        {values.rows.length > 0 &&
+          (chosen ? (
+            <ChosenRows rows={values.rows} choice={chosen} checks={values.conformance} />
+          ) : values.summary ? (
+            <p className="text-sm text-muted-foreground">Press a chip above to see its elements.</p>
+          ) : (
+            // An older adapter gives no numbers, so there is no chip to press.
+            <Review rows={values.rows} />
+          ))}
       </CardContent>
       {values.accepted && values.draftId && (
         <CardFooter className="flex flex-col items-stretch gap-2">

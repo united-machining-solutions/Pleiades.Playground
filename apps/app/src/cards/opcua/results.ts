@@ -241,6 +241,33 @@ export function shownProfiles(checks: ReadonlyArray<ProfileCheck> | undefined): 
   }
 }
 
+/** What a chip of a card chooses: the rows of one state, or the elements a profile lacks. */
+export type RowChoice = { state: MappingState } | { profile: string }
+
+/** Whether two choices are the same chip. No choice is the same as no choice. */
+export function sameChoice(one: RowChoice | null | undefined, other: RowChoice | null | undefined): boolean {
+  if (!one || !other) return !one && !other
+  if ("state" in one) return "state" in other && one.state === other.state
+  return "profile" in other && one.profile === other.profile
+}
+
+/**
+ * The rows a chosen chip shows. For a profile, the elements it lacks in the order it names them; one that has no
+ * row of its own (the scan did not list it) is shown as missing, without a reason.
+ */
+export function chosenRows(
+  rows: ReadonlyArray<MappingRow>,
+  choice: RowChoice,
+  checks: ReadonlyArray<ProfileCheck> | undefined,
+): Array<MappingRow> {
+  if ("state" in choice) return rows.filter((row) => row.state === choice.state)
+  const check = checks?.find((one) => one.name === choice.profile)
+  if (!check) return []
+  return check.missing.map(
+    (path) => rows.find((row) => row.area === "umati" && row.path === path) ?? { path, area: "umati", state: "Missing" },
+  )
+}
+
 /** The rows a person has to look at: everything that is not plainly fine. */
 export function needingALook(rows: ReadonlyArray<MappingRow>): Array<MappingRow> {
   return rows.filter((row) => row.state !== "Ok")
