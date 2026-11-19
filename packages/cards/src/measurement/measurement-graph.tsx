@@ -7,12 +7,17 @@ import type { ChartConfig } from "@pleiades/ui/components/chart"
 import { clock } from "../machine/format.ts"
 import { labelOf } from "../machine/in-words.ts"
 import { categoryColour } from "../shared/colour.ts"
-import type { MachineMeasurements, MeasurementSeries } from "./contract.ts"
+import type { Measurement, MeasurementSeries, Quantity } from "./contract.ts"
 import { axisNumber, clockWithSeconds, measuredValue, quantityLabel, unitSign } from "./words.ts"
 
-/** One quantity of the result, with the minutes the result is about and the instants of its lines. */
-type QuantitySeries = MeasurementSeries["quantities"][number] & Pick<MeasurementSeries, "from" | "to" | "instants">
+/**
+ * One quantity of the result, with the minutes the result is about and the instants of its lines. Any
+ * other signal of a machine is drawn the same way, under its path and with a `title` of its own.
+ */
+type QuantitySeries = Omit<MeasurementSeries["quantities"][number], "quantity"> & { quantity: string } & Pick<MeasurementSeries, "from" | "to" | "instants">
 
+/** What a machine measures now, of the quantity of the graph or of another signal. */
+type Now = { machine: string; measurements: ReadonlyArray<Pick<Measurement, "value" | "unit" | "stale"> & { quantity: string }> }
 
 /**
  * The graph of one quantity: a line for each machine over the last minutes, with what each
@@ -21,16 +26,18 @@ type QuantitySeries = MeasurementSeries["quantities"][number] & Pick<Measurement
  * nothing but the wording.
  *
  * `machines` names every machine of the page in a fixed order: a machine keeps its colour in every
- * graph, also in one where it has no line.
+ * graph, also in one where it has no line. `title` names a graph of another signal than a quantity.
  */
 export function MeasurementGraph({
   series,
+  title,
   machines,
   current,
 }: {
   series: QuantitySeries
+  title?: string
   machines: ReadonlyArray<string>
-  current: ReadonlyArray<MachineMeasurements>
+  current: ReadonlyArray<Now>
 }) {
   const { quantity, unit, lines } = series
   const now = current.flatMap((one) => {
@@ -43,7 +50,7 @@ export function MeasurementGraph({
     <Card size="sm">
       <CardHeader>
         <CardTitle className="font-semibold group-data-[size=sm]/card:text-base">
-          {quantityLabel[quantity]}
+          {title ?? quantityLabel[quantity as Quantity]}
           {sign && <span className="font-normal text-muted-foreground">, {sign}</span>}
         </CardTitle>
         {now.length > 0 && (

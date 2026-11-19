@@ -2,6 +2,9 @@ import { clock } from "@pleiades/cards/machine/format.ts"
 import { labelOf } from "@pleiades/cards/machine/in-words.ts"
 import type { MachineMeasurements, MeasurementSeries } from "@pleiades/cards/measurement/contract.ts"
 import { MeasurementGraph } from "@pleiades/cards/measurement/measurement-graph.tsx"
+import { MOST_LINES } from "@pleiades/cards/timeseries/contract.ts"
+import type { SeriesLine, TimeseriesSeries } from "@pleiades/cards/timeseries/contract.ts"
+import { signalLabel } from "@pleiades/cards/timeseries/words.ts"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@pleiades/ui/components/empty"
 import { Skeleton } from "@pleiades/ui/components/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@pleiades/ui/components/toggle-group"
@@ -15,7 +18,9 @@ import { useLive, useRetry } from "@/hooks/use-live.ts"
 import type { Live } from "@/hooks/use-live.ts"
 import { liveAt, livePageOf, liveWith, measurementFilters } from "@/live/measurements.ts"
 import type { LivePage } from "@/live/measurements.ts"
-import { getMeasurementSeries, getMeasurements } from "@/machines/get-machines.ts"
+import { signalFilters, signalsAt, signalsPageOf, signalsWith, silentNow } from "@/live/signals.ts"
+import type { SignalsPage } from "@/live/signals.ts"
+import { getMeasurementSeries, getMeasurements, getTimeseriesSeries, getTimeseriesSignals } from "@/machines/get-machines.ts"
 
 /** The graphs are read once, from the backend; then every value comes from the broker, and the graphs move on with the clock. */
 const live: Live<LivePage> = { filters: measurementFilters(), message: liveWith, at: liveAt }
@@ -26,18 +31,55 @@ export const Route = createFileRoute("/live")({
   // The machine whose lines the graphs show, in the address, so that a link keeps it. Without one, all.
   validateSearch: (search): { machine?: string } =>
     typeof search.machine === "string" && search.machine !== "" ? { machine: search.machine } : {},
+  // A chosen machine is read again: every signal it has is found anew.
+  loaderDeps: ({ search }) => ({ machine: search.machine }),
   // If the server of the app itself is away for a moment, the page says so and keeps trying.
-  loader: async () => {
+  loader: async ({ deps }) => {
     const failed = (error: unknown) => ({ values: null, error: String(error) })
-    const [series, current] = await Promise.all([
+    const [series, current, signals] = await Promise.all([
       getMeasurementSeries().catch(failed),
       getMeasurements().catch(failed),
+      deps.machine === undefined ? null : signalsOf(deps.machine),
     ])
-    return { series, current }
+    return { series, current, signals }
   },
   component: LiveValues,
   pendingComponent: Loading,
 })
+
+/**
+ * The lines of every signal a machine published in the last 24 hours, over the last 15 minutes, as
+ * the backend lists them: the tool draws so many lines at most at once, so they are asked for in
+ * parts that end at the same instant. Null if the machine has none, or they are not to be had.
+ */
+async function signalsOf(machine: string): Promise<TimeseriesSeries | null> {
+  try {
+    const listed = await getTimeseriesSignals()
+    const paths = listed?.machines.find((one) => one.machine === machine)?.signals.map((signal) => signal.path) ?? []
+    if (paths.length === 0) return null
+    const to = new Date().toISOString()
+    const parts = Array.from({ length: Math.ceil(paths.length / MOST_LINES) }, (_, index) =>
+      paths.slice(index * MOST_LINES, (index + 1) * MOST_LINES),
+    )
+    const answers = await Promise.all(
+      parts.map((part) => getTimeseriesSeries({ data: { lines: part.map((signal) => ({ machine, signal })), range: "15m", to } })),
+    )
+    const [first] = answers
+    if (first === undefined || first === null || answers.some((answer) => answer === null)) return null
+    return { ...first, lines: answers.flatMap((answer) => answer?.lines ?? []) }
+  } catch {
+    return null
+  }
+}
+
+/** How the signals of a chosen machine are kept live; without one, there are none. */
+function signalsLive(machine: string | undefined): Live<SignalsPage | null> {
+  return {
+    filters: machine === undefined ? [] : signalFilters(machine),
+    message: (page, topic, payload, now) => page && signalsWith(page, topic, payload, now),
+    at: (page, now) => page && signalsAt(page, now),
+  }
+}
 
 /** What the choice of all machines is called in the address of the toggle group. */
 const ALL = "all"
@@ -51,6 +93,13 @@ function LiveValues() {
   const { values, connected } = useLive(page, live)
   useRetry(loaded.series.values === null)
   const { series, current } = values
+  // With a machine chosen, every signal it has, live as the graphs of all machines.
+  const signalsPage = useMemo(
+    () => (chosen !== undefined && loaded.signals ? signalsPageOf(chosen, loaded.signals) : null),
+    [loaded, chosen],
+  )
+  const signalsLiveness = useMemo(() => signalsLive(chosen), [chosen])
+  const { values: signals } = useLive(signalsPage, signalsLiveness)
 
   if (series === null) {
     return (
@@ -86,6 +135,10 @@ function LiveValues() {
   const { from, to, instants, quantities } = series
   // A machine that is no longer there, from an old link, shows as none: the choice says so.
   const shown = chosen === undefined ? machines : machines.filter((one) => one === chosen)
+  // With all machines, only the graphs that have a line: a value no machine published is left out.
+  const graphs = chosen === undefined ? quantities.filter((one) => one.lines.length > 0) : quantities
+  // With a machine chosen, a graph for each of its signals that has a value; one without any keeps the graphs above.
+  const signalLines = signals?.series.lines.filter((line) => line.values.some((value) => value !== null) || signals.newest[line.topic]) ?? []
   const choose = (machine: string | undefined) =>
     void navigate({ search: (previous) => ({ ...previous, machine }), replace: true })
 
@@ -117,23 +170,44 @@ function LiveValues() {
         )}
       </ToggleGroup>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,28rem),1fr))] gap-3">
-        {/* With all machines, only the graphs that have a line: a value no machine published is left out. */}
-        {quantities
-          .filter((one) => chosen !== undefined || one.lines.length > 0)
-          .map((one) => (
-            <QuantityGraph
-              key={one.quantity}
-              quantity={one}
-              from={from}
-              to={to}
-              instants={instants}
-              machines={machines}
-              shown={shown}
-              current={now}
-            />
-          ))}
+        {signals !== null && signalLines.length > 0
+          ? signalLines.map((line) => <SignalGraph key={line.topic} line={line} page={signals} machines={machines} />)
+          : graphs.map((one) => (
+              <QuantityGraph
+                key={one.quantity}
+                quantity={one}
+                from={from}
+                to={to}
+                instants={instants}
+                machines={machines}
+                shown={shown}
+                current={now}
+              />
+            ))}
       </div>
     </Page>
+  )
+}
+
+/**
+ * The graph of one signal of the chosen machine, under its name and with its newest value. A number
+ * without a unit is a plain number, not a yes or no.
+ */
+function SignalGraph({ line, page, machines }: { line: SeriesLine; page: SignalsPage; machines: ReadonlyArray<string> }) {
+  const { from, to, instants } = page.series
+  const unit = line.kind === "yesNo" ? null : (line.unit ?? "one")
+  const newest = page.newest[line.topic]
+  return (
+    <MeasurementGraph
+      series={{ quantity: line.path, unit, lines: [line], from, to, instants }}
+      title={signalLabel(line.path)}
+      machines={machines}
+      current={
+        newest === undefined
+          ? []
+          : [{ machine: line.machine, measurements: [{ quantity: line.path, value: newest.value, unit, stale: silentNow(page) }] }]
+      }
+    />
   )
 }
 

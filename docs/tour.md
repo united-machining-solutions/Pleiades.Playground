@@ -144,13 +144,15 @@ where the list of the sites stood before, leads here.
 
 The sidebar leads to a second overview, **Live values** (<http://localhost:5600/live>): a graph for each
 physical value over the last 15 minutes, such as active power or the temperature of the spindle bearing, with
-a line for each machine. A choice above the graphs shows one machine or all of them. It has no picture in
-this tour.
+a line for each machine. A choice above the graphs shows all machines or one: then every signal that
+machine publishes gets a graph of its own, whatever it is. It has no picture in this tour.
 
 **In the code:** [`apps/app/src/routes/live.tsx`](../apps/app/src/routes/live.tsx) is the page,
 [`packages/cards/src/measurement/measurement-graph.tsx`](../packages/cards/src/measurement/measurement-graph.tsx)
 a graph. The lines are the result of the tool `genui_measurement_series`
-([`apps/genui-mcp/src/measurements.ts`](../apps/genui-mcp/src/measurements.ts)).
+([`apps/genui-mcp/src/measurements.ts`](../apps/genui-mcp/src/measurements.ts)); those of one machine
+come from `genui_timeseries_signals` and `genui_timeseries_series`, kept live in
+[`apps/app/src/live/signals.ts`](../apps/app/src/live/signals.ts).
 
 The page "Charts" in the sidebar, <http://localhost:5600/charts>, shows the last hours of every machine as charts:
 one bar per machine with how long it was in each state, and a tile per machine with its state over the last 30
