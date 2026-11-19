@@ -495,12 +495,12 @@ For deployment from published images, see [deployment](deployment.md#enable-the-
 ## Optional: Titan, an assistant you talk to
 
 Titan is not part of the six stops either. A stack with `APP_SHOWCASES` set has the page
-<http://localhost:5600/titan>, in the sidebar like every page: a dark panel with a cloud of points. A click on it
-or the space bar starts it. Then
-hold the space bar, ask "Welche Maschine steht?" and let go, or say "Hey Titan" and the question. Titan
-says "Moment." at once and answers aloud, in German, from the values of the stack; the panel shows the
-conversation to scroll through, each answer with the card its tool gave. The space bar interrupts it, P pauses it, and the
-sidebar leads away from it.
+<http://localhost:5600/titan>, in the sidebar like every page: a dark panel with a cloud of points. A tap on
+the cloud or the space bar starts it. Then press and hold the cloud, or the space bar, ask "Welche Maschine
+steht?" and let go, or say "Hey Titan" and the question. Titan says "Moment." at once and answers aloud, in
+German, from the values of the stack; the panel shows the conversation to scroll through, with the cards its
+tools gave. A press interrupts it, the button under the cloud or P pauses it, and the sidebar leads away from
+it. It needs no keyboard.
 
 Titan needs the language model of stop 4, and of the same gateway a transcription model to listen. With a
 speech model at the gateway it speaks with that voice, else with a voice of the browser. Everything it hears

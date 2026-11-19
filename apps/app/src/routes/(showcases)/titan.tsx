@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { Kbd } from "@pleiades/ui/components/kbd"
 import { SparklesIcon } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 
@@ -32,7 +31,7 @@ import { loadRecognition } from "@/showcases/titan/voice/transcribe.ts"
 import { AWAKE_MS, isPause, useWakeWord } from "@/showcases/titan/voice/wake.ts"
 import { greetingFor, machinesInWords } from "@/showcases/titan/voice/greeting.ts"
 import { unbroken } from "@/showcases/titan/words.ts"
-import { Cloud } from "@/showcases/titan/voice/cloud.tsx"
+import { Orb } from "@/showcases/titan/orb.tsx"
 
 // Titan: a dark panel with a cloud of points that greets, listens and speaks, and nothing else. It stands
 // in the frame of the app like every other page, so the sidebar leads to it and away from it.
@@ -203,6 +202,8 @@ function Assistant() {
     return true
   }
   const actions = useRef({ pause, resume })
+  /** The press and the release of the space bar, for the cloud to call: set where the keys are bound. */
+  const controls = useRef<{ press: () => void; release: () => void } | undefined>(undefined)
   actions.current = { pause, resume }
 
   // Titan speaks with the speech model of the gateway if it has one, else with a voice of this computer.
@@ -325,7 +326,14 @@ function Assistant() {
       }
       if (event.code !== "Space") return
       event.preventDefault()
-      if (event.repeat || holding.current) return
+      if (event.repeat) return
+      press()
+    }
+
+    // The space bar goes down, or the cloud is pressed: the first press starts Titan, one in a pause ends
+    // the pause, and every other one records until it is let go.
+    const press = () => {
+      if (holding.current) return
       holding.current = true
       setProblem(undefined)
       if (start()) return
@@ -334,7 +342,7 @@ function Assistant() {
         setProblem("Dieser Browser kann nicht aufnehmen. Nimm Chrome oder Edge.")
         return
       }
-      // The space bar interrupts: an answer that is still arriving is given up, and Titan listens.
+      // A press interrupts: an answer that is still arriving is given up, and Titan listens.
       conversation.current?.stop()
       heldSince.current = performance.now()
       recognising.current = true
@@ -342,7 +350,7 @@ function Assistant() {
         (question) => {
           recognising.current = false
           if (!question) {
-            setProblem("Ich habe nichts verstanden. Halte die Leertaste gedrückt, solange du sprichst.")
+            setProblem("Ich habe nichts verstanden. Halte gedrückt, solange du sprichst.")
             return
           }
           conversation.current?.ask(question)
@@ -367,6 +375,11 @@ function Assistant() {
       // A key that went down for Titan also comes up for it, wherever the focus is by then.
       if ((typing(event) || elsewhere(event)) && !holding.current) return
       event.preventDefault()
+      release()
+    }
+
+    // The space bar comes up, or the cloud is let go.
+    const release = () => {
       const wasHolding = holding.current
       holding.current = false
       // Also before the microphone is ready: the recording then ends as soon as it begins.
@@ -374,6 +387,7 @@ function Assistant() {
       // Titan says at once that it heard, while the question is still being recognised.
       if (wasHolding && latest.current.state === "listening" && performance.now() - heldSince.current >= SHORTEST_QUESTION_MS) void sayNext(ON_IT)
     }
+    controls.current = { press, release }
 
     window.addEventListener("keydown", onDown)
     window.addEventListener("keyup", onUp)
@@ -388,6 +402,23 @@ function Assistant() {
     }
   }, [])
 
+  /** The cloud to touch, with what a press does now under it and the button that pauses beside it. */
+  const orb = (size: "large" | "small") => (
+    <Orb
+      state={state}
+      alarm={alarmed.length > 0}
+      started={started}
+      paused={paused}
+      hearsItsName={wakeReady}
+      size={size}
+      onPress={() => controls.current?.press()}
+      onRelease={() => controls.current?.release()}
+      onPauseOrGoOn={() => {
+        if (!actions.current.resume()) actions.current.pause()
+      }}
+    />
+  )
+
   /** The conversation has begun: its transcript takes the panel, and the cloud steps to the side. */
   const talking = started && transcript.messages.length > 0
 
@@ -395,11 +426,11 @@ function Assistant() {
   const line =
     problem ??
     recognition ??
-    (paused ? "Pause · „Hey Titan“ sagen oder die Leertaste drücken, um weiterzumachen." : undefined) ??
+
     (overheard && `Gehört: „${overheard}“`) ??
     // A fault Titan did not say, because it was busy or had just said one, is still named here.
-    (alarmed.length > 0 ? `Offener Fehler an ${machinesInWords(alarmed)} · Leertaste halten und fragen.` : undefined) ??
-    (wakeReady ? "„Hey Titan“ sagen, oder die Leertaste halten und sprechen. P pausiert." : undefined)
+    (alarmed.length > 0 ? `Offener Fehler an ${machinesInWords(alarmed)}` : undefined) ??
+    (started ? "Mit Tastatur: Leertaste halten und sprechen, P pausiert." : undefined)
 
   return (
     // A dark panel that fills the page, in the frame of the app: as high as the window below the bar of
@@ -409,8 +440,8 @@ function Assistant() {
       {talking ? (
         <div className="flex min-h-0 flex-1">
           {/* The cloud stays in sight and still shows whether Titan listens, thinks or speaks. */}
-          <aside className="flex w-56 shrink-0 items-center justify-center max-md:hidden">
-            <Cloud state={state} alarm={alarmed.length > 0} className={`size-48 ${paused ? "opacity-30" : ""}`} />
+          <aside className="flex w-64 shrink-0 items-center justify-center px-4 max-md:w-48">
+            {orb("small")}
           </aside>
           <main className="flex min-h-0 min-w-0 flex-1 flex-col">
             <TranscriptView transcript={transcript} />
@@ -419,13 +450,8 @@ function Assistant() {
       ) : (
         <main className="flex min-h-0 flex-1 px-8 py-10">
           <div className="m-auto flex w-full max-w-3xl flex-col items-center gap-8 text-center">
-            <Cloud state={state} alarm={alarmed.length > 0} className={`size-72 ${paused ? "opacity-30" : ""}`} />
             <h1 className="text-3xl font-light tracking-wide text-balance">{paused ? "Pause" : unbroken(greetingFor(undefined, alarmed))}</h1>
-            {!started && (
-              <p className="flex items-center gap-2 text-base text-muted-foreground">
-                <Kbd>Leertaste</Kbd> drücken oder klicken, um Titan zu starten.
-              </p>
-            )}
+            {orb("large")}
           </div>
         </main>
       )}

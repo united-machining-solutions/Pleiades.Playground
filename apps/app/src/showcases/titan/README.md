@@ -10,16 +10,17 @@ came out of the umati hackathon in November 2026.
 
 | | |
 |---|---|
-| Start | A click or the space bar. A browser speaks and listens only after one of them |
-| Ask | Hold the space bar, speak, let go. Or say "Hey Titan" and the question |
-| Interrupt | The space bar: Titan falls silent and listens |
-| Pause | The key P, or "Hey Titan, Pause". "Hey Titan" or the space bar wakes it |
+| Start | A tap on the cloud, or the space bar. A browser speaks and listens only after one of them |
+| Ask | Press and hold the cloud, speak, let go; the same with the space bar. Or say "Hey Titan" and the question |
+| Interrupt | Press the cloud or the space bar: Titan falls silent and listens |
+| Pause | The button under the cloud, the key P, or "Hey Titan, Pause". The button, a press, or "Hey Titan" wakes it |
 | Leave | The sidebar, as from every page |
 
 Titan also speaks first: when a machine raises a new error it says so, in its own words. It never talks over
 the person or over an answer, and says at most one fault a minute; the line at the bottom names the machines with an open error.
 
-Titan speaks German, as the demo does.
+Titan needs no keyboard: on a touch screen the cloud is the button, and the line under it says what a press
+does now. Titan speaks German, as the demo does.
 
 ## How a question becomes an answer
 
