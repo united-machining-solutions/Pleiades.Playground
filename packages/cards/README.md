@@ -12,6 +12,7 @@ generative UI backend. Its contract and its component lie next to each other, so
 |---|---|---|---|
 | Documentation: one answer with exact source warnings, one evidence chip, inline preview and host PDF navigation | External `docs_answer` | `documentationAnswer` in `src/documentation/contract.ts` | `DocumentationAnswerCard` in `src/documentation/documentation-answer-card.tsx` |
 | Energy: how much energy machines imported over the last hours, from their meters, with mean and peak power, and the power of each as a graph | `genui_energy_show`, and `genui_energy_series` for the lines of the graph, which only a card calls | `energyShow` and `energySeries` in `src/energy/contract.ts` | `EnergyCard` in `src/energy/energy-card.tsx` |
+| Job order: the job order of one machine (`JobMonitoring.JobOrders` with its result) and its program execution (`WorkMasterMonitoring.ProgramExecution`), by the names of the umati data model, and both over the last hours as a timeline | `genui_job_order_show`, and `genui_job_order_timeline` for the spans of the timeline, which only a card calls | `jobOrderShow` and `jobOrderTimeline` in `src/joborder/contract.ts` | `JobOrderCard` in `src/joborder/joborder-card.tsx` |
 | Machine: what one machine does now, since when, with which work master and job order, and the states of the last hours | `genui_machine_show` | `machineShow` in `src/machine/contract.ts` | `MachineCard` in `src/machine/machine-card.tsx` |
 | Measurement: the newest physical values of every machine, each in the unit it was published in | `genui_measurement_list` | `measurementList` in `src/measurement/contract.ts` | `MeasurementCards` in `src/measurement/measurement-card.tsx`; for one machine as tiles, with its power over the last minutes and its energy, `MeasurementTiles` in `src/measurement/measurement-tiles.tsx` |
 | Measurement graph: one quantity of every machine over the last minutes, a line for each machine | `genui_measurement_series`, called by the card file of the measurements below its cards, and by the page `/live` of the example app. The chat draws no graph | `measurementSeries` in `src/measurement/contract.ts` | `MeasurementGraph` in `src/measurement/measurement-graph.tsx` |
@@ -49,6 +50,9 @@ Both import the theme from [`packages/ui`](../ui/README.md), so the card looks t
 
 ## What is where
 
+- `src/joborder/`: what is shown about the job order of a machine.
+  - `contract.ts`: the job order, its program execution, the counts of the hours, and the spans of the timeline.
+  - `in-words.ts`: the card in words. `joborder-card.tsx`: the job order card with its timeline.
 - `src/machine/`: what is shown about a machine.
   - `contract.ts`: the shape of a machine as the tools return it, the contract of the machine card and of
     the spans of its band, and after how many seconds of silence a machine is not live.

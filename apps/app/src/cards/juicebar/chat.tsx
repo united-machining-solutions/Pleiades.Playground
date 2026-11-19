@@ -55,7 +55,7 @@ const patience = 10
 /** The pause between two reads of an order. The next read starts when the last one has ended. */
 const READ_EVERY_MS = 1000
 
-export function DrinkPicker({ drinks: listed }: { drinks: Array<Drink> }) {
+function DrinkPicker({ drinks: listed }: { drinks: Array<Drink> }) {
   const { drinks, hidden, low } = orderable(listed)
   const [pickedId, setPickedId] = useState(drinks[0]?.id)
   const [step, setStep] = useState<Step>({ at: "pick" })

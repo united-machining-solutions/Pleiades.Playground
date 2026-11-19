@@ -399,15 +399,14 @@ Within seconds the app appears in the launchpad of the hub, as "Playground", and
   commit this file; here everything that needs it writes it first.
 - `src/showcases/`: what is made for one demo or one fair, and is in a build only where `APP_SHOWCASES` is
   set ([ADR-0018](../../docs/adr/0018-a-showcase-is-built-in-on-request-and-only-adds.md)). A folder below
-  it is a showcase: `juice-bar/` is what the page `/juice-bar` reads, the drink card of the chat on a page of
-  its own for a screen next to the machine, without a language model. `titan/` is the assistant you talk
+  it is a showcase: `titan/` is the assistant you talk
   to, the page `/titan`, with a [guide](src/showcases/titan/README.md) of its own. `where-is-my-job/` holds
   the made-up orders WI-… of the page `/where-is-my-job`, "Where is My Job?", a page for discussion that
   follows an order across the machines, with the machines of one step of manufacturing side by side. Its view,
   map and panels, the grouping of job orders, the steps and `getFloor`, which reads its values, are of the app,
   in `src/where-is-my-job/`, and take the made-up orders through `extras.ts`. The pages of the showcases, and their
   server routes, are the route files under `src/routes/(showcases)/`; the brackets make a folder that adds
-  nothing to an address, so `(showcases)/juice-bar.tsx` answers at `/juice-bar`. A page belongs to the
+  nothing to an address, so `(showcases)/titan.tsx` answers at `/titan`. A page belongs to the
   showcase its name begins with: `titan.tsx`, `titan.faces.tsx` and `titan/faces.tsx` are pages of
   `showcases/titan/`. A build without the setting leaves that folder out
   (`vite.config.ts`): the router does not know the pages, nothing imports the folder of a showcase, and

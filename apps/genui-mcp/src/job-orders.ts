@@ -14,7 +14,7 @@ import { secondsBefore } from "./time.ts"
  * An instant as an ISO 8601 string in UTC, or null. Instants compare as text only in one form:
  * the source may leave out the trailing zeros of the fraction, or write an offset.
  */
-function utc(written: string | null | undefined): string | null {
+export function utc(written: string | null | undefined): string | null {
   if (!written) return null
   const at = Date.parse(written)
   return Number.isNaN(at) ? null : new Date(at).toISOString()

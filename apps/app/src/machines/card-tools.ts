@@ -28,3 +28,9 @@ export const ENERGY_SERIES_TOOL = "genui_energy_series"
  */
 export const TIMESERIES_SERIES_TOOL = "genui_timeseries_series"
 export const TIMESERIES_SIGNALS_TOOL = "genui_timeseries_signals"
+
+/**
+ * The tool for the timeline of the job order card. Only a card calls it: the chat asks for the timeline
+ * itself, see get-machines.ts, and keeps the tool from its language model, see cards/joborder/chat.tsx.
+ */
+export const JOB_ORDER_TIMELINE_TOOL = "genui_job_order_timeline"
