@@ -395,6 +395,11 @@ All notable changes are documented here. The format follows
 
 ### Changed
 
+- Example app: the microphone of the chat field can be held. Hold it while you speak and let go, as on a
+  tablet, and what was said goes into the field; a tap starts and ends the recording as before. The recording
+  starts as the finger goes down, so the first word is heard. While it records, the second line of the field
+  shows bars that move with the voice, the time and what ends it, where the finger does not cover it. The
+  recorder is the app's own now, so that the bars read the stream that records.
 - Example app: "New chat" is back in the head of the chat panel, as a plus in the list and in every chat. It
   opens a new chat with no question yet and the cursor in its field; the list stays behind "All chats". After
   the first question asked in the panel, the field of the new chat keeps the cursor, so the next question

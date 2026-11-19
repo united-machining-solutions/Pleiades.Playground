@@ -340,8 +340,10 @@ The three questions above are suggestions to begin with.
 While an answer comes, send turns into stop: it ends the answer, what came so far stays, and the next
 question can go.
 
-With a speech-to-text model at the gateway, the field also has a microphone: press it, speak, press it
-again, and what was said stands in the field, to send like a typed question. The gateway decides which model
+With a speech-to-text model at the gateway, the field also has a microphone: tap it, speak, tap it again,
+or hold it while you speak and let go, and what was said stands in the field, to send like a typed question.
+While it records, bars at the left of the field move with your voice, beside the time and what ends the
+recording. The gateway decides which model
 writes it down, see [Dictation](../apps/app/README.md#dictation). The picture of the answer shows the microphone
 at the right of the field.
 

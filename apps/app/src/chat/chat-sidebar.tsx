@@ -90,7 +90,7 @@ import { blocksOf, questionOf, thinkingLine } from "./blocks.ts"
 import type { Block, Call, CallState } from "./blocks.ts"
 import { chatTools } from "./cards.tsx"
 import { UNNAMED_CHAT, chatName, nameOfQuestion } from "./chat-name.ts"
-import { DictateButton } from "./dictate.tsx"
+import { DictateButton, DictationLine, useDictation } from "./dictate.tsx"
 import { SaveAsPage } from "./save-as-page.tsx"
 import type { ListedServer } from "./server-list.ts"
 import { chooseChatModel, fetchChatSettings, getChatServers, switchChatServer } from "./status.ts"
@@ -758,7 +758,7 @@ function Composer({
   off,
   settled = true,
   onSwitch,
-  dictation,
+  dictation: canDictate,
 }: {
   placeholder: string
   suggestions?: ReadonlyArray<string>
@@ -818,6 +818,7 @@ function Composer({
     setNotice(undefined)
     field.current?.focus()
   }
+  const dictation = useDictation(dictated)
   // What was typed: a question goes out, a command becomes its question, /help shows the commands.
   const submit = (value: string) => {
     if (value.trim() === "" || busy) return
@@ -941,23 +942,27 @@ function Composer({
             onKeyDown={onKeyDown}
           />
           {/* The second line of the field: the tools, the commands and, with a choice of models, the
-              model on the left, dictation and send on the right. */}
+              model on the left, dictation and send on the right. While dictation records or writes, its
+              line stands on the left instead, where a finger on the microphone does not cover it. */}
           <InputGroupAddon align="block-end">
-            <ToolsMenu off={off} settled={settled} onSwitch={onSwitch} />
-            <InputGroupButton
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Commands"
-              aria-pressed={help}
-              onClick={() => {
-                setHelp((open) => !open)
-                setClosed(false)
-                setMarked(0)
-              }}
-            >
-              <SlashIcon />
-            </InputGroupButton>
-            {choice && (
+            {dictation.phase !== "idle" && <DictationLine dictation={dictation} />}
+            {dictation.phase === "idle" && <ToolsMenu off={off} settled={settled} onSwitch={onSwitch} />}
+            {dictation.phase === "idle" && (
+              <InputGroupButton
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Commands"
+                aria-pressed={help}
+                onClick={() => {
+                  setHelp((open) => !open)
+                  setClosed(false)
+                  setMarked(0)
+                }}
+              >
+                <SlashIcon />
+              </InputGroupButton>
+            )}
+            {choice && dictation.phase === "idle" && (
               <DropdownMenu>
                 <DropdownMenuTrigger render={<InputGroupButton variant="ghost" aria-label={`Model: ${model}`} />}>
                   {model}
@@ -977,12 +982,12 @@ function Composer({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            {dictation && <DictateButton className="ml-auto" onText={dictated} />}
+            {canDictate && <DictateButton dictation={dictation} className="ml-auto" />}
             <InputGroupButton
               type={stoppable ? "button" : "submit"}
               variant="default"
               size="icon-sm"
-              className={dictation ? undefined : "ml-auto"}
+              className={canDictate ? undefined : "ml-auto"}
               aria-label={stoppable ? "Stop" : "Send"}
               disabled={busy && !stoppable}
               onClick={stoppable ? onStop : undefined}
