@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Options;
 using MQTTnet;
+using MQTTnet.Protocol;
 using Pleiades.Playground.Mqtt.Extensions;
 using Pleiades.Playground.Mqtt.Extensions.Machines;
 
@@ -31,6 +32,7 @@ internal sealed partial class VirtualMachineService : BackgroundService
     private JsonObject _manifest = [];
     private string _machineId = string.Empty;
     private bool _faulted;
+    private readonly Dictionary<string, JsonNode?> _upstreamLists = new(StringComparer.Ordinal);
 
     public VirtualMachineService(
         IOptions<Config> config,
@@ -56,7 +58,9 @@ internal sealed partial class VirtualMachineService : BackgroundService
         _manifest = SpecManifest.Build(identity, _spec);
         _machineId = SpecManifest.MachineId(identity, _spec);
         var counters = SpecCounterStore.Load(_spec.PersistenceFilePath, _spec.Scenario, _spec.TickInterval);
-        _machine = new VirtualMachine(identity, _spec, counters, start);
+        var routeState = RouteStateStore.Load(_spec.EffectiveRouteStateFilePath);
+        _machine = new VirtualMachine(identity, _spec, counters, start, routeState);
+        var upstream = _machine.Upstream;
         // The values of the start go out whole with the first connect. Its events, the first entries of the list
         // of job orders, wait in the outbox for it: so the count of a group begins at 1, without a gap.
         var initialEvents = _machine.TakeInitialMessages().OfType<SpecEvent>().ToList();
@@ -76,17 +80,40 @@ internal sealed partial class VirtualMachineService : BackgroundService
 #pragma warning disable CA2025
             _client.ConnectedAsync += _ => OnConnectedAsync(publisher);
 #pragma warning restore CA2025
+            if (upstream.Count > 0)
+            {
+                // Handler first, then subscribe. The retained lists of the machine before come at once: they are the
+                // catch-up after a start, and every change of them after.
+#pragma warning disable CA2025
+                _client.ApplicationMessageReceivedAsync += OnUpstreamMessageAsync;
+#pragma warning restore CA2025
+            }
             await _client.StartAsync(CreateOptions(start)).ConfigureAwait(false);
+            foreach (var machineId in upstream)
+            {
+                LogFollowing(machineId);
+                await _client.SubscribeAsync(SpecWire.Topic(machineId, SpecElements.JobOrders), MqttQualityOfServiceLevel.AtLeastOnce).ConfigureAwait(false);
+                await _client.SubscribeAsync(SpecWire.Topic(machineId, SpecElements.JobOrderResults), MqttQualityOfServiceLevel.AtLeastOnce).ConfigureAwait(false);
+            }
 
             while (await timer.WaitForNextTickAsync(stoppingToken).ConfigureAwait(false))
             {
                 var now = _timeProvider.GetUtcNow();
                 IReadOnlyList<SpecMessage> messages;
                 MachineCounters current;
+                RouteState? routes = null;
                 lock (_lock)
                 {
                     messages = _machine.Advance(now);
                     current = _machine.Counters;
+                    if (_machine.RouteStateChanged)
+                    {
+                        routes = _machine.TakeRouteState();
+                    }
+                }
+                if (routes is not null)
+                {
+                    SaveRouteState(routes);
                 }
 
                 await PublishSpecAsync(publisher, faults.IsFaulted(now), messages, now).ConfigureAwait(false);
@@ -170,6 +197,50 @@ internal sealed partial class VirtualMachineService : BackgroundService
         await publisher.PublishAsync(messages).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// A retained list of job orders of a machine this one follows in a route: kept with the other list of that
+    /// machine, and both handed to the virtual machine, which takes its steps from them.
+    /// </summary>
+    private Task OnUpstreamMessageAsync(MqttApplicationMessageReceivedEventArgs args)
+    {
+        var topic = args.ApplicationMessage.Topic;
+        var machineId = topic.Split('/') is { Length: > 2 } levels && levels[0] == SpecWire.Root ? levels[1] : null;
+        if (machineId is null)
+        {
+            return Task.CompletedTask;
+        }
+        var isOrders = topic == SpecWire.Topic(machineId, SpecElements.JobOrders);
+        if (!isOrders && topic != SpecWire.Topic(machineId, SpecElements.JobOrderResults))
+        {
+            return Task.CompletedTask;
+        }
+        JsonNode? value;
+        try
+        {
+            var payload = args.ApplicationMessage.ConvertPayloadToString();
+            value = string.IsNullOrEmpty(payload) ? null : JsonNode.Parse(payload)?["value"];
+        }
+        catch (JsonException exception)
+        {
+            LogUpstreamUnreadable(topic, exception);
+            return Task.CompletedTask;
+        }
+        lock (_lock)
+        {
+            // The two lists come one after the other: a job order ends in the first, its good parts are final in the
+            // second. Both are taken together whenever one of them changes, once the list of job orders is known.
+            _upstreamLists[topic] = value?.DeepClone();
+            // Without a list (not known yet, or taken back with the machine) nothing is decided.
+            if (!_upstreamLists.TryGetValue(SpecWire.Topic(machineId, SpecElements.JobOrders), out var orders) || orders is not JsonArray)
+            {
+                return Task.CompletedTask;
+            }
+            _upstreamLists.TryGetValue(SpecWire.Topic(machineId, SpecElements.JobOrderResults), out var results);
+            _machine!.ObserveUpstream(machineId, UpstreamJobOrder.FromLists(orders, results));
+        }
+        return Task.CompletedTask;
+    }
+
     private async Task OnConnectedAsync(SpecPublisher publisher)
     {
         List<SpecValue> values;
@@ -227,6 +298,19 @@ internal sealed partial class VirtualMachineService : BackgroundService
         };
     }
 
+    private void SaveRouteState(RouteState state)
+    {
+        var path = _spec.EffectiveRouteStateFilePath;
+        try
+        {
+            RouteStateStore.Save(path, state);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            LogSaveFailed(path ?? string.Empty, exception);
+        }
+    }
+
     private void SaveCounters(MachineCounters counters)
     {
         try
@@ -247,6 +331,12 @@ internal sealed partial class VirtualMachineService : BackgroundService
 
     [LoggerMessage(EventId = 104, Level = LogLevel.Warning, Message = "Saving the counters to {File} failed")]
     private partial void LogSaveFailed(string file, Exception exception);
+
+    [LoggerMessage(EventId = 107, Level = LogLevel.Information, Message = "Virtual machine follows the job orders of {MachineId} in a route")]
+    private partial void LogFollowing(string machineId);
+
+    [LoggerMessage(EventId = 108, Level = LogLevel.Warning, Message = "A list of job orders on {Topic} cannot be read")]
+    private partial void LogUpstreamUnreadable(string topic, Exception exception);
 
     [LoggerMessage(EventId = 105, Level = LogLevel.Information, Message = "Spec output cannot reach the virtual machine (scenario): CommunicationFault")]
     private partial void LogCommunicationFault();
@@ -339,5 +429,40 @@ internal static class SpecCounterStore
             Directory.CreateDirectory(directory);
         }
         File.WriteAllText(path, JsonSerializer.Serialize(counters));
+    }
+}
+
+/// <summary>Keeps the state of the routes of the virtual machine in a small JSON file.</summary>
+internal static class RouteStateStore
+{
+    public static RouteState Load(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            return new RouteState();
+        }
+        try
+        {
+            return JsonSerializer.Deserialize<RouteState>(File.ReadAllText(path)) ?? new RouteState();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return new RouteState();
+        }
+    }
+
+    public static void Save(string? path, RouteState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+        File.WriteAllText(path, JsonSerializer.Serialize(state));
     }
 }

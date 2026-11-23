@@ -50,6 +50,9 @@ In PowerShell, set the variable first: `$env:PLEIADES_VERSION = "main"`. Or writ
 | OPC UA adapter | <http://localhost:5560/machines> | Machines that speak OPC UA, added in the chat; with a simulated one, A1121O0001, web UI at <http://localhost:8090/>. On this computer only (`OPCUA_ADAPTER_BIND`); see [the adapter](source/Pleiades.Playground.OpcUa.Adapter/README.md) |
 
 The simulator publishes values, states and notifications for three machines as soon as the stack is healthy.
+Besides the job orders of its own, every half hour one job order passes all three in turn under one job order id,
+turned on M-02, milled on P-07 and ground on P-04 (a route, see
+[What the simulators publish](contracts/mqtt/README.md#what-the-simulators-publish)).
 An optional [Ultimaker 3 service](source/Pleiades.Playground.Ultimaker.Api/README.md) adds CuraEngine,
 REST and MCP slicing, static toolpath validation and explicit printer pairing/start. It is started only
 with the `ultimaker` Compose profile and leaves printing disabled by default.

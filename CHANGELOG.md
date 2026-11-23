@@ -7,6 +7,14 @@ All notable changes are documented here. The format follows
 
 ### Added
 
+- Simulator: routes, job orders that pass several machines in turn under one `JobOrderID`, the id an MES knows
+  a job by (`Config:SpecOutput:Routes`, off unless `Enabled`). The machine of the first step adds one every
+  `Interval`; every later machine follows the retained lists `JobMonitoring/JobOrders` and `JobOrderResults` of
+  the machine before it: it adds its step as `NotAllowedToStart` when the job order shows up there, releases it
+  with the good parts as `RunsPlanned` when it ended there, and cancels it when it was aborted there, made no good
+  part or left the list. The next number of a route and the job orders taken are kept in
+  `/data/spec_routes.json`. The demo stack runs the route `ValveBody` M-02 → P-07 → P-04 every 30 minutes, so the
+  page "Where is My Job?" shows an order across three machines.
 - Juice bar API and example app: the use of the ingredients. `juicebar_consumption_get` and `GET /consumption`
   say in how many sold drinks each ingredient on a pump was, in the last hours (8 if not asked) and since the
   start, the most used first, and name the least used one, the one to take off a pump first. The counts come

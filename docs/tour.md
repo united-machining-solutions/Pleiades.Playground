@@ -540,8 +540,7 @@ For deployment from published images, see [deployment](deployment.md#enable-the-
 
 ## Optional: Where is My Job?
 
-Following an order across the shop floor is not part of the six stops either: no source of the stack sends an
-order across machines yet. A stack with `APP_SHOWCASES` set has the page
+Following an order across the shop floor is not part of the six stops either. A stack with `APP_SHOWCASES` set has the page
 <http://localhost:5600/where-is-my-job>, in the sidebar as "Where is My Job?", a basis for discussion. It shows
 the machines of the stack from above, with their state, utilisation and job orders, the machines of one step of
 manufacturing side by side: cutting, turning, milling, grinding, in the order of DIN 8580. The step comes from
@@ -553,7 +552,10 @@ The page opens with made-up orders WI-… across the clusters; "Real orders" tur
 every job order that names the same order number, read from the backend (`genui_job_order_list`) and kept live
 by the retained lists `JobMonitoring/JobOrders` and `JobOrderResults`. Programming before the machines, packing
 after them and the single part on its sheet have no source yet: the page draws them dashed, as the gaps to
-discuss. It has no picture in this tour.
+discuss. The simulators send one real order across machines every half hour: the route `ValveBody`, job order
+`90001/01` and on, the same `JobOrderID` on every machine, order number `SO-90001`, turned on M-02, milled on
+P-07 and ground on P-04; P-07 releases its step once M-02 has ended it, P-04 once P-07 has. Search for "Valve
+body" or "SO-900" to find one. It has no picture in this tour.
 
 It is a showcase: its route is `routes/(showcases)/where-is-my-job.tsx`, and the made-up orders are in
 [`apps/app/src/showcases/where-is-my-job/`](../apps/app/src/showcases/where-is-my-job/). The map, the panels and

@@ -30,7 +30,7 @@ internal sealed record MachineCounters(
 /// thread-safe; the caller serialises access.
 /// </remarks>
 [SuppressMessage("Security", "CA5394:Do not use insecure randomness", Justification = "Simulation, not security")]
-internal sealed class VirtualMachine
+internal sealed partial class VirtualMachine
 {
     private const string NotExecuting = "NotExecuting";
     private const string Executing = "Executing";
@@ -84,7 +84,7 @@ internal sealed class VirtualMachine
     private DateTimeOffset _nextHeartbeat;
     private DateTimeOffset _nextMeasurement;
 
-    public VirtualMachine(MachineIdentity identity, SpecOutputConfig config, MachineCounters counters, DateTimeOffset start)
+    public VirtualMachine(MachineIdentity identity, SpecOutputConfig config, MachineCounters counters, DateTimeOffset start, RouteState? routeState = null)
     {
         ArgumentNullException.ThrowIfNull(identity);
         ArgumentNullException.ThrowIfNull(config);
@@ -120,6 +120,7 @@ internal sealed class VirtualMachine
         _feedOverride = _feedOverrideSteps[0];
         _spindleOverride = _spindleOverrideSteps[0];
         Initialise();
+        InitialiseRoutes(routeState ?? new RouteState());
     }
 
     private enum Phase
@@ -181,6 +182,7 @@ internal sealed class VirtualMachine
         RaiseAlerts(elapsed);
         StopProgram(elapsed);
         ChangeQueue(elapsed);
+        AddRouteJobOrders();
         PromoteNextJobOrder();
         RemoveExpiredJobOrders();
         PublishPeriodic();
@@ -263,7 +265,9 @@ internal sealed class VirtualMachine
 
     private void StartJobOrder()
     {
-        var job = _jobOrders.FirstOrDefault(j => j.State == "AllowedToStart");
+        // A job order of a route goes first: the machines after this one wait for it.
+        var job = _jobOrders.FirstOrDefault(j => j.State == "AllowedToStart" && j.Route is not null)
+            ?? _jobOrders.FirstOrDefault(j => j.State == "AllowedToStart");
         if (job is null)
         {
             return;
@@ -277,8 +281,11 @@ internal sealed class VirtualMachine
         ChangeJobState(job, "Running");
         _activeJob = job;
 
-        // Keep the queue full: the next one may start, a new one waits.
-        AddJobOrder();
+        // Keep the queue full: the next one may start, a new one waits. A job order of a route is no part of it.
+        if (job.Route is null)
+        {
+            AddJobOrder();
+        }
         PromoteNextJobOrder();
 
         SetWorkMaster(job, null);
@@ -442,7 +449,8 @@ internal sealed class VirtualMachine
         {
             return;
         }
-        var waiting = _jobOrders.Where(j => j.State is "NotAllowedToStart" or "AllowedToStart").ToList();
+        // The planner of the machine leaves the job orders of a route alone: the route plans them.
+        var waiting = _jobOrders.Where(j => (j.State is "NotAllowedToStart" or "AllowedToStart") && j.Route is null).ToList();
         if (waiting.Count == 0)
         {
             return;
@@ -652,11 +660,12 @@ internal sealed class VirtualMachine
 
     private void PromoteNextJobOrder()
     {
-        if (_jobOrders.Any(j => j.State == "AllowedToStart"))
+        // Only the own queue of the machine: a job order of a route is released by its route.
+        if (_jobOrders.Any(j => j.State == "AllowedToStart" && j.Route is null))
         {
             return;
         }
-        var next = _jobOrders.FirstOrDefault(j => j.State == "NotAllowedToStart" && (j.HeldUntil is null || _now >= j.HeldUntil));
+        var next = _jobOrders.FirstOrDefault(j => j.State == "NotAllowedToStart" && j.Route is null && (j.HeldUntil is null || _now >= j.HeldUntil));
         if (next is null)
         {
             return;
@@ -907,6 +916,9 @@ internal sealed class VirtualMachine
         public long RunsCompleted { get; set; }
         public string JobResult { get; set; } = "Unknown";
         public DateTimeOffset? HeldUntil { get; set; }
+
+        /// <summary>The name of the route the job order belongs to; null for one of the own queue of the machine.</summary>
+        public string? Route { get; init; }
 
         /// <summary>
         /// The entry of <c>JobMonitoring.JobOrders</c>: what is ordered. The machine knows no planned times.
