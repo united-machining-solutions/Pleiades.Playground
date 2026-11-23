@@ -26,17 +26,29 @@ The machine id is `<manufacturer>_<model>_<serial number>`: `united-grinding_sim
 | `Identification/Manufacturer`, `SerialNumber`, `ProductInstanceUri`, `ManufacturerUri`, `Model` | settings, then the stream | The settings give all five at the start; where the stream says one, its value stands. It says neither the model nor the URI of the manufacturer. |
 | `State/Status` | the stream | `MachineryItemState` and `MachineryOperationMode`, goes out when it changes |
 | `Notification/ActiveAlerts` | the stream | The list of alerts |
-| `WorkMasterMonitoring/ActiveWorkMaster` | `activity.jobName` of the stream | The job, the model's name for what the machine works on; `null` when none runs |
+| `WorkMasterMonitoring/ActiveWorkMaster` | the name of the running print in `Production.ActiveJob`, else `activity.jobName` of the stream | The job, the model's name for what the machine works on; `null` when none runs. A slicing job is no work master, it is what the machine does |
 | `../oem/Activity/Context` | `activity.context` | What the machine does now, for example `printing` |
-| `../oem/Activity/Progress` | `activity.progressPercent` | How far the job is, as a fraction of 1 with the unit `one` (6 % is `0.06`) |
+| `../oem/Activity/Progress` | `ProgressPercent` of `Production.ActiveJob`, else `activity.progressPercent` | How far the job is, as a fraction of 1 with the unit `one` (6 % is `0.06`) |
+| `../oem/Activity/CurrentLayer`, `TotalLayers` | `CurrentLayer`, `TotalLayers` of `Production.ActiveJob`, else `activity` | The layer the job is at and how many it has, counted from 1, with the unit `one`; `null` where the machine does not say it. A print on the Ultimaker has no current layer, and none is made up from the progress |
+| `../oem/Job/Id`, `Kind`, `State`, `Start` | `JobId`, `Kind`, `State`, `Start` of `Production.ActiveJob` | Which job runs: its id, `Slicing` or `Printing`, `Running` and its start in UTC; all `null` while none runs |
 | `Identification/ProductCode`, `YearOfConstruction`, `State/FeedOverride`, `OperationCounters/PowerOnDuration` | – | The machine has none: `"available": false` in the manifest, `null` on the topic |
 
-The stream says the job beside `State.Status`, as `activity`. The data model has no element for how far a job is
-or for a layer; its `ProgramExecution` and `JobOrders` count whole runs and parts. So the progress and the context
-are signals of the manufacturer: they lie below `oem/` (the prefix `x-united-grinding-com` stands only in the
-manifest, with their type, unit and a description), and a consumer that knows only the model ignores them. The
-stack stores them; the machine page of the example app shows the work master but not these two. The backend sends
-no layer.
+The stream says the job in two places: beside `State.Status`, as `activity`, and in the group `production`, as
+`Production.ActiveJob` (the newest running job, `null` while idle) and `Production.JobHistory` (the last ten jobs that
+ended). A job is `{JobId, Name, Kind, State, Start, End, ProgressPercent, CurrentLayer, TotalLayers}`. The data model
+has no element for how far a job is, for a layer or for these jobs; its `ProgramExecution` and `JobOrders` count whole
+runs and parts. So the progress, the layers and the job are signals of the manufacturer: they lie below `oem/` (the
+prefix `x-united-grinding-com` stands only in the manifest, with their type, unit and a description), and a consumer
+that knows only the model ignores them. The stack stores them; the machine page of the example app shows the work
+master but not these. The job says it more closely than `activity`, so it wins where both name the same thing; the
+other stays the source where the job says none (a backend without the group `production` works as before).
+
+The stream sends only the groups that changed, and a message may hold the job without the status or the other way
+round. The adapter keeps the status and the job as they were said last and makes the work master, the progress, the
+layers and the job from both, each time one of them comes. `Production.ActiveJob` and `Production.JobHistory` do not
+go out as they are: the group is no part of the model and is not published below `umati/`. The history is not
+published yet; it would be the jobs of the profile `JobMonitoring` (job orders, their results and the events
+below `events/jobs`), which this adapter does not declare.
 
 The backend's own `Connection.State` and `Connection.Heartbeat` are not forwarded: `Connection/State` and
 `Connection/Heartbeat` tell whether this adapter lives. The adapter says `Running` while the stream answers with

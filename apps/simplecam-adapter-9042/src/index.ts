@@ -6,8 +6,10 @@ import http from "node:http"
 import mqtt from "mqtt"
 import {
   ACTIVE_ALERTS,
+  ACTIVE_JOB,
   ADAPTER_OWNED,
   CONNECTION_STATE,
+  JOB_HISTORY,
   EVENT_CONTENT_TYPE,
   HEARTBEAT,
   activityReadings,
@@ -21,6 +23,8 @@ import {
   extensionPrefix,
   identityReadings,
   isAlert,
+  isJob,
+  jobReadings,
   machineId,
   manifestTopic,
   readingsOf,
@@ -30,6 +34,7 @@ import {
   type Alert,
   type AlertChange,
   type DeliveredElement,
+  type Job,
   type Manifest,
   type Reading,
 } from "./binding.ts"
@@ -104,6 +109,11 @@ const current = new Map<string, Reading>(
 const sent = new Map<string, string>()
 // The time the adapter first read a value that has none of its own, kept while the value stays the same.
 const seen = new Map<string, { signature: string; time: string }>()
+
+// The status and the job as the backend said them last. The stream sends only the groups that changed, and the work
+// master, the progress and the layers are made from both: a message with one of them is made with the other as it was.
+let lastStatus: Reading | undefined
+let lastJob: Job | null | undefined
 
 // The list of alerts as the backend said it last; null before it said one.
 let alerts: Alert[] | null = null
@@ -266,11 +276,17 @@ function handle(event: string, text: string): void {
     lost()
     return
   }
-  // The job and its progress come beside State.Status and are no elements of the model: the job is the active work
-  // master, the rest signals of the manufacturer.
-  const own = readings
-    .filter((reading) => !ADAPTER_OWNED.has(reading.path))
-    .flatMap((reading) => (reading.path === "State.Status" ? [reading, ...activityReadings(reading, SIGNAL_PREFIX, read)] : [reading]))
+  // The job and its progress are no elements of the model: the job is the active work master (a print), the rest
+  // signals of the manufacturer. They come beside State.Status (`activity`) and from the group `production`:
+  // `Production.ActiveJob` is used, `Production.JobHistory` is not published (yet), and neither goes out as it is.
+  const status = readings.find((reading) => reading.path === "State.Status")
+  const job = readings.find((reading) => reading.path === ACTIVE_JOB)
+  if (status !== undefined) lastStatus = status
+  if (job !== undefined) lastJob = isJob(job.value) ? job.value : null
+  const own = readings.filter((reading) => !ADAPTER_OWNED.has(reading.path) && reading.path !== ACTIVE_JOB && reading.path !== JOB_HISTORY)
+  if (status !== undefined || job !== undefined) {
+    own.push(...activityReadings(lastStatus, SIGNAL_PREFIX, read, lastJob), ...jobReadings(lastStatus, lastJob, SIGNAL_PREFIX, read))
+  }
   // A message that says only "Connected" says as well that the machine is there again.
   if (own.length > 0 || (backend !== undefined && reachable !== true)) reached(own)
 }
@@ -282,6 +298,10 @@ async function readStream(): Promise<void> {
     const response = await fetch(SSE_URL, { headers: { accept: "text/event-stream" }, signal: controller.signal })
     if (!response.ok || response.body === null) throw new Error(`HTTP ${response.status}`)
     console.log(`[SSE] Connected to ${SSE_URL}`)
+    // What was said on an earlier connection is not kept: a backend that answers after a restart (an older one, say,
+    // without the group `production`) must not leave the job signals on the last job. Its first message is the whole state.
+    lastStatus = undefined
+    lastJob = undefined
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     const parse = sseParser()

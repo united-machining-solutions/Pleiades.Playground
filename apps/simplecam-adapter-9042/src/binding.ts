@@ -195,6 +195,32 @@ const SIGNALS: Readonly<Record<string, Signal>> = {
     unit: { code: "C62", name: "one" },
     description: "Progress of the current job as a fraction, 1.0 = done; null when no job runs",
   },
+  "Activity.CurrentLayer": {
+    type: "number",
+    unit: { code: "C62", name: "one" },
+    description: "The layer the current job is at, counted from 1; null when no job runs or the machine does not say it (a print on the Ultimaker has none)",
+  },
+  "Activity.TotalLayers": {
+    type: "number",
+    unit: { code: "C62", name: "one" },
+    description: "How many layers the current job has; null when no job runs or the number is not known",
+  },
+  "Job.Id": {
+    type: "string",
+    description: "The id of the current job, stable for the job and unique over restarts of the backend; null when no job runs",
+  },
+  "Job.Kind": {
+    type: "string",
+    description: "What the current job is: Slicing or Printing; null when no job runs",
+  },
+  "Job.State": {
+    type: "string",
+    description: "The state of the current job: Running, Ended, Aborted or Error; null when no job runs",
+  },
+  "Job.Start": {
+    type: "string",
+    description: "When the current job started, ISO 8601 in UTC; null when no job runs",
+  },
 }
 
 function signalOf(path: string): Signal | undefined {
@@ -208,12 +234,17 @@ function signalOf(path: string): Signal | undefined {
  * the backend says no job, all three are `null`: not available right now. `timestamp` is the time the adapter read
  * them: the time of `State.Status` is that of its last change, and says nothing about the progress made since.
  */
-export function activityReadings(status: Reading, prefix: string, timestamp: string): Reading[] {
-  const activity = status.activity
-  const text = (value: unknown): string | null => (typeof value === "string" && value.length > 0 ? value : null)
-  const percent = typeof activity?.progressPercent === "number" && Number.isFinite(activity.progressPercent) ? activity.progressPercent : null
+export function activityReadings(status: Reading | undefined, prefix: string, timestamp: string, job?: Job | null): Reading[] {
+  const activity = status?.activity
+  // The job of the backend (`Production.ActiveJob`) says it in more detail than `activity` beside the status: where
+  // it names the same thing, it wins. A slicing job is named `slicing`, which is what the machine does, no work master.
+  // The backend says a `jobName` in `activity` only for a print (while it slices, the activity has none), so the
+  // fallback to `activity.jobName` never makes a slicing job the work master.
+  const running = job ?? null
+  const percent = percentOf(running?.ProgressPercent) ?? percentOf(activity?.progressPercent)
+  const printing = running?.Kind === "Printing" ? text(running.Name) : null
   return [
-    { path: "WorkMasterMonitoring.ActiveWorkMaster", value: text(activity?.jobName), timestamp },
+    { path: "WorkMasterMonitoring.ActiveWorkMaster", value: printing ?? text(activity?.jobName), timestamp },
     { path: `${prefix}.Activity.Context`, value: text(activity?.context), timestamp },
     {
       path: `${prefix}.Activity.Progress`,
@@ -221,6 +252,41 @@ export function activityReadings(status: Reading, prefix: string, timestamp: str
       timestamp,
       unit: "one",
     },
+  ]
+}
+
+/** `Production.ActiveJob` and `Production.JobHistory`: the jobs of the backend, a SimpleCAM extension and no element of the model. */
+export const ACTIVE_JOB = "Production.ActiveJob"
+export const JOB_HISTORY = "Production.JobHistory"
+
+/** A job of the backend: `{JobId, Name, Kind, State, Start, End, ProgressPercent, CurrentLayer, TotalLayers}`, the numbers only where it knows them. */
+export type Job = Record<string, unknown> & { JobId: string }
+
+export function isJob(node: unknown): node is Job {
+  return isRecord(node) && typeof node.JobId === "string" && node.JobId.length > 0
+}
+
+const text = (value: unknown): string | null => (typeof value === "string" && value.length > 0 ? value : null)
+const percentOf = (value: unknown): number | null => (typeof value === "number" && Number.isFinite(value) ? value : null)
+const countOf = (value: unknown): number | null => (typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null)
+const timeOf = (value: unknown): string | null => (typeof value === "string" && !Number.isNaN(Date.parse(value)) ? value : null)
+
+/**
+ * What the running job says besides how far it is, as signals of the manufacturer: the layer it is at and of how
+ * many, and which job it is. The layers come from the job, else from `activity` beside the status; a printer that
+ * reports none gives no current layer. With no job (`null`), and before the backend has said one, all six are `null`:
+ * not available right now. `timestamp` is the time the adapter read them.
+ */
+export function jobReadings(status: Reading | undefined, job: Job | null | undefined, prefix: string, timestamp: string): Reading[] {
+  const activity = status?.activity
+  const running = job ?? null
+  return [
+    { path: `${prefix}.Activity.CurrentLayer`, value: countOf(running?.CurrentLayer) ?? countOf(activity?.currentLayer), timestamp, unit: "one" },
+    { path: `${prefix}.Activity.TotalLayers`, value: countOf(running?.TotalLayers) ?? countOf(activity?.totalLayers), timestamp, unit: "one" },
+    { path: `${prefix}.Job.Id`, value: text(running?.JobId), timestamp },
+    { path: `${prefix}.Job.Kind`, value: text(running?.Kind), timestamp },
+    { path: `${prefix}.Job.State`, value: text(running?.State), timestamp },
+    { path: `${prefix}.Job.Start`, value: timeOf(running?.Start), timestamp },
   ]
 }
 
@@ -304,6 +370,12 @@ export function deliveredElements(prefix: string): DeliveredElement[] {
     { path: "WorkMasterMonitoring.ActiveWorkMaster", timestampSource: "adapter" },
     { path: `${prefix}.Activity.Context`, timestampSource: "adapter" },
     { path: `${prefix}.Activity.Progress`, timestampSource: "adapter" },
+    { path: `${prefix}.Activity.CurrentLayer`, timestampSource: "adapter" },
+    { path: `${prefix}.Activity.TotalLayers`, timestampSource: "adapter" },
+    { path: `${prefix}.Job.Id`, timestampSource: "adapter" },
+    { path: `${prefix}.Job.Kind`, timestampSource: "adapter" },
+    { path: `${prefix}.Job.State`, timestampSource: "adapter" },
+    { path: `${prefix}.Job.Start`, timestampSource: "adapter" },
   ]
 }
 
