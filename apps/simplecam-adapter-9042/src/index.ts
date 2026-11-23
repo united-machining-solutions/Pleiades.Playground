@@ -298,6 +298,10 @@ async function readStream(): Promise<void> {
     const response = await fetch(SSE_URL, { headers: { accept: "text/event-stream" }, signal: controller.signal })
     if (!response.ok || response.body === null) throw new Error(`HTTP ${response.status}`)
     console.log(`[SSE] Connected to ${SSE_URL}`)
+    // What was said on an earlier connection is not kept: a backend that answers after a restart (an older one, say,
+    // without the group `production`) must not leave the job signals on the last job. Its first message is the whole state.
+    lastStatus = undefined
+    lastJob = undefined
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     const parse = sseParser()

@@ -197,10 +197,12 @@ const SIGNALS: Readonly<Record<string, Signal>> = {
   },
   "Activity.CurrentLayer": {
     type: "number",
+    unit: { code: "C62", name: "one" },
     description: "The layer the current job is at, counted from 1; null when no job runs or the machine does not say it (a print on the Ultimaker has none)",
   },
   "Activity.TotalLayers": {
     type: "number",
+    unit: { code: "C62", name: "one" },
     description: "How many layers the current job has; null when no job runs or the number is not known",
   },
   "Job.Id": {
@@ -236,6 +238,8 @@ export function activityReadings(status: Reading | undefined, prefix: string, ti
   const activity = status?.activity
   // The job of the backend (`Production.ActiveJob`) says it in more detail than `activity` beside the status: where
   // it names the same thing, it wins. A slicing job is named `slicing`, which is what the machine does, no work master.
+  // The backend says a `jobName` in `activity` only for a print (while it slices, the activity has none), so the
+  // fallback to `activity.jobName` never makes a slicing job the work master.
   const running = job ?? null
   const percent = percentOf(running?.ProgressPercent) ?? percentOf(activity?.progressPercent)
   const printing = running?.Kind === "Printing" ? text(running.Name) : null
@@ -277,8 +281,8 @@ export function jobReadings(status: Reading | undefined, job: Job | null | undef
   const activity = status?.activity
   const running = job ?? null
   return [
-    { path: `${prefix}.Activity.CurrentLayer`, value: countOf(running?.CurrentLayer) ?? countOf(activity?.currentLayer), timestamp },
-    { path: `${prefix}.Activity.TotalLayers`, value: countOf(running?.TotalLayers) ?? countOf(activity?.totalLayers), timestamp },
+    { path: `${prefix}.Activity.CurrentLayer`, value: countOf(running?.CurrentLayer) ?? countOf(activity?.currentLayer), timestamp, unit: "one" },
+    { path: `${prefix}.Activity.TotalLayers`, value: countOf(running?.TotalLayers) ?? countOf(activity?.totalLayers), timestamp, unit: "one" },
     { path: `${prefix}.Job.Id`, value: text(running?.JobId), timestamp },
     { path: `${prefix}.Job.Kind`, value: text(running?.Kind), timestamp },
     { path: `${prefix}.Job.State`, value: text(running?.State), timestamp },

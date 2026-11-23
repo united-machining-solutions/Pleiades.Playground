@@ -29,7 +29,7 @@ The machine id is `<manufacturer>_<model>_<serial number>`: `united-grinding_sim
 | `WorkMasterMonitoring/ActiveWorkMaster` | the name of the running print in `Production.ActiveJob`, else `activity.jobName` of the stream | The job, the model's name for what the machine works on; `null` when none runs. A slicing job is no work master, it is what the machine does |
 | `../oem/Activity/Context` | `activity.context` | What the machine does now, for example `printing` |
 | `../oem/Activity/Progress` | `ProgressPercent` of `Production.ActiveJob`, else `activity.progressPercent` | How far the job is, as a fraction of 1 with the unit `one` (6 % is `0.06`) |
-| `../oem/Activity/CurrentLayer`, `TotalLayers` | `CurrentLayer`, `TotalLayers` of `Production.ActiveJob`, else `activity` | The layer the job is at and how many it has, counted from 1; `null` where the machine does not say it. A print on the Ultimaker has no current layer, and none is made up from the progress |
+| `../oem/Activity/CurrentLayer`, `TotalLayers` | `CurrentLayer`, `TotalLayers` of `Production.ActiveJob`, else `activity` | The layer the job is at and how many it has, counted from 1, with the unit `one`; `null` where the machine does not say it. A print on the Ultimaker has no current layer, and none is made up from the progress |
 | `../oem/Job/Id`, `Kind`, `State`, `Start` | `JobId`, `Kind`, `State`, `Start` of `Production.ActiveJob` | Which job runs: its id, `Slicing` or `Printing`, `Running` and its start in UTC; all `null` while none runs |
 | `Identification/ProductCode`, `YearOfConstruction`, `State/FeedOverride`, `OperationCounters/PowerOnDuration` | – | The machine has none: `"available": false` in the manifest, `null` on the topic |
 

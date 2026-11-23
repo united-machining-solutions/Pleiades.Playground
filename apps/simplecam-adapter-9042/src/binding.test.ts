@@ -280,7 +280,7 @@ test("where the backend says no job, the three are null; progress stays between 
   assert.equal(activityReadings(under, PREFIX, READ)[2].value, 0)
 })
 
-// The jobs as the backend sends them (ADR-0022, P-37): a slicing job, and a print the backend sent to the printer.
+// The jobs as the backend sends them (ADR-0022 of the SimpleCAM repository, P-37): a slicing job, and a print the backend sent to the printer.
 const slicing = { CurrentLayer: 37, JobId: "1763546400-3", Kind: "Slicing", Name: "slicing", ProgressPercent: 26, Start: "2026-11-19T10:02:12.507Z", State: "Running", TotalLayers: 142 }
 const printing = { JobId: "1763546400-4", Kind: "Printing", Name: "Nadel-Beatrice", ProgressPercent: 6, Start: "2026-11-19T10:05:00.000Z", State: "Running", TotalLayers: 210 }
 const production = (activeJob: unknown, jobHistory?: unknown) => ({
@@ -315,8 +315,8 @@ test("a print is the active work master with the progress of the job; a slicing 
 test("the layer and the job are signals of the manufacturer, null where the machine does not say them", () => {
   const [reading] = readingsOf(status({ context: "slicing", currentLayer: 5, totalLayers: 9 }))
   assert.deepEqual(jobReadings(reading, slicing, PREFIX, READ), [
-    { path: `${PREFIX}.Activity.CurrentLayer`, value: 37, timestamp: READ },
-    { path: `${PREFIX}.Activity.TotalLayers`, value: 142, timestamp: READ },
+    { path: `${PREFIX}.Activity.CurrentLayer`, value: 37, timestamp: READ, unit: "one" },
+    { path: `${PREFIX}.Activity.TotalLayers`, value: 142, timestamp: READ, unit: "one" },
     { path: `${PREFIX}.Job.Id`, value: "1763546400-3", timestamp: READ },
     { path: `${PREFIX}.Job.Kind`, value: "Slicing", timestamp: READ },
     { path: `${PREFIX}.Job.State`, value: "Running", timestamp: READ },
@@ -337,7 +337,11 @@ test("the layer and the job are signals of the manufacturer, null where the mach
 test("the manifest names the layer and the job signals with their type", () => {
   const manifest = buildManifest(ID, "urn:united-grinding:simplecam:9042", deliveredElements(PREFIX), 10)
   const element = (path: string) => manifest.elements.find((one) => one.path === path)
-  for (const path of ["Activity.CurrentLayer", "Activity.TotalLayers"]) assert.equal(element(`${PREFIX}.${path}`)?.type, "number")
+  for (const path of ["Activity.CurrentLayer", "Activity.TotalLayers"]) {
+    assert.equal(element(`${PREFIX}.${path}`)?.type, "number")
+    // A signal of the manufacturer that is a number names its unit in the manifest (contracts/mqtt): a count is `one`.
+    assert.deepEqual(element(`${PREFIX}.${path}`)?.unit, { code: "C62", name: "one" })
+  }
   for (const path of ["Job.Id", "Job.Kind", "Job.State", "Job.Start"]) {
     assert.equal(element(`${PREFIX}.${path}`)?.type, "string")
     assert.equal(element(`${PREFIX}.${path}`)?.timestampSource, "adapter")
