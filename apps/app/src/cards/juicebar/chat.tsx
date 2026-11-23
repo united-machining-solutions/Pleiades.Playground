@@ -11,10 +11,11 @@ import { Field, FieldContent, FieldDescription, FieldLabel, FieldLegend, FieldSe
 import { RadioGroup, RadioGroupItem } from "@pleiades/ui/components/radio-group"
 import { Spinner } from "@pleiades/ui/components/spinner"
 
+import { ConsumptionCard } from "./consumption.tsx"
 import { readAgainAndAgain, reached } from "./follow.ts"
 import { PouringGlass, SmallGlass } from "./glass.tsx"
 import type { Pour } from "./glass.tsx"
-import { drinksOf, glassOf, ingredientsOf, isFizzy, orderOf, orderable, shortName, stageOf, whereLost, whyNoOrder } from "./results.ts"
+import { consumptionOf, drinksOf, glassOf, ingredientsOf, isFizzy, orderOf, orderable, shortName, stageOf, whereLost, whyNoOrder } from "./results.ts"
 import type { Drink, Order, Stage } from "./results.ts"
 
 // The drink card, in the chat and on a page: what the juice bar can mix now, one drink to pick, and its
@@ -269,6 +270,16 @@ export const juicebarTools: ReadonlyArray<ChatTool> = [
     draw(content) {
       const drinks = drinksOf(content)
       return drinks && <DrinkPicker drinks={drinks} />
+    },
+  },
+  {
+    name: "juicebar_consumption_get",
+    label: { running: "Counting the juices", done: "Counted the juices", failed: "Failed to count the juices" },
+    // A page asks for the counts each time it is opened (ADR-0025); the tool only reads.
+    part: "How often each juice on a pump was used",
+    draw(content) {
+      const used = consumptionOf(content)
+      return used && <ConsumptionCard used={used} />
     },
   },
   {

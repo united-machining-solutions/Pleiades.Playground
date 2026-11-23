@@ -15,6 +15,12 @@ All notable changes are documented here. The format follows
   part or left the list. The next number of a route and the job orders taken are kept in
   `/data/spec_routes.json`. The demo stack runs the route `ValveBody` M-02 → P-07 → P-04 every 30 minutes, so the
   page "Where is My Job?" shows an order across three machines.
+- Juice bar API and example app: the use of the ingredients. `juicebar_consumption_get` and `GET /consumption`
+  say in how many sold drinks each ingredient on a pump was, in the last hours (8 if not asked) and since the
+  start, the most used first, and name the least used one, the one to take off a pump first. The counts come
+  from the public report of the marketplace the machine takes its recipes from, `JUICEBAR_MARKETPLACE_URL`, over
+  all its machines: drinks, not millilitres. The chat draws them as the card of the juices used, after the
+  energy card, and a page keeps it as a part.
 - Example app: the chat adds machines and makes sites and halls. Asked for it, the language model proposes with
   `app_placement_propose`, and the chat draws a card that asks step by step for what is missing (which machine,
   where) and writes only when a person confirms, with the server functions and the undo of Home

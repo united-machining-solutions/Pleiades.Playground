@@ -342,6 +342,8 @@ services:
       JuiceBar__Model: ${JUICEBAR_MODEL:-JuiceBar}
       JuiceBar__SerialNumber: ${JUICEBAR_SERIAL_NUMBER:-JUICEBAR-01}
       JuiceBar__Language: ${JUICEBAR_LANGUAGE:-en}
+      # The website of the marketplace, for the use of the ingredients; empty: not read.
+      JuiceBar__MarketplaceUrl: ${JUICEBAR_MARKETPLACE_URL:-}
 
   # The example application.
   app:

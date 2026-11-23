@@ -22,6 +22,10 @@ builder.Services.AddOptions<JuiceBarOptions>().BindConfiguration("JuiceBar")
         "JuiceBar:ManufacturerUri must be an HTTP(S) URL; its domain names the manufacturer in the machine id.")
     .Validate(o => o.ProductInstanceUri.Length <= 255 && o.Identity.EffectiveProductInstanceUri.Length <= 255,
         "JuiceBar:ProductInstanceUri must have at most 255 characters.")
+    .Validate(o => string.IsNullOrWhiteSpace(o.MarketplaceUrl)
+        || (Uri.TryCreate(o.MarketplaceUrl, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) && string.IsNullOrEmpty(uri.UserInfo)),
+        "JuiceBar:MarketplaceUrl must be empty or an HTTP(S) URL without credentials.")
     .ValidateOnStart();
 builder.Services.AddPleiadesHttpJsonOptions();
 builder.Services.AddPleiadesForwardedHeaders();
@@ -39,6 +43,20 @@ builder.Services.AddHttpClient(MixerClient.HttpClientName, (services, client) =>
     client.BaseAddress = new Uri(new Uri(settings.BaseUrl), "/");
     client.Timeout = TimeSpan.FromSeconds(8);
 }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false });
+builder.Services.AddSingleton<MarketplaceClient>();
+builder.Services.AddHttpClient(MarketplaceClient.HttpClientName, (services, client) =>
+{
+    // Without an address the client is never asked: the service says that no marketplace is named.
+    var settings = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<JuiceBarOptions>>().Value;
+    if (!string.IsNullOrWhiteSpace(settings.MarketplaceUrl))
+    {
+        client.BaseAddress = new Uri(new Uri(settings.MarketplaceUrl), "/");
+    }
+
+    client.Timeout = TimeSpan.FromSeconds(8);
+    // Unlike the machine on the network of the stand, the marketplace may be on the internet: it is reached through
+    // the proxy the container names in HTTPS_PROXY or HTTP_PROXY, where it names one.
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddHostedService<MixerLiveWorker>();
 
 // The state goes to the broker only where one is named; REST and MCP work without it.
@@ -63,6 +81,7 @@ builder.Services.AddPleiadesMcpServer(mcp =>
     mcp.Domains.Add("Drinks: what the machine can mix now, with ingredients.");
     mcp.Domains.Add("Status: production state, queue, progress, pumps and low-bottle warnings.");
     mcp.Domains.Add("Orders: place one drink in the queue and follow it. A person starts the production at the machine.");
+    mcp.Domains.Add("Consumption: in how many sold drinks each ingredient on a pump was, and which one is used least.");
     mcp.DiscoveryFlow.Add("Use juicebar_drinks_list to see the card and juicebar_status to see whether the machine is ready.");
     mcp.DiscoveryFlow.Add("Use juicebar_order_create only when a person asked for a drink, then juicebar_order_get to follow it.");
     mcp.WritePolicy = FeaturePolicy.Write(Feature);
@@ -98,6 +117,8 @@ app.MapGet("/drinks", (JuiceBarService juiceBar, CancellationToken ct) => juiceB
 app.MapGet("/drinks/{id}", (string id, JuiceBarService juiceBar, CancellationToken ct) => juiceBar.DrinkAsync(id, ct))
     .RequireFeatureRead(Feature);
 app.MapGet("/status", (JuiceBarService juiceBar, CancellationToken ct) => juiceBar.StatusAsync(ct)).RequireFeatureRead(Feature);
+app.MapGet("/consumption", (int? hours, JuiceBarService juiceBar, CancellationToken ct)
+    => juiceBar.ConsumptionAsync(hours ?? ConsumptionReport.DefaultHours, ct)).RequireFeatureRead(Feature);
 app.MapGet("/orders/{orderNumber:int}", (int orderNumber, JuiceBarService juiceBar, CancellationToken ct) => juiceBar.OrderAsync(orderNumber, ct))
     .RequireFeatureRead(Feature);
 app.MapPost("/orders", async (OrderRequest request, JuiceBarService juiceBar, CancellationToken ct) =>
