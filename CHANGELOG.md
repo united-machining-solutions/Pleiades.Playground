@@ -705,6 +705,10 @@ All notable changes are documented here. The format follows
 
 ### Fixed
 
+- Example app, showcase Titan: with "Hey Titan" in a room where people talk, a question ends when the voice at
+  the microphone does. Titan took the talk of the room for speech, so every piece it heard ran to its longest,
+  eight seconds, and the answer began only then. It now also learns the level of the room from its quietest
+  moments.
 - Generative UI backend: a question about the job orders of every machine shows the job order card in the
   chat. The model answered it with `genui_job_order_list`, which draws no card, and told the person the values
   were in a card; the result of the list now says so and names the machines whose job order runs, for
