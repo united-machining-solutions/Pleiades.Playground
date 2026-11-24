@@ -26,6 +26,9 @@ internal sealed record PrinterJob(string PrinterId, string PrinterJobId, string?
     DateTimeOffset? FinishedAt, DateTimeOffset? CleanedAt, IReadOnlyList<PrintSubmission> SliceAssociations);
 internal sealed record CurrentPrinterJob(string PrinterId, PrinterJob? Job);
 internal sealed record PrintHistoryPage(int Offset, int Count, int? NextOffset, IReadOnlyList<PrinterJob> Items);
+internal sealed record PrinterFaultEntry(DateTimeOffset RaisedAt, int Code, int Level, string Message);
+internal sealed record PrinterFaultReport(string PrinterId, DateTimeOffset CheckedAt, int LogLines,
+    DateTimeOffset? LogSince, IReadOnlyList<PrinterFaultEntry> Faults, IReadOnlyList<PrinterJob> FailedJobs);
 internal sealed record SlicingProfile(string Id, string Printer, string Material, string Core,
     double WidthMetre, double DepthMetre, double HeightMetre);
 
@@ -38,4 +41,6 @@ internal sealed class UltimakerOptions
     public int SliceTimeoutSecond { get; set; } = 180;
     public int MaximumModelBytes { get; set; } = 20 * 1024 * 1024;
     public bool EnablePrinting { get; set; }
+    /// <summary>How many of the newest lines of the printer log a fault query reads.</summary>
+    public int FaultLogLines { get; set; } = 5000;
 }

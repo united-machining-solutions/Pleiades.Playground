@@ -21,6 +21,10 @@ internal sealed class TelemetryOptions
     /// <summary>The globally unique id of the printer; empty for <c>{ManufacturerUri}/{Model}/{SerialNumber}</c>.</summary>
     public string ProductInstanceUri { get; set; } = string.Empty;
     public int PollIntervalSecond { get; set; } = 2;
+    /// <summary>How often the printer log and job history are read for faults.</summary>
+    public int FaultPollIntervalSecond { get; set; } = 30;
+    /// <summary>How many of the newest log lines one fault poll reads.</summary>
+    public int FaultLogLines { get; set; } = 500;
 
     /// <summary>Who the printer is, by the rules of the binding.</summary>
     public MachineIdentity Identity => new(ManufacturerName, ManufacturerUri, Model, SerialNumber, ProductInstanceUri);

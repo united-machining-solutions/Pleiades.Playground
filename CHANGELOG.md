@@ -224,6 +224,9 @@ All notable changes are documented here. The format follows
   current jobs and history with durable slice associations, and a separate MQTT telemetry adapter.
   Both containers are part of the root Compose stack and image-publication workflow, enabled for
   deployment with COMPOSE_PROFILES=ultimaker.
+- Ultimaker services: the reason a print failed. The tool `ultimaker_printer_faults` and the route
+  `GET /printer/faults` return the faults of the printer log and the failed or aborted jobs; the telemetry
+  adapter publishes them as alert events of the data model, which the Events API stores.
 - Optional juice bar service `juicebar-api` (Compose profile `juicebar`, port 5550): the card and the state of
   a machine that runs MixerControl over REST and MCP, an order on request, and its state on the broker below
   `machines/{MachineId}/`, `trumpf_JuiceBar_JUICEBAR-01` by default, with its own values below `oem/JuiceBar/`.

@@ -6,6 +6,8 @@
     <ProjectReference Include="../Pleiades.Playground.HealthChecks.Mqtt/Pleiades.Playground.HealthChecks.Mqtt.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- One reader of the printer's fault lines for the API and for this adapter. -->
+    <Compile Include="../Pleiades.Playground.Ultimaker.Api/PrinterFaultLog.cs" Link="PrinterFaultLog.cs" />
     <InternalsVisibleTo Include="Pleiades.Playground.Ultimaker.Telemetry.Test" />
   </ItemGroup>
 </Project>

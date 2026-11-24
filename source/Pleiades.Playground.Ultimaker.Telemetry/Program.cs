@@ -16,6 +16,8 @@ builder.Services.AddOptions<TelemetryOptions>().BindConfiguration("Config")
     .Validate(o => o.ProductInstanceUri.Length <= 255 && o.Identity.EffectiveProductInstanceUri.Length <= 255,
         "ProductInstanceUri must have at most 255 characters.")
     .Validate(o => o.PollIntervalSecond is >= 1 and <= 10, "Poll interval must be 1..10 seconds.")
+    .Validate(o => o.FaultPollIntervalSecond is >= 5 and <= 600 && o.FaultLogLines is >= 50 and <= 5000,
+        "Fault poll interval must be 5..600 seconds and fault log lines 50..5000.")
     .Validate(o => Uri.TryCreate(o.PrinterBaseUrl, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"
         && string.IsNullOrEmpty(uri.UserInfo), "PrinterBaseUrl must be an HTTP(S) URL without credentials.")
     .ValidateOnStart();
@@ -33,6 +35,7 @@ builder.Services.AddHttpClient("printer", client =>
     client.Timeout = TimeSpan.FromSeconds(8);
 }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false });
 builder.Services.AddHostedService<TelemetryWorker>();
+builder.Services.AddHostedService<FaultEventWorker>();
 builder.Services.AddHealthChecks().AddMqtt().AddCheck<PrinterTelemetryHealthCheck>("printer");
 var app = builder.Build();
 app.MapPleiadesHealthChecks();
